@@ -1,10 +1,12 @@
 // src/server.ts
 import Fastify, { type FastifyInstance } from 'fastify';
 import { gamesRoutes } from './api/games.js';
+import { actionsRoutes } from './api/actions.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   await app.register(gamesRoutes);
+  await app.register(actionsRoutes);
   return app;
 }
 

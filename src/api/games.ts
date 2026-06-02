@@ -7,6 +7,19 @@ import { joinGame } from '../engine/engine.js';
 import { authenticate, sanitizeGameForResponse, statusForCode } from './auth.js';
 
 export async function gamesRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/api/games', async () => {
+    const ids = globalStore.list();
+    return {
+      games: ids.map(id => {
+        const g = globalStore.get(id)!;
+        return {
+          id, phase: g.phase, turnNumber: g.turn.turnNumber,
+          currentOwner: g.turn.currentOwner, winner: g.winner,
+        };
+      }),
+    };
+  });
+
   app.post('/api/games', async (_req, _reply) => {
     const id = randomUUID();
     const game = createInitialGame(id);

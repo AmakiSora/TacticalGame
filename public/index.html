@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>战棋对战 — 观战</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>战棋对战观战</h1>
+    <div id="game-meta">
+      <select id="game-select"><option value="">-- 选择对局 --</option></select>
+      <button id="refresh-list">刷新列表</button>
+      <span id="status"></span>
+    </div>
+  </header>
+  <main>
+    <canvas id="board" width="900" height="900"></canvas>
+    <aside id="sidebar">
+      <section id="resources"></section>
+      <section id="turn-info"></section>
+      <section id="event-log">
+        <h3>事件流</h3>
+        <ul id="events"></ul>
+      </section>
+    </aside>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

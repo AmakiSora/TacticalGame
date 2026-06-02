@@ -89,3 +89,42 @@ export function attackTarget(
   }
   return { ok: true };
 }
+
+export function healTarget(
+  game: GameState,
+  bus: EventBus,
+  owner: PlayerId,
+  medicId: string,
+  targetId: string,
+): Result {
+  const medic = game.units.find(u => u.id === medicId && u.owner === owner && u.alive);
+  if (!medic) {
+    return { ok: false, code: 'unit_not_found', message: 'medic not found' };
+  }
+  if (medic.type !== 'medic') {
+    return { ok: false, code: 'invalid_heal', message: 'caster is not a medic' };
+  }
+  if (medic.hasAttacked) {
+    return { ok: false, code: 'invalid_heal', message: 'already acted this turn' };
+  }
+  const target = game.units.find(u => u.id === targetId && u.alive);
+  if (!target) {
+    return { ok: false, code: 'invalid_heal', message: 'target is not a unit' };
+  }
+  if (target.owner !== owner) {
+    return { ok: false, code: 'invalid_heal', message: 'cannot heal enemy' };
+  }
+  const dist = manhattanDistance({ x: medic.x, y: medic.y }, { x: target.x, y: target.y });
+  if (dist > 1) {
+    return { ok: false, code: 'invalid_heal', message: 'target not adjacent' };
+  }
+
+  const amount = rollHealAmount();
+  const healed = Math.min(target.maxHp - target.hp, amount);
+  target.hp += healed;
+  medic.hasAttacked = true;
+  appendEvent(game, bus, 'heal', {
+    medicId, targetId, amount: healed, targetHp: target.hp,
+  });
+  return { ok: true };
+}

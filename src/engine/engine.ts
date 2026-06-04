@@ -50,6 +50,7 @@ export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result
       u.hasAttacked = false;
     }
   }
+  appendEvent(game, bus, 'reset_actions', { owner });
 
   const next = otherPlayer(owner);
   if (next === 'player_a') {

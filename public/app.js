@@ -103,6 +103,14 @@ function applyEvent(s, ev) {
     case 'base_income':
       s.resources[ev.payload.owner].gold += ev.payload.amount;
       break;
+    case 'reset_actions':
+      for (const u of s.units.values()) {
+        if (u.owner === ev.payload.owner) {
+          u.hasMoved = false;
+          u.hasAttacked = false;
+        }
+      }
+      break;
     case 'turn_end':
       s.turn.currentOwner = ev.payload.nextOwner;
       s.turn.turnNumber = ev.payload.turnNumber;

@@ -71,6 +71,7 @@ export type EventType =
   | 'produce_complete'
   | 'mine'
   | 'base_income'
+  | 'reset_actions'
   | 'base_destroyed'
   | 'turn_end'
   | 'game_over';

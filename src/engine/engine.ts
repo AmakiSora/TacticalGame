@@ -26,6 +26,11 @@ export function joinGame(game: GameState, bus: EventBus): Result {
   appendEvent(game, bus, 'game_start', {
     mapWidth: game.mapWidth, mapHeight: game.mapHeight,
     miningPoints: game.miningPoints, firstPlayer: game.turn.currentOwner,
+    buildings: game.buildings.map(b => ({
+      id: b.id, owner: b.owner, type: b.type,
+      x: b.x, y: b.y, hp: b.hp, maxHp: b.maxHp,
+      alive: b.alive, isBuilding: b.isBuilding,
+    })),
   });
   return { ok: true };
 }

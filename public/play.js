@@ -174,7 +174,9 @@ function applyEvent(s, ev) {
       s.miningPoints = p.miningPoints ?? [];
       // buildings from payload or defaults
       if (p.buildings) {
-        for (const b of p.buildings) s.buildings.set(b.id, { ...b });
+        for (const b of p.buildings) s.buildings.set(b.id, {
+          ...b, production: b.production || null, buildProgress: b.buildProgress || 0,
+        });
       } else {
         s.buildings.set('hq_a', { id:'hq_a', owner:'player_a', type:'headquarters', x:4,  y:15, hp:200, maxHp:200, alive:true, isBuilding:false, production:null, buildProgress:0 });
         s.buildings.set('hq_b', { id:'hq_b', owner:'player_b', type:'headquarters', x:25, y:15, hp:200, maxHp:200, alive:true, isBuilding:false, production:null, buildProgress:0 });

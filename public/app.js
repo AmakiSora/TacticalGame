@@ -54,8 +54,14 @@ function applyEvent(s, ev) {
       s.mapWidth = ev.payload.mapWidth ?? 30;
       s.mapHeight = ev.payload.mapHeight ?? 30;
       s.miningPoints = ev.payload.miningPoints ?? [];
-      s.buildings.set('hq_a', { id: 'hq_a', owner: 'player_a', type: 'headquarters', x: 4, y: 15, hp: 200, maxHp: 200, alive: true, isBuilding: false });
-      s.buildings.set('hq_b', { id: 'hq_b', owner: 'player_b', type: 'headquarters', x: 25, y: 15, hp: 200, maxHp: 200, alive: true, isBuilding: false });
+      if (ev.payload.buildings) {
+        for (const b of ev.payload.buildings) {
+          s.buildings.set(b.id, { ...b, production: b.production || null, buildProgress: b.buildProgress || 0 });
+        }
+      } else {
+        s.buildings.set('hq_a', { id: 'hq_a', owner: 'player_a', type: 'headquarters', x: 4, y: 15, hp: 200, maxHp: 200, alive: true, isBuilding: false, production: null, buildProgress: 0 });
+        s.buildings.set('hq_b', { id: 'hq_b', owner: 'player_b', type: 'headquarters', x: 25, y: 15, hp: 200, maxHp: 200, alive: true, isBuilding: false, production: null, buildProgress: 0 });
+      }
       break;
     case 'build':
       s.buildings.set(ev.payload.buildingId, {

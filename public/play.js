@@ -81,6 +81,20 @@ const els = {
 
 const ctx = els.canvas.getContext('2d');
 
+// ─── client-side specs ───
+const UNIT_SPECS = {
+  infantry: { moveRange: 3, attackRange: 1 },
+  sniper:   { moveRange: 2, attackRange: 4 },
+  tank:     { moveRange: 2, attackRange: 1 },
+  medic:    { moveRange: 3, attackRange: 1 },
+};
+const UNIT_COSTS = { infantry: 40, sniper: 60, tank: 80, medic: 50 };
+const BUILD_SPECS = {
+  barracks: { cost: 50 },
+  miner:    { cost: 30 },
+};
+const BUILD_RANGE = 2;
+
 // ─── state ───
 let state = null;          // reconstructed game state
 let gameId = null;
@@ -89,6 +103,9 @@ let myPlayer = null;       // 'player_a' | 'player_b'
 let sse = null;
 let hoverCell = null;
 let selectedUnitId = null;
+let interactionMode = 'idle'; // 'idle' | 'unit_selected' | 'building_selected'
+let rangeHighlights = [];     // [{x, y, type: 'move'|'attack'|'heal'}]
+let selectedBuildingId = null;
 
 // ─── helpers ───
 function toast(msg, type = 'info') {
@@ -244,6 +261,150 @@ async function loadFullState() {
   return true;
 }
 
+// ─── map interaction helpers ───
+function manhattan(a, b) {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+function isOccupied(x, y) {
+  for (const u of state.units.values()) {
+    if (u.alive && u.x === x && u.y === y) return true;
+  }
+  for (const b of state.buildings.values()) {
+    if (b.alive && b.x === x && b.y === y) return true;
+  }
+  return false;
+}
+
+function entityAt(x, y, owner) {
+  for (const u of state.units.values()) {
+    if (u.alive && u.x === x && u.y === y && (!owner || u.owner === owner)) return u;
+  }
+  for (const b of state.buildings.values()) {
+    if (b.alive && b.x === x && b.y === y && (!owner || b.owner === owner)) return b;
+  }
+  return null;
+}
+
+function computeRangeHighlights(unit) {
+  rangeHighlights = [];
+  const spec = UNIT_SPECS[unit.type];
+  if (!spec) return;
+  const W = state.mapWidth, H = state.mapHeight;
+
+  if (unit.type === 'medic' && !unit.hasAttacked) {
+    // heal range: adjacent friendly damaged units
+    for (const t of state.units.values()) {
+      if (t.alive && t.owner === myPlayer && t.hp < t.maxHp && manhattan(unit, t) <= 1) {
+        rangeHighlights.push({ x: t.x, y: t.y, type: 'heal' });
+      }
+    }
+  }
+
+  if (!unit.hasMoved) {
+    for (let dx = -spec.moveRange; dx <= spec.moveRange; dx++) {
+      for (let dy = -spec.moveRange; dy <= spec.moveRange; dy++) {
+        if (Math.abs(dx) + Math.abs(dy) > spec.moveRange) continue;
+        const nx = unit.x + dx, ny = unit.y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        if (nx === unit.x && ny === unit.y) continue;
+        if (isOccupied(nx, ny)) continue;
+        rangeHighlights.push({ x: nx, y: ny, type: 'move' });
+      }
+    }
+  }
+
+  if (!unit.hasAttacked && unit.type !== 'medic') {
+    for (const t of state.units.values()) {
+      if (t.alive && t.owner !== myPlayer && manhattan(unit, t) <= spec.attackRange) {
+        if (!rangeHighlights.find(h => h.x === t.x && h.y === t.y && h.type === 'attack')) {
+          rangeHighlights.push({ x: t.x, y: t.y, type: 'attack' });
+        }
+      }
+    }
+    for (const b of state.buildings.values()) {
+      if (b.alive && b.owner !== myPlayer && manhattan(unit, b) <= spec.attackRange) {
+        if (!rangeHighlights.find(h => h.x === b.x && h.y === b.y && h.type === 'attack')) {
+          rangeHighlights.push({ x: b.x, y: b.y, type: 'attack' });
+        }
+      }
+    }
+  }
+}
+
+function computeBuildHighlights() {
+  rangeHighlights = [];
+  const W = state.mapWidth, H = state.mapHeight;
+  const friendlyEntities = [
+    ...[...state.units.values()].filter(u => u.alive && u.owner === myPlayer),
+    ...[...state.buildings.values()].filter(b => b.alive && b.owner === myPlayer),
+  ];
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      if (isOccupied(x, y)) continue;
+      if (friendlyEntities.some(e => manhattan(e, { x, y }) <= BUILD_RANGE)) {
+        rangeHighlights.push({ x, y, type: 'move' }); // reuse 'move' color (green)
+      }
+    }
+  }
+}
+
+// ─── popup system ───
+const mapPopup = $('map-popup');
+
+function showPopup(cellX, cellY, title, items) {
+  const rect = els.canvas.getBoundingClientRect();
+  const wrapRect = els.canvas.parentElement.getBoundingClientRect();
+  const px = cellX * CELL + CELL - wrapRect.left + rect.left;
+  const py = cellY * CELL - wrapRect.top + rect.top;
+
+  let html = `<div class="map-popup-title">${title}</div>`;
+  for (const item of items) {
+    const afford = item.cost === undefined || state.resources[myPlayer].gold >= item.cost;
+    html += `<button class="map-popup-btn" data-action="${item.action}" data-params='${JSON.stringify(item.params || {})}'>
+      <span>${item.label}</span>
+      ${item.cost !== undefined ? `<span class="map-popup-cost ${afford ? '' : 'cant-afford'}">${item.cost}金</span>` : ''}
+    </button>`;
+  }
+  mapPopup.innerHTML = html;
+  mapPopup.style.left = px + 'px';
+  mapPopup.style.top = py + 'px';
+  mapPopup.classList.remove('hidden');
+
+  mapPopup.querySelectorAll('.map-popup-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      const params = JSON.parse(btn.dataset.params);
+      await handlePopupAction(action, params);
+      closePopup();
+    });
+  });
+}
+
+function closePopup() {
+  mapPopup.classList.add('hidden');
+  selectedBuildingId = null;
+  interactionMode = 'idle';
+  rangeHighlights = [];
+  drawBoard();
+}
+
+async function handlePopupAction(action, params) {
+  if (action === 'produce') {
+    await apiAction(`/api/games/${gameId}/produce`, {
+      buildingId: params.buildingId,
+      unitType: params.unitType,
+    });
+  } else if (action === 'build') {
+    await apiAction(`/api/games/${gameId}/build`, {
+      type: params.type,
+      x: params.x,
+      y: params.y,
+    });
+  }
+}
+
 // ─── drawing ───
 function drawBoard() {
   if (!state) return;
@@ -271,6 +432,24 @@ function drawBoard() {
     ctx.fill();
   }
 
+  // range highlights
+  for (const h of rangeHighlights) {
+    const px = h.x * CELL, py = h.y * CELL;
+    if (h.type === 'move') {
+      ctx.fillStyle = 'rgba(0, 200, 100, 0.15)';
+      ctx.strokeStyle = 'rgba(0, 200, 100, 0.4)';
+    } else if (h.type === 'attack') {
+      ctx.fillStyle = 'rgba(255, 60, 60, 0.12)';
+      ctx.strokeStyle = 'rgba(255, 60, 60, 0.35)';
+    } else if (h.type === 'heal') {
+      ctx.fillStyle = 'rgba(0, 200, 150, 0.15)';
+      ctx.strokeStyle = 'rgba(0, 200, 150, 0.4)';
+    }
+    ctx.fillRect(px, py, CELL, CELL);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 0.5, py + 0.5, CELL - 1, CELL - 1);
+  }
+
   // hover highlight
   if (hoverCell) {
     ctx.fillStyle = COLORS.hover;
@@ -281,8 +460,8 @@ function drawBoard() {
   if (selectedUnitId) {
     const u = state.units.get(selectedUnitId);
     if (u && u.alive) {
-      ctx.strokeStyle = COLORS.select;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2.5;
       ctx.strokeRect(u.x * CELL + 1, u.y * CELL + 1, CELL - 2, CELL - 2);
     }
   }
@@ -341,26 +520,46 @@ function drawBoard() {
   // units
   for (const u of state.units.values()) {
     if (!u.alive) continue;
+    const isMine = u.owner === myPlayer;
     const color = u.owner === 'player_a' ? COLORS.unit_a : COLORS.unit_b;
+    const cx = u.x * CELL + CELL / 2, cy = u.y * CELL + CELL / 2;
 
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(u.x * CELL + CELL / 2, u.y * CELL + CELL / 2, CELL / 3, 0, Math.PI * 2);
+    ctx.arc(cx, cy, CELL / 3, 0, Math.PI * 2);
     ctx.fill();
 
-    // inner circle for moved/attacked
-    if (u.hasMoved && u.hasAttacked) {
+    // spent indicator for enemy units only
+    if (!isMine && u.hasMoved && u.hasAttacked) {
       ctx.fillStyle = 'rgba(0,0,0,.4)';
       ctx.beginPath();
-      ctx.arc(u.x * CELL + CELL / 2, u.y * CELL + CELL / 2, CELL / 5, 0, Math.PI * 2);
+      ctx.arc(cx, cy, CELL / 5, 0, Math.PI * 2);
       ctx.fill();
     }
 
+    // letter label
     ctx.fillStyle = '#000';
     ctx.font = 'bold 9px sans-serif';
     ctx.textAlign = 'center';
     const letter = u.type === 'infantry' ? 'I' : u.type === 'sniper' ? 'S' : u.type === 'tank' ? 'T' : 'M';
-    ctx.fillText(letter, u.x * CELL + CELL / 2, u.y * CELL + CELL / 2 + 3);
+    ctx.fillText(letter, cx, cy + 3);
+
+    // AP indicators for own units
+    if (isMine) {
+      const bx = u.x * CELL, by = u.y * CELL;
+      if (!u.hasMoved) {
+        ctx.fillStyle = '#0c8';
+        ctx.beginPath();
+        ctx.arc(bx + 4, by + CELL - 4, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (!u.hasAttacked) {
+        ctx.fillStyle = '#f44';
+        ctx.beginPath();
+        ctx.arc(bx + CELL - 4, by + CELL - 4, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     // hp bar
     if (u.hp < u.maxHp) {
@@ -502,40 +701,164 @@ els.canvas.addEventListener('mouseleave', () => {
   drawBoard();
 });
 
+els.canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  selectedUnitId = null;
+  selectedBuildingId = null;
+  interactionMode = 'idle';
+  rangeHighlights = [];
+  closePopup();
+});
+
 els.canvas.addEventListener('click', e => {
   const cell = cellFromMouse(e);
-  if (!cell) return;
+  if (!cell || !state) return;
 
-  // check if clicked on own unit → select it
-  const unit = [...state.units.values()].find(u => u.owner === myPlayer && u.alive && u.x === cell.x && u.y === cell.y);
-  if (unit) {
-    selectedUnitId = selectedUnitId === unit.id ? null : unit.id;
-    // also populate move form with current pos
+  // ── building_selected: ignore (popup handles it) ──
+  if (interactionMode === 'building_selected') return;
+
+  // ── unit_selected mode ──
+  if (interactionMode === 'unit_selected' && selectedUnitId) {
+    const sel = state.units.get(selectedUnitId);
+    if (!sel || !sel.alive) { deselectAll(); return; }
+
+    // clicked same unit → deselect
+    if (sel.x === cell.x && sel.y === cell.y) {
+      deselectAll();
+      return;
+    }
+
+    // clicked another own unit → switch selection
+    const otherOwn = entityAt(cell.x, cell.y, myPlayer);
+    if (otherOwn && otherOwn.id && otherOwn.owner === myPlayer && !otherOwn.type?.startsWith?.('headquarters')) {
+      // it's a unit (has moveRange in UNIT_SPECS)
+      if (UNIT_SPECS[otherOwn.type]) {
+        selectedUnitId = otherOwn.id;
+        computeRangeHighlights(otherOwn);
+        els.moveUnit.value = otherOwn.id;
+        drawBoard();
+        return;
+      }
+    }
+
+    // check if click is on a highlighted cell
+    const highlight = rangeHighlights.find(h => h.x === cell.x && h.y === cell.y);
+    if (highlight) {
+      if (highlight.type === 'move') {
+        doMove(sel, cell.x, cell.y);
+        return;
+      }
+      if (highlight.type === 'attack') {
+        const target = entityAt(cell.x, cell.y);
+        if (target && target.owner !== myPlayer) {
+          doAttack(sel, target);
+          return;
+        }
+      }
+      if (highlight.type === 'heal') {
+        const target = entityAt(cell.x, cell.y, myPlayer);
+        if (target && target.hp < target.maxHp) {
+          doHeal(sel, target);
+          return;
+        }
+      }
+    }
+
+    // click outside valid range → deselect
+    deselectAll();
+    return;
+  }
+
+  // ── idle mode ──
+  closePopup();
+
+  // clicked own unit → select it
+  const unit = entityAt(cell.x, cell.y, myPlayer);
+  if (unit && unit.id && UNIT_SPECS[unit.type]) {
+    selectedUnitId = unit.id;
+    interactionMode = 'unit_selected';
+    computeRangeHighlights(unit);
     els.moveUnit.value = unit.id;
-    els.moveX.value = '';
-    els.moveY.value = '';
     drawBoard();
     return;
   }
 
-  // if a unit is selected and we clicked elsewhere → set move target
-  if (selectedUnitId) {
-    els.moveX.value = cell.x;
-    els.moveY.value = cell.y;
+  // clicked own building (HQ/barracks, completed) → show production popup
+  if (unit && unit.type && (unit.type === 'headquarters' || unit.type === 'barracks') && !unit.isBuilding) {
+    selectedBuildingId = unit.id;
+    interactionMode = 'building_selected';
+    const canProduce = unit.type === 'headquarters' ? ['infantry'] : ['infantry', 'sniper', 'tank', 'medic'];
+    const items = canProduce.map(ut => ({
+      label: ut === 'infantry' ? '步兵' : ut === 'sniper' ? '狙击手' : ut === 'tank' ? '坦克' : '医疗兵',
+      cost: UNIT_COSTS[ut],
+      action: 'produce',
+      params: { buildingId: unit.id, unitType: ut },
+    }));
+    showPopup(cell.x, cell.y, '生产单位', items);
+    return;
   }
 
-  // fill build coords
-  els.buildX.value = cell.x;
-  els.buildY.value = cell.y;
-
-  // check if clicked enemy → set attack target
-  const enemy = [...state.units.values()].find(u => u.owner !== myPlayer && u.alive && u.x === cell.x && u.y === cell.y)
-    || [...state.buildings.values()].find(b => b.owner !== myPlayer && b.alive && b.x === cell.x && b.y === cell.y);
-  if (enemy) {
-    els.attackTarget.value = enemy.id;
-    els.healTarget.value = enemy.id;
+  // clicked empty cell → check build range
+  if (!entityAt(cell.x, cell.y)) {
+    const friendlyEntities = [
+      ...[...state.units.values()].filter(u => u.alive && u.owner === myPlayer),
+      ...[...state.buildings.values()].filter(b => b.alive && b.owner === myPlayer),
+    ];
+    const inRange = friendlyEntities.some(e => manhattan(e, cell) <= BUILD_RANGE);
+    if (inRange) {
+      interactionMode = 'building_selected';
+      const items = [
+        { label: '兵营', cost: 50, action: 'build', params: { type: 'barracks', x: cell.x, y: cell.y } },
+        { label: '采矿器', cost: 30, action: 'build', params: { type: 'miner', x: cell.x, y: cell.y } },
+      ];
+      showPopup(cell.x, cell.y, '建造', items);
+      computeBuildHighlights();
+      drawBoard();
+      return;
+    }
   }
+
+  // nothing relevant → deselect
+  deselectAll();
 });
+
+function deselectAll() {
+  selectedUnitId = null;
+  selectedBuildingId = null;
+  interactionMode = 'idle';
+  rangeHighlights = [];
+  drawBoard();
+}
+
+async function doMove(unit, x, y) {
+  const { ok, data } = await API.post(`/api/games/${gameId}/move`, { unitId: unit.id, x, y });
+  if (ok) {
+    toast('移动成功', 'ok');
+    deselectAll();
+  } else {
+    toast(`${data.error || '移动失败'} (${data.code || ''})`, 'err');
+  }
+}
+
+async function doAttack(attacker, target) {
+  const { ok, data } = await API.post(`/api/games/${gameId}/attack`, { attackerId: attacker.id, targetId: target.id });
+  if (ok) {
+    toast('攻击成功', 'ok');
+    deselectAll();
+  } else {
+    toast(`${data.error || '攻击失败'} (${data.code || ''})`, 'err');
+  }
+}
+
+async function doHeal(medic, target) {
+  const { ok, data } = await API.post(`/api/games/${gameId}/heal`, { medicId: medic.id, targetId: target.id });
+  if (ok) {
+    toast('治疗成功', 'ok');
+    deselectAll();
+  } else {
+    toast(`${data.error || '治疗失败'} (${data.code || ''})`, 'err');
+  }
+}
 
 // ─── SSE subscription ───
 function subscribeSse() {
@@ -546,6 +869,15 @@ function subscribeSse() {
       const ev = JSON.parse(e.data);
       if (!state) state = createEmptyState();
       applyEvent(state, ev);
+      // clear interaction state on turn change or game-relevant events
+      if (ev.type === 'turn_end' || ev.type === 'move' || ev.type === 'attack' ||
+          ev.type === 'heal' || ev.type === 'unit_death' || ev.type === 'base_destroyed') {
+        selectedUnitId = null;
+        selectedBuildingId = null;
+        interactionMode = 'idle';
+        rangeHighlights = [];
+        closePopup();
+      }
       drawBoard();
       renderSidebar();
     } catch (err) { console.error('SSE parse', err); }
@@ -667,12 +999,19 @@ els.btnConnect.addEventListener('click', async () => {
 // ─── keyboard shortcuts ───
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    selectedUnitId = null;
-    drawBoard();
+    closePopup();
+    deselectAll();
   }
   if (e.key === ' ' || e.key === 'Enter') {
     if (state && state.turn.currentOwner === myPlayer) {
       els.btnEndTurn.click();
     }
+  }
+});
+
+// close popup on outside click
+document.addEventListener('click', e => {
+  if (!mapPopup.classList.contains('hidden') && !mapPopup.contains(e.target) && e.target !== els.canvas) {
+    closePopup();
   }
 });

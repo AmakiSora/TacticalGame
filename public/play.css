@@ -231,6 +231,54 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 #toast.ok    { background: #1a3a2a; border: 1px solid #2a6a4a; color: #8da; }
 #toast.err   { background: #3a1a1a; border: 1px solid #6a2a2a; color: #da8; }
 
+/* ══════════ map popup ══════════ */
+.map-popup {
+  position: absolute;
+  z-index: 50;
+  background: #141c26;
+  border: 1px solid #2a4a6a;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 140px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+.map-popup-title {
+  font-size: 11px;
+  color: #7a9aaa;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+.map-popup-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: #1a2a3a;
+  color: #b0c8d8;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .12s;
+  margin-bottom: 3px;
+}
+.map-popup-btn:hover {
+  background: #26384a;
+  border-color: #3a6a9a;
+  color: #d8e0e8;
+}
+.map-popup-btn:last-child { margin-bottom: 0; }
+.map-popup-cost {
+  font-size: 11px;
+  color: #da0;
+  font-weight: 600;
+}
+.map-popup-cost.cant-afford { color: #a44; }
+
 /* ══════════ scrollbar ══════════ */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #0f141c; }

@@ -1,8 +1,17 @@
 // src/engine/mining.ts
 import type { GameState, PlayerId } from '../types.js';
 import type { EventBus } from '../events/bus.js';
-import { MINER_INCOME } from './specs.js';
+import { MINER_INCOME, BASE_INCOME } from './specs.js';
 import { appendEvent } from './events.js';
+
+export function collectBaseIncome(
+  game: GameState,
+  bus: EventBus,
+  owner: PlayerId,
+): void {
+  game.resources[owner].gold += BASE_INCOME;
+  appendEvent(game, bus, 'base_income', { owner, amount: BASE_INCOME });
+}
 
 export function collectMiningIncome(
   game: GameState,

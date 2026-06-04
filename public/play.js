@@ -222,6 +222,7 @@ function applyEvent(s, ev) {
       break;
     }
     case 'mine':
+    case 'base_income':
       s.resources[p.owner].gold += p.amount;
       break;
     case 'turn_end':

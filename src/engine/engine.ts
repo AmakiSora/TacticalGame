@@ -5,7 +5,7 @@ import type { EventBus } from '../events/bus.js';
 import type { Result } from './building.js';
 import { tickBuildProgress } from './building.js';
 import { tickProduction } from './production.js';
-import { collectMiningIncome } from './mining.js';
+import { collectMiningIncome, collectBaseIncome } from './mining.js';
 import { appendEvent } from './events.js';
 
 function generateToken(): string {
@@ -57,6 +57,7 @@ export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result
   }
   game.turn.currentOwner = next;
 
+  collectBaseIncome(game, bus, next);
   collectMiningIncome(game, bus, next);
 
   appendEvent(game, bus, 'turn_end', {

@@ -38,6 +38,7 @@ export const CAN_PRODUCE: Record<BuildingType, UnitType[]> = {
 
 export const STARTING_GOLD = 100;
 export const MINER_INCOME = 15;
+export const BASE_INCOME = 5;
 export const BUILD_RANGE = 2;
 export const MAP_WIDTH = 30;
 export const MAP_HEIGHT = 30;

@@ -100,6 +100,7 @@ function applyEvent(s, ev) {
       break;
     }
     case 'mine':
+    case 'base_income':
       s.resources[ev.payload.owner].gold += ev.payload.amount;
       break;
     case 'turn_end':

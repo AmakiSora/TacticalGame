@@ -70,6 +70,7 @@ export type EventType =
   | 'produce'
   | 'produce_complete'
   | 'mine'
+  | 'base_income'
   | 'base_destroyed'
   | 'turn_end'
   | 'game_over';

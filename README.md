@@ -6,9 +6,10 @@
 
 ```bash
 npm install
+```
+```bash
 npm run dev
 ```
-
 服务器默认监听 3000 端口。
 
 ## 简单 API 流程

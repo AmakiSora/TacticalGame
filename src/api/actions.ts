@@ -13,7 +13,7 @@ import type { AuthContext } from './auth.js';
 async function actionHandler(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply,
-  action: (ctx: AuthContext) => Result,
+  action: (ctx: AuthContext) => Result<unknown>,
 ): Promise<unknown> {
   const ctx = authenticate(req, reply);
   if (!ctx) return;

@@ -35,7 +35,7 @@ export function startProduction(
   game.resources[owner].gold -= spec.cost;
   building.production = { type: unitType, turnsRemaining: spec.productionTime };
   appendEvent(game, bus, 'produce', {
-    buildingId: building.id, owner, unitType, productionTime: spec.productionTime,
+    buildingId: building.id, owner, unitType, productionTime: spec.productionTime, cost: spec.cost,
   });
   return { ok: true };
 }

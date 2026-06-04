@@ -6,13 +6,11 @@ import type { GameEvent } from '../types.js';
 
 function writeSseEvent(reply: FastifyReply, event: GameEvent): void {
   const payload = JSON.stringify(event);
-  reply.raw.write(`event: ${event.type}\n`);
-  reply.raw.write(`id: ${event.seq}\n`);
   reply.raw.write(`data: ${payload}\n\n`);
 }
 
 export async function eventsRoutes(app: FastifyInstance): Promise<void> {
-  app.get<{ Params: { id: string }; Querystring: { after?: string } }>(
+  app.get<{ Params: { id: string }; Querystring: { after?: string; close?: string } }>(
     '/api/games/:id/events',
     async (req, reply) => {
       const game = globalStore.get(req.params.id);
@@ -23,6 +21,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       const filtered = game.events.filter(e => e.seq > after);
 
       const wantsSse = (req.headers.accept ?? '').includes('text/event-stream');
+      const closeAfterFlush = req.query.close === 'true';
       if (!wantsSse) {
         return { events: filtered };
       }
@@ -50,8 +49,11 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         unsubscribe();
       });
 
-      // Flush existing events then end; clients use EventSource auto-reconnect
-      reply.raw.end();
+      // For test clients: close after flushing historical events
+      if (closeAfterFlush) {
+        unsubscribe();
+        reply.raw.end();
+      }
     },
   );
 }

@@ -49,7 +49,7 @@ describe('Events API', () => {
   it('GET /events returns SSE stream when Accept is text/event-stream', async () => {
     const { gameId } = await createGameAndJoin(app);
     const res = await app.inject({
-      method: 'GET', url: `/api/games/${gameId}/events`,
+      method: 'GET', url: `/api/games/${gameId}/events?close=true`,
       headers: { accept: 'text/event-stream' },
     });
     expect(res.statusCode).toBe(200);

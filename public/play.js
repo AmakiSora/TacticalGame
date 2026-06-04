@@ -314,7 +314,7 @@ function computeRangeHighlights(unit) {
     }
   }
 
-  if (!unit.hasAttacked && unit.type !== 'medic') {
+  if (!unit.hasAttacked) {
     for (const t of state.units.values()) {
       if (t.alive && t.owner !== myPlayer && manhattan(unit, t) <= spec.attackRange) {
         if (!rangeHighlights.find(h => h.x === t.x && h.y === t.y && h.type === 'attack')) {
@@ -353,10 +353,10 @@ function computeBuildHighlights() {
 const mapPopup = $('map-popup');
 
 function showPopup(cellX, cellY, title, items) {
-  const rect = els.canvas.getBoundingClientRect();
   const wrapRect = els.canvas.parentElement.getBoundingClientRect();
-  const px = cellX * CELL + CELL - wrapRect.left + rect.left;
-  const py = cellY * CELL - wrapRect.top + rect.top;
+  const canvasRect = els.canvas.getBoundingClientRect();
+  const px = canvasRect.left - wrapRect.left + cellX * CELL + CELL;
+  const py = canvasRect.top - wrapRect.top + cellY * CELL;
 
   let html = `<div class="map-popup-title">${title}</div>`;
   for (const item of items) {
@@ -387,7 +387,6 @@ function closePopup() {
   selectedBuildingId = null;
   interactionMode = 'idle';
   rangeHighlights = [];
-  drawBoard();
 }
 
 async function handlePopupAction(action, params) {
@@ -708,6 +707,7 @@ els.canvas.addEventListener('contextmenu', e => {
   interactionMode = 'idle';
   rangeHighlights = [];
   closePopup();
+  drawBoard();
 });
 
 els.canvas.addEventListener('click', e => {
@@ -1013,5 +1013,6 @@ document.addEventListener('keydown', e => {
 document.addEventListener('click', e => {
   if (!mapPopup.classList.contains('hidden') && !mapPopup.contains(e.target) && e.target !== els.canvas) {
     closePopup();
+    drawBoard();
   }
 });

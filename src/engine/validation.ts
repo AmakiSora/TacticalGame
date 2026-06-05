@@ -1,6 +1,6 @@
 // src/engine/validation.ts
 import type { GameState, PlayerId, Position, Unit, Building } from '../types.js';
-import { BUILD_RANGE } from './specs.js';
+import { BUILD_RANGE, HQ_POSITIONS } from './specs.js';
 
 export type Occupant =
   | { kind: 'unit'; entity: Unit }
@@ -39,14 +39,13 @@ export function isMiningPoint(game: GameState, x: number, y: number): boolean {
   return game.miningPoints.some(p => p.x === x && p.y === y);
 }
 
-export function findAdjacentFreeCell(game: GameState, x: number, y: number): Position | null {
+export function findAdjacentFreeCell(game: GameState, x: number, y: number, owner?: PlayerId): Position | null {
   const candidates: Position[] = [
     { x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 },
   ];
-  // Shuffle to avoid directional bias
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  if (owner) {
+    const hq = HQ_POSITIONS[owner];
+    candidates.sort((a, b) => manhattanDistance(b, hq) - manhattanDistance(a, hq));
   }
   for (const c of candidates) {
     if (!isInBounds(c.x, c.y, game.mapWidth, game.mapHeight)) continue;

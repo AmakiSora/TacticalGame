@@ -153,7 +153,7 @@ const API = {
 // ─── event reconstruction (same logic as spectator) ───
 function createEmptyState() {
   return {
-    mapWidth: 30, mapHeight: 30,
+    mapWidth: 20, mapHeight: 20,
     miningPoints: [],
     units: new Map(),
     buildings: new Map(),
@@ -169,8 +169,8 @@ function applyEvent(s, ev) {
   const p = ev.payload || {};
   switch (ev.type) {
     case 'game_start':
-      s.mapWidth = p.mapWidth ?? 30;
-      s.mapHeight = p.mapHeight ?? 30;
+      s.mapWidth = p.mapWidth ?? 20;
+      s.mapHeight = p.mapHeight ?? 20;
       s.miningPoints = p.miningPoints ?? [];
       // buildings from payload or defaults
       if (p.buildings) {

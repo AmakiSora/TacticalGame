@@ -284,7 +284,7 @@ async function fetchGameList() {
 
 function createEmptyState() {
   return {
-    mapWidth: 30, mapHeight: 30,
+    mapWidth: 20, mapHeight: 20,
     miningPoints: [],
     units: new Map(), buildings: new Map(),
     resources: { player_a: { gold: 100 }, player_b: { gold: 100 } },
@@ -297,8 +297,8 @@ function applyEvent(s, ev) {
   s.eventLog.push(ev);
   switch (ev.type) {
     case 'game_start':
-      s.mapWidth = ev.payload.mapWidth ?? 30;
-      s.mapHeight = ev.payload.mapHeight ?? 30;
+      s.mapWidth = ev.payload.mapWidth ?? 20;
+      s.mapHeight = ev.payload.mapHeight ?? 20;
       s.miningPoints = ev.payload.miningPoints ?? [];
       if (ev.payload.buildings) {
         for (const b of ev.payload.buildings) {

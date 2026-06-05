@@ -40,15 +40,15 @@ export const STARTING_GOLD = 100;
 export const MINER_INCOME = 15;
 export const BASE_INCOME = 5;
 export const BUILD_RANGE = 2;
-export const MAP_WIDTH = 30;
-export const MAP_HEIGHT = 30;
+export const MAP_WIDTH = 20;
+export const MAP_HEIGHT = 20;
 
 export const HQ_POSITIONS: Record<'player_a' | 'player_b', { x: number; y: number }> = {
-  player_a: { x: 4,  y: 15 },
-  player_b: { x: 25, y: 15 },
+  player_a: { x: 3,  y: 10 },
+  player_b: { x: 16, y: 10 },
 };
 
 export const MINING_POINTS = [
-  { x: 10, y: 5  }, { x: 10, y: 15 }, { x: 10, y: 25 },
-  { x: 19, y: 5  }, { x: 19, y: 15 }, { x: 19, y: 25 },
+  { x: 8, y: 5  }, { x: 8, y: 14 },
+  { x: 11, y: 5  }, { x: 11, y: 14 },
 ];

@@ -49,6 +49,6 @@ export const HQ_POSITIONS: Record<'player_a' | 'player_b', { x: number; y: numbe
 };
 
 export const MINING_POINTS = [
-  { x: 8, y: 5  }, { x: 8, y: 14 },
-  { x: 11, y: 5  }, { x: 11, y: 14 },
+  { x: 6, y: 7  }, { x: 6, y: 13 },
+  { x: 13, y: 7  }, { x: 13, y: 13 },
 ];

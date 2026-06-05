@@ -12,13 +12,46 @@
       <select id="game-select"><option value="">-- 选择对局 --</option></select>
       <button id="refresh-list">刷新列表</button>
       <span id="status"></span>
+      <span id="file-actions">
+        <button id="btn-export-html" title="导出为独立 HTML 文件">导出 HTML</button>
+        <button id="btn-export-json" title="导出为 JSON 文件">导出 JSON</button>
+        <button id="btn-import" title="从 JSON 文件导入对局">导入</button>
+        <input type="file" id="import-file" accept=".json" hidden />
+      </span>
     </div>
   </header>
   <main>
-    <canvas id="board" width="900" height="900"></canvas>
+    <div id="board-wrap">
+      <canvas id="board" width="840" height="840"></canvas>
+      <div id="replay-controls">
+        <div id="control-buttons">
+          <button id="btn-start" title="回到开始">⏮</button>
+          <button id="btn-prev" title="上一步 (←)">◀</button>
+          <button id="btn-play" title="播放/暂停 (Space)">▶</button>
+          <button id="btn-next" title="下一步 (→)">▶</button>
+          <button id="btn-end" title="跳到末尾">⏭</button>
+          <select id="speed-select" title="播放速度">
+            <option value="1000">0.5x</option>
+            <option value="500" selected>1x</option>
+            <option value="200">2.5x</option>
+            <option value="100">5x</option>
+            <option value="50">10x</option>
+          </select>
+          <span id="step-info">0 / 0</span>
+        </div>
+        <div id="timeline-wrap">
+          <input type="range" id="timeline" min="0" max="0" value="0" />
+          <div id="timeline-markers"></div>
+        </div>
+      </div>
+    </div>
     <aside id="sidebar">
       <section id="resources"></section>
       <section id="turn-info"></section>
+      <section id="event-detail">
+        <h3>当前操作</h3>
+        <div id="detail-content">选择对局后使用时间轴回放</div>
+      </section>
       <section id="event-log">
         <h3>事件流</h3>
         <ul id="events"></ul>

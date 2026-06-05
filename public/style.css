@@ -14,14 +14,126 @@ header h1 { margin: 0 0 8px; font-size: 18px; }
 #game-meta { display: flex; gap: 10px; align-items: center; }
 #game-meta select, #game-meta button {
   padding: 4px 10px; background: #333; color: #e0e0e0;
-  border: 1px solid #555; border-radius: 4px;
+  border: 1px solid #555; border-radius: 4px; cursor: pointer;
 }
+#game-meta select:hover, #game-meta button:hover { background: #444; }
+#file-actions { margin-left: 12px; display: inline-flex; gap: 6px; }
+#file-actions button { font-size: 12px; padding: 3px 8px; }
+#btn-export-html { border-color: #5a5; }
+#btn-export-json { border-color: #58f; }
+#btn-import { border-color: #a8f; }
 main { display: flex; padding: 16px; gap: 16px; }
+
+/* Board wrapper */
+#board-wrap { display: flex; flex-direction: column; gap: 0; }
 #board {
   background: #0f1410;
   border: 1px solid #333;
   image-rendering: pixelated;
 }
+
+/* Replay controls */
+#replay-controls {
+  background: #222;
+  border: 1px solid #333;
+  border-top: none;
+  padding: 10px 14px 12px;
+}
+#control-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+#control-buttons button {
+  width: 36px; height: 30px;
+  background: #333; color: #e0e0e0;
+  border: 1px solid #555; border-radius: 4px;
+  cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+#control-buttons button:hover { background: #4a6a8a; }
+#control-buttons button.active { background: #4a8; color: #000; }
+#speed-select {
+  padding: 4px 6px; background: #333; color: #e0e0e0;
+  border: 1px solid #555; border-radius: 4px; font-size: 12px;
+}
+#step-info {
+  margin-left: auto;
+  font-size: 13px; color: #9ad;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Timeline */
+#timeline-wrap {
+  position: relative;
+  height: 32px;
+}
+#timeline {
+  width: 100%;
+  height: 24px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+}
+#timeline::-webkit-slider-runnable-track {
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+}
+#timeline::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  background: #4a8;
+  border-radius: 50%;
+  margin-top: -4px;
+  cursor: grab;
+  box-shadow: 0 0 6px rgba(68,170,136,0.5);
+}
+#timeline::-moz-range-track {
+  height: 8px;
+  background: #333;
+  border-radius: 4px; border: none;
+}
+#timeline::-moz-range-thumb {
+  width: 16px; height: 16px;
+  background: #4a8;
+  border-radius: 50%; border: none;
+  cursor: grab;
+}
+#timeline-markers {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 24px;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+#timeline-markers .marker {
+  position: absolute;
+  top: 4px;
+  width: 3px; height: 16px;
+  border-radius: 1px;
+  opacity: 0.7;
+}
+
+/* Event type colors for markers */
+.marker-attack { background: #e55; }
+.marker-move { background: #58f; }
+.marker-build { background: #5a5; }
+.marker-produce { background: #a8f; }
+.marker-heal { background: #5c8; }
+.marker-turn_end { background: #a80; }
+.marker-game_over { background: #fff; }
+.marker-unit_death { background: #f44; }
+.marker-base_destroyed { background: #f00; }
+.marker-other { background: #666; }
+
+/* Sidebar */
 #sidebar {
   width: 320px; max-height: 90vh; overflow: auto;
   background: #232323; padding: 12px; border-radius: 6px;
@@ -32,6 +144,66 @@ main { display: flex; padding: 16px; gap: 16px; }
 #events li {
   padding: 4px 6px; margin: 2px 0;
   background: #1a1a1a; border-left: 3px solid #4a8;
+  cursor: pointer; transition: background 0.15s;
 }
+#events li:hover { background: #252525; }
+#events li.active { background: #2a3a2a; border-left-color: #6f8; }
+
+/* Event type colors for log */
+#events li[data-type="attack"]       { border-left-color: #e55; }
+#events li[data-type="move"]         { border-left-color: #58f; }
+#events li[data-type="build"]        { border-left-color: #5a5; }
+#events li[data-type="produce"]      { border-left-color: #a8f; }
+#events li[data-type="produce_complete"] { border-left-color: #a8f; }
+#events li[data-type="heal"]         { border-left-color: #5c8; }
+#events li[data-type="turn_end"]     { border-left-color: #a80; }
+#events li[data-type="game_over"]    { border-left-color: #fff; }
+#events li[data-type="unit_death"]   { border-left-color: #f44; }
+#events li[data-type="base_destroyed"] { border-left-color: #f00; }
+
+/* Event detail panel */
+#event-detail {
+  background: #1a1a1a;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid #333;
+}
+#detail-content {
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: "Cascadia Code", "Fira Code", monospace;
+  color: #ccc;
+  max-height: 160px;
+  overflow: auto;
+}
+#detail-content .ev-type {
+  font-weight: bold;
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  margin-right: 4px;
+}
+#detail-content .ev-type.attack { background: #633; color: #f88; }
+#detail-content .ev-type.move { background: #336; color: #8af; }
+#detail-content .ev-type.build { background: #363; color: #8f8; }
+#detail-content .ev-type.produce { background: #436; color: #c8f; }
+#detail-content .ev-type.heal { background: #364; color: #8fc; }
+#detail-content .ev-type.turn_end { background: #643; color: #fa8; }
+#detail-content .ev-type.game_over { background: #555; color: #fff; }
+#detail-content .ev-type.unit_death { background: #633; color: #f88; }
+#detail-content .ev-type.base_destroyed { background: #600; color: #f44; }
+#detail-content .ev-type.other { background: #333; color: #aaa; }
+#detail-content .ev-payload {
+  display: block;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: #111;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 .player-a { color: #6cf; }
 .player-b { color: #f86; }

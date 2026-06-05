@@ -43,6 +43,11 @@ export function findAdjacentFreeCell(game: GameState, x: number, y: number): Pos
   const candidates: Position[] = [
     { x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 },
   ];
+  // Shuffle to avoid directional bias
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
   for (const c of candidates) {
     if (!isInBounds(c.x, c.y, game.mapWidth, game.mapHeight)) continue;
     if (getCellOccupant(game, c.x, c.y) === null) return c;

@@ -636,13 +636,16 @@ function renderSelectionInfo() {
       const ownerCls = u.owner === 'player_a' ? 'sel-owner-a' : 'sel-owner-b';
       const ownerName = u.owner === myPlayer ? '己方' : '敌方';
       const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
+      const hpPct = Math.round((u.hp / u.maxHp) * 100);
+      const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
       const actions = [];
       if (!u.hasMoved) actions.push('移动');
       if (!u.hasAttacked) actions.push(u.type === 'medic' ? '治疗' : '攻击');
       el.innerHTML = `
         <div class="sel-type"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
-        <div class="sel-hp">❤️ ${u.hp} / ${u.maxHp}</div>
-        <div class="sel-stat">⚔️ ${u.attack} 🛡️ ${u.defense} 📍(${u.x},${u.y})</div>
+        <div class="sel-hp">❤️ ${u.hp} / ${u.maxHp} <span class="sel-hp-bar"><span class="sel-hp-fill" style="width:${hpPct}%;background:${hpColor}"></span></span></div>
+        <div class="sel-stat">⚔️ 攻击 ${u.attack}　🛡️ 防御 ${u.defense}　🏃 移动 ${u.moveRange}　🎯 射程 ${u.attackRange}</div>
+        <div class="sel-stat">📍 位置 (${u.x}, ${u.y})</div>
         ${actions.length > 0 ? `<div class="sel-actions">可执行: ${actions.join(' / ')} — 点击高亮格子</div>` : '<div class="sel-actions" style="color:#a66">本回合已行动</div>'}
       `;
       return;
@@ -655,16 +658,22 @@ function renderSelectionInfo() {
       const ownerCls = b.owner === 'player_a' ? 'sel-owner-a' : 'sel-owner-b';
       const ownerName = b.owner === myPlayer ? '己方' : '敌方';
       const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+      const hpPct = Math.round((b.hp / b.maxHp) * 100);
+      const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
+      const prodText = b.production
+        ? `🏭 生产中: ${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'} (剩余 ${b.production.turnsRemaining} 回合)`
+        : '✅ 空闲';
       el.innerHTML = `
         <div class="sel-type"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
-        <div class="sel-hp">❤️ ${b.hp} / ${b.maxHp}</div>
-        <div class="sel-stat">📍(${b.x},${b.y})${b.production ? ' 🏭 生产中' : ''}</div>
+        <div class="sel-hp">❤️ ${b.hp} / ${b.maxHp} <span class="sel-hp-bar"><span class="sel-hp-fill" style="width:${hpPct}%;background:${hpColor}"></span></span></div>
+        <div class="sel-stat">📍 位置 (${b.x}, ${b.y})</div>
+        <div class="sel-stat">${prodText}</div>
       `;
       return;
     }
   }
 
-  el.textContent = '点击棋盘上的单位或建筑';
+  el.textContent = '点击棋盘上的单位或建筑查看详情';
 }
 
 function renderEvents() {

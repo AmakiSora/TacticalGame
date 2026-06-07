@@ -81,19 +81,15 @@ const els = {
 
 const ctx = els.canvas.getContext('2d');
 
-// ─── client-side specs ───
-const UNIT_SPECS = {
-  infantry: { moveRange: 3, attackRange: 1 },
-  sniper:   { moveRange: 2, attackRange: 4 },
-  tank:     { moveRange: 2, attackRange: 1 },
-  medic:    { moveRange: 3, attackRange: 1 },
-};
-const UNIT_COSTS = { infantry: 40, sniper: 60, tank: 80, medic: 50 };
-const BUILD_SPECS = {
-  barracks: { cost: 50 },
-  miner:    { cost: 30 },
-};
-const BUILD_RANGE = 2;
+// ─── game config (loaded from /api/config) ───
+let gameConfig = null;
+
+async function loadGameConfig() {
+  if (window.GAME_CONFIG) { gameConfig = window.GAME_CONFIG; return; }
+  const res = await fetch('/api/config');
+  if (!res.ok) throw new Error('Failed to load game config');
+  gameConfig = await res.json();
+}
 
 // ─── state ───
 let state = null;          // reconstructed game state
@@ -152,12 +148,15 @@ const API = {
 
 // ─── event reconstruction (same logic as spectator) ───
 function createEmptyState() {
+  const cfg = gameConfig || {};
+  const map = cfg.map || {};
+  const eco = cfg.economy || {};
   return {
-    mapWidth: 20, mapHeight: 20,
+    mapWidth: map.width || 20, mapHeight: map.height || 20,
     miningPoints: [],
     units: new Map(),
     buildings: new Map(),
-    resources: { player_a: { gold: 100 }, player_b: { gold: 100 } },
+    resources: { player_a: { gold: eco.startingGold || 100 }, player_b: { gold: eco.startingGold || 100 } },
     turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command' },
     eventLog: [],
     winner: null,
@@ -169,8 +168,8 @@ function applyEvent(s, ev) {
   const p = ev.payload || {};
   switch (ev.type) {
     case 'game_start':
-      s.mapWidth = p.mapWidth ?? 20;
-      s.mapHeight = p.mapHeight ?? 20;
+      s.mapWidth = p.mapWidth ?? (gameConfig?.map?.width ?? 20);
+      s.mapHeight = p.mapHeight ?? (gameConfig?.map?.height ?? 20);
       s.miningPoints = p.miningPoints ?? [];
       // buildings from payload or defaults
       if (p.buildings) {
@@ -178,17 +177,24 @@ function applyEvent(s, ev) {
           ...b, production: b.production || null, buildProgress: b.buildProgress || 0,
         });
       } else {
-        s.buildings.set('hq_a', { id:'hq_a', owner:'player_a', type:'headquarters', x:4,  y:15, hp:200, maxHp:200, alive:true, isBuilding:false, production:null, buildProgress:0 });
-        s.buildings.set('hq_b', { id:'hq_b', owner:'player_b', type:'headquarters', x:25, y:15, hp:200, maxHp:200, alive:true, isBuilding:false, production:null, buildProgress:0 });
+        const hqPos = gameConfig?.map?.headquartersPositions || {};
+        const hqHp = gameConfig?.buildings?.headquarters?.hp || 200;
+        const posA = hqPos.player_a || { x: 3, y: 10 };
+        const posB = hqPos.player_b || { x: 16, y: 10 };
+        s.buildings.set('hq_a', { id:'hq_a', owner:'player_a', type:'headquarters', x:posA.x, y:posA.y, hp:hqHp, maxHp:hqHp, alive:true, isBuilding:false, production:null, buildProgress:0 });
+        s.buildings.set('hq_b', { id:'hq_b', owner:'player_b', type:'headquarters', x:posB.x, y:posB.y, hp:hqHp, maxHp:hqHp, alive:true, isBuilding:false, production:null, buildProgress:0 });
       }
       break;
     case 'build':
       s.resources[p.owner].gold -= (p.cost || 0);
-      s.buildings.set(p.buildingId, {
-        id: p.buildingId, owner: p.owner, type: p.type,
-        x: p.x, y: p.y, hp: p.hp || 60, maxHp: p.maxHp || 60,
-        alive: true, isBuilding: true, production: null, buildProgress: 0,
-      });
+      {
+        const bMaxHp = gameConfig?.buildings?.[p.type]?.hp || 60;
+        s.buildings.set(p.buildingId, {
+          id: p.buildingId, owner: p.owner, type: p.type,
+          x: p.x, y: p.y, hp: p.hp || bMaxHp, maxHp: p.maxHp || bMaxHp,
+          alive: true, isBuilding: true, production: null, buildProgress: 0,
+        });
+      }
       break;
     case 'build_complete': {
       const b = s.buildings.get(p.buildingId);
@@ -205,14 +211,17 @@ function applyEvent(s, ev) {
     case 'produce_complete': {
       const b = s.buildings.get(p.buildingId);
       if (b) b.production = null;
-      s.units.set(p.unitId, {
-        id: p.unitId, owner: p.owner, type: p.type,
-        x: p.x, y: p.y,
-        hp: p.hp || 100, maxHp: p.maxHp || 100,
-        attack: p.attack || 0, defense: p.defense || 0,
-        moveRange: p.moveRange || 0, attackRange: p.attackRange || 0,
-        alive: true, hasMoved: false, hasAttacked: false,
-      });
+      {
+        const uSpec = gameConfig?.units?.[p.type] || {};
+        s.units.set(p.unitId, {
+          id: p.unitId, owner: p.owner, type: p.type,
+          x: p.x, y: p.y,
+          hp: p.hp || uSpec.hp || 100, maxHp: p.maxHp || uSpec.hp || 100,
+          attack: p.attack || uSpec.attack || 0, defense: p.defense || uSpec.defense || 0,
+          moveRange: p.moveRange || uSpec.moveRange || 0, attackRange: p.attackRange || uSpec.attackRange || 0,
+          alive: true, hasMoved: false, hasAttacked: false,
+        });
+      }
       break;
     }
     case 'move': {
@@ -298,7 +307,7 @@ function entityAt(x, y, owner) {
 
 function computeRangeHighlights(unit) {
   rangeHighlights = [];
-  const spec = UNIT_SPECS[unit.type];
+  const spec = gameConfig?.units?.[unit.type];
   if (!spec) return;
   const W = state.mapWidth, H = state.mapHeight;
 
@@ -352,7 +361,7 @@ function computeBuildHighlights() {
   for (let x = 0; x < W; x++) {
     for (let y = 0; y < H; y++) {
       if (isOccupied(x, y)) continue;
-      if (friendlyEntities.some(e => manhattan(e, { x, y }) <= BUILD_RANGE)) {
+      if (friendlyEntities.some(e => manhattan(e, { x, y }) <= (gameConfig?.map?.buildRange ?? 2))) {
         rangeHighlights.push({ x, y, type: 'move' }); // reuse 'move' color (green)
       }
     }
@@ -741,8 +750,8 @@ els.canvas.addEventListener('click', e => {
     // clicked another own unit → switch selection
     const otherOwn = entityAt(cell.x, cell.y, myPlayer);
     if (otherOwn && otherOwn.id && otherOwn.owner === myPlayer && !otherOwn.type?.startsWith?.('headquarters')) {
-      // it's a unit (has moveRange in UNIT_SPECS)
-      if (UNIT_SPECS[otherOwn.type]) {
+      // it's a unit (has moveRange in gameConfig)
+      if (gameConfig?.units?.[otherOwn.type]) {
         selectedUnitId = otherOwn.id;
         computeRangeHighlights(otherOwn);
         els.moveUnit.value = otherOwn.id;
@@ -784,7 +793,7 @@ els.canvas.addEventListener('click', e => {
 
   // clicked own unit → select it
   const unit = entityAt(cell.x, cell.y, myPlayer);
-  if (unit && unit.id && UNIT_SPECS[unit.type]) {
+  if (unit && unit.id && gameConfig?.units?.[unit.type]) {
     selectedUnitId = unit.id;
     interactionMode = 'unit_selected';
     computeRangeHighlights(unit);
@@ -797,10 +806,10 @@ els.canvas.addEventListener('click', e => {
   if (unit && unit.type === 'barracks' && !unit.isBuilding) {
     selectedBuildingId = unit.id;
     interactionMode = 'building_selected';
-    const canProduce = unit.type === 'barracks' ? ['infantry', 'sniper', 'tank', 'medic'] : [];
+    const canProduce = gameConfig?.canProduce?.barracks || ['infantry', 'sniper', 'tank', 'medic'];
     const items = canProduce.map(ut => ({
       label: ut === 'infantry' ? '步兵' : ut === 'sniper' ? '狙击手' : ut === 'tank' ? '坦克' : '医疗兵',
-      cost: UNIT_COSTS[ut],
+      cost: gameConfig?.units?.[ut]?.cost ?? 0,
       action: 'produce',
       params: { buildingId: unit.id, unitType: ut },
     }));
@@ -814,12 +823,12 @@ els.canvas.addEventListener('click', e => {
       ...[...state.units.values()].filter(u => u.alive && u.owner === myPlayer),
       ...[...state.buildings.values()].filter(b => b.alive && b.owner === myPlayer),
     ];
-    const inRange = friendlyEntities.some(e => manhattan(e, cell) <= BUILD_RANGE);
+    const inRange = friendlyEntities.some(e => manhattan(e, cell) <= (gameConfig?.map?.buildRange ?? 2));
     if (inRange) {
       interactionMode = 'building_selected';
       const items = [
-        { label: '兵营', cost: 50, action: 'build', params: { type: 'barracks', x: cell.x, y: cell.y } },
-        { label: '采矿器', cost: 30, action: 'build', params: { type: 'miner', x: cell.x, y: cell.y } },
+        { label: '兵营', cost: gameConfig?.buildings?.barracks?.cost ?? 50, action: 'build', params: { type: 'barracks', x: cell.x, y: cell.y } },
+        { label: '采矿器', cost: gameConfig?.buildings?.miner?.cost ?? 30, action: 'build', params: { type: 'miner', x: cell.x, y: cell.y } },
       ];
       showPopup(cell.x, cell.y, '建造', items);
       computeBuildHighlights();
@@ -992,7 +1001,8 @@ els.btnConnect.addEventListener('click', async () => {
 
   if (!myPlayer) myPlayer = 'player_a';
 
-  // load state first so UI renders immediately
+  // load config first, then state
+  try { await loadGameConfig(); } catch { toast('无法加载游戏配置', 'err'); return; }
   const ok = await loadFullState();
   if (!ok) { toast('无法加载游戏状态', 'err'); return; }
 

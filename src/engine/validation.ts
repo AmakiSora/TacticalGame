@@ -1,6 +1,6 @@
 // src/engine/validation.ts
 import type { GameState, PlayerId, Position, Unit, Building } from '../types.js';
-import { BUILD_RANGE, HQ_POSITIONS } from './specs.js';
+import { getBuildRange, getHQPositions } from './specs.js';
 
 export type Occupant =
   | { kind: 'unit'; entity: Unit }
@@ -24,13 +24,14 @@ export function getCellOccupant(game: GameState, x: number, y: number): Occupant
 
 export function isInBuildRange(game: GameState, owner: PlayerId, x: number, y: number): boolean {
   const target = { x, y };
+  const range = getBuildRange();
   for (const u of game.units) {
     if (u.owner !== owner || !u.alive) continue;
-    if (manhattanDistance(u, target) <= BUILD_RANGE) return true;
+    if (manhattanDistance(u, target) <= range) return true;
   }
   for (const b of game.buildings) {
     if (b.owner !== owner || !b.alive) continue;
-    if (manhattanDistance(b, target) <= BUILD_RANGE) return true;
+    if (manhattanDistance(b, target) <= range) return true;
   }
   return false;
 }
@@ -44,7 +45,7 @@ export function findAdjacentFreeCell(game: GameState, x: number, y: number, owne
     { x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 },
   ];
   if (owner) {
-    const hq = HQ_POSITIONS[owner];
+    const hq = getHQPositions()[owner];
     candidates.sort((a, b) => manhattanDistance(b, hq) - manhattanDistance(a, hq));
   }
   for (const c of candidates) {

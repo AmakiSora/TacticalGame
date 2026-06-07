@@ -2,8 +2,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { GameState, Building, PlayerId } from '../types.js';
 import {
-  BUILDING_SPECS, HQ_POSITIONS, MINING_POINTS,
-  MAP_WIDTH, MAP_HEIGHT, STARTING_GOLD,
+  getBuildingSpec, getHQPositions, getMiningPoints,
+  getMapWidth, getMapHeight, getStartingGold,
 } from '../engine/specs.js';
 
 function generateToken(): string {
@@ -11,15 +11,16 @@ function generateToken(): string {
 }
 
 function createHQ(owner: PlayerId): Building {
-  const pos = HQ_POSITIONS[owner];
+  const pos = getHQPositions()[owner];
+  const spec = getBuildingSpec('headquarters');
   return {
     id: randomUUID(),
     owner,
     type: 'headquarters',
     x: pos.x,
     y: pos.y,
-    hp: BUILDING_SPECS.headquarters.hp,
-    maxHp: BUILDING_SPECS.headquarters.hp,
+    hp: spec.hp,
+    maxHp: spec.hp,
     alive: true,
     buildProgress: 0,
     isBuilding: false,
@@ -31,14 +32,14 @@ export function createInitialGame(id: string): GameState {
   return {
     id,
     phase: 'waiting_for_player',
-    mapWidth: MAP_WIDTH,
-    mapHeight: MAP_HEIGHT,
-    miningPoints: MINING_POINTS.map(p => ({ ...p })),
+    mapWidth: getMapWidth(),
+    mapHeight: getMapHeight(),
+    miningPoints: getMiningPoints().map(p => ({ ...p })),
     buildings: [createHQ('player_a'), createHQ('player_b')],
     units: [],
     resources: {
-      player_a: { gold: STARTING_GOLD },
-      player_b: { gold: STARTING_GOLD },
+      player_a: { gold: getStartingGold() },
+      player_b: { gold: getStartingGold() },
     },
     tokens: {
       player_a: generateToken(),

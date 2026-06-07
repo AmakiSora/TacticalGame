@@ -1,7 +1,7 @@
 // src/engine/mining.ts
 import type { GameState, PlayerId } from '../types.js';
 import type { EventBus } from '../events/bus.js';
-import { MINER_INCOME, BASE_INCOME } from './specs.js';
+import { getMinerIncome, getBaseIncome } from './specs.js';
 import { appendEvent } from './events.js';
 
 export function collectBaseIncome(
@@ -9,8 +9,9 @@ export function collectBaseIncome(
   bus: EventBus,
   owner: PlayerId,
 ): void {
-  game.resources[owner].gold += BASE_INCOME;
-  appendEvent(game, bus, 'base_income', { owner, amount: BASE_INCOME });
+  const amount = getBaseIncome();
+  game.resources[owner].gold += amount;
+  appendEvent(game, bus, 'base_income', { owner, amount });
 }
 
 export function collectMiningIncome(
@@ -18,15 +19,16 @@ export function collectMiningIncome(
   bus: EventBus,
   owner: PlayerId,
 ): number {
+  const income = getMinerIncome();
   let total = 0;
   for (const b of game.buildings) {
     if (b.owner !== owner) continue;
     if (b.type !== 'miner') continue;
     if (!b.alive || b.isBuilding) continue;
-    game.resources[owner].gold += MINER_INCOME;
-    total += MINER_INCOME;
+    game.resources[owner].gold += income;
+    total += income;
     appendEvent(game, bus, 'mine', {
-      buildingId: b.id, owner, amount: MINER_INCOME, x: b.x, y: b.y,
+      buildingId: b.id, owner, amount: income, x: b.x, y: b.y,
     });
   }
   return total;

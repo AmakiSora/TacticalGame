@@ -3,13 +3,16 @@ import type { EventBus } from '../events/bus.js';
 import type { Result } from './building.js';
 import { manhattanDistance } from './validation.js';
 import { appendEvent } from './events.js';
+import { getConfig } from '../config/loader.js';
 
 function rollDamageVariance(): number {
-  return Math.floor(Math.random() * 7) - 3;
+  const range = getConfig().combat.damageVarianceRange;
+  return Math.floor(Math.random() * (2 * range + 1)) - range;
 }
 
 export function rollHealAmount(): number {
-  return 25 + Math.floor(Math.random() * 11);
+  const cfg = getConfig().combat;
+  return cfg.healBase + Math.floor(Math.random() * (cfg.healVarianceRange + 1));
 }
 
 function findTarget(game: GameState, targetId: string): Unit | Building | null {
@@ -26,7 +29,7 @@ function targetPos(t: Unit | Building): { x: number; y: number } {
 
 function computeDamage(attack: number, defense: number): number {
   const base = attack - defense + rollDamageVariance();
-  return Math.max(1, base);
+  return Math.max(getConfig().combat.minimumDamage, base);
 }
 
 function endGame(game: GameState, bus: EventBus, winner: PlayerId): void {
@@ -115,7 +118,7 @@ export function healTarget(
     return { ok: false, code: 'invalid_heal', message: 'cannot heal enemy' };
   }
   const dist = manhattanDistance({ x: medic.x, y: medic.y }, { x: target.x, y: target.y });
-  if (dist > 1) {
+  if (dist > getConfig().combat.healRange) {
     return { ok: false, code: 'invalid_heal', message: 'target not adjacent' };
   }
 

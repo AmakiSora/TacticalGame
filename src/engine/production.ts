@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { GameState, PlayerId, UnitType, Unit } from '../types.js';
 import type { EventBus } from '../events/bus.js';
-import { UNIT_SPECS, CAN_PRODUCE } from './specs.js';
+import { getUnitSpec, getCanProduce } from './specs.js';
 import { findAdjacentFreeCell } from './validation.js';
 import { appendEvent } from './events.js';
 import type { Result } from './building.js';
@@ -21,13 +21,13 @@ export function startProduction(
   if (building.isBuilding) {
     return { ok: false, code: 'building_not_ready', message: 'building under construction' };
   }
-  if (!CAN_PRODUCE[building.type].includes(unitType)) {
+  if (!getCanProduce(building.type).includes(unitType)) {
     return { ok: false, code: 'cannot_produce', message: `${building.type} cannot produce ${unitType}` };
   }
   if (building.production !== null) {
     return { ok: false, code: 'cannot_produce', message: 'production slot busy' };
   }
-  const spec = UNIT_SPECS[unitType];
+  const spec = getUnitSpec(unitType);
   if (game.resources[owner].gold < spec.cost) {
     return { ok: false, code: 'insufficient_gold', message: `need ${spec.cost} gold` };
   }
@@ -48,7 +48,7 @@ function spawnUnit(
   x: number,
   y: number,
 ): Unit {
-  const spec = UNIT_SPECS[type];
+  const spec = getUnitSpec(type);
   const unit: Unit = {
     id: randomUUID(),
     owner, type, x, y,

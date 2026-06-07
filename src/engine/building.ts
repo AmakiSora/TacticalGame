@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { GameState, PlayerId, BuildingType, Building, ApiErrorCode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
-import { BUILDING_SPECS } from './specs.js';
+import { getBuildingSpec } from './specs.js';
 import {
   isInBounds, getCellOccupant, isInBuildRange, isMiningPoint,
 } from './validation.js';
@@ -26,7 +26,7 @@ export function startBuild(
   if (!isInBounds(x, y, game.mapWidth, game.mapHeight)) {
     return { ok: false, code: 'invalid_move', message: 'out of bounds' };
   }
-  const spec = BUILDING_SPECS[type];
+  const spec = getBuildingSpec(type);
   if (game.resources[owner].gold < spec.cost) {
     return { ok: false, code: 'insufficient_gold', message: `need ${spec.cost} gold` };
   }

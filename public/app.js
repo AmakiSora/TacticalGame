@@ -1,6 +1,16 @@
 const CELL = 28;
 const GRID_COLOR = '#244';
 
+// ─── game config (loaded from /api/config) ───
+let gameConfig = null;
+
+async function loadGameConfig() {
+  if (window.GAME_CONFIG) { gameConfig = window.GAME_CONFIG; return; }
+  const res = await fetch('/api/config');
+  if (!res.ok) throw new Error('Failed to load game config');
+  gameConfig = await res.json();
+}
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const gameSelect = document.getElementById('game-select');
@@ -283,11 +293,14 @@ async function fetchGameList() {
 // ─── State reconstruction ───
 
 function createEmptyState() {
+  const cfg = gameConfig || {};
+  const map = cfg.map || {};
+  const eco = cfg.economy || {};
   return {
-    mapWidth: 20, mapHeight: 20,
+    mapWidth: map.width || 20, mapHeight: map.height || 20,
     miningPoints: [],
     units: new Map(), buildings: new Map(),
-    resources: { player_a: { gold: 100 }, player_b: { gold: 100 } },
+    resources: { player_a: { gold: eco.startingGold || 100 }, player_b: { gold: eco.startingGold || 100 } },
     turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command' },
     eventLog: [], winner: null,
   };
@@ -297,25 +310,29 @@ function applyEvent(s, ev) {
   s.eventLog.push(ev);
   switch (ev.type) {
     case 'game_start':
-      s.mapWidth = ev.payload.mapWidth ?? 20;
-      s.mapHeight = ev.payload.mapHeight ?? 20;
+      s.mapWidth = ev.payload.mapWidth ?? (gameConfig?.map?.width ?? 20);
+      s.mapHeight = ev.payload.mapHeight ?? (gameConfig?.map?.height ?? 20);
       s.miningPoints = ev.payload.miningPoints ?? [];
       if (ev.payload.buildings) {
         for (const b of ev.payload.buildings) {
           s.buildings.set(b.id, { ...b, production: b.production || null, buildProgress: b.buildProgress || 0 });
         }
       } else {
-        s.buildings.set('hq_a', { id: 'hq_a', owner: 'player_a', type: 'headquarters', x: 4, y: 15, hp: 200, maxHp: 200, alive: true, isBuilding: false, production: null, buildProgress: 0 });
-        s.buildings.set('hq_b', { id: 'hq_b', owner: 'player_b', type: 'headquarters', x: 25, y: 15, hp: 200, maxHp: 200, alive: true, isBuilding: false, production: null, buildProgress: 0 });
+        const hqPos = gameConfig?.map?.headquartersPositions || {};
+        const hqHp = gameConfig?.buildings?.headquarters?.hp || 200;
+        const posA = hqPos.player_a || { x: 3, y: 10 };
+        const posB = hqPos.player_b || { x: 16, y: 10 };
+        s.buildings.set('hq_a', { id: 'hq_a', owner: 'player_a', type: 'headquarters', x: posA.x, y: posA.y, hp: hqHp, maxHp: hqHp, alive: true, isBuilding: false, production: null, buildProgress: 0 });
+        s.buildings.set('hq_b', { id: 'hq_b', owner: 'player_b', type: 'headquarters', x: posB.x, y: posB.y, hp: hqHp, maxHp: hqHp, alive: true, isBuilding: false, production: null, buildProgress: 0 });
       }
       break;
     case 'build': {
-      const maxHp = { headquarters: 200, barracks: 100, miner: 60 };
+      const bMaxHp = gameConfig?.buildings?.[ev.payload.type]?.hp || 60;
       s.resources[ev.payload.owner].gold -= ev.payload.cost || 0;
       s.buildings.set(ev.payload.buildingId, {
         id: ev.payload.buildingId, owner: ev.payload.owner, type: ev.payload.type,
         x: ev.payload.x, y: ev.payload.y,
-        hp: maxHp[ev.payload.type] || 60, maxHp: maxHp[ev.payload.type] || 60,
+        hp: bMaxHp, maxHp: bMaxHp,
         alive: true, isBuilding: true, production: null,
       });
       break;
@@ -400,13 +417,11 @@ function applyEvent(s, ev) {
 }
 
 function getUnitMaxHp(type) {
-  const hp = { infantry: 100, sniper: 60, tank: 150, medic: 70 };
-  return hp[type] || 100;
+  return gameConfig?.units?.[type]?.hp || 100;
 }
 
 function getUnitCost(type) {
-  const cost = { infantry: 40, sniper: 60, tank: 80, medic: 50 };
-  return cost[type] || 0;
+  return gameConfig?.units?.[type]?.cost || 0;
 }
 
 // ─── Replay: reconstruct state at a given step ───
@@ -840,11 +855,12 @@ function exportJson() {
 function exportHtml() {
   if (allEvents.length === 0) { alert('没有可导出的对局'); return; }
 
-  // Fetch current CSS and JS to embed
+  // Fetch current CSS, JS, and config to embed
   Promise.all([
     fetch('/style.css').then(r => r.text()),
     fetch('/app.js').then(r => r.text()),
-  ]).then(([cssText, jsText]) => {
+    fetch('/api/config').then(r => r.json()).catch(() => null),
+  ]).then(([cssText, jsText, configData]) => {
     // Build standalone HTML
     const eventsJson = JSON.stringify(allEvents);
     const gameId = gameSelect.value || 'unknown';
@@ -901,6 +917,8 @@ body { padding-top: 12px; }
 </aside>
 </main>
 <script>
+// Embedded game config
+${configData ? `window.GAME_CONFIG = ${JSON.stringify(configData)};` : ''}
 // Embedded events data
 const EMBEDDED_EVENTS = ${eventsJson};
 // Override fetch for standalone mode
@@ -908,6 +926,9 @@ const _fetch = window.fetch;
 window.fetch = function(url, opts) {
   if (typeof url === 'string' && url.includes('/events')) {
     return Promise.resolve(new Response(JSON.stringify({ events: EMBEDDED_EVENTS })));
+  }
+  if (typeof url === 'string' && url === '/api/config') {
+    return Promise.resolve(new Response(JSON.stringify(window.GAME_CONFIG || {})));
   }
   if (typeof url === 'string' && url === '/api/games') {
     return Promise.resolve(new Response(JSON.stringify({ games: [
@@ -965,4 +986,7 @@ btnImport.addEventListener('click', importJson);
 
 // ─── Init ───
 
-fetchGameList();
+(async () => {
+  try { await loadGameConfig(); } catch (e) { console.error('Failed to load game config:', e); }
+  fetchGameList();
+})();

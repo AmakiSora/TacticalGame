@@ -1,6 +1,10 @@
 const CELL = 28;
 const GRID_COLOR = '#244';
 
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ─── game config (derived from game_start event) ───
 let gameConfig = null;
 
@@ -528,8 +532,8 @@ function renderSidebar() {
   `;
   turnInfoEl.innerHTML = `
     <h3>回合 ${state.turn.turnNumber}</h3>
-    <div>当前: <span class="${state.turn.currentOwner === 'player_a' ? 'player-a' : 'player-b'}">${state.turn.currentOwner}</span></div>
-    ${state.winner ? `<div>胜者: <strong>${state.winner}</strong></div>` : ''}
+    <div>当前: <span class="${state.turn.currentOwner === 'player_a' ? 'player-a' : 'player-b'}">${esc(state.turn.currentOwner)}</span></div>
+    ${state.winner ? `<div>胜者: <strong>${esc(state.winner)}</strong></div>` : ''}
   `;
 
   // Event log — show all, highlight current
@@ -563,9 +567,9 @@ function renderDetail() {
   const typeClass = getTypeClass(ev.type);
   const payloadStr = formatPayload(ev.payload);
   detailEl.innerHTML = `
-    <span class="ev-type ${typeClass}">${ev.type}</span>
+    <span class="ev-type ${typeClass}">${esc(ev.type)}</span>
     <span style="color:#888">#${ev.seq}</span>
-    <span class="ev-payload">${payloadStr}</span>
+    <span class="ev-payload">${esc(payloadStr)}</span>
   `;
 }
 

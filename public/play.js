@@ -114,6 +114,10 @@ let rangeHighlights = [];     // [{x, y, type: 'move'|'attack'|'heal'}]
 let selectedBuildingId = null;
 
 // ─── helpers ───
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function toast(msg, type = 'info') {
   const t = $('toast');
   t.textContent = msg;
@@ -389,11 +393,11 @@ function showPopup(cellX, cellY, title, items) {
   const px = canvasRect.left - wrapRect.left + cellX * CELL + CELL;
   const py = canvasRect.top - wrapRect.top + cellY * CELL;
 
-  let html = `<div class="map-popup-title">${title}</div>`;
+  let html = `<div class="map-popup-title">${esc(title)}</div>`;
   for (const item of items) {
     const afford = item.cost === undefined || state.resources[myPlayer].gold >= item.cost;
-    html += `<button class="map-popup-btn" data-action="${item.action}" data-params='${JSON.stringify(item.params || {})}'>
-      <span>${item.label}</span>
+    html += `<button class="map-popup-btn" data-action="${esc(item.action)}" data-params='${esc(JSON.stringify(item.params || {}))}'>
+      <span>${esc(item.label)}</span>
       ${item.cost !== undefined ? `<span class="map-popup-cost ${afford ? '' : 'cant-afford'}">${item.cost}金</span>` : ''}
     </button>`;
   }
@@ -712,7 +716,7 @@ function renderEvents() {
     const li = document.createElement('li');
     li.className = `type-${ev.type}`;
     const payload = JSON.stringify(ev.payload || {}).slice(0, 100);
-    li.innerHTML = `<span class="ev-seq">#${ev.seq}</span><span class="ev-type">${ev.type}</span>${payload}`;
+    li.innerHTML = `<span class="ev-seq">#${ev.seq}</span><span class="ev-type">${esc(ev.type)}</span>${esc(payload)}`;
     els.events.appendChild(li);
   }
   els.events.scrollTop = els.events.scrollHeight;

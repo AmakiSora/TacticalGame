@@ -71,7 +71,7 @@ export function tickProduction(game: GameState, bus: EventBus, owner: PlayerId):
     if (b.production.turnsRemaining <= 0) {
       const cell = findAdjacentFreeCell(game, b.x, b.y, b.owner);
       if (cell === null) {
-        b.production.turnsRemaining = 0;
+        b.production = null;
         continue;
       }
       const type = b.production.type;

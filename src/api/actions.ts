@@ -37,6 +37,10 @@ async function actionHandler(
   return { ok: true };
 }
 
+function badRequest(reply: FastifyReply, msg: string) {
+  return reply.code(400).send({ error: msg, code: 'invalid_move' });
+}
+
 interface BuildBody { type: 'barracks' | 'miner'; x: number; y: number }
 interface ProduceBody { buildingId: string; unitType: 'infantry' | 'sniper' | 'tank' | 'medic' }
 interface MoveBody { unitId: string; x: number; y: number }
@@ -45,33 +49,58 @@ interface HealBody { medicId: string; targetId: string }
 
 export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: BuildBody }>(
-    '/api/games/:id/build', async (req, reply) =>
-      actionHandler(req, reply, ({ game, player }) =>
-        startBuild(game, globalEventBus, player, req.body.type, req.body.x, req.body.y)),
+    '/api/games/:id/build', async (req, reply) => {
+      const { type, x, y } = req.body || {};
+      if (!type || typeof x !== 'number' || typeof y !== 'number') {
+        return badRequest(reply, 'type, x, y required');
+      }
+      return actionHandler(req, reply, ({ game, player }) =>
+        startBuild(game, globalEventBus, player, type, x, y));
+    },
   );
 
   app.post<{ Params: { id: string }; Body: ProduceBody }>(
-    '/api/games/:id/produce', async (req, reply) =>
-      actionHandler(req, reply, ({ game, player }) =>
-        startProduction(game, globalEventBus, player, req.body.buildingId, req.body.unitType)),
+    '/api/games/:id/produce', async (req, reply) => {
+      const { buildingId, unitType } = req.body || {};
+      if (!buildingId || !unitType) {
+        return badRequest(reply, 'buildingId and unitType required');
+      }
+      return actionHandler(req, reply, ({ game, player }) =>
+        startProduction(game, globalEventBus, player, buildingId, unitType));
+    },
   );
 
   app.post<{ Params: { id: string }; Body: MoveBody }>(
-    '/api/games/:id/move', async (req, reply) =>
-      actionHandler(req, reply, ({ game, player }) =>
-        moveUnit(game, globalEventBus, player, req.body.unitId, req.body.x, req.body.y)),
+    '/api/games/:id/move', async (req, reply) => {
+      const { unitId, x, y } = req.body || {};
+      if (!unitId || typeof x !== 'number' || typeof y !== 'number') {
+        return badRequest(reply, 'unitId, x, y required');
+      }
+      return actionHandler(req, reply, ({ game, player }) =>
+        moveUnit(game, globalEventBus, player, unitId, x, y));
+    },
   );
 
   app.post<{ Params: { id: string }; Body: AttackBody }>(
-    '/api/games/:id/attack', async (req, reply) =>
-      actionHandler(req, reply, ({ game, player }) =>
-        attackTarget(game, globalEventBus, player, req.body.attackerId, req.body.targetId)),
+    '/api/games/:id/attack', async (req, reply) => {
+      const { attackerId, targetId } = req.body || {};
+      if (!attackerId || !targetId) {
+        return badRequest(reply, 'attackerId and targetId required');
+      }
+      return actionHandler(req, reply, ({ game, player }) =>
+        attackTarget(game, globalEventBus, player, attackerId, targetId));
+    },
   );
 
   app.post<{ Params: { id: string }; Body: HealBody }>(
-    '/api/games/:id/heal', async (req, reply) =>
-      actionHandler(req, reply, ({ game, player }) =>
-        healTarget(game, globalEventBus, player, req.body.medicId, req.body.targetId)),
+    '/api/games/:id/heal', async (req, reply) => {
+      const { medicId, targetId } = req.body || {};
+      if (!medicId || !targetId) {
+        return badRequest(reply, 'medicId and targetId required');
+      }
+      return actionHandler(req, reply, ({ game, player }) =>
+        healTarget(game, globalEventBus, player, medicId, targetId));
+    },
   );
 
   app.post<{ Params: { id: string } }>(

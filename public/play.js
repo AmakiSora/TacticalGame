@@ -293,6 +293,13 @@ function entityAt(x, y, owner) {
   return null;
 }
 
+function entityAtBuilding(x, y) {
+  for (const b of state.buildings.values()) {
+    if (b.alive && b.x === x && b.y === y) return b;
+  }
+  return null;
+}
+
 function computeRangeHighlights(unit) {
   rangeHighlights = [];
   const spec = gameConfig?.units?.[unit.type];
@@ -750,17 +757,26 @@ els.canvas.addEventListener('click', e => {
       return;
     }
 
-    // clicked another own unit → switch selection
-    const otherOwn = entityAt(cell.x, cell.y, myPlayer);
-    if (otherOwn && otherOwn.id && otherOwn.owner === myPlayer && !otherOwn.type?.startsWith?.('headquarters')) {
-      // it's a unit (has moveRange in gameConfig)
-      if (gameConfig?.units?.[otherOwn.type]) {
-        selectedUnitId = otherOwn.id;
-        computeRangeHighlights(otherOwn);
-        renderSidebar();
-        drawBoard();
-        return;
-      }
+    // clicked another unit → switch selection
+    const otherUnit = entityAt(cell.x, cell.y);
+    if (otherUnit && otherUnit.id && gameConfig?.units?.[otherUnit.type]) {
+      selectedUnitId = otherUnit.id;
+      computeRangeHighlights(otherUnit);
+      renderSidebar();
+      drawBoard();
+      return;
+    }
+
+    // clicked a building → switch to building selection
+    const otherBuilding = entityAtBuilding(cell.x, cell.y);
+    if (otherBuilding) {
+      selectedUnitId = null;
+      selectedBuildingId = otherBuilding.id;
+      interactionMode = 'building_selected';
+      rangeHighlights = [];
+      renderSidebar();
+      drawBoard();
+      return;
     }
 
     // check if click is on a highlighted cell
@@ -794,29 +810,35 @@ els.canvas.addEventListener('click', e => {
   // ── idle mode ──
   closePopup();
 
-  // clicked own unit → select it
-  const unit = entityAt(cell.x, cell.y, myPlayer);
+  // clicked any unit → select it
+  const unit = entityAt(cell.x, cell.y);
   if (unit && unit.id && gameConfig?.units?.[unit.type]) {
     selectedUnitId = unit.id;
     interactionMode = 'unit_selected';
-    computeRangeHighlights(unit);
+    if (unit.owner === myPlayer) computeRangeHighlights(unit);
     renderSidebar();
     drawBoard();
     return;
   }
 
-  // clicked own building (barracks, completed) → show production popup
-  if (unit && unit.type === 'barracks' && !unit.isBuilding) {
-    selectedBuildingId = unit.id;
+  // clicked any building → select it
+  const building = entityAtBuilding(cell.x, cell.y);
+  if (building && building.alive) {
+    selectedBuildingId = building.id;
     interactionMode = 'building_selected';
-    const canProduce = gameConfig?.canProduce?.barracks || ['infantry', 'sniper', 'tank', 'medic'];
-    const items = canProduce.map(ut => ({
-      label: ut === 'infantry' ? '步兵' : ut === 'sniper' ? '狙击手' : ut === 'tank' ? '坦克' : '医疗兵',
-      cost: gameConfig?.units?.[ut]?.cost ?? 0,
-      action: 'produce',
-      params: { buildingId: unit.id, unitType: ut },
-    }));
-    showPopup(cell.x, cell.y, '生产单位', items);
+    renderSidebar();
+    drawBoard();
+    // own barracks → also show production popup
+    if (building.owner === myPlayer && building.type === 'barracks' && !building.isBuilding) {
+      const canProduce = gameConfig?.canProduce?.barracks || ['infantry', 'sniper', 'tank', 'medic'];
+      const items = canProduce.map(ut => ({
+        label: ut === 'infantry' ? '步兵' : ut === 'sniper' ? '狙击手' : ut === 'tank' ? '坦克' : '医疗兵',
+        cost: gameConfig?.units?.[ut]?.cost ?? 0,
+        action: 'produce',
+        params: { buildingId: building.id, unitType: ut },
+      }));
+      showPopup(cell.x, cell.y, '生产单位', items);
+    }
     return;
   }
 

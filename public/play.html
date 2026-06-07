@@ -59,6 +59,24 @@
       <div id="resources-display" class="resources-display"></div>
     </section>
 
+    <!-- 选中信息 -->
+    <section id="selection-info">
+      <h3>🔍 选中</h3>
+      <div id="selection-detail" class="selection-detail">点击棋盘上的单位或建筑</div>
+    </section>
+
+    <!-- 操作提示 -->
+    <section id="action-hints">
+      <h3>🎯 操作</h3>
+      <div class="hint-list">
+        <div class="hint"><span class="hint-key">点击己方单位</span> 选中后显示移动/攻击范围</div>
+        <div class="hint"><span class="hint-key">点击高亮格子</span> 移动 / 攻击 / 治疗</div>
+        <div class="hint"><span class="hint-key">点击己方兵营</span> 弹出生产菜单</div>
+        <div class="hint"><span class="hint-key">点击空地</span> 弹出建造菜单（需在范围内）</div>
+        <div class="hint"><span class="hint-key">右键 / Esc</span> 取消选择</div>
+      </div>
+    </section>
+
     <!-- 快捷操作 -->
     <section id="quick-actions">
       <h3>⚡ 快捷操作</h3>
@@ -66,88 +84,6 @@
         <button id="btn-end-turn" class="btn warning">⏭ 结束回合</button>
         <button id="btn-refresh" class="btn">🔄 刷新状态</button>
       </div>
-    </section>
-
-    <!-- 操作表单 -->
-    <section id="action-forms">
-      <h3>🎯 操作</h3>
-
-      <!-- 建造 -->
-      <details class="act-group" open>
-        <summary>🏗 建造</summary>
-        <div class="form">
-          <select id="build-type">
-            <option value="barracks">兵营 (barracks) — 50金</option>
-            <option value="miner">采矿器 (miner) — 30金</option>
-          </select>
-          <div class="row">
-            <div class="field"><label>X</label><input id="build-x" type="number" min="0" max="19" /></div>
-            <div class="field"><label>Y</label><input id="build-y" type="number" min="0" max="19" /></div>
-          </div>
-          <button id="btn-build" class="btn primary">建造</button>
-        </div>
-      </details>
-
-      <!-- 生产 -->
-      <details class="act-group">
-        <summary>🏭 生产单位</summary>
-        <div class="form">
-          <select id="produce-building">
-            <option value="">-- 选择兵营 --</option>
-          </select>
-          <select id="produce-type">
-            <option value="infantry">步兵 (infantry) — 40金</option>
-            <option value="sniper">狙击手 (sniper) — 60金</option>
-            <option value="tank">坦克 (tank) — 80金</option>
-            <option value="medic">医疗兵 (medic) — 50金</option>
-          </select>
-          <button id="btn-produce" class="btn primary">生产</button>
-        </div>
-      </details>
-
-      <!-- 移动 -->
-      <details class="act-group">
-        <summary>🚶 移动单位</summary>
-        <div class="form">
-          <select id="move-unit">
-            <option value="">-- 选择单位 --</option>
-          </select>
-          <div class="row">
-            <div class="field"><label>目标 X</label><input id="move-x" type="number" min="0" max="19" /></div>
-            <div class="field"><label>目标 Y</label><input id="move-y" type="number" min="0" max="19" /></div>
-          </div>
-          <button id="btn-move" class="btn">移动</button>
-        </div>
-      </details>
-
-      <!-- 攻击 -->
-      <details class="act-group">
-        <summary>💥 攻击</summary>
-        <div class="form">
-          <select id="attack-unit">
-            <option value="">-- 攻击方 --</option>
-          </select>
-          <select id="attack-target">
-            <option value="">-- 目标 --</option>
-          </select>
-          <button id="btn-attack" class="btn danger">攻击</button>
-        </div>
-      </details>
-
-      <!-- 治疗 -->
-      <details class="act-group">
-        <summary>💚 治疗</summary>
-        <div class="form">
-          <select id="heal-medic">
-            <option value="">-- 医疗兵 --</option>
-          </select>
-          <select id="heal-target">
-            <option value="">-- 治疗目标 --</option>
-          </select>
-          <button id="btn-heal" class="btn success">治疗</button>
-        </div>
-      </details>
-
     </section>
 
     <!-- 事件日志 -->

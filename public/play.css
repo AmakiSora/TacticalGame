@@ -187,6 +187,28 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .form select { width: 100%; }
 .form .row { gap: 8px; }
 
+/* selection info */
+.selection-detail {
+  font-size: 13px;
+  color: #7a9aaa;
+  line-height: 1.6;
+}
+.selection-detail .sel-type {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.selection-detail .sel-owner-a { color: #6cf; }
+.selection-detail .sel-owner-b { color: #f86; }
+.selection-detail .sel-hp { color: #8a8; }
+.selection-detail .sel-stat { color: #9ab; }
+.selection-detail .sel-actions { margin-top: 8px; font-size: 12px; color: #5a7a8a; }
+
+/* hints */
+.hint-list { display: flex; flex-direction: column; gap: 4px; }
+.hint { font-size: 12px; color: #5a7a8a; line-height: 1.5; }
+.hint-key { color: #8ab; font-weight: 600; }
+
 /* event log */
 #events { list-style: none; max-height: 240px; overflow-y: auto; font-size: 12px; font-family: "SF Mono", "Consolas", monospace; }
 #events li {

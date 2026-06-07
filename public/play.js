@@ -48,35 +48,7 @@ const els = {
   resDisplay:   $('resources-display'),
   btnEndTurn:   $('btn-end-turn'),
   btnRefresh:   $('btn-refresh'),
-
-  // build
-  buildType:    $('build-type'),
-  buildX:       $('build-x'),
-  buildY:       $('build-y'),
-  btnBuild:     $('btn-build'),
-
-  // produce
-  produceBldg:  $('produce-building'),
-  produceType:  $('produce-type'),
-  btnProduce:   $('btn-produce'),
-
-  // move
-  moveUnit:     $('move-unit'),
-  moveX:        $('move-x'),
-  moveY:        $('move-y'),
-  btnMove:      $('btn-move'),
-
-  // attack
-  attackUnit:   $('attack-unit'),
-  attackTarget: $('attack-target'),
-  btnAttack:    $('btn-attack'),
-
-  // heal
-  healMedic:    $('heal-medic'),
-  healTarget:   $('heal-target'),
-  btnHeal:      $('btn-heal'),
-
-  // events
+  selDetail:    $('selection-detail'),
   events:       $('events'),
 };
 
@@ -647,64 +619,52 @@ function renderSidebar() {
     ${state.winner ? `<div style="color:#ff8;font-weight:700;margin-top:4px">🏆 胜者: ${state.winner}</div>` : ''}
   `;
 
-  // populate selects
-  populateSelects();
+  // selection info
+  renderSelectionInfo();
 
   // events
   renderEvents();
 }
 
-function populateSelects() {
-  if (!state) return;
-  const myUnits = [...state.units.values()].filter(u => u.owner === myPlayer && u.alive);
-  const allEnemyUnits = [...state.units.values()].filter(u => u.owner !== myPlayer && u.alive);
-  const allEnemyBuildings = [...state.buildings.values()].filter(b => b.owner !== myPlayer && b.alive);
-  const myBuildings = [...state.buildings.values()].filter(b => b.owner === myPlayer && b.alive && !b.isBuilding);
-  const myBarracks = myBuildings.filter(b => b.type === 'barracks');
-  const myMedics = myUnits.filter(u => u.type === 'medic');
-  const myNonMedics = myUnits.filter(u => u.type !== 'medic');
-  const healTargets = myUnits.filter(u => u.hp < u.maxHp);
+function renderSelectionInfo() {
+  const el = els.selDetail;
+  if (!el) return;
 
-  // move unit
-  const moveSel = els.moveUnit;
-  moveSel.innerHTML = '<option value="">-- 选择单位 --</option>';
-  for (const u of myUnits) {
-    moveSel.innerHTML += `<option value="${u.id}">${u.type} #${u.id.slice(-4)} (${u.x},${y=u.y})</option>`;
-  }
-
-  // produce building
-  const prodSel = els.produceBldg;
-  prodSel.innerHTML = '<option value="">-- 选择兵营 --</option>';
-  for (const b of myBarracks) {
-    prodSel.innerHTML += `<option value="${b.id}">兵营 #${b.id.slice(-4)} (${b.x},${b.y}) ${b.production ? '[生产中]' : ''}</option>`;
+  if (selectedUnitId) {
+    const u = state.units.get(selectedUnitId);
+    if (u && u.alive) {
+      const ownerCls = u.owner === 'player_a' ? 'sel-owner-a' : 'sel-owner-b';
+      const ownerName = u.owner === myPlayer ? '己方' : '敌方';
+      const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
+      const actions = [];
+      if (!u.hasMoved) actions.push('移动');
+      if (!u.hasAttacked) actions.push(u.type === 'medic' ? '治疗' : '攻击');
+      el.innerHTML = `
+        <div class="sel-type"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
+        <div class="sel-hp">❤️ ${u.hp} / ${u.maxHp}</div>
+        <div class="sel-stat">⚔️ ${u.attack} 🛡️ ${u.defense} 📍(${u.x},${u.y})</div>
+        ${actions.length > 0 ? `<div class="sel-actions">可执行: ${actions.join(' / ')} — 点击高亮格子</div>` : '<div class="sel-actions" style="color:#a66">本回合已行动</div>'}
+      `;
+      return;
+    }
   }
 
-  // attack
-  const atkSel = els.attackUnit;
-  atkSel.innerHTML = '<option value="">-- 攻击方 --</option>';
-  for (const u of myNonMedics) {
-    atkSel.innerHTML += `<option value="${u.id}">${u.type} #${u.id.slice(-4)}</option>`;
-  }
-  const tgtSel = els.attackTarget;
-  tgtSel.innerHTML = '<option value="">-- 目标 --</option>';
-  for (const u of allEnemyUnits) {
-    tgtSel.innerHTML += `<option value="${u.id}">单位 ${u.type} #${u.id.slice(-4)}</option>`;
-  }
-  for (const b of allEnemyBuildings) {
-    tgtSel.innerHTML += `<option value="${b.id}">建筑 ${b.type} #${b.id.slice(-4)}</option>`;
+  if (selectedBuildingId) {
+    const b = state.buildings.get(selectedBuildingId);
+    if (b && b.alive) {
+      const ownerCls = b.owner === 'player_a' ? 'sel-owner-a' : 'sel-owner-b';
+      const ownerName = b.owner === myPlayer ? '己方' : '敌方';
+      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+      el.innerHTML = `
+        <div class="sel-type"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
+        <div class="sel-hp">❤️ ${b.hp} / ${b.maxHp}</div>
+        <div class="sel-stat">📍(${b.x},${b.y})${b.production ? ' 🏭 生产中' : ''}</div>
+      `;
+      return;
+    }
   }
 
-  // heal
-  const medSel = els.healMedic;
-  medSel.innerHTML = '<option value="">-- 医疗兵 --</option>';
-  for (const u of myMedics) {
-    medSel.innerHTML += `<option value="${u.id}">医疗兵 #${u.id.slice(-4)}</option>`;
-  }
-  const healSel = els.healTarget;
-  healSel.innerHTML = '<option value="">-- 治疗目标 --</option>';
-  for (const u of healTargets) {
-    healSel.innerHTML += `<option value="${u.id}">${u.type} #${u.id.slice(-4)} (hp:${u.hp}/${u.maxHp})</option>`;
-  }
+  el.textContent = '点击棋盘上的单位或建筑';
 }
 
 function renderEvents() {
@@ -788,7 +748,7 @@ els.canvas.addEventListener('click', e => {
       if (gameConfig?.units?.[otherOwn.type]) {
         selectedUnitId = otherOwn.id;
         computeRangeHighlights(otherOwn);
-        els.moveUnit.value = otherOwn.id;
+        renderSidebar();
         drawBoard();
         return;
       }
@@ -831,7 +791,7 @@ els.canvas.addEventListener('click', e => {
     selectedUnitId = unit.id;
     interactionMode = 'unit_selected';
     computeRangeHighlights(unit);
-    els.moveUnit.value = unit.id;
+    renderSidebar();
     drawBoard();
     return;
   }
@@ -880,6 +840,7 @@ function deselectAll() {
   selectedBuildingId = null;
   interactionMode = 'idle';
   rangeHighlights = [];
+  renderSelectionInfo();
   drawBoard();
 }
 
@@ -950,45 +911,6 @@ async function apiAction(path, body) {
     return false;
   }
 }
-
-els.btnBuild.addEventListener('click', async () => {
-  await apiAction(`/api/games/${gameId}/build`, {
-    type: els.buildType.value,
-    x: Number(els.buildX.value),
-    y: Number(els.buildY.value),
-  });
-});
-
-els.btnProduce.addEventListener('click', async () => {
-  await apiAction(`/api/games/${gameId}/produce`, {
-    buildingId: els.produceBldg.value,
-    unitType: els.produceType.value,
-  });
-});
-
-els.btnMove.addEventListener('click', async () => {
-  await apiAction(`/api/games/${gameId}/move`, {
-    unitId: els.moveUnit.value,
-    x: Number(els.moveX.value),
-    y: Number(els.moveY.value),
-  });
-  selectedUnitId = null;
-  drawBoard();
-});
-
-els.btnAttack.addEventListener('click', async () => {
-  await apiAction(`/api/games/${gameId}/attack`, {
-    attackerId: els.attackUnit.value,
-    targetId: els.attackTarget.value,
-  });
-});
-
-els.btnHeal.addEventListener('click', async () => {
-  await apiAction(`/api/games/${gameId}/heal`, {
-    medicId: els.healMedic.value,
-    targetId: els.healTarget.value,
-  });
-});
 
 els.btnEndTurn.addEventListener('click', async () => {
   await apiAction(`/api/games/${gameId}/end-turn`, {});

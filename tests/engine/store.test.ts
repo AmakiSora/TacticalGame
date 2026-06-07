@@ -20,9 +20,9 @@ describe('GameStore', () => {
     expect(game.resources.player_b.gold).toBe(100);
   });
 
-  it('initial game has 6 mining points', () => {
+  it('initial game has 4 mining points', () => {
     const game = createInitialGame('g1');
-    expect(game.miningPoints).toHaveLength(6);
+    expect(game.miningPoints).toHaveLength(4);
   });
 
   it('initial game has no units and waiting_for_player phase', () => {

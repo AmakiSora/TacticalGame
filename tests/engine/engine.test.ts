@@ -60,7 +60,7 @@ describe('endTurn', () => {
     joinGame(game, bus);
     game.units.push({
       id: 'u1', owner: 'player_a', type: 'infantry',
-      x: 5, y: 15, hp: 100, maxHp: 100, attack: 20, defense: 8,
+      x: 4, y: 10, hp: 100, maxHp: 100, attack: 20, defense: 8,
       moveRange: 3, attackRange: 1, alive: true, hasMoved: true, hasAttacked: true,
     });
     endTurn(game, bus, 'player_a');
@@ -74,7 +74,7 @@ describe('endTurn', () => {
     joinGame(game, bus);
     game.buildings.push({
       id: 'b1', owner: 'player_a', type: 'barracks',
-      x: 5, y: 15, hp: 100, maxHp: 100, alive: true,
+      x: 4, y: 10, hp: 100, maxHp: 100, alive: true,
       buildProgress: 1, isBuilding: true, production: null,
     });
     endTurn(game, bus, 'player_a');
@@ -106,12 +106,12 @@ describe('endTurn', () => {
     joinGame(game, bus);
     game.buildings.push({
       id: 'm1', owner: 'player_b', type: 'miner',
-      x: 19, y: 5, hp: 60, maxHp: 60, alive: true,
+      x: 6, y: 7, hp: 60, maxHp: 60, alive: true,
       buildProgress: 0, isBuilding: false, production: null,
     });
     const before = game.resources.player_b.gold;
     endTurn(game, bus, 'player_a');
-    expect(game.resources.player_b.gold).toBe(before + 15);
+    expect(game.resources.player_b.gold).toBe(before + 5 + 15);
   });
 
   it('fails when game is over', () => {

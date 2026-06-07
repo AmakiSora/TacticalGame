@@ -60,12 +60,12 @@ describe('End-to-end gameplay', () => {
     const game = globalStore.get(gameId)!;
     const hqA = game.buildings.find(b => b.owner === 'player_a')!;
 
-    hqA.x = 10; hqA.y = 14;
+    hqA.x = 5; hqA.y = 7;
 
     const buildRes = await app.inject({
       method: 'POST', url: `/api/games/${gameId}/build`,
       headers: { 'x-player-token': tokenA },
-      payload: { type: 'miner', x: 10, y: 15 },
+      payload: { type: 'miner', x: 6, y: 7 },
     });
     expect(buildRes.statusCode).toBe(200);
     expect(game.resources.player_a.gold).toBe(70);
@@ -79,15 +79,32 @@ describe('End-to-end gameplay', () => {
       headers: { 'x-player-token': tokenB },
     });
 
-    expect(game.resources.player_a.gold).toBe(85);
+    expect(game.resources.player_a.gold).toBe(90);
 
+    // Build a barracks first
+    const buildBarracksRes = await app.inject({
+      method: 'POST', url: `/api/games/${gameId}/build`,
+      headers: { 'x-player-token': tokenA },
+      payload: { type: 'barracks', x: 5, y: 9 },
+    });
+    expect(buildBarracksRes.statusCode).toBe(200);
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/end-turn`, headers: { 'x-player-token': tokenB } });
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/end-turn`, headers: { 'x-player-token': tokenA } });
+    const barracks = game.buildings.find(b => b.type === 'barracks')!;
+
+    // Wait for construction to complete
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/end-turn`, headers: { 'x-player-token': tokenA } });
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/end-turn`, headers: { 'x-player-token': tokenB } });
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/end-turn`, headers: { 'x-player-token': tokenA } });
+
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/end-turn`, headers: { 'x-player-token': tokenB } });
     const produceRes = await app.inject({
       method: 'POST', url: `/api/games/${gameId}/produce`,
       headers: { 'x-player-token': tokenA },
-      payload: { buildingId: hqA.id, unitType: 'infantry' },
+      payload: { buildingId: barracks.id, unitType: 'infantry' },
     });
     expect(produceRes.statusCode).toBe(200);
-    expect(game.resources.player_a.gold).toBe(45);
+    expect(game.resources.player_a.gold).toBe(40);
 
     await app.inject({
       method: 'POST', url: `/api/games/${gameId}/end-turn`,

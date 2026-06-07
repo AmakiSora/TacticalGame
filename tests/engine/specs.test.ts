@@ -20,8 +20,8 @@ describe('specs', () => {
     expect(BUILDING_SPECS.barracks.buildTime).toBe(2);
   });
 
-  it('headquarters can produce infantry but not tanks', () => {
-    expect(CAN_PRODUCE.headquarters).toEqual(['infantry']);
+  it('headquarters cannot produce any units', () => {
+    expect(CAN_PRODUCE.headquarters).toEqual([]);
   });
 
   it('barracks can produce all 4 unit types', () => {

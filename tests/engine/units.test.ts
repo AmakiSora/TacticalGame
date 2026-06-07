@@ -52,7 +52,12 @@ describe('moveUnit', () => {
 
   it('fails when target cell is occupied', () => {
     const { game, bus, unit } = setupWithUnit();
-    const result = moveUnit(game, bus, 'player_a', unit.id, 4, 15);
+    game.units.push({
+      id: 'blocker', owner: 'player_b', type: 'infantry',
+      x: 7, y: 15, hp: 100, maxHp: 100, attack: 20, defense: 8,
+      moveRange: 3, attackRange: 1, alive: true, hasMoved: false, hasAttacked: false,
+    });
+    const result = moveUnit(game, bus, 'player_a', unit.id, 7, 15);
     expect(result.ok).toBe(false);
     expect(result.code).toBe('cell_occupied');
   });

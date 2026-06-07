@@ -29,7 +29,7 @@ describe('validation', () => {
 
   it('getCellOccupant returns HQ at its location', () => {
     const game = createInitialGame('g1');
-    const occ = getCellOccupant(game, 4, 15);
+    const occ = getCellOccupant(game, 3, 10);
     expect(occ?.kind).toBe('building');
     expect((occ as any).entity.type).toBe('headquarters');
   });
@@ -41,30 +41,30 @@ describe('validation', () => {
 
   it('isInBuildRange returns true near friendly HQ', () => {
     const game = createInitialGame('g1');
-    expect(isInBuildRange(game, 'player_a', 5, 15)).toBe(true);
-    expect(isInBuildRange(game, 'player_a', 4, 17)).toBe(true);
+    expect(isInBuildRange(game, 'player_a', 4, 10)).toBe(true);
+    expect(isInBuildRange(game, 'player_a', 3, 12)).toBe(true);
   });
 
   it('isInBuildRange returns false far from friendly objects', () => {
     const game = createInitialGame('g1');
-    expect(isInBuildRange(game, 'player_a', 20, 20)).toBe(false);
+    expect(isInBuildRange(game, 'player_a', 10, 10)).toBe(false);
   });
 
   it('isInBuildRange ignores enemy objects', () => {
     const game = createInitialGame('g1');
-    expect(isInBuildRange(game, 'player_a', 26, 15)).toBe(false);
+    expect(isInBuildRange(game, 'player_a', 16, 10)).toBe(false);
   });
 
   it('isMiningPoint identifies known mining points', () => {
     const game = createInitialGame('g1');
-    expect(isMiningPoint(game, 10, 15)).toBe(true);
+    expect(isMiningPoint(game, 6, 7)).toBe(true);
     expect(isMiningPoint(game, 0, 0)).toBe(false);
   });
 
   it('findAdjacentFreeCell returns a free neighbor', () => {
     const game = createInitialGame('g1');
-    const cell = findAdjacentFreeCell(game, 4, 15);
+    const cell = findAdjacentFreeCell(game, 3, 10);
     expect(cell).not.toBeNull();
-    expect(manhattanDistance(cell!, { x: 4, y: 15 })).toBe(1);
+    expect(manhattanDistance(cell!, { x: 3, y: 10 })).toBe(1);
   });
 });

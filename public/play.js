@@ -793,11 +793,11 @@ els.canvas.addEventListener('click', e => {
     return;
   }
 
-  // clicked own building (HQ/barracks, completed) → show production popup
-  if (unit && unit.type && (unit.type === 'headquarters' || unit.type === 'barracks') && !unit.isBuilding) {
+  // clicked own building (barracks, completed) → show production popup
+  if (unit && unit.type === 'barracks' && !unit.isBuilding) {
     selectedBuildingId = unit.id;
     interactionMode = 'building_selected';
-    const canProduce = unit.type === 'headquarters' ? ['infantry'] : ['infantry', 'sniper', 'tank', 'medic'];
+    const canProduce = unit.type === 'barracks' ? ['infantry', 'sniper', 'tank', 'medic'] : [];
     const items = canProduce.map(ut => ({
       label: ut === 'infantry' ? '步兵' : ut === 'sniper' ? '狙击手' : ut === 'tank' ? '坦克' : '医疗兵',
       cost: UNIT_COSTS[ut],

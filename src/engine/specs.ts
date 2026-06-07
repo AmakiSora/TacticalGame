@@ -31,7 +31,7 @@ export const BUILDING_SPECS: Record<BuildingType, BuildingSpec> = {
 };
 
 export const CAN_PRODUCE: Record<BuildingType, UnitType[]> = {
-  headquarters: ['infantry'],
+  headquarters: [],
   barracks:     ['infantry', 'sniper', 'tank', 'medic'],
   miner:        [],
 };

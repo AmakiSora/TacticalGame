@@ -667,14 +667,16 @@ function renderSelectionInfo() {
       const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
       const hpPct = Math.round((b.hp / b.maxHp) * 100);
       const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
-      const prodText = b.production
+      const statusText = b.isBuilding
+        ? `🔨 建造中 (${Math.round((b.buildProgress || 0) * 100)}%)`
+        : b.production
         ? `🏭 生产中: ${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'} (剩余 ${b.production.turnsRemaining} 回合)`
         : '✅ 空闲';
       el.innerHTML = `
         <div class="sel-type"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
         <div class="sel-hp">❤️ ${b.hp} / ${b.maxHp} <span class="sel-hp-bar"><span class="sel-hp-fill" style="width:${hpPct}%;background:${hpColor}"></span></span></div>
         <div class="sel-stat">📍 位置 (${b.x}, ${b.y})</div>
-        <div class="sel-stat">${prodText}</div>
+        <div class="sel-stat">${statusText}</div>
       `;
       return;
     }
@@ -908,7 +910,7 @@ async function doHeal(medic, target) {
 // ─── SSE subscription ───
 function subscribeSse() {
   if (sse) sse.close();
-  sse = new EventSource(`/api/games/${gameId}/events`);
+  sse = new EventSource(`/api/games/${gameId}/events?token=${encodeURIComponent(myToken)}`);
   sse.onmessage = e => {
     try {
       const ev = JSON.parse(e.data);

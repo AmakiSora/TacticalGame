@@ -1,4 +1,5 @@
 // src/api/auth.ts
+import { timingSafeEqual } from 'node:crypto';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { GameState, PlayerId } from '../types.js';
 import { globalStore } from '../state/store.js';
@@ -21,6 +22,11 @@ export interface AuthContext {
   player: PlayerId;
 }
 
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 export function authenticate(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply,
@@ -36,8 +42,8 @@ export function authenticate(
     return null;
   }
   let player: PlayerId | null = null;
-  if (game.tokens.player_a === token) player = 'player_a';
-  else if (game.tokens.player_b === token) player = 'player_b';
+  if (safeEqual(game.tokens.player_a, token)) player = 'player_a';
+  else if (safeEqual(game.tokens.player_b, token)) player = 'player_b';
   if (player === null) {
     reply.code(401).send({ error: 'invalid token', code: 'invalid_token' });
     return null;

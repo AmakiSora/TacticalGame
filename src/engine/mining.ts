@@ -9,7 +9,7 @@ export function collectBaseIncome(
   bus: EventBus,
   owner: PlayerId,
 ): void {
-  const amount = getBaseIncome();
+  const amount = getBaseIncome(game.config);
   game.resources[owner].gold += amount;
   appendEvent(game, bus, 'base_income', { owner, amount });
 }
@@ -19,7 +19,7 @@ export function collectMiningIncome(
   bus: EventBus,
   owner: PlayerId,
 ): number {
-  const income = getMinerIncome();
+  const income = getMinerIncome(game.config);
   let total = 0;
   for (const b of game.buildings) {
     if (b.owner !== owner) continue;

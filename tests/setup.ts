@@ -1,3 +1,3 @@
-import { loadConfig } from '../src/config/loader.js';
+import { loadMaps } from '../src/config/loader.js';
 
-loadConfig();
+loadMaps();

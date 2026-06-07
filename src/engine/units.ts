@@ -2,7 +2,7 @@
 import type { GameState, PlayerId } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './building.js';
-import { isInBounds, getCellOccupant, manhattanDistance } from './validation.js';
+import { isInBounds, getCellOccupant, manhattanDistance, isPassable } from './validation.js';
 import { appendEvent } from './events.js';
 
 export function moveUnit(
@@ -29,6 +29,9 @@ export function moveUnit(
   const dist = manhattanDistance({ x: unit.x, y: unit.y }, { x: toX, y: toY });
   if (dist > unit.moveRange) {
     return { ok: false, code: 'invalid_move', message: `target too far (${dist} > ${unit.moveRange})` };
+  }
+  if (!isPassable(game, toX, toY)) {
+    return { ok: false, code: 'invalid_move', message: 'target cell is impassable terrain' };
   }
   if (getCellOccupant(game, toX, toY) !== null) {
     return { ok: false, code: 'cell_occupied', message: 'target cell occupied' };

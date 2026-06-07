@@ -1,18 +1,16 @@
 // src/state/store.ts
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { GameState, Building, PlayerId } from '../types.js';
-import {
-  getBuildingSpec, getHQPositions, getMiningPoints,
-  getMapWidth, getMapHeight, getStartingGold,
-} from '../engine/specs.js';
+import { getMapConfig } from '../config/loader.js';
+import type { MapConfig } from '../config/loader.js';
 
 function generateToken(): string {
   return randomBytes(16).toString('hex');
 }
 
-function createHQ(owner: PlayerId): Building {
-  const pos = getHQPositions()[owner];
-  const spec = getBuildingSpec('headquarters');
+function createHQ(owner: PlayerId, config: MapConfig): Building {
+  const pos = config.map.headquartersPositions[owner];
+  const spec = config.buildings['headquarters'];
   return {
     id: randomUUID(),
     owner,
@@ -28,18 +26,23 @@ function createHQ(owner: PlayerId): Building {
   };
 }
 
-export function createInitialGame(id: string): GameState {
+export function createInitialGame(id: string, mapId?: string): GameState {
+  const resolvedMapId = mapId || 'default';
+  const config = getMapConfig(resolvedMapId);
   return {
     id,
+    mapId: resolvedMapId,
+    config,
     phase: 'waiting_for_player',
-    mapWidth: getMapWidth(),
-    mapHeight: getMapHeight(),
-    miningPoints: getMiningPoints().map(p => ({ ...p })),
-    buildings: [createHQ('player_a'), createHQ('player_b')],
+    mapWidth: config.map.width,
+    mapHeight: config.map.height,
+    miningPoints: config.map.miningPoints.map(p => ({ ...p })),
+    terrain: config.map.terrain.map(row => [...row]),
+    buildings: [createHQ('player_a', config), createHQ('player_b', config)],
     units: [],
     resources: {
-      player_a: { gold: getStartingGold() },
-      player_b: { gold: getStartingGold() },
+      player_a: { gold: config.economy.startingGold },
+      player_b: { gold: config.economy.startingGold },
     },
     tokens: {
       player_a: generateToken(),

@@ -4,7 +4,7 @@ import type { GameState, PlayerId, BuildingType, Building, ApiErrorCode } from '
 import type { EventBus } from '../events/bus.js';
 import { getBuildingSpec } from './specs.js';
 import {
-  isInBounds, getCellOccupant, isInBuildRange, isMiningPoint,
+  isInBounds, getCellOccupant, isInBuildRange, isMiningPoint, isBuildable,
 } from './validation.js';
 import { appendEvent } from './events.js';
 
@@ -26,7 +26,10 @@ export function startBuild(
   if (!isInBounds(x, y, game.mapWidth, game.mapHeight)) {
     return { ok: false, code: 'invalid_move', message: 'out of bounds' };
   }
-  const spec = getBuildingSpec(type);
+  if (!isBuildable(game, x, y)) {
+    return { ok: false, code: 'cell_occupied', message: 'cannot build on wall or water' };
+  }
+  const spec = getBuildingSpec(game.config, type);
   if (game.resources[owner].gold < spec.cost) {
     return { ok: false, code: 'insufficient_gold', message: `need ${spec.cost} gold` };
   }

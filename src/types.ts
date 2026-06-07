@@ -1,4 +1,5 @@
 // src/types.ts
+import type { MapConfig } from './config/loader.js';
 
 export type PlayerId = 'player_a' | 'player_b';
 
@@ -7,6 +8,8 @@ export type UnitType = 'infantry' | 'sniper' | 'tank' | 'medic';
 export type BuildingType = 'headquarters' | 'barracks' | 'miner';
 
 export type GamePhase = 'waiting_for_player' | 'waiting_command' | 'executing' | 'game_over';
+
+export type TerrainType = 0 | 1 | 2; // 0=empty, 1=wall, 2=water
 
 export interface Position {
   x: number;
@@ -85,10 +88,13 @@ export interface GameEvent {
 
 export interface GameState {
   id: string;
+  mapId: string;
+  config: MapConfig;
   phase: GamePhase;
   mapWidth: number;
   mapHeight: number;
   miningPoints: Position[];
+  terrain: number[][];
   buildings: Building[];
   units: Unit[];
   resources: Record<PlayerId, Resources>;

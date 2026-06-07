@@ -14,6 +14,18 @@ export function isInBounds(x: number, y: number, w: number, h: number): boolean 
   return x >= 0 && x < w && y >= 0 && y < h;
 }
 
+export function getTerrain(game: GameState, x: number, y: number): number {
+  return game.terrain[y]?.[x] ?? 0;
+}
+
+export function isPassable(game: GameState, x: number, y: number): boolean {
+  return getTerrain(game, x, y) === 0;
+}
+
+export function isBuildable(game: GameState, x: number, y: number): boolean {
+  return getTerrain(game, x, y) === 0;
+}
+
 export function getCellOccupant(game: GameState, x: number, y: number): Occupant | null {
   const unit = game.units.find(u => u.alive && u.x === x && u.y === y);
   if (unit) return { kind: 'unit', entity: unit };
@@ -24,7 +36,7 @@ export function getCellOccupant(game: GameState, x: number, y: number): Occupant
 
 export function isInBuildRange(game: GameState, owner: PlayerId, x: number, y: number): boolean {
   const target = { x, y };
-  const range = getBuildRange();
+  const range = getBuildRange(game.config);
   for (const u of game.units) {
     if (u.owner !== owner || !u.alive) continue;
     if (manhattanDistance(u, target) <= range) return true;
@@ -45,11 +57,12 @@ export function findAdjacentFreeCell(game: GameState, x: number, y: number, owne
     { x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 },
   ];
   if (owner) {
-    const hq = getHQPositions()[owner];
+    const hq = getHQPositions(game.config)[owner];
     candidates.sort((a, b) => manhattanDistance(b, hq) - manhattanDistance(a, hq));
   }
   for (const c of candidates) {
     if (!isInBounds(c.x, c.y, game.mapWidth, game.mapHeight)) continue;
+    if (!isPassable(game, c.x, c.y)) continue;
     if (getCellOccupant(game, c.x, c.y) === null) return c;
   }
   return null;

@@ -21,13 +21,13 @@ export function startProduction(
   if (building.isBuilding) {
     return { ok: false, code: 'building_not_ready', message: 'building under construction' };
   }
-  if (!getCanProduce(building.type).includes(unitType)) {
+  if (!getCanProduce(game.config, building.type).includes(unitType)) {
     return { ok: false, code: 'cannot_produce', message: `${building.type} cannot produce ${unitType}` };
   }
   if (building.production !== null) {
     return { ok: false, code: 'cannot_produce', message: 'production slot busy' };
   }
-  const spec = getUnitSpec(unitType);
+  const spec = getUnitSpec(game.config, unitType);
   if (game.resources[owner].gold < spec.cost) {
     return { ok: false, code: 'insufficient_gold', message: `need ${spec.cost} gold` };
   }
@@ -48,7 +48,7 @@ function spawnUnit(
   x: number,
   y: number,
 ): Unit {
-  const spec = getUnitSpec(type);
+  const spec = getUnitSpec(game.config, type);
   const unit: Unit = {
     id: randomUUID(),
     owner, type, x, y,

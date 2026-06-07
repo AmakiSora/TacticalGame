@@ -3,19 +3,19 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { loadConfig } from './config/loader.js';
+import { loadMaps } from './config/loader.js';
 import { gamesRoutes } from './api/games.js';
 import { actionsRoutes } from './api/actions.js';
 import { eventsRoutes } from './api/events.js';
-import { configRoutes } from './api/config.js';
+import { mapsRoutes } from './api/maps.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
 
 export async function buildServer(): Promise<FastifyInstance> {
-  loadConfig();
+  loadMaps();
   const app = Fastify({ logger: false });
-  await app.register(configRoutes);
+  await app.register(mapsRoutes);
   await app.register(gamesRoutes);
   await app.register(actionsRoutes);
   await app.register(eventsRoutes);
@@ -40,7 +40,7 @@ if (isMain) {
       console.log(`    游戏页面      ${base}/play.html`);
       console.log('');
       console.log('  API 端点:');
-      console.log(`    游戏配置      GET   ${base}/api/config`);
+      console.log(`    地图列表      GET   ${base}/api/maps`);
       console.log(`    列出对局      GET   ${base}/api/games`);
       console.log(`    创建对局      POST  ${base}/api/games`);
       console.log(`    加入对局      POST  ${base}/api/games/:id/join`);

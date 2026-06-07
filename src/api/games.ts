@@ -5,6 +5,7 @@ import { globalStore, createInitialGame } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import { joinGame } from '../engine/engine.js';
 import { authenticate, sanitizeGameForResponse, statusForCode } from './auth.js';
+import { listMaps } from '../config/loader.js';
 
 export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/games', async () => {
@@ -20,9 +21,17 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
-  app.post('/api/games', async (_req, _reply) => {
+  app.post<{ Body: { mapId?: string } }>('/api/games', async (req, reply) => {
+    const mapId = req.body?.mapId || 'default';
+    const available = listMaps();
+    if (!available.some(m => m.id === mapId)) {
+      return reply.code(400).send({
+        error: `Map "${mapId}" not found. Available: ${available.map(m => m.id).join(', ')}`,
+        code: 'invalid_move',
+      });
+    }
     const id = randomUUID();
-    const game = createInitialGame(id);
+    const game = createInitialGame(id, mapId);
     globalStore.save(game);
     return { gameId: id, playerAToken: game.tokens.player_a };
   });

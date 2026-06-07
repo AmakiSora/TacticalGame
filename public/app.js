@@ -1,15 +1,8 @@
 const CELL = 28;
 const GRID_COLOR = '#244';
 
-// ─── game config (loaded from /api/config) ───
+// ─── game config (derived from game_start event) ───
 let gameConfig = null;
-
-async function loadGameConfig() {
-  if (window.GAME_CONFIG) { gameConfig = window.GAME_CONFIG; return; }
-  const res = await fetch('/api/config');
-  if (!res.ok) throw new Error('Failed to load game config');
-  gameConfig = await res.json();
-}
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -299,6 +292,7 @@ function createEmptyState() {
   return {
     mapWidth: map.width || 20, mapHeight: map.height || 20,
     miningPoints: [],
+    terrain: [],
     units: new Map(), buildings: new Map(),
     resources: { player_a: { gold: eco.startingGold || 100 }, player_b: { gold: eco.startingGold || 100 } },
     turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command' },
@@ -313,6 +307,7 @@ function applyEvent(s, ev) {
       s.mapWidth = ev.payload.mapWidth ?? (gameConfig?.map?.width ?? 20);
       s.mapHeight = ev.payload.mapHeight ?? (gameConfig?.map?.height ?? 20);
       s.miningPoints = ev.payload.miningPoints ?? [];
+      s.terrain = ev.payload.terrain ?? [];
       if (ev.payload.buildings) {
         for (const b of ev.payload.buildings) {
           s.buildings.set(b.id, { ...b, production: b.production || null, buildProgress: b.buildProgress || 0 });
@@ -460,6 +455,8 @@ function drawHpBar(cx, cy, hp, maxHp, barWidth) {
 
 function drawBoard() {
   if (!state) return;
+  canvas.width = state.mapWidth * CELL;
+  canvas.height = state.mapHeight * CELL;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = GRID_COLOR;
   ctx.lineWidth = 1;
@@ -474,6 +471,23 @@ function drawBoard() {
     ctx.beginPath();
     ctx.arc(p.x * CELL + CELL / 2, p.y * CELL + CELL / 2, 4, 0, 6.28);
     ctx.fill();
+  }
+  // terrain
+  for (let y = 0; y < state.mapHeight; y++) {
+    for (let x = 0; x < state.mapWidth; x++) {
+      const t = state.terrain[y]?.[x] ?? 0;
+      if (t === 1) {
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+        ctx.fillStyle = '#555';
+        ctx.fillRect(x * CELL + 3, y * CELL + 3, CELL - 6, CELL - 6);
+      } else if (t === 2) {
+        ctx.fillStyle = '#1a3a5a';
+        ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+        ctx.fillStyle = '#2a5a8a';
+        ctx.fillRect(x * CELL + 3, y * CELL + 3, CELL - 6, CELL - 6);
+      }
+    }
   }
   for (const b of state.buildings.values()) {
     if (!b.alive) continue;
@@ -855,12 +869,11 @@ function exportJson() {
 function exportHtml() {
   if (allEvents.length === 0) { alert('没有可导出的对局'); return; }
 
-  // Fetch current CSS, JS, and config to embed
+  // Fetch current CSS and JS to embed
   Promise.all([
     fetch('/style.css').then(r => r.text()),
     fetch('/app.js').then(r => r.text()),
-    fetch('/api/config').then(r => r.json()).catch(() => null),
-  ]).then(([cssText, jsText, configData]) => {
+  ]).then(([cssText, jsText]) => {
     // Build standalone HTML
     const eventsJson = JSON.stringify(allEvents);
     const gameId = gameSelect.value || 'unknown';
@@ -917,8 +930,6 @@ body { padding-top: 12px; }
 </aside>
 </main>
 <script>
-// Embedded game config
-${configData ? `window.GAME_CONFIG = ${JSON.stringify(configData)};` : ''}
 // Embedded events data
 const EMBEDDED_EVENTS = ${eventsJson};
 // Override fetch for standalone mode
@@ -926,9 +937,6 @@ const _fetch = window.fetch;
 window.fetch = function(url, opts) {
   if (typeof url === 'string' && url.includes('/events')) {
     return Promise.resolve(new Response(JSON.stringify({ events: EMBEDDED_EVENTS })));
-  }
-  if (typeof url === 'string' && url === '/api/config') {
-    return Promise.resolve(new Response(JSON.stringify(window.GAME_CONFIG || {})));
   }
   if (typeof url === 'string' && url === '/api/games') {
     return Promise.resolve(new Response(JSON.stringify({ games: [
@@ -986,7 +994,4 @@ btnImport.addEventListener('click', importJson);
 
 // ─── Init ───
 
-(async () => {
-  try { await loadGameConfig(); } catch (e) { console.error('Failed to load game config:', e); }
-  fetchGameList();
-})();
+fetchGameList();

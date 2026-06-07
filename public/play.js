@@ -31,6 +31,7 @@ const els = {
   joinPanel:    $('join-panel'),
   gameId:       $('game-id'),
   playerToken:  $('player-token'),
+  mapSelect:    $('map-select'),
   btnCreate:    $('btn-create'),
   btnJoin:      $('btn-join'),
   btnConnect:   $('btn-connect'),
@@ -81,14 +82,23 @@ const els = {
 
 const ctx = els.canvas.getContext('2d');
 
-// ─── game config (loaded from /api/config) ───
+// ─── game config (derived from game_start event) ───
 let gameConfig = null;
 
-async function loadGameConfig() {
-  if (window.GAME_CONFIG) { gameConfig = window.GAME_CONFIG; return; }
-  const res = await fetch('/api/config');
-  if (!res.ok) throw new Error('Failed to load game config');
-  gameConfig = await res.json();
+async function loadMapList() {
+  try {
+    const res = await fetch('/api/maps');
+    const { maps } = await res.json();
+    const sel = els.mapSelect;
+    if (!sel) return;
+    sel.innerHTML = '';
+    for (const m of maps) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = `${m.name} — ${m.description}`;
+      sel.appendChild(opt);
+    }
+  } catch (e) { console.error('Failed to load map list:', e); }
 }
 
 // ─── state ───
@@ -154,6 +164,7 @@ function createEmptyState() {
   return {
     mapWidth: map.width || 20, mapHeight: map.height || 20,
     miningPoints: [],
+    terrain: [],
     units: new Map(),
     buildings: new Map(),
     resources: { player_a: { gold: eco.startingGold || 100 }, player_b: { gold: eco.startingGold || 100 } },
@@ -171,6 +182,7 @@ function applyEvent(s, ev) {
       s.mapWidth = p.mapWidth ?? (gameConfig?.map?.width ?? 20);
       s.mapHeight = p.mapHeight ?? (gameConfig?.map?.height ?? 20);
       s.miningPoints = p.miningPoints ?? [];
+      s.terrain = p.terrain ?? [];
       // buildings from payload or defaults
       if (p.buildings) {
         for (const b of p.buildings) s.buildings.set(b.id, {
@@ -440,6 +452,24 @@ function drawBoard() {
   }
   for (let j = 0; j <= H; j++) {
     ctx.beginPath(); ctx.moveTo(0, j * CELL); ctx.lineTo(W * CELL, j * CELL); ctx.stroke();
+  }
+
+  // terrain
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const t = state.terrain[y]?.[x] ?? 0;
+      if (t === 1) {
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+        ctx.fillStyle = '#555';
+        ctx.fillRect(x * CELL + 3, y * CELL + 3, CELL - 6, CELL - 6);
+      } else if (t === 2) {
+        ctx.fillStyle = '#1a3a5a';
+        ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+        ctx.fillStyle = '#2a5a8a';
+        ctx.fillRect(x * CELL + 3, y * CELL + 3, CELL - 6, CELL - 6);
+      }
+    }
   }
 
   // mining points
@@ -969,7 +999,12 @@ els.btnRefresh.addEventListener('click', async () => {
 
 // ─── join / create flow ───
 els.btnCreate.addEventListener('click', async () => {
-  const res = await fetch('/api/games', { method: 'POST' });
+  const mapId = els.mapSelect?.value || 'default';
+  const res = await fetch('/api/games', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mapId }),
+  });
   const data = await res.json();
   els.gameId.value = data.gameId;
   els.playerToken.value = data.playerAToken;
@@ -1001,8 +1036,6 @@ els.btnConnect.addEventListener('click', async () => {
 
   if (!myPlayer) myPlayer = 'player_a';
 
-  // load config first, then state
-  try { await loadGameConfig(); } catch { toast('无法加载游戏配置', 'err'); return; }
   const ok = await loadFullState();
   if (!ok) { toast('无法加载游戏状态', 'err'); return; }
 
@@ -1036,3 +1069,6 @@ document.addEventListener('click', e => {
     drawBoard();
   }
 });
+
+// load map list on startup
+loadMapList();

@@ -1,17 +1,17 @@
 import type { GameState, PlayerId, Unit, Building } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './building.js';
+import type { MapConfig } from '../config/loader.js';
 import { manhattanDistance } from './validation.js';
 import { appendEvent } from './events.js';
-import { getConfig } from '../config/loader.js';
 
-function rollDamageVariance(): number {
-  const range = getConfig().combat.damageVarianceRange;
+function rollDamageVariance(config: MapConfig): number {
+  const range = config.combat.damageVarianceRange;
   return Math.floor(Math.random() * (2 * range + 1)) - range;
 }
 
-export function rollHealAmount(): number {
-  const cfg = getConfig().combat;
+export function rollHealAmount(config: MapConfig): number {
+  const cfg = config.combat;
   return cfg.healBase + Math.floor(Math.random() * (cfg.healVarianceRange + 1));
 }
 
@@ -27,9 +27,9 @@ function targetPos(t: Unit | Building): { x: number; y: number } {
   return { x: t.x, y: t.y };
 }
 
-function computeDamage(attack: number, defense: number): number {
-  const base = attack - defense + rollDamageVariance();
-  return Math.max(getConfig().combat.minimumDamage, base);
+function computeDamage(config: MapConfig, attack: number, defense: number): number {
+  const base = attack - defense + rollDamageVariance(config);
+  return Math.max(config.combat.minimumDamage, base);
 }
 
 function endGame(game: GameState, bus: EventBus, winner: PlayerId): void {
@@ -66,7 +66,7 @@ export function attackTarget(
   }
 
   const defense = 'defense' in target ? target.defense : 0;
-  const damage = computeDamage(attacker.attack, defense);
+  const damage = computeDamage(game.config, attacker.attack, defense);
   target.hp = Math.max(0, target.hp - damage);
   attacker.hasAttacked = true;
   appendEvent(game, bus, 'attack', {
@@ -118,11 +118,11 @@ export function healTarget(
     return { ok: false, code: 'invalid_heal', message: 'cannot heal enemy' };
   }
   const dist = manhattanDistance({ x: medic.x, y: medic.y }, { x: target.x, y: target.y });
-  if (dist > getConfig().combat.healRange) {
+  if (dist > game.config.combat.healRange) {
     return { ok: false, code: 'invalid_heal', message: 'target not adjacent' };
   }
 
-  const amount = rollHealAmount();
+  const amount = rollHealAmount(game.config);
   const healed = Math.min(target.maxHp - target.hp, amount);
   target.hp += healed;
   medic.hasAttacked = true;

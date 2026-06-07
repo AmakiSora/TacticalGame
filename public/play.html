@@ -13,31 +13,50 @@
   <div id="conn-status" class="badge">未连接</div>
 </header>
 
-<!-- ══════════ 第一步：加入游戏 ══════════ -->
+<!-- ══════════ 加入/创建游戏 ══════════ -->
 <section id="join-panel" class="panel">
-  <h2>🎮 加入游戏</h2>
-  <div class="row">
-    <div class="field">
-      <label>游戏 ID</label>
-      <input id="game-id" placeholder="粘贴 gameId…" />
-    </div>
-    <div class="field">
-      <label>玩家 Token</label>
-      <input id="player-token" placeholder="粘贴 token…（留空则创建新游戏）" />
-    </div>
+  <h2>🎮 游戏大厅</h2>
+
+  <!-- 标签切换 -->
+  <div class="lobby-tabs">
+    <button class="lobby-tab active" data-tab="create">创建游戏</button>
+    <button class="lobby-tab" data-tab="join">加入游戏</button>
   </div>
-  <div class="row">
-    <div class="field" style="flex:1">
+
+  <!-- 创建游戏 -->
+  <div id="tab-create" class="lobby-tab-content active">
+    <div class="field">
       <label>选择地图</label>
       <select id="map-select"><option value="default">default</option></select>
     </div>
+    <button id="btn-create" class="btn primary" style="margin-top:14px;width:100%">➕ 创建新游戏</button>
+    <div id="create-result" class="lobby-result hidden">
+      <div class="info-row">
+        <span class="info-label">Game ID</span>
+        <code id="created-game-id" class="info-value"></code>
+        <button class="btn-copy" data-copy="created-game-id">复制</button>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Token</span>
+        <code id="created-token" class="info-value"></code>
+        <button class="btn-copy" data-copy="created-token">复制</button>
+      </div>
+      <p class="lobby-hint">请保存 Token，将 Game ID 发给对手。</p>
+      <button id="btn-connect-create" class="btn success" style="width:100%;margin-top:10px">✅ 连接进入游戏</button>
+    </div>
   </div>
-  <div class="row actions">
-    <button id="btn-create" class="btn primary">➕ 创建新游戏</button>
-    <button id="btn-join" class="btn">🔗 加入游戏</button>
-    <button id="btn-connect" class="btn success" disabled>✅ 连接</button>
+
+  <!-- 加入游戏 -->
+  <div id="tab-join" class="lobby-tab-content">
+    <div class="field">
+      <label>游戏 ID</label>
+      <input id="game-id" placeholder="粘贴 Game ID…" />
+    </div>
+    <button id="btn-join" class="btn primary" style="margin-top:14px;width:100%">🔗 加入游戏</button>
+    <div id="join-result" class="lobby-result hidden">
+      <p class="lobby-status" id="join-status-text"></p>
+    </div>
   </div>
-  <div id="join-result" class="result"></div>
 </section>
 
 <!-- ══════════ 主界面（连接后显示）══════════ -->

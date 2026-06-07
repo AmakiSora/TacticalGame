@@ -34,6 +34,13 @@ export function joinGame(game: GameState, bus: EventBus): Result {
       x: b.x, y: b.y, hp: b.hp, maxHp: b.maxHp,
       alive: b.alive, isBuilding: b.isBuilding,
     })),
+    config: {
+      units: game.config.units,
+      buildings: game.config.buildings,
+      canProduce: game.config.canProduce,
+      economy: game.config.economy,
+      map: { buildRange: game.config.map.buildRange, headquartersPositions: game.config.map.headquartersPositions },
+    },
   });
   return { ok: true };
 }

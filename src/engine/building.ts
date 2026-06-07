@@ -74,6 +74,10 @@ export function tickBuildProgress(game: GameState, bus: EventBus, owner: PlayerI
       appendEvent(game, bus, 'build_complete', {
         buildingId: b.id, owner, type: b.type, x: b.x, y: b.y,
       });
+    } else {
+      appendEvent(game, bus, 'build_tick', {
+        buildingId: b.id, owner, type: b.type, buildProgress: b.buildProgress,
+      });
     }
   }
 }

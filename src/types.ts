@@ -69,6 +69,7 @@ export type EventType =
   | 'heal'
   | 'unit_death'
   | 'build'
+  | 'build_tick'
   | 'build_complete'
   | 'produce'
   | 'produce_complete'

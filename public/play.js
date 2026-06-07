@@ -27,16 +27,19 @@ const COLORS = {
 // ─── DOM refs ───
 const $ = id => document.getElementById(id);
 const els = {
-  // join panel
-  joinPanel:    $('join-panel'),
-  gameId:       $('game-id'),
-  playerToken:  $('player-token'),
-  mapSelect:    $('map-select'),
-  btnCreate:    $('btn-create'),
-  btnJoin:      $('btn-join'),
-  btnConnect:   $('btn-connect'),
-  joinResult:   $('join-result'),
-  connStatus:   $('conn-status'),
+  // lobby
+  joinPanel:      $('join-panel'),
+  gameId:         $('game-id'),
+  mapSelect:      $('map-select'),
+  btnCreate:      $('btn-create'),
+  btnJoin:        $('btn-join'),
+  btnConnectCreate: $('btn-connect-create'),
+  connStatus:     $('conn-status'),
+  createResult:   $('create-result'),
+  createdGameId:  $('created-game-id'),
+  createdToken:   $('created-token'),
+  joinResult:     $('join-result'),
+  joinStatusText: $('join-status-text'),
 
   // game UI
   gameUI:       $('game-ui'),
@@ -51,6 +54,29 @@ const els = {
   selDetail:    $('selection-detail'),
   events:       $('events'),
 };
+
+// ─── lobby tab switching ───
+document.querySelectorAll('.lobby-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.lobby-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.lobby-tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ─── copy buttons ───
+document.querySelectorAll('.btn-copy').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sourceEl = document.getElementById(btn.dataset.copy);
+    if (!sourceEl) return;
+    navigator.clipboard.writeText(sourceEl.textContent).then(() => {
+      btn.textContent = '已复制';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+    });
+  });
+});
 
 const ctx = els.canvas.getContext('2d');
 
@@ -155,6 +181,7 @@ function applyEvent(s, ev) {
   const p = ev.payload || {};
   switch (ev.type) {
     case 'game_start':
+      if (p.config) gameConfig = p.config;
       s.mapWidth = p.mapWidth ?? (gameConfig?.map?.width ?? 20);
       s.mapHeight = p.mapHeight ?? (gameConfig?.map?.height ?? 20);
       s.miningPoints = p.miningPoints ?? [];
@@ -180,10 +207,15 @@ function applyEvent(s, ev) {
         s.buildings.set(p.buildingId, {
           id: p.buildingId, owner: p.owner, type: p.type,
           x: p.x, y: p.y, hp: p.hp || bMaxHp, maxHp: p.maxHp || bMaxHp,
-          alive: true, isBuilding: true, production: null, buildProgress: 0,
+          alive: true, isBuilding: true, production: null, buildProgress: p.buildTime || 0,
         });
       }
       break;
+    case 'build_tick': {
+      const b = s.buildings.get(p.buildingId);
+      if (b) b.buildProgress = p.buildProgress;
+      break;
+    }
     case 'build_complete': {
       const b = s.buildings.get(p.buildingId);
       if (b) { b.isBuilding = false; b.buildProgress = 0; }
@@ -520,7 +552,8 @@ function drawBoard() {
       ctx.fillStyle = '#333';
       ctx.fillRect(b.x * CELL + 1, b.y * CELL + 1, CELL - 2, CELL - 2);
       ctx.fillStyle = color;
-      const pct = b.buildProgress || 0;
+      const buildTime = gameConfig?.buildings?.[b.type]?.buildTime || 1;
+      const pct = 1 - (b.buildProgress || 0) / buildTime;
       ctx.fillRect(b.x * CELL + 1, b.y * CELL + CELL - 4, (CELL - 2) * pct, 3);
     } else {
       ctx.fillStyle = color;
@@ -668,7 +701,7 @@ function renderSelectionInfo() {
       const hpPct = Math.round((b.hp / b.maxHp) * 100);
       const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
       const statusText = b.isBuilding
-        ? `🔨 建造中 (${Math.round((b.buildProgress || 0) * 100)}%)`
+        ? `🔨 建造中 (剩余 ${b.buildProgress || 0} 回合)`
         : b.production
         ? `🏭 生产中: ${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'} (剩余 ${b.production.turnsRemaining} 回合)`
         : '✅ 空闲';
@@ -956,53 +989,98 @@ els.btnRefresh.addEventListener('click', async () => {
   toast('状态已刷新', 'ok');
 });
 
-// ─── join / create flow ───
+// ─── create game ───
 els.btnCreate.addEventListener('click', async () => {
   const mapId = els.mapSelect?.value || 'default';
+  els.btnCreate.disabled = true;
+  els.btnCreate.textContent = '创建中…';
+
   const res = await fetch('/api/games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mapId }),
   });
   const data = await res.json();
-  els.gameId.value = data.gameId;
-  els.playerToken.value = data.playerAToken;
-  showResult(els.joinResult, `✅ 游戏已创建！\nGame ID: ${data.gameId}\nToken: ${data.playerAToken}\n\n请保存 token，然后将 gameId 发给对手。`, true);
+
   myToken = data.playerAToken;
   myPlayer = 'player_a';
   gameId = data.gameId;
-  els.btnConnect.disabled = false;
+
+  els.createdGameId.textContent = data.gameId;
+  els.createdToken.textContent = data.playerAToken;
+  els.createResult.classList.remove('hidden');
+  els.btnCreate.disabled = false;
+  els.btnCreate.textContent = '➕ 创建新游戏';
 });
 
+// ─── join game (auto-connect) ───
 els.btnJoin.addEventListener('click', async () => {
   const gid = els.gameId.value.trim();
-  if (!gid) { showResult(els.joinResult, '请输入游戏 ID', false); return; }
+  if (!gid) {
+    els.joinStatusText.textContent = '请输入游戏 ID';
+    els.joinStatusText.className = 'lobby-status err';
+    els.joinResult.classList.remove('hidden');
+    return;
+  }
+
+  els.btnJoin.disabled = true;
+  els.btnJoin.textContent = '加入中…';
+
   const res = await fetch(`/api/games/${gid}/join`, { method: 'POST' });
   const data = await res.json();
-  if (!res.ok) { showResult(els.joinResult, `加入失败: ${data.error}`, false); return; }
-  els.playerToken.value = data.playerBToken;
-  showResult(els.joinResult, `✅ 已加入游戏！\nToken: ${data.playerBToken}`, true);
+
+  if (!res.ok) {
+    els.joinStatusText.textContent = `加入失败: ${data.error}`;
+    els.joinStatusText.className = 'lobby-status err';
+    els.joinResult.classList.remove('hidden');
+    els.btnJoin.disabled = false;
+    els.btnJoin.textContent = '🔗 加入游戏';
+    return;
+  }
+
   myToken = data.playerBToken;
   myPlayer = 'player_b';
   gameId = gid;
-  els.btnConnect.disabled = false;
-});
 
-els.btnConnect.addEventListener('click', async () => {
-  gameId = els.gameId.value.trim();
-  myToken = els.playerToken.value.trim();
-  if (!gameId || !myToken) { toast('请填写游戏 ID 和 Token', 'err'); return; }
-
-  if (!myPlayer) myPlayer = 'player_a';
+  els.joinStatusText.textContent = '已加入，正在连接…';
+  els.joinStatusText.className = 'lobby-status connecting';
+  els.joinResult.classList.remove('hidden');
 
   const ok = await loadFullState();
-  if (!ok) { toast('无法加载游戏状态', 'err'); return; }
+  if (!ok) {
+    els.joinStatusText.textContent = '加载游戏状态失败';
+    els.joinStatusText.className = 'lobby-status err';
+    els.btnJoin.disabled = false;
+    els.btnJoin.textContent = '🔗 加入游戏';
+    return;
+  }
 
-  // switch UI
   els.joinPanel.classList.add('hidden');
   els.gameUI.classList.remove('hidden');
   statusBadge('已连接', 'ok');
+  subscribeSse();
+  drawBoard();
+  renderSidebar();
+});
 
+// ─── connect after create ───
+els.btnConnectCreate.addEventListener('click', async () => {
+  if (!gameId || !myToken) { toast('缺少游戏 ID 或 Token', 'err'); return; }
+
+  els.btnConnectCreate.disabled = true;
+  els.btnConnectCreate.textContent = '连接中…';
+
+  const ok = await loadFullState();
+  if (!ok) {
+    toast('无法加载游戏状态', 'err');
+    els.btnConnectCreate.disabled = false;
+    els.btnConnectCreate.textContent = '✅ 连接进入游戏';
+    return;
+  }
+
+  els.joinPanel.classList.add('hidden');
+  els.gameUI.classList.remove('hidden');
+  statusBadge('已连接', 'ok');
   subscribeSse();
   drawBoard();
   renderSidebar();

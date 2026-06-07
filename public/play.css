@@ -97,6 +97,97 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .result.ok   { background: #0a2a1a; border: 1px solid #1a5a3a; color: #6dcc8a; }
 .result.err  { background: #2a0a0a; border: 1px solid #5a1a1a; color: #cc6d6d; }
 
+/* ══════════ lobby tabs ══════════ */
+.lobby-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #2a3a4a;
+}
+.lobby-tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  color: #7a9aaa;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+}
+.lobby-tab:hover { color: #b0c8d8; }
+.lobby-tab.active {
+  color: #9ec;
+  border-bottom-color: #9ec;
+}
+.lobby-tab-content { display: none; }
+.lobby-tab-content.active { display: block; }
+
+/* ══════════ lobby result ══════════ */
+.lobby-result {
+  margin-top: 16px;
+  padding: 16px;
+  background: #0f1a24;
+  border: 1px solid #2a4a5a;
+  border-radius: 8px;
+}
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.info-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #5a8a9a;
+  min-width: 60px;
+}
+.info-value {
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 13px;
+  color: #9ec;
+  background: #0a1218;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #1a3a4a;
+  flex: 1;
+  word-break: break-all;
+}
+.btn-copy {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid #2a3a4a;
+  border-radius: 4px;
+  background: #1a2a3a;
+  color: #7a9aaa;
+  cursor: pointer;
+  transition: all .12s;
+  flex-shrink: 0;
+}
+.btn-copy:hover { background: #26384a; color: #b0c8d8; }
+.btn-copy.copied { background: #1a4a2a; border-color: #2a8a4a; color: #8da; }
+.lobby-hint {
+  font-size: 12px;
+  color: #5a7a8a;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.lobby-status {
+  font-size: 14px;
+  text-align: center;
+  margin: 0;
+}
+.lobby-status.ok { color: #6dcc8a; }
+.lobby-status.err { color: #cc6d6d; }
+.lobby-status.connecting { color: #6cf; }
+
 /* ══════════ main layout ══════════ */
 #game-ui { display: flex; padding: 20px 24px; gap: 20px; }
 .hidden { display: none !important; }

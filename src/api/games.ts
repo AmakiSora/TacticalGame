@@ -16,13 +16,15 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         return {
           id, phase: g.phase, turnNumber: g.turn.turnNumber,
           currentOwner: g.turn.currentOwner, winner: g.winner,
+          playerNames: g.playerNames,
         };
       }),
     };
   });
 
-  app.post<{ Body: { mapId?: string } }>('/api/games', async (req, reply) => {
+  app.post<{ Body: { mapId?: string; name?: string } }>('/api/games', async (req, reply) => {
     const mapId = req.body?.mapId || 'default';
+    const name = req.body?.name || '玩家 A';
     const available = listMaps();
     if (!available.some(m => m.id === mapId)) {
       return reply.code(400).send({
@@ -32,16 +34,18 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     }
     const id = randomUUID();
     const game = createInitialGame(id, mapId);
+    game.playerNames.player_a = name;
     globalStore.save(game);
     return { gameId: id, playerAToken: game.tokens.player_a };
   });
 
-  app.post<{ Params: { id: string } }>('/api/games/:id/join', async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { name?: string } }>('/api/games/:id/join', async (req, reply) => {
     const game = globalStore.get(req.params.id);
     if (!game) {
       return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
     }
-    const result = joinGame(game, globalEventBus);
+    const name = req.body?.name || '玩家 B';
+    const result = joinGame(game, globalEventBus, name);
     if (!result.ok) {
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }

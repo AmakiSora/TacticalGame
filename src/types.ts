@@ -100,6 +100,7 @@ export interface GameState {
   units: Unit[];
   resources: Record<PlayerId, Resources>;
   tokens: Record<PlayerId, string>;
+  playerNames: Record<PlayerId, string>;
   turn: TurnState;
   events: GameEvent[];
   winner: PlayerId | null;

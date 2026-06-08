@@ -5,8 +5,13 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function playerName(owner) {
+  return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B');
+}
+
 // ─── game config (derived from game_start event) ───
 let gameConfig = null;
+let playerNames = { player_a: '玩家 A', player_b: '玩家 B' };
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -292,7 +297,10 @@ async function fetchGameList() {
   for (const g of games) {
     const opt = document.createElement('option');
     opt.value = g.id;
-    opt.textContent = `${g.id.slice(0, 8)} — ${g.phase} (回合 ${g.turnNumber}, ${g.currentOwner})`;
+    const names = g.playerNames || {};
+    const nameA = names.player_a || 'A';
+    const nameB = names.player_b || 'B';
+    opt.textContent = `${g.id.slice(0, 8)} — ${g.phase} (回合 ${g.turnNumber}, ${g.currentOwner === 'player_a' ? nameA : nameB})`;
     gameSelect.appendChild(opt);
   }
   // Restore previous selection if still available
@@ -324,6 +332,7 @@ function applyEvent(s, ev) {
   switch (ev.type) {
     case 'game_start':
       if (ev.payload.config) gameConfig = ev.payload.config;
+      if (ev.payload.playerNames) playerNames = ev.payload.playerNames;
       s.mapWidth = ev.payload.mapWidth ?? (gameConfig?.map?.width ?? 20);
       s.mapHeight = ev.payload.mapHeight ?? (gameConfig?.map?.height ?? 20);
       s.miningPoints = ev.payload.miningPoints ?? [];
@@ -626,12 +635,12 @@ canvas.addEventListener('mousemove', e => {
   let info = `(${x}, ${y})`;
   if (u) {
     const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
-    info += ` | ${typeName} [${u.owner}] HP:${u.hp}/${u.maxHp}`;
+    info += ` | ${typeName} [${playerName(u.owner)}] HP:${u.hp}/${u.maxHp}`;
   }
   if (b) {
     const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
     const status = b.isBuilding ? ' 建造中' : b.production ? ` 生产${b.production.type}` : '';
-    info += ` | ${typeName} [${b.owner}] HP:${b.hp}/${b.maxHp}${status}`;
+    info += ` | ${typeName} [${playerName(b.owner)}] HP:${b.hp}/${b.maxHp}${status}`;
   }
   cellInfoEl.textContent = info;
   renderSelectionInfo(u, b);
@@ -657,7 +666,7 @@ function renderSelectionInfo(u, b) {
   if (!selDetailEl) return;
   if (u) {
     const ownerCls = u.owner === 'player_a' ? 'player-a' : 'player-b';
-    const ownerName = u.owner === 'player_a' ? '玩家 A' : '玩家 B';
+    const ownerName = playerName(u.owner);
     const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
     const hpPct = Math.round((u.hp / u.maxHp) * 100);
     const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
@@ -677,7 +686,7 @@ function renderSelectionInfo(u, b) {
   }
   if (b) {
     const ownerCls = b.owner === 'player_a' ? 'player-a' : 'player-b';
-    const ownerName = b.owner === 'player_a' ? '玩家 A' : '玩家 B';
+    const ownerName = playerName(b.owner);
     const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
     const hpPct = Math.round((b.hp / b.maxHp) * 100);
     const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
@@ -719,19 +728,19 @@ function renderSidebar() {
   resourcesEl.innerHTML = `
     <h3>资源 & 总览</h3>
     <div style="display:flex;gap:16px;margin-bottom:8px">
-      <div><span class="player-a">玩家 A</span>: ${state.resources.player_a.gold} 金</div>
-      <div><span class="player-b">玩家 B</span>: ${state.resources.player_b.gold} 金</div>
+      <div><span class="player-a">${esc(playerName('player_a'))}</span>: ${state.resources.player_a.gold} 金</div>
+      <div><span class="player-b">${esc(playerName('player_b'))}</span>: ${state.resources.player_b.gold} 金</div>
     </div>
     <div style="font-size:11px;color:#5a7a8a">
-      <span class="player-a">A</span>: ${counts.a_units} 单位 / ${counts.a_bld} 建筑
+      <span class="player-a">${esc(playerName('player_a'))}</span>: ${counts.a_units} 单位 / ${counts.a_bld} 建筑
       &nbsp;|&nbsp;
-      <span class="player-b">B</span>: ${counts.b_units} 单位 / ${counts.b_bld} 建筑
+      <span class="player-b">${esc(playerName('player_b'))}</span>: ${counts.b_units} 单位 / ${counts.b_bld} 建筑
     </div>
   `;
   turnInfoEl.innerHTML = `
     <h3>回合 ${state.turn.turnNumber}</h3>
-    <div>当前: <span class="${turnOwner === 'player_a' ? 'player-a' : 'player-b'}">${esc(turnOwner)}</span></div>
-    ${isOver ? `<div style="color:#ff8;font-weight:700;margin-top:4px">🏆 游戏结束 — 胜者: ${esc(state.winner || '无')}</div>` : ''}
+    <div>当前: <span class="${turnOwner === 'player_a' ? 'player-a' : 'player-b'}">${esc(playerName(turnOwner))}</span></div>
+    ${isOver ? `<div style="color:#ff8;font-weight:700;margin-top:4px">🏆 游戏结束 — 胜者: ${esc(state.winner ? playerName(state.winner) : '无')}</div>` : ''}
   `;
 
   // Event log — show all, highlight current
@@ -804,8 +813,8 @@ function formatEventShort(ev) {
     case 'produce_complete': return `${p.type} 出现在(${p.x},${p.y})`;
     case 'unit_death': return `单位阵亡 ${p.unitId?.slice(0,6)}`;
     case 'base_destroyed': return `建筑摧毁 ${p.type} @(${p.x},${p.y})`;
-    case 'turn_end': return `回合结束 → ${p.nextOwner} (回合${p.turnNumber})`;
-    case 'game_over': return `游戏结束 胜者:${p.winner}`;
+    case 'turn_end': return `回合结束 → ${playerName(p.nextOwner)} (回合${p.turnNumber})`;
+    case 'game_over': return `游戏结束 胜者:${p.winner ? playerName(p.winner) : '无'}`;
     case 'mine': return `采矿收入 +${p.amount}`;
     case 'base_income': return `基础收入 +${p.amount}`;
     case 'reset_actions': return `行动重置 ${p.owner}`;

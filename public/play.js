@@ -30,6 +30,8 @@ const els = {
   // lobby
   joinPanel:      $('join-panel'),
   gameId:         $('game-id'),
+  createName:     $('create-name'),
+  joinName:       $('join-name'),
   mapSelect:      $('map-select'),
   btnCreate:      $('btn-create'),
   btnJoin:        $('btn-join'),
@@ -82,6 +84,7 @@ const ctx = els.canvas.getContext('2d');
 
 // ─── game config (derived from game_start event) ───
 let gameConfig = null;
+let playerNames = { player_a: '玩家 A', player_b: '玩家 B' };
 
 async function loadMapList() {
   try {
@@ -114,6 +117,10 @@ let selectedBuildingId = null;
 // ─── helpers ───
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function playerName(owner) {
+  return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B');
 }
 
 function toast(msg, type = 'info') {
@@ -182,6 +189,7 @@ function applyEvent(s, ev) {
   switch (ev.type) {
     case 'game_start':
       if (p.config) gameConfig = p.config;
+      if (p.playerNames) playerNames = p.playerNames;
       s.mapWidth = p.mapWidth ?? (gameConfig?.map?.width ?? 20);
       s.mapHeight = p.mapHeight ?? (gameConfig?.map?.height ?? 20);
       s.miningPoints = p.miningPoints ?? [];
@@ -633,6 +641,17 @@ function drawBoard() {
       drawHpBar(u.x * CELL + 2, u.y * CELL - 3, CELL - 4, u.hp / u.maxHp);
     }
   }
+
+  // hover border highlight on entities
+  if (hoverCell) {
+    const hu = [...state.units.values()].find(u => u.alive && u.x === hoverCell.x && u.y === hoverCell.y);
+    const hb = [...state.buildings.values()].find(b => b.alive && b.x === hoverCell.x && b.y === hoverCell.y);
+    if (hu || hb) {
+      ctx.strokeStyle = 'rgba(255,255,255,.6)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(hoverCell.x * CELL + 1, hoverCell.y * CELL + 1, CELL - 2, CELL - 2);
+    }
+  }
 }
 
 function drawHpBar(x, y, w, pct) {
@@ -649,17 +668,18 @@ function renderSidebar() {
   const isMyTurn = t.currentOwner === myPlayer;
 
   // turn badge
-  els.turnBadge.textContent = `回合 ${t.turnNumber} — ${isMyTurn ? '你的回合' : t.currentOwner}`;
+  els.turnBadge.textContent = `回合 ${t.turnNumber} — ${isMyTurn ? '你的回合' : playerName(t.currentOwner)}`;
   els.turnBadge.className = `turn-badge ${isMyTurn ? 'my-turn' : ''}`;
   els.btnEndTurn.disabled = !isMyTurn;
 
   // resources
   const me = (myPlayer === 'player_a' ? 'res-a' : 'res-b') + ' res-me';
   const opp = myPlayer === 'player_a' ? 'res-b' : 'res-a';
+  const oppPlayer = myPlayer === 'player_a' ? 'player_b' : 'player_a';
   els.resDisplay.innerHTML = `
-    <div class="${me}">💰 你: ${state.resources[myPlayer].gold} 金</div>
-    <div class="${opp}">💰 对手: ${state.resources[myPlayer === 'player_a' ? 'player_b' : 'player_a'].gold} 金</div>
-    ${state.winner ? `<div style="color:#ff8;font-weight:700;margin-top:4px">🏆 胜者: ${state.winner}</div>` : ''}
+    <div class="${me}">💰 ${esc(playerName(myPlayer))}: ${state.resources[myPlayer].gold} 金</div>
+    <div class="${opp}">💰 ${esc(playerName(oppPlayer))}: ${state.resources[oppPlayer].gold} 金</div>
+    ${state.winner ? `<div style="color:#ff8;font-weight:700;margin-top:4px">🏆 胜者: ${playerName(state.winner)}</div>` : ''}
   `;
 
   // selection info
@@ -677,7 +697,7 @@ function renderSelectionInfo() {
     const u = state.units.get(selectedUnitId);
     if (u && u.alive) {
       const ownerCls = u.owner === 'player_a' ? 'sel-owner-a' : 'sel-owner-b';
-      const ownerName = u.owner === myPlayer ? '己方' : '敌方';
+      const ownerName = playerName(u.owner);
       const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
       const hpPct = Math.round((u.hp / u.maxHp) * 100);
       const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
@@ -705,7 +725,7 @@ function renderSelectionInfo() {
     const b = state.buildings.get(selectedBuildingId);
     if (b && b.alive) {
       const ownerCls = b.owner === 'player_a' ? 'sel-owner-a' : 'sel-owner-b';
-      const ownerName = b.owner === myPlayer ? '己方' : '敌方';
+      const ownerName = playerName(b.owner);
       const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
       const hpPct = Math.round((b.hp / b.maxHp) * 100);
       const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
@@ -760,14 +780,12 @@ els.canvas.addEventListener('mousemove', e => {
     let info = `(${hoverCell.x}, ${hoverCell.y})`;
     if (u) {
       const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
-      const side = u.owner === myPlayer ? '己方' : '敌方';
-      info += ` | ${typeName} [${side}] HP:${u.hp}/${u.maxHp}`;
+      info += ` | ${typeName} [${playerName(u.owner)}] HP:${u.hp}/${u.maxHp}`;
     }
     if (b) {
       const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
-      const side = b.owner === myPlayer ? '己方' : '敌方';
       const status = b.isBuilding ? ' 建造中' : b.production ? ` 生产${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'}` : '';
-      info += ` | ${typeName} [${side}] HP:${b.hp}/${b.maxHp}${status}`;
+      info += ` | ${typeName} [${playerName(b.owner)}] HP:${b.hp}/${b.maxHp}${status}`;
     }
     els.cellInfo.textContent = info;
   } else {
@@ -1034,10 +1052,11 @@ els.btnCreate.addEventListener('click', async () => {
   els.btnCreate.disabled = true;
   els.btnCreate.textContent = '创建中…';
 
+  const name = els.createName.value.trim();
   const res = await fetch('/api/games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mapId }),
+    body: JSON.stringify({ mapId, name: name || undefined }),
   });
   const data = await res.json();
 
@@ -1065,7 +1084,12 @@ els.btnJoin.addEventListener('click', async () => {
   els.btnJoin.disabled = true;
   els.btnJoin.textContent = '加入中…';
 
-  const res = await fetch(`/api/games/${gid}/join`, { method: 'POST' });
+  const name = els.joinName.value.trim();
+  const res = await fetch(`/api/games/${gid}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name || undefined }),
+  });
   const data = await res.json();
 
   if (!res.ok) {

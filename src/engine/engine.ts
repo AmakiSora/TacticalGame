@@ -16,11 +16,12 @@ function otherPlayer(p: PlayerId): PlayerId {
   return p === 'player_a' ? 'player_b' : 'player_a';
 }
 
-export function joinGame(game: GameState, bus: EventBus): Result {
+export function joinGame(game: GameState, bus: EventBus, playerName?: string): Result {
   if (game.tokens.player_b !== '') {
     return { ok: false, code: 'game_already_full', message: 'game already has 2 players' };
   }
   game.tokens.player_b = generateToken();
+  game.playerNames.player_b = playerName || '玩家 B';
   game.phase = 'waiting_command';
   game.turn.phase = 'waiting_command';
   appendEvent(game, bus, 'game_start', {
@@ -29,6 +30,7 @@ export function joinGame(game: GameState, bus: EventBus): Result {
     miningPoints: game.miningPoints,
     terrain: game.terrain,
     firstPlayer: game.turn.currentOwner,
+    playerNames: { ...game.playerNames },
     buildings: game.buildings.map(b => ({
       id: b.id, owner: b.owner, type: b.type,
       x: b.x, y: b.y, hp: b.hp, maxHp: b.maxHp,

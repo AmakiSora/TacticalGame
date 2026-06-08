@@ -25,9 +25,15 @@
 
   <!-- 创建游戏 -->
   <div id="tab-create" class="lobby-tab-content active">
-    <div class="field">
-      <label>选择地图</label>
-      <select id="map-select"><option value="default">default</option></select>
+    <div class="row">
+      <div class="field">
+        <label>你的名称</label>
+        <input id="create-name" placeholder="留空使用默认名称" maxlength="20" />
+      </div>
+      <div class="field">
+        <label>选择地图</label>
+        <select id="map-select"><option value="default">default</option></select>
+      </div>
     </div>
     <button id="btn-create" class="btn primary" style="margin-top:14px;width:100%">➕ 创建新游戏</button>
     <div id="create-result" class="lobby-result hidden">
@@ -51,6 +57,10 @@
     <div class="field">
       <label>游戏 ID</label>
       <input id="game-id" placeholder="粘贴 Game ID…" />
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label>你的名称</label>
+      <input id="join-name" placeholder="留空使用默认名称" maxlength="20" />
     </div>
     <button id="btn-join" class="btn primary" style="margin-top:14px;width:100%">🔗 加入游戏</button>
     <div id="join-result" class="lobby-result hidden">

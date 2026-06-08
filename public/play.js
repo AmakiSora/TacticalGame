@@ -758,8 +758,17 @@ els.canvas.addEventListener('mousemove', e => {
     const u = [...state.units.values()].find(u => u.alive && u.x === hoverCell.x && u.y === hoverCell.y);
     const b = [...state.buildings.values()].find(b => b.alive && b.x === hoverCell.x && b.y === hoverCell.y);
     let info = `(${hoverCell.x}, ${hoverCell.y})`;
-    if (u) info += ` | ${u.type} #${u.id.slice(-4)} [${u.owner}] hp:${u.hp}/${u.maxHp}`;
-    if (b) info += ` | ${b.type} #${b.id.slice(-4)} [${b.owner}] hp:${b.hp}/${b.maxHp}`;
+    if (u) {
+      const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
+      const side = u.owner === myPlayer ? '己方' : '敌方';
+      info += ` | ${typeName} [${side}] HP:${u.hp}/${u.maxHp}`;
+    }
+    if (b) {
+      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+      const side = b.owner === myPlayer ? '己方' : '敌方';
+      const status = b.isBuilding ? ' 建造中' : b.production ? ` 生产${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'}` : '';
+      info += ` | ${typeName} [${side}] HP:${b.hp}/${b.maxHp}${status}`;
+    }
     els.cellInfo.textContent = info;
   } else {
     els.cellInfo.textContent = '';

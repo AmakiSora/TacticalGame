@@ -38,6 +38,12 @@ let playing = false;
 let playTimer = null;
 let liveSse = null;
 
+// Auto-refresh
+const autoRefreshCb = document.getElementById('auto-refresh');
+const followLatestCb = document.getElementById('follow-latest');
+let refreshTimer = null;
+const REFRESH_INTERVAL = 5000;
+
 // Reconstructed state at currentStep
 let state = null;
 
@@ -281,6 +287,7 @@ function animLoop() {
 async function fetchGameList() {
   const res = await fetch('/api/games');
   const { games } = await res.json();
+  const prevValue = gameSelect.value;
   gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
   for (const g of games) {
     const opt = document.createElement('option');
@@ -288,6 +295,11 @@ async function fetchGameList() {
     opt.textContent = `${g.id.slice(0, 8)} — ${g.phase} (回合 ${g.turnNumber}, ${g.currentOwner})`;
     gameSelect.appendChild(opt);
   }
+  // Restore previous selection if still available
+  if (prevValue && [...gameSelect.options].some(o => o.value === prevValue)) {
+    gameSelect.value = prevValue;
+  }
+  return games;
 }
 
 // ─── State reconstruction ───
@@ -968,9 +980,18 @@ function subscribeSse(id) {
         stepForward();
       }
       updateControls();
+      statusEl.textContent = '实时连接中';
     } catch (err) { console.error(err); }
   };
-  liveSse.onerror = () => { statusEl.textContent = 'SSE 断开'; };
+  liveSse.onerror = () => {
+    statusEl.textContent = 'SSE 断开，重连中…';
+    // EventSource auto-reconnects, but reload state on open
+    liveSse.addEventListener('open', async () => {
+      statusEl.textContent = '已重连，同步中…';
+      await loadGameState(id);
+      statusEl.textContent = '实时连接中';
+    }, { once: true });
+  };
 }
 
 // ─── Event listeners ───
@@ -1183,6 +1204,41 @@ btnExportHtml.addEventListener('click', exportHtml);
 btnExportJson.addEventListener('click', exportJson);
 btnImport.addEventListener('click', importJson);
 
+// ─── Auto-refresh & follow latest ───
+
+async function autoRefreshTick() {
+  if (!autoRefreshCb.checked) return;
+  const games = await fetchGameList();
+  if (!games || games.length === 0) return;
+
+  // Follow latest: auto-select the first (most recent) game
+  if (followLatestCb.checked) {
+    const latestId = games[0].id;
+    const currentId = gameSelect.value;
+    if (latestId !== currentId) {
+      gameSelect.value = latestId;
+      await loadGameState(latestId);
+      subscribeSse(latestId);
+      statusEl.textContent = '自动切换到最新对局';
+    }
+  }
+}
+
+function startAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(autoRefreshTick, REFRESH_INTERVAL);
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+autoRefreshCb.addEventListener('change', () => {
+  if (autoRefreshCb.checked) startAutoRefresh();
+  else stopAutoRefresh();
+});
+
 // ─── Init ───
 
 fetchGameList();
+startAutoRefresh();

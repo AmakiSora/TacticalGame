@@ -46,6 +46,9 @@ let liveSse = null;
 // Auto-refresh
 const autoRefreshCb = document.getElementById('auto-refresh');
 const followLatestCb = document.getElementById('follow-latest');
+const refreshIntervalInput = document.getElementById('refresh-interval');
+const btnSettings = document.getElementById('btn-settings');
+const settingsPopover = document.getElementById('settings-popover');
 
 // ─── Player rename ───
 
@@ -95,7 +98,7 @@ resourcesEl.addEventListener('click', e => {
   });
 });
 let refreshTimer = null;
-const REFRESH_INTERVAL = 5000;
+let refreshInterval = 5000;
 
 // Reconstructed state at currentStep
 let state = null;
@@ -1288,7 +1291,7 @@ async function autoRefreshTick() {
 
 function startAutoRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(autoRefreshTick, REFRESH_INTERVAL);
+  refreshTimer = setInterval(autoRefreshTick, refreshInterval);
 }
 
 function stopAutoRefresh() {
@@ -1298,6 +1301,24 @@ function stopAutoRefresh() {
 autoRefreshCb.addEventListener('change', () => {
   if (autoRefreshCb.checked) startAutoRefresh();
   else stopAutoRefresh();
+});
+
+refreshIntervalInput.addEventListener('change', () => {
+  const sec = Math.max(1, Math.min(60, parseInt(refreshIntervalInput.value) || 5));
+  refreshIntervalInput.value = sec;
+  refreshInterval = sec * 1000;
+  if (autoRefreshCb.checked) startAutoRefresh();
+});
+
+// Settings popover
+btnSettings.addEventListener('click', e => {
+  e.stopPropagation();
+  settingsPopover.classList.toggle('open');
+});
+document.addEventListener('click', e => {
+  if (!settingsPopover.contains(e.target) && e.target !== btnSettings) {
+    settingsPopover.classList.remove('open');
+  }
 });
 
 // ─── Init ───

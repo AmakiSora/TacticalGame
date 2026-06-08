@@ -11,8 +11,6 @@
     <div id="game-meta">
       <select id="game-select"><option value="">-- 选择对局 --</option></select>
       <button id="refresh-list">刷新列表</button>
-      <label id="auto-refresh-label" title="自动刷新对局列表"><input type="checkbox" id="auto-refresh" checked /> 自动刷新</label>
-      <label id="follow-latest-label" title="自动跟随最新对局"><input type="checkbox" id="follow-latest" /> 跟随最新</label>
       <span id="status"></span>
       <span id="file-actions">
         <button id="btn-export-html" title="导出为独立 HTML 文件">导出 HTML</button>
@@ -20,6 +18,14 @@
         <button id="btn-import" title="从 JSON 文件导入对局">导入</button>
         <input type="file" id="import-file" accept=".json" hidden />
       </span>
+      <div id="settings-wrap">
+        <button id="btn-settings" title="设置">&#9881;</button>
+        <div id="settings-popover">
+          <label><input type="checkbox" id="auto-refresh" checked /> 自动刷新</label>
+          <label>刷新间隔 <input type="number" id="refresh-interval" min="1" max="60" value="5" /> 秒</label>
+          <label><input type="checkbox" id="follow-latest" /> 跟随最新</label>
+        </div>
+      </div>
     </div>
   </header>
   <main>

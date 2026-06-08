@@ -107,7 +107,7 @@ let myPlayer = null;       // 'player_a' | 'player_b'
 let sse = null;
 let hoverCell = null;
 let selectedUnitId = null;
-let interactionMode = 'idle'; // 'idle' | 'unit_selected' | 'building_selected'
+let interactionMode = 'idle'; // 'idle' | 'unit_selected' | 'move_mode' | 'attack_mode' | 'heal_mode' | 'building_selected'
 let rangeHighlights = [];     // [{x, y, type: 'move'|'attack'|'heal'}]
 let selectedBuildingId = null;
 
@@ -332,48 +332,47 @@ function entityAtBuilding(x, y) {
   return null;
 }
 
-function computeRangeHighlights(unit) {
+function computeMoveHighlights(unit) {
   rangeHighlights = [];
   const spec = gameConfig?.units?.[unit.type];
-  if (!spec) return;
+  if (!spec || unit.hasMoved) return;
   const W = state.mapWidth, H = state.mapHeight;
+  for (let dx = -spec.moveRange; dx <= spec.moveRange; dx++) {
+    for (let dy = -spec.moveRange; dy <= spec.moveRange; dy++) {
+      if (Math.abs(dx) + Math.abs(dy) > spec.moveRange) continue;
+      const nx = unit.x + dx, ny = unit.y + dy;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      if (nx === unit.x && ny === unit.y) continue;
+      if (isOccupied(nx, ny)) continue;
+      rangeHighlights.push({ x: nx, y: ny, type: 'move' });
+    }
+  }
+}
 
-  if (unit.type === 'medic' && !unit.hasAttacked) {
-    // heal range: adjacent friendly damaged units
-    for (const t of state.units.values()) {
-      if (t.alive && t.owner === myPlayer && t.hp < t.maxHp && manhattan(unit, t) <= 1) {
-        rangeHighlights.push({ x: t.x, y: t.y, type: 'heal' });
+function computeAttackHighlights(unit) {
+  rangeHighlights = [];
+  const spec = gameConfig?.units?.[unit.type];
+  if (!spec || unit.hasAttacked) return;
+  for (const t of state.units.values()) {
+    if (t.alive && t.owner !== myPlayer && manhattan(unit, t) <= spec.attackRange) {
+      rangeHighlights.push({ x: t.x, y: t.y, type: 'attack' });
+    }
+  }
+  for (const b of state.buildings.values()) {
+    if (b.alive && b.owner !== myPlayer && manhattan(unit, b) <= spec.attackRange) {
+      if (!rangeHighlights.find(h => h.x === b.x && h.y === b.y)) {
+        rangeHighlights.push({ x: b.x, y: b.y, type: 'attack' });
       }
     }
   }
+}
 
-  if (!unit.hasMoved) {
-    for (let dx = -spec.moveRange; dx <= spec.moveRange; dx++) {
-      for (let dy = -spec.moveRange; dy <= spec.moveRange; dy++) {
-        if (Math.abs(dx) + Math.abs(dy) > spec.moveRange) continue;
-        const nx = unit.x + dx, ny = unit.y + dy;
-        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-        if (nx === unit.x && ny === unit.y) continue;
-        if (isOccupied(nx, ny)) continue;
-        rangeHighlights.push({ x: nx, y: ny, type: 'move' });
-      }
-    }
-  }
-
-  if (!unit.hasAttacked) {
-    for (const t of state.units.values()) {
-      if (t.alive && t.owner !== myPlayer && manhattan(unit, t) <= spec.attackRange) {
-        if (!rangeHighlights.find(h => h.x === t.x && h.y === t.y && h.type === 'attack')) {
-          rangeHighlights.push({ x: t.x, y: t.y, type: 'attack' });
-        }
-      }
-    }
-    for (const b of state.buildings.values()) {
-      if (b.alive && b.owner !== myPlayer && manhattan(unit, b) <= spec.attackRange) {
-        if (!rangeHighlights.find(h => h.x === b.x && h.y === b.y && h.type === 'attack')) {
-          rangeHighlights.push({ x: b.x, y: b.y, type: 'attack' });
-        }
-      }
+function computeHealHighlights(unit) {
+  rangeHighlights = [];
+  if (unit.type !== 'medic' || unit.hasAttacked) return;
+  for (const t of state.units.values()) {
+    if (t.alive && t.owner === myPlayer && t.hp < t.maxHp && manhattan(unit, t) <= 1) {
+      rangeHighlights.push({ x: t.x, y: t.y, type: 'heal' });
     }
   }
 }
@@ -398,7 +397,7 @@ function computeBuildHighlights() {
 // ─── popup system ───
 const mapPopup = $('map-popup');
 
-function showPopup(cellX, cellY, title, items) {
+function showPopup(cellX, cellY, title, items, onAction) {
   const wrapRect = els.canvas.parentElement.getBoundingClientRect();
   const canvasRect = els.canvas.getBoundingClientRect();
   const px = canvasRect.left - wrapRect.left + cellX * CELL + CELL;
@@ -422,8 +421,12 @@ function showPopup(cellX, cellY, title, items) {
       e.stopPropagation();
       const action = btn.dataset.action;
       const params = JSON.parse(btn.dataset.params);
-      await handlePopupAction(action, params);
-      closePopup();
+      if (onAction) {
+        onAction(action, params);
+      } else {
+        await handlePopupAction(action, params);
+        closePopup();
+      }
     });
   });
 }
@@ -681,12 +684,18 @@ function renderSelectionInfo() {
       const actions = [];
       if (!u.hasMoved) actions.push('移动');
       if (!u.hasAttacked) actions.push(u.type === 'medic' ? '治疗' : '攻击');
+      const modeHint = interactionMode === 'move_mode' ? '🏃 选择移动目标'
+        : interactionMode === 'attack_mode' ? '⚔️ 选择攻击目标'
+        : interactionMode === 'heal_mode' ? '💊 选择治疗目标'
+        : null;
       el.innerHTML = `
         <div class="sel-type"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
         <div class="sel-hp">❤️ ${u.hp} / ${u.maxHp} <span class="sel-hp-bar"><span class="sel-hp-fill" style="width:${hpPct}%;background:${hpColor}"></span></span></div>
         <div class="sel-stat">⚔️ 攻击 ${u.attack}　🛡️ 防御 ${u.defense}　🏃 移动 ${u.moveRange}　🎯 射程 ${u.attackRange}</div>
         <div class="sel-stat">📍 位置 (${u.x}, ${u.y})</div>
-        ${actions.length > 0 ? `<div class="sel-actions">可执行: ${actions.join(' / ')} — 点击高亮格子</div>` : '<div class="sel-actions" style="color:#a66">本回合已行动</div>'}
+        ${modeHint ? `<div class="sel-actions" style="color:#6cf">${modeHint} — 点击高亮格子 (Esc取消)</div>`
+          : actions.length > 0 ? `<div class="sel-actions">点击单位选择操作</div>`
+          : '<div class="sel-actions" style="color:#a66">本回合已行动</div>'}
       `;
       return;
     }
@@ -781,54 +790,36 @@ els.canvas.addEventListener('click', e => {
   // ── building_selected: ignore (popup handles it) ──
   if (interactionMode === 'building_selected') return;
 
-  // ── unit_selected mode ──
-  if (interactionMode === 'unit_selected' && selectedUnitId) {
+  // ── action modes: move_mode / attack_mode / heal_mode ──
+  if ((interactionMode === 'move_mode' || interactionMode === 'attack_mode' || interactionMode === 'heal_mode') && selectedUnitId) {
     const sel = state.units.get(selectedUnitId);
     if (!sel || !sel.alive) { deselectAll(); return; }
 
-    // clicked same unit → deselect
+    // clicked same unit → cancel action, go back to unit_selected
     if (sel.x === cell.x && sel.y === cell.y) {
-      deselectAll();
-      return;
-    }
-
-    // clicked another unit → switch selection
-    const otherUnit = entityAt(cell.x, cell.y);
-    if (otherUnit && otherUnit.id && gameConfig?.units?.[otherUnit.type]) {
-      selectedUnitId = otherUnit.id;
-      computeRangeHighlights(otherUnit);
-      renderSidebar();
-      drawBoard();
-      return;
-    }
-
-    // clicked a building → switch to building selection
-    const otherBuilding = entityAtBuilding(cell.x, cell.y);
-    if (otherBuilding) {
-      selectedUnitId = null;
-      selectedBuildingId = otherBuilding.id;
-      interactionMode = 'building_selected';
+      interactionMode = 'unit_selected';
       rangeHighlights = [];
+      closePopup();
       renderSidebar();
       drawBoard();
       return;
     }
 
-    // check if click is on a highlighted cell
+    // check if click is on a highlighted target
     const highlight = rangeHighlights.find(h => h.x === cell.x && h.y === cell.y);
     if (highlight) {
-      if (highlight.type === 'move') {
+      if (interactionMode === 'move_mode' && highlight.type === 'move') {
         doMove(sel, cell.x, cell.y);
         return;
       }
-      if (highlight.type === 'attack') {
+      if (interactionMode === 'attack_mode' && highlight.type === 'attack') {
         const target = entityAt(cell.x, cell.y);
         if (target && target.owner !== myPlayer) {
           doAttack(sel, target);
           return;
         }
       }
-      if (highlight.type === 'heal') {
+      if (interactionMode === 'heal_mode' && highlight.type === 'heal') {
         const target = entityAt(cell.x, cell.y, myPlayer);
         if (target && target.hp < target.maxHp) {
           doHeal(sel, target);
@@ -837,9 +828,27 @@ els.canvas.addEventListener('click', e => {
       }
     }
 
-    // click outside valid range → deselect
-    deselectAll();
-    return;
+    // click outside valid range → cancel mode, fall through to select whatever is at new cell
+    closePopup();
+    rangeHighlights = [];
+    interactionMode = 'idle';
+    selectedUnitId = null;
+    selectedBuildingId = null;
+  }
+
+  // ── unit_selected (viewing) mode ──
+  if (interactionMode === 'unit_selected') {
+    // clicked same unit → deselect
+    const sel = state.units.get(selectedUnitId);
+    if (sel && sel.x === cell.x && sel.y === cell.y) {
+      deselectAll();
+      return;
+    }
+    // clicked anything else → deselect first, then fall through to idle handling
+    closePopup();
+    rangeHighlights = [];
+    interactionMode = 'idle';
+    selectedUnitId = null;
   }
 
   // ── idle mode ──
@@ -850,9 +859,30 @@ els.canvas.addEventListener('click', e => {
   if (unit && unit.id && gameConfig?.units?.[unit.type]) {
     selectedUnitId = unit.id;
     interactionMode = 'unit_selected';
-    if (unit.owner === myPlayer) computeRangeHighlights(unit);
     renderSidebar();
     drawBoard();
+    // own unit → show action popup
+    if (unit.owner === myPlayer && unit.alive) {
+      const items = [];
+      if (!unit.hasMoved) items.push({ label: '移动', action: 'move' });
+      if (!unit.hasAttacked) items.push({ label: unit.type === 'medic' ? '治疗' : '攻击', action: unit.type === 'medic' ? 'heal' : 'attack' });
+      if (items.length > 0) {
+        showPopup(cell.x, cell.y, '操作', items, (action) => {
+          closePopup();
+          if (action === 'move') {
+            interactionMode = 'move_mode';
+            computeMoveHighlights(unit);
+          } else if (action === 'attack') {
+            interactionMode = 'attack_mode';
+            computeAttackHighlights(unit);
+          } else if (action === 'heal') {
+            interactionMode = 'heal_mode';
+            computeHealHighlights(unit);
+          }
+          drawBoard();
+        });
+      }
+    }
     return;
   }
 

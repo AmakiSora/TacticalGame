@@ -24,15 +24,14 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       const wantsSse = (req.headers.accept ?? '').includes('text/event-stream');
       const closeAfterFlush = req.query.close === 'true';
 
-      // For SSE: require valid player token
+      // For SSE: token is optional (spectators can connect without one)
       if (wantsSse && !closeAfterFlush) {
         const token = req.headers['x-player-token'] ?? req.query.token;
-        if (typeof token !== 'string' || token.length === 0) {
-          return reply.code(401).send({ error: 'missing token', code: 'invalid_token' });
-        }
-        const isValid = game.tokens.player_a === token || game.tokens.player_b === token;
-        if (!isValid) {
-          return reply.code(401).send({ error: 'invalid token', code: 'invalid_token' });
+        if (typeof token === 'string' && token.length > 0) {
+          const isValid = game.tokens.player_a === token || game.tokens.player_b === token;
+          if (!isValid) {
+            return reply.code(401).send({ error: 'invalid token', code: 'invalid_token' });
+          }
         }
       }
 

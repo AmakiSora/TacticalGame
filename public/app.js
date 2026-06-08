@@ -79,11 +79,11 @@ resourcesEl.addEventListener('click', e => {
     }
     // Update local name immediately (SSE event may not arrive if not connected)
     playerNames[playerId] = newName;
-    // Add rename event to allEvents so it's included in exports
-    if (newName !== currentName) {
-      allEvents.push({ seq: allEvents.length + 1, type: 'name_rename', timestamp: Date.now(), payload: { playerId, name: newName } });
-      buildTimelineMarkers();
-      timeline.max = allEvents.length - 1;
+    // Update playerNames in the game_start event so exports reflect the rename
+    const gsEvent = allEvents.find(e => e.type === 'game_start');
+    if (gsEvent) {
+      if (!gsEvent.payload.playerNames) gsEvent.payload.playerNames = { ...playerNames };
+      gsEvent.payload.playerNames[playerId] = newName;
     }
     renderSidebar();
   }
@@ -1130,11 +1130,12 @@ function gameFilename(ext) {
 
 function exportJson() {
   if (allEvents.length === 0) { alert('没有可导出的对局'); return; }
+  const events = allEvents.filter(e => e.type !== 'name_rename');
   const data = {
     gameId: gameSelect.value,
     exportedAt: new Date().toISOString(),
-    eventCount: allEvents.length,
-    events: allEvents,
+    eventCount: events.length,
+    events,
   };
   downloadFile(gameFilename('json'), JSON.stringify(data, null, 2), 'application/json');
 }
@@ -1148,7 +1149,7 @@ function exportHtml() {
     fetch('/app.js').then(r => r.text()),
   ]).then(([cssText, jsText]) => {
     // Build standalone HTML
-    const eventsJson = JSON.stringify(allEvents);
+    const eventsJson = JSON.stringify(allEvents.filter(e => e.type !== 'name_rename'));
     const gameId = gameSelect.value || 'unknown';
     const html = `<!DOCTYPE html>
 <html lang="zh-CN">

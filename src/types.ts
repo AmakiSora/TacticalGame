@@ -78,7 +78,8 @@ export type EventType =
   | 'reset_actions'
   | 'base_destroyed'
   | 'turn_end'
-  | 'game_over';
+  | 'game_over'
+  | 'name_rename';
 
 export interface GameEvent {
   seq: number;

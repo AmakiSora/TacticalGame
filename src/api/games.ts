@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { globalStore, createInitialGame } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
+import { appendEvent } from '../engine/events.js';
 import { joinGame } from '../engine/engine.js';
 import { authenticate, sanitizeGameForResponse, statusForCode } from './auth.js';
 import { listMaps } from '../config/loader.js';
@@ -66,11 +67,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     }
     const trimmed = name.trim().slice(0, 20);
     game.playerNames[playerId] = trimmed;
-    globalEventBus.emit(game.id, {
-      type: 'name_rename',
-      seq: game.nextSeq++,
-      payload: { playerId, name: trimmed },
-    });
+    appendEvent(game, globalEventBus, 'name_rename', { playerId, name: trimmed });
     return { ok: true };
   });
 

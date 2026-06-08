@@ -5,16 +5,19 @@ body {
   background: #11161a;
   color: #d8e0e8;
 }
+
+/* Header */
 header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 28px;
+  padding: 12px 24px;
   background: linear-gradient(135deg, #1a2530 0%, #16202b 100%);
   border-bottom: 1px solid #2a3a4a;
+  flex-wrap: wrap; gap: 8px;
 }
-header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .5px; }
-#game-meta { display: flex; gap: 10px; align-items: center; }
+header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
+#game-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 #game-meta select, #game-meta button {
-  padding: 6px 14px; background: #1e2e3e; color: #b0c8d8;
+  padding: 5px 12px; background: #1e2e3e; color: #b0c8d8;
   border: 1px solid #2a3a4a; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .15s;
 }
 #game-meta select:hover, #game-meta button:hover { background: #26384a; color: #d8e0e8; }
@@ -24,12 +27,21 @@ header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .5px; 
   user-select: none;
 }
 #auto-refresh-label input, #follow-latest-label input { cursor: pointer; accent-color: #4a8; }
-#file-actions { margin-left: 12px; display: inline-flex; gap: 6px; }
+#file-actions { display: inline-flex; gap: 6px; }
 #file-actions button { font-size: 12px; padding: 4px 10px; }
 #btn-export-html { border-color: #2a6a4a; }
 #btn-export-json { border-color: #2a4a8a; }
 #btn-import { border-color: #6a4a8a; }
-main { display: flex; padding: 20px 24px; gap: 20px; align-items: flex-start; }
+
+/* Main layout */
+main {
+  display: flex;
+  padding: 16px 20px;
+  gap: 16px;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: calc(100vh - 60px);
+}
 
 /* Selection panel (left of board) */
 #selection-panel {
@@ -39,7 +51,7 @@ main { display: flex; padding: 20px 24px; gap: 20px; align-items: flex-start; }
   border: 1px solid #1e2e3e;
   border-radius: 8px;
   padding: 12px 14px;
-  align-self: flex-start;
+  position: sticky; top: 16px;
 }
 #selection-detail {
   font-size: 13px;
@@ -48,7 +60,10 @@ main { display: flex; padding: 20px 24px; gap: 20px; align-items: flex-start; }
 }
 
 /* Board wrapper */
-#board-wrap { display: flex; flex-direction: column; gap: 0; position: relative; flex-shrink: 0; }
+#board-wrap {
+  display: flex; flex-direction: column; gap: 0;
+  position: relative; flex-shrink: 0;
+}
 #board {
   background: #0a0e14;
   border: 1px solid #1e2e3e;
@@ -161,10 +176,12 @@ main { display: flex; padding: 20px 24px; gap: 20px; align-items: flex-start; }
 
 /* Sidebar */
 #sidebar {
-  width: 320px; max-height: 90vh; overflow: auto;
-  background: #141c26; padding: 12px; border-radius: 8px;
-  border: 1px solid #1e2e3e;
+  width: 300px;
+  flex-shrink: 0;
   display: flex; flex-direction: column; gap: 12px;
+  position: sticky; top: 16px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
 }
 #sidebar section {
   background: #141c26;
@@ -173,7 +190,7 @@ main { display: flex; padding: 20px 24px; gap: 20px; align-items: flex-start; }
   padding: 12px 14px;
 }
 #sidebar h3 { margin: 0 0 8px; font-size: 13px; color: #7a9aaa; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
-#events { list-style: none; padding: 0; margin: 0; font-size: 12px; max-height: 240px; overflow-y: auto; font-family: "SF Mono", "Consolas", "Cascadia Code", monospace; }
+#events { list-style: none; padding: 0; margin: 0; font-size: 12px; max-height: 300px; overflow-y: auto; font-family: "SF Mono", "Consolas", "Cascadia Code", monospace; }
 #events li {
   padding: 4px 8px; margin: 2px 0;
   background: #0f141c; border-left: 3px solid #3a5a7a;

@@ -1,5 +1,5 @@
 const CELL = 28;
-const GRID_COLOR = '#244';
+const GRID_COLOR = '#1a2a30';
 
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -17,6 +17,9 @@ const resourcesEl = document.getElementById('resources');
 const turnInfoEl = document.getElementById('turn-info');
 const eventsEl = document.getElementById('events');
 const detailEl = document.getElementById('detail-content');
+const cellInfoEl = document.getElementById('cell-info');
+const selDetailEl = document.getElementById('selection-detail');
+let hoverCell = null;
 
 // Replay controls
 const btnStart = document.getElementById('btn-start');
@@ -476,6 +479,12 @@ function drawBoard() {
   for (let j = 0; j <= state.mapHeight; j++) {
     ctx.beginPath(); ctx.moveTo(0, j * CELL); ctx.lineTo(state.mapWidth * CELL, j * CELL); ctx.stroke();
   }
+  // hover highlight
+  if (hoverCell) {
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
+    ctx.fillRect(hoverCell.x * CELL, hoverCell.y * CELL, CELL, CELL);
+  }
+
   ctx.fillStyle = '#b80';
   for (const p of state.miningPoints) {
     ctx.beginPath();
@@ -500,15 +509,55 @@ function drawBoard() {
     }
   }
   for (const b of state.buildings.values()) {
-    if (!b.alive) continue;
-    const color = b.owner === 'player_a' ? '#3a8ad9' : '#d96a3a';
-    ctx.fillStyle = b.isBuilding ? '#666' : color;
-    ctx.fillRect(b.x * CELL + 2, b.y * CELL + 2, CELL - 4, CELL - 4);
+    if (!b.alive) {
+      // ghost for destroyed buildings
+      ctx.save();
+      ctx.globalAlpha = .25;
+      const isA = b.owner === 'player_a';
+      ctx.fillStyle = b.type === 'headquarters' ? (isA ? '#1a4070' : '#703010')
+        : b.type === 'barracks' ? (isA ? '#2a5a90' : '#904a20')
+        : (isA ? '#2a6a4a' : '#6a5a2a');
+      ctx.fillRect(b.x * CELL + 2, b.y * CELL + 2, CELL - 4, CELL - 4);
+      ctx.restore();
+      continue;
+    }
+    const isA = b.owner === 'player_a';
+    let color;
+    if (b.type === 'headquarters') color = isA ? '#2a60a0' : '#a04020';
+    else if (b.type === 'barracks') color = isA ? '#3a8ad9' : '#d96a3a';
+    else color = isA ? '#4a9a6a' : '#9a7a3a';
+
+    if (b.isBuilding) {
+      // building under construction — dark base + progress bar
+      ctx.fillStyle = '#333';
+      ctx.fillRect(b.x * CELL + 1, b.y * CELL + 1, CELL - 2, CELL - 2);
+      ctx.fillStyle = color;
+      const buildTime = gameConfig?.buildings?.[b.type]?.buildTime || 1;
+      const pct = Math.max(0, 1 - (b.buildProgress || 0) / buildTime);
+      ctx.fillRect(b.x * CELL + 1, b.y * CELL + CELL - 4, (CELL - 2) * pct, 3);
+    } else {
+      ctx.fillStyle = color;
+      ctx.fillRect(b.x * CELL + 2, b.y * CELL + 2, CELL - 4, CELL - 4);
+    }
+
+    // label
     ctx.fillStyle = '#fff';
-    ctx.font = '10px sans-serif';
-    const letter = b.type === 'headquarters' ? 'H' : b.type === 'barracks' ? 'B' : 'M';
-    ctx.fillText(letter, b.x * CELL + CELL / 2 - 3, b.y * CELL + CELL / 2 + 4);
-    drawHpBar(b.x * CELL + CELL / 2, b.y * CELL + CELL - 1, b.hp, b.maxHp, CELL - 6);
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    const letter = b.type === 'headquarters' ? 'HQ' : b.type === 'barracks' ? 'B' : 'M';
+    ctx.fillText(letter, b.x * CELL + CELL / 2, b.y * CELL + CELL / 2 + 4);
+    ctx.textAlign = 'left';
+
+    // hp bar
+    drawHpBar(b.x * CELL + CELL / 2, b.y * CELL - 2, b.hp, b.maxHp, CELL - 6);
+
+    // production indicator (yellow dot)
+    if (b.production) {
+      ctx.fillStyle = '#ff0';
+      ctx.beginPath();
+      ctx.arc(b.x * CELL + CELL - 4, b.y * CELL + 4, 3, 0, 6.28);
+      ctx.fill();
+    }
   }
   for (const u of state.units.values()) {
     if (!u.alive) continue;
@@ -520,26 +569,157 @@ function drawBoard() {
     ctx.arc(u.x * CELL + CELL / 2, u.y * CELL + CELL / 2, CELL / 3, 0, 6.28);
     ctx.fill();
     ctx.fillStyle = '#000';
-    ctx.font = '9px sans-serif';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'center';
     const letter = u.type === 'infantry' ? 'I' : u.type === 'sniper' ? 'S' : u.type === 'tank' ? 'T' : 'M';
-    ctx.fillText(letter, u.x * CELL + CELL / 2 - 3, u.y * CELL + CELL / 2 + 3);
+    ctx.fillText(letter, u.x * CELL + CELL / 2, u.y * CELL + CELL / 2 + 3);
+    ctx.textAlign = 'left';
+
+    // highlight hovered entity
+    if (hoverCell && hoverCell.x === u.x && hoverCell.y === u.y) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(u.x * CELL + 1, u.y * CELL + 1, CELL - 2, CELL - 2);
+    }
+
     drawHpBar(u.x * CELL + CELL / 2, u.y * CELL - 2, u.hp, u.maxHp, CELL - 4);
   }
+
+  // highlight hovered building
+  if (hoverCell) {
+    const hb = [...state.buildings.values()].find(b => b.alive && b.x === hoverCell.x && b.y === hoverCell.y);
+    if (hb) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(hb.x * CELL + 1, hb.y * CELL + 1, CELL - 2, CELL - 2);
+    }
+  }
+}
+
+// ─── Canvas hover & selection ───
+
+canvas.addEventListener('mousemove', e => {
+  if (!state) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / CELL);
+  const y = Math.floor((e.clientY - rect.top) / CELL);
+  if (x < 0 || y < 0 || x >= state.mapWidth || y >= state.mapHeight) {
+    hoverCell = null;
+    cellInfoEl.textContent = '';
+    return;
+  }
+  hoverCell = { x, y };
+  const u = [...state.units.values()].find(u => u.alive && u.x === x && u.y === y);
+  const b = [...state.buildings.values()].find(b => b.alive && b.x === x && b.y === y);
+  let info = `(${x}, ${y})`;
+  if (u) {
+    const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
+    info += ` | ${typeName} [${u.owner}] HP:${u.hp}/${u.maxHp}`;
+  }
+  if (b) {
+    const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+    const status = b.isBuilding ? ' 建造中' : b.production ? ` 生产${b.production.type}` : '';
+    info += ` | ${typeName} [${b.owner}] HP:${b.hp}/${b.maxHp}${status}`;
+  }
+  cellInfoEl.textContent = info;
+  renderSelectionInfo(u, b);
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoverCell = null;
+  cellInfoEl.textContent = '';
+});
+
+canvas.addEventListener('click', e => {
+  if (!state) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / CELL);
+  const y = Math.floor((e.clientY - rect.top) / CELL);
+  if (x < 0 || y < 0 || x >= state.mapWidth || y >= state.mapHeight) return;
+  const u = [...state.units.values()].find(u => u.alive && u.x === x && u.y === y);
+  const b = [...state.buildings.values()].find(b => b.alive && b.x === x && b.y === y);
+  if (u || b) renderSelectionInfo(u, b);
+});
+
+function renderSelectionInfo(u, b) {
+  if (!selDetailEl) return;
+  if (u) {
+    const ownerCls = u.owner === 'player_a' ? 'player-a' : 'player-b';
+    const ownerName = u.owner === 'player_a' ? '玩家 A' : '玩家 B';
+    const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
+    const hpPct = Math.round((u.hp / u.maxHp) * 100);
+    const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
+    const actions = [];
+    if (!u.hasMoved) actions.push('可移动');
+    if (!u.hasAttacked) actions.push(u.type === 'medic' ? '可治疗' : '可攻击');
+    const spec = gameConfig?.units?.[u.type] || {};
+    selDetailEl.innerHTML = `
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
+      <div style="color:#8a8">❤️ ${u.hp} / ${u.maxHp} <span style="display:inline-block;width:80px;height:6px;background:#2a1a1a;border-radius:3px;vertical-align:middle;margin-left:6px"><span style="display:block;height:100%;border-radius:3px;background:${hpColor};width:${hpPct}%"></span></span></div>
+      <div style="color:#9ab;font-size:12px;margin-top:4px">⚔️ 攻击 ${spec.attack ?? '-'}　🛡️ 防御 ${spec.defense ?? '-'}</div>
+      <div style="color:#9ab;font-size:12px">🏃 移动 ${spec.moveRange ?? '-'}　🎯 射程 ${spec.attackRange ?? '-'}</div>
+      <div style="color:#5a7a8a;font-size:12px;margin-top:4px">📍 (${u.x}, ${u.y})</div>
+      ${actions.length > 0 ? `<div style="color:#6a8;font-size:11px;margin-top:4px">${actions.join(' · ')}</div>` : '<div style="color:#a66;font-size:11px;margin-top:4px">本回合已行动</div>'}
+    `;
+    return;
+  }
+  if (b) {
+    const ownerCls = b.owner === 'player_a' ? 'player-a' : 'player-b';
+    const ownerName = b.owner === 'player_a' ? '玩家 A' : '玩家 B';
+    const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+    const hpPct = Math.round((b.hp / b.maxHp) * 100);
+    const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
+    const statusText = b.isBuilding
+      ? `🔨 建造中 (剩余 ${b.buildProgress || 0} 回合)`
+      : b.production
+      ? `🏭 生产中: ${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'} (剩余 ${b.production.turnsRemaining} 回合)`
+      : '✅ 空闲';
+    selDetailEl.innerHTML = `
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
+      <div style="color:#8a8">❤️ ${b.hp} / ${b.maxHp} <span style="display:inline-block;width:80px;height:6px;background:#2a1a1a;border-radius:3px;vertical-align:middle;margin-left:6px"><span style="display:block;height:100%;border-radius:3px;background:${hpColor};width:${hpPct}%"></span></span></div>
+      <div style="color:#5a7a8a;font-size:12px;margin-top:4px">📍 (${b.x}, ${b.y})</div>
+      <div style="color:#9ab;font-size:12px;margin-top:4px">${statusText}</div>
+    `;
+    return;
+  }
+  selDetailEl.textContent = '点击或悬停棋盘查看单位/建筑信息';
 }
 
 // ─── Sidebar ───
 
 function renderSidebar() {
   if (!state) return;
+
+  // Count units & buildings per player
+  const counts = { a_units: 0, b_units: 0, a_bld: 0, b_bld: 0 };
+  for (const u of state.units.values()) {
+    if (!u.alive) continue;
+    if (u.owner === 'player_a') counts.a_units++; else counts.b_units++;
+  }
+  for (const b of state.buildings.values()) {
+    if (!b.alive) continue;
+    if (b.owner === 'player_a') counts.a_bld++; else counts.b_bld++;
+  }
+
+  const turnOwner = state.turn.currentOwner;
+  const isOver = state.turn.phase === 'game_over';
+
   resourcesEl.innerHTML = `
-    <h3>资源</h3>
-    <div><span class="player-a">玩家 A</span>: ${state.resources.player_a.gold} 金</div>
-    <div><span class="player-b">玩家 B</span>: ${state.resources.player_b.gold} 金</div>
+    <h3>资源 & 总览</h3>
+    <div style="display:flex;gap:16px;margin-bottom:8px">
+      <div><span class="player-a">玩家 A</span>: ${state.resources.player_a.gold} 金</div>
+      <div><span class="player-b">玩家 B</span>: ${state.resources.player_b.gold} 金</div>
+    </div>
+    <div style="font-size:11px;color:#5a7a8a">
+      <span class="player-a">A</span>: ${counts.a_units} 单位 / ${counts.a_bld} 建筑
+      &nbsp;|&nbsp;
+      <span class="player-b">B</span>: ${counts.b_units} 单位 / ${counts.b_bld} 建筑
+    </div>
   `;
   turnInfoEl.innerHTML = `
     <h3>回合 ${state.turn.turnNumber}</h3>
-    <div>当前: <span class="${state.turn.currentOwner === 'player_a' ? 'player-a' : 'player-b'}">${esc(state.turn.currentOwner)}</span></div>
-    ${state.winner ? `<div>胜者: <strong>${esc(state.winner)}</strong></div>` : ''}
+    <div>当前: <span class="${turnOwner === 'player_a' ? 'player-a' : 'player-b'}">${esc(turnOwner)}</span></div>
+    ${isOver ? `<div style="color:#ff8;font-weight:700;margin-top:4px">🏆 游戏结束 — 胜者: ${esc(state.winner || '无')}</div>` : ''}
   `;
 
   // Event log — show all, highlight current

@@ -21,9 +21,17 @@
       <div id="settings-wrap">
         <button id="btn-settings" title="设置">&#9881;</button>
         <div id="settings-popover">
-          <label><input type="checkbox" id="auto-refresh" checked /> 自动刷新</label>
-          <label>刷新间隔 <input type="number" id="refresh-interval" min="1" max="60" value="5" /> 秒</label>
-          <label><input type="checkbox" id="follow-latest" /> 跟随最新</label>
+          <label class="toggle-row">
+            <span>自动刷新</span>
+            <span class="toggle"><input type="checkbox" id="auto-refresh" checked /><span class="slider"></span></span>
+          </label>
+          <label class="setting-row">
+            刷新间隔 <input type="number" id="refresh-interval" min="1" max="60" value="5" /> 秒
+          </label>
+          <label class="toggle-row">
+            <span>跟随最新</span>
+            <span class="toggle"><input type="checkbox" id="follow-latest" /><span class="slider"></span></span>
+          </label>
         </div>
       </div>
     </div>

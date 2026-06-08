@@ -60,10 +60,33 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; 
 }
 #settings-popover.open { display: flex; }
 #settings-popover label {
-  display: flex; align-items: center; gap: 8px;
   font-size: 13px; color: #b0c8d8; cursor: pointer;
 }
-#settings-popover input[type="checkbox"] { cursor: pointer; accent-color: #4a8; }
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.setting-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.toggle {
+  position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.slider {
+  position: absolute; inset: 0;
+  background: #2a3a4a; border-radius: 10px;
+  transition: background .2s;
+  cursor: pointer;
+}
+.slider::before {
+  content: '';
+  position: absolute; left: 2px; top: 2px;
+  width: 16px; height: 16px;
+  background: #889; border-radius: 50%;
+  transition: transform .2s, background .2s;
+}
+.toggle input:checked + .slider { background: #2a8a4a; }
+.toggle input:checked + .slider::before { transform: translateX(16px); background: #6f8; }
 #settings-popover input[type="number"] {
   width: 50px; padding: 3px 6px;
   background: #0f1a24; color: #d8e0e8;

@@ -46,6 +46,44 @@ let liveSse = null;
 // Auto-refresh
 const autoRefreshCb = document.getElementById('auto-refresh');
 const followLatestCb = document.getElementById('follow-latest');
+
+// ─── Player rename ───
+
+resourcesEl.addEventListener('click', e => {
+  const span = e.target.closest('.player-name');
+  if (!span) return;
+  const playerId = span.dataset.player;
+  const currentName = playerName(playerId);
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.maxLength = 20;
+  input.style.cssText = 'width:80px;font-size:inherit;padding:0 2px;border:1px solid #6cf;background:#1a2a3a;color:#fff;border-radius:2px;outline:none;';
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  async function commit() {
+    const newName = input.value.trim() || currentName;
+    try {
+      const res = await fetch(`/api/games/${gameSelect.value}/rename`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId, name: newName }),
+      });
+      if (!res.ok) console.error('rename failed');
+    } catch (err) {
+      console.error('rename error', err);
+    }
+    renderSidebar();
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+    if (ev.key === 'Escape') { input.value = currentName; input.blur(); }
+  });
+});
 let refreshTimer = null;
 const REFRESH_INTERVAL = 5000;
 
@@ -442,6 +480,9 @@ function applyEvent(s, ev) {
       s.turn.phase = 'game_over';
       s.winner = ev.payload.winner;
       break;
+    case 'name_rename':
+      playerNames[ev.payload.playerId] = ev.payload.name;
+      break;
   }
 }
 
@@ -725,11 +766,11 @@ function renderSidebar() {
   const turnOwner = state.turn.currentOwner;
   const isOver = state.turn.phase === 'game_over';
 
-  resourcesEl.innerHTML = `
+    resourcesEl.innerHTML = `
     <h3>资源 & 总览</h3>
     <div style="display:flex;gap:16px;margin-bottom:8px">
-      <div><span class="player-a">${esc(playerName('player_a'))}</span>: ${state.resources.player_a.gold} 金</div>
-      <div><span class="player-b">${esc(playerName('player_b'))}</span>: ${state.resources.player_b.gold} 金</div>
+      <div><span class="player-a player-name" data-player="player_a" title="点击改名">${esc(playerName('player_a'))}</span>: ${state.resources.player_a.gold} 金</div>
+      <div><span class="player-b player-name" data-player="player_b" title="点击改名">${esc(playerName('player_b'))}</span>: ${state.resources.player_b.gold} 金</div>
     </div>
     <div style="font-size:11px;color:#5a7a8a">
       <span class="player-a">${esc(playerName('player_a'))}</span>: ${counts.a_units} 单位 / ${counts.a_bld} 建筑
@@ -818,6 +859,7 @@ function formatEventShort(ev) {
     case 'mine': return `采矿收入 +${p.amount}`;
     case 'base_income': return `基础收入 +${p.amount}`;
     case 'reset_actions': return `行动重置 ${p.owner}`;
+    case 'name_rename': return `${p.playerId === 'player_a' ? '玩家A' : '玩家B'} 改名为 "${p.name}"`;
     default: return `${ev.type} ${JSON.stringify(p).slice(0,60)}`;
   }
 }

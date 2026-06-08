@@ -52,6 +52,28 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     return { playerBToken: game.tokens.player_b };
   });
 
+  app.patch<{ Params: { id: string }; Body: { playerId: string; name: string } }>('/api/games/:id/rename', async (req, reply) => {
+    const game = globalStore.get(req.params.id);
+    if (!game) {
+      return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    }
+    const { playerId, name } = req.body || {};
+    if (playerId !== 'player_a' && playerId !== 'player_b') {
+      return reply.code(400).send({ error: 'playerId must be player_a or player_b', code: 'invalid_move' });
+    }
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return reply.code(400).send({ error: 'name is required', code: 'invalid_move' });
+    }
+    const trimmed = name.trim().slice(0, 20);
+    game.playerNames[playerId] = trimmed;
+    globalEventBus.emit(game.id, {
+      type: 'name_rename',
+      seq: game.nextSeq++,
+      payload: { playerId, name: trimmed },
+    });
+    return { ok: true };
+  });
+
   app.get<{ Params: { id: string } }>('/api/games/:id', async (req, reply) => {
     const ctx = authenticate(req, reply);
     if (!ctx) return;

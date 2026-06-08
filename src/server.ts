@@ -36,7 +36,7 @@ if (isMain) {
       console.log('='.repeat(60));
       console.log('');
       console.log('  页面:');
-      console.log(`    观战页面      ${base}/`);
+      console.log(`    观战页面      ${base}/spectator.html`);
       console.log(`    游戏页面      ${base}/play.html`);
       console.log('');
       console.log('  API 端点:');

@@ -65,16 +65,20 @@ resourcesEl.addEventListener('click', e => {
 
   async function commit() {
     const newName = input.value.trim() || currentName;
-    try {
-      const res = await fetch(`/api/games/${gameSelect.value}/rename`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId, name: newName }),
-      });
-      if (!res.ok) console.error('rename failed');
-    } catch (err) {
-      console.error('rename error', err);
+    if (newName !== currentName && gameSelect.value) {
+      try {
+        const res = await fetch(`/api/games/${gameSelect.value}/rename`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId, name: newName }),
+        });
+        if (!res.ok) console.error('rename failed');
+      } catch (err) {
+        console.error('rename error', err);
+      }
     }
+    // Update local name immediately (SSE event may not arrive if not connected)
+    playerNames[playerId] = newName;
     renderSidebar();
   }
 

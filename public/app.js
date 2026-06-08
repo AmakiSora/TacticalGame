@@ -79,6 +79,12 @@ resourcesEl.addEventListener('click', e => {
     }
     // Update local name immediately (SSE event may not arrive if not connected)
     playerNames[playerId] = newName;
+    // Add rename event to allEvents so it's included in exports
+    if (newName !== currentName) {
+      allEvents.push({ seq: allEvents.length + 1, type: 'name_rename', timestamp: Date.now(), payload: { playerId, name: newName } });
+      buildTimelineMarkers();
+      timeline.max = allEvents.length - 1;
+    }
     renderSidebar();
   }
 

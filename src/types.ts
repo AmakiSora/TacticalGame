@@ -79,6 +79,7 @@ export type EventType =
   | 'base_destroyed'
   | 'turn_end'
   | 'game_over'
+  | 'sell'
   | 'name_rename';
 
 export interface GameEvent {

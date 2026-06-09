@@ -64,6 +64,36 @@ export function startBuild(
   return { ok: true, data: building };
 }
 
+export function sellBuilding(
+  game: GameState,
+  bus: EventBus,
+  owner: PlayerId,
+  buildingId: string,
+): Result<{ refund: number }> {
+  const building = game.buildings.find(b => b.id === buildingId);
+  if (!building) {
+    return { ok: false, code: 'invalid_move', message: 'building not found' };
+  }
+  if (building.owner !== owner) {
+    return { ok: false, code: 'not_your_turn', message: 'not your building' };
+  }
+  if (building.type === 'headquarters') {
+    return { ok: false, code: 'cannot_produce', message: 'headquarters cannot be sold' };
+  }
+  if (building.isBuilding) {
+    return { ok: false, code: 'invalid_move', message: 'building is still under construction' };
+  }
+
+  const spec = getBuildingSpec(game.config, building.type);
+  const refund = Math.floor(spec.cost * 0.8);
+  game.resources[owner].gold += refund;
+  building.alive = false;
+  appendEvent(game, bus, 'sell', {
+    buildingId: building.id, owner, type: building.type, x: building.x, y: building.y, refund,
+  });
+  return { ok: true, data: { refund } };
+}
+
 export function tickBuildProgress(game: GameState, bus: EventBus, owner: PlayerId): void {
   for (const b of game.buildings) {
     if (b.owner !== owner || !b.isBuilding || !b.alive) continue;

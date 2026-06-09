@@ -2,7 +2,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { globalEventBus } from '../events/bus.js';
 import { authenticate, statusForCode } from './auth.js';
-import { startBuild } from '../engine/building.js';
+import { startBuild, sellBuilding } from '../engine/building.js';
 import { startProduction } from '../engine/production.js';
 import { moveUnit } from '../engine/units.js';
 import { attackTarget, healTarget } from '../engine/combat.js';
@@ -46,6 +46,7 @@ interface ProduceBody { buildingId: string; unitType: 'infantry' | 'sniper' | 't
 interface MoveBody { unitId: string; x: number; y: number }
 interface AttackBody { attackerId: string; targetId: string }
 interface HealBody { medicId: string; targetId: string }
+interface SellBody { buildingId: string }
 
 export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: BuildBody }>(
@@ -100,6 +101,17 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
       }
       return actionHandler(req, reply, ({ game, player }) =>
         healTarget(game, globalEventBus, player, medicId, targetId));
+    },
+  );
+
+  app.post<{ Params: { id: string }; Body: SellBody }>(
+    '/api/games/:id/sell', async (req, reply) => {
+      const { buildingId } = req.body || {};
+      if (!buildingId) {
+        return badRequest(reply, 'buildingId required');
+      }
+      return actionHandler(req, reply, ({ game, player }) =>
+        sellBuilding(game, globalEventBus, player, buildingId));
     },
   );
 

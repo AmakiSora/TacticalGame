@@ -277,6 +277,12 @@ function applyEvent(s, ev) {
       if (b) b.alive = false;
       break;
     }
+    case 'sell': {
+      const b = s.buildings.get(p.buildingId);
+      if (b) b.alive = false;
+      s.resources[p.owner].gold += p.refund;
+      break;
+    }
     case 'mine':
     case 'base_income':
       s.resources[p.owner].gold += p.amount;
@@ -414,9 +420,15 @@ function showPopup(cellX, cellY, title, items, onAction) {
   let html = `<div class="map-popup-title">${esc(title)}</div>`;
   for (const item of items) {
     const afford = item.cost === undefined || state.resources[myPlayer].gold >= item.cost;
+    let costHtml = '';
+    if (item.gain !== undefined) {
+      costHtml = `<span class="map-popup-cost gain">+${item.gain}金</span>`;
+    } else if (item.cost !== undefined) {
+      costHtml = `<span class="map-popup-cost ${afford ? '' : 'cant-afford'}">${item.cost}金</span>`;
+    }
     html += `<button class="map-popup-btn" data-action="${esc(item.action)}" data-params='${esc(JSON.stringify(item.params || {}))}'>
       <span>${esc(item.label)}</span>
-      ${item.cost !== undefined ? `<span class="map-popup-cost ${afford ? '' : 'cant-afford'}">${item.cost}金</span>` : ''}
+      ${costHtml}
     </button>`;
   }
   mapPopup.innerHTML = html;
@@ -457,6 +469,10 @@ async function handlePopupAction(action, params) {
       type: params.type,
       x: params.x,
       y: params.y,
+    });
+  } else if (action === 'sell') {
+    await apiAction(`/api/games/${gameId}/sell`, {
+      buildingId: params.buildingId,
     });
   }
 }
@@ -920,16 +936,25 @@ els.canvas.addEventListener('click', e => {
     interactionMode = 'building_selected';
     renderSidebar();
     drawBoard();
-    // own barracks → also show production popup
-    if (building.owner === myPlayer && building.type === 'barracks' && !building.isBuilding) {
-      const canProduce = gameConfig?.canProduce?.barracks || ['infantry', 'sniper', 'tank', 'medic'];
-      const items = canProduce.map(ut => ({
-        label: ut === 'infantry' ? '步兵' : ut === 'sniper' ? '狙击手' : ut === 'tank' ? '坦克' : '医疗兵',
-        cost: gameConfig?.units?.[ut]?.cost ?? 0,
-        action: 'produce',
-        params: { buildingId: building.id, unitType: ut },
-      }));
-      showPopup(cell.x, cell.y, '生产单位', items);
+    // own barracks/miner → show action popup
+    if (building.owner === myPlayer && !building.isBuilding) {
+      const items = [];
+      if (building.type === 'barracks') {
+        const canProduce = gameConfig?.canProduce?.barracks || ['infantry', 'sniper', 'tank', 'medic'];
+        for (const ut of canProduce) {
+          items.push({
+            label: ut === 'infantry' ? '步兵' : ut === 'sniper' ? '狙击手' : ut === 'tank' ? '坦克' : '医疗兵',
+            cost: gameConfig?.units?.[ut]?.cost ?? 0,
+            action: 'produce',
+            params: { buildingId: building.id, unitType: ut },
+          });
+        }
+      }
+      const spec = gameConfig?.buildings?.[building.type];
+      const refund = spec ? Math.floor(spec.cost * 0.8) : 0;
+      items.push({ label: '出售', gain: refund, action: 'sell', params: { buildingId: building.id } });
+      const title = building.type === 'barracks' ? '生产单位' : '操作';
+      showPopup(cell.x, cell.y, title, items);
     }
     return;
   }

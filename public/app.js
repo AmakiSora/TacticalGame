@@ -212,6 +212,16 @@ function buildAnimationsForEvent(oldSnap, ev) {
       }
       break;
     }
+    case 'sell': {
+      const oldB = oldSnap.buildings.get(p.buildingId);
+      if (oldB) {
+        addAnim({
+          kind: 'death', id: p.buildingId, x: p.x, y: p.y,
+          duration: ANIM_DEATH_DURATION, owner: oldB.owner, etype: oldB.etype,
+        });
+      }
+      break;
+    }
   }
 }
 
@@ -384,6 +394,11 @@ function applyEvent(s, ev) {
     case 'game_start':
       if (ev.payload.config) gameConfig = ev.payload.config;
       if (ev.payload.playerNames) playerNames = ev.payload.playerNames;
+      // Sync starting gold from actual game config
+      if (gameConfig?.economy?.startingGold != null) {
+        s.resources.player_a.gold = gameConfig.economy.startingGold;
+        s.resources.player_b.gold = gameConfig.economy.startingGold;
+      }
       s.mapWidth = ev.payload.mapWidth ?? (gameConfig?.map?.width ?? 20);
       s.mapHeight = ev.payload.mapHeight ?? (gameConfig?.map?.height ?? 20);
       s.miningPoints = ev.payload.miningPoints ?? [];
@@ -425,7 +440,7 @@ function applyEvent(s, ev) {
     case 'produce': {
       const b = s.buildings.get(ev.payload.buildingId);
       if (b) b.production = { type: ev.payload.unitType, turnsRemaining: ev.payload.productionTime };
-      s.resources[ev.payload.owner].gold -= getUnitCost(ev.payload.unitType);
+      s.resources[ev.payload.owner].gold -= ev.payload.cost || getUnitCost(ev.payload.unitType);
       break;
     }
     case 'produce_complete': {
@@ -471,6 +486,12 @@ function applyEvent(s, ev) {
     case 'base_destroyed': {
       const b = s.buildings.get(ev.payload.buildingId);
       if (b) b.alive = false;
+      break;
+    }
+    case 'sell': {
+      const b = s.buildings.get(ev.payload.buildingId);
+      if (b) b.alive = false;
+      s.resources[ev.payload.owner].gold += ev.payload.refund;
       break;
     }
     case 'mine':
@@ -837,7 +858,7 @@ function renderDetail() {
 function getTypeClass(type) {
   const classes = {
     attack: 'attack', move: 'move', build: 'build', build_tick: 'build', build_complete: 'build',
-    produce: 'produce', produce_complete: 'produce', heal: 'heal',
+    sell: 'build', produce: 'produce', produce_complete: 'produce', heal: 'heal',
     turn_end: 'turn_end', game_over: 'game_over',
     unit_death: 'unit_death', base_destroyed: 'base_destroyed',
   };
@@ -863,6 +884,7 @@ function formatEventShort(ev) {
     case 'build': return `建造 ${p.type} @(${p.x},${p.y})`;
     case 'build_tick': return `建造进度 ${p.type} 剩余${p.buildProgress}回合`;
     case 'build_complete': return `建造完成 ${p.buildingId?.slice(0,6)}`;
+    case 'sell': return `出售 ${p.type} @(${p.x},${p.y}) +${p.refund}金`;
     case 'produce': return `生产 ${p.unitType}`;
     case 'produce_complete': return `${p.type} 出现在(${p.x},${p.y})`;
     case 'unit_death': return `单位阵亡 ${p.unitId?.slice(0,6)}`;

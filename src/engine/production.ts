@@ -60,6 +60,8 @@ function spawnUnit(
   game.units.push(unit);
   appendEvent(game, bus, 'produce_complete', {
     unitId: unit.id, owner, type, x, y,
+    hp: spec.hp, attack: spec.attack, defense: spec.defense,
+    moveRange: spec.moveRange, attackRange: spec.attackRange,
   });
   return unit;
 }

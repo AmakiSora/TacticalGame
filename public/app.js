@@ -454,7 +454,12 @@ function applyEvent(s, ev) {
       s.units.set(ev.payload.unitId, {
         id: ev.payload.unitId, owner: ev.payload.owner, type: ev.payload.type,
         x: ev.payload.x, y: ev.payload.y,
-        hp: getUnitMaxHp(ev.payload.type), maxHp: getUnitMaxHp(ev.payload.type),
+        hp: ev.payload.hp ?? getUnitMaxHp(ev.payload.type),
+        maxHp: ev.payload.hp ?? getUnitMaxHp(ev.payload.type),
+        attack: ev.payload.attack ?? (gameConfig?.units?.[ev.payload.type]?.attack ?? 0),
+        defense: ev.payload.defense ?? (gameConfig?.units?.[ev.payload.type]?.defense ?? 0),
+        moveRange: ev.payload.moveRange ?? (gameConfig?.units?.[ev.payload.type]?.moveRange ?? 0),
+        attackRange: ev.payload.attackRange ?? (gameConfig?.units?.[ev.payload.type]?.attackRange ?? 0),
         alive: true, hasMoved: false, hasAttacked: false,
       });
       break;
@@ -748,12 +753,11 @@ function renderSelectionInfo(u, b) {
     const actions = [];
     if (!u.hasMoved) actions.push('可移动');
     if (!u.hasAttacked) actions.push(u.type === 'medic' ? '可治疗' : '可攻击');
-    const spec = gameConfig?.units?.[u.type] || {};
     selDetailEl.innerHTML = `
       <div style="font-weight:700;font-size:15px;margin-bottom:4px"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
       <div style="color:#8a8">❤️ ${u.hp} / ${u.maxHp} <span style="display:inline-block;width:80px;height:6px;background:#2a1a1a;border-radius:3px;vertical-align:middle;margin-left:6px"><span style="display:block;height:100%;border-radius:3px;background:${hpColor};width:${hpPct}%"></span></span></div>
-      <div style="color:#9ab;font-size:12px;margin-top:4px">⚔️ 攻击 ${spec.attack ?? '-'}　🛡️ 防御 ${spec.defense ?? '-'}</div>
-      <div style="color:#9ab;font-size:12px">🏃 移动 ${spec.moveRange ?? '-'}　🎯 射程 ${spec.attackRange ?? '-'}</div>
+      <div style="color:#9ab;font-size:12px;margin-top:4px">⚔️ 攻击 ${u.attack ?? '-'}　🛡️ 防御 ${u.defense ?? '-'}</div>
+      <div style="color:#9ab;font-size:12px">🏃 移动 ${u.moveRange ?? '-'}　🎯 射程 ${u.attackRange ?? '-'}</div>
       <div style="color:#5a7a8a;font-size:12px;margin-top:4px">📍 (${u.x}, ${u.y})</div>
       ${actions.length > 0 ? `<div style="color:#6a8;font-size:11px;margin-top:4px">${actions.join(' · ')}</div>` : '<div style="color:#a66;font-size:11px;margin-top:4px">本回合已行动</div>'}
     `;

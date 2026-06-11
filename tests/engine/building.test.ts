@@ -69,6 +69,22 @@ describe('startBuild', () => {
     startBuild(game, bus, 'player_a', 'barracks', 4, 10);
     expect(game.events.some(e => e.type === 'build')).toBe(true);
   });
+
+  it('bunker creates with attack stats and attacksLeft 0', () => {
+    const { game, bus } = setup();
+    const before = game.resources.player_a.gold;
+    const result = startBuild(game, bus, 'player_a', 'bunker', 4, 10);
+    expect(result.ok).toBe(true);
+    expect(game.resources.player_a.gold).toBe(before - 70);
+    const b = game.buildings.find(x => x.x === 4 && x.y === 10)!;
+    expect(b.type).toBe('bunker');
+    expect(b.hp).toBe(120);
+    expect(b.attack).toBe(24);
+    expect(b.defense).toBe(10);
+    expect(b.attackRange).toBe(2);
+    expect(b.attacksLeft).toBe(0);
+    expect(b.isBuilding).toBe(true);
+  });
 });
 
 describe('tickBuildProgress', () => {

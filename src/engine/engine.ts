@@ -67,6 +67,12 @@ export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result
       u.hasAttacked = false;
     }
   }
+  for (const b of game.buildings) {
+    if (b.owner === owner && b.alive && !b.isBuilding && b.attacksLeft != null) {
+      const spec = game.config.buildings[b.type];
+      b.attacksLeft = spec.attacksPerTurn ?? 0;
+    }
+  }
   appendEvent(game, bus, 'reset_actions', { owner });
 
   const next = otherPlayer(owner);

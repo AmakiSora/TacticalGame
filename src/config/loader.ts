@@ -20,6 +20,10 @@ export interface BuildingSpec {
   hp: number;
   cost: number;
   buildTime: number;
+  attack?: number;
+  defense?: number;
+  attackRange?: number;
+  attacksPerTurn?: number;
 }
 
 export interface MapConfig {
@@ -92,10 +96,20 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   const buildings = c.buildings as Record<string, unknown>;
   if (typeof buildings !== 'object' || buildings === null) throw new Error(`Map "${id}" buildings must be an object`);
   const buildingKeys = ['hp', 'cost', 'buildTime'];
+  const attackKeys = ['attack', 'defense', 'attackRange', 'attacksPerTurn'];
   for (const [bType, spec] of Object.entries(buildings)) {
     const s = spec as Record<string, unknown>;
     for (const k of buildingKeys) {
       assertPositiveInt(s, k, `buildings.${bType}`);
+    }
+    const hasAnyAttack = attackKeys.some(k => k in s);
+    if (hasAnyAttack) {
+      for (const k of attackKeys) {
+        if (!(k in s)) {
+          throw new Error(`buildings.${bType} has some attack keys but missing "${k}" — all of ${attackKeys.join(', ')} required together`);
+        }
+        assertPositiveInt(s, k, `buildings.${bType}`);
+      }
     }
   }
 

@@ -57,6 +57,12 @@ export function startBuild(
     isBuilding: spec.buildTime > 0,
     production: null,
   };
+  if (spec.attacksPerTurn != null) {
+    building.attack = spec.attack;
+    building.defense = spec.defense;
+    building.attackRange = spec.attackRange;
+    building.attacksLeft = 0;
+  }
   game.buildings.push(building);
   appendEvent(game, bus, 'build', {
     buildingId: building.id, owner, type, x, y, buildTime: spec.buildTime, cost: spec.cost,

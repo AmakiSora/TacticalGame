@@ -14,6 +14,8 @@ const COLORS = {
   barracks_b: '#d96a3a',
   miner_a:    '#4a9a6a',
   miner_b:    '#9a7a3a',
+  bunker_a:   '#5a4a8a',
+  bunker_b:   '#8a5a5a',
   building_a: '#3a8ad9',
   building_b: '#d96a3a',
   unit_a:     '#6cf',
@@ -211,12 +213,20 @@ function applyEvent(s, ev) {
     case 'build':
       s.resources[p.owner].gold -= (p.cost || 0);
       {
-        const bMaxHp = gameConfig?.buildings?.[p.type]?.hp || 60;
-        s.buildings.set(p.buildingId, {
+        const bSpec = gameConfig?.buildings?.[p.type] || {};
+        const bMaxHp = bSpec.hp || 60;
+        const newBuilding = {
           id: p.buildingId, owner: p.owner, type: p.type,
           x: p.x, y: p.y, hp: p.hp || bMaxHp, maxHp: p.maxHp || bMaxHp,
           alive: true, isBuilding: true, production: null, buildProgress: p.buildTime || 0,
-        });
+        };
+        if (bSpec.attacksPerTurn != null) {
+          newBuilding.attack = bSpec.attack;
+          newBuilding.defense = bSpec.defense;
+          newBuilding.attackRange = bSpec.attackRange;
+          newBuilding.attacksLeft = 0;
+        }
+        s.buildings.set(p.buildingId, newBuilding);
       }
       break;
     case 'build_tick': {
@@ -260,6 +270,8 @@ function applyEvent(s, ev) {
     case 'attack': {
       const t = s.units.get(p.targetId) || s.buildings.get(p.targetId);
       if (t) { t.hp = p.targetHp; if (p.attackerHasAttacked) { const a = s.units.get(ev.payload.attackerId); if (a) a.hasAttacked = true; } }
+      const ab = s.buildings.get(p.attackerId);
+      if (ab && ab.attacksLeft != null) ab.attacksLeft = Math.max(0, ab.attacksLeft - 1);
       break;
     }
     case 'heal': {
@@ -292,6 +304,12 @@ function applyEvent(s, ev) {
         if (u.owner === p.owner) {
           u.hasMoved = false;
           u.hasAttacked = false;
+        }
+      }
+      for (const b of s.buildings.values()) {
+        if (b.owner === p.owner && b.alive && !b.isBuilding && b.attacksLeft != null) {
+          const spec = gameConfig?.buildings?.[b.type];
+          b.attacksLeft = spec?.attacksPerTurn ?? 0;
         }
       }
       break;
@@ -387,6 +405,24 @@ function computeHealHighlights(unit) {
   for (const t of state.units.values()) {
     if (t.alive && t.owner === myPlayer && t.hp < t.maxHp && manhattan(unit, t) <= 1) {
       rangeHighlights.push({ x: t.x, y: t.y, type: 'heal' });
+    }
+  }
+}
+
+function computeBunkerAttackHighlights(bunker) {
+  rangeHighlights = [];
+  if (!bunker || bunker.isBuilding || (bunker.attacksLeft ?? 0) <= 0) return;
+  const range = bunker.attackRange ?? 2;
+  for (const t of state.units.values()) {
+    if (t.alive && t.owner !== myPlayer && manhattan(bunker, t) <= range) {
+      rangeHighlights.push({ x: t.x, y: t.y, type: 'attack' });
+    }
+  }
+  for (const b of state.buildings.values()) {
+    if (b.alive && b.owner !== myPlayer && manhattan(bunker, b) <= range) {
+      if (!rangeHighlights.find(h => h.x === b.x && h.y === b.y)) {
+        rangeHighlights.push({ x: b.x, y: b.y, type: 'attack' });
+      }
     }
   }
 }
@@ -572,6 +608,7 @@ function drawBoard() {
     let color;
     if (b.type === 'headquarters') color = isA ? COLORS.hq_a : COLORS.hq_b;
     else if (b.type === 'barracks') color = isA ? COLORS.barracks_a : COLORS.barracks_b;
+    else if (b.type === 'bunker') color = isA ? COLORS.bunker_a : COLORS.bunker_b;
     else color = isA ? COLORS.miner_a : COLORS.miner_b;
 
     if (b.isBuilding) {
@@ -591,7 +628,7 @@ function drawBoard() {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
-    const letter = b.type === 'headquarters' ? 'HQ' : b.type === 'barracks' ? 'B' : 'M';
+    const letter = b.type === 'headquarters' ? 'HQ' : b.type === 'barracks' ? 'B' : b.type === 'bunker' ? 'MG' : 'M';
     ctx.fillText(letter, b.x * CELL + CELL / 2, b.y * CELL + CELL / 2 + 4);
 
     // hp bar
@@ -742,7 +779,7 @@ function renderSelectionInfo() {
     if (b && b.alive) {
       const ownerCls = b.owner === 'player_a' ? 'sel-owner-a' : 'sel-owner-b';
       const ownerName = playerName(b.owner);
-      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : '采矿器';
       const hpPct = Math.round((b.hp / b.maxHp) * 100);
       const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
       const statusText = b.isBuilding
@@ -750,11 +787,17 @@ function renderSelectionInfo() {
         : b.production
         ? `🏭 生产中: ${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'} (剩余 ${b.production.turnsRemaining} 回合)`
         : '✅ 空闲';
+      const modeHint = interactionMode === 'bunker_attack_mode' ? '⚔️ 选择攻击目标 (Esc取消)' : '';
+      const bunkerStats = b.type === 'bunker' && !b.isBuilding
+        ? `<div class="sel-stat">⚔️ 攻击 ${b.attack ?? '-'}　🛡️ 防御 ${b.defense ?? '-'}　🎯 射程 ${b.attackRange ?? '-'}　🔫 剩余 ${b.attacksLeft ?? 0}/2</div>`
+        : '';
       el.innerHTML = `
         <div class="sel-type"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
         <div class="sel-hp">❤️ ${b.hp} / ${b.maxHp} <span class="sel-hp-bar"><span class="sel-hp-fill" style="width:${hpPct}%;background:${hpColor}"></span></span></div>
+        ${bunkerStats}
         <div class="sel-stat">📍 位置 (${b.x}, ${b.y})</div>
         <div class="sel-stat">${statusText}</div>
+        ${modeHint ? `<div class="sel-actions" style="color:#6cf">${modeHint}</div>` : ''}
       `;
       return;
     }
@@ -799,9 +842,10 @@ els.canvas.addEventListener('mousemove', e => {
       info += ` | ${typeName} [${playerName(u.owner)}] HP:${u.hp}/${u.maxHp}`;
     }
     if (b) {
-      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : '采矿器';
       const status = b.isBuilding ? ' 建造中' : b.production ? ` 生产${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'}` : '';
-      info += ` | ${typeName} [${playerName(b.owner)}] HP:${b.hp}/${b.maxHp}${status}`;
+      const bunkerInfo = b.type === 'bunker' && !b.isBuilding ? ` ⚔️${b.attack ?? '-'}/🎯${b.attackRange ?? '-'} 剩余${b.attacksLeft ?? 0}` : '';
+      info += ` | ${typeName} [${playerName(b.owner)}] HP:${b.hp}/${b.maxHp}${status}${bunkerInfo}`;
     }
     els.cellInfo.textContent = info;
   } else {
@@ -829,6 +873,32 @@ els.canvas.addEventListener('contextmenu', e => {
 els.canvas.addEventListener('click', e => {
   const cell = cellFromMouse(e);
   if (!cell || !state) return;
+
+  // ── bunker_attack_mode: click on highlighted enemy → bunker attacks ──
+  if (interactionMode === 'bunker_attack_mode' && selectedBuildingId) {
+    const bunker = state.buildings.get(selectedBuildingId);
+    if (!bunker || !bunker.alive) { deselectAll(); return; }
+    if (bunker.x === cell.x && bunker.y === cell.y) {
+      interactionMode = 'building_selected';
+      rangeHighlights = [];
+      renderSidebar();
+      drawBoard();
+      return;
+    }
+    const highlight = rangeHighlights.find(h => h.x === cell.x && h.y === cell.y && h.type === 'attack');
+    if (highlight) {
+      const target = entityAt(cell.x, cell.y);
+      if (target && target.owner !== myPlayer) {
+        doBunkerAttack(bunker, target);
+        return;
+      }
+    }
+    // click outside → cancel mode
+    interactionMode = 'idle';
+    selectedBuildingId = null;
+    rangeHighlights = [];
+    closePopup();
+  }
 
   // ── building_selected: ignore (popup handles it) ──
   if (interactionMode === 'building_selected') return;
@@ -936,7 +1006,7 @@ els.canvas.addEventListener('click', e => {
     interactionMode = 'building_selected';
     renderSidebar();
     drawBoard();
-    // own barracks/miner → show action popup
+    // own barracks/miner/bunker → show action popup
     if (building.owner === myPlayer && !building.isBuilding) {
       const items = [];
       if (building.type === 'barracks') {
@@ -950,11 +1020,26 @@ els.canvas.addEventListener('click', e => {
           });
         }
       }
+      if (building.type === 'bunker' && (building.attacksLeft ?? 0) > 0) {
+        items.push({ label: `攻击 (剩余 ${building.attacksLeft})`, action: 'bunker_attack', params: { buildingId: building.id } });
+      }
       const spec = gameConfig?.buildings?.[building.type];
       const refund = spec ? Math.floor(spec.cost * 0.8) : 0;
       items.push({ label: '出售', gain: refund, action: 'sell', params: { buildingId: building.id } });
-      const title = building.type === 'barracks' ? '生产单位' : '操作';
-      showPopup(cell.x, cell.y, title, items);
+      const title = building.type === 'barracks' ? '生产单位' : building.type === 'bunker' ? '碉堡操作' : '操作';
+      showPopup(cell.x, cell.y, title, items, (action, params) => {
+        if (action === 'bunker_attack') {
+          closePopup();
+          interactionMode = 'bunker_attack_mode';
+          selectedBuildingId = params.buildingId;
+          computeBunkerAttackHighlights(building);
+          renderSidebar();
+          drawBoard();
+        } else {
+          handlePopupAction(action, params);
+          closePopup();
+        }
+      });
     }
     return;
   }
@@ -971,6 +1056,7 @@ els.canvas.addEventListener('click', e => {
       const items = [
         { label: '兵营', cost: gameConfig?.buildings?.barracks?.cost ?? 50, action: 'build', params: { type: 'barracks', x: cell.x, y: cell.y } },
         { label: '采矿器', cost: gameConfig?.buildings?.miner?.cost ?? 30, action: 'build', params: { type: 'miner', x: cell.x, y: cell.y } },
+        { label: '碉堡', cost: gameConfig?.buildings?.bunker?.cost ?? 70, action: 'build', params: { type: 'bunker', x: cell.x, y: cell.y } },
       ];
       showPopup(cell.x, cell.y, '建造', items);
       computeBuildHighlights();
@@ -1019,6 +1105,23 @@ async function doHeal(medic, target) {
     deselectAll();
   } else {
     toast(`${data.error || '治疗失败'} (${data.code || ''})`, 'err');
+  }
+}
+
+async function doBunkerAttack(bunker, target) {
+  const { ok, data } = await API.post(`/api/games/${gameId}/attack`, { attackerId: bunker.id, targetId: target.id });
+  if (ok) {
+    toast('碉堡攻击', 'ok');
+    // re-select bunker, refresh highlights for possible second attack
+    const refreshed = state.buildings.get(bunker.id);
+    if (refreshed && (refreshed.attacksLeft ?? 0) > 0) {
+      computeBunkerAttackHighlights(refreshed);
+      drawBoard();
+    } else {
+      deselectAll();
+    }
+  } else {
+    toast(`${data.error || '攻击失败'} (${data.code || ''})`, 'err');
   }
 }
 

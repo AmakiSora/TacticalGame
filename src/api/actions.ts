@@ -41,7 +41,7 @@ function badRequest(reply: FastifyReply, msg: string) {
   return reply.code(400).send({ error: msg, code: 'invalid_move' });
 }
 
-interface BuildBody { type: 'barracks' | 'miner'; x: number; y: number }
+interface BuildBody { type: 'barracks' | 'miner' | 'bunker'; x: number; y: number }
 interface ProduceBody { buildingId: string; unitType: 'infantry' | 'sniper' | 'tank' | 'medic' }
 interface MoveBody { unitId: string; x: number; y: number }
 interface AttackBody { attackerId: string; targetId: string }

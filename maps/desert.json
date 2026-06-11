@@ -4,7 +4,7 @@
   "units": {
     "infantry": {
       "hp": 100,
-      "attack": 20,
+      "attack": 40,
       "defense": 8,
       "moveRange": 3,
       "attackRange": 1,
@@ -13,7 +13,7 @@
     },
     "sniper": {
       "hp": 60,
-      "attack": 35,
+      "attack": 70,
       "defense": 3,
       "moveRange": 2,
       "attackRange": 4,
@@ -22,7 +22,7 @@
     },
     "tank": {
       "hp": 150,
-      "attack": 25,
+      "attack": 50,
       "defense": 15,
       "moveRange": 2,
       "attackRange": 1,
@@ -31,7 +31,7 @@
     },
     "medic": {
       "hp": 70,
-      "attack": 5,
+      "attack": 10,
       "defense": 5,
       "moveRange": 3,
       "attackRange": 1,
@@ -54,6 +54,15 @@
       "hp": 60,
       "cost": 30,
       "buildTime": 1
+    },
+    "bunker": {
+      "hp": 120,
+      "cost": 70,
+      "buildTime": 2,
+      "attack": 24,
+      "defense": 10,
+      "attackRange": 2,
+      "attacksPerTurn": 2
     }
   },
   "canProduce": {
@@ -64,7 +73,8 @@
       "tank",
       "medic"
     ],
-    "miner": []
+    "miner": [],
+    "bunker": []
   },
   "economy": {
     "startingGold": 80,

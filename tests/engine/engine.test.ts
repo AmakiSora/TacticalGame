@@ -122,4 +122,46 @@ describe('endTurn', () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe('game_over');
   });
+
+  it('resets bunker attacksLeft to attacksPerTurn at end of turn', () => {
+    const { game, bus } = setup();
+    joinGame(game, bus);
+    game.buildings.push({
+      id: 'bunker1', owner: 'player_a', type: 'bunker',
+      x: 4, y: 10, hp: 120, maxHp: 120, alive: true,
+      buildProgress: 0, isBuilding: false, production: null,
+      attack: 12, defense: 10, attackRange: 2, attacksLeft: 0,
+    });
+    endTurn(game, bus, 'player_a');
+    const b = game.buildings.find(x => x.id === 'bunker1')!;
+    expect(b.attacksLeft).toBe(2);
+  });
+
+  it('does not reset attacksLeft for bunker still under construction', () => {
+    const { game, bus } = setup();
+    joinGame(game, bus);
+    game.buildings.push({
+      id: 'bunker1', owner: 'player_a', type: 'bunker',
+      x: 4, y: 10, hp: 120, maxHp: 120, alive: true,
+      buildProgress: 2, isBuilding: true, production: null,
+      attack: 12, defense: 10, attackRange: 2, attacksLeft: 0,
+    });
+    endTurn(game, bus, 'player_a');
+    const b = game.buildings.find(x => x.id === 'bunker1')!;
+    expect(b.attacksLeft).toBe(0);
+  });
+
+  it('does not reset enemy bunker attacksLeft', () => {
+    const { game, bus } = setup();
+    joinGame(game, bus);
+    game.buildings.push({
+      id: 'bunker_b', owner: 'player_b', type: 'bunker',
+      x: 15, y: 10, hp: 120, maxHp: 120, alive: true,
+      buildProgress: 0, isBuilding: false, production: null,
+      attack: 12, defense: 10, attackRange: 2, attacksLeft: 1,
+    });
+    endTurn(game, bus, 'player_a');
+    const b = game.buildings.find(x => x.id === 'bunker_b')!;
+    expect(b.attacksLeft).toBe(1);
+  });
 });

@@ -617,6 +617,7 @@ function drawBoard() {
       const isA = b.owner === 'player_a';
       ctx.fillStyle = b.type === 'headquarters' ? (isA ? '#1a4070' : '#703010')
         : b.type === 'barracks' ? (isA ? '#2a5a90' : '#904a20')
+        : b.type === 'bunker' ? (isA ? '#3a3a5a' : '#5a3a3a')
         : (isA ? '#2a6a4a' : '#6a5a2a');
       ctx.fillRect(b.x * CELL + 2, b.y * CELL + 2, CELL - 4, CELL - 4);
       ctx.restore();
@@ -626,6 +627,7 @@ function drawBoard() {
     let color;
     if (b.type === 'headquarters') color = isA ? '#2a60a0' : '#a04020';
     else if (b.type === 'barracks') color = isA ? '#3a8ad9' : '#d96a3a';
+    else if (b.type === 'bunker') color = isA ? '#5a4a8a' : '#8a5a5a';
     else color = isA ? '#4a9a6a' : '#9a7a3a';
 
     if (b.isBuilding) {
@@ -645,7 +647,7 @@ function drawBoard() {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
-    const letter = b.type === 'headquarters' ? 'HQ' : b.type === 'barracks' ? 'B' : 'M';
+    const letter = b.type === 'headquarters' ? 'HQ' : b.type === 'barracks' ? 'B' : b.type === 'bunker' ? 'MG' : 'M';
     ctx.fillText(letter, b.x * CELL + CELL / 2, b.y * CELL + CELL / 2 + 4);
     ctx.textAlign = 'left';
 
@@ -718,7 +720,7 @@ canvas.addEventListener('mousemove', e => {
     info += ` | ${typeName} [${playerName(u.owner)}] HP:${u.hp}/${u.maxHp}`;
   }
   if (b) {
-    const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+    const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : '采矿器';
     const status = b.isBuilding ? ' 建造中' : b.production ? ` 生产${b.production.type}` : '';
     info += ` | ${typeName} [${playerName(b.owner)}] HP:${b.hp}/${b.maxHp}${status}`;
   }
@@ -766,7 +768,7 @@ function renderSelectionInfo(u, b) {
   if (b) {
     const ownerCls = b.owner === 'player_a' ? 'player-a' : 'player-b';
     const ownerName = playerName(b.owner);
-    const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : '采矿器';
+    const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : '采矿器';
     const hpPct = Math.round((b.hp / b.maxHp) * 100);
     const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
     const statusText = b.isBuilding

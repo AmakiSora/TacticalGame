@@ -8,7 +8,7 @@ const config = getDefaultMapConfig();
 describe('specs', () => {
   it('infantry has expected stats', () => {
     expect(getUnitSpec(config, 'infantry')).toEqual({
-      hp: 100, attack: 20, defense: 8,
+      hp: 100, attack: 40, defense: 8,
       moveRange: 3, attackRange: 1,
       cost: 40, productionTime: 1,
     });

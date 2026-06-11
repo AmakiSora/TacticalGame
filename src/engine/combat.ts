@@ -46,12 +46,26 @@ export function attackTarget(
   attackerId: string,
   targetId: string,
 ): Result {
-  const attacker = game.units.find(u => u.id === attackerId && u.owner === owner && u.alive);
-  if (!attacker) {
+  const attackerUnit = game.units.find(u => u.id === attackerId && u.owner === owner && u.alive);
+  const attackerBuilding = attackerUnit
+    ? null
+    : game.buildings.find(b => b.id === attackerId && b.owner === owner && b.alive);
+  if (!attackerUnit && !attackerBuilding) {
     return { ok: false, code: 'unit_not_found', message: 'attacker not found' };
   }
-  if (attacker.hasAttacked) {
+  if (attackerUnit && attackerUnit.hasAttacked) {
     return { ok: false, code: 'invalid_attack', message: 'already attacked this turn' };
+  }
+  if (attackerBuilding) {
+    if (attackerBuilding.attacksLeft == null || attackerBuilding.attack == null) {
+      return { ok: false, code: 'invalid_attack', message: 'building cannot attack' };
+    }
+    if (attackerBuilding.isBuilding) {
+      return { ok: false, code: 'invalid_attack', message: 'building still under construction' };
+    }
+    if (attackerBuilding.attacksLeft <= 0) {
+      return { ok: false, code: 'invalid_attack', message: 'no attacks left this turn' };
+    }
   }
   const target = findTarget(game, targetId);
   if (!target) {
@@ -60,15 +74,24 @@ export function attackTarget(
   if (target.owner === owner) {
     return { ok: false, code: 'invalid_attack', message: 'cannot attack friendly target' };
   }
-  const dist = manhattanDistance({ x: attacker.x, y: attacker.y }, targetPos(target));
-  if (dist > attacker.attackRange) {
-    return { ok: false, code: 'invalid_attack', message: `out of range (${dist} > ${attacker.attackRange})` };
+  const aPos = attackerUnit
+    ? { x: attackerUnit.x, y: attackerUnit.y }
+    : { x: attackerBuilding!.x, y: attackerBuilding!.y };
+  const aRange = attackerUnit ? attackerUnit.attackRange : attackerBuilding!.attackRange!;
+  const aAttack = attackerUnit ? attackerUnit.attack : attackerBuilding!.attack!;
+  const dist = manhattanDistance(aPos, targetPos(target));
+  if (dist > aRange) {
+    return { ok: false, code: 'invalid_attack', message: `out of range (${dist} > ${aRange})` };
   }
 
-  const defense = 'defense' in target ? target.defense : 0;
-  const damage = computeDamage(game.config, attacker.attack, defense);
+  const defense = 'defense' in target && target.defense != null ? target.defense : 0;
+  const damage = computeDamage(game.config, aAttack, defense);
   target.hp = Math.max(0, target.hp - damage);
-  attacker.hasAttacked = true;
+  if (attackerUnit) {
+    attackerUnit.hasAttacked = true;
+  } else {
+    attackerBuilding!.attacksLeft! -= 1;
+  }
   appendEvent(game, bus, 'attack', {
     attackerId, targetId, damage, targetHp: target.hp,
   });

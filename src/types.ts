@@ -5,7 +5,7 @@ export type PlayerId = 'player_a' | 'player_b';
 
 export type UnitType = 'infantry' | 'sniper' | 'tank' | 'medic';
 
-export type BuildingType = 'headquarters' | 'barracks' | 'miner';
+export type BuildingType = 'headquarters' | 'barracks' | 'miner' | 'bunker';
 
 export type GamePhase = 'waiting_for_player' | 'waiting_command' | 'executing' | 'game_over';
 
@@ -54,6 +54,10 @@ export interface Building {
   buildProgress: number;
   isBuilding: boolean;
   production: ProductionItem | null;
+  attack?: number;
+  defense?: number;
+  attackRange?: number;
+  attacksLeft?: number;
 }
 
 export interface TurnState {

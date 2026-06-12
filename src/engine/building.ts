@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { GameState, PlayerId, BuildingType, Building, ApiErrorCode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
-import { getBuildingSpec } from './specs.js';
+import { getBuildingSpec, getWallBuildRange } from './specs.js';
 import {
   isInBounds, getCellOccupant, isInBuildRange, isMiningPoint, isBuildable,
 } from './validation.js';
@@ -33,8 +33,8 @@ export function startBuild(
   if (game.resources[owner].gold < spec.cost) {
     return { ok: false, code: 'insufficient_gold', message: `need ${spec.cost} gold` };
   }
-  if (!isInBuildRange(game, owner, x, y)) {
-    return { ok: false, code: 'out_of_build_range', message: 'no friendly object within 2 cells' };
+  if (!isInBuildRange(game, owner, x, y, type === 'wall' ? getWallBuildRange(game.config) : undefined)) {
+    return { ok: false, code: 'out_of_build_range', message: 'no friendly object within range' };
   }
   if (getCellOccupant(game, x, y) !== null) {
     return { ok: false, code: 'cell_occupied', message: 'cell occupied' };
@@ -62,6 +62,9 @@ export function startBuild(
     building.defense = spec.defense;
     building.attackRange = spec.attackRange;
     building.attacksLeft = 0;
+  } else if (spec.defense != null) {
+    // Defense-only building (e.g. wall)
+    building.defense = spec.defense;
   }
   game.buildings.push(building);
   appendEvent(game, bus, 'build', {

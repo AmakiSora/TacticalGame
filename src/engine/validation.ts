@@ -34,9 +34,9 @@ export function getCellOccupant(game: GameState, x: number, y: number): Occupant
   return null;
 }
 
-export function isInBuildRange(game: GameState, owner: PlayerId, x: number, y: number): boolean {
+export function isInBuildRange(game: GameState, owner: PlayerId, x: number, y: number, rangeOverride?: number): boolean {
   const target = { x, y };
-  const range = getBuildRange(game.config);
+  const range = rangeOverride ?? getBuildRange(game.config);
   for (const u of game.units) {
     if (u.owner !== owner || !u.alive) continue;
     if (manhattanDistance(u, target) <= range) return true;

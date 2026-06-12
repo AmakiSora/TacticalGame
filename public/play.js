@@ -16,6 +16,8 @@ const COLORS = {
   miner_b:    '#9a7a3a',
   bunker_a:   '#5a4a8a',
   bunker_b:   '#8a5a5a',
+  wall_a:     '#6a6a5a',
+  wall_b:     '#8a7a5a',
   building_a: '#3a8ad9',
   building_b: '#d96a3a',
   unit_a:     '#6cf',
@@ -225,6 +227,8 @@ function applyEvent(s, ev) {
           newBuilding.defense = bSpec.defense;
           newBuilding.attackRange = bSpec.attackRange;
           newBuilding.attacksLeft = 0;
+        } else if (bSpec.defense != null) {
+          newBuilding.defense = bSpec.defense;
         }
         s.buildings.set(p.buildingId, newBuilding);
       }
@@ -434,11 +438,13 @@ function computeBuildHighlights() {
     ...[...state.units.values()].filter(u => u.alive && u.owner === myPlayer),
     ...[...state.buildings.values()].filter(b => b.alive && b.owner === myPlayer),
   ];
+  const buildRange = gameConfig?.map?.buildRange ?? 2;
+  const wallRange = gameConfig?.map?.wallBuildRange ?? buildRange;
   for (let x = 0; x < W; x++) {
     for (let y = 0; y < H; y++) {
       if (isOccupied(x, y)) continue;
-      if (friendlyEntities.some(e => manhattan(e, { x, y }) <= (gameConfig?.map?.buildRange ?? 2))) {
-        rangeHighlights.push({ x, y, type: 'move' }); // reuse 'move' color (green)
+      if (friendlyEntities.some(e => manhattan(e, { x, y }) <= wallRange)) {
+        rangeHighlights.push({ x, y, type: 'move' });
       }
     }
   }
@@ -609,6 +615,7 @@ function drawBoard() {
     if (b.type === 'headquarters') color = isA ? COLORS.hq_a : COLORS.hq_b;
     else if (b.type === 'barracks') color = isA ? COLORS.barracks_a : COLORS.barracks_b;
     else if (b.type === 'bunker') color = isA ? COLORS.bunker_a : COLORS.bunker_b;
+    else if (b.type === 'wall') color = isA ? COLORS.wall_a : COLORS.wall_b;
     else color = isA ? COLORS.miner_a : COLORS.miner_b;
 
     if (b.isBuilding) {
@@ -628,7 +635,7 @@ function drawBoard() {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
-    const letter = b.type === 'headquarters' ? 'HQ' : b.type === 'barracks' ? 'B' : b.type === 'bunker' ? 'MG' : 'M';
+    const letter = b.type === 'headquarters' ? 'HQ' : b.type === 'barracks' ? 'B' : b.type === 'bunker' ? 'MG' : b.type === 'wall' ? 'W' : 'M';
     ctx.fillText(letter, b.x * CELL + CELL / 2, b.y * CELL + CELL / 2 + 4);
 
     // hp bar
@@ -779,7 +786,7 @@ function renderSelectionInfo() {
     if (b && b.alive) {
       const ownerCls = b.owner === 'player_a' ? 'sel-owner-a' : 'sel-owner-b';
       const ownerName = playerName(b.owner);
-      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : '采矿器';
+      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : b.type === 'wall' ? '墙壁' : '采矿器';
       const hpPct = Math.round((b.hp / b.maxHp) * 100);
       const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
       const statusText = b.isBuilding
@@ -791,10 +798,14 @@ function renderSelectionInfo() {
       const bunkerStats = b.type === 'bunker' && !b.isBuilding
         ? `<div class="sel-stat">⚔️ 攻击 ${b.attack ?? '-'}　🛡️ 防御 ${b.defense ?? '-'}　🎯 射程 ${b.attackRange ?? '-'}　🔫 剩余 ${b.attacksLeft ?? 0}/2</div>`
         : '';
+      const wallStats = b.type === 'wall' && !b.isBuilding
+        ? `<div class="sel-stat">🧱 防御 ${b.defense ?? 5}　|　纯障碍物，无法攻击和生产</div>`
+        : '';
       el.innerHTML = `
         <div class="sel-type"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
         <div class="sel-hp">❤️ ${b.hp} / ${b.maxHp} <span class="sel-hp-bar"><span class="sel-hp-fill" style="width:${hpPct}%;background:${hpColor}"></span></span></div>
         ${bunkerStats}
+        ${wallStats}
         <div class="sel-stat">📍 位置 (${b.x}, ${b.y})</div>
         <div class="sel-stat">${statusText}</div>
         ${modeHint ? `<div class="sel-actions" style="color:#6cf">${modeHint}</div>` : ''}
@@ -842,10 +853,11 @@ els.canvas.addEventListener('mousemove', e => {
       info += ` | ${typeName} [${playerName(u.owner)}] HP:${u.hp}/${u.maxHp}`;
     }
     if (b) {
-      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : '采矿器';
+      const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : b.type === 'wall' ? '墙壁' : '采矿器';
       const status = b.isBuilding ? ' 建造中' : b.production ? ` 生产${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'}` : '';
       const bunkerInfo = b.type === 'bunker' && !b.isBuilding ? ` ⚔️${b.attack ?? '-'}/🎯${b.attackRange ?? '-'} 剩余${b.attacksLeft ?? 0}` : '';
-      info += ` | ${typeName} [${playerName(b.owner)}] HP:${b.hp}/${b.maxHp}${status}${bunkerInfo}`;
+      const wallInfo = b.type === 'wall' && !b.isBuilding ? ` 🛡️${b.defense ?? 5}` : '';
+      info += ` | ${typeName} [${playerName(b.owner)}] HP:${b.hp}/${b.maxHp}${status}${bunkerInfo}${wallInfo}`;
     }
     els.cellInfo.textContent = info;
   } else {
@@ -1026,7 +1038,7 @@ els.canvas.addEventListener('click', e => {
       const spec = gameConfig?.buildings?.[building.type];
       const refund = spec ? Math.floor(spec.cost * 0.8) : 0;
       items.push({ label: '出售', gain: refund, action: 'sell', params: { buildingId: building.id } });
-      const title = building.type === 'barracks' ? '生产单位' : building.type === 'bunker' ? '碉堡操作' : '操作';
+      const title = building.type === 'barracks' ? '生产单位' : building.type === 'bunker' ? '碉堡操作' : building.type === 'wall' ? '墙壁' : '操作';
       showPopup(cell.x, cell.y, title, items, (action, params) => {
         if (action === 'bunker_attack') {
           closePopup();
@@ -1050,15 +1062,25 @@ els.canvas.addEventListener('click', e => {
       ...[...state.units.values()].filter(u => u.alive && u.owner === myPlayer),
       ...[...state.buildings.values()].filter(b => b.alive && b.owner === myPlayer),
     ];
-    const inRange = friendlyEntities.some(e => manhattan(e, cell) <= (gameConfig?.map?.buildRange ?? 2));
-    if (inRange) {
+    const inBuildRange = friendlyEntities.some(e => manhattan(e, cell) <= (gameConfig?.map?.buildRange ?? 2));
+    const inWallRange = friendlyEntities.some(e => manhattan(e, cell) <= (gameConfig?.map?.wallBuildRange ?? (gameConfig?.map?.buildRange ?? 2)));
+    if (inBuildRange || inWallRange) {
       interactionMode = 'building_selected';
-      const items = [
-        { label: '兵营', cost: gameConfig?.buildings?.barracks?.cost ?? 50, action: 'build', params: { type: 'barracks', x: cell.x, y: cell.y } },
-        { label: '采矿器', cost: gameConfig?.buildings?.miner?.cost ?? 30, action: 'build', params: { type: 'miner', x: cell.x, y: cell.y } },
-        { label: '碉堡', cost: gameConfig?.buildings?.bunker?.cost ?? 70, action: 'build', params: { type: 'bunker', x: cell.x, y: cell.y } },
-      ];
-      showPopup(cell.x, cell.y, '建造', items);
+      const items = [];
+      if (inBuildRange) {
+        items.push(
+          { label: '兵营', cost: gameConfig?.buildings?.barracks?.cost ?? 50, action: 'build', params: { type: 'barracks', x: cell.x, y: cell.y } },
+          { label: '采矿器', cost: gameConfig?.buildings?.miner?.cost ?? 30, action: 'build', params: { type: 'miner', x: cell.x, y: cell.y } },
+          { label: '碉堡', cost: gameConfig?.buildings?.bunker?.cost ?? 70, action: 'build', params: { type: 'bunker', x: cell.x, y: cell.y } },
+        );
+      }
+      if (inWallRange) {
+        items.push(
+          { label: '墙壁', cost: gameConfig?.buildings?.wall?.cost ?? 20, action: 'build', params: { type: 'wall', x: cell.x, y: cell.y } },
+        );
+      }
+      const title = inBuildRange ? '建造' : '建造墙壁';
+      showPopup(cell.x, cell.y, title, items);
       computeBuildHighlights();
       drawBoard();
       return;

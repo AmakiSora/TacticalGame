@@ -41,6 +41,7 @@ export interface MapConfig {
     width: number;
     height: number;
     buildRange: number;
+    wallBuildRange: number;
     headquartersPositions: Record<string, { x: number; y: number }>;
     miningPoints: { x: number; y: number }[];
     terrain: number[][];
@@ -102,13 +103,18 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     for (const k of buildingKeys) {
       assertPositiveInt(s, k, `buildings.${bType}`);
     }
-    const hasAnyAttack = attackKeys.some(k => k in s);
+    const hasAnyAttack = 'attack' in s;
     if (hasAnyAttack) {
       for (const k of attackKeys) {
         if (!(k in s)) {
           throw new Error(`buildings.${bType} has some attack keys but missing "${k}" — all of ${attackKeys.join(', ')} required together`);
         }
         assertPositiveInt(s, k, `buildings.${bType}`);
+      }
+    } else {
+      // Allow defense-only buildings (e.g. wall): validate 'defense' if present standalone
+      if ('defense' in s) {
+        assertPositiveInt(s, 'defense', `buildings.${bType}`);
       }
     }
   }
@@ -140,6 +146,12 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   const w = assertPositive(map, 'width', `Map "${id}" map`);
   const h = assertPositive(map, 'height', `Map "${id}" map`);
   assertPositiveInt(map, 'buildRange', `Map "${id}" map`);
+  // wallBuildRange defaults to buildRange if not specified
+  if ('wallBuildRange' in map) {
+    assertPositiveInt(map, 'wallBuildRange', `Map "${id}" map`);
+  } else {
+    map.wallBuildRange = map.buildRange;
+  }
 
   // Validate terrain dimensions and values
   const terrain = map.terrain as number[][];

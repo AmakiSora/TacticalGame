@@ -16,6 +16,7 @@ const SIDE = getArg('--side', 'a');
 const GAME_ARG = getArg('--game', null);
 
 const PLAYER_ID = SIDE === 'a' ? 'player_a' : 'player_b';
+const ENEMY_ID = SIDE === 'a' ? 'player_b' : 'player_a';
 
 // --- Game Constants ---
 const UNIT_SPECS = {
@@ -266,6 +267,91 @@ async function executeTurn(state) {
     }
   }
 
+  // --- PHASE 3b: BUILD WALLS (tactical blocking) ---
+  if (gold >= 20 && state.turn.turnNumber > 2) {
+    if (actions.length > 0) state = await getState(token);
+    const myData = my(state);
+    const eData = enemy(state);
+
+    // Find threatened miners: miners with enemies within 3 cells
+    const threatenedMiners = myData.buildings.filter(b =>
+      b.type === 'miner' && !b.isBuilding &&
+      eData.units.some(e => manhattan(b, e) <= 3)
+    );
+
+    // Build wall between threatened miner and nearest enemy
+    if (threatenedMiners.length > 0 && gold >= 20) {
+      for (const miner of threatenedMiners) {
+        if (gold < 20) break;
+        const nearestEnemy = eData.units.reduce((best, e) =>
+          !best || manhattan(miner, e) < manhattan(miner, best) ? e : best, null
+        );
+        if (!nearestEnemy) continue;
+
+        // Find wall position between miner and enemy
+        const dx = nearestEnemy.x - miner.x;
+        const dy = nearestEnemy.y - miner.y;
+        const step = Math.abs(dx) > Math.abs(dy)
+          ? { x: miner.x + Math.sign(dx), y: miner.y }
+          : { x: miner.x, y: miner.y + Math.sign(dy) };
+
+        const occupied = state.units.find(u => u.alive && u.x === step.x && u.y === step.y) ||
+                         state.buildings.find(b => b.alive && b.x === step.x && b.y === step.y);
+        if (occupied) continue;
+
+        const inRange = [...myData.units, ...myData.buildings].some(e => manhattan(e, step) <= 4);
+        if (!inRange) continue;
+
+        console.log(`  Building defensive wall at (${step.x},${step.y}) near miner (${miner.x},${miner.y})`);
+        await api('POST', `/api/games/${gameId}/build`, token, { type: 'wall', x: step.x, y: step.y });
+        gold -= 20;
+        actions.push('build_wall_defense');
+      }
+    }
+
+    // Build chokepoint wall if gold remaining: find narrow passages
+    if (gold >= 20) {
+      if (actions.length > 0) state = await getState(token);
+      const friendly = [...my(state).units, ...my(state).buildings];
+      // Check if there's a narrow gap (1-2 wide between permanent walls or water) near the front line
+      for (const ent of friendly) {
+        if (gold < 20) break;
+        for (let dx = -4; dx <= 4; dx++) {
+          for (let dy = -4; dy <= 4; dy++) {
+            if (Math.abs(dx) + Math.abs(dy) > 4) continue;
+            if (gold < 20) break;
+            const wx = ent.x + dx, wy = ent.y + dy;
+            if (wx < 0 || wx >= GRID_SIZE || wy < 0 || wy >= GRID_SIZE) continue;
+            const occupied = state.units.find(u => u.alive && u.x === wx && u.y === wy) ||
+                             state.buildings.find(b => b.alive && b.x === wx && b.y === wy);
+            if (occupied) continue;
+            // Only build if within wallBuildRange
+            const inRange = friendly.some(e => manhattan(e, { x: wx, y: wy }) <= 4);
+            if (!inRange) continue;
+            // Build wall in chokepoint: cell between two impassable cells
+            const neighbors = [
+              { x: wx + 1, y: wy }, { x: wx - 1, y: wy },
+              { x: wx, y: wy + 1 }, { x: wx, y: wy - 1 },
+            ];
+            const impassable = neighbors.filter(n => {
+              if (n.x < 0 || n.x >= GRID_SIZE || n.y < 0 || n.y >= GRID_SIZE) return true;
+              const occ = state.units.find(u => u.alive && u.x === n.x && u.y === n.y) ||
+                          state.buildings.find(b => b.alive && b.x === n.x && b.y === n.y);
+              return occ && occ.owner !== PLAYER_ID;
+            });
+            if (impassable.length >= 2) {
+              console.log(`  Building chokepoint wall at (${wx},${wy})`);
+              await api('POST', `/api/games/${gameId}/build`, token, { type: 'wall', x: wx, y: wy });
+              gold -= 20;
+              actions.push('build_wall_choke');
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   // --- PHASE 4: COMBAT ---
   // Refresh state to get accurate hasMoved/hasAttacked flags
   if (actions.length > 0) state = await getState(token);
@@ -282,13 +368,14 @@ async function executeTurn(state) {
         ...enemyData.buildings.filter(e => manhattan(unit, e) <= unit.attackRange),
       ];
 
-      // Priority: HQ > enemy units (lowest HP first) > production buildings > miners
+      // Priority: HQ > enemy units (lowest HP first) > blocking walls > production buildings > miners
       const hqTarget = targetsInRange.find(t => t.type === 'headquarters');
       const unitTargets = targetsInRange.filter(t => 'attack' in t).sort((a, b) => a.hp - b.hp);
-      const prodBuildings = targetsInRange.filter(t => !('attack' in t) && t.type !== 'miner');
+      const wallTargets = targetsInRange.filter(t => t.type === 'wall').sort((a, b) => a.hp - b.hp);
+      const prodBuildings = targetsInRange.filter(t => !('attack' in t) && t.type !== 'miner' && t.type !== 'wall');
       const miners = targetsInRange.filter(t => t.type === 'miner');
 
-      const target = hqTarget || unitTargets[0] || prodBuildings[0] || miners[0];
+      const target = hqTarget || unitTargets[0] || wallTargets[0] || prodBuildings[0] || miners[0];
 
       if (target) {
         console.log(`  ${unit.type} (${unit.id.slice(0, 8)}) attacking ${target.type || target.unitType} (${target.id.slice(0, 8)}) HP:${target.hp}`);

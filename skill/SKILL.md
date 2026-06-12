@@ -72,7 +72,7 @@ All POST, all require `X-Player-Token` header, all under `/api/games/:id`.
 
 | Action | Endpoint | Body | Notes |
 |--------|----------|------|-------|
-| Build | `/build` | `{type, x, y}` | type: `"barracks"` or `"miner"` |
+| Build | `/build` | `{type, x, y}` | type: `"barracks"` `"miner"` `"bunker"` `"wall"` |
 | Sell | `/sell` | `{buildingId}` | Refunds 80% of build cost. HQ cannot be sold. Building must not be under construction. |
 | Produce | `/produce` | `{buildingId, unitType}` | unitType: `"infantry"` `"sniper"` `"tank"` `"medic"` |
 | Move | `/move` | `{unitId, x, y}` | Manhattan distance, must be unoccupied |
@@ -98,6 +98,10 @@ All POST, all require `X-Player-Token` header, all under `/api/games/:id`.
 | Headquarters | 200 | — | — | **NOTHING** (cannot produce units) | **CANNOT SELL** |
 | Barracks | 100 | 50 | 2 turns | Infantry, Sniper, Tank, Medic | 40 (80%) |
 | Miner | 60 | 30 | 1 turn | Nothing (generates 15 gold/turn) | 24 (80%) |
+| Bunker | 120 | 70 | 2 turns | Nothing (attacks: 24 ATK × 2/turn, range 2) | 56 (80%) |
+| **Wall** | **50** | **20** | **1 turn** | **Nothing (DEF 5, build range 4)** | **16 (80%)** |
+
+**Wall:** Walls are pure obstacles with 5 DEF. They cannot attack or produce. Build range is 4 (Manhattan) vs 2 for other buildings. Used to block chokepoints, protect miners, or funnel enemies into bunker fire. Walls can be attacked and destroyed.
 
 **CRITICAL:** The Headquarters CANNOT produce units. You MUST build Barracks first. This is the most common mistake — the config field `canProduce.headquarters` is an empty array.
 
@@ -175,11 +179,33 @@ ELSE IF hasMoved=false:
     ATTACK
 ```
 
-**Target priority:** HQ > low-HP units > full-HP units > production buildings > miners.
+**Target priority:** HQ > low-HP units > **blocking walls** > full-HP units > production buildings > miners.
 
 **Focus fire:** Concentrate attacks on one target to kill it rather than spreading damage.
 
 **Move then attack:** A unit can move AND attack in the same turn (different flags). Always try to move toward enemies and attack in the same turn.
+
+**Wall breaking:** If no enemy unit/HQ is in range, consider attacking nearby enemy walls if destroying them would open a shorter path to the enemy HQ or key targets.
+
+### Phase 4b: Wall Building (optional, when gold allows)
+
+```
+IF gold >= 20 AND (defensive need OR offensive funnel):
+  BUILD wall at tactical chokepoint
+```
+
+**When to build walls:**
+- **Defensive:** Protect a miner that's under threat — build wall between miner and enemy units
+- **Chokepoint:** Block a narrow passage between permanent walls or water to force enemies to detour or waste attacks breaking it
+- **Funnel:** Build walls to guide enemies into your bunker's attack range
+- **Forward block:** Build walls near enemy HQ to restrict their unit movement
+
+**When NOT to build walls:**
+- Early game (first 3 turns) — gold is better spent on miners and barracks
+- When gold is below 50 — keep a reserve for unit production
+- In open areas where enemies can easily walk around
+
+**Wall build range is 4 (Manhattan)** — farther than normal buildings (range 2). Exploit this to build walls in contested areas without exposing units.
 
 ### Phase 5: Medic Heals
 

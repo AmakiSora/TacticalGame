@@ -32,6 +32,10 @@ export function getBuildRange(config: MapConfig): number {
   return config.map.buildRange;
 }
 
+export function getWallBuildRange(config: MapConfig): number {
+  return config.map.wallBuildRange;
+}
+
 export function getMapWidth(config: MapConfig): number {
   return config.map.width;
 }

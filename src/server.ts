@@ -25,7 +25,7 @@ export async function buildServer(): Promise<FastifyInstance> {
 
 const isMain = import.meta.url === `file:///${resolve(process.argv[1]).replace(/\\/g, '/')}`;
 if (isMain) {
-  const port = Number(process.env.PORT) || 3000;
+  const port = Number(process.env.PORT) || 3100;
   buildServer()
     .then(app => app.listen({ port, host: '0.0.0.0' }))
     .then(addr => {
@@ -45,8 +45,7 @@ if (isMain) {
       console.log(`    创建对局      POST  ${base}/api/games`);
       console.log(`    加入对局      POST  ${base}/api/games/:id/join`);
       console.log(`    查看对局      GET   ${base}/api/games/:id`);
-      console.log(`    建造          POST  ${base}/api/games/:id/build`);
-      console.log(`    生产          POST  ${base}/api/games/:id/produce`);
+      console.log(`    部署          POST  ${base}/api/games/:id/deploy`);
       console.log(`    移动          POST  ${base}/api/games/:id/move`);
       console.log(`    攻击          POST  ${base}/api/games/:id/attack`);
       console.log(`    治疗          POST  ${base}/api/games/:id/heal`);

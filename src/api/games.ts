@@ -18,6 +18,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
           id, phase: g.phase, turnNumber: g.turn.turnNumber,
           currentOwner: g.turn.currentOwner, winner: g.winner,
           playerNames: g.playerNames,
+          mapId: g.mapId,
         };
       }),
     };

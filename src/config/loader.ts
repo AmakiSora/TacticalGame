@@ -2,6 +2,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { PlayerId, TerrainType, UnitType } from '../types.js';
+import { isValidHex } from '../engine/hex.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -13,191 +15,165 @@ export interface UnitSpec {
   moveRange: number;
   attackRange: number;
   cost: number;
-  productionTime: number;
+  canCapture: boolean;
+  healPower?: number;
 }
 
-export interface BuildingSpec {
+export interface HeadquartersSpec {
   hp: number;
-  cost: number;
-  buildTime: number;
-  attack?: number;
-  defense?: number;
-  attackRange?: number;
-  attacksPerTurn?: number;
+  defense: number;
+}
+
+export interface TerrainCellConfig {
+  q: number;
+  r: number;
+  terrain: TerrainType;
+}
+
+export interface ControlPointConfig {
+  id: string;
+  name: string;
+  q: number;
+  r: number;
+}
+
+export interface StartingUnitConfig {
+  owner: PlayerId;
+  type: UnitType;
+  q: number;
+  r: number;
 }
 
 export interface MapConfig {
   name: string;
   description: string;
-  units: Record<string, UnitSpec>;
-  buildings: Record<string, BuildingSpec>;
-  canProduce: Record<string, string[]>;
-  economy: {
-    startingGold: number;
-    minerIncome: number;
+  grid: 'hex';
+  orientation: 'pointy';
+  radius: number;
+  terrainCells: TerrainCellConfig[];
+  controlPoints: ControlPointConfig[];
+  headquarters: Record<PlayerId, { q: number; r: number }>;
+  startingUnits: StartingUnitConfig[];
+  units: Record<UnitType, UnitSpec>;
+  headquartersSpec: HeadquartersSpec;
+  balance: {
+    startingSupplies: number;
     baseIncome: number;
-  };
-  map: {
-    width: number;
-    height: number;
-    buildRange: number;
-    wallBuildRange: number;
-    headquartersPositions: Record<string, { x: number; y: number }>;
-    miningPoints: { x: number; y: number }[];
-    terrain: number[][];
-  };
-  combat: {
+    controlPointIncome: number;
     damageVarianceRange: number;
-    healBase: number;
-    healVarianceRange: number;
     minimumDamage: number;
-    healRange: number;
+    healVarianceRange: number;
   };
 }
-
-export type GameBalanceConfig = MapConfig;
 
 const maps = new Map<string, MapConfig>();
 
-function assertPositiveInt(obj: Record<string, unknown>, key: string, ctx: string): number {
-  const v = obj[key];
-  if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
-    throw new Error(`${ctx}.${key} must be a non-negative number, got: ${v}`);
+function asRecord(value: unknown, ctx: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`${ctx} must be an object`);
   }
-  return v;
+  return value as Record<string, unknown>;
 }
 
-function assertPositive(obj: Record<string, unknown>, key: string, ctx: string): number {
-  const v = obj[key];
-  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) {
-    throw new Error(`${ctx}.${key} must be a positive number, got: ${v}`);
+function assertString(obj: Record<string, unknown>, key: string, ctx: string): string {
+  const value = obj[key];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`${ctx}.${key} must be a non-empty string`);
   }
-  return v;
+  return value;
+}
+
+function assertNumber(obj: Record<string, unknown>, key: string, ctx: string, min = 0): number {
+  const value = obj[key];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min) {
+    throw new Error(`${ctx}.${key} must be a number >= ${min}`);
+  }
+  return value;
+}
+
+function assertPosition(obj: Record<string, unknown>, ctx: string, radius: number): { q: number; r: number } {
+  const q = assertNumber(obj, 'q', ctx, -Infinity);
+  const r = assertNumber(obj, 'r', ctx, -Infinity);
+  if (!Number.isInteger(q) || !Number.isInteger(r)) throw new Error(`${ctx} q/r must be integers`);
+  if (!isValidHex({ q, r }, radius)) throw new Error(`${ctx} (${q},${r}) is outside radius ${radius}`);
+  return { q, r };
 }
 
 function validateMap(id: string, config: unknown): asserts config is MapConfig {
-  const c = config as Record<string, unknown>;
-  for (const key of ['name', 'units', 'buildings', 'canProduce', 'economy', 'map', 'combat']) {
-    if (!(key in c)) throw new Error(`Map "${id}" missing required key: "${key}"`);
-  }
-  if (typeof c.name !== 'string') throw new Error(`Map "${id}" name must be a string`);
+  const c = asRecord(config, `Map "${id}"`);
+  const name = assertString(c, 'name', `Map "${id}"`);
+  const description = assertString(c, 'description', `Map "${id}"`);
+  if (c.grid !== 'hex') throw new Error(`Map "${id}" grid must be "hex"`);
+  if (c.orientation !== 'pointy') throw new Error(`Map "${id}" orientation must be "pointy"`);
+  const radius = assertNumber(c, 'radius', `Map "${id}"`, 1);
+  if (!Number.isInteger(radius)) throw new Error(`Map "${id}" radius must be an integer`);
 
-  // Validate units
-  const units = c.units as Record<string, unknown>;
-  if (typeof units !== 'object' || units === null) throw new Error(`Map "${id}" units must be an object`);
-  const unitKeys = ['hp', 'attack', 'defense', 'moveRange', 'attackRange', 'cost', 'productionTime'];
-  for (const [unitType, spec] of Object.entries(units)) {
-    const s = spec as Record<string, unknown>;
-    for (const k of unitKeys) {
-      assertPositiveInt(s, k, `units.${unitType}`);
+  const units = asRecord(c.units, `Map "${id}".units`) as Record<UnitType, UnitSpec>;
+  for (const type of ['infantry', 'scout', 'heavy', 'ranger', 'support'] as UnitType[]) {
+    const spec = asRecord(units[type], `units.${type}`);
+    for (const key of ['hp', 'attack', 'defense', 'moveRange', 'attackRange', 'cost']) {
+      assertNumber(spec, key, `units.${type}`, 0);
+    }
+    if (typeof spec.canCapture !== 'boolean') throw new Error(`units.${type}.canCapture must be boolean`);
+    if ('healPower' in spec) assertNumber(spec, 'healPower', `units.${type}`, 0);
+  }
+
+  const hqSpec = asRecord(c.headquartersSpec, `Map "${id}".headquartersSpec`);
+  assertNumber(hqSpec, 'hp', `Map "${id}".headquartersSpec`, 1);
+  assertNumber(hqSpec, 'defense', `Map "${id}".headquartersSpec`, 0);
+
+  const balance = asRecord(c.balance, `Map "${id}".balance`);
+  for (const key of ['startingSupplies', 'baseIncome', 'controlPointIncome', 'damageVarianceRange', 'minimumDamage', 'healVarianceRange']) {
+    assertNumber(balance, key, `Map "${id}".balance`, 0);
+  }
+
+  const hq = asRecord(c.headquarters, `Map "${id}".headquarters`);
+  for (const player of ['player_a', 'player_b'] as PlayerId[]) {
+    assertPosition(asRecord(hq[player], `headquarters.${player}`), `headquarters.${player}`, radius);
+  }
+
+  const occupied = new Set<string>();
+  function claim(pos: { q: number; r: number }, ctx: string) {
+    const key = `${pos.q},${pos.r}`;
+    if (occupied.has(key)) throw new Error(`${ctx} overlaps another fixed map object at ${key}`);
+    occupied.add(key);
+  }
+  claim(hq.player_a as { q: number; r: number }, 'headquarters.player_a');
+  claim(hq.player_b as { q: number; r: number }, 'headquarters.player_b');
+
+  if (!Array.isArray(c.terrainCells)) throw new Error(`Map "${id}".terrainCells must be an array`);
+  for (let i = 0; i < c.terrainCells.length; i++) {
+    const cell = asRecord(c.terrainCells[i], `terrainCells[${i}]`);
+    assertPosition(cell, `terrainCells[${i}]`, radius);
+    if (cell.terrain !== 'water' && cell.terrain !== 'blocker' && cell.terrain !== 'plain') {
+      throw new Error(`terrainCells[${i}].terrain must be plain, water, or blocker`);
     }
   }
 
-  // Validate buildings
-  const buildings = c.buildings as Record<string, unknown>;
-  if (typeof buildings !== 'object' || buildings === null) throw new Error(`Map "${id}" buildings must be an object`);
-  const buildingKeys = ['hp', 'cost', 'buildTime'];
-  const attackKeys = ['attack', 'defense', 'attackRange', 'attacksPerTurn'];
-  for (const [bType, spec] of Object.entries(buildings)) {
-    const s = spec as Record<string, unknown>;
-    for (const k of buildingKeys) {
-      assertPositiveInt(s, k, `buildings.${bType}`);
+  if (!Array.isArray(c.controlPoints) || c.controlPoints.length === 0) {
+    throw new Error(`Map "${id}".controlPoints must be a non-empty array`);
+  }
+  for (let i = 0; i < c.controlPoints.length; i++) {
+    const cp = asRecord(c.controlPoints[i], `controlPoints[${i}]`);
+    assertString(cp, 'id', `controlPoints[${i}]`);
+    assertString(cp, 'name', `controlPoints[${i}]`);
+    const pos = assertPosition(cp, `controlPoints[${i}]`, radius);
+    claim(pos, `controlPoints[${i}]`);
+  }
+
+  if (!Array.isArray(c.startingUnits)) throw new Error(`Map "${id}".startingUnits must be an array`);
+  for (let i = 0; i < c.startingUnits.length; i++) {
+    const unit = asRecord(c.startingUnits[i], `startingUnits[${i}]`);
+    if (unit.owner !== 'player_a' && unit.owner !== 'player_b') throw new Error(`startingUnits[${i}].owner invalid`);
+    if (!['infantry', 'scout', 'heavy', 'ranger', 'support'].includes(String(unit.type))) {
+      throw new Error(`startingUnits[${i}].type invalid`);
     }
-    const hasAnyAttack = 'attack' in s;
-    if (hasAnyAttack) {
-      for (const k of attackKeys) {
-        if (!(k in s)) {
-          throw new Error(`buildings.${bType} has some attack keys but missing "${k}" — all of ${attackKeys.join(', ')} required together`);
-        }
-        assertPositiveInt(s, k, `buildings.${bType}`);
-      }
-    } else {
-      // Allow defense-only buildings (e.g. wall): validate 'defense' if present standalone
-      if ('defense' in s) {
-        assertPositiveInt(s, 'defense', `buildings.${bType}`);
-      }
-    }
+    const pos = assertPosition(unit, `startingUnits[${i}]`, radius);
+    claim(pos, `startingUnits[${i}]`);
   }
 
-  // Validate canProduce references
-  const canProduce = c.canProduce as Record<string, unknown>;
-  if (typeof canProduce !== 'object' || canProduce === null) throw new Error(`Map "${id}" canProduce must be an object`);
-  for (const [bType, produces] of Object.entries(canProduce)) {
-    if (!(bType in buildings)) throw new Error(`Map "${id}" canProduce references unknown building "${bType}"`);
-    if (!Array.isArray(produces)) throw new Error(`Map "${id}" canProduce.${bType} must be an array`);
-    for (const uType of produces) {
-      if (typeof uType !== 'string' || !(uType in units)) {
-        throw new Error(`Map "${id}" canProduce.${bType} references unknown unit "${uType}"`);
-      }
-    }
-  }
-
-  // Validate economy
-  const econ = c.economy as Record<string, unknown>;
-  assertPositiveInt(econ, 'startingGold', `Map "${id}" economy`);
-  assertPositiveInt(econ, 'minerIncome', `Map "${id}" economy`);
-  assertPositiveInt(econ, 'baseIncome', `Map "${id}" economy`);
-
-  // Validate map
-  const map = c.map as Record<string, unknown>;
-  for (const key of ['width', 'height', 'buildRange', 'headquartersPositions', 'miningPoints', 'terrain']) {
-    if (!(key in map)) throw new Error(`Map "${id}" missing map.${key}`);
-  }
-  const w = assertPositive(map, 'width', `Map "${id}" map`);
-  const h = assertPositive(map, 'height', `Map "${id}" map`);
-  assertPositiveInt(map, 'buildRange', `Map "${id}" map`);
-  // wallBuildRange defaults to buildRange if not specified
-  if ('wallBuildRange' in map) {
-    assertPositiveInt(map, 'wallBuildRange', `Map "${id}" map`);
-  } else {
-    map.wallBuildRange = map.buildRange;
-  }
-
-  // Validate terrain dimensions and values
-  const terrain = map.terrain as number[][];
-  if (!Array.isArray(terrain) || terrain.length !== h) {
-    throw new Error(`Map "${id}" terrain rows (${terrain?.length}) !== height (${h})`);
-  }
-  for (let y = 0; y < h; y++) {
-    if (!Array.isArray(terrain[y]) || terrain[y].length !== w) {
-      throw new Error(`Map "${id}" terrain row ${y} cols (${terrain[y]?.length}) !== width (${w})`);
-    }
-    for (let x = 0; x < w; x++) {
-      const v = terrain[y][x];
-      if (v !== 0 && v !== 1 && v !== 2) {
-        throw new Error(`Map "${id}" terrain[${y}][${x}] must be 0, 1, or 2, got: ${v}`);
-      }
-    }
-  }
-
-  // Validate HQ positions
-  const hqPos = map.headquartersPositions as Record<string, unknown>;
-  if (typeof hqPos !== 'object' || hqPos === null) throw new Error(`Map "${id}" headquartersPositions must be an object`);
-  for (const owner of ['player_a', 'player_b']) {
-    const pos = hqPos[owner] as Record<string, unknown> | undefined;
-    if (!pos || typeof pos !== 'object') throw new Error(`Map "${id}" missing headquartersPositions.${owner}`);
-    const px = assertPositiveInt(pos, 'x', `headquartersPositions.${owner}`);
-    const py = assertPositiveInt(pos, 'y', `headquartersPositions.${owner}`);
-    if (px >= w || py >= h) throw new Error(`Map "${id}" headquartersPositions.${owner} (${px},${py}) out of bounds`);
-  }
-
-  // Validate mining points
-  const miningPoints = map.miningPoints as unknown[];
-  if (!Array.isArray(miningPoints)) throw new Error(`Map "${id}" miningPoints must be an array`);
-  for (let i = 0; i < miningPoints.length; i++) {
-    const mp = miningPoints[i] as Record<string, unknown>;
-    const mx = assertPositiveInt(mp, 'x', `miningPoints[${i}]`);
-    const my = assertPositiveInt(mp, 'y', `miningPoints[${i}]`);
-    if (mx >= w || my >= h) throw new Error(`Map "${id}" miningPoints[${i}] (${mx},${my}) out of bounds`);
-  }
-
-  // Validate combat
-  const combat = c.combat as Record<string, unknown>;
-  assertPositiveInt(combat, 'damageVarianceRange', `Map "${id}" combat`);
-  assertPositiveInt(combat, 'healBase', `Map "${id}" combat`);
-  assertPositiveInt(combat, 'healVarianceRange', `Map "${id}" combat`);
-  assertPositiveInt(combat, 'minimumDamage', `Map "${id}" combat`);
-  assertPositiveInt(combat, 'healRange', `Map "${id}" combat`);
+  void name;
+  void description;
 }
 
 export function loadMaps(mapsDir?: string): void {
@@ -208,25 +184,12 @@ export function loadMaps(mapsDir?: string): void {
   } catch {
     throw new Error(`Cannot read maps directory at ${dir}`);
   }
-  if (files.length === 0) {
-    throw new Error(`No map files found in ${dir}`);
-  }
+  if (files.length === 0) throw new Error(`No map files found in ${dir}`);
   maps.clear();
   for (const file of files) {
     const id = basename(file, '.json');
-    const filePath = join(dir, file);
-    let raw: string;
-    try {
-      raw = readFileSync(filePath, 'utf-8');
-    } catch {
-      throw new Error(`Cannot read map file ${filePath}`);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      throw new Error(`Map file ${file} is not valid JSON`);
-    }
+    const raw = readFileSync(join(dir, file), 'utf-8');
+    const parsed = JSON.parse(raw) as unknown;
     validateMap(id, parsed);
     maps.set(id, parsed as MapConfig);
   }
@@ -234,26 +197,16 @@ export function loadMaps(mapsDir?: string): void {
 
 export function getMapConfig(id: string): MapConfig {
   const config = maps.get(id);
-  if (!config) {
-    throw new Error(`Map "${id}" not found. Available: ${[...maps.keys()].join(', ')}`);
-  }
+  if (!config) throw new Error(`Map "${id}" not found. Available: ${[...maps.keys()].join(', ')}`);
   return config;
 }
 
 export function listMaps(): { id: string; name: string; description: string }[] {
-  return [...maps.entries()].map(([id, cfg]) => ({
-    id,
-    name: cfg.name,
-    description: cfg.description,
-  }));
+  return [...maps.entries()].map(([id, cfg]) => ({ id, name: cfg.name, description: cfg.description }));
 }
 
 export function getDefaultMapConfig(): MapConfig {
   return getMapConfig('default');
-}
-
-export function getConfig(): GameBalanceConfig {
-  return getDefaultMapConfig();
 }
 
 export function resetConfig(): void {

@@ -1,29 +1,65 @@
 // src/state/store.ts
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { GameState, Building, PlayerId } from '../types.js';
+import type { GameState, Headquarters, MapCell, PlayerId, Unit, UnitType } from '../types.js';
 import { getMapConfig } from '../config/loader.js';
-import type { MapConfig } from '../config/loader.js';
+import type { MapConfig, UnitSpec } from '../config/loader.js';
+import { isValidHex } from '../engine/hex.js';
 
 function generateToken(): string {
   return randomBytes(16).toString('hex');
 }
 
-function createHQ(owner: PlayerId, config: MapConfig): Building {
-  const pos = config.map.headquartersPositions[owner];
-  const spec = config.buildings['headquarters'];
+function createUnit(owner: PlayerId, type: UnitType, q: number, r: number, spec: UnitSpec): Unit {
   return {
     id: randomUUID(),
     owner,
-    type: 'headquarters',
-    x: pos.x,
-    y: pos.y,
+    type,
+    q,
+    r,
     hp: spec.hp,
     maxHp: spec.hp,
+    attack: spec.attack,
+    defense: spec.defense,
+    moveRange: spec.moveRange,
+    attackRange: spec.attackRange,
+    cost: spec.cost,
     alive: true,
-    buildProgress: 0,
-    isBuilding: false,
-    production: null,
+    hasMoved: false,
+    hasActed: false,
+    canCapture: spec.canCapture,
+    healPower: spec.healPower,
   };
+}
+
+export function createUnitFromConfig(config: MapConfig, owner: PlayerId, type: UnitType, q: number, r: number): Unit {
+  return createUnit(owner, type, q, r, config.units[type]);
+}
+
+function createHQ(owner: PlayerId, config: MapConfig): Headquarters {
+  const pos = config.headquarters[owner];
+  return {
+    id: randomUUID(),
+    owner,
+    q: pos.q,
+    r: pos.r,
+    hp: config.headquartersSpec.hp,
+    maxHp: config.headquartersSpec.hp,
+    defense: config.headquartersSpec.defense,
+    alive: true,
+  };
+}
+
+function createCells(config: MapConfig): MapCell[] {
+  const terrain = new Map(config.terrainCells.map(c => [`${c.q},${c.r}`, c.terrain]));
+  const cells: MapCell[] = [];
+  const radius = config.radius;
+  for (let q = -radius; q <= radius; q++) {
+    for (let r = -radius; r <= radius; r++) {
+      if (!isValidHex({ q, r }, radius)) continue;
+      cells.push({ q, r, terrain: terrain.get(`${q},${r}`) ?? 'plain' });
+    }
+  }
+  return cells;
 }
 
 export function createInitialGame(id: string, mapId?: string): GameState {
@@ -34,15 +70,22 @@ export function createInitialGame(id: string, mapId?: string): GameState {
     mapId: resolvedMapId,
     config,
     phase: 'waiting_for_player',
-    mapWidth: config.map.width,
-    mapHeight: config.map.height,
-    miningPoints: config.map.miningPoints.map(p => ({ ...p })),
-    terrain: config.map.terrain.map(row => [...row]),
-    buildings: [createHQ('player_a', config), createHQ('player_b', config)],
-    units: [],
+    map: {
+      grid: 'hex',
+      orientation: 'pointy',
+      radius: config.radius,
+      terrainCells: config.terrainCells.map(c => ({ ...c })),
+    },
+    cells: createCells(config),
+    controlPoints: config.controlPoints.map(p => ({ ...p, owner: null })),
+    headquarters: {
+      player_a: createHQ('player_a', config),
+      player_b: createHQ('player_b', config),
+    },
+    units: config.startingUnits.map(u => createUnitFromConfig(config, u.owner, u.type, u.q, u.r)),
     resources: {
-      player_a: { gold: config.economy.startingGold },
-      player_b: { gold: config.economy.startingGold },
+      player_a: { supplies: config.balance.startingSupplies },
+      player_b: { supplies: config.balance.startingSupplies },
     },
     tokens: {
       player_a: generateToken(),

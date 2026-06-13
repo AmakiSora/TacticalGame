@@ -226,8 +226,9 @@ main {
 /* Event type colors for markers */
 .marker-attack { background: #a66; }
 .marker-move { background: #68a; }
-.marker-build { background: #6a8; }
-.marker-produce { background: #8a6; }
+.marker-deploy { background: #d6b34a; }
+.marker-control_point_captured { background: #6a8; }
+.marker-income { background: #a86; }
 .marker-heal { background: #8a6; }
 .marker-turn_end { background: #a86; }
 .marker-game_over { background: #8a6; }
@@ -264,18 +265,14 @@ main {
 /* Event type colors for log */
 #events li[data-type="attack"]       { border-left-color: #a66; color: #c88; }
 #events li[data-type="move"]         { border-left-color: #68a; color: #8ac; }
-#events li[data-type="build"]        { border-left-color: #6a8; color: #8ca; }
-#events li[data-type="build_tick"]   { border-left-color: #6a8; color: #8ca; }
-#events li[data-type="build_complete"] { border-left-color: #6a8; color: #8ca; }
-#events li[data-type="produce"]      { border-left-color: #8a6; color: #ac8; }
-#events li[data-type="produce_complete"] { border-left-color: #8a6; color: #ac8; }
+#events li[data-type="deploy"]       { border-left-color: #d6b34a; color: #f0d77c; }
+#events li[data-type="control_point_captured"] { border-left-color: #6a8; color: #8ca; }
+#events li[data-type="income"]       { border-left-color: #a86; color: #ca8; }
 #events li[data-type="heal"]         { border-left-color: #8a6; color: #ac8; }
 #events li[data-type="turn_end"]     { border-left-color: #a86; color: #ca8; }
 #events li[data-type="game_over"]    { border-left-color: #8a6; color: #ad8; }
 #events li[data-type="unit_death"]   { border-left-color: #a66; color: #c88; }
-#events li[data-type="base_destroyed"] { border-left-color: #a66; color: #c88; }
-#events li[data-type="mine"]         { border-left-color: #a86; color: #ca8; }
-#events li[data-type="base_income"]  { border-left-color: #a86; color: #ca8; }
+#events li[data-type="headquarters_destroyed"] { border-left-color: #a66; color: #c88; }
 #events li[data-type="game_start"]   { border-left-color: #8a6; color: #ad8; }
 
 /* Event detail panel */
@@ -303,13 +300,14 @@ main {
 }
 #detail-content .ev-type.attack { background: #633; color: #f88; }
 #detail-content .ev-type.move { background: #336; color: #8af; }
-#detail-content .ev-type.build { background: #363; color: #8f8; }
-#detail-content .ev-type.produce { background: #436; color: #c8f; }
+#detail-content .ev-type.deploy { background: #553; color: #f0d77c; }
+#detail-content .ev-type.control_point_captured { background: #363; color: #8f8; }
+#detail-content .ev-type.income { background: #643; color: #fa8; }
 #detail-content .ev-type.heal { background: #364; color: #8fc; }
 #detail-content .ev-type.turn_end { background: #643; color: #fa8; }
 #detail-content .ev-type.game_over { background: #555; color: #fff; }
 #detail-content .ev-type.unit_death { background: #633; color: #f88; }
-#detail-content .ev-type.base_destroyed { background: #600; color: #f44; }
+#detail-content .ev-type.headquarters_destroyed { background: #600; color: #f44; }
 #detail-content .ev-type.other { background: #333; color: #aaa; }
 #detail-content .ev-payload {
   display: block;

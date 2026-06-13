@@ -1,17 +1,24 @@
-const CELL = 28;
-const GRID_COLOR = '#1a2a30';
+const HEX_SIZE = 28;
+const PAD = 42;
+const SQRT3 = Math.sqrt(3);
 
-function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+const TERRAIN = {
+  plain: '#111923',
+  water: '#183a55',
+  blocker: '#393f46',
+};
+const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
 
-function playerName(owner) {
-  return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B');
-}
-
-// ─── game config (derived from game_start event) ───
 let gameConfig = null;
 let playerNames = { player_a: '玩家 A', player_b: '玩家 B' };
+let allEvents = [];
+let currentStep = -1;
+let playing = false;
+let playTimer = null;
+let liveSse = null;
+let state = null;
+let hoverCell = null;
+let layout = { minX: 0, minY: 0, width: 840, height: 840 };
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -24,9 +31,6 @@ const eventsEl = document.getElementById('events');
 const detailEl = document.getElementById('detail-content');
 const cellInfoEl = document.getElementById('cell-info');
 const selDetailEl = document.getElementById('selection-detail');
-let hoverCell = null;
-
-// Replay controls
 const btnStart = document.getElementById('btn-start');
 const btnPrev = document.getElementById('btn-prev');
 const btnPlay = document.getElementById('btn-play');
@@ -36,526 +40,192 @@ const speedSelect = document.getElementById('speed-select');
 const stepInfo = document.getElementById('step-info');
 const timeline = document.getElementById('timeline');
 const timelineMarkers = document.getElementById('timeline-markers');
-
-let allEvents = [];       // Full event array for current game
-let currentStep = -1;     // Index into allEvents (-1 = before first event)
-let playing = false;
-let playTimer = null;
-let liveSse = null;
-
-// Auto-refresh
 const autoRefreshCb = document.getElementById('auto-refresh');
 const followLatestCb = document.getElementById('follow-latest');
 const refreshIntervalInput = document.getElementById('refresh-interval');
 const btnSettings = document.getElementById('btn-settings');
 const settingsPopover = document.getElementById('settings-popover');
+const btnExportHtml = document.getElementById('btn-export-html');
+const btnExportJson = document.getElementById('btn-export-json');
+const btnImport = document.getElementById('btn-import');
+const importFile = document.getElementById('import-file');
 
-// ─── Player rename ───
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
-resourcesEl.addEventListener('click', e => {
-  const span = e.target.closest('.player-name');
-  if (!span) return;
-  const playerId = span.dataset.player;
-  const currentName = playerName(playerId);
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = currentName;
-  input.maxLength = 20;
-  input.style.cssText = 'width:80px;font-size:inherit;padding:0 2px;border:1px solid #6cf;background:#1a2a3a;color:#fff;border-radius:2px;outline:none;';
-  span.replaceWith(input);
-  input.focus();
-  input.select();
+function playerName(owner) {
+  return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B');
+}
 
-  async function commit() {
-    const newName = input.value.trim() || currentName;
-    if (newName !== currentName && gameSelect.value) {
-      try {
-        const res = await fetch(`/api/games/${gameSelect.value}/rename`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId, name: newName }),
-        });
-        if (!res.ok) console.error('rename failed');
-      } catch (err) {
-        console.error('rename error', err);
-      }
-    }
-    // Update local name immediately (SSE event may not arrive if not connected)
-    playerNames[playerId] = newName;
-    // Update playerNames in the game_start event so exports reflect the rename
-    const gsEvent = allEvents.find(e => e.type === 'game_start');
-    if (gsEvent) {
-      if (!gsEvent.payload.playerNames) gsEvent.payload.playerNames = { ...playerNames };
-      gsEvent.payload.playerNames[playerId] = newName;
-    }
-    renderSidebar();
+function key(pos) { return `${pos.q},${pos.r}`; }
+function hexDistance(a, b) {
+  return Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs((-a.q - a.r) - (-b.q - b.r)));
+}
+function hexToRaw(q, r) {
+  return { x: HEX_SIZE * SQRT3 * (q + r / 2), y: HEX_SIZE * 1.5 * r };
+}
+function hexToPixel(q, r) {
+  const raw = hexToRaw(q, r);
+  return { x: raw.x - layout.minX + PAD, y: raw.y - layout.minY + PAD };
+}
+function cubeRound(q, r) {
+  let x = q, z = r, y = -x - z;
+  let rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+  const xDiff = Math.abs(rx - x), yDiff = Math.abs(ry - y), zDiff = Math.abs(rz - z);
+  if (xDiff > yDiff && xDiff > zDiff) rx = -ry - rz;
+  else if (yDiff > zDiff) ry = -rx - rz;
+  else rz = -rx - ry;
+  return { q: rx, r: rz };
+}
+function pixelToHex(px, py) {
+  const x = px + layout.minX - PAD;
+  const y = py + layout.minY - PAD;
+  return cubeRound((SQRT3 / 3 * x - 1 / 3 * y) / HEX_SIZE, (2 / 3 * y) / HEX_SIZE);
+}
+function hexCorners(q, r, inset = 0) {
+  const c = hexToPixel(q, r);
+  const size = HEX_SIZE - inset;
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = Math.PI / 180 * (60 * i - 30);
+    pts.push({ x: c.x + size * Math.cos(angle), y: c.y + size * Math.sin(angle) });
   }
-
-  input.addEventListener('blur', commit);
-  input.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
-    if (ev.key === 'Escape') { input.value = currentName; input.blur(); }
-  });
-});
-let refreshTimer = null;
-let refreshInterval = 5000;
-
-// Reconstructed state at currentStep
-let state = null;
-
-// ─── Animation system ───
-const ANIM_MOVE_DURATION = 220;
-const ANIM_SPAWN_DURATION = 280;
-const ANIM_DEATH_DURATION = 300;
-const ANIM_FLASH_DURATION = 350;
-const ANIM_FLOAT_DURATION = 600;
-
-let animations = [];       // Active animations
-let animating = false;      // True while animations are running
-let animBlocked = false;     // True when waiting for animations to finish before next step
-let pendingStepCallback = null; // Called when animations finish
-
-function px(gridX) { return gridX * CELL + CELL / 2; }
-function py(gridY) { return gridY * CELL + CELL / 2; }
-
-function now() { return performance.now(); }
-
-function addAnim(a) {
-  a.startTime = now();
-  animations.push(a);
+  return pts;
 }
-
-function snapshotEntity(type, id, entity) {
-  return { type, id, x: entity.x, y: entity.y, hp: entity.hp, alive: entity.alive, owner: entity.owner, etype: entity.type, isBuilding: entity.isBuilding };
+function pathHex(q, r, inset = 0) {
+  const pts = hexCorners(q, r, inset);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
 }
-
-function snapshotState(s) {
-  const snap = { units: new Map(), buildings: new Map() };
-  for (const [id, u] of s.units) snap.units.set(id, snapshotEntity('unit', id, u));
-  for (const [id, b] of s.buildings) snap.buildings.set(id, snapshotEntity('building', id, b));
-  return snap;
+function computeLayout(cells) {
+  const pts = cells.flatMap(c => hexCornersRaw(c.q, c.r));
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  layout = {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    width: Math.ceil(Math.max(...xs) - Math.min(...xs) + PAD * 2),
+    height: Math.ceil(Math.max(...ys) - Math.min(...ys) + PAD * 2),
+  };
+  canvas.width = layout.width;
+  canvas.height = layout.height;
 }
-
-function buildAnimationsForEvent(oldSnap, ev) {
-  const p = ev.payload;
-  switch (ev.type) {
-    case 'move': {
-      const oldU = oldSnap.units.get(p.unitId);
-      if (oldU) {
-        addAnim({
-          kind: 'move', unitId: p.unitId,
-          fromX: oldU.x, fromY: oldU.y, toX: p.toX, toY: p.toY,
-          duration: ANIM_MOVE_DURATION, owner: oldU.owner, etype: oldU.etype,
-        });
-      }
-      break;
-    }
-    case 'produce_complete': {
-      addAnim({
-        kind: 'spawn', id: p.unitId, x: p.x, y: p.y,
-        duration: ANIM_SPAWN_DURATION, owner: p.owner, etype: p.type,
-      });
-      break;
-    }
-    case 'build': {
-      addAnim({
-        kind: 'spawn', id: p.buildingId, x: p.x, y: p.y,
-        duration: ANIM_SPAWN_DURATION, owner: p.owner, etype: p.type,
-      });
-      break;
-    }
-    case 'attack': {
-      const target = oldSnap.units.get(p.targetId) || oldSnap.buildings.get(p.targetId);
-      if (target) {
-        addAnim({
-          kind: 'flash', id: p.targetId, x: target.x, y: target.y,
-          color: 'attack', duration: ANIM_FLASH_DURATION,
-        });
-        addAnim({
-          kind: 'float', x: target.x, y: target.y, text: `-${p.damage}`,
-          color: '#f44', duration: ANIM_FLOAT_DURATION,
-        });
-      }
-      break;
-    }
-    case 'heal': {
-      const target = oldSnap.units.get(p.targetId);
-      if (target) {
-        addAnim({
-          kind: 'flash', id: p.targetId, x: target.x, y: target.y,
-          color: 'heal', duration: ANIM_FLASH_DURATION,
-        });
-        addAnim({
-          kind: 'float', x: target.x, y: target.y, text: `+${p.amount}`,
-          color: '#5f8', duration: ANIM_FLOAT_DURATION,
-        });
-      }
-      break;
-    }
-    case 'unit_death': {
-      const oldU = oldSnap.units.get(p.unitId);
-      if (oldU) {
-        addAnim({
-          kind: 'death', id: p.unitId, x: p.x, y: p.y,
-          duration: ANIM_DEATH_DURATION, owner: oldU.owner, etype: oldU.etype,
-        });
-      }
-      break;
-    }
-    case 'base_destroyed': {
-      const oldB = oldSnap.buildings.get(p.buildingId);
-      if (oldB) {
-        addAnim({
-          kind: 'death', id: p.buildingId, x: p.x, y: p.y,
-          duration: ANIM_DEATH_DURATION, owner: oldB.owner, etype: oldB.etype,
-        });
-      }
-      break;
-    }
-    case 'sell': {
-      const oldB = oldSnap.buildings.get(p.buildingId);
-      if (oldB) {
-        addAnim({
-          kind: 'death', id: p.buildingId, x: p.x, y: p.y,
-          duration: ANIM_DEATH_DURATION, owner: oldB.owner, etype: oldB.etype,
-        });
-      }
-      break;
-    }
+function hexCornersRaw(q, r) {
+  const c = hexToRaw(q, r);
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = Math.PI / 180 * (60 * i - 30);
+    pts.push({ x: c.x + HEX_SIZE * Math.cos(angle), y: c.y + HEX_SIZE * Math.sin(angle) });
   }
+  return pts;
 }
-
-function updateAnimations() {
-  const t = now();
-  animations = animations.filter(a => t - a.startTime < a.duration);
-  if (animations.length === 0 && animBlocked) {
-    animBlocked = false;
-    animating = false;
-    if (pendingStepCallback) {
-      const cb = pendingStepCallback;
-      pendingStepCallback = null;
-      cb();
-    }
-  }
-}
-
-function drawAnimations() {
-  const t = now();
-  for (const a of animations) {
-    const elapsed = t - a.startTime;
-    const progress = Math.min(1, elapsed / a.duration);
-    const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-    switch (a.kind) {
-      case 'move': {
-        // Hide the unit at its final position (already in state), draw it interpolated
-        const cx = px(a.fromX) + (px(a.toX) - px(a.fromX)) * ease;
-        const cy = py(a.fromY) + (py(a.toY) - py(a.fromY)) * ease;
-        const color = a.owner === 'player_a' ? '#6cf' : '#f86';
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(cx, cy, CELL / 3, 0, 6.28);
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.font = '9px sans-serif';
-        const letter = a.etype === 'infantry' ? 'I' : a.etype === 'sniper' ? 'S' : a.etype === 'tank' ? 'T' : 'M';
-        ctx.fillText(letter, cx - 3, cy + 3);
-        // Mark this unit as "being animated" so drawBoard skips it
-        a._active = true;
-        break;
-      }
-      case 'spawn': {
-        const scale = ease;
-        const alpha = ease;
-        const r = CELL / 3 * scale;
-        const color = a.owner === 'player_a' ? '#6cf' : '#f86';
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(px(a.x), py(a.y), r, 0, 6.28);
-        ctx.fill();
-        ctx.restore();
-        break;
-      }
-      case 'death': {
-        const alpha = 1 - ease;
-        const scale = 1 - ease * 0.5;
-        const color = a.owner === 'player_a' ? '#6cf' : '#f86';
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(px(a.x), py(a.y), CELL / 3 * scale, 0, 6.28);
-        ctx.fill();
-        ctx.restore();
-        break;
-      }
-      case 'flash': {
-        const alpha = 1 - progress;
-        const radius = CELL / 2 + CELL * progress;
-        const color = a.color === 'attack' ? 'rgba(255,60,60,' : 'rgba(60,255,120,';
-        ctx.save();
-        ctx.strokeStyle = color + alpha + ')';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(px(a.x), py(a.y), radius, 0, 6.28);
-        ctx.stroke();
-        // Inner glow
-        ctx.fillStyle = color + (alpha * 0.3) + ')';
-        ctx.beginPath();
-        ctx.arc(px(a.x), py(a.y), CELL / 2, 0, 6.28);
-        ctx.fill();
-        ctx.restore();
-        break;
-      }
-      case 'float': {
-        const yOffset = -CELL * 1.5 * ease;
-        const alpha = progress < 0.7 ? 1 : 1 - (progress - 0.7) / 0.3;
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = a.color;
-        ctx.font = 'bold 13px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(a.text, px(a.x), py(a.y) + yOffset);
-        ctx.restore();
-        break;
-      }
-    }
-  }
-}
-
-function isAnimating() {
-  return animations.length > 0;
-}
-
-function onAnimationsDone(cb) {
-  if (!isAnimating()) { cb(); return; }
-  animBlocked = true;
-  pendingStepCallback = cb;
-}
-
-function animLoop() {
-  if (!animating) return;
-  drawBoard();
-  drawAnimations();
-  updateAnimations();
-  if (isAnimating()) {
-    requestAnimationFrame(animLoop);
-  } else {
-    animating = false;
-    drawBoard(); // Final clean draw
-  }
-}
-
-// ─── Game list ───
-
-async function fetchGameList() {
-  const res = await fetch('/api/games');
-  const { games } = await res.json();
-  const prevValue = gameSelect.value;
-  gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
-  for (const g of games) {
-    const opt = document.createElement('option');
-    opt.value = g.id;
-    const names = g.playerNames || {};
-    const nameA = names.player_a || 'A';
-    const nameB = names.player_b || 'B';
-    opt.textContent = `${g.id.slice(0, 8)} — ${g.phase} (回合 ${g.turnNumber}, ${g.currentOwner === 'player_a' ? nameA : nameB})`;
-    gameSelect.appendChild(opt);
-  }
-  // Restore previous selection if still available
-  if (prevValue && [...gameSelect.options].some(o => o.value === prevValue)) {
-    gameSelect.value = prevValue;
-  }
-  return games;
-}
-
-// ─── State reconstruction ───
 
 function createEmptyState() {
-  const cfg = gameConfig || {};
-  const map = cfg.map || {};
-  const eco = cfg.economy || {};
   return {
-    mapWidth: map.width || 20, mapHeight: map.height || 20,
-    miningPoints: [],
-    terrain: [],
-    units: new Map(), buildings: new Map(),
-    resources: { player_a: { gold: eco.startingGold || 100 }, player_b: { gold: eco.startingGold || 100 } },
+    map: { radius: 8, cells: [], terrainCells: [] },
+    cells: [],
+    controlPoints: new Map(),
+    headquarters: new Map(),
+    units: new Map(),
+    resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } },
     turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command' },
-    eventLog: [], winner: null,
+    winner: null,
+    eventLog: [],
   };
+}
+
+function entityAt(q, r) {
+  for (const u of state.units.values()) if (u.alive && u.q === q && u.r === r) return u;
+  for (const h of state.headquarters.values()) if (h.alive && h.q === q && h.r === r) return h;
+  return null;
 }
 
 function applyEvent(s, ev) {
   s.eventLog.push(ev);
+  const p = ev.payload || {};
   switch (ev.type) {
     case 'game_start':
-      if (ev.payload.config) gameConfig = ev.payload.config;
-      if (ev.payload.playerNames) playerNames = ev.payload.playerNames;
-      // Sync starting gold from actual game config
-      if (gameConfig?.economy?.startingGold != null) {
-        s.resources.player_a.gold = gameConfig.economy.startingGold;
-        s.resources.player_b.gold = gameConfig.economy.startingGold;
-      }
-      s.mapWidth = ev.payload.mapWidth ?? (gameConfig?.map?.width ?? 20);
-      s.mapHeight = ev.payload.mapHeight ?? (gameConfig?.map?.height ?? 20);
-      s.miningPoints = ev.payload.miningPoints ?? [];
-      s.terrain = ev.payload.terrain ?? [];
-      if (ev.payload.buildings) {
-        for (const b of ev.payload.buildings) {
-          s.buildings.set(b.id, { ...b, production: b.production || null, buildProgress: b.buildProgress || 0 });
-        }
-      } else {
-        const hqPos = gameConfig?.map?.headquartersPositions || {};
-        const hqHp = gameConfig?.buildings?.headquarters?.hp || 200;
-        const posA = hqPos.player_a || { x: 3, y: 10 };
-        const posB = hqPos.player_b || { x: 16, y: 10 };
-        s.buildings.set('hq_a', { id: 'hq_a', owner: 'player_a', type: 'headquarters', x: posA.x, y: posA.y, hp: hqHp, maxHp: hqHp, alive: true, isBuilding: false, production: null, buildProgress: 0 });
-        s.buildings.set('hq_b', { id: 'hq_b', owner: 'player_b', type: 'headquarters', x: posB.x, y: posB.y, hp: hqHp, maxHp: hqHp, alive: true, isBuilding: false, production: null, buildProgress: 0 });
-      }
+      gameConfig = p.config;
+      if (p.playerNames) playerNames = p.playerNames;
+      s.map = p.map;
+      s.cells = p.map.cells || [];
+      s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
+      s.headquarters = new Map(Object.values(p.headquarters || {}).map(h => [h.id, { ...h }]));
+      s.units = new Map((p.units || []).map(u => [u.id, { ...u }]));
+      s.resources = JSON.parse(JSON.stringify(p.resources || s.resources));
+      computeLayout(s.cells);
       break;
-    case 'build': {
-      const bSpec = gameConfig?.buildings?.[ev.payload.type] || {};
-      const bMaxHp = bSpec.hp || 60;
-      s.resources[ev.payload.owner].gold -= ev.payload.cost || 0;
-      const newB = {
-        id: ev.payload.buildingId, owner: ev.payload.owner, type: ev.payload.type,
-        x: ev.payload.x, y: ev.payload.y,
-        hp: bMaxHp, maxHp: bMaxHp,
-        alive: true, isBuilding: true, production: null,
-      };
-      if (bSpec.attacksPerTurn != null) {
-        newB.attack = bSpec.attack;
-        newB.defense = bSpec.defense;
-        newB.attackRange = bSpec.attackRange;
-        newB.attacksLeft = 0;
-      } else if (bSpec.defense != null) {
-        newB.defense = bSpec.defense;
-      }
-      s.buildings.set(ev.payload.buildingId, newB);
-      break;
-    }
-    case 'build_tick': {
-      const b = s.buildings.get(ev.payload.buildingId);
-      if (b) b.buildProgress = ev.payload.buildProgress;
-      break;
-    }
-    case 'build_complete': {
-      const b = s.buildings.get(ev.payload.buildingId);
-      if (b) b.isBuilding = false;
-      break;
-    }
-    case 'produce': {
-      const b = s.buildings.get(ev.payload.buildingId);
-      if (b) b.production = { type: ev.payload.unitType, turnsRemaining: ev.payload.productionTime };
-      s.resources[ev.payload.owner].gold -= ev.payload.cost || getUnitCost(ev.payload.unitType);
-      break;
-    }
-    case 'produce_complete': {
-      // Clear production slot on the building that produced this unit
-      for (const b of s.buildings.values()) {
-        if (b.owner === ev.payload.owner && b.production && b.production.type === ev.payload.type) {
-          b.production = null;
-          break;
-        }
-      }
-      s.units.set(ev.payload.unitId, {
-        id: ev.payload.unitId, owner: ev.payload.owner, type: ev.payload.type,
-        x: ev.payload.x, y: ev.payload.y,
-        hp: ev.payload.hp ?? getUnitMaxHp(ev.payload.type),
-        maxHp: ev.payload.hp ?? getUnitMaxHp(ev.payload.type),
-        attack: ev.payload.attack ?? (gameConfig?.units?.[ev.payload.type]?.attack ?? 0),
-        defense: ev.payload.defense ?? (gameConfig?.units?.[ev.payload.type]?.defense ?? 0),
-        moveRange: ev.payload.moveRange ?? (gameConfig?.units?.[ev.payload.type]?.moveRange ?? 0),
-        attackRange: ev.payload.attackRange ?? (gameConfig?.units?.[ev.payload.type]?.attackRange ?? 0),
-        alive: true, hasMoved: false, hasAttacked: false,
+    case 'deploy':
+      s.resources[p.owner].supplies -= p.cost || 0;
+      s.units.set(p.unitId, {
+        id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r,
+        hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense,
+        moveRange: p.moveRange, attackRange: p.attackRange,
+        alive: true, hasMoved: true, hasActed: false,
+        canCapture: !!p.canCapture, healPower: p.healPower, cost: p.cost,
       });
       break;
-    }
     case 'move': {
-      const u = s.units.get(ev.payload.unitId);
-      if (u) { u.x = ev.payload.toX; u.y = ev.payload.toY; u.hasMoved = true; }
+      const u = s.units.get(p.unitId);
+      if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; }
       break;
     }
     case 'attack': {
-      const t = s.units.get(ev.payload.targetId) || s.buildings.get(ev.payload.targetId);
-      if (t) t.hp = ev.payload.targetHp;
-      const a = s.units.get(ev.payload.attackerId);
-      if (a) a.hasAttacked = true;
+      const target = s.units.get(p.targetId) || s.headquarters.get(p.targetId);
+      if (target) target.hp = p.targetHp;
+      const a = s.units.get(p.attackerId);
+      if (a) a.hasActed = true;
       break;
     }
     case 'heal': {
-      const t = s.units.get(ev.payload.targetId);
-      if (t) t.hp = ev.payload.targetHp;
-      const m = s.units.get(ev.payload.medicId);
-      if (m) m.hasAttacked = true;
+      const target = s.units.get(p.targetId);
+      if (target) target.hp = p.targetHp;
+      const support = s.units.get(p.supportId);
+      if (support) support.hasActed = true;
       break;
     }
     case 'unit_death': {
-      const u = s.units.get(ev.payload.unitId);
+      const u = s.units.get(p.unitId);
       if (u) u.alive = false;
       break;
     }
-    case 'base_destroyed': {
-      const b = s.buildings.get(ev.payload.buildingId);
-      if (b) b.alive = false;
+    case 'headquarters_destroyed': {
+      const h = s.headquarters.get(p.headquartersId);
+      if (h) h.alive = false;
       break;
     }
-    case 'sell': {
-      const b = s.buildings.get(ev.payload.buildingId);
-      if (b) b.alive = false;
-      s.resources[ev.payload.owner].gold += ev.payload.refund;
+    case 'control_point_captured': {
+      const cp = s.controlPoints.get(p.pointId);
+      if (cp) cp.owner = p.owner;
       break;
     }
-    case 'mine':
-    case 'base_income':
-      s.resources[ev.payload.owner].gold += ev.payload.amount;
+    case 'income':
+      s.resources[p.owner].supplies += p.amount;
       break;
     case 'reset_actions':
       for (const u of s.units.values()) {
-        if (u.owner === ev.payload.owner) {
-          u.hasMoved = false;
-          u.hasAttacked = false;
-        }
+        if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; }
       }
       break;
     case 'turn_end':
-      s.turn.currentOwner = ev.payload.nextOwner;
-      s.turn.turnNumber = ev.payload.turnNumber;
+      s.turn.currentOwner = p.nextOwner;
+      s.turn.turnNumber = p.turnNumber;
       break;
     case 'game_over':
       s.turn.phase = 'game_over';
-      s.winner = ev.payload.winner;
+      s.winner = p.winner;
       break;
     case 'name_rename':
-      playerNames[ev.payload.playerId] = ev.payload.name;
+      playerNames[p.playerId] = p.name;
       break;
   }
 }
 
-function getUnitMaxHp(type) {
-  return gameConfig?.units?.[type]?.hp || 100;
-}
-
-function getUnitCost(type) {
-  return gameConfig?.units?.[type]?.cost || 0;
-}
-
-// ─── Replay: reconstruct state at a given step ───
-
 function rebuildToStep(step) {
-  // Clear animation state for instant jumps
-  animations = [];
-  animating = false;
-  animBlocked = false;
-  pendingStepCallback = null;
-
   state = createEmptyState();
-  for (let i = 0; i <= step && i < allEvents.length; i++) {
-    applyEvent(state, allEvents[i]);
-  }
+  for (let i = 0; i <= step && i < allEvents.length; i++) applyEvent(state, allEvents[i]);
   currentStep = step;
   drawBoard();
   renderSidebar();
@@ -563,300 +233,129 @@ function rebuildToStep(step) {
   updateControls();
 }
 
-// ─── Board rendering ───
-
-function drawHpBar(cx, cy, hp, maxHp, barWidth) {
-  if (hp >= maxHp) return;
-  const ratio = hp / maxHp;
-  const barH = 3;
-  const x = cx - barWidth / 2;
-  const y = cy;
-  ctx.fillStyle = '#111';
-  ctx.fillRect(x - 1, y - 1, barWidth + 2, barH + 2);
-  ctx.fillStyle = ratio > 0.5 ? '#4a4' : ratio > 0.25 ? '#ca0' : '#e33';
-  ctx.fillRect(x, y, barWidth * ratio, barH);
+function drawHpBar(x, y, width, hp, maxHp) {
+  if (!maxHp || hp >= maxHp) return;
+  ctx.fillStyle = '#190d0d';
+  ctx.fillRect(x - width / 2, y, width, 4);
+  ctx.fillStyle = hp / maxHp > 0.5 ? '#49b66d' : hp / maxHp > 0.25 ? '#d0a832' : '#d65a4a';
+  ctx.fillRect(x - width / 2, y, width * Math.max(0, hp / maxHp), 4);
 }
 
 function drawBoard() {
-  if (!state) return;
-  canvas.width = state.mapWidth * CELL;
-  canvas.height = state.mapHeight * CELL;
+  if (!state || state.cells.length === 0) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = GRID_COLOR;
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= state.mapWidth; i++) {
-    ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, state.mapHeight * CELL); ctx.stroke();
-  }
-  for (let j = 0; j <= state.mapHeight; j++) {
-    ctx.beginPath(); ctx.moveTo(0, j * CELL); ctx.lineTo(state.mapWidth * CELL, j * CELL); ctx.stroke();
-  }
-  // hover highlight
-  if (hoverCell) {
-    ctx.fillStyle = 'rgba(255,255,255,.08)';
-    ctx.fillRect(hoverCell.x * CELL, hoverCell.y * CELL, CELL, CELL);
+  ctx.fillStyle = '#0a0e14';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (const cell of state.cells) {
+    pathHex(cell.q, cell.r, 1);
+    ctx.fillStyle = TERRAIN[cell.terrain] || TERRAIN.plain;
+    ctx.fill();
+    ctx.strokeStyle = '#20313d';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 
-  ctx.fillStyle = '#b80';
-  for (const p of state.miningPoints) {
-    ctx.beginPath();
-    ctx.arc(p.x * CELL + CELL / 2, p.y * CELL + CELL / 2, 4, 0, 6.28);
+  if (hoverCell) {
+    pathHex(hoverCell.q, hoverCell.r, 2);
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
     ctx.fill();
   }
-  // terrain
-  for (let y = 0; y < state.mapHeight; y++) {
-    for (let x = 0; x < state.mapWidth; x++) {
-      const t = state.terrain[y]?.[x] ?? 0;
-      if (t === 1) {
-        ctx.fillStyle = '#3a3a3a';
-        ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
-        ctx.fillStyle = '#555';
-        ctx.fillRect(x * CELL + 3, y * CELL + 3, CELL - 6, CELL - 6);
-      } else if (t === 2) {
-        ctx.fillStyle = '#1a3a5a';
-        ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
-        ctx.fillStyle = '#2a5a8a';
-        ctx.fillRect(x * CELL + 3, y * CELL + 3, CELL - 6, CELL - 6);
-      }
-    }
+
+  for (const cp of state.controlPoints.values()) {
+    const p = hexToPixel(cp.q, cp.r);
+    pathHex(cp.q, cp.r, 8);
+    ctx.fillStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a';
+    ctx.globalAlpha = 0.32;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#f0d77c';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('CP', p.x, p.y + 4);
   }
-  for (const b of state.buildings.values()) {
-    if (!b.alive) {
-      // ghost for destroyed buildings
-      ctx.save();
-      ctx.globalAlpha = .25;
-      const isA = b.owner === 'player_a';
-      ctx.fillStyle = b.type === 'headquarters' ? (isA ? '#1a4070' : '#703010')
-        : b.type === 'barracks' ? (isA ? '#2a5a90' : '#904a20')
-        : b.type === 'bunker' ? (isA ? '#3a3a5a' : '#5a3a3a')
-        : b.type === 'wall' ? (isA ? '#4a4a3a' : '#5a4a3a')
-        : (isA ? '#2a6a4a' : '#6a5a2a');
-      ctx.fillRect(b.x * CELL + 2, b.y * CELL + 2, CELL - 4, CELL - 4);
-      ctx.restore();
-      continue;
-    }
-    const isA = b.owner === 'player_a';
-    let color;
-    if (b.type === 'headquarters') color = isA ? '#2a60a0' : '#a04020';
-    else if (b.type === 'barracks') color = isA ? '#3a8ad9' : '#d96a3a';
-    else if (b.type === 'bunker') color = isA ? '#5a4a8a' : '#8a5a5a';
-    else if (b.type === 'wall') color = isA ? '#6a6a5a' : '#8a7a5a';
-    else color = isA ? '#4a9a6a' : '#9a7a3a';
 
-    if (b.isBuilding) {
-      // building under construction — dark base + progress bar
-      ctx.fillStyle = '#333';
-      ctx.fillRect(b.x * CELL + 1, b.y * CELL + 1, CELL - 2, CELL - 2);
-      ctx.fillStyle = color;
-      const buildTime = gameConfig?.buildings?.[b.type]?.buildTime || 1;
-      const pct = Math.max(0, 1 - (b.buildProgress || 0) / buildTime);
-      ctx.fillRect(b.x * CELL + 1, b.y * CELL + CELL - 4, (CELL - 2) * pct, 3);
-    } else {
-      ctx.fillStyle = color;
-      ctx.fillRect(b.x * CELL + 2, b.y * CELL + 2, CELL - 4, CELL - 4);
-    }
+  for (const hq of state.headquarters.values()) {
+    const p = hexToPixel(hq.q, hq.r);
+    pathHex(hq.q, hq.r, 5);
+    ctx.fillStyle = hq.alive ? OWNER_COLOR[hq.owner] : '#555';
+    ctx.globalAlpha = hq.alive ? 0.78 : 0.3;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#071016';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HQ', p.x, p.y + 4);
+    drawHpBar(p.x, p.y - 25, 42, hq.hp, hq.maxHp);
+  }
 
-    // label
-    ctx.fillStyle = '#fff';
+  for (const u of state.units.values()) {
+    if (!u.alive) continue;
+    const p = hexToPixel(u.q, u.r);
+    ctx.fillStyle = OWNER_COLOR[u.owner];
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, HEX_SIZE * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#071016';
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
-    const letter = b.type === 'headquarters' ? 'HQ' : b.type === 'barracks' ? 'B' : b.type === 'bunker' ? 'MG' : b.type === 'wall' ? 'W' : 'M';
-    ctx.fillText(letter, b.x * CELL + CELL / 2, b.y * CELL + CELL / 2 + 4);
-    ctx.textAlign = 'left';
-
-    // hp bar
-    drawHpBar(b.x * CELL + CELL / 2, b.y * CELL - 2, b.hp, b.maxHp, CELL - 6);
-
-    // production indicator (yellow dot)
-    if (b.production) {
-      ctx.fillStyle = '#ff0';
+    ctx.fillText(unitLabel(u.type), p.x, p.y + 4);
+    drawHpBar(p.x, p.y - 21, 34, u.hp, u.maxHp);
+    if (u.hasMoved || u.hasActed) {
+      ctx.fillStyle = 'rgba(0,0,0,.35)';
       ctx.beginPath();
-      ctx.arc(b.x * CELL + CELL - 4, b.y * CELL + 4, 3, 0, 6.28);
+      ctx.arc(p.x + 12, p.y + 12, 5, 0, Math.PI * 2);
       ctx.fill();
     }
   }
-  for (const u of state.units.values()) {
-    if (!u.alive) continue;
-    // Skip units currently being animated by a move
-    if (animations.some(a => a.kind === 'move' && a.unitId === u.id && a._active)) continue;
-    const color = u.owner === 'player_a' ? '#6cf' : '#f86';
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(u.x * CELL + CELL / 2, u.y * CELL + CELL / 2, CELL / 3, 0, 6.28);
-    ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.font = 'bold 9px sans-serif';
-    ctx.textAlign = 'center';
-    const letter = u.type === 'infantry' ? 'I' : u.type === 'sniper' ? 'S' : u.type === 'tank' ? 'T' : 'M';
-    ctx.fillText(letter, u.x * CELL + CELL / 2, u.y * CELL + CELL / 2 + 3);
-    ctx.textAlign = 'left';
-
-    // highlight hovered entity
-    if (hoverCell && hoverCell.x === u.x && hoverCell.y === u.y) {
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(u.x * CELL + 1, u.y * CELL + 1, CELL - 2, CELL - 2);
-    }
-
-    drawHpBar(u.x * CELL + CELL / 2, u.y * CELL - 2, u.hp, u.maxHp, CELL - 4);
-  }
-
-  // highlight hovered building
-  if (hoverCell) {
-    const hb = [...state.buildings.values()].find(b => b.alive && b.x === hoverCell.x && b.y === hoverCell.y);
-    if (hb) {
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(hb.x * CELL + 1, hb.y * CELL + 1, CELL - 2, CELL - 2);
-    }
-  }
 }
 
-// ─── Canvas hover & selection ───
-
-canvas.addEventListener('mousemove', e => {
-  if (!state) return;
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / CELL);
-  const y = Math.floor((e.clientY - rect.top) / CELL);
-  if (x < 0 || y < 0 || x >= state.mapWidth || y >= state.mapHeight) {
-    hoverCell = null;
-    cellInfoEl.textContent = '';
-    return;
-  }
-  hoverCell = { x, y };
-  const u = [...state.units.values()].find(u => u.alive && u.x === x && u.y === y);
-  const b = [...state.buildings.values()].find(b => b.alive && b.x === x && b.y === y);
-  let info = `(${x}, ${y})`;
-  if (u) {
-    const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
-    info += ` | ${typeName} [${playerName(u.owner)}] HP:${u.hp}/${u.maxHp}`;
-  }
-  if (b) {
-    const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : b.type === 'wall' ? '墙壁' : '采矿器';
-    const status = b.isBuilding ? ' 建造中' : b.production ? ` 生产${b.production.type}` : '';
-    info += ` | ${typeName} [${playerName(b.owner)}] HP:${b.hp}/${b.maxHp}${status}`;
-  }
-  cellInfoEl.textContent = info;
-  renderSelectionInfo(u, b);
-});
-
-canvas.addEventListener('mouseleave', () => {
-  hoverCell = null;
-  cellInfoEl.textContent = '';
-});
-
-canvas.addEventListener('click', e => {
-  if (!state) return;
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / CELL);
-  const y = Math.floor((e.clientY - rect.top) / CELL);
-  if (x < 0 || y < 0 || x >= state.mapWidth || y >= state.mapHeight) return;
-  const u = [...state.units.values()].find(u => u.alive && u.x === x && u.y === y);
-  const b = [...state.buildings.values()].find(b => b.alive && b.x === x && b.y === y);
-  if (u || b) renderSelectionInfo(u, b);
-});
-
-function renderSelectionInfo(u, b) {
-  if (!selDetailEl) return;
-  if (u) {
-    const ownerCls = u.owner === 'player_a' ? 'player-a' : 'player-b';
-    const ownerName = playerName(u.owner);
-    const typeName = u.type === 'infantry' ? '步兵' : u.type === 'sniper' ? '狙击手' : u.type === 'tank' ? '坦克' : '医疗兵';
-    const hpPct = Math.round((u.hp / u.maxHp) * 100);
-    const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
-    const actions = [];
-    if (!u.hasMoved) actions.push('可移动');
-    if (!u.hasAttacked) actions.push(u.type === 'medic' ? '可治疗' : '可攻击');
-    selDetailEl.innerHTML = `
-      <div style="font-weight:700;font-size:15px;margin-bottom:4px"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
-      <div style="color:#8a8">❤️ ${u.hp} / ${u.maxHp} <span style="display:inline-block;width:80px;height:6px;background:#2a1a1a;border-radius:3px;vertical-align:middle;margin-left:6px"><span style="display:block;height:100%;border-radius:3px;background:${hpColor};width:${hpPct}%"></span></span></div>
-      <div style="color:#9ab;font-size:12px;margin-top:4px">⚔️ 攻击 ${u.attack ?? '-'}　🛡️ 防御 ${u.defense ?? '-'}</div>
-      <div style="color:#9ab;font-size:12px">🏃 移动 ${u.moveRange ?? '-'}　🎯 射程 ${u.attackRange ?? '-'}</div>
-      <div style="color:#5a7a8a;font-size:12px;margin-top:4px">📍 (${u.x}, ${u.y})</div>
-      ${actions.length > 0 ? `<div style="color:#6a8;font-size:11px;margin-top:4px">${actions.join(' · ')}</div>` : '<div style="color:#a66;font-size:11px;margin-top:4px">本回合已行动</div>'}
-    `;
-    return;
-  }
-  if (b) {
-    const ownerCls = b.owner === 'player_a' ? 'player-a' : 'player-b';
-    const ownerName = playerName(b.owner);
-    const typeName = b.type === 'headquarters' ? '总部' : b.type === 'barracks' ? '兵营' : b.type === 'bunker' ? '碉堡' : b.type === 'wall' ? '墙壁' : '采矿器';
-    const hpPct = Math.round((b.hp / b.maxHp) * 100);
-    const hpColor = hpPct > 50 ? '#4a8' : hpPct > 25 ? '#ca0' : '#e33';
-    const statusText = b.isBuilding
-      ? `🔨 建造中 (剩余 ${b.buildProgress || 0} 回合)`
-      : b.production
-      ? `🏭 生产中: ${b.production.type === 'infantry' ? '步兵' : b.production.type === 'sniper' ? '狙击手' : b.production.type === 'tank' ? '坦克' : '医疗兵'} (剩余 ${b.production.turnsRemaining} 回合)`
-      : '✅ 空闲';
-    selDetailEl.innerHTML = `
-      <div style="font-weight:700;font-size:15px;margin-bottom:4px"><span class="${ownerCls}">[${esc(ownerName)}]</span> ${esc(typeName)}</div>
-      <div style="color:#8a8">❤️ ${b.hp} / ${b.maxHp} <span style="display:inline-block;width:80px;height:6px;background:#2a1a1a;border-radius:3px;vertical-align:middle;margin-left:6px"><span style="display:block;height:100%;border-radius:3px;background:${hpColor};width:${hpPct}%"></span></span></div>
-      <div style="color:#5a7a8a;font-size:12px;margin-top:4px">📍 (${b.x}, ${b.y})</div>
-      <div style="color:#9ab;font-size:12px;margin-top:4px">${statusText}</div>
-    `;
-    return;
-  }
-  selDetailEl.textContent = '点击或悬停棋盘查看单位/建筑信息';
+function unitLabel(type) {
+  return { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP' }[type] || '?';
 }
 
-// ─── Sidebar ───
+function formatEventShort(ev) {
+  const p = ev.payload || {};
+  switch (ev.type) {
+    case 'game_start': return '对局开始';
+    case 'deploy': return `部署 ${p.unitType} @(${p.q},${p.r})`;
+    case 'move': return `移动 ${String(p.unitId).slice(0, 6)} -> (${p.toQ},${p.toR})`;
+    case 'attack': return `攻击 ${String(p.targetId).slice(0, 6)} 伤害:${p.damage}`;
+    case 'heal': return `治疗 ${String(p.targetId).slice(0, 6)} +${p.amount}`;
+    case 'unit_death': return `单位阵亡 ${String(p.unitId).slice(0, 6)}`;
+    case 'headquarters_destroyed': return `指挥部摧毁 ${p.owner}`;
+    case 'control_point_captured': return `占领 ${p.name}`;
+    case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
+    case 'turn_end': return `回合结束 -> ${playerName(p.nextOwner)} (${p.turnNumber})`;
+    case 'game_over': return `游戏结束 胜者:${playerName(p.winner)}`;
+    default: return ev.type;
+  }
+}
 
 function renderSidebar() {
   if (!state) return;
+  resourcesEl.innerHTML = `<h3>资源</h3>
+    <div><span class="player-a">${esc(playerName('player_a'))}</span>: ${state.resources.player_a.supplies} 补给</div>
+    <div><span class="player-b">${esc(playerName('player_b'))}</span>: ${state.resources.player_b.supplies} 补给</div>
+    <div style="margin-top:6px;color:#7a9aaa;font-size:12px">据点: ${[...state.controlPoints.values()].map(cp => `${cp.name}:${cp.owner ? playerName(cp.owner) : '中立'}`).join(' / ')}</div>`;
+  const owner = state.turn.currentOwner;
+  turnInfoEl.innerHTML = `<h3>回合 ${state.turn.turnNumber}</h3>
+    <div>当前: <span class="${owner === 'player_a' ? 'player-a' : 'player-b'}">${esc(playerName(owner))}</span></div>
+    ${state.winner ? `<div style="margin-top:6px;color:#f0d77c">胜者: ${esc(playerName(state.winner))}</div>` : ''}`;
 
-  // Count units & buildings per player
-  const counts = { a_units: 0, b_units: 0, a_bld: 0, b_bld: 0 };
-  for (const u of state.units.values()) {
-    if (!u.alive) continue;
-    if (u.owner === 'player_a') counts.a_units++; else counts.b_units++;
-  }
-  for (const b of state.buildings.values()) {
-    if (!b.alive) continue;
-    if (b.owner === 'player_a') counts.a_bld++; else counts.b_bld++;
-  }
-
-  const turnOwner = state.turn.currentOwner;
-  const isOver = state.turn.phase === 'game_over';
-
-    resourcesEl.innerHTML = `
-    <h3>资源 & 总览</h3>
-    <div style="display:flex;gap:16px;margin-bottom:8px">
-      <div><span class="player-a player-name" data-player="player_a" title="点击改名">${esc(playerName('player_a'))}</span>: ${state.resources.player_a.gold} 金</div>
-      <div><span class="player-b player-name" data-player="player_b" title="点击改名">${esc(playerName('player_b'))}</span>: ${state.resources.player_b.gold} 金</div>
-    </div>
-    <div style="font-size:11px;color:#5a7a8a">
-      <span class="player-a">${esc(playerName('player_a'))}</span>: ${counts.a_units} 单位 / ${counts.a_bld} 建筑
-      &nbsp;|&nbsp;
-      <span class="player-b">${esc(playerName('player_b'))}</span>: ${counts.b_units} 单位 / ${counts.b_bld} 建筑
-    </div>
-  `;
-  turnInfoEl.innerHTML = `
-    <h3>回合 ${state.turn.turnNumber}</h3>
-    <div>当前: <span class="${turnOwner === 'player_a' ? 'player-a' : 'player-b'}">${esc(playerName(turnOwner))}</span></div>
-    ${isOver ? `<div style="color:#ff8;font-weight:700;margin-top:4px">🏆 游戏结束 — 胜者: ${esc(state.winner ? playerName(state.winner) : '无')}</div>` : ''}
-  `;
-
-  // Event log — show all, highlight current
   eventsEl.innerHTML = '';
-  for (let i = 0; i < allEvents.length; i++) {
-    const ev = allEvents[i];
+  allEvents.forEach((ev, i) => {
     const li = document.createElement('li');
     li.dataset.type = ev.type;
     li.textContent = `#${ev.seq} ${formatEventShort(ev)}`;
     if (i === currentStep) li.classList.add('active');
-    li.addEventListener('click', () => {
-      pausePlayback();
-      rebuildToStep(i);
-    });
+    li.addEventListener('click', () => { pausePlayback(); rebuildToStep(i); });
     eventsEl.appendChild(li);
-  }
-
-  // Scroll active event into view
-  const activeLi = eventsEl.querySelector('.active');
-  if (activeLi) activeLi.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
 }
-
-// ─── Event detail ───
 
 function renderDetail() {
   if (!state || currentStep < 0 || currentStep >= allEvents.length) {
@@ -864,297 +363,124 @@ function renderDetail() {
     return;
   }
   const ev = allEvents[currentStep];
-  const typeClass = getTypeClass(ev.type);
-  const payloadStr = formatPayload(ev.payload);
-  detailEl.innerHTML = `
-    <span class="ev-type ${typeClass}">${esc(ev.type)}</span>
-    <span style="color:#888">#${ev.seq}</span>
-    <span class="ev-payload">${esc(payloadStr)}</span>
-  `;
+  detailEl.innerHTML = `<span class="ev-type ${ev.type}">${esc(ev.type)}</span><span style="color:#888">#${ev.seq}</span><span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>`;
 }
-
-function getTypeClass(type) {
-  const classes = {
-    attack: 'attack', move: 'move', build: 'build', build_tick: 'build', build_complete: 'build',
-    sell: 'build', produce: 'produce', produce_complete: 'produce', heal: 'heal',
-    turn_end: 'turn_end', game_over: 'game_over',
-    unit_death: 'unit_death', base_destroyed: 'base_destroyed',
-  };
-  return classes[type] || 'other';
-}
-
-function formatPayload(payload) {
-  const lines = [];
-  for (const [k, v] of Object.entries(payload)) {
-    let val = v;
-    if (typeof val === 'string' && val.length > 20) val = val.slice(0, 12) + '…';
-    lines.push(`${k}: ${JSON.stringify(val)}`);
-  }
-  return lines.join('\n');
-}
-
-function formatEventShort(ev) {
-  const p = ev.payload;
-  switch (ev.type) {
-    case 'move': return `移动 ${p.unitId?.slice(0,6)} (${p.fromX},${p.fromY})->(${p.toX},${p.toY})`;
-    case 'attack': return `攻击 ${p.attackerId?.slice(0,6)} → ${p.targetId?.slice(0,6)} 伤害:${p.damage}`;
-    case 'heal': return `治疗 ${p.medicId?.slice(0,6)} → ${p.targetId?.slice(0,6)} +${p.amount}`;
-    case 'build': return `建造 ${p.type} @(${p.x},${p.y})`;
-    case 'build_tick': return `建造进度 ${p.type} 剩余${p.buildProgress}回合`;
-    case 'build_complete': return `建造完成 ${p.buildingId?.slice(0,6)}`;
-    case 'sell': return `出售 ${p.type} @(${p.x},${p.y}) +${p.refund}金`;
-    case 'produce': return `生产 ${p.unitType}`;
-    case 'produce_complete': return `${p.type} 出现在(${p.x},${p.y})`;
-    case 'unit_death': return `单位阵亡 ${p.unitId?.slice(0,6)}`;
-    case 'base_destroyed': return `建筑摧毁 ${p.type} @(${p.x},${p.y})`;
-    case 'turn_end': return `回合结束 → ${playerName(p.nextOwner)} (回合${p.turnNumber})`;
-    case 'game_over': return `游戏结束 胜者:${p.winner ? playerName(p.winner) : '无'}`;
-    case 'mine': return `采矿收入 +${p.amount}`;
-    case 'base_income': return `基础收入 +${p.amount}`;
-    case 'reset_actions': return `行动重置 ${p.owner}`;
-    case 'name_rename': return `${p.playerId === 'player_a' ? '玩家A' : '玩家B'} 改名为 "${p.name}"`;
-    default: return `${ev.type} ${JSON.stringify(p).slice(0,60)}`;
-  }
-}
-
-// ─── Playback controls ───
 
 function updateControls() {
   const total = allEvents.length;
   stepInfo.textContent = `${currentStep + 1} / ${total}`;
   timeline.max = Math.max(0, total - 1);
-  timeline.value = currentStep;
+  timeline.value = Math.max(0, currentStep);
   btnPlay.textContent = playing ? '⏸' : '▶';
   btnPlay.classList.toggle('active', playing);
-
-  // Highlight active event in log
-  const lis = eventsEl.querySelectorAll('li');
-  lis.forEach((li, i) => {
-    li.classList.toggle('active', i === currentStep);
-  });
-  const activeLi = eventsEl.querySelector('.active');
-  if (activeLi) activeLi.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function stepForward() {
-  if (currentStep >= allEvents.length - 1) {
-    pausePlayback();
-    return;
-  }
-  const nextStep = currentStep + 1;
-  const ev = allEvents[nextStep];
-
-  // Snapshot entities before applying event
-  const oldSnap = state ? snapshotState(state) : null;
-
-  // Apply event to state
-  applyEvent(state, ev);
-  currentStep = nextStep;
-
-  // Build animations from the diff
-  if (oldSnap) {
-    animations = [];
-    buildAnimationsForEvent(oldSnap, ev);
-    if (isAnimating()) {
-      animating = true;
-      animBlocked = true;
-      requestAnimationFrame(animLoop);
-    }
-  }
-
-  renderSidebar();
-  renderDetail();
-  updateControls();
+  if (currentStep >= allEvents.length - 1) { pausePlayback(); return; }
+  applyEvent(state, allEvents[currentStep + 1]);
+  currentStep++;
+  drawBoard(); renderSidebar(); renderDetail(); updateControls();
 }
-
-function stepBackward() {
-  if (currentStep > 0) {
-    rebuildToStep(currentStep - 1);
-  }
-}
-
-function goToStart() {
-  pausePlayback();
-  rebuildToStep(-1);
-}
-
-function goToEnd() {
-  pausePlayback();
-  rebuildToStep(allEvents.length - 1);
-}
-
+function stepBackward() { if (currentStep > 0) rebuildToStep(currentStep - 1); }
+function goToStart() { pausePlayback(); rebuildToStep(-1); }
+function goToEnd() { pausePlayback(); rebuildToStep(allEvents.length - 1); }
 function startPlayback() {
   if (allEvents.length === 0) return;
-  if (currentStep >= allEvents.length - 1) {
-    // Already at end, restart from beginning
-    rebuildToStep(-1);
-  }
-  playing = true;
-  updateControls();
-  scheduleNext();
+  if (currentStep >= allEvents.length - 1) rebuildToStep(-1);
+  playing = true; updateControls(); scheduleNext();
 }
-
 function pausePlayback() {
   playing = false;
-  if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
   updateControls();
 }
-
-function togglePlayback() {
-  if (playing) pausePlayback();
-  else startPlayback();
-}
-
 function scheduleNext() {
   if (!playing) return;
-  const speed = parseInt(speedSelect.value) || 500;
-  // Wait for current animations + speed delay, then step
-  const waitAndStep = () => {
-    playTimer = setTimeout(() => {
-      if (!playing) return;
-      stepForward();
-      if (playing) {
-        if (isAnimating()) {
-          onAnimationsDone(() => { if (playing) scheduleNext(); });
-        } else {
-          scheduleNext();
-        }
-      }
-    }, speed);
-  };
-  if (isAnimating()) {
-    onAnimationsDone(waitAndStep);
-  } else {
-    waitAndStep();
-  }
+  playTimer = setTimeout(() => { stepForward(); if (playing) scheduleNext(); }, Number(speedSelect.value) || 500);
 }
-
-// ─── Timeline markers ───
 
 function buildTimelineMarkers() {
   timelineMarkers.innerHTML = '';
-  const total = allEvents.length;
-  if (total <= 1) return;
-  for (let i = 0; i < total; i++) {
-    const ev = allEvents[i];
+  if (allEvents.length <= 1) return;
+  allEvents.forEach((ev, i) => {
     const marker = document.createElement('div');
-    marker.className = `marker marker-${getTypeClass(ev.type)}`;
-    marker.style.left = `${(i / (total - 1)) * 100}%`;
+    marker.className = `marker marker-${ev.type}`;
+    marker.style.left = `${(i / (allEvents.length - 1)) * 100}%`;
     timelineMarkers.appendChild(marker);
-  }
+  });
 }
 
-// ─── Load game ───
+async function fetchGameList() {
+  const res = await fetch('/api/games');
+  const { games } = await res.json();
+  const prev = gameSelect.value;
+  gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
+  for (const g of games) {
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = `${g.id.slice(0, 8)} - ${g.phase} 回合${g.turnNumber}`;
+    gameSelect.appendChild(opt);
+  }
+  if (prev && [...gameSelect.options].some(o => o.value === prev)) gameSelect.value = prev;
+  return games;
+}
 
 async function loadGameState(id) {
   pausePlayback();
-  allEvents = [];
-  currentStep = -1;
-  state = null;
-
   const res = await fetch(`/api/games/${id}/events`);
   const { events } = await res.json();
   allEvents = events;
-
   buildTimelineMarkers();
-
-  // Jump to end
-  if (allEvents.length > 0) {
-    rebuildToStep(allEvents.length - 1);
-  } else {
-    state = createEmptyState();
-    drawBoard();
-    renderSidebar();
-    renderDetail();
-    updateControls();
-  }
+  if (allEvents.length > 0) rebuildToStep(allEvents.length - 1);
+  else { state = createEmptyState(); drawBoard(); renderSidebar(); renderDetail(); updateControls(); }
 }
 
 function subscribeSse(id) {
   if (liveSse) liveSse.close();
   liveSse = new EventSource(`/api/games/${id}/events`);
   liveSse.onmessage = e => {
-    try {
-      const ev = JSON.parse(e.data);
-      allEvents.push(ev);
-      buildTimelineMarkers();
-      timeline.max = allEvents.length - 1;
-      // If at end, auto-advance
-      if (currentStep >= allEvents.length - 2) {
-        stepForward();
-      }
-      updateControls();
-      statusEl.textContent = '实时连接中';
-    } catch (err) { console.error(err); }
+    const ev = JSON.parse(e.data);
+    if (allEvents.some(existing => existing.seq === ev.seq)) return;
+    allEvents.push(ev);
+    buildTimelineMarkers();
+    if (currentStep >= allEvents.length - 2) stepForward();
+    statusEl.textContent = '实时连接中';
   };
-  liveSse.onerror = () => {
-    statusEl.textContent = 'SSE 断开，重连中…';
-    // EventSource auto-reconnects, but reload state on open
-    liveSse.addEventListener('open', async () => {
-      statusEl.textContent = '已重连，同步中…';
-      await loadGameState(id);
-      statusEl.textContent = '实时连接中';
-    }, { once: true });
-  };
+  liveSse.onerror = () => { statusEl.textContent = 'SSE 断开，自动重连中'; };
 }
 
-// ─── Event listeners ───
-
-gameSelect.addEventListener('change', async () => {
-  const id = gameSelect.value;
-  if (!id) return;
-  await loadGameState(id);
-  subscribeSse(id);
-  statusEl.textContent = '已订阅事件';
+canvas.addEventListener('mousemove', e => {
+  if (!state || state.cells.length === 0) return;
+  const rect = canvas.getBoundingClientRect();
+  const h = pixelToHex(e.clientX - rect.left, e.clientY - rect.top);
+  hoverCell = state.cells.some(c => c.q === h.q && c.r === h.r) ? h : null;
+  if (!hoverCell) { cellInfoEl.textContent = ''; drawBoard(); return; }
+  const ent = entityAt(h.q, h.r);
+  const cp = [...state.controlPoints.values()].find(p => p.q === h.q && p.r === h.r);
+  cellInfoEl.textContent = `(${h.q}, ${h.r})${cp ? ` | ${cp.name}` : ''}${ent ? ` | ${ent.type || 'HQ'} ${ent.hp}/${ent.maxHp}` : ''}`;
+  renderSelectionInfo(ent, cp);
+  drawBoard();
+});
+canvas.addEventListener('mouseleave', () => { hoverCell = null; cellInfoEl.textContent = ''; drawBoard(); });
+canvas.addEventListener('click', () => {
+  if (!hoverCell) return;
+  renderSelectionInfo(entityAt(hoverCell.q, hoverCell.r), [...state.controlPoints.values()].find(p => p.q === hoverCell.q && p.r === hoverCell.r));
 });
 
-refreshBtn.addEventListener('click', fetchGameList);
-
-btnStart.addEventListener('click', goToStart);
-btnPrev.addEventListener('click', () => { pausePlayback(); stepBackward(); });
-btnPlay.addEventListener('click', togglePlayback);
-btnNext.addEventListener('click', () => { pausePlayback(); stepForward(); });
-btnEnd.addEventListener('click', goToEnd);
-
-timeline.addEventListener('input', () => {
-  pausePlayback();
-  rebuildToStep(parseInt(timeline.value));
-});
-
-document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-  switch (e.key) {
-    case ' ':
-      e.preventDefault();
-      togglePlayback();
-      break;
-    case 'ArrowRight':
-      e.preventDefault();
-      pausePlayback();
-      stepForward();
-      break;
-    case 'ArrowLeft':
-      e.preventDefault();
-      pausePlayback();
-      stepBackward();
-      break;
-    case 'Home':
-      e.preventDefault();
-      goToStart();
-      break;
-    case 'End':
-      e.preventDefault();
-      goToEnd();
-      break;
+function renderSelectionInfo(ent, cp) {
+  if (!ent && !cp) {
+    selDetailEl.textContent = '点击或悬停棋盘查看单位、指挥部或据点信息';
+    return;
   }
-});
-
-// ─── Export / Import ───
-
-const btnExportHtml = document.getElementById('btn-export-html');
-const btnExportJson = document.getElementById('btn-export-json');
-const btnImport = document.getElementById('btn-import');
-const importFile = document.getElementById('import-file');
+  let html = '';
+  if (cp) html += `<div class="sel-type">据点 ${esc(cp.name)}</div><div>归属: ${cp.owner ? esc(playerName(cp.owner)) : '中立'}</div>`;
+  if (ent) {
+    html += `<div class="sel-type">${esc(ent.type || 'headquarters')} <span class="${ent.owner === 'player_a' ? 'player-a' : 'player-b'}">${esc(playerName(ent.owner))}</span></div>
+      <div>HP ${ent.hp}/${ent.maxHp}</div><div>位置 (${ent.q}, ${ent.r})</div>`;
+  }
+  selDetailEl.innerHTML = html;
+}
 
 function downloadFile(filename, content, mime) {
   const blob = new Blob([content], { type: mime });
@@ -1164,204 +490,77 @@ function downloadFile(filename, content, mime) {
   a.click();
   URL.revokeObjectURL(a.href);
 }
-
 function gameFilename(ext) {
-  const id = gameSelect.value || 'unknown';
-  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return `game_${id.slice(0, 8)}_${ts}.${ext}`;
+  return `hex_game_${(gameSelect.value || 'unknown').slice(0, 8)}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.${ext}`;
 }
-
 function exportJson() {
-  if (allEvents.length === 0) { alert('没有可导出的对局'); return; }
-  const events = allEvents.filter(e => e.type !== 'name_rename');
-  const data = {
-    gameId: gameSelect.value,
-    exportedAt: new Date().toISOString(),
-    eventCount: events.length,
-    events,
-  };
-  downloadFile(gameFilename('json'), JSON.stringify(data, null, 2), 'application/json');
+  downloadFile(gameFilename('json'), JSON.stringify({ gameId: gameSelect.value, exportedAt: new Date().toISOString(), events: allEvents }, null, 2), 'application/json');
 }
-
-function exportHtml() {
-  if (allEvents.length === 0) { alert('没有可导出的对局'); return; }
-
-  // Fetch current CSS and JS to embed
-  Promise.all([
-    fetch('/style.css').then(r => r.text()),
-    fetch('/app.js').then(r => r.text()),
-  ]).then(([cssText, jsText]) => {
-    // Build standalone HTML
-    const eventsJson = JSON.stringify(allEvents.filter(e => e.type !== 'name_rename'));
-    const gameId = gameSelect.value || 'unknown';
-    const html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8"/>
-<title>战棋回放 — ${gameId.slice(0, 8)}</title>
-<style>
-${cssText}
-/* Standalone overrides */
-header { display: none; }
-#replay-controls { border: 1px solid #333; }
-body { padding-top: 12px; }
-</style>
-</head>
-<body>
-<main>
-<div id="board-wrap">
-  <canvas id="board" width="840" height="840"></canvas>
-  <div id="replay-controls">
-    <div id="control-buttons">
-      <button id="btn-start" title="回到开始">⏮</button>
-      <button id="btn-prev" title="上一步 (←)">◀</button>
-      <button id="btn-play" title="播放/暂停 (Space)">▶</button>
-      <button id="btn-next" title="下一步 (→)">▶</button>
-      <button id="btn-end" title="跳到末尾">⏭</button>
-      <select id="speed-select" title="播放速度">
-        <option value="1000">0.5x</option>
-        <option value="500" selected>1x</option>
-        <option value="200">2.5x</option>
-        <option value="100">5x</option>
-        <option value="50">10x</option>
-      </select>
-      <span id="step-info">0 / 0</span>
-    </div>
-    <div id="timeline-wrap">
-      <input type="range" id="timeline" min="0" max="0" value="0"/>
-      <div id="timeline-markers"></div>
-    </div>
-  </div>
-</div>
-<aside id="sidebar">
-  <section id="resources"></section>
-  <section id="turn-info"></section>
-  <section id="event-detail">
-    <h3>当前操作</h3>
-    <div id="detail-content">使用时间轴回放</div>
-  </section>
-  <section id="event-log">
-    <h3>事件流</h3>
-    <ul id="events"></ul>
-  </section>
-</aside>
-</main>
-<script>
-// Embedded events data
-const EMBEDDED_EVENTS = ${eventsJson};
-// Override fetch for standalone mode
-const _fetch = window.fetch;
-window.fetch = function(url, opts) {
-  if (typeof url === 'string' && url.includes('/events')) {
-    return Promise.resolve(new Response(JSON.stringify({ events: EMBEDDED_EVENTS })));
-  }
-  if (typeof url === 'string' && url === '/api/games') {
-    return Promise.resolve(new Response(JSON.stringify({ games: [
-      { id: '${gameId}', phase: 'game_over', turnNumber: 0, currentOwner: 'player_a', winner: null }
-    ] })));
-  }
-  return _fetch.call(this, url, opts);
-};
-</script>
-<script>
-${jsText}
-</script>
-</body>
-</html>`;
-    downloadFile(gameFilename('html'), html, 'text/html');
-  });
+async function exportHtml() {
+  const [cssText, jsText] = await Promise.all([fetch('/style.css').then(r => r.text()), fetch('/app.js').then(r => r.text())]);
+  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Hex Replay</title><style>${cssText}</style></head><body><main><div id="board-wrap"><canvas id="board"></canvas><div id="cell-info" class="cell-info"></div><div id="replay-controls"><div id="control-buttons"><button id="btn-start">⏮</button><button id="btn-prev">◀</button><button id="btn-play">▶</button><button id="btn-next">▶</button><button id="btn-end">⏭</button><select id="speed-select"><option value="500">1x</option></select><span id="step-info"></span></div><div id="timeline-wrap"><input type="range" id="timeline"><div id="timeline-markers"></div></div></div></div><aside id="sidebar"><section id="resources"></section><section id="turn-info"></section><section id="event-detail"><div id="detail-content"></div></section><section id="event-log"><ul id="events"></ul></section></aside><div id="selection-panel"><div id="selection-detail"></div></div></main><select id="game-select"></select><button id="refresh-list"></button><span id="status"></span><button id="btn-export-html"></button><button id="btn-export-json"></button><button id="btn-import"></button><input id="import-file" type="file"><input id="auto-refresh" type="checkbox"><input id="follow-latest" type="checkbox"><input id="refresh-interval" value="5"><button id="btn-settings"></button><div id="settings-popover"></div><script>const EMBEDDED_EVENTS=${JSON.stringify(allEvents)};window.fetch=(url)=>Promise.resolve(new Response(JSON.stringify(url.includes('/events')?{events:EMBEDDED_EVENTS}:{games:[{id:'offline',phase:'replay',turnNumber:0,currentOwner:'player_a'}]})));window.EventSource=function(){return {close(){}}};</script><script>${jsText}</script></body></html>`;
+  downloadFile(gameFilename('html'), html, 'text/html');
 }
-
-function importJson() {
-  importFile.click();
-}
-
+function importJson() { importFile.click(); }
 importFile.addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    try {
-      const data = JSON.parse(reader.result);
-      if (!data.events || !Array.isArray(data.events)) {
-        alert('无效的对局文件：缺少 events 数组');
-        return;
-      }
-      allEvents = data.events;
-      buildTimelineMarkers();
-      if (allEvents.length > 0) {
-        rebuildToStep(allEvents.length - 1);
-      }
-      // Update game select to show imported game
-      const importedId = data.gameId || 'imported';
-      statusEl.textContent = `已导入 ${importedId.slice(0,8)} (${allEvents.length} 事件)`;
-      // Disconnect SSE since this is a local import
-      if (liveSse) { liveSse.close(); liveSse = null; }
-    } catch (err) {
-      alert('解析失败: ' + err.message);
-    }
+    const data = JSON.parse(reader.result);
+    allEvents = data.events || [];
+    buildTimelineMarkers();
+    if (allEvents.length) rebuildToStep(allEvents.length - 1);
+    if (liveSse) liveSse.close();
+    statusEl.textContent = `已导入 ${allEvents.length} 事件`;
   };
   reader.readAsText(file);
-  importFile.value = '';
 });
 
-btnExportHtml.addEventListener('click', exportHtml);
-btnExportJson.addEventListener('click', exportJson);
-btnImport.addEventListener('click', importJson);
-
-// ─── Auto-refresh & follow latest ───
-
+let refreshTimer = null;
+let refreshInterval = 5000;
 async function autoRefreshTick() {
   if (!autoRefreshCb.checked) return;
   const games = await fetchGameList();
-  if (!games || games.length === 0) return;
-
-  // Follow latest: auto-select the first (most recent) game
-  if (followLatestCb.checked) {
-    const latestId = games[0].id;
-    const currentId = gameSelect.value;
-    if (latestId !== currentId) {
-      gameSelect.value = latestId;
-      await loadGameState(latestId);
-      subscribeSse(latestId);
-      statusEl.textContent = '自动切换到最新对局';
-    }
+  if (followLatestCb.checked && games[0] && games[0].id !== gameSelect.value) {
+    gameSelect.value = games[0].id;
+    await loadGameState(games[0].id);
+    subscribeSse(games[0].id);
   }
 }
-
 function startAutoRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(autoRefreshTick, refreshInterval);
 }
 
-function stopAutoRefresh() {
-  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
-}
-
-autoRefreshCb.addEventListener('change', () => {
-  if (autoRefreshCb.checked) startAutoRefresh();
-  else stopAutoRefresh();
+gameSelect.addEventListener('change', async () => {
+  if (!gameSelect.value) return;
+  await loadGameState(gameSelect.value);
+  subscribeSse(gameSelect.value);
 });
-
+refreshBtn.addEventListener('click', fetchGameList);
+btnStart.addEventListener('click', goToStart);
+btnPrev.addEventListener('click', () => { pausePlayback(); stepBackward(); });
+btnPlay.addEventListener('click', () => playing ? pausePlayback() : startPlayback());
+btnNext.addEventListener('click', () => { pausePlayback(); stepForward(); });
+btnEnd.addEventListener('click', goToEnd);
+timeline.addEventListener('input', () => { pausePlayback(); rebuildToStep(Number(timeline.value)); });
+btnExportJson.addEventListener('click', exportJson);
+btnExportHtml.addEventListener('click', exportHtml);
+btnImport.addEventListener('click', importJson);
+autoRefreshCb.addEventListener('change', () => { if (autoRefreshCb.checked) startAutoRefresh(); else clearInterval(refreshTimer); });
 refreshIntervalInput.addEventListener('change', () => {
-  const sec = Math.max(1, Math.min(60, parseInt(refreshIntervalInput.value) || 5));
-  refreshIntervalInput.value = sec;
-  refreshInterval = sec * 1000;
+  refreshInterval = Math.max(1, Math.min(60, Number(refreshIntervalInput.value) || 5)) * 1000;
   if (autoRefreshCb.checked) startAutoRefresh();
 });
-
-// Settings popover
-btnSettings.addEventListener('click', e => {
-  e.stopPropagation();
-  settingsPopover.classList.toggle('open');
+btnSettings.addEventListener('click', e => { e.stopPropagation(); settingsPopover.classList.toggle('open'); });
+document.addEventListener('click', e => { if (!settingsPopover.contains(e.target) && e.target !== btnSettings) settingsPopover.classList.remove('open'); });
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === ' ') { e.preventDefault(); playing ? pausePlayback() : startPlayback(); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); pausePlayback(); stepForward(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); pausePlayback(); stepBackward(); }
 });
-document.addEventListener('click', e => {
-  if (!settingsPopover.contains(e.target) && e.target !== btnSettings) {
-    settingsPopover.classList.remove('open');
-  }
-});
-
-// ─── Init ───
 
 fetchGameList();
 startAutoRefresh();

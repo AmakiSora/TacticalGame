@@ -2,10 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import type { GameState, PlayerId } from '../types.js';
 import type { EventBus } from '../events/bus.js';
-import type { Result } from './building.js';
-import { tickBuildProgress } from './building.js';
-import { tickProduction } from './production.js';
-import { collectMiningIncome, collectBaseIncome } from './mining.js';
+import type { Result } from './result.js';
 import { appendEvent } from './events.js';
 
 function generateToken(): string {
@@ -16,6 +13,37 @@ function otherPlayer(p: PlayerId): PlayerId {
   return p === 'player_a' ? 'player_b' : 'player_a';
 }
 
+function mapPayload(game: GameState) {
+  return {
+    id: game.mapId,
+    name: game.config.name,
+    description: game.config.description,
+    grid: game.map.grid,
+    orientation: game.map.orientation,
+    radius: game.map.radius,
+    terrainCells: game.map.terrainCells,
+    cells: game.cells,
+  };
+}
+
+function fullReplayPayload(game: GameState) {
+  return {
+    mapId: game.mapId,
+    map: mapPayload(game),
+    controlPoints: game.controlPoints,
+    headquarters: game.headquarters,
+    units: game.units,
+    resources: game.resources,
+    firstPlayer: game.turn.currentOwner,
+    playerNames: { ...game.playerNames },
+    config: {
+      units: game.config.units,
+      headquartersSpec: game.config.headquartersSpec,
+      balance: game.config.balance,
+    },
+  };
+}
+
 export function joinGame(game: GameState, bus: EventBus, playerName?: string): Result {
   if (game.tokens.player_b !== '') {
     return { ok: false, code: 'game_already_full', message: 'game already has 2 players' };
@@ -24,68 +52,54 @@ export function joinGame(game: GameState, bus: EventBus, playerName?: string): R
   game.playerNames.player_b = playerName || '玩家 B';
   game.phase = 'waiting_command';
   game.turn.phase = 'waiting_command';
-  appendEvent(game, bus, 'game_start', {
-    mapId: game.mapId,
-    mapWidth: game.mapWidth, mapHeight: game.mapHeight,
-    miningPoints: game.miningPoints,
-    terrain: game.terrain,
-    firstPlayer: game.turn.currentOwner,
-    playerNames: { ...game.playerNames },
-    buildings: game.buildings.map(b => ({
-      id: b.id, owner: b.owner, type: b.type,
-      x: b.x, y: b.y, hp: b.hp, maxHp: b.maxHp,
-      alive: b.alive, isBuilding: b.isBuilding,
-    })),
-    config: {
-      units: game.config.units,
-      buildings: game.config.buildings,
-      canProduce: game.config.canProduce,
-      economy: game.config.economy,
-      map: { buildRange: game.config.map.buildRange, headquartersPositions: game.config.map.headquartersPositions },
-    },
-  });
+  appendEvent(game, bus, 'game_start', fullReplayPayload(game));
   return { ok: true };
 }
 
+function captureControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
+  for (const point of game.controlPoints) {
+    const capturer = game.units.find(u =>
+      u.owner === owner && u.alive && (u.type === 'infantry' || u.type === 'scout') && u.q === point.q && u.r === point.r);
+    if (!capturer || point.owner === owner) continue;
+    const previousOwner = point.owner;
+    point.owner = owner;
+    appendEvent(game, bus, 'control_point_captured', {
+      pointId: point.id, name: point.name, owner, previousOwner, unitId: capturer.id, q: point.q, r: point.r,
+    });
+  }
+}
+
+function resetActions(game: GameState, owner: PlayerId): void {
+  for (const unit of game.units) {
+    if (unit.owner === owner && unit.alive) {
+      unit.hasMoved = false;
+      unit.hasActed = false;
+    }
+  }
+}
+
+function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): void {
+  const base = game.config.balance.baseIncome;
+  const points = game.controlPoints.filter(p => p.owner === owner).length;
+  const control = points * game.config.balance.controlPointIncome;
+  const amount = base + control;
+  game.resources[owner].supplies += amount;
+  appendEvent(game, bus, 'income', { owner, base, control, controlPoints: points, amount });
+}
+
 export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result {
-  if (game.phase === 'game_over') {
-    return { ok: false, code: 'game_over', message: 'game has ended' };
-  }
-  if (game.phase !== 'waiting_command') {
-    return { ok: false, code: 'game_not_started', message: 'game not in play' };
-  }
-  if (game.turn.currentOwner !== owner) {
-    return { ok: false, code: 'not_your_turn', message: 'not your turn' };
-  }
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
+  if (game.phase !== 'waiting_command') return { ok: false, code: 'game_not_started', message: 'game not in play' };
+  if (game.turn.currentOwner !== owner) return { ok: false, code: 'not_your_turn', message: 'not your turn' };
 
-  tickBuildProgress(game, bus, owner);
-  tickProduction(game, bus, owner);
-
-  for (const u of game.units) {
-    if (u.owner === owner) {
-      u.hasMoved = false;
-      u.hasAttacked = false;
-    }
-  }
-  for (const b of game.buildings) {
-    if (b.owner === owner && b.alive && !b.isBuilding && b.attacksLeft != null) {
-      const spec = game.config.buildings[b.type];
-      b.attacksLeft = spec.attacksPerTurn ?? 0;
-    }
-  }
+  captureControlPoints(game, bus, owner);
+  resetActions(game, owner);
   appendEvent(game, bus, 'reset_actions', { owner });
 
   const next = otherPlayer(owner);
-  if (next === 'player_a') {
-    game.turn.turnNumber += 1;
-  }
+  if (next === 'player_a') game.turn.turnNumber += 1;
   game.turn.currentOwner = next;
-
-  collectBaseIncome(game, bus, next);
-  collectMiningIncome(game, bus, next);
-
-  appendEvent(game, bus, 'turn_end', {
-    previousOwner: owner, nextOwner: next, turnNumber: game.turn.turnNumber,
-  });
+  collectIncome(game, bus, next);
+  appendEvent(game, bus, 'turn_end', { previousOwner: owner, nextOwner: next, turnNumber: game.turn.turnNumber });
   return { ok: true };
 }

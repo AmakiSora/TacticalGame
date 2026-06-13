@@ -1,69 +1,61 @@
 // src/engine/validation.ts
-import type { GameState, PlayerId, Position, Unit, Building } from '../types.js';
-import { getBuildRange, getHQPositions } from './specs.js';
+import type { GameState, Position, Unit, Headquarters, TerrainType } from '../types.js';
+import { hexDistance, hexKey, hexNeighbors, isValidHex } from './hex.js';
 
 export type Occupant =
   | { kind: 'unit'; entity: Unit }
-  | { kind: 'building'; entity: Building };
+  | { kind: 'headquarters'; entity: Headquarters };
 
-export function manhattanDistance(a: Position, b: Position): number {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+export { hexDistance };
+
+export function getTerrain(game: GameState, q: number, r: number): TerrainType {
+  const override = game.map.terrainCells.find(c => c.q === q && c.r === r);
+  if (override) return override.terrain;
+  return game.cells.find(c => c.q === q && c.r === r)?.terrain ?? 'blocker';
 }
 
-export function isInBounds(x: number, y: number, w: number, h: number): boolean {
-  return x >= 0 && x < w && y >= 0 && y < h;
+export function isInBounds(game: GameState, q: number, r: number): boolean {
+  return isValidHex({ q, r }, game.map.radius);
 }
 
-export function getTerrain(game: GameState, x: number, y: number): number {
-  return game.terrain[y]?.[x] ?? 0;
+export function isPassable(game: GameState, q: number, r: number): boolean {
+  return isInBounds(game, q, r) && getTerrain(game, q, r) === 'plain';
 }
 
-export function isPassable(game: GameState, x: number, y: number): boolean {
-  return getTerrain(game, x, y) === 0;
+export function isDeployable(game: GameState, q: number, r: number): boolean {
+  return isPassable(game, q, r) && getCellOccupant(game, q, r) === null;
 }
 
-export function isBuildable(game: GameState, x: number, y: number): boolean {
-  return getTerrain(game, x, y) === 0;
-}
-
-export function getCellOccupant(game: GameState, x: number, y: number): Occupant | null {
-  const unit = game.units.find(u => u.alive && u.x === x && u.y === y);
+export function getCellOccupant(game: GameState, q: number, r: number): Occupant | null {
+  const unit = game.units.find(u => u.alive && u.q === q && u.r === r);
   if (unit) return { kind: 'unit', entity: unit };
-  const building = game.buildings.find(b => b.alive && b.x === x && b.y === y);
-  if (building) return { kind: 'building', entity: building };
+  const hq = Object.values(game.headquarters).find(h => h.alive && h.q === q && h.r === r);
+  if (hq) return { kind: 'headquarters', entity: hq };
   return null;
 }
 
-export function isInBuildRange(game: GameState, owner: PlayerId, x: number, y: number, rangeOverride?: number): boolean {
-  const target = { x, y };
-  const range = rangeOverride ?? getBuildRange(game.config);
-  for (const u of game.units) {
-    if (u.owner !== owner || !u.alive) continue;
-    if (manhattanDistance(u, target) <= range) return true;
+export function findReachableCells(game: GameState, unit: Unit): Position[] {
+  const visited = new Set<string>([hexKey(unit)]);
+  const result: Position[] = [];
+  const queue: { pos: Position; distance: number }[] = [{ pos: { q: unit.q, r: unit.r }, distance: 0 }];
+
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    if (current.distance >= unit.moveRange) continue;
+    for (const next of hexNeighbors(current.pos)) {
+      const key = hexKey(next);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (!isPassable(game, next.q, next.r)) continue;
+      if (getCellOccupant(game, next.q, next.r) !== null) continue;
+      result.push(next);
+      queue.push({ pos: next, distance: current.distance + 1 });
+    }
   }
-  for (const b of game.buildings) {
-    if (b.owner !== owner || !b.alive) continue;
-    if (manhattanDistance(b, target) <= range) return true;
-  }
-  return false;
+
+  return result;
 }
 
-export function isMiningPoint(game: GameState, x: number, y: number): boolean {
-  return game.miningPoints.some(p => p.x === x && p.y === y);
-}
-
-export function findAdjacentFreeCell(game: GameState, x: number, y: number, owner?: PlayerId): Position | null {
-  const candidates: Position[] = [
-    { x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 },
-  ];
-  if (owner) {
-    const hq = getHQPositions(game.config)[owner];
-    candidates.sort((a, b) => manhattanDistance(b, hq) - manhattanDistance(a, hq));
-  }
-  for (const c of candidates) {
-    if (!isInBounds(c.x, c.y, game.mapWidth, game.mapHeight)) continue;
-    if (!isPassable(game, c.x, c.y)) continue;
-    if (getCellOccupant(game, c.x, c.y) === null) return c;
-  }
-  return null;
+export function findAdjacentDeployCell(game: GameState, origin: Position): Position | null {
+  return hexNeighbors(origin).find(pos => isDeployable(game, pos.q, pos.r)) ?? null;
 }

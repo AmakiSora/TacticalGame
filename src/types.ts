@@ -3,61 +3,69 @@ import type { MapConfig } from './config/loader.js';
 
 export type PlayerId = 'player_a' | 'player_b';
 
-export type UnitType = 'infantry' | 'sniper' | 'tank' | 'medic';
+export type UnitType = 'infantry' | 'scout' | 'heavy' | 'ranger' | 'support';
 
-export type BuildingType = 'headquarters' | 'barracks' | 'miner' | 'bunker' | 'wall';
+export type GamePhase = 'waiting_for_player' | 'waiting_command' | 'game_over';
 
-export type GamePhase = 'waiting_for_player' | 'waiting_command' | 'executing' | 'game_over';
-
-export type TerrainType = 0 | 1 | 2; // 0=empty, 1=wall, 2=water
+export type TerrainType = 'plain' | 'water' | 'blocker';
 
 export interface Position {
-  x: number;
-  y: number;
+  q: number;
+  r: number;
 }
 
 export interface Resources {
-  gold: number;
+  supplies: number;
 }
 
 export interface Unit {
   id: string;
   owner: PlayerId;
   type: UnitType;
-  x: number;
-  y: number;
+  q: number;
+  r: number;
   hp: number;
   maxHp: number;
   attack: number;
   defense: number;
   moveRange: number;
   attackRange: number;
+  cost: number;
   alive: boolean;
   hasMoved: boolean;
-  hasAttacked: boolean;
+  hasActed: boolean;
+  canCapture: boolean;
+  healPower?: number;
 }
 
-export interface ProductionItem {
-  type: UnitType;
-  turnsRemaining: number;
-}
-
-export interface Building {
+export interface Headquarters {
   id: string;
   owner: PlayerId;
-  type: BuildingType;
-  x: number;
-  y: number;
+  q: number;
+  r: number;
   hp: number;
   maxHp: number;
+  defense: number;
   alive: boolean;
-  buildProgress: number;
-  isBuilding: boolean;
-  production: ProductionItem | null;
-  attack?: number;
-  defense?: number;
-  attackRange?: number;
-  attacksLeft?: number;
+}
+
+export interface ControlPoint {
+  id: string;
+  name: string;
+  q: number;
+  r: number;
+  owner: PlayerId | null;
+}
+
+export interface MapCell extends Position {
+  terrain: TerrainType;
+}
+
+export interface HexMapState {
+  grid: 'hex';
+  orientation: 'pointy';
+  radius: number;
+  terrainCells: MapCell[];
 }
 
 export interface TurnState {
@@ -72,18 +80,13 @@ export type EventType =
   | 'attack'
   | 'heal'
   | 'unit_death'
-  | 'build'
-  | 'build_tick'
-  | 'build_complete'
-  | 'produce'
-  | 'produce_complete'
-  | 'mine'
-  | 'base_income'
+  | 'deploy'
+  | 'control_point_captured'
+  | 'income'
   | 'reset_actions'
-  | 'base_destroyed'
   | 'turn_end'
+  | 'headquarters_destroyed'
   | 'game_over'
-  | 'sell'
   | 'name_rename';
 
 export interface GameEvent {
@@ -98,11 +101,10 @@ export interface GameState {
   mapId: string;
   config: MapConfig;
   phase: GamePhase;
-  mapWidth: number;
-  mapHeight: number;
-  miningPoints: Position[];
-  terrain: number[][];
-  buildings: Building[];
+  map: HexMapState;
+  cells: MapCell[];
+  controlPoints: ControlPoint[];
+  headquarters: Record<PlayerId, Headquarters>;
   units: Unit[];
   resources: Record<PlayerId, Resources>;
   tokens: Record<PlayerId, string>;
@@ -119,18 +121,17 @@ export interface ApiError {
 
 export type ApiErrorCode =
   | 'not_your_turn'
-  | 'insufficient_gold'
-  | 'out_of_build_range'
+  | 'insufficient_supplies'
+  | 'out_of_deploy_range'
   | 'cell_occupied'
-  | 'not_mining_point'
-  | 'building_not_ready'
-  | 'cannot_produce'
+  | 'invalid_terrain'
   | 'unit_not_found'
-  | 'building_not_found'
+  | 'headquarters_not_found'
   | 'target_not_found'
   | 'invalid_move'
   | 'invalid_attack'
   | 'invalid_heal'
+  | 'invalid_deploy'
   | 'invalid_token'
   | 'game_not_found'
   | 'game_already_full'

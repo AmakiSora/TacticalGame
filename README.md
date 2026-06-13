@@ -21,8 +21,8 @@ npm run dev
 
 | 路径 | 说明 |
 |---|---|
-| `http://localhost:3000/play.html` | 创建/加入并手动操作 |
-| `http://localhost:3000/spectator.html` | 观战、回放、导出 |
+| `http://localhost:3100/play.html` | 创建/加入并手动操作 |
+| `http://localhost:3100/spectator.html` | 观战、回放、导出 |
 
 ## 核心规则
 

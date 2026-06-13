@@ -1,13 +1,15 @@
 ---
-name: play-tactical-game
-description: Use when the user asks the AI to play, control, or automate a player in the tactical war game. Handles hex V2 game creation, joining, strategy, and continuous play via the REST API.
+name: play-hex-tactics-v2
+description: Use when the user asks the AI to play, control, or automate a player in the Hex V2 tactical control-point war game. Handles pointy-top axial hex coordinates, V2 REST actions, game creation, joining, strategy, and continuous play via the REST API. Use this instead of play-tactical-game for the new hex version.
 ---
 
-# Play Tactical Game — Hex V2
+# Play Hex Tactics V2
 
 ## Overview
 
 The game is a pointy-top hex, axial-coordinate (`q/r`) tactical control game. Two players fight to destroy the enemy Headquarters. Control points provide supplies and forward deployment.
+
+This skill is for the V2 hex game only. Do not use V1 square-grid concepts such as `x/y`, buildings, miners, barracks, walls, production queues, Manhattan movement, or `/build`, `/produce`, `/sell`.
 
 ## Loop
 
@@ -50,4 +52,4 @@ Priority order:
 5. Move combat units toward enemy HQ.
 6. Heal damaged friendly units with support.
 
-Use `node skill/ai-player.mjs --url http://localhost:3000 --side a` to create a game, or `--game <id> --side b` to join one.
+Use `node skill/ai-player.mjs --url http://localhost:3100 --side a` to create a game, or `--game <id> --side b` to join one.

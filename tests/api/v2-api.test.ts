@@ -103,4 +103,27 @@ describe('V2 API', () => {
     expect(body.events[0].payload.map.grid).toBe('hex');
     await app.close();
   });
+
+  it('allows spectators to rename players through the event stream', async () => {
+    const app = await startTestServer();
+    const { gameId } = await createAndJoin(app);
+
+    const rename = await app.inject({
+      method: 'PATCH',
+      url: `/api/games/${gameId}/rename`,
+      payload: { playerId: 'player_a', name: 'Blue Commander' },
+    });
+    expect(rename.statusCode).toBe(200);
+
+    const eventsRes = await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` });
+    const eventsBody = eventsRes.json();
+    expect(eventsBody.events.at(-1)).toMatchObject({
+      type: 'name_rename',
+      payload: { playerId: 'player_a', name: 'Blue Commander' },
+    });
+
+    const listRes = await app.inject({ method: 'GET', url: '/api/games' });
+    expect(listRes.json().games.find((g: any) => g.id === gameId).playerNames.player_a).toBe('Blue Commander');
+    await app.close();
+  });
 });

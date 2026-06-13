@@ -10,7 +10,7 @@ const TERRAIN = {
 const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
 
 let gameConfig = null;
-let playerNames = { player_a: '玩家 A', player_b: '玩家 B' };
+let playerNames = defaultPlayerNames();
 let allEvents = [];
 let currentStep = -1;
 let playing = false;
@@ -54,8 +54,17 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function defaultPlayerNames() {
+  return { player_a: '玩家 A', player_b: '玩家 B' };
+}
+
 function playerName(owner) {
   return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B');
+}
+
+function playerNameControl(owner) {
+  const cls = owner === 'player_a' ? 'player-a' : 'player-b';
+  return `<button class="player-name ${cls}" data-rename-player="${owner}" title="更改玩家名字">${esc(playerName(owner))}</button>`;
 }
 
 function key(pos) { return `${pos.q},${pos.r}`; }
@@ -224,6 +233,7 @@ function applyEvent(s, ev) {
 }
 
 function rebuildToStep(step) {
+  playerNames = defaultPlayerNames();
   state = createEmptyState();
   for (let i = 0; i <= step && i < allEvents.length; i++) applyEvent(state, allEvents[i]);
   currentStep = step;
@@ -338,12 +348,12 @@ function formatEventShort(ev) {
 function renderSidebar() {
   if (!state) return;
   resourcesEl.innerHTML = `<h3>资源</h3>
-    <div><span class="player-a">${esc(playerName('player_a'))}</span>: ${state.resources.player_a.supplies} 补给</div>
-    <div><span class="player-b">${esc(playerName('player_b'))}</span>: ${state.resources.player_b.supplies} 补给</div>
+    <div>${playerNameControl('player_a')}: ${state.resources.player_a.supplies} 补给</div>
+    <div>${playerNameControl('player_b')}: ${state.resources.player_b.supplies} 补给</div>
     <div style="margin-top:6px;color:#7a9aaa;font-size:12px">据点: ${[...state.controlPoints.values()].map(cp => `${cp.name}:${cp.owner ? playerName(cp.owner) : '中立'}`).join(' / ')}</div>`;
   const owner = state.turn.currentOwner;
   turnInfoEl.innerHTML = `<h3>回合 ${state.turn.turnNumber}</h3>
-    <div>当前: <span class="${owner === 'player_a' ? 'player-a' : 'player-b'}">${esc(playerName(owner))}</span></div>
+    <div>当前: ${playerNameControl(owner)}</div>
     ${state.winner ? `<div style="margin-top:6px;color:#f0d77c">胜者: ${esc(playerName(state.winner))}</div>` : ''}`;
 
   eventsEl.innerHTML = '';
@@ -476,10 +486,36 @@ function renderSelectionInfo(ent, cp) {
   let html = '';
   if (cp) html += `<div class="sel-type">据点 ${esc(cp.name)}</div><div>归属: ${cp.owner ? esc(playerName(cp.owner)) : '中立'}</div>`;
   if (ent) {
-    html += `<div class="sel-type">${esc(ent.type || 'headquarters')} <span class="${ent.owner === 'player_a' ? 'player-a' : 'player-b'}">${esc(playerName(ent.owner))}</span></div>
+    html += `<div class="sel-type">${esc(ent.type || 'headquarters')} ${playerNameControl(ent.owner)}</div>
       <div>HP ${ent.hp}/${ent.maxHp}</div><div>位置 (${ent.q}, ${ent.r})</div>`;
   }
   selDetailEl.innerHTML = html;
+}
+
+async function renamePlayer(playerId) {
+  if (!gameSelect.value || gameSelect.value === 'offline') {
+    statusEl.textContent = '请选择在线对局后再改名';
+    return;
+  }
+  const current = playerName(playerId);
+  const next = prompt(`更改${current}的名字`, current);
+  if (next === null) return;
+  const name = next.trim();
+  if (!name) {
+    statusEl.textContent = '名字不能为空';
+    return;
+  }
+  const res = await fetch(`/api/games/${gameSelect.value}/rename`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerId, name }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    statusEl.textContent = body.error || '改名失败';
+    return;
+  }
+  statusEl.textContent = '名字已更新';
 }
 
 function downloadFile(filename, content, mime) {
@@ -555,6 +591,11 @@ refreshIntervalInput.addEventListener('change', () => {
 });
 btnSettings.addEventListener('click', e => { e.stopPropagation(); settingsPopover.classList.toggle('open'); });
 document.addEventListener('click', e => { if (!settingsPopover.contains(e.target) && e.target !== btnSettings) settingsPopover.classList.remove('open'); });
+document.addEventListener('click', e => {
+  const target = e.target.closest('[data-rename-player]');
+  if (!target) return;
+  renamePlayer(target.dataset.renamePlayer);
+});
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === ' ') { e.preventDefault(); playing ? pausePlayback() : startPlayback(); }

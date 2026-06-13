@@ -322,7 +322,20 @@ main {
 
 .player-a { color: #6cf; }
 .player-b { color: #f86; }
-.player-name { cursor: pointer; border-bottom: 1px dashed rgba(255,255,255,.3); padding-bottom: 1px; }
+.player-name {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed rgba(255,255,255,.3);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 0 1px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
 .player-name:hover { border-bottom-color: rgba(255,255,255,.7); }
 
 /* Cell info overlay */

@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-BASE_URL="${1:-http://localhost:3000}"
+BASE_URL="${1:-http://localhost:3100}"
 GAME_ID=""
 TOKEN_A=""
 TOKEN_B=""

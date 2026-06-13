@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Hex V2 AI Player
-// Usage: node skill/ai-player.mjs [--url http://localhost:3000] [--side a|b] [--game <id>]
+// Usage: node skill/ai-player.mjs [--url http://localhost:3100] [--side a|b] [--game <id>]
 
 function getArg(name, fallback) {
   const eq = process.argv.find(a => a.startsWith(`${name}=`));
@@ -10,7 +10,7 @@ function getArg(name, fallback) {
   return fallback;
 }
 
-const BASE_URL = getArg('--url', 'http://localhost:3000');
+const BASE_URL = getArg('--url', 'http://localhost:3100');
 const SIDE = getArg('--side', 'a');
 const GAME_ARG = getArg('--game', null);
 const PLAYER_ID = SIDE === 'a' ? 'player_a' : 'player_b';

@@ -22,13 +22,60 @@ When asked to play, follow this high-level loop:
 2. LOOP:
    a. Get game state
    b. If game_over → report winner, STOP
-   c. If not your turn → wait 1-2 seconds, goto (a)
+   c. If not your turn → wait for opponent (use Wait Script below)
    d. Execute your turn (all phases below)
    e. End turn
    f. goto (a)
 ```
 
 You MUST keep playing until the game ends. Never stop mid-game.
+
+### Wait Script — Poll Until Your Turn
+
+Use this bash script to wait for the opponent to finish their turn. Run it after ending your turn or at the start of the game when waiting for the first turn.
+
+```bash
+while true; do
+  result=$(curl -s -H "X-Player-Token: <token>" http://localhost:3000/api/games/<gameId>)
+  
+  winner=$(echo "$result" | python -c "import json,sys;d=json.load(sys.stdin);print(d['winner'])")
+  if [ "$winner" != "None" ]; then
+    echo "=== GAME OVER! Winner: $winner ==="
+    echo "$result" > /tmp/game_state.json
+    break
+  fi
+  
+  owner=$(echo "$result" | python -c "import json,sys;d=json.load(sys.stdin);print(d['turn']['currentOwner'])")
+  turn=$(echo "$result" | python -c "import json,sys;d=json.load(sys.stdin);print(d['turn']['turnNumber'])")
+  
+  if [ "$owner" = "<my_player_id>" ]; then
+    echo "=== MY TURN! Turn $turn ==="
+    echo "$result" > /tmp/game_state.json
+    break
+  fi
+  
+  sleep 2
+done
+```
+
+**Usage:**
+- Replace `<token>` with your player token
+- Replace `<gameId>` with the game ID
+- Replace `<my_player_id>` with `"player_a"` or `"player_b"` depending on which player you are
+- The script saves the game state to `/tmp/game_state.json` when it becomes your turn
+- It prints a message when the game is over
+- Polls every 2 seconds — adjust if needed
+
+**One-liner version** (compact, for quick inline use):
+```bash
+while true; do r=$(curl -s -H "X-Player-Token: <token>" http://localhost:3000/api/games/<gameId>); w=$(echo "$r"|python -c "import json,sys;d=json.load(sys.stdin);print(d['winner'])"); [ "$w" != "None" ] && echo "=== GAME OVER! Winner: $w ===" && echo "$r" > /tmp/game_state.json && break; o=$(echo "$r"|python -c "import json,sys;d=json.load(sys.stdin);print(d['turn']['currentOwner'])"); t=$(echo "$r"|python -c "import json,sys;d=json.load(sys.stdin);print(d['turn']['turnNumber'])"); [ "$o" = "<my_player_id>" ] && echo "=== MY TURN! Turn $t ===" && echo "$r" > /tmp/game_state.json && break; sleep 2; done
+```
+
+**IMPORTANT:** When running this script, always set a reasonable `--timeout` (e.g., 300 seconds for 5 minutes) so the AI doesn't get stuck forever if the opponent disconnects.
+
+### After the Wait Script Returns
+
+Once the script breaks out with "MY TURN", read `/tmp/game_state.json` to analyze the state and execute your turn phases. Do NOT re-fetch the game state — use the saved file.
 
 ## Setup
 
@@ -281,7 +328,7 @@ Build 2-3 snipers behind a tank wall. Range 4 lets them attack without retaliati
 
 | Error Code | Meaning | Fix |
 |-----------|---------|-----|
-| `not_your_turn` | It's the opponent's turn | Wait and poll |
+| `not_your_turn` | It's the opponent's turn | Wait and poll (use Wait Script) |
 | `insufficient_gold` | Not enough gold | Skip action or choose cheaper option |
 | `cell_occupied` | Target cell has a unit/building | Pick different coordinates |
 | `out_of_build_range` | No friendly entity within 2 cells | Move a unit closer first |
@@ -302,5 +349,6 @@ Build 2-3 snipers behind a tank wall. Range 4 lets them attack without retaliati
 - Gold is deducted immediately on build/produce, not at end of turn
 - Under-construction buildings still count for build range
 - The `config` field in game state response has all specs — prefer reading it over hardcoding values
-- When polling for your turn, check `phase === "game_over"` first to avoid infinite loops
+- **Always use the Wait Script** (above) to poll for your turn — never manually "wait and retry"
+- When polling for your turn, check `winner` first (game_over check) to avoid infinite loops
 - Production items show `turnsRemaining` — 0 or null means the slot is free

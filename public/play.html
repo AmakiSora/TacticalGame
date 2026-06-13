@@ -7,23 +7,19 @@
 </head>
 <body>
 
-<!-- ══════════ 顶部导航 ══════════ -->
-<header>
-  <h1>⚔️ 战棋对战 <span class="sub">玩家控制台</span></h1>
+  <header>
+    <h1>六边形战棋 <span class="sub">玩家控制台</span></h1>
   <div id="conn-status" class="badge">未连接</div>
 </header>
 
-<!-- ══════════ 加入/创建游戏 ══════════ -->
-<section id="join-panel" class="panel">
-  <h2>🎮 游戏大厅</h2>
+  <section id="join-panel" class="panel">
+    <h2>游戏大厅</h2>
 
-  <!-- 标签切换 -->
   <div class="lobby-tabs">
     <button class="lobby-tab active" data-tab="create">创建游戏</button>
     <button class="lobby-tab" data-tab="join">加入游戏</button>
   </div>
 
-  <!-- 创建游戏 -->
   <div id="tab-create" class="lobby-tab-content active">
     <div class="row">
       <div class="field">
@@ -35,7 +31,7 @@
         <select id="map-select"><option value="default">default</option></select>
       </div>
     </div>
-    <button id="btn-create" class="btn primary" style="margin-top:14px;width:100%">➕ 创建新游戏</button>
+    <button id="btn-create" class="btn primary" style="margin-top:14px;width:100%">创建新游戏</button>
     <div id="create-result" class="lobby-result hidden">
       <div class="info-row">
         <span class="info-label">Game ID</span>
@@ -48,11 +44,10 @@
         <button class="btn-copy" data-copy="created-token">复制</button>
       </div>
       <p class="lobby-hint">请保存 Token，将 Game ID 发给对手。</p>
-      <button id="btn-connect-create" class="btn success" style="width:100%;margin-top:10px">✅ 连接进入游戏</button>
+      <button id="btn-connect-create" class="btn success" style="width:100%;margin-top:10px">连接进入游戏</button>
     </div>
   </div>
 
-  <!-- 加入游戏 -->
   <div id="tab-join" class="lobby-tab-content">
     <div class="field">
       <label>游戏 ID</label>
@@ -62,40 +57,34 @@
       <label>你的名称</label>
       <input id="join-name" placeholder="留空使用默认名称" maxlength="20" />
     </div>
-    <button id="btn-join" class="btn primary" style="margin-top:14px;width:100%">🔗 加入游戏</button>
+    <button id="btn-join" class="btn primary" style="margin-top:14px;width:100%">加入游戏</button>
     <div id="join-result" class="lobby-result hidden">
       <p class="lobby-status" id="join-status-text"></p>
     </div>
   </div>
 </section>
 
-<!-- ══════════ 主界面（连接后显示）══════════ -->
-<main id="game-ui" class="hidden">
+  <main id="game-ui" class="hidden">
 
-  <!-- 左侧：选中信息 -->
   <div id="selection-panel" class="selection-panel">
-    <div id="selection-detail" class="selection-detail">点击棋盘上的单位或建筑查看详情</div>
+    <div id="selection-detail" class="selection-detail">点击棋盘上的单位、总部或据点查看详情</div>
   </div>
 
-  <!-- 中间：棋盘 -->
   <div class="board-wrap">
     <canvas id="board" width="840" height="840"></canvas>
     <div id="cell-info" class="cell-info"></div>
     <div id="map-popup" class="map-popup hidden"></div>
   </div>
 
-  <!-- 右侧：侧边栏 -->
   <aside id="sidebar">
 
-    <!-- 回合 & 资源 -->
     <section id="turn-resources">
       <div id="turn-badge" class="turn-badge">回合 —</div>
       <div id="resources-display" class="resources-display"></div>
     </section>
 
-    <!-- 操作提示 -->
     <section id="action-hints">
-      <h3>🎯 操作</h3>
+      <h3>操作</h3>
       <div class="hint-list">
         <div class="hint"><span class="hint-key">点击己方单位</span> 弹出移动/攻击/治疗选项</div>
         <div class="hint"><span class="hint-key">选择选项后</span> 点击高亮六边形执行</div>
@@ -106,18 +95,16 @@
       </div>
     </section>
 
-    <!-- 快捷操作 -->
     <section id="quick-actions">
-      <h3>⚡ 快捷操作</h3>
+      <h3>快捷操作</h3>
       <div class="btn-grid">
-        <button id="btn-end-turn" class="btn warning">⏭ 结束回合</button>
-        <button id="btn-refresh" class="btn">🔄 刷新状态</button>
+        <button id="btn-end-turn" class="btn warning">结束回合</button>
+        <button id="btn-refresh" class="btn">刷新状态</button>
       </div>
     </section>
 
-    <!-- 事件日志 -->
     <section id="event-log">
-      <h3>📜 事件流</h3>
+      <h3>事件流</h3>
       <ul id="events"></ul>
     </section>
 

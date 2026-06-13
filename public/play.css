@@ -189,11 +189,11 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .lobby-status.connecting { color: #6cf; }
 
 /* ══════════ main layout ══════════ */
-#game-ui { display: flex; padding: 20px 24px; gap: 20px; }
+#game-ui { display: flex; padding: 20px 24px; gap: 20px; align-items: flex-start; }
 .hidden { display: none !important; }
 
 /* ══════════ board ══════════ */
-.board-wrap { position: relative; flex-shrink: 0; }
+.board-wrap { position: relative; flex-shrink: 1; overflow: auto; max-width: 100%; }
 #board {
   background: #0a0e14;
   border: 1px solid #1e2e3e;
@@ -417,6 +417,44 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 .map-popup-cost.cant-afford { color: #a44; }
 .map-popup-cost.gain { color: #4a4; }
+
+@media (max-width: 1180px) {
+  #game-ui {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .selection-panel {
+    width: 100%;
+    max-width: 760px;
+    order: 1;
+  }
+  .board-wrap {
+    order: 2;
+  }
+  #sidebar {
+    width: 100%;
+    max-width: 760px;
+    max-height: none;
+    order: 3;
+  }
+}
+
+@media (max-width: 720px) {
+  header {
+    padding: 12px 16px;
+    align-items: flex-start;
+    gap: 10px;
+    flex-direction: column;
+  }
+  .panel {
+    margin: 16px;
+    padding: 20px;
+  }
+  #game-ui {
+    padding: 12px;
+    gap: 12px;
+  }
+}
 
 /* ══════════ scrollbar ══════════ */
 ::-webkit-scrollbar { width: 6px; }

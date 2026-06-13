@@ -18,7 +18,7 @@ const els = {
 const ctx = els.canvas.getContext('2d');
 
 let gameConfig = null;
-let playerNames = { player_a: '玩家 A', player_b: '玩家 B' };
+let playerNames = defaultPlayerNames();
 let state = null;
 let gameId = null;
 let myToken = null;
@@ -27,11 +27,13 @@ let sse = null;
 let hoverCell = null;
 let selectedUnitId = null;
 let selectedOriginId = null;
+let selectedDeployType = null;
 let interactionMode = 'idle';
 let rangeHighlights = [];
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function defaultPlayerNames() { return { player_a: '玩家 A', player_b: '玩家 B' }; }
 function playerName(owner) { return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B'); }
 function statusBadge(text, cls) { els.connStatus.textContent = text; els.connStatus.className = `badge ${cls}`; }
 function toast(msg, type = 'info') {
@@ -106,11 +108,12 @@ function createEmptyState() {
   return { cells: [], controlPoints: new Map(), headquarters: new Map(), units: new Map(), resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } }, turn: { turnNumber: 1, currentOwner: 'player_a' }, winner: null, eventLog: [] };
 }
 function applyEvent(s, ev) {
+  if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
   s.eventLog.push(ev);
   const p = ev.payload || {};
   switch (ev.type) {
     case 'game_start':
-      gameConfig = p.config; if (p.playerNames) playerNames = p.playerNames;
+      gameConfig = p.config; if (p.playerNames) playerNames = { ...p.playerNames };
       s.cells = p.map.cells || [];
       s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
       s.headquarters = new Map(Object.values(p.headquarters || {}).map(h => [h.id, { ...h }]));
@@ -134,11 +137,13 @@ function applyEvent(s, ev) {
       break;
     case 'turn_end': s.turn.currentOwner = p.nextOwner; s.turn.turnNumber = p.turnNumber; break;
     case 'game_over': s.winner = p.winner; break;
+    case 'name_rename': playerNames[p.playerId] = p.name; break;
   }
 }
 async function loadFullState() {
   const { ok, data } = await API.get(`/api/games/${gameId}/events`);
   if (!ok) return false;
+  playerNames = defaultPlayerNames();
   state = createEmptyState();
   for (const ev of data.events) applyEvent(state, ev);
   return true;
@@ -219,12 +224,33 @@ function renderSidebar() {
   els.events.innerHTML = '';
   for (const ev of state.eventLog.slice(-60)) {
     const li = document.createElement('li'); li.className = `type-${ev.type}`;
-    li.innerHTML = `<span class="ev-seq">#${ev.seq}</span><span class="ev-type">${esc(ev.type)}</span>${esc(JSON.stringify(ev.payload || {}).slice(0, 100))}`;
+    li.innerHTML = `<span class="ev-seq">#${ev.seq}</span><span class="ev-type">${esc(ev.type)}</span>${esc(formatEventShort(ev))}`;
     els.events.appendChild(li);
   }
   els.events.scrollTop = els.events.scrollHeight;
   renderSelectionInfo();
 }
+
+function formatEventShort(ev) {
+  const p = ev.payload || {};
+  switch (ev.type) {
+    case 'game_start': return '对局开始';
+    case 'deploy': return `${playerName(p.owner)} 部署 ${UNIT_NAMES[p.unitType] || p.unitType}`;
+    case 'move': return `移动到 (${p.toQ}, ${p.toR})`;
+    case 'attack': return `攻击造成 ${p.damage} 伤害`;
+    case 'heal': return `治疗 +${p.amount}`;
+    case 'unit_death': return `${UNIT_NAMES[p.unitType] || '单位'} 阵亡`;
+    case 'headquarters_destroyed': return `${playerName(p.owner)} 指挥部被摧毁`;
+    case 'control_point_captured': return `${playerName(p.owner)} 占领 ${p.name}`;
+    case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
+    case 'reset_actions': return `${playerName(p.owner)} 单位已重置`;
+    case 'turn_end': return `轮到 ${playerName(p.nextOwner)}`;
+    case 'game_over': return `${playerName(p.winner)} 获胜`;
+    case 'name_rename': return `${p.playerId} 改名为 ${p.name}`;
+    default: return JSON.stringify(p).slice(0, 100);
+  }
+}
+
 function renderSelectionInfo(ent) {
   if (!ent && selectedUnitId) ent = state.units.get(selectedUnitId);
   if (!ent && selectedOriginId) ent = state.headquarters.get(selectedOriginId) || state.controlPoints.get(selectedOriginId);
@@ -245,7 +271,7 @@ function showPopup(cell, title, items, cb) {
   popup.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => cb(btn.dataset.action, btn.dataset.type)));
 }
 function closePopup() { $('map-popup').classList.add('hidden'); }
-function deselect() { selectedUnitId = null; selectedOriginId = null; interactionMode = 'idle'; rangeHighlights = []; closePopup(); renderSidebar(); drawBoard(); }
+function deselect() { selectedUnitId = null; selectedOriginId = null; selectedDeployType = null; interactionMode = 'idle'; rangeHighlights = []; closePopup(); renderSidebar(); drawBoard(); }
 
 async function apiAction(path, body) {
   const { ok, data } = await API.post(path, body);
@@ -257,7 +283,7 @@ async function afterAction(msg) {
 }
 
 function selectUnit(unit) {
-  selectedUnitId = unit.id; selectedOriginId = null; interactionMode = 'unit_selected'; rangeHighlights = [];
+  selectedUnitId = unit.id; selectedOriginId = null; selectedDeployType = null; interactionMode = 'unit_selected'; rangeHighlights = [];
   renderSidebar(); drawBoard();
   if (unit.owner !== myPlayer || state.turn.currentOwner !== myPlayer) return;
   const items = [];
@@ -272,15 +298,14 @@ function selectUnit(unit) {
   });
 }
 function selectDeployOrigin(origin) {
-  selectedOriginId = origin.id; selectedUnitId = null; interactionMode = 'deploy_origin'; rangeHighlights = [];
+  selectedOriginId = origin.id; selectedUnitId = null; selectedDeployType = null; interactionMode = 'deploy_origin'; rangeHighlights = [];
   renderSidebar(); drawBoard();
   if (origin.owner !== myPlayer && origin.owner !== undefined) return;
   if (state.turn.currentOwner !== myPlayer) return;
   const items = Object.entries(gameConfig.units).map(([type, spec]) => ({ label: UNIT_NAMES[type], action: 'deploy', type, cost: spec.cost }));
   showPopup(origin, '部署单位', items, (_action, type) => {
-    closePopup(); interactionMode = 'deploy_mode'; selectedOriginId = origin.id;
+    closePopup(); interactionMode = 'deploy_mode'; selectedOriginId = origin.id; selectedDeployType = type;
     rangeHighlights = deployCells(origin).map(p => ({ ...p, type: 'deploy', unitType: type }));
-    rangeHighlights.unitType = type;
     drawBoard();
   });
 }
@@ -320,7 +345,7 @@ els.canvas.addEventListener('click', async () => {
     return;
   }
   if (interactionMode === 'deploy_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
-    if (await apiAction(`/api/games/${gameId}/deploy`, { unitType: rangeHighlights.unitType, fromId: selectedOriginId, q: hoverCell.q, r: hoverCell.r })) afterAction('部署成功');
+    if (await apiAction(`/api/games/${gameId}/deploy`, { unitType: selectedDeployType, fromId: selectedOriginId, q: hoverCell.q, r: hoverCell.r })) afterAction('部署成功');
     return;
   }
 
@@ -333,7 +358,8 @@ els.canvas.addEventListener('click', async () => {
 
 function subscribeSse() {
   if (sse) sse.close();
-  sse = new EventSource(`/api/games/${gameId}/events?token=${encodeURIComponent(myToken)}`);
+  const lastSeq = state?.eventLog.at(-1)?.seq ?? 0;
+  sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}&token=${encodeURIComponent(myToken)}`);
   sse.onmessage = e => { applyEvent(state, JSON.parse(e.data)); drawBoard(); renderSidebar(); };
   sse.onerror = () => statusBadge('SSE 断开', 'err');
   sse.onopen = () => statusBadge('已连接', 'ok');
@@ -343,11 +369,20 @@ els.btnEndTurn.addEventListener('click', async () => { if (await apiAction(`/api
 els.btnRefresh.addEventListener('click', async () => { await loadFullState(); drawBoard(); renderSidebar(); toast('状态已刷新', 'ok'); });
 els.btnCreate.addEventListener('click', async () => {
   els.btnCreate.disabled = true;
-  const res = await fetch('/api/games', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mapId: els.mapSelect.value || 'default', name: els.createName.value.trim() || undefined }) });
-  const data = await res.json();
-  myToken = data.playerAToken; myPlayer = 'player_a'; gameId = data.gameId;
-  els.createdGameId.textContent = gameId; els.createdToken.textContent = myToken; els.createResult.classList.remove('hidden');
-  els.btnCreate.disabled = false;
+  try {
+    const res = await fetch('/api/games', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mapId: els.mapSelect.value || 'default', name: els.createName.value.trim() || undefined }) });
+    const data = await res.json();
+    if (!res.ok) {
+      toast(data.error || '创建失败', 'err');
+      return;
+    }
+    myToken = data.playerAToken; myPlayer = 'player_a'; gameId = data.gameId;
+    els.createdGameId.textContent = gameId; els.createdToken.textContent = myToken; els.createResult.classList.remove('hidden');
+  } catch {
+    toast('创建失败：无法连接服务器', 'err');
+  } finally {
+    els.btnCreate.disabled = false;
+  }
 });
 els.btnJoin.addEventListener('click', async () => {
   const gid = els.gameId.value.trim(); if (!gid) return;

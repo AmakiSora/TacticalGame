@@ -4,6 +4,7 @@ const SQRT3 = Math.sqrt(3);
 const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
 const TERRAIN = { plain: '#111923', water: '#183a55', blocker: '#393f46' };
 const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
+const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP', headquarters: 'HQ' };
 
 const $ = id => document.getElementById(id);
 const els = {
@@ -184,6 +185,61 @@ function drawHpBar(x, y, width, hp, maxHp) {
   ctx.fillRect(x - width / 2, y, width * Math.max(0, hp / maxHp), 4);
 }
 function unitLabel(type) { return { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP' }[type] || '?'; }
+function hpClass(ent) {
+  const ratio = ent.maxHp ? ent.hp / ent.maxHp : 1;
+  return ratio > 0.5 ? 'healthy' : ratio > 0.25 ? 'wounded' : 'critical';
+}
+function statItem(label, value, tone = '') {
+  if (value == null) return '';
+  return `<div class="sel-stat-card ${tone}"><span>${label}</span><strong>${esc(value)}</strong></div>`;
+}
+function renderEntityCard(ent) {
+  const type = ent.type || 'headquarters';
+  const title = UNIT_NAMES[type] || '指挥部';
+  const ownerClass = ent.owner === 'player_a' ? 'player-a' : 'player-b';
+  const hpPct = Math.max(0, Math.min(100, ent.maxHp ? (ent.hp / ent.maxHp) * 100 : 0));
+  const stats = [
+    statItem('攻击', ent.attack, 'attack'),
+    statItem('防御', ent.defense, 'defense'),
+    statItem('移动', ent.moveRange, 'move'),
+    statItem('射程', ent.attackRange, 'range'),
+    statItem('治疗', ent.healPower, 'heal'),
+    statItem('费用', ent.cost, 'cost'),
+  ].join('');
+  return `<div class="sel-card">
+    <div class="sel-head">
+      <div class="sel-token ${ownerClass}">${esc(UNIT_LABELS[type] || '?')}</div>
+      <div class="sel-title-wrap">
+        <div class="sel-type">${esc(title)}</div>
+        <div class="sel-owner ${ownerClass}">${esc(playerName(ent.owner))}</div>
+      </div>
+    </div>
+    <div class="sel-hp-row">
+      <div class="sel-hp-label"><span>生命</span><strong>${Math.max(0, ent.hp)} / ${ent.maxHp}</strong></div>
+      <div class="sel-hp-bar"><span class="sel-hp-fill ${hpClass(ent)}" style="width:${hpPct}%"></span></div>
+    </div>
+    ${stats ? `<div class="sel-stat-grid">${stats}</div>` : '<div class="sel-note">部署源</div>'}
+    <div class="sel-coord">坐标 (${ent.q}, ${ent.r})</div>
+  </div>`;
+}
+function renderControlPointCard(cp) {
+  const owner = cp.owner ? playerName(cp.owner) : '中立';
+  const ownerClass = cp.owner === 'player_a' ? 'player-a' : cp.owner === 'player_b' ? 'player-b' : 'neutral';
+  return `<div class="sel-card">
+    <div class="sel-head">
+      <div class="sel-token cp">CP</div>
+      <div class="sel-title-wrap">
+        <div class="sel-type">${esc(cp.name)}</div>
+        <div class="sel-owner ${ownerClass}">${esc(owner)}</div>
+      </div>
+    </div>
+    <div class="sel-stat-grid">
+      ${statItem('收入', '+20', 'cost')}
+      ${statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : '')}
+    </div>
+    <div class="sel-coord">坐标 (${cp.q}, ${cp.r})</div>
+  </div>`;
+}
 function drawBoard() {
   if (!state || state.cells.length === 0) return;
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
@@ -256,9 +312,9 @@ function renderSelectionInfo(ent) {
   if (!ent && selectedOriginId) ent = state.headquarters.get(selectedOriginId) || state.controlPoints.get(selectedOriginId);
   if (!ent) { els.selDetail.textContent = '点击己方单位执行移动/攻击/治疗；点击己方 HQ 或据点部署单位。'; return; }
   if ('hp' in ent) {
-    els.selDetail.innerHTML = `<div class="sel-type"><span class="${ent.owner === 'player_a' ? 'player-a' : 'player-b'}">[${esc(playerName(ent.owner))}]</span> ${esc(UNIT_NAMES[ent.type] || '指挥部')}</div><div class="sel-hp">HP ${ent.hp}/${ent.maxHp}</div><div class="sel-stat">位置 (${ent.q}, ${ent.r})</div>${ent.attack ? `<div class="sel-stat">攻 ${ent.attack} 防 ${ent.defense} 移 ${ent.moveRange} 射 ${ent.attackRange}</div>` : '<div class="sel-stat">部署源</div>'}`;
+    els.selDetail.innerHTML = renderEntityCard(ent);
   } else {
-    els.selDetail.innerHTML = `<div class="sel-type">据点 ${esc(ent.name)}</div><div class="sel-stat">归属: ${ent.owner ? esc(playerName(ent.owner)) : '中立'}</div><div class="sel-stat">位置 (${ent.q}, ${ent.r})</div>`;
+    els.selDetail.innerHTML = renderControlPointCard(ent);
   }
 }
 

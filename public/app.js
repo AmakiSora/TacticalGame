@@ -8,6 +8,8 @@ const TERRAIN = {
   blocker: '#393f46',
 };
 const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
+const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
+const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP', headquarters: 'HQ' };
 
 let gameConfig = null;
 let playerNames = defaultPlayerNames();
@@ -16,6 +18,7 @@ let currentStep = -1;
 let playing = false;
 let playTimer = null;
 let liveSse = null;
+let pinnedReplayStep = false;
 let state = null;
 let hoverCell = null;
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
@@ -234,6 +237,8 @@ function applyEvent(s, ev) {
 
 function rebuildToStep(step) {
   playerNames = defaultPlayerNames();
+  hoverCell = null;
+  cellInfoEl.textContent = '';
   state = createEmptyState();
   for (let i = 0; i <= step && i < allEvents.length; i++) applyEvent(state, allEvents[i]);
   currentStep = step;
@@ -252,10 +257,10 @@ function drawHpBar(x, y, width, hp, maxHp) {
 }
 
 function drawBoard() {
-  if (!state || state.cells.length === 0) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#0a0e14';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!state || state.cells.length === 0) return;
 
   for (const cell of state.cells) {
     pathHex(cell.q, cell.r, 1);
@@ -327,6 +332,65 @@ function unitLabel(type) {
   return { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP' }[type] || '?';
 }
 
+function hpClass(ent) {
+  const ratio = ent.maxHp ? ent.hp / ent.maxHp : 1;
+  return ratio > 0.5 ? 'healthy' : ratio > 0.25 ? 'wounded' : 'critical';
+}
+
+function statItem(label, value, tone = '') {
+  if (value == null) return '';
+  return `<div class="sel-stat-card ${tone}"><span>${label}</span><strong>${esc(value)}</strong></div>`;
+}
+
+function renderEntityCard(ent) {
+  const type = ent.type || 'headquarters';
+  const title = UNIT_NAMES[type] || '指挥部';
+  const ownerClass = ent.owner === 'player_a' ? 'player-a' : 'player-b';
+  const hpPct = Math.max(0, Math.min(100, ent.maxHp ? (ent.hp / ent.maxHp) * 100 : 0));
+  const stats = [
+    statItem('攻击', ent.attack, 'attack'),
+    statItem('防御', ent.defense, 'defense'),
+    statItem('移动', ent.moveRange, 'move'),
+    statItem('射程', ent.attackRange, 'range'),
+    statItem('治疗', ent.healPower, 'heal'),
+    statItem('费用', ent.cost, 'cost'),
+  ].join('');
+  return `<div class="sel-card">
+    <div class="sel-head">
+      <div class="sel-token ${ownerClass}">${esc(UNIT_LABELS[type] || '?')}</div>
+      <div class="sel-title-wrap">
+        <div class="sel-type">${esc(title)}</div>
+        <div class="sel-owner">${playerNameControl(ent.owner)}</div>
+      </div>
+    </div>
+    <div class="sel-hp-row">
+      <div class="sel-hp-label"><span>生命</span><strong>${Math.max(0, ent.hp)} / ${ent.maxHp}</strong></div>
+      <div class="sel-hp-bar"><span class="sel-hp-fill ${hpClass(ent)}" style="width:${hpPct}%"></span></div>
+    </div>
+    ${stats ? `<div class="sel-stat-grid">${stats}</div>` : '<div class="sel-note">部署源</div>'}
+    <div class="sel-coord">坐标 (${ent.q}, ${ent.r})</div>
+  </div>`;
+}
+
+function renderControlPointCard(cp) {
+  const owner = cp.owner ? playerName(cp.owner) : '中立';
+  const ownerClass = cp.owner === 'player_a' ? 'player-a' : cp.owner === 'player_b' ? 'player-b' : 'neutral';
+  return `<div class="sel-card">
+    <div class="sel-head">
+      <div class="sel-token cp">CP</div>
+      <div class="sel-title-wrap">
+        <div class="sel-type">${esc(cp.name)}</div>
+        <div class="sel-owner ${ownerClass}">${esc(owner)}</div>
+      </div>
+    </div>
+    <div class="sel-stat-grid">
+      ${statItem('收入', '+20', 'cost')}
+      ${statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : '')}
+    </div>
+    <div class="sel-coord">坐标 (${cp.q}, ${cp.r})</div>
+  </div>`;
+}
+
 function formatEventShort(ev) {
   const p = ev.payload || {};
   switch (ev.type) {
@@ -378,7 +442,8 @@ function renderDetail() {
 
 function updateControls() {
   const total = allEvents.length;
-  stepInfo.textContent = `${currentStep + 1} / ${total}`;
+  stepInfo.textContent = currentStep < 0 ? `开始前 / ${total}` : `${currentStep + 1} / ${total}`;
+  timeline.min = 0;
   timeline.max = Math.max(0, total - 1);
   timeline.value = Math.max(0, currentStep);
   btnPlay.textContent = playing ? '⏸' : '▶';
@@ -392,11 +457,12 @@ function stepForward() {
   drawBoard(); renderSidebar(); renderDetail(); updateControls();
 }
 function stepBackward() { if (currentStep > 0) rebuildToStep(currentStep - 1); }
-function goToStart() { pausePlayback(); rebuildToStep(-1); }
-function goToEnd() { pausePlayback(); rebuildToStep(allEvents.length - 1); }
+function goToStart() { pausePlayback(); rebuildToStep(allEvents.length ? 0 : -1); }
+function goToEnd() { pausePlayback(); pinnedReplayStep = false; rebuildToStep(allEvents.length - 1); }
 function startPlayback() {
   if (allEvents.length === 0) return;
   if (currentStep >= allEvents.length - 1) rebuildToStep(-1);
+  pinnedReplayStep = false;
   playing = true; updateControls(); scheduleNext();
 }
 function pausePlayback() {
@@ -412,11 +478,11 @@ function scheduleNext() {
 
 function buildTimelineMarkers() {
   timelineMarkers.innerHTML = '';
-  if (allEvents.length <= 1) return;
+  if (allEvents.length === 0) return;
   allEvents.forEach((ev, i) => {
     const marker = document.createElement('div');
     marker.className = `marker marker-${ev.type}`;
-    marker.style.left = `${(i / (allEvents.length - 1)) * 100}%`;
+    marker.style.left = `${allEvents.length === 1 ? 0 : (i / (allEvents.length - 1)) * 100}%`;
     timelineMarkers.appendChild(marker);
   });
 }
@@ -438,6 +504,7 @@ async function fetchGameList() {
 
 async function loadGameState(id) {
   pausePlayback();
+  pinnedReplayStep = false;
   const res = await fetch(`/api/games/${id}/events`);
   const { events } = await res.json();
   allEvents = events;
@@ -452,9 +519,11 @@ function subscribeSse(id) {
   liveSse.onmessage = e => {
     const ev = JSON.parse(e.data);
     if (allEvents.some(existing => existing.seq === ev.seq)) return;
+    const wasAtLatest = currentStep >= allEvents.length - 1;
     allEvents.push(ev);
     buildTimelineMarkers();
-    if (currentStep >= allEvents.length - 2) stepForward();
+    if (!pinnedReplayStep && wasAtLatest) stepForward();
+    else updateControls();
     statusEl.textContent = '实时连接中';
   };
   liveSse.onerror = () => { statusEl.textContent = 'SSE 断开，自动重连中'; };
@@ -484,11 +553,8 @@ function renderSelectionInfo(ent, cp) {
     return;
   }
   let html = '';
-  if (cp) html += `<div class="sel-type">据点 ${esc(cp.name)}</div><div>归属: ${cp.owner ? esc(playerName(cp.owner)) : '中立'}</div>`;
-  if (ent) {
-    html += `<div class="sel-type">${esc(ent.type || 'headquarters')} ${playerNameControl(ent.owner)}</div>
-      <div>HP ${ent.hp}/${ent.maxHp}</div><div>位置 (${ent.q}, ${ent.r})</div>`;
-  }
+  if (cp) html += renderControlPointCard(cp);
+  if (ent) html += renderEntityCard(ent);
   selDetailEl.innerHTML = html;
 }
 
@@ -534,7 +600,7 @@ function exportJson() {
 }
 async function exportHtml() {
   const [cssText, jsText] = await Promise.all([fetch('/style.css').then(r => r.text()), fetch('/app.js').then(r => r.text())]);
-  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Hex Replay</title><style>${cssText}</style></head><body><main><div id="board-wrap"><canvas id="board"></canvas><div id="cell-info" class="cell-info"></div><div id="replay-controls"><div id="control-buttons"><button id="btn-start">⏮</button><button id="btn-prev">◀</button><button id="btn-play">▶</button><button id="btn-next">▶</button><button id="btn-end">⏭</button><select id="speed-select"><option value="500">1x</option></select><span id="step-info"></span></div><div id="timeline-wrap"><input type="range" id="timeline"><div id="timeline-markers"></div></div></div></div><aside id="sidebar"><section id="resources"></section><section id="turn-info"></section><section id="event-detail"><div id="detail-content"></div></section><section id="event-log"><ul id="events"></ul></section></aside><div id="selection-panel"><div id="selection-detail"></div></div></main><select id="game-select"><option value="offline" selected>offline</option></select><button id="refresh-list"></button><span id="status"></span><button id="btn-export-html"></button><button id="btn-export-json"></button><button id="btn-import"></button><input id="import-file" type="file"><input id="auto-refresh" type="checkbox"><input id="follow-latest" type="checkbox"><input id="refresh-interval" value="5"><button id="btn-settings"></button><div id="settings-popover"></div><script>window.EMBEDDED_EVENTS=${JSON.stringify(allEvents)};window.fetch=(url)=>Promise.resolve(new Response(JSON.stringify(url.includes('/events')?{events:window.EMBEDDED_EVENTS}:{games:[{id:'offline',phase:'replay',turnNumber:0,currentOwner:'player_a'}]})));window.EventSource=function(){return {close(){}}};</script><script>${jsText}</script></body></html>`;
+  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Hex Replay</title><style>${cssText}</style></head><body><main><div id="board-wrap"><canvas id="board"></canvas><div id="cell-info" class="cell-info"></div><div id="replay-controls"><div id="control-buttons"><button id="btn-start">⏮</button><button id="btn-prev">◀</button><button id="btn-play">▶</button><button id="btn-next">▶</button><button id="btn-end">⏭</button><select id="speed-select"><option value="500">1x</option></select><span id="step-info"></span></div><div id="timeline-wrap"><input type="range" id="timeline" min="0" max="0" value="0"><div id="timeline-markers"></div></div></div></div><aside id="sidebar"><section id="resources"></section><section id="turn-info"></section><section id="event-detail"><div id="detail-content"></div></section><section id="event-log"><ul id="events"></ul></section></aside><div id="selection-panel"><div id="selection-detail"></div></div></main><select id="game-select"><option value="offline" selected>offline</option></select><button id="refresh-list"></button><span id="status"></span><button id="btn-export-html"></button><button id="btn-export-json"></button><button id="btn-import"></button><input id="import-file" type="file"><input id="auto-refresh" type="checkbox"><input id="follow-latest" type="checkbox"><input id="refresh-interval" value="5"><button id="btn-settings"></button><div id="settings-popover"></div><script>window.EMBEDDED_EVENTS=${JSON.stringify(allEvents)};window.fetch=(url)=>Promise.resolve(new Response(JSON.stringify(url.includes('/events')?{events:window.EMBEDDED_EVENTS}:{games:[{id:'offline',phase:'replay',turnNumber:0,currentOwner:'player_a'}]})));window.EventSource=function(){return {close(){}}};</script><script>${jsText}</script></body></html>`;
   downloadFile(gameFilename('html'), html, 'text/html');
 }
 function importJson() { importFile.click(); }
@@ -545,6 +611,7 @@ importFile.addEventListener('change', e => {
   reader.onload = () => {
     const data = JSON.parse(reader.result);
     allEvents = data.events || [];
+    pinnedReplayStep = false;
     buildTimelineMarkers();
     if (allEvents.length) rebuildToStep(allEvents.length - 1);
     if (liveSse) liveSse.close();
@@ -580,7 +647,12 @@ btnPrev.addEventListener('click', () => { pausePlayback(); stepBackward(); });
 btnPlay.addEventListener('click', () => playing ? pausePlayback() : startPlayback());
 btnNext.addEventListener('click', () => { pausePlayback(); stepForward(); });
 btnEnd.addEventListener('click', goToEnd);
-timeline.addEventListener('input', () => { pausePlayback(); rebuildToStep(Number(timeline.value)); });
+timeline.addEventListener('input', () => {
+  pausePlayback();
+  const step = Number(timeline.value);
+  pinnedReplayStep = step < allEvents.length - 1;
+  rebuildToStep(step);
+});
 btnExportJson.addEventListener('click', exportJson);
 btnExportHtml.addEventListener('click', exportHtml);
 btnImport.addEventListener('click', importJson);

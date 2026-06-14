@@ -12,7 +12,7 @@ export function appendEvent(
     seq: game.events.length + 1,
     type,
     timestamp: Date.now(),
-    payload,
+    payload: structuredClone(payload),
   };
   game.events.push(event);
   bus.emit(game.id, event);

@@ -21,8 +21,8 @@ function mapPayload(game: GameState) {
     grid: game.map.grid,
     orientation: game.map.orientation,
     radius: game.map.radius,
-    terrainCells: game.map.terrainCells,
-    cells: game.cells,
+    terrainCells: game.map.terrainCells.map(c => ({ ...c })),
+    cells: game.cells.map(c => ({ ...c })),
   };
 }
 
@@ -30,16 +30,22 @@ function fullReplayPayload(game: GameState) {
   return {
     mapId: game.mapId,
     map: mapPayload(game),
-    controlPoints: game.controlPoints,
-    headquarters: game.headquarters,
-    units: game.units,
-    resources: game.resources,
+    controlPoints: game.controlPoints.map(p => ({ ...p })),
+    headquarters: {
+      player_a: { ...game.headquarters.player_a },
+      player_b: { ...game.headquarters.player_b },
+    },
+    units: game.units.map(u => ({ ...u })),
+    resources: {
+      player_a: { ...game.resources.player_a },
+      player_b: { ...game.resources.player_b },
+    },
     firstPlayer: game.turn.currentOwner,
     playerNames: { ...game.playerNames },
     config: {
-      units: game.config.units,
-      headquartersSpec: game.config.headquartersSpec,
-      balance: game.config.balance,
+      units: structuredClone(game.config.units),
+      headquartersSpec: { ...game.config.headquartersSpec },
+      balance: { ...game.config.balance },
     },
   };
 }

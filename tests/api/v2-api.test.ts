@@ -126,4 +126,25 @@ describe('V2 API', () => {
     expect(listRes.json().games.find((g: any) => g.id === gameId).playerNames.player_a).toBe('Blue Commander');
     await app.close();
   });
+
+  it('keeps game_start replay payload immutable after later actions', async () => {
+    const app = await startTestServer();
+    const { gameId, playerAToken } = await createAndJoin(app);
+    let eventsBody = (await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` })).json();
+    const scout = eventsBody.events[0].payload.units.find((u: any) => u.owner === 'player_a' && u.type === 'scout');
+    const initial = { q: scout.q, r: scout.r };
+
+    const move = await app.inject({
+      method: 'POST',
+      url: `/api/games/${gameId}/move`,
+      headers: { 'X-Player-Token': playerAToken },
+      payload: { unitId: scout.id, q: -4, r: 0 },
+    });
+    expect(move.statusCode).toBe(200);
+
+    eventsBody = (await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` })).json();
+    const replayScout = eventsBody.events[0].payload.units.find((u: any) => u.id === scout.id);
+    expect({ q: replayScout.q, r: replayScout.r }).toEqual(initial);
+    await app.close();
+  });
 });

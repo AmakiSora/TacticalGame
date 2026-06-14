@@ -63,6 +63,7 @@ export interface MapConfig {
     damageVarianceRange: number;
     minimumDamage: number;
     healVarianceRange: number;
+    actionsPerTurn: number;
   };
 }
 
@@ -126,6 +127,8 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   for (const key of ['startingSupplies', 'baseIncome', 'controlPointIncome', 'damageVarianceRange', 'minimumDamage', 'healVarianceRange']) {
     assertNumber(balance, key, `Map "${id}".balance`, 0);
   }
+  if (!('actionsPerTurn' in balance)) throw new Error(`Map "${id}".balance.actionsPerTurn is required`);
+  assertNumber(balance, 'actionsPerTurn', `Map "${id}".balance`, 1);
 
   const hq = asRecord(c.headquarters, `Map "${id}".headquarters`);
   for (const player of ['player_a', 'player_b'] as PlayerId[]) {

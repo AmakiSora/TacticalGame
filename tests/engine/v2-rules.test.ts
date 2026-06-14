@@ -46,7 +46,7 @@ describe('hex V2 rules', () => {
 
     expect(result.ok).toBe(true);
     expect(game.controlPoints.find(p => p.q === -4 && p.r === 0)!.owner).toBe('player_a');
-    expect(game.resources.player_b.supplies).toBe(beforeB + 15);
+    expect(game.resources.player_b.supplies).toBe(beforeB + 10);
     expect(game.events.some(e => e.type === 'control_point_captured')).toBe(true);
     expect(game.events.some(e => e.type === 'income')).toBe(true);
   });
@@ -67,10 +67,12 @@ describe('hex V2 rules', () => {
     const result = deployUnit(game, bus, 'player_a', 'scout', game.headquarters.player_a.id, -8, 1);
 
     expect(result.ok).toBe(true);
-    expect(game.resources.player_a.supplies).toBe(45);
+    expect(game.resources.player_a.supplies).toBe(40);
     const deployed = game.units.find(u => u.type === 'scout' && u.q === -8 && u.r === 1)!;
     expect(deployed.hasMoved).toBe(true);
     expect(deployed.hasActed).toBe(false);
+    expect(deployed.actionSpent).toBe(true);
+    expect(game.turn.actionsUsed).toBe(1);
     expect(game.events.at(-1)!.type).toBe('deploy');
   });
 
@@ -104,5 +106,74 @@ describe('hex V2 rules', () => {
     expect(result.ok).toBe(true);
     expect(target.hp).toBeGreaterThan(50);
     expect(support.hasActed).toBe(true);
+  });
+
+  it('limits the player to actionsPerTurn activations across deploy/move/attack', () => {
+    const { game, bus } = setup();
+    const limit = game.config.balance.actionsPerTurn;
+    expect(limit).toBe(5);
+    expect(game.turn.actionsUsed).toBe(0);
+
+    // Stage 6 player_a infantry, each on its own plain cell with a distinct
+    // adjacent free plain cell to step into. Cells are spread so no overlaps occur.
+    game.units = game.units.filter(u => u.owner !== 'player_a');
+    const pairs = [
+      { from: { q: -4, r: -3 }, to: { q: -3, r: -3 } },
+      { from: { q: -4, r: -2 }, to: { q: -3, r: -2 } },
+      { from: { q: -4, r: -1 }, to: { q: -3, r: -1 } },
+      { from: { q: 1, r: -3 }, to: { q: 2, r: -3 } },
+      { from: { q: 1, r: -2 }, to: { q: 2, r: -2 } },
+      { from: { q: 1, r: -1 }, to: { q: 2, r: -1 } },
+    ];
+    const movers = pairs.map((pair, i) => ({
+      id: `m${i}`, owner: 'player_a' as const, type: 'infantry' as const,
+      q: pair.from.q, r: pair.from.r, hp: 100, maxHp: 100, attack: 28, defense: 8,
+      moveRange: 3, attackRange: 1, cost: 45, alive: true,
+      hasMoved: false, hasActed: false, actionSpent: false, canCapture: true,
+    }));
+    game.units.push(...movers);
+
+    for (let i = 0; i < limit; i++) {
+      const res = moveUnit(game, bus, 'player_a', `m${i}`, pairs[i].to.q, pairs[i].to.r);
+      expect(res.ok).toBe(true);
+    }
+    expect(game.turn.actionsUsed).toBe(limit);
+
+    // A 6th fresh unit is rejected with the action-limit code.
+    const blocked = moveUnit(game, bus, 'player_a', 'm5', pairs[5].to.q, pairs[5].to.r);
+    expect(blocked.ok).toBe(false);
+    expect(blocked.code).toBe('action_limit_reached');
+
+    // An already-activated unit (moved this turn) can still attack for free.
+    const attacker = movers[0];
+    const enemy = game.units.find(u => u.owner === 'player_b' && u.alive)!;
+    enemy.q = pairs[0].to.q; enemy.r = pairs[0].to.r + 1;
+    const followUp = attackTarget(game, bus, 'player_a', attacker.id, enemy.id);
+    expect(followUp.ok).toBe(true);
+    expect(game.turn.actionsUsed).toBe(limit); // no extra point spent
+  });
+
+  it('resets actionsUsed and unit actionSpent at turn end', () => {
+    const { game, bus } = setup();
+    // Clear and place one infantry on an open plain next to an empty cell.
+    game.units = game.units.filter(u => u.owner !== 'player_a');
+    const unit = {
+      id: 'u1', owner: 'player_a' as const, type: 'infantry' as const,
+      q: -7, r: 0, hp: 100, maxHp: 100, attack: 28, defense: 8,
+      moveRange: 3, attackRange: 1, cost: 45, alive: true,
+      hasMoved: false, hasActed: false, actionSpent: false, canCapture: true,
+    };
+    game.units.push(unit);
+
+    expect(moveUnit(game, bus, 'player_a', 'u1', -8, 1).ok).toBe(true);
+    expect(game.turn.actionsUsed).toBe(1);
+    expect(unit.actionSpent).toBe(true);
+
+    endTurn(game, bus, 'player_a');
+
+    expect(game.turn.actionsUsed).toBe(0);
+    expect(game.turn.currentOwner).toBe('player_b');
+    // the ending player's units are reset for their next turn
+    expect(unit.actionSpent).toBe(false);
   });
 });

@@ -34,6 +34,7 @@ export interface Unit {
   alive: boolean;
   hasMoved: boolean;
   hasActed: boolean;
+  actionSpent: boolean;
   canCapture: boolean;
   healPower?: number;
 }
@@ -72,6 +73,7 @@ export interface TurnState {
   turnNumber: number;
   currentOwner: PlayerId;
   phase: GamePhase;
+  actionsUsed: number;
 }
 
 export type EventType =
@@ -136,4 +138,5 @@ export type ApiErrorCode =
   | 'game_not_found'
   | 'game_already_full'
   | 'game_not_started'
-  | 'game_over';
+  | 'game_over'
+  | 'action_limit_reached';

@@ -26,6 +26,7 @@ function createUnit(owner: PlayerId, type: UnitType, q: number, r: number, spec:
     alive: true,
     hasMoved: false,
     hasActed: false,
+    actionSpent: false,
     canCapture: spec.canCapture,
     healPower: spec.healPower,
   };
@@ -95,7 +96,7 @@ export function createInitialGame(id: string, mapId?: string): GameState {
       player_a: '',
       player_b: '',
     },
-    turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_for_player' },
+    turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_for_player', actionsUsed: 0 },
     events: [],
     winner: null,
   };

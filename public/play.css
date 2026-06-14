@@ -320,6 +320,20 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .res-b { color: #f86; }
 .res-me { font-weight: 700; text-decoration: underline; }
 
+/* actions counter */
+.actions-display {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; margin: 8px 0 10px;
+  background: #1a2a3a; border: 1px solid #2a4a6a; border-radius: 6px;
+  font-size: 13px; color: #9ec;
+}
+.actions-display .actions-label { color: #7a9aaa; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
+.actions-display .actions-count { font-weight: 700; font-size: 15px; }
+.actions-display .actions-count.zero { color: #f96; }
+.actions-display .actions-hint { color: #d6a; font-size: 11px; margin-left: auto; }
+.actions-display.exhausted { border-color: #6a3a2a; background: #2a1a1a; }
+.actions-display.mine { border-color: #2a6a4a; }
+
 /* quick actions */
 .btn-grid { display: flex; gap: 8px; flex-wrap: wrap; }
 

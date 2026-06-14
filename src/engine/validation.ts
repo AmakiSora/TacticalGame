@@ -1,5 +1,6 @@
 // src/engine/validation.ts
 import type { GameState, Position, Unit, Headquarters, TerrainType } from '../types.js';
+import type { Result } from './result.js';
 import { hexDistance, hexKey, hexNeighbors, isValidHex } from './hex.js';
 
 export type Occupant =
@@ -58,4 +59,26 @@ export function findReachableCells(game: GameState, unit: Unit): Position[] {
 
 export function findAdjacentDeployCell(game: GameState, origin: Position): Position | null {
   return hexNeighbors(origin).find(pos => isDeployable(game, pos.q, pos.r)) ?? null;
+}
+
+/**
+ * Spend one action point on a unit. Each unit consumes at most one action per
+ * turn: activating it (first move/attack/deploy/heal) costs a point, and any
+ * further action by that same unit is free. Returns the limit-reached error
+ * when the per-turn action budget is exhausted and the unit has not yet been
+ * activated.
+ */
+export function consumeAction(game: GameState, unit: Unit): Result {
+  if (unit.actionSpent) return { ok: true };
+  const limit = game.config.balance.actionsPerTurn;
+  if (game.turn.actionsUsed >= limit) {
+    return { ok: false, code: 'action_limit_reached', message: `only ${limit} actions allowed per turn` };
+  }
+  game.turn.actionsUsed += 1;
+  unit.actionSpent = true;
+  return { ok: true };
+}
+
+export function actionsRemaining(game: GameState): number {
+  return Math.max(0, game.config.balance.actionsPerTurn - game.turn.actionsUsed);
 }

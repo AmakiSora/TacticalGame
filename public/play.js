@@ -13,7 +13,8 @@ const els = {
   connStatus: $('conn-status'), createResult: $('create-result'), createdGameId: $('created-game-id'),
   createdToken: $('created-token'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
-  resDisplay: $('resources-display'), btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'),
+  resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
+  btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'),
   selDetail: $('selection-detail'), events: $('events'),
 };
 const ctx = els.canvas.getContext('2d');
@@ -106,7 +107,7 @@ async function loadMapList() {
 }
 
 function createEmptyState() {
-  return { cells: [], controlPoints: new Map(), headquarters: new Map(), units: new Map(), resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } }, turn: { turnNumber: 1, currentOwner: 'player_a' }, winner: null, eventLog: [] };
+  return { cells: [], controlPoints: new Map(), headquarters: new Map(), units: new Map(), resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } }, turn: { turnNumber: 1, currentOwner: 'player_a', actionsUsed: 0 }, winner: null, eventLog: [] };
 }
 function applyEvent(s, ev) {
   if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
@@ -124,19 +125,21 @@ function applyEvent(s, ev) {
       break;
     case 'deploy':
       s.resources[p.owner].supplies -= p.cost || 0;
-      s.units.set(p.unitId, { id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r, hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense, moveRange: p.moveRange, attackRange: p.attackRange, alive: true, hasMoved: true, hasActed: false, canCapture: !!p.canCapture, healPower: p.healPower, cost: p.cost });
+      s.units.set(p.unitId, { id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r, hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense, moveRange: p.moveRange, attackRange: p.attackRange, alive: true, hasMoved: true, hasActed: false, actionSpent: true, canCapture: !!p.canCapture, healPower: p.healPower, cost: p.cost });
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
-    case 'move': { const u = s.units.get(p.unitId); if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; } break; }
-    case 'attack': { const t = s.units.get(p.targetId) || s.headquarters.get(p.targetId); if (t) t.hp = p.targetHp; const a = s.units.get(p.attackerId); if (a) a.hasActed = true; break; }
-    case 'heal': { const t = s.units.get(p.targetId); if (t) t.hp = p.targetHp; const u = s.units.get(p.supportId); if (u) u.hasActed = true; break; }
+    case 'move': { const u = s.units.get(p.unitId); if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
+    case 'attack': { const t = s.units.get(p.targetId) || s.headquarters.get(p.targetId); if (t) t.hp = p.targetHp; const a = s.units.get(p.attackerId); if (a) { a.hasActed = true; a.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
+    case 'heal': { const t = s.units.get(p.targetId); if (t) t.hp = p.targetHp; const u = s.units.get(p.supportId); if (u) { u.hasActed = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
     case 'unit_death': { const u = s.units.get(p.unitId); if (u) u.alive = false; break; }
     case 'headquarters_destroyed': { const h = s.headquarters.get(p.headquartersId); if (h) h.alive = false; break; }
     case 'control_point_captured': { const cp = s.controlPoints.get(p.pointId); if (cp) cp.owner = p.owner; break; }
     case 'income': s.resources[p.owner].supplies += p.amount; break;
     case 'reset_actions':
-      for (const u of s.units.values()) if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; }
+      for (const u of s.units.values()) if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
-    case 'turn_end': s.turn.currentOwner = p.nextOwner; s.turn.turnNumber = p.turnNumber; break;
+    case 'turn_end': s.turn.currentOwner = p.nextOwner; s.turn.turnNumber = p.turnNumber; s.turn.actionsUsed = 0; break;
     case 'game_over': s.winner = p.winner; break;
     case 'name_rename': playerNames[p.playerId] = p.name; break;
   }
@@ -234,7 +237,7 @@ function renderControlPointCard(cp) {
       </div>
     </div>
     <div class="sel-stat-grid">
-      ${statItem('收入', '+20', 'cost')}
+      ${statItem('收入', `+${gameConfig?.balance?.controlPointIncome ?? 20}`, 'cost')}
       ${statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : '')}
     </div>
     <div class="sel-coord">坐标 (${cp.q}, ${cp.r})</div>
@@ -271,12 +274,30 @@ function drawBoard() {
   }
 }
 
+function actionsPerTurn() { return gameConfig?.balance?.actionsPerTurn ?? 0; }
+function renderActionsDisplay(owner) {
+  const max = actionsPerTurn();
+  if (!max || !els.actionsDisplay) { if (els.actionsDisplay) els.actionsDisplay.innerHTML = ''; return; }
+  const used = state.turn.actionsUsed || 0;
+  const remaining = Math.max(0, max - used);
+  const isMine = owner === myPlayer;
+  const exhausted = remaining === 0;
+  els.actionsDisplay.classList.toggle('exhausted', isMine && exhausted);
+  els.actionsDisplay.classList.toggle('mine', isMine);
+  if (isMine) {
+    els.actionsDisplay.innerHTML = `<span class="actions-label">行动点</span><span class="actions-count ${exhausted ? 'zero' : ''}">${remaining}/${max}</span>${exhausted ? '<span class="actions-hint">已用尽，仅可继续操作已行动单位</span>' : ''}`;
+  } else {
+    els.actionsDisplay.innerHTML = `<span class="actions-label">行动点</span><span class="actions-count">${used}/${max} 已用</span>`;
+  }
+}
+
 function renderSidebar() {
   if (!state) return;
   const owner = state.turn.currentOwner;
   els.turnBadge.textContent = `回合 ${state.turn.turnNumber} · ${playerName(owner)}`;
   els.turnBadge.classList.toggle('my-turn', owner === myPlayer);
   els.resDisplay.innerHTML = `<span class="res-a ${myPlayer === 'player_a' ? 'res-me' : ''}">${esc(playerName('player_a'))}: ${state.resources.player_a.supplies}</span><span class="res-b ${myPlayer === 'player_b' ? 'res-me' : ''}">${esc(playerName('player_b'))}: ${state.resources.player_b.supplies}</span>`;
+  renderActionsDisplay(owner);
   els.events.innerHTML = '';
   for (const ev of state.eventLog.slice(-60)) {
     const li = document.createElement('li'); li.className = `type-${ev.type}`;

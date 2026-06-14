@@ -80,6 +80,7 @@ function resetActions(game: GameState, owner: PlayerId): void {
     if (unit.owner === owner && unit.alive) {
       unit.hasMoved = false;
       unit.hasActed = false;
+      unit.actionSpent = false;
     }
   }
 }
@@ -100,11 +101,12 @@ export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result
 
   captureControlPoints(game, bus, owner);
   resetActions(game, owner);
-  appendEvent(game, bus, 'reset_actions', { owner });
+  appendEvent(game, bus, 'reset_actions', { owner, actionsUsed: 0 });
 
   const next = otherPlayer(owner);
   if (next === 'player_a') game.turn.turnNumber += 1;
   game.turn.currentOwner = next;
+  game.turn.actionsUsed = 0;
   collectIncome(game, bus, next);
   appendEvent(game, bus, 'turn_end', { previousOwner: owner, nextOwner: next, turnNumber: game.turn.turnNumber });
   return { ok: true };

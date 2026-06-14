@@ -205,6 +205,19 @@ function livingUnits(game, owner) {
   return game.units.filter(u => u.owner === owner && u.alive);
 }
 
+function actionsPerTurn(game) {
+  return game.config?.balance?.actionsPerTurn ?? Infinity;
+}
+
+function actionsRemaining(game) {
+  return Math.max(0, actionsPerTurn(game) - (game.turn?.actionsUsed ?? 0));
+}
+
+/** Units the owner can still spend an action point on this turn (not yet activated). */
+function activatableUnits(game, owner) {
+  return livingUnits(game, owner).filter(u => !u.actionSpent);
+}
+
 function enemyTargets(game, owner) {
   const enemy = otherPlayer(owner);
   return [
@@ -272,6 +285,7 @@ function movementGoal(game, owner, unit) {
 
 async function tryMove(game, args, seat, unit) {
   if (unit.hasMoved) return false;
+  if (!unit.actionSpent && actionsRemaining(game) <= 0) return false;
   const reachable = reachableCells(game, unit);
   if (reachable.length === 0) return false;
   const goal = movementGoal(game, seat.owner, unit);
@@ -312,6 +326,7 @@ function deployChoice(game, owner) {
 }
 
 async function tryDeploy(game, args, seat) {
+  if (actionsRemaining(game) <= 0) return false;
   const unitType = deployChoice(game, seat.owner);
   if (!unitType) return false;
 

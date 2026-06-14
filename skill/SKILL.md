@@ -1,6 +1,6 @@
 ---
 name: play-hex-api-game
-description: Use when Codex needs to play, control, automate, or script a player in this repository's Hex V2 tactical control-point game through the REST API. Covers game creation/joining, token handling, legal pointy-top axial q/r actions, turn loops, deployment, movement, combat, healing, and complete AI-vs-AI API play. Do not use old square-grid x/y, build, produce, sell, mining, or wall workflows.
+description: Use when Codex needs to play, control, automate, or script a player in this repository's Hex V2 tactical control-point game through the REST API. Covers game creation/joining, token handling, legal pointy-top axial q/r actions, the per-turn action-point limit, turn loops, deployment, movement, combat, healing, and complete AI-vs-AI API play. Do not use old square-grid x/y, build, produce, sell, mining, or wall workflows.
 ---
 
 # Play Hex API Game
@@ -46,6 +46,21 @@ If `POST /join` returns `game_already_full`, report that error. Do not fetch sta
 - Deploy only from your headquarters or owned control points into adjacent empty plain cells.
 - Destroying the enemy headquarters immediately wins.
 
+### Action Points (per-turn limit)
+
+Each player has a limited number of **action points** per turn (`config.balance.actionsPerTurn`, currently **5**). Activating a unit costs one point; the limit caps how many different units a player can operate each turn and prevents a snowballing side from acting with a huge army.
+
+- **One action point = activate one unit.** The first deploy/move/attack/heal that touches a unit this turn spends a point and marks that unit activated.
+- A unit that is already activated can finish its remaining legal actions for **free** (e.g. move then attack, or move then heal) without spending more points.
+- **Deploy** always spends a point (the new unit is freshly activated; it cannot also move the same turn).
+- Once the budget is exhausted, only already-activated units may still act; end the turn after that.
+- The server returns `429` with code `action_limit_reached` when you try to activate a new unit while out of points. Track `game.turn.actionsUsed` against `game.config.balance.actionsPerTurn` and stop attempting new-unit actions once `actionsUsed >= actionsPerTurn`.
+
+### Economy
+
+- Base income is `config.balance.baseIncome` (**10**); each owned control point adds `config.balance.controlPointIncome` (**15**) per turn.
+- With a 5-action cap, income above ~85/turn cannot all be spent on deployment, so hoarding supplies has diminishing value — spend on high-impact units rather than stockpiling.
+
 Do not use V1 concepts: `x/y`, Manhattan distance, buildings, miners, production queues, walls, `/build`, `/produce`, or `/sell`.
 
 ## Turn Heuristic
@@ -53,11 +68,11 @@ Do not use V1 concepts: `x/y`, Manhattan distance, buildings, miners, production
 Use this order unless the user asks for a different style:
 
 1. Attack the enemy headquarters if any unit can hit it.
-2. Attack killable or low-HP enemies; prefer support, ranger, and capturing units.
+2. Attack killable or low-HP enemies; prefer support, ranger, and capturing units. (Free for an already-activated unit.)
 3. Heal the most damaged friendly unit with support.
 4. Move infantry/scout toward neutral or enemy control points.
-5. Move combat units toward the enemy headquarters, preferring cells that maintain or improve attack options.
-6. Deploy when supplies allow: scouts/infantry early for capture, ranger/heavy for pressure, support when multiple friendly units are damaged.
-7. End the turn after no useful legal action remains.
+5. Move combat units toward the enemy headquarters, preferring cells that maintain or improve attack options. Prefer to fully resolve a unit (move then attack) before activating the next, so each action point yields maximum value.
+6. Deploy when supplies AND an action point remain: scouts/infantry early for capture, ranger/heavy for pressure, support when multiple friendly units are damaged.
+7. Once `actionsUsed >= actionsPerTurn`, stop trying to move/deploy fresh units; finish any free attacks from activated units, then end the turn.
 
 Refresh state after every successful action. If an action fails, log the API error and continue to the next candidate; do not repeat the same failing action in a tight loop.

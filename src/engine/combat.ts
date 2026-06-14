@@ -3,6 +3,7 @@ import type { GameState, Headquarters, PlayerId, Unit } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { hexDistance } from './hex.js';
+import { consumeAction, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
 
 type Target =
@@ -63,6 +64,9 @@ export function attackTarget(
     return { ok: false, code: 'invalid_attack', message: `out of range (${distance} > ${attacker.attackRange})` };
   }
 
+  const spent = consumeAction(game, attacker);
+  if (!spent.ok) return spent;
+
   const damage = computeDamage(game, attacker.attack, target.entity.defense);
   target.entity.hp = Math.max(0, target.entity.hp - damage);
   attacker.hasActed = true;
@@ -72,6 +76,8 @@ export function attackTarget(
     damage,
     targetHp: target.entity.hp,
     targetKind: target.kind,
+    actionsUsed: game.turn.actionsUsed,
+    actionsRemaining: actionsRemaining(game),
   });
 
   if (target.entity.hp === 0) {
@@ -112,10 +118,16 @@ export function healTarget(
   const distance = hexDistance(support, target);
   if (distance > support.attackRange) return { ok: false, code: 'invalid_heal', message: 'target out of range' };
 
+  const spent = consumeAction(game, support);
+  if (!spent.ok) return spent;
+
   const amount = rollHeal(game, support);
   const healed = Math.min(target.maxHp - target.hp, amount);
   target.hp += healed;
   support.hasActed = true;
-  appendEvent(game, bus, 'heal', { supportId, targetId, amount: healed, targetHp: target.hp });
+  appendEvent(game, bus, 'heal', {
+    supportId, targetId, amount: healed, targetHp: target.hp,
+    actionsUsed: game.turn.actionsUsed, actionsRemaining: actionsRemaining(game),
+  });
   return { ok: true };
 }

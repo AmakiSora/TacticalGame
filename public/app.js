@@ -142,7 +142,7 @@ function createEmptyState() {
     headquarters: new Map(),
     units: new Map(),
     resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } },
-    turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command' },
+    turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command', actionsUsed: 0 },
     winner: null,
     eventLog: [],
   };
@@ -175,27 +175,31 @@ function applyEvent(s, ev) {
         id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r,
         hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense,
         moveRange: p.moveRange, attackRange: p.attackRange,
-        alive: true, hasMoved: true, hasActed: false,
+        alive: true, hasMoved: true, hasActed: false, actionSpent: true,
         canCapture: !!p.canCapture, healPower: p.healPower, cost: p.cost,
       });
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'move': {
       const u = s.units.get(p.unitId);
-      if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; }
+      if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; u.actionSpent = true; }
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     }
     case 'attack': {
       const target = s.units.get(p.targetId) || s.headquarters.get(p.targetId);
       if (target) target.hp = p.targetHp;
       const a = s.units.get(p.attackerId);
-      if (a) a.hasActed = true;
+      if (a) { a.hasActed = true; a.actionSpent = true; }
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     }
     case 'heal': {
       const target = s.units.get(p.targetId);
       if (target) target.hp = p.targetHp;
       const support = s.units.get(p.supportId);
-      if (support) support.hasActed = true;
+      if (support) { support.hasActed = true; support.actionSpent = true; }
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     }
     case 'unit_death': {
@@ -218,12 +222,14 @@ function applyEvent(s, ev) {
       break;
     case 'reset_actions':
       for (const u of s.units.values()) {
-        if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; }
+        if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       }
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'turn_end':
       s.turn.currentOwner = p.nextOwner;
       s.turn.turnNumber = p.turnNumber;
+      s.turn.actionsUsed = 0;
       break;
     case 'game_over':
       s.turn.phase = 'game_over';
@@ -416,8 +422,13 @@ function renderSidebar() {
     <div>${playerNameControl('player_b')}: ${state.resources.player_b.supplies} 补给</div>
     <div style="margin-top:6px;color:#7a9aaa;font-size:12px">据点: ${[...state.controlPoints.values()].map(cp => `${cp.name}:${cp.owner ? playerName(cp.owner) : '中立'}`).join(' / ')}</div>`;
   const owner = state.turn.currentOwner;
+  const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
+  const actionsLine = maxActions
+    ? `<div style="margin-top:4px;color:#9ec">行动点: <strong>${state.turn.actionsUsed ?? 0}/${maxActions}</strong></div>`
+    : '';
   turnInfoEl.innerHTML = `<h3>回合 ${state.turn.turnNumber}</h3>
     <div>当前: ${playerNameControl(owner)}</div>
+    ${actionsLine}
     ${state.winner ? `<div style="margin-top:6px;color:#f0d77c">胜者: ${esc(playerName(state.winner))}</div>` : ''}`;
 
   eventsEl.innerHTML = '';

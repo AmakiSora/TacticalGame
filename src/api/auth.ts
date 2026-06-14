@@ -12,6 +12,7 @@ const errorStatus: Record<string, number> = {
   game_over: 409,
   game_not_started: 409,
   insufficient_supplies: 400,
+  action_limit_reached: 429,
 };
 
 export function statusForCode(code: string): number {

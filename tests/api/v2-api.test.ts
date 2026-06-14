@@ -101,6 +101,7 @@ describe('V2 API', () => {
     const body = res.json();
     expect(body.events[0].type).toBe('game_start');
     expect(body.events[0].payload.map.grid).toBe('hex');
+    expect(body.events[0].payload.config.balance.actionsPerTurn).toBe(5);
     await app.close();
   });
 
@@ -145,6 +146,46 @@ describe('V2 API', () => {
     eventsBody = (await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` })).json();
     const replayScout = eventsBody.events[0].payload.units.find((u: any) => u.id === scout.id);
     expect({ q: replayScout.q, r: replayScout.r }).toEqual(initial);
+    await app.close();
+  });
+
+  it('rejects actions past the per-turn action limit with 429 action_limit_reached', async () => {
+    const app = await startTestServer();
+    const { gameId, playerAToken } = await createAndJoin(app);
+    const fetchGame = () => app.inject({
+      method: 'GET', url: `/api/games/${gameId}`, headers: { 'X-Player-Token': playerAToken },
+    });
+
+    // Move all 3 starting units out of the HQ ring (3 action points), freeing
+    // (-7,0) and (-7,-1) as deploy cells, then deploy 2 scouts there (2 more = 5 total).
+    let game = (await fetchGame()).json() as any;
+    const hqA = game.headquarters.player_a;
+    const starters = game.units.filter((u: any) => u.owner === 'player_a');
+    for (const u of starters) {
+      const res = await app.inject({
+        method: 'POST', url: `/api/games/${gameId}/move`,
+        headers: { 'X-Player-Token': playerAToken },
+        payload: { unitId: u.id, q: u.q + 1, r: u.r },
+      });
+      expect(res.statusCode).toBe(200);
+    }
+    for (const cell of [{ q: -7, r: 0 }, { q: -7, r: -1 }]) {
+      const res = await app.inject({
+        method: 'POST', url: `/api/games/${gameId}/deploy`,
+        headers: { 'X-Player-Token': playerAToken },
+        payload: { unitType: 'scout', fromId: hqA.id, q: cell.q, r: cell.r },
+      });
+      expect(res.statusCode).toBe(200);
+    }
+
+    // 6th action (any deploy) is rejected with the action-limit code.
+    const blocked = await app.inject({
+      method: 'POST', url: `/api/games/${gameId}/deploy`,
+      headers: { 'X-Player-Token': playerAToken },
+      payload: { unitType: 'scout', fromId: hqA.id, q: -8, r: 1 },
+    });
+    expect(blocked.statusCode).toBe(429);
+    expect((blocked.json() as any).code).toBe('action_limit_reached');
     await app.close();
   });
 });

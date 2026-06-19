@@ -15,7 +15,7 @@ const els = {
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
   btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'),
-  selDetail: $('selection-detail'), events: $('events'),
+  selDetail: $('selection-detail'), events: $('events'), scorePanel: $('score-panel'),
 };
 const ctx = els.canvas.getContext('2d');
 
@@ -107,7 +107,7 @@ async function loadMapList() {
 }
 
 function createEmptyState() {
-  return { cells: [], controlPoints: new Map(), headquarters: new Map(), units: new Map(), resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } }, turn: { turnNumber: 1, currentOwner: 'player_a', actionsUsed: 0 }, winner: null, eventLog: [] };
+  return { cells: [], controlPoints: new Map(), headquarters: new Map(), units: new Map(), resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } }, turn: { turnNumber: 1, currentOwner: 'player_a', actionsUsed: 0 }, winner: null, result: null, eventLog: [] };
 }
 function applyEvent(s, ev) {
   if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
@@ -140,7 +140,10 @@ function applyEvent(s, ev) {
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'turn_end': s.turn.currentOwner = p.nextOwner; s.turn.turnNumber = p.turnNumber; s.turn.actionsUsed = 0; break;
-    case 'game_over': s.winner = p.winner; break;
+    case 'game_over':
+      s.winner = p.winner;
+      s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores };
+      break;
     case 'name_rename': playerNames[p.playerId] = p.name; break;
   }
 }
@@ -291,6 +294,71 @@ function renderActionsDisplay(owner) {
   }
 }
 
+function playerScore(owner) {
+  const weights = gameConfig?.balance?.adjudicationWeights;
+  if (!weights || !state) return null;
+  const enemy = owner === 'player_a' ? 'player_b' : 'player_a';
+  const ownHq = [...state.headquarters.values()].find(h => h.owner === owner);
+  const enemyHq = [...state.headquarters.values()].find(h => h.owner === enemy);
+  if (!ownHq || !enemyHq) return null;
+  const enemyHqDamage = Math.max(0, (enemyHq.maxHp || 0) - (enemyHq.hp || 0));
+  const ownHqHp = Math.max(0, ownHq.hp || 0);
+  const controlPoints = [...state.controlPoints.values()].filter(p => p.owner === owner).length;
+  const armyValue = [...state.units.values()]
+    .filter(u => u.owner === owner && u.alive)
+    .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
+  const supplies = state.resources?.[owner]?.supplies || 0;
+  return {
+    enemyHqDamage,
+    ownHqHp,
+    controlPoints,
+    armyValue,
+    supplies,
+    total:
+      enemyHqDamage * weights.enemyHqDamage +
+      ownHqHp * weights.ownHqHp +
+      controlPoints * weights.controlPoint +
+      armyValue * weights.armyValue +
+      supplies * weights.supplies,
+  };
+}
+
+function computeAdjudicationScores() {
+  const playerA = playerScore('player_a');
+  const playerB = playerScore('player_b');
+  return playerA && playerB ? { player_a: playerA, player_b: playerB } : null;
+}
+
+function scoreBreakdown(score) {
+  return `HQ伤害 ${score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
+}
+
+function renderScoreRow(owner, score) {
+  const cls = owner === 'player_a' ? 'player-a' : 'player-b';
+  const mine = owner === myPlayer ? ' mine' : '';
+  return `<div class="score-row ${cls}${mine}">
+    <div class="score-row-head"><span>${esc(playerName(owner))}${owner === myPlayer ? '（你）' : ''}</span><strong>${score.total}</strong></div>
+    <div class="score-breakdown">${esc(scoreBreakdown(score))}</div>
+  </div>`;
+}
+
+function renderScorePanel() {
+  const scorePanelEl = els.scorePanel;
+  if (!scorePanelEl) return;
+  const scores = computeAdjudicationScores();
+  if (!scores) {
+    scorePanelEl.innerHTML = '<h3>裁决分</h3><div class="score-empty">等待对局开始</div>';
+    return;
+  }
+  const a = scores.player_a;
+  const b = scores.player_b;
+  const leader = a.total === b.total ? '当前平分' : `${playerName(a.total > b.total ? 'player_a' : 'player_b')} 领先 ${Math.abs(a.total - b.total)}`;
+  scorePanelEl.innerHTML = `<h3>裁决分</h3>
+    <div class="score-leader">${esc(leader)}</div>
+    ${renderScoreRow('player_a', a)}
+    ${renderScoreRow('player_b', b)}`;
+}
+
 function renderSidebar() {
   if (!state) return;
   const owner = state.turn.currentOwner;
@@ -298,6 +366,7 @@ function renderSidebar() {
   els.turnBadge.classList.toggle('my-turn', owner === myPlayer);
   els.resDisplay.innerHTML = `<span class="res-a ${myPlayer === 'player_a' ? 'res-me' : ''}">${esc(playerName('player_a'))}: ${state.resources.player_a.supplies}</span><span class="res-b ${myPlayer === 'player_b' ? 'res-me' : ''}">${esc(playerName('player_b'))}: ${state.resources.player_b.supplies}</span>`;
   renderActionsDisplay(owner);
+  renderScorePanel();
   els.events.innerHTML = '';
   for (const ev of state.eventLog.slice(-60)) {
     const li = document.createElement('li'); li.className = `type-${ev.type}`;
@@ -322,7 +391,10 @@ function formatEventShort(ev) {
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
     case 'reset_actions': return `${playerName(p.owner)} 单位已重置`;
     case 'turn_end': return `轮到 ${playerName(p.nextOwner)}`;
-    case 'game_over': return `${playerName(p.winner)} 获胜`;
+    case 'game_over':
+      if (p.reason === 'turn_limit_draw') return '20回合裁决平局';
+      if (p.reason === 'turn_limit_score') return `${playerName(p.winner)} 20回合裁决获胜`;
+      return `${playerName(p.winner)} 获胜`;
     case 'name_rename': return `${p.playerId} 改名为 ${p.name}`;
     default: return JSON.stringify(p).slice(0, 100);
   }

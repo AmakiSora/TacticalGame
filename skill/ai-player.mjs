@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { pathToFileURL } from 'node:url';
+
 const DEFAULT_URL = 'http://localhost:3100';
 const HEX_DIRECTIONS = [
   { q: 1, r: 0 },
@@ -233,9 +235,10 @@ function targetScore(target) {
     ranger: 420,
     scout: 350,
     infantry: 320,
-    heavy: 250,
+    heavy: 180,
   }[target.entity.type] || 0;
-  return typeBonus + (target.entity.maxHp - target.entity.hp) * 4 - target.entity.hp;
+  const heavyPenalty = target.entity.type === 'heavy' && target.entity.hp > 80 ? 180 : 0;
+  return typeBonus + (target.entity.maxHp - target.entity.hp) * 4 - target.entity.hp - heavyPenalty;
 }
 
 async function tryAttack(game, args, seat, unit) {
@@ -267,8 +270,16 @@ async function tryHeal(game, args, seat, unit) {
   return true;
 }
 
-function movementGoal(game, owner, unit) {
+export function movementGoal(game, owner, unit) {
   const enemy = otherPlayer(owner);
+  const ownedPoints = game.controlPoints.filter(p => p.owner === owner).length;
+  const endgamePush = game.turn.turnNumber >= 8 || ownedPoints >= 3;
+  const adjudicationMode = game.turn.turnNumber >= 15;
+
+  if ((endgamePush || adjudicationMode) && ['scout', 'ranger', 'infantry'].includes(unit.type)) {
+    return game.headquarters[enemy];
+  }
+
   if (unit.canCapture) {
     const point = game.controlPoints
       .filter(p => p.owner !== owner)
@@ -323,6 +334,16 @@ function deployChoice(game, owner) {
   if (game.turn.turnNumber <= 3) preferences.push('scout', 'infantry');
   preferences.push('ranger', 'heavy', 'infantry', 'scout', 'support');
   return preferences.find(type => specs[type] && supplies >= specs[type].cost) || null;
+}
+
+export function shouldStrategicDeploy(game, owner) {
+  if (actionsRemaining(game) <= 0) return false;
+  if (!deployChoice(game, owner)) return false;
+  const friendly = livingUnits(game, owner).length;
+  const enemy = livingUnits(game, otherPlayer(owner)).length;
+  const ownedPoints = game.controlPoints.filter(p => p.owner === owner).length;
+  const supplies = game.resources[owner].supplies;
+  return supplies >= 90 || friendly <= enemy || ownedPoints >= 2 || game.turn.turnNumber >= 8;
 }
 
 async function tryDeploy(game, args, seat) {
@@ -388,6 +409,16 @@ async function playOwnedTurn(game, args, seat) {
     if (game.winner) break;
     if (changed) continue;
 
+    try {
+      if (shouldStrategicDeploy(game, seat.owner) && await tryDeploy(game, args, seat)) {
+        game = await refreshAfterAction(args, seat);
+        acted = changed = true;
+      }
+    } catch (err) {
+      console.error(`Deploy failed: ${err.message}`);
+    }
+    if (changed) continue;
+
     for (const unit of livingUnits(game, seat.owner)) {
       try {
         if (await tryMove(game, args, seat, unit)) {
@@ -449,7 +480,9 @@ async function main() {
   console.log(`Stopped after ${playedTurns} owned turns without a winner.`);
 }
 
-main().catch(err => {
-  console.error(err.message);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(err => {
+    console.error(err.message);
+    process.exit(1);
+  });
+}

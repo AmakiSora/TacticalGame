@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { startTestServer } from '../helpers.js';
+import { globalStore } from '../../src/state/store.js';
 
 async function createAndJoin(app: Awaited<ReturnType<typeof startTestServer>>) {
   const createRes = await app.inject({
@@ -102,6 +103,49 @@ describe('V2 API', () => {
     expect(body.events[0].type).toBe('game_start');
     expect(body.events[0].payload.map.grid).toBe('hex');
     expect(body.events[0].payload.config.balance.actionsPerTurn).toBe(5);
+    expect(body.events[0].payload.config.balance.maxTurns).toBe(20);
+    await app.close();
+  });
+
+  it('returns adjudication result and replay reason after the turn limit', async () => {
+    const app = await startTestServer();
+    const { gameId, playerAToken, playerBToken } = await createAndJoin(app);
+
+    const game = globalStore.get(gameId)!;
+    game.turn.turnNumber = 20;
+    game.turn.currentOwner = 'player_b';
+    game.resources.player_a.supplies = 0;
+    game.resources.player_b.supplies = 10;
+    game.units = [];
+    game.controlPoints.forEach((p: any) => { p.owner = null; });
+    game.headquarters.player_a.hp = 200;
+    game.headquarters.player_b.hp = 200;
+
+    const end = await app.inject({
+      method: 'POST',
+      url: `/api/games/${gameId}/end-turn`,
+      headers: { 'X-Player-Token': playerBToken },
+      payload: {},
+    });
+    expect(end.statusCode).toBe(200);
+
+    const finalRes = await app.inject({
+      method: 'GET',
+      url: `/api/games/${gameId}`,
+      headers: { 'X-Player-Token': playerAToken },
+    });
+    const finalGame = finalRes.json() as any;
+    expect(finalGame.tokens).toBeUndefined();
+    expect(finalGame.phase).toBe('game_over');
+    expect(finalGame.turn.turnNumber).toBe(20);
+    expect(finalGame.turn.currentOwner).toBe('player_b');
+    expect(finalGame.result).toMatchObject({ winner: 'player_b', reason: 'turn_limit_score' });
+
+    const eventsBody = (await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` })).json();
+    expect(eventsBody.events.at(-1)).toMatchObject({
+      type: 'game_over',
+      payload: expect.objectContaining({ winner: 'player_b', reason: 'turn_limit_score' }),
+    });
     await app.close();
   });
 

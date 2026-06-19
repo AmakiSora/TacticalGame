@@ -10,6 +10,9 @@ const TERRAIN = {
 const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
 const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
 const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP', headquarters: 'HQ' };
+const APP_VERSION = '2.1.0';
+const REPLAY_EXPORT_FORMAT = 'hex-v2-replay';
+const REPLAY_SCHEMA_VERSION = APP_VERSION;
 
 let gameConfig = null;
 let playerNames = defaultPlayerNames();
@@ -29,6 +32,7 @@ const gameSelect = document.getElementById('game-select');
 const refreshBtn = document.getElementById('refresh-list');
 const statusEl = document.getElementById('status');
 const resourcesEl = document.getElementById('resources');
+const scorePanelEl = document.getElementById('score-panel');
 const turnInfoEl = document.getElementById('turn-info');
 const eventsEl = document.getElementById('events');
 const detailEl = document.getElementById('detail-content');
@@ -144,6 +148,7 @@ function createEmptyState() {
     resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } },
     turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command', actionsUsed: 0 },
     winner: null,
+    result: null,
     eventLog: [],
   };
 }
@@ -234,6 +239,7 @@ function applyEvent(s, ev) {
     case 'game_over':
       s.turn.phase = 'game_over';
       s.winner = p.winner;
+      s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores };
       break;
     case 'name_rename':
       playerNames[p.playerId] = p.name;
@@ -410,9 +416,75 @@ function formatEventShort(ev) {
     case 'control_point_captured': return `占领 ${p.name}`;
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
     case 'turn_end': return `回合结束 -> ${playerName(p.nextOwner)} (${p.turnNumber})`;
-    case 'game_over': return `游戏结束 胜者:${playerName(p.winner)}`;
+    case 'game_over':
+      if (p.reason === 'turn_limit_draw') return '20回合裁决平局';
+      if (p.reason === 'turn_limit_score') return `20回合裁决 胜者:${playerName(p.winner)}`;
+      return `游戏结束 胜者:${playerName(p.winner)}`;
     default: return ev.type;
   }
+}
+
+function playerScore(owner) {
+  const weights = gameConfig?.balance?.adjudicationWeights;
+  if (!weights || !state) return null;
+  const enemy = owner === 'player_a' ? 'player_b' : 'player_a';
+  const ownHq = [...state.headquarters.values()].find(h => h.owner === owner);
+  const enemyHq = [...state.headquarters.values()].find(h => h.owner === enemy);
+  if (!ownHq || !enemyHq) return null;
+  const enemyHqDamage = Math.max(0, (enemyHq.maxHp || 0) - (enemyHq.hp || 0));
+  const ownHqHp = Math.max(0, ownHq.hp || 0);
+  const controlPoints = [...state.controlPoints.values()].filter(p => p.owner === owner).length;
+  const armyValue = [...state.units.values()]
+    .filter(u => u.owner === owner && u.alive)
+    .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
+  const supplies = state.resources?.[owner]?.supplies || 0;
+  return {
+    enemyHqDamage,
+    ownHqHp,
+    controlPoints,
+    armyValue,
+    supplies,
+    total:
+      enemyHqDamage * weights.enemyHqDamage +
+      ownHqHp * weights.ownHqHp +
+      controlPoints * weights.controlPoint +
+      armyValue * weights.armyValue +
+      supplies * weights.supplies,
+  };
+}
+
+function computeAdjudicationScores() {
+  const playerA = playerScore('player_a');
+  const playerB = playerScore('player_b');
+  return playerA && playerB ? { player_a: playerA, player_b: playerB } : null;
+}
+
+function scoreBreakdown(score) {
+  return `HQ伤害 ${score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
+}
+
+function renderScorePanel() {
+  if (!scorePanelEl) return;
+  const scores = computeAdjudicationScores();
+  if (!scores) {
+    scorePanelEl.innerHTML = '<h3>裁决分</h3><div class="score-empty">等待对局开始</div>';
+    return;
+  }
+  const a = scores.player_a;
+  const b = scores.player_b;
+  const leader = a.total === b.total ? '当前平分' : `${playerName(a.total > b.total ? 'player_a' : 'player_b')} 领先 ${Math.abs(a.total - b.total)}`;
+  scorePanelEl.innerHTML = `<h3>裁决分</h3>
+    <div class="score-leader">${esc(leader)}</div>
+    ${renderScoreRow('player_a', a)}
+    ${renderScoreRow('player_b', b)}`;
+}
+
+function renderScoreRow(owner, score) {
+  const cls = owner === 'player_a' ? 'player-a' : 'player-b';
+  return `<div class="score-row ${cls}">
+    <div class="score-row-head"><span>${playerNameControl(owner)}</span><strong>${score.total}</strong></div>
+    <div class="score-breakdown">${esc(scoreBreakdown(score))}</div>
+  </div>`;
 }
 
 function renderSidebar() {
@@ -421,6 +493,7 @@ function renderSidebar() {
     <div>${playerNameControl('player_a')}: ${state.resources.player_a.supplies} 补给</div>
     <div>${playerNameControl('player_b')}: ${state.resources.player_b.supplies} 补给</div>
     <div style="margin-top:6px;color:#7a9aaa;font-size:12px">据点: ${[...state.controlPoints.values()].map(cp => `${cp.name}:${cp.owner ? playerName(cp.owner) : '中立'}`).join(' / ')}</div>`;
+  renderScorePanel();
   const owner = state.turn.currentOwner;
   const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
   const actionsLine = maxActions
@@ -429,7 +502,7 @@ function renderSidebar() {
   turnInfoEl.innerHTML = `<h3>回合 ${state.turn.turnNumber}</h3>
     <div>当前: ${playerNameControl(owner)}</div>
     ${actionsLine}
-    ${state.winner ? `<div style="margin-top:6px;color:#f0d77c">胜者: ${esc(playerName(state.winner))}</div>` : ''}`;
+    ${state.result ? `<div style="margin-top:6px;color:#f0d77c">${esc(resultText(state.result))}</div>` : ''}`;
 
   eventsEl.innerHTML = '';
   allEvents.forEach((ev, i) => {
@@ -440,6 +513,12 @@ function renderSidebar() {
     li.addEventListener('click', () => { pausePlayback(); rebuildToStep(i); });
     eventsEl.appendChild(li);
   });
+}
+
+function resultText(result) {
+  if (result.reason === 'turn_limit_draw') return '20回合裁决平局';
+  if (result.reason === 'turn_limit_score') return `20回合裁决胜者: ${playerName(result.winner)}`;
+  return `胜者: ${playerName(result.winner)}`;
 }
 
 function renderDetail() {
@@ -606,27 +685,123 @@ function downloadFile(filename, content, mime) {
 function gameFilename(ext) {
   return `hex_game_${(gameSelect.value || 'unknown').slice(0, 8)}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.${ext}`;
 }
+
+function latestGameOverResult() {
+  const gameOver = [...allEvents].reverse().find(ev => ev.type === 'game_over');
+  if (!gameOver) return state?.result ?? null;
+  const p = gameOver.payload || {};
+  return { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores };
+}
+
+function replayMapId() {
+  const start = allEvents.find(ev => ev.type === 'game_start');
+  return start?.payload?.config?.mapId || start?.payload?.config?.id || start?.payload?.map?.id || null;
+}
+
+function normalizeVersion(value) {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) return `${value}.0.0`;
+  if (typeof value !== 'string') return null;
+  return /^\d+\.\d+\.\d+$/.test(value) ? value : null;
+}
+
+function compareSemver(a, b) {
+  const left = normalizeVersion(a);
+  const right = normalizeVersion(b);
+  if (!left || !right) return NaN;
+  const leftParts = left.split('.').map(Number);
+  const rightParts = right.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if (leftParts[i] !== rightParts[i]) return leftParts[i] - rightParts[i];
+  }
+  return 0;
+}
+
+function buildReplayExport() {
+  return {
+    format: REPLAY_EXPORT_FORMAT,
+    schemaVersion: REPLAY_SCHEMA_VERSION,
+    gameId: gameSelect.value || 'offline',
+    mapId: replayMapId(),
+    playerNames,
+    exportedAt: new Date().toISOString(),
+    eventCount: allEvents.length,
+    finalResult: latestGameOverResult(),
+    events: allEvents,
+  };
+}
+
 function exportJson() {
-  downloadFile(gameFilename('json'), JSON.stringify({ gameId: gameSelect.value, exportedAt: new Date().toISOString(), events: allEvents }, null, 2), 'application/json');
+  downloadFile(gameFilename('json'), JSON.stringify(buildReplayExport(), null, 2), 'application/json');
 }
 async function exportHtml() {
+  const replay = buildReplayExport();
   const [cssText, jsText] = await Promise.all([fetch('/style.css').then(r => r.text()), fetch('/app.js').then(r => r.text())]);
-  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Hex Replay</title><style>${cssText}</style></head><body><main><div id="board-wrap"><canvas id="board"></canvas><div id="cell-info" class="cell-info"></div><div id="replay-controls"><div id="control-buttons"><button id="btn-start">⏮</button><button id="btn-prev">◀</button><button id="btn-play">▶</button><button id="btn-next">▶</button><button id="btn-end">⏭</button><select id="speed-select"><option value="500">1x</option></select><span id="step-info"></span></div><div id="timeline-wrap"><input type="range" id="timeline" min="0" max="0" value="0"><div id="timeline-markers"></div></div></div></div><aside id="sidebar"><section id="resources"></section><section id="turn-info"></section><section id="event-detail"><div id="detail-content"></div></section><section id="event-log"><ul id="events"></ul></section></aside><div id="selection-panel"><div id="selection-detail"></div></div></main><select id="game-select"><option value="offline" selected>offline</option></select><button id="refresh-list"></button><span id="status"></span><button id="btn-export-html"></button><button id="btn-export-json"></button><button id="btn-import"></button><input id="import-file" type="file"><input id="auto-refresh" type="checkbox"><input id="follow-latest" type="checkbox"><input id="refresh-interval" value="5"><button id="btn-settings"></button><div id="settings-popover"></div><script>window.EMBEDDED_EVENTS=${JSON.stringify(allEvents)};window.fetch=(url)=>Promise.resolve(new Response(JSON.stringify(url.includes('/events')?{events:window.EMBEDDED_EVENTS}:{games:[{id:'offline',phase:'replay',turnNumber:0,currentOwner:'player_a'}]})));window.EventSource=function(){return {close(){}}};</script><script>${jsText}</script></body></html>`;
+  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Hex Replay</title><style>${cssText}</style></head><body><header><h1>Hex Replay <span class="version-badge">v2.1.0</span></h1></header><main><div id="board-wrap"><canvas id="board"></canvas><div id="cell-info" class="cell-info"></div><div id="replay-controls"><div id="control-buttons"><button id="btn-start">⏮</button><button id="btn-prev">◀</button><button id="btn-play">▶</button><button id="btn-next">▶</button><button id="btn-end">⏭</button><select id="speed-select"><option value="500">1x</option></select><span id="step-info"></span></div><div id="timeline-wrap"><input type="range" id="timeline" min="0" max="0" value="0"><div id="timeline-markers"></div></div></div></div><aside id="sidebar"><section id="resources"></section><section id="score-panel"></section><section id="turn-info"></section><section id="event-detail"><div id="detail-content"></div></section><section id="event-log"><ul id="events"></ul></section></aside><div id="selection-panel"><div id="selection-detail"></div></div></main><select id="game-select"><option value="offline" selected>offline</option></select><button id="refresh-list"></button><span id="status"></span><button id="btn-export-html"></button><button id="btn-export-json"></button><button id="btn-import"></button><input id="import-file" type="file"><input id="auto-refresh" type="checkbox"><input id="follow-latest" type="checkbox"><input id="refresh-interval" value="5"><button id="btn-settings"></button><div id="settings-popover"></div><script>window.EMBEDDED_REPLAY=${JSON.stringify(replay)};window.EMBEDDED_EVENTS=window.EMBEDDED_REPLAY.events;window.fetch=(url)=>Promise.resolve(new Response(JSON.stringify(url.includes('/events')?{events:window.EMBEDDED_REPLAY.events}:{games:[{id:'offline',phase:'replay',turnNumber:0,currentOwner:'player_a',result:window.EMBEDDED_REPLAY.finalResult}]})));window.EventSource=function(){return {close(){}}};</script><script>${jsText}</script></body></html>`;
   downloadFile(gameFilename('html'), html, 'text/html');
 }
+
+function normalizeImportedReplay(data) {
+  const events = Array.isArray(data) ? data : data.events;
+  const schemaVersion = Array.isArray(data) ? '1.0.0' : data.schemaVersion ?? '1.0.0';
+  if (!Array.isArray(data) && data.format && data.format !== REPLAY_EXPORT_FORMAT) {
+    throw new Error(`不支持的回放格式: ${data.format}`);
+  }
+  if (!normalizeVersion(schemaVersion)) throw new Error('回放版本号无效');
+  if (compareSemver(schemaVersion, REPLAY_SCHEMA_VERSION) > 0) throw new Error(`回放版本 ${schemaVersion} 高于当前支持版本 ${REPLAY_SCHEMA_VERSION}`);
+  if (!Array.isArray(events)) throw new Error('JSON 必须是事件数组或包含 events 数组的回放对象');
+  events.forEach((ev, index) => {
+    if (!ev || typeof ev !== 'object') throw new Error(`第 ${index + 1} 个事件不是对象`);
+    if (typeof ev.seq !== 'number' || !Number.isFinite(ev.seq)) throw new Error(`第 ${index + 1} 个事件缺少有效 seq`);
+    if (typeof ev.type !== 'string' || !ev.type) throw new Error(`第 ${index + 1} 个事件缺少有效 type`);
+    if (!ev.payload || typeof ev.payload !== 'object' || Array.isArray(ev.payload)) throw new Error(`第 ${index + 1} 个事件缺少有效 payload`);
+  });
+  return {
+    format: Array.isArray(data) ? 'legacy-event-array' : data.format || 'legacy-replay-object',
+    schemaVersion,
+    gameId: Array.isArray(data) ? 'offline' : data.gameId,
+    finalResult: Array.isArray(data) ? null : data.finalResult ?? null,
+    events,
+  };
+}
+
+function loadImportedReplay(replay) {
+  pausePlayback();
+  allEvents = replay.events;
+  pinnedReplayStep = false;
+  buildTimelineMarkers();
+  if (allEvents.length) rebuildToStep(allEvents.length - 1);
+  else {
+    state = createEmptyState();
+    currentStep = -1;
+    drawBoard();
+    renderSidebar();
+    renderDetail();
+    updateControls();
+  }
+  if (liveSse) liveSse.close();
+  liveSse = null;
+}
+
 function importJson() { importFile.click(); }
 importFile.addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    const data = JSON.parse(reader.result);
-    allEvents = data.events || [];
-    pinnedReplayStep = false;
-    buildTimelineMarkers();
-    if (allEvents.length) rebuildToStep(allEvents.length - 1);
-    if (liveSse) liveSse.close();
-    statusEl.textContent = `已导入 ${allEvents.length} 事件`;
+    try {
+      const data = JSON.parse(reader.result);
+      const replay = normalizeImportedReplay(data);
+      loadImportedReplay(replay);
+      statusEl.textContent = `已导入 ${allEvents.length} 事件`;
+    } catch (err) {
+      statusEl.textContent = `导入失败: ${err.message}`;
+    } finally {
+      importFile.value = '';
+    }
+  };
+  reader.onerror = () => {
+    statusEl.textContent = '导入失败: 无法读取文件';
+    importFile.value = '';
   };
   reader.readAsText(file);
 });
@@ -686,5 +861,20 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') { e.preventDefault(); pausePlayback(); stepBackward(); }
 });
 
-fetchGameList();
-startAutoRefresh();
+async function initializeApp() {
+  if (window.EMBEDDED_REPLAY || window.EMBEDDED_EVENTS) {
+    try {
+      const replay = normalizeImportedReplay(window.EMBEDDED_REPLAY || window.EMBEDDED_EVENTS);
+      window.EMBEDDED_EVENTS = replay.events;
+      loadImportedReplay(replay);
+      statusEl.textContent = `已加载离线回放 ${allEvents.length} 事件`;
+    } catch (err) {
+      statusEl.textContent = `导入失败: ${err.message}`;
+    }
+    return;
+  }
+  await fetchGameList();
+  startAutoRefresh();
+}
+
+initializeApp();

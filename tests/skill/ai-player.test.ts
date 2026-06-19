@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { startTestServer } from '../helpers.js';
+import { globalStore } from '../../src/state/store.js';
 
 function runAi(args: string[]): Promise<{ code: number | null; output: string }> {
   return new Promise(resolve => {
@@ -64,5 +65,37 @@ describe('AI player setup', () => {
     } finally {
       await app.close();
     }
+  });
+});
+
+describe('AI player strategy', () => {
+  it('deploys strategically before ordinary movement when supplies and actions remain', async () => {
+    const app = await startTestServer();
+    const { gameId } = (await app.inject({ method: 'POST', url: '/api/games' })).json() as { gameId: string };
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/join` });
+    const game = globalStore.get(gameId)! as any;
+    game.resources.player_a.supplies = 120;
+
+    const ai = await import('../../skill/ai-player.mjs');
+
+    expect(ai.shouldStrategicDeploy(game, 'player_a')).toBe(true);
+  });
+
+  it('targets the enemy headquarters in endgame push mode after turn 8 with three control points', async () => {
+    const app = await startTestServer();
+    const { gameId } = (await app.inject({ method: 'POST', url: '/api/games' })).json() as { gameId: string };
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/join` });
+    const game = globalStore.get(gameId)! as any;
+    game.turn.turnNumber = 8;
+    game.controlPoints[0].owner = 'player_a';
+    game.controlPoints[1].owner = 'player_a';
+    game.controlPoints[2].owner = 'player_a';
+    const scout = game.units.find((u: any) => u.owner === 'player_a' && u.type === 'scout');
+
+    const ai = await import('../../skill/ai-player.mjs');
+    const goal = ai.movementGoal(game, 'player_a', scout);
+
+    expect(goal.id).toBe(game.headquarters.player_b.id);
+    await app.close();
   });
 });

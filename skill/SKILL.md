@@ -5,7 +5,7 @@ description: Use when Codex needs to play, control, automate, or script a player
 
 # Play Hex API Game
 
-Use this skill to operate the local Hex V2 game through HTTP. The objective is to play legal turns until the enemy headquarters is destroyed or the configured turn/action limit is reached.
+Use this skill to operate the local Hex V2 game through HTTP. The objective is to play legal turns until the enemy headquarters is destroyed or the 20-round adjudication limit is reached.
 
 ## Start Points
 
@@ -45,6 +45,8 @@ If `POST /join` returns `game_already_full`, report that error. Do not fetch sta
 - New current player receives base income plus owned control-point income after each turn switch.
 - Deploy only from your headquarters or owned control points into adjacent empty plain cells.
 - Destroying the enemy headquarters immediately wins.
+- If no headquarters is destroyed after both players complete turn 20 (player B ends turn 20), the server adjudicates by score. A true draw is only possible when scores are exactly tied.
+- Adjudication score is: enemy HQ damage × 4 + own HQ HP × 2 + owned control points × 120 + surviving army value × 2 + supplies × 1.
 
 ### Action Points (per-turn limit)
 
@@ -68,11 +70,11 @@ Do not use V1 concepts: `x/y`, Manhattan distance, buildings, miners, production
 Use this order unless the user asks for a different style:
 
 1. Attack the enemy headquarters if any unit can hit it.
-2. Attack killable or low-HP enemies; prefer support, ranger, and capturing units. (Free for an already-activated unit.)
+2. Attack killable or low-HP enemies; prefer support, ranger, and capturing units. Avoid wasting many attacks on healthy heavy units when a point or HQ route is available.
 3. Heal the most damaged friendly unit with support.
-4. Move infantry/scout toward neutral or enemy control points.
-5. Move combat units toward the enemy headquarters, preferring cells that maintain or improve attack options. Prefer to fully resolve a unit (move then attack) before activating the next, so each action point yields maximum value.
-6. Deploy when supplies AND an action point remain: scouts/infantry early for capture, ranger/heavy for pressure, support when multiple friendly units are damaged.
+4. Deploy strategically before ordinary movement when supplies and an action point remain, especially if supplies ≥ 90, unit count is not ahead, you own at least 2 control points, or the game has reached turn 8.
+5. Move infantry/scout toward neutral or enemy control points before turn 8. From turn 8 onward, or once you own 3+ points, move scout/ranger/infantry toward enemy HQ attack positions.
+6. From turn 15 onward, prioritize adjudication score: damage HQ, capture/hold points, preserve valuable units, and spend excess supplies.
 7. Once `actionsUsed >= actionsPerTurn`, stop trying to move/deploy fresh units; finish any free attacks from activated units, then end the turn.
 
 Refresh state after every successful action. If an action fails, log the API error and continue to the next candidate; do not repeat the same failing action in a tight loop.

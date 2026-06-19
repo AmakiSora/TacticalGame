@@ -38,13 +38,13 @@
   "units": {
     "infantry": { "hp": 100, "attack": 28, "defense": 8, "moveRange": 3, "attackRange": 1, "cost": 45, "canCapture": true },
     "scout": { "hp": 70, "attack": 18, "defense": 4, "moveRange": 5, "attackRange": 1, "cost": 40, "canCapture": true },
-    "heavy": { "hp": 160, "attack": 36, "defense": 16, "moveRange": 2, "attackRange": 1, "cost": 90, "canCapture": false },
-    "ranger": { "hp": 75, "attack": 42, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 75, "canCapture": false },
-    "support": { "hp": 80, "attack": 12, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 60, "canCapture": false, "healPower": 28 }
+    "heavy": { "hp": 145, "attack": 36, "defense": 14, "moveRange": 2, "attackRange": 1, "cost": 90, "canCapture": false },
+    "ranger": { "hp": 75, "attack": 46, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 75, "canCapture": false },
+    "support": { "hp": 80, "attack": 12, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 60, "canCapture": false, "healPower": 20 }
   },
   "headquartersSpec": {
-    "hp": 240,
-    "defense": 10
+    "hp": 200,
+    "defense": 8
   },
   "balance": {
     "startingSupplies": 80,
@@ -52,7 +52,15 @@
     "controlPointIncome": 15,
     "damageVarianceRange": 3,
     "minimumDamage": 1,
-    "healVarianceRange": 10,
-    "actionsPerTurn": 5
+    "healVarianceRange": 6,
+    "actionsPerTurn": 5,
+    "maxTurns": 20,
+    "adjudicationWeights": {
+      "enemyHqDamage": 4,
+      "ownHqHp": 2,
+      "controlPoint": 120,
+      "armyValue": 2,
+      "supplies": 1
+    }
   }
 }

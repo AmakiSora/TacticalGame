@@ -99,6 +99,7 @@ export function createInitialGame(id: string, mapId?: string): GameState {
     turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_for_player', actionsUsed: 0 },
     events: [],
     winner: null,
+    result: null,
   };
 }
 

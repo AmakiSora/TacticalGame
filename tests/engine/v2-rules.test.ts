@@ -89,7 +89,85 @@ describe('hex V2 rules', () => {
     expect(result.ok).toBe(true);
     expect(game.phase).toBe('game_over');
     expect(game.winner).toBe('player_a');
+    expect(game.result).toMatchObject({ winner: 'player_a', reason: 'headquarters_destroyed' });
     expect(game.events.some(e => e.type === 'headquarters_destroyed')).toBe(true);
+    expect(game.events.find(e => e.type === 'game_over')!.payload.reason).toBe('headquarters_destroyed');
+  });
+
+  it('does not adjudicate after player_a ends turn 20', () => {
+    const { game, bus } = setup();
+    game.turn.turnNumber = 20;
+    game.turn.currentOwner = 'player_a';
+
+    const result = endTurn(game, bus, 'player_a');
+
+    expect(result.ok).toBe(true);
+    expect(game.phase).toBe('waiting_command');
+    expect(game.turn.turnNumber).toBe(20);
+    expect(game.turn.currentOwner).toBe('player_b');
+    expect(game.result).toBeNull();
+  });
+
+  it('adjudicates by score after player_b ends turn 20 and captures first', () => {
+    const { game, bus } = setup();
+    game.turn.turnNumber = 20;
+    game.turn.currentOwner = 'player_b';
+    game.resources.player_a.supplies = 0;
+    game.resources.player_b.supplies = 0;
+    game.headquarters.player_a.hp = 200;
+    game.headquarters.player_b.hp = 200;
+    game.units = game.units.slice(0, 1);
+    const unit = game.units[0];
+    unit.owner = 'player_b';
+    unit.type = 'infantry';
+    unit.canCapture = true;
+    unit.q = 0;
+    unit.r = 0;
+
+    const result = endTurn(game, bus, 'player_b');
+
+    expect(result.ok).toBe(true);
+    expect(game.phase).toBe('game_over');
+    expect(game.turn.turnNumber).toBe(20);
+    expect(game.turn.currentOwner).toBe('player_b');
+    expect(game.winner).toBe('player_b');
+    expect(game.result).toMatchObject({
+      winner: 'player_b',
+      reason: 'turn_limit_score',
+      scores: {
+        player_b: expect.objectContaining({ controlPoints: 1 }),
+      },
+    });
+    expect(game.controlPoints.find(p => p.id === 'cp_c')!.owner).toBe('player_b');
+    expect(game.events.at(-1)).toMatchObject({
+      type: 'game_over',
+      payload: expect.objectContaining({ winner: 'player_b', reason: 'turn_limit_score' }),
+    });
+  });
+
+  it('records a draw when turn-limit adjudication scores are tied', () => {
+    const { game, bus } = setup();
+    game.turn.turnNumber = 20;
+    game.turn.currentOwner = 'player_b';
+    game.resources.player_a.supplies = 0;
+    game.resources.player_b.supplies = 0;
+    game.units = [];
+    game.controlPoints.forEach(p => { p.owner = null; });
+    game.headquarters.player_a.hp = 200;
+    game.headquarters.player_b.hp = 200;
+
+    const result = endTurn(game, bus, 'player_b');
+
+    expect(result.ok).toBe(true);
+    expect(game.phase).toBe('game_over');
+    expect(game.turn.turnNumber).toBe(20);
+    expect(game.turn.currentOwner).toBe('player_b');
+    expect(game.winner).toBeNull();
+    expect(game.result).toMatchObject({ winner: null, reason: 'turn_limit_draw' });
+    expect(game.events.at(-1)).toMatchObject({
+      type: 'game_over',
+      payload: expect.objectContaining({ winner: null, reason: 'turn_limit_draw' }),
+    });
   });
 
   it('support heals friendly units by supportId', () => {

@@ -64,6 +64,14 @@ export interface MapConfig {
     minimumDamage: number;
     healVarianceRange: number;
     actionsPerTurn: number;
+    maxTurns: number;
+    adjudicationWeights: {
+      enemyHqDamage: number;
+      ownHqHp: number;
+      controlPoint: number;
+      armyValue: number;
+      supplies: number;
+    };
   };
 }
 
@@ -129,6 +137,15 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   }
   if (!('actionsPerTurn' in balance)) throw new Error(`Map "${id}".balance.actionsPerTurn is required`);
   assertNumber(balance, 'actionsPerTurn', `Map "${id}".balance`, 1);
+  if (!('maxTurns' in balance)) throw new Error(`Map "${id}".balance.maxTurns is required`);
+  assertNumber(balance, 'maxTurns', `Map "${id}".balance`, 1);
+  if (!('adjudicationWeights' in balance)) {
+    throw new Error(`Map "${id}".balance.adjudicationWeights is required`);
+  }
+  const weights = asRecord(balance.adjudicationWeights, `Map "${id}".balance.adjudicationWeights`);
+  for (const key of ['enemyHqDamage', 'ownHqHp', 'controlPoint', 'armyValue', 'supplies']) {
+    assertNumber(weights, key, `Map "${id}".balance.adjudicationWeights`, 0);
+  }
 
   const hq = asRecord(c.headquarters, `Map "${id}".headquarters`);
   for (const player of ['player_a', 'player_b'] as PlayerId[]) {

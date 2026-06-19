@@ -7,6 +7,8 @@ export type UnitType = 'infantry' | 'scout' | 'heavy' | 'ranger' | 'support';
 
 export type GamePhase = 'waiting_for_player' | 'waiting_command' | 'game_over';
 
+export type GameOverReason = 'headquarters_destroyed' | 'turn_limit_score' | 'turn_limit_draw';
+
 export type TerrainType = 'plain' | 'water' | 'blocker';
 
 export interface Position {
@@ -98,6 +100,21 @@ export interface GameEvent {
   payload: Record<string, unknown>;
 }
 
+export interface AdjudicationScore {
+  enemyHqDamage: number;
+  ownHqHp: number;
+  controlPoints: number;
+  armyValue: number;
+  supplies: number;
+  total: number;
+}
+
+export interface GameResult {
+  winner: PlayerId | null;
+  reason: GameOverReason;
+  scores?: Record<PlayerId, AdjudicationScore>;
+}
+
 export interface GameState {
   id: string;
   mapId: string;
@@ -114,6 +131,7 @@ export interface GameState {
   turn: TurnState;
   events: GameEvent[];
   winner: PlayerId | null;
+  result: GameResult | null;
 }
 
 export interface ApiError {

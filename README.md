@@ -38,6 +38,7 @@ npm run dev
 - 回合切换后，新当前玩家获得基础收入 10 + 每个己方据点 15。
 - 可从己方总部或己方据点向相邻空白平地部署单位。
 - 摧毁敌方总部立即获胜。
+- 若双方完成第 20 回合后仍未摧毁总部，系统按优势分裁决：敌方总部已损血×4 + 己方总部当前 HP×2 + 己方据点数×120 + 存活部队价值×2 + 剩余补给×1。分高者胜；完全同分才记录为平局。
 
 ## 单位
 
@@ -45,11 +46,11 @@ npm run dev
 |---|---:|---:|---:|---:|---:|---:|---|
 | `infantry` | 100 | 28 | 8 | 3 | 1 | 45 | 占点与守点 |
 | `scout` | 70 | 18 | 4 | 5 | 1 | 40 | 快速抢点 |
-| `heavy` | 160 | 36 | 16 | 2 | 1 | 90 | 抗线突破 |
-| `ranger` | 75 | 42 | 3 | 2 | 3 | 75 | 远程输出 |
+| `heavy` | 145 | 36 | 14 | 2 | 1 | 90 | 抗线突破 |
+| `ranger` | 75 | 46 | 3 | 2 | 3 | 75 | 远程输出 |
 | `support` | 80 | 12 | 5 | 3 | 1 | 60 | 治疗支援 |
 
-总部：HP 240，防御 10。
+总部：HP 200，防御 8。
 
 > 经济说明：基础收入 10/回合，每个己方据点额外 +15。配合 5 行动点上限，囤积补给无法快速转化为兵力，避免雪球。
 
@@ -88,7 +89,7 @@ npm run dev
 
 `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `control_point_captured`, `income`, `reset_actions`, `turn_end`, `headquarters_destroyed`, `game_over`, `name_rename`
 
-`game_start` 包含完整地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。
+`game_start` 包含完整地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `headquarters_destroyed`、`turn_limit_score` 或 `turn_limit_draw`。
 
 ## 地图格式
 
@@ -107,8 +108,8 @@ npm run dev
   },
   "startingUnits": [{ "owner": "player_a", "type": "infantry", "q": -7, "r": 0 }],
   "units": {},
-  "headquartersSpec": { "hp": 240, "defense": 10 },
-  "balance": { "startingSupplies": 80, "baseIncome": 10, "controlPointIncome": 15, "damageVarianceRange": 3, "minimumDamage": 1, "healVarianceRange": 10, "actionsPerTurn": 5 }
+  "headquartersSpec": { "hp": 200, "defense": 8 },
+  "balance": { "startingSupplies": 80, "baseIncome": 10, "controlPointIncome": 15, "damageVarianceRange": 3, "minimumDamage": 1, "healVarianceRange": 6, "actionsPerTurn": 5, "maxTurns": 20, "adjudicationWeights": { "enemyHqDamage": 4, "ownHqHp": 2, "controlPoint": 120, "armyValue": 2, "supplies": 1 } }
 }
 ```
 
@@ -122,7 +123,7 @@ node skill/ai-player.mjs --side a
 node skill/ai-player.mjs --side b --game <gameId>
 ```
 
-AI 策略优先级：击毁总部、击杀低血单位、抢占据点、部署补强、推进总部、治疗友军。受 5 行动点限制，AI 会优先把每个激活单位「移动+攻击」用满后再激活下一个，行动点耗尽后结束回合。
+AI 策略优先级：击毁总部、击杀低血单位、治疗友军、战略部署、抢占据点/推进总部。第 8 回合后或拥有 3 个据点时优先转入总部压力；第 15 回合后按裁决分优化行动。
 
 ## 测试
 

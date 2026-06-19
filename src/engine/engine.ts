@@ -1,6 +1,6 @@
 // src/engine/engine.ts
 import { randomBytes } from 'node:crypto';
-import type { GameState, PlayerId } from '../types.js';
+import type { AdjudicationScore, GameOverReason, GameState, PlayerId } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { appendEvent } from './events.js';
@@ -94,6 +94,68 @@ function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): void {
   appendEvent(game, bus, 'income', { owner, base, control, controlPoints: points, amount });
 }
 
+function armyValue(game: GameState, owner: PlayerId): number {
+  return game.units
+    .filter(u => u.owner === owner && u.alive)
+    .reduce((sum, unit) => sum + Math.round(unit.cost * (unit.hp / unit.maxHp)), 0);
+}
+
+function scorePlayer(game: GameState, owner: PlayerId): AdjudicationScore {
+  const enemy = otherPlayer(owner);
+  const weights = game.config.balance.adjudicationWeights;
+  const enemyHqDamage = game.headquarters[enemy].maxHp - game.headquarters[enemy].hp;
+  const ownHqHp = game.headquarters[owner].hp;
+  const controlPoints = game.controlPoints.filter(p => p.owner === owner).length;
+  const army = armyValue(game, owner);
+  const supplies = game.resources[owner].supplies;
+  return {
+    enemyHqDamage,
+    ownHqHp,
+    controlPoints,
+    armyValue: army,
+    supplies,
+    total:
+      enemyHqDamage * weights.enemyHqDamage +
+      ownHqHp * weights.ownHqHp +
+      controlPoints * weights.controlPoint +
+      army * weights.armyValue +
+      supplies * weights.supplies,
+  };
+}
+
+export function buildAdjudicationScores(game: GameState): Record<PlayerId, AdjudicationScore> {
+  return {
+    player_a: scorePlayer(game, 'player_a'),
+    player_b: scorePlayer(game, 'player_b'),
+  };
+}
+
+export function endGame(
+  game: GameState,
+  bus: EventBus,
+  winner: PlayerId | null,
+  reason: GameOverReason,
+  scores?: Record<PlayerId, AdjudicationScore>,
+): void {
+  game.phase = 'game_over';
+  game.turn.phase = 'game_over';
+  game.winner = winner;
+  game.result = scores ? { winner, reason, scores } : { winner, reason };
+  appendEvent(game, bus, 'game_over', { winner, reason, ...(scores ? { scores } : {}) });
+}
+
+function maybeAdjudicate(game: GameState, bus: EventBus, endedOwner: PlayerId): boolean {
+  if (endedOwner !== 'player_b') return false;
+  if (game.turn.turnNumber < game.config.balance.maxTurns) return false;
+
+  const scores = buildAdjudicationScores(game);
+  const a = scores.player_a.total;
+  const b = scores.player_b.total;
+  const winner = a === b ? null : a > b ? 'player_a' : 'player_b';
+  endGame(game, bus, winner, winner === null ? 'turn_limit_draw' : 'turn_limit_score', scores);
+  return true;
+}
+
 export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result {
   if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
   if (game.phase !== 'waiting_command') return { ok: false, code: 'game_not_started', message: 'game not in play' };
@@ -102,6 +164,7 @@ export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result
   captureControlPoints(game, bus, owner);
   resetActions(game, owner);
   appendEvent(game, bus, 'reset_actions', { owner, actionsUsed: 0 });
+  if (maybeAdjudicate(game, bus, owner)) return { ok: true };
 
   const next = otherPlayer(owner);
   if (next === 'player_a') game.turn.turnNumber += 1;

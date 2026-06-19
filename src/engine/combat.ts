@@ -5,6 +5,7 @@ import type { Result } from './result.js';
 import { hexDistance } from './hex.js';
 import { consumeAction, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
+import { endGame } from './engine.js';
 
 type Target =
   | { kind: 'unit'; entity: Unit }
@@ -35,13 +36,6 @@ function computeDamage(game: GameState, attack: number, defense: number): number
     game.config.balance.minimumDamage,
     attack - defense + rollVariance(game.config.balance.damageVarianceRange),
   );
-}
-
-function endGame(game: GameState, bus: EventBus, winner: PlayerId): void {
-  game.phase = 'game_over';
-  game.turn.phase = 'game_over';
-  game.winner = winner;
-  appendEvent(game, bus, 'game_over', { winner });
 }
 
 export function attackTarget(
@@ -86,7 +80,7 @@ export function attackTarget(
       appendEvent(game, bus, 'headquarters_destroyed', {
         headquartersId: target.entity.id, owner: target.entity.owner, q: target.entity.q, r: target.entity.r,
       });
-      endGame(game, bus, owner);
+      endGame(game, bus, owner, 'headquarters_destroyed');
     } else {
       appendEvent(game, bus, 'unit_death', {
         unitId: target.entity.id,

@@ -6,6 +6,22 @@ body {
   color: #d8e0e8;
 }
 
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  background: #0f1820;
+  color: #9ec;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Header */
 header {
   display: flex; align-items: center; justify-content: space-between;
@@ -383,6 +399,46 @@ main {
   white-space: nowrap;
 }
 .player-name:hover { border-bottom-color: rgba(255,255,255,.7); }
+
+/* Adjudication score */
+#score-panel .score-leader {
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: #0f1a24;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  color: #f0d77c;
+  font-weight: 700;
+  font-size: 13px;
+}
+.score-row {
+  padding: 8px;
+  margin-top: 8px;
+  background: #0f141c;
+  border: 1px solid #243545;
+  border-left-width: 3px;
+  border-radius: 6px;
+}
+.score-row.player-a { border-left-color: #66ccff; }
+.score-row.player-b { border-left-color: #ff9966; }
+.score-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.score-row-head strong {
+  color: #d8e0e8;
+  font: 800 18px "SF Mono", "Consolas", monospace;
+}
+.score-breakdown {
+  margin-top: 4px;
+  color: #7a9aaa;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.score-empty { color: #668495; font-size: 12px; }
 
 /* Cell info overlay */
 .cell-info {

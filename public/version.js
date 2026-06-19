@@ -1,0 +1,13 @@
+window.APP_VERSION = '2.1.2';
+
+function renderAppVersionBadges() {
+  document.querySelectorAll('.version-badge').forEach(el => {
+    el.textContent = `v${window.APP_VERSION}`;
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderAppVersionBadges);
+} else {
+  renderAppVersionBadges();
+}

@@ -9,7 +9,7 @@ describe('spectator import/export', () => {
 
     expect(source).toContain('function buildReplayExport');
     expect(source).toContain('REPLAY_EXPORT_FORMAT');
-    expect(source).toContain("APP_VERSION = '2.1.0'");
+    expect(source).toContain("APP_VERSION = '2.1.1'");
     expect(source).toContain('REPLAY_SCHEMA_VERSION = APP_VERSION');
     expect(source).toContain('format: REPLAY_EXPORT_FORMAT');
     expect(source).toContain('schemaVersion');

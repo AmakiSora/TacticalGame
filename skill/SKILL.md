@@ -14,6 +14,7 @@ Use this skill to operate the local Hex V2 game through HTTP. The objective is t
 - Create a new player A game: `node skill/ai-player.mjs --side a --name "AI A"`.
 - Join an existing game as player B: `node skill/ai-player.mjs --side b --game <gameId> --name "AI B"`.
 - Reconnect to an existing seat with `--game <gameId> --side a|b --token <token>`.
+- Normal AI play is continuous. Use `--once` only when the user explicitly asks to play exactly one turn.
 
 Never continue without a token. `POST /api/games` and `POST /api/games/:id/join` are the only endpoints that return player tokens.
 
@@ -34,6 +35,20 @@ All state and action requests require `X-Player-Token: <token>`.
 | Events | `GET /api/games/:id/events?after=<seq>` | none |
 
 If `POST /join` returns `game_already_full`, report that error. Do not fetch state with a missing token.
+
+## Mandatory Turn Loop
+
+Do not stop after ending one owned turn. Keep the player process active until the game is over, the turn budget is reached, or the user explicitly asks for `--once`.
+
+Required loop:
+
+1. `GET /api/games/:id`.
+2. If `winner` exists or `phase === "game_over"`, stop and report the result.
+3. If `phase !== "waiting_command"`, sleep briefly and poll again.
+4. If `game.turn.currentOwner !== your owner`, sleep briefly and poll again. Do not ask the human to say "your turn".
+5. If it is your turn, play a complete legal turn, call `/end-turn`, then immediately return to step 1.
+
+After `POST /end-turn`, the correct next action is polling. Ending a turn is not task completion; it only hands control to the opponent. Only use `--once` when the user explicitly asks to play exactly one turn.
 
 ## Rules To Remember
 

@@ -12,8 +12,8 @@ describe('adjudication score panels', () => {
   });
 
   it('shows the application version on spectator and play pages', () => {
-    expect(read('public/spectator.html')).toContain('<h1>战棋对战观战 <span class="version-badge">v2.1.0</span></h1>');
-    expect(read('public/play.html')).toContain('<h1>六边形战棋 <span class="sub">玩家控制台</span> <span class="version-badge">v2.1.0</span></h1>');
+    expect(read('public/spectator.html')).toContain('<h1>战棋对战观战 <span class="version-badge">v2.1.1</span></h1>');
+    expect(read('public/play.html')).toContain('<h1>六边形战棋 <span class="sub">玩家控制台</span> <span class="version-badge">v2.1.1</span></h1>');
   });
 
   it('computes and renders live scores in both front-end bundles', () => {

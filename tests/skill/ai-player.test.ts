@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { startTestServer } from '../helpers.js';
 import { globalStore } from '../../src/state/store.js';
@@ -65,6 +66,19 @@ describe('AI player setup', () => {
     } finally {
       await app.close();
     }
+  });
+});
+
+describe('AI player skill documentation', () => {
+  it('requires polling for future owned turns instead of waiting for human reminders', async () => {
+    const skill = await readFile('skill/SKILL.md', 'utf8');
+
+    expect(skill).toContain('## Mandatory Turn Loop');
+    expect(skill).toContain('Do not stop after ending one owned turn');
+    expect(skill).toContain('If `game.turn.currentOwner !== your owner`, sleep briefly and poll again');
+    expect(skill).toContain('Do not ask the human to say "your turn"');
+    expect(skill).toContain('After `POST /end-turn`, the correct next action is polling');
+    expect(skill).toContain('Only use `--once` when the user explicitly asks to play exactly one turn');
   });
 });
 

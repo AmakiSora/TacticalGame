@@ -2,12 +2,15 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。两名玩家争夺地图据点获取补给，在总部或己方据点部署单位，最终摧毁敌方总部获胜。
 
+当前版本：`2.1.3`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
+
 ## 技术栈
 
 - 后端：Node.js + TypeScript + Fastify
 - 前端：原生 HTML/CSS/JS + Canvas
 - 数据：内存存储，服务器重启后对局丢失
 - 地图：`maps/*.json` V2 hex 配置
+- 对战记录：`records/` 保存导出的回放 JSON、复盘 Markdown 和 AI 日志
 
 ## 启动
 
@@ -22,14 +25,14 @@ npm run dev
 | 路径 | 说明 |
 |---|---|
 | `http://localhost:3100/play.html` | 创建/加入并手动操作 |
-| `http://localhost:3100/spectator.html` | 观战、回放、导出 |
+| `http://localhost:3100/spectator.html` | 观战、导入回放、导出 JSON/HTML |
 
 ## 核心规则
 
 - 地图为尖顶六边形，坐标为 `{ q, r }`。
-- 默认地图半径为 `8`，有效格满足 `max(abs(q), abs(r), abs(-q-r)) <= radius`。
+- 当前内置地图为 `default`（六角前线）和 `desert`（裂谷控制区），半径均为 `8`；有效格满足 `max(abs(q), abs(r), abs(-q-r)) <= radius`。
 - 地形：`plain` 可通行/部署，`water` 和 `blocker` 不可通行/部署。
-- 每方开局有总部、2 个步兵、1 个侦察兵、80 补给。
+- 每方开局有总部、2 个步兵、1 个侦察兵、80 补给；不同地图可调整初始坐标。
 - **每回合最多消耗 5 个行动点**（`config.balance.actionsPerTurn`）。首次操作一个单位（部署/移动/攻击/治疗）消耗 1 点并「激活」该单位；同一单位在本回合内的后续动作免费。行动点用尽后，只能继续操作已激活的单位。这是为防止资源碾压方操作过多单位而设的硬上限。
 - 每个单位每回合可移动一次、行动一次。
 - 移动使用路径搜索，不能穿过水域、阻挡、单位或总部。
@@ -93,7 +96,7 @@ npm run dev
 
 ## 地图格式
 
-地图位于 `maps/`：
+地图位于 `maps/`，文件名就是 `mapId`（例如 `default.json` 对应 `mapId: "default"`）。服务启动时会加载并校验地图配置，`GET /api/maps` 返回可选地图：
 
 ```json
 {
@@ -119,11 +122,32 @@ npm run dev
 
 ```bash
 npm run dev
-node skill/ai-player.mjs --side a
-node skill/ai-player.mjs --side b --game <gameId>
+node skill/ai-player.mjs --side a --name "AI A"
+node skill/ai-player.mjs --side b --game <gameId> --name "AI B"
+node skill/ai-player.mjs --side a --game <gameId> --token <playerAToken>
 ```
 
-AI 策略优先级：击毁总部、击杀低血单位、治疗友军、战略部署、抢占据点/推进总部。第 8 回合后或拥有 3 个据点时优先转入总部压力；第 15 回合后按裁决分优化行动。
+AI 默认会持续轮询并自动处理后续己方回合，直到游戏结束、达到 `--max-turns`，或命令被停止。只有明确想让它只行动一个己方回合时才使用 `--once`。
+
+常用参数：
+
+| 参数 | 说明 |
+|---|---|
+| `--url <url>` | API 地址，默认 `http://localhost:3100` |
+| `--side <a|b>` | 选择玩家 A 或 B |
+| `--game <gameId>` | 加入或重连已有对局 |
+| `--token <token>` | 用已有 token 重连指定席位 |
+| `--map <mapId>` | 创建对局时选择地图，默认 `default` |
+| `--max-turns <n>` | 最多处理多少个己方回合，默认 `80` |
+| `--once` | 只处理当前或下一个己方回合 |
+
+AI 策略优先级：击毁总部、击杀低血单位、治疗友军、战略部署、抢占据点/推进总部。第 8 回合后或拥有 3 个据点时优先转入总部压力；第 15 回合后按裁决分优化行动。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。
+
+## 回放与记录
+
+- 观战页可以从在线对局导出回放 JSON 或离线 HTML。
+- 导出的 JSON 可在观战页重新导入并按事件流回放。
+- 历史对战记录放在 `records/V1` 和 `records/V2`；V2 记录包含 `schemaVersion`，便于后续回放兼容。
 
 ## 测试
 

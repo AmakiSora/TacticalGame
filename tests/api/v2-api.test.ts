@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { startTestServer } from '../helpers.js';
 import { globalStore } from '../../src/state/store.js';
 
@@ -18,6 +18,33 @@ async function createAndJoin(app: Awaited<ReturnType<typeof startTestServer>>) {
 }
 
 describe('V2 API', () => {
+  it('logs game id and player tokens when creating and joining a game', async () => {
+    const app = await startTestServer();
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/games',
+        payload: { name: 'A' },
+      });
+      const created = createRes.json() as { gameId: string; playerAToken: string };
+
+      const joinRes = await app.inject({
+        method: 'POST',
+        url: `/api/games/${created.gameId}/join`,
+        payload: { name: 'B' },
+      });
+      const joined = joinRes.json() as { playerBToken: string };
+
+      expect(log).toHaveBeenCalledWith(`[game:create] gameId=${created.gameId} playerAToken=${created.playerAToken}`);
+      expect(log).toHaveBeenCalledWith(`[game:join] gameId=${created.gameId} playerBToken=${joined.playerBToken}`);
+    } finally {
+      log.mockRestore();
+      await app.close();
+    }
+  });
+
   it('creates hex games and returns sanitized q/r state', async () => {
     const app = await startTestServer();
     const { gameId, playerAToken } = await createAndJoin(app);

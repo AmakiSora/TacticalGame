@@ -38,6 +38,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const game = createInitialGame(id, mapId);
     game.playerNames.player_a = name;
     globalStore.save(game);
+    console.log(`[game:create] gameId=${id} playerAToken=${game.tokens.player_a}`);
     return { gameId: id, playerAToken: game.tokens.player_a };
   });
 
@@ -51,6 +52,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!result.ok) {
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
+    console.log(`[game:join] gameId=${req.params.id} playerBToken=${game.tokens.player_b}`);
     return { playerBToken: game.tokens.player_b };
   });
 

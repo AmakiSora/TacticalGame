@@ -99,6 +99,24 @@ function pixelToHex(px, py) {
   const y = py + layout.minY - PAD;
   return cubeRound((SQRT3 / 3 * x - 1 / 3 * y) / HEX_SIZE, (2 / 3 * y) / HEX_SIZE);
 }
+function canvasCssMetrics() {
+  const rect = canvas.getBoundingClientRect();
+  const style = getComputedStyle(canvas);
+  const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+  const borderTop = parseFloat(style.borderTopWidth) || 0;
+  const borderRight = parseFloat(style.borderRightWidth) || 0;
+  const borderBottom = parseFloat(style.borderBottomWidth) || 0;
+  const cssWidth = Math.max(1, rect.width - borderLeft - borderRight);
+  const cssHeight = Math.max(1, rect.height - borderTop - borderBottom);
+  return { rect, borderLeft, borderTop, cssWidth, cssHeight };
+}
+function eventToCanvasPoint(e) {
+  const m = canvasCssMetrics();
+  return {
+    x: (e.clientX - m.rect.left - m.borderLeft) * (canvas.width / m.cssWidth),
+    y: (e.clientY - m.rect.top - m.borderTop) * (canvas.height / m.cssHeight),
+  };
+}
 function hexCorners(q, r, inset = 0) {
   const c = hexToPixel(q, r);
   const size = HEX_SIZE - inset;
@@ -621,8 +639,8 @@ function subscribeSse(id) {
 
 canvas.addEventListener('mousemove', e => {
   if (!state || state.cells.length === 0) return;
-  const rect = canvas.getBoundingClientRect();
-  const h = pixelToHex(e.clientX - rect.left, e.clientY - rect.top);
+  const p = eventToCanvasPoint(e);
+  const h = pixelToHex(p.x, p.y);
   hoverCell = state.cells.some(c => c.q === h.q && c.r === h.r) ? h : null;
   if (!hoverCell) { cellInfoEl.textContent = ''; drawBoard(); return; }
   const ent = entityAt(h.q, h.r);

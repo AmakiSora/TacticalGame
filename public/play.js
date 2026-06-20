@@ -76,6 +76,31 @@ function pixelToHex(px, py) {
   const x = px + layout.minX - PAD, y = py + layout.minY - PAD;
   return cubeRound((SQRT3 / 3 * x - 1 / 3 * y) / HEX_SIZE, (2 / 3 * y) / HEX_SIZE);
 }
+function canvasCssMetrics() {
+  const rect = els.canvas.getBoundingClientRect();
+  const style = getComputedStyle(els.canvas);
+  const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+  const borderTop = parseFloat(style.borderTopWidth) || 0;
+  const borderRight = parseFloat(style.borderRightWidth) || 0;
+  const borderBottom = parseFloat(style.borderBottomWidth) || 0;
+  const cssWidth = Math.max(1, rect.width - borderLeft - borderRight);
+  const cssHeight = Math.max(1, rect.height - borderTop - borderBottom);
+  return { rect, borderLeft, borderTop, cssWidth, cssHeight };
+}
+function eventToCanvasPoint(e) {
+  const m = canvasCssMetrics();
+  return {
+    x: (e.clientX - m.rect.left - m.borderLeft) * (els.canvas.width / m.cssWidth),
+    y: (e.clientY - m.rect.top - m.borderTop) * (els.canvas.height / m.cssHeight),
+  };
+}
+function canvasToCssPoint(p) {
+  const m = canvasCssMetrics();
+  return {
+    x: m.borderLeft + p.x * (m.cssWidth / els.canvas.width),
+    y: m.borderTop + p.y * (m.cssHeight / els.canvas.height),
+  };
+}
 function pathHex(q, r, inset = 0) {
   const c = hexToPixel(q, r), size = HEX_SIZE - inset;
   ctx.beginPath();
@@ -412,7 +437,7 @@ function renderSelectionInfo(ent) {
 }
 
 function showPopup(cell, title, items, cb) {
-  const p = hexToPixel(cell.q, cell.r);
+  const p = canvasToCssPoint(hexToPixel(cell.q, cell.r));
   const popup = $('map-popup');
   popup.style.left = `${p.x + 18}px`; popup.style.top = `${p.y - 10}px`;
   popup.innerHTML = `<div class="map-popup-title">${esc(title)}</div>` + items.map(i => `<button class="map-popup-btn" data-action="${esc(i.action)}" data-type="${esc(i.type || '')}"><span>${esc(i.label)}</span>${i.cost != null ? `<span class="map-popup-cost">${i.cost}</span>` : ''}</button>`).join('');
@@ -461,8 +486,8 @@ function selectDeployOrigin(origin) {
 
 els.canvas.addEventListener('mousemove', e => {
   if (!state || state.cells.length === 0) return;
-  const rect = els.canvas.getBoundingClientRect();
-  const h = pixelToHex(e.clientX - rect.left, e.clientY - rect.top);
+  const p = eventToCanvasPoint(e);
+  const h = pixelToHex(p.x, p.y);
   hoverCell = cellAt(h.q, h.r) ? h : null;
   if (!hoverCell) els.cellInfo.textContent = '';
   else {

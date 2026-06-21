@@ -19,6 +19,13 @@ Create `script/pi-match-runner.mjs` with these supported flows:
 
 Default command construction uses `pi -p --session-id <stable-id>` with `--session-dir`, `--model`, or `--provider` when supplied. Full command overrides still receive the generated session flags and append the generated message as the final argument.
 
+Stable session ids are deterministic and restart-safe:
+
+- Player A default: `hexv2-{gameId}-player_a`
+- Player B default: `hexv2-{gameId}-player_b`
+
+Use the full game id in the default id, not a random UUID, so restarting the runner can resume the same Pi history. `--a-session-id` and `--b-session-id` are explicit escape hatches for manually chosen sessions.
+
 ## Behavior
 
 - Poll `GET /api/games/:id` with the correct player token until `winner` exists or `phase === "game_over"`.
@@ -52,7 +59,7 @@ Later messages are deliberately short so each model can rely on its own session 
 ## Test Plan
 
 - Unit-test argument parsing and Pi command construction.
-- Unit-test stable per-player `--session-id` generation and overrides.
+- Unit-test deterministic per-player `--session-id` generation as `hexv2-{gameId}-{player}` and explicit overrides.
 - Unit-test turn-owner-to-command selection.
 - Unit-test retry behavior when Pi exits but turn ownership does not change.
 - Unit-test stop behavior after `--max-calls-per-turn`.

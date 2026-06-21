@@ -1,0 +1,58 @@
+# Pi Match Runner Design
+
+## Summary
+
+Add a non-interactive match runner for Hex V2 that repeatedly calls the correct Pi Coding Agent when that player's turn is active. The runner lives under `script/`, not `skill/`, because it is an orchestration utility rather than the reusable local AI skill.
+
+The selected integration mode is direct Pi control: each Pi invocation receives the current game id, player token, API base URL, and a prompt instructing it to use the REST API to play a complete legal turn and call `/end-turn`. The runner does not decide moves. It only creates or reconnects games, detects whose turn it is, invokes the matching Pi command, and verifies that turn ownership changes or the game ends.
+
+## User Interface
+
+Create `script/pi-match-runner.mjs` with these supported flows:
+
+- New match: create player A, join player B, then run both sides.
+- Existing match: accept `--game`, `--a-token`, and `--b-token` to resume.
+- Player identity: `--a-name`, `--b-name`, `--map`, and `--url`.
+- Pi selection: either shorthand model flags (`--a-model`, `--b-model`, optional `--a-provider`, `--b-provider`) or full command overrides (`--a-pi`, `--b-pi`).
+- Safety limits: `--max-rounds`, `--max-calls-per-turn`, `--delay-ms`, and `--timeout-ms`.
+
+Default command construction uses `pi -p` with `--model` or `--provider` when supplied. Full command overrides append the generated prompt as the final argument.
+
+## Behavior
+
+- Poll `GET /api/games/:id` with the correct player token until `winner` exists or `phase === "game_over"`.
+- If `phase !== "waiting_command"`, wait and poll again.
+- If `turn.currentOwner === "player_a"`, invoke player A's Pi command; if it is `"player_b"`, invoke player B's Pi command.
+- After Pi exits, fetch state again. If the same player still owns the turn and the game is not over, call the same Pi command again with a continuation prompt.
+- Stop with an error if one player exceeds `--max-calls-per-turn` without ending the turn.
+- Log each Pi invocation to `records/pi-runs/<gameId>/`, including prompt, stdout, stderr, exit code, and before/after turn metadata.
+
+## Prompt Contract
+
+Each Pi prompt includes:
+
+- API base URL, game id, current player id, and that player's token.
+- The REST endpoints and the requirement to use `X-Player-Token`.
+- A concise Hex V2 rule reminder: axial `q/r`, five action activations per turn, deploy/move/attack/heal/end-turn endpoints, and no V1 build/produce/sell commands.
+- A hard instruction that the agent must finish by calling `/end-turn` unless it wins before then.
+
+## Error Handling
+
+- Treat non-zero Pi exit codes as retryable within the per-turn call limit.
+- Treat malformed or failed HTTP responses from the game server as runner errors with clear diagnostics.
+- Do not continue without both player tokens.
+- Preserve existing untracked record files and never clean `records/`.
+
+## Test Plan
+
+- Unit-test argument parsing and Pi command construction.
+- Unit-test turn-owner-to-command selection.
+- Unit-test retry behavior when Pi exits but turn ownership does not change.
+- Unit-test stop behavior after `--max-calls-per-turn`.
+- Smoke-test against the local server with stub Pi commands that call `/end-turn`.
+
+## References
+
+- Pi non-interactive mode: `pi -p` / `--print`, documented at https://pi.dev/docs/latest/usage.
+- Pi CLI output modes and command options, documented at https://pi.dev/docs/latest/usage and available locally via `pi --help`.
+- Hex V2 REST contract and turn-loop requirements in this repository's `README.md` and `skill/SKILL.md`.

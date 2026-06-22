@@ -1,0 +1,130 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", "PingFang SC", sans-serif;
+  background: #11161a;
+  color: #d8e0e8;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #182431;
+  border-bottom: 1px solid #2a3a4a;
+}
+h1 { margin: 0; font-size: 18px; }
+.version-badge { color: #9ec; font-size: 12px; }
+.toolbar, .actions, .log-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+input, select, textarea, button {
+  background: #101a24;
+  color: #d8e0e8;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  padding: 7px 9px;
+  font: inherit;
+}
+button {
+  background: #1f3445;
+  cursor: pointer;
+}
+button:hover { background: #29475d; }
+main {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+.status-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.status-strip div {
+  background: #17212b;
+  border: 1px solid #263848;
+  border-radius: 6px;
+  padding: 10px;
+  min-width: 0;
+}
+.status-strip span {
+  display: block;
+  color: #89a5b8;
+  font-size: 12px;
+}
+.status-strip strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+}
+#config-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+fieldset, .manual, .logs {
+  border: 1px solid #263848;
+  border-radius: 6px;
+  background: #17212b;
+  padding: 12px;
+}
+legend, .manual h2 {
+  color: #d8e0e8;
+  font-size: 14px;
+  font-weight: 700;
+}
+label {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  color: #9bb0bd;
+  font-size: 12px;
+}
+label input, label select, label textarea {
+  width: 100%;
+  font-size: 13px;
+}
+textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+.manual {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.logs {
+  min-height: 260px;
+}
+#log-output {
+  margin: 10px 0 0;
+  padding: 10px;
+  min-height: 220px;
+  max-height: 360px;
+  overflow: auto;
+  background: #0b1117;
+  border: 1px solid #253544;
+  border-radius: 6px;
+  color: #c8d6de;
+  white-space: pre-wrap;
+}
+#status-text {
+  color: #9ec;
+  font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .status-strip, #config-form, .grid { grid-template-columns: 1fr; }
+  header { align-items: flex-start; flex-direction: column; }
+}

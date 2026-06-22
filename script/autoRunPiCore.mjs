@@ -24,6 +24,10 @@ const VALUE_FLAGS = new Set([
   "--interval",
   "--timeout",
   "--base-url",
+  "--a-name",
+  "--b-name",
+  "--a-start-prompt",
+  "--b-start-prompt",
 ]);
 
 export function getArg(args, flag) {
@@ -63,7 +67,8 @@ export function parseOptions(args) {
   }
 
   const gameId = getGameId(args);
-  if (!gameId) {
+  const bootstrap = args.includes("--bootstrap");
+  if (!gameId && !bootstrap) {
     return {
       ok: false,
       message: "用法: node script/autoRunPi.mjs <game_id> --a-session <path> --b-session <path> [options]",
@@ -85,7 +90,8 @@ export function parseOptions(args) {
   return {
     ok: true,
     options: {
-      gameId,
+      gameId: gameId ?? null,
+      bootstrap,
       interval: interval.value,
       timeout: timeout.value,
       baseUrl: getArg(args, "--base-url") || DEFAULT_BASE_URL,
@@ -93,27 +99,32 @@ export function parseOptions(args) {
       skill: getArg(args, "--skill") || DEFAULT_SKILL,
       aSession,
       bSession,
+      aName: getArg(args, "--a-name"),
+      bName: getArg(args, "--b-name"),
       aModel: getArg(args, "--a-model") || DEFAULT_MODEL,
       bModel: getArg(args, "--b-model") || DEFAULT_MODEL,
       aProvider: getArg(args, "--a-provider") || defaultProvider,
       bProvider: getArg(args, "--b-provider") || defaultProvider,
       aPrompt: getArg(args, "--a-prompt") || DEFAULT_PROMPT,
       bPrompt: getArg(args, "--b-prompt") || DEFAULT_PROMPT,
+      aStartPrompt: getArg(args, "--a-start-prompt"),
+      bStartPrompt: getArg(args, "--b-start-prompt"),
     },
   };
 }
 
-export function buildPiInvocation({ provider, model, session, skill, prompt }) {
-  return {
-    command: "pi",
-    args: [
-      "--provider", provider,
-      "--model", model,
-      "--session", session,
-      "--skill", skill,
-      "-p", prompt,
-    ],
-  };
+export function buildPiInvocation({ provider, model, name, session, skill, prompt }) {
+  const args = [
+    "--provider", provider,
+    "--model", model,
+  ];
+  if (name) args.push("--name", name);
+  args.push(
+    "--session", session,
+    "--skill", skill,
+    "-p", prompt,
+  );
+  return { command: "pi", args };
 }
 
 export function stateFilePath(gameId, scriptDir) {
@@ -174,6 +185,41 @@ export function runPi(label, invocation, deps = {}) {
     return false;
   }
   return true;
+}
+
+export function runPiCapture(label, invocation, deps = {}) {
+  const runner = deps.spawnSync ?? spawnSync;
+  const log = deps.log ?? console.log;
+  const error = deps.error ?? console.error;
+  const cwd = deps.cwd ?? dirname(dirname(fileURLToPath(import.meta.url)));
+  const resolved = resolvePiInvocation(invocation);
+
+  log(`[${ts()}] 执行 ${label} pi ...`);
+  const result = runner(resolved.command, resolved.args, {
+    cwd,
+    encoding: "utf8",
+    shell: false,
+  });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  if (output) log(output.trimEnd());
+
+  if (result.error) {
+    error(`[${ts()}] ${label} pi 启动失败: ${result.error.message}`);
+    return { ok: false, output };
+  }
+  if (result.status !== 0) {
+    error(`[${ts()}] ${label} pi 退出码 ${result.status}`);
+    return { ok: false, output };
+  }
+  return { ok: true, output };
+}
+
+export function extractGameId(output) {
+  return output.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
+}
+
+export function renderPrompt(prompt, gameId) {
+  return prompt.replaceAll("{gameId}", gameId);
 }
 
 export async function fetchEvents({ baseUrl, gameId, after = 0, fetchImpl = fetch }) {

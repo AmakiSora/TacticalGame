@@ -17,13 +17,18 @@
  *   --b-model <model>       player_b 的模型 (默认 step-3.7-flash)
  *   --a-provider <provider> player_a 的 pi provider (默认 new-api)
  *   --b-provider <provider> player_b 的 pi provider (默认 new-api)
+ *   --a-name <name>         player_a 的 pi 名称
+ *   --b-name <name>         player_b 的 pi 名称
  *   --a-prompt <text>       player_a 的提示语 (默认 "到你了")
  *   --b-prompt <text>       player_b 的提示语 (默认 "到你了")
+ *   --a-start-prompt <text> bootstrap 时 player_a 创建对局提示语
+ *   --b-start-prompt <text> bootstrap 时 player_b 加入对局提示语, 可用 {gameId}
  *   --provider <provider>   两侧默认 pi provider (默认 new-api, 被 --a/b-provider 覆盖)
  *   --skill <path>          pi skill 路径 (默认 .pi/skills/skill)
  *   --interval <sec>        轮询间隔 (默认 2)
  *   --timeout <sec>         等待对方结束回合的超时 (默认 10)
  *   --base-url <url>        服务地址 (默认 http://localhost:3100)
+ *   --bootstrap             先运行 A 创建对局、B 加入对局, 再进入轮询
  *   --fresh                 忽略断点从头开始
  */
 
@@ -32,9 +37,12 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildPiInvocation,
+  extractGameId,
   fetchEvents,
   loadState,
   parseOptions,
+  renderPrompt,
+  runPiCapture,
   runPi,
   saveState,
   sleep,
@@ -54,21 +62,54 @@ if (!parsed.ok) {
 }
 
 const options = parsed.options;
-const stateFile = stateFilePath(options.gameId, SCRIPT_DIR);
-const piA = buildPiInvocation({
-  provider: options.aProvider,
-  model: options.aModel,
-  session: options.aSession,
-  skill: options.skill,
-  prompt: options.aPrompt,
-});
-const piB = buildPiInvocation({
-  provider: options.bProvider,
-  model: options.bModel,
-  session: options.bSession,
-  skill: options.skill,
-  prompt: options.bPrompt,
-});
+let stateFile = options.gameId ? stateFilePath(options.gameId, SCRIPT_DIR) : null;
+
+function buildPiA(prompt) {
+  return buildPiInvocation({
+    provider: options.aProvider,
+    model: options.aModel,
+    name: options.aName,
+    session: options.aSession,
+    skill: options.skill,
+    prompt,
+  });
+}
+
+function buildPiB(prompt) {
+  return buildPiInvocation({
+    provider: options.bProvider,
+    model: options.bModel,
+    name: options.bName,
+    session: options.bSession,
+    skill: options.skill,
+    prompt,
+  });
+}
+
+function requireOption(value, name) {
+  if (!value) throw new Error(`${name} is required when --bootstrap is used`);
+  return value;
+}
+
+function bootstrapGame() {
+  const aStartPrompt = requireOption(options.aStartPrompt, "--a-start-prompt");
+  const bStartPrompt = requireOption(options.bStartPrompt, "--b-start-prompt");
+
+  const created = runPiCapture("player_a bootstrap", buildPiA(aStartPrompt), { cwd: PROJECT_DIR });
+  if (!created.ok) throw new Error("player_a bootstrap pi failed");
+
+  const gameId = extractGameId(created.output);
+  if (!gameId) throw new Error("无法从 player_a 输出中提取 gameId");
+
+  console.log(`[autoRunPi] bootstrap gameId=${gameId}`);
+  options.gameId = gameId;
+  stateFile = stateFilePath(gameId, SCRIPT_DIR);
+
+  const joined = runPiCapture("player_b bootstrap", buildPiB(renderPrompt(bStartPrompt, gameId)), { cwd: PROJECT_DIR });
+  if (!joined.ok) throw new Error("player_b bootstrap pi failed");
+
+  return gameId;
+}
 
 function logEvent(turnNumber, ev) {
   const { type, seq, payload = {} } = ev;
@@ -100,6 +141,8 @@ function logEvent(turnNumber, ev) {
 }
 
 async function poll() {
+  if (options.bootstrap) bootstrapGame();
+
   const { gameId, baseUrl, interval, timeout, fresh } = options;
   console.log(`[autoRunPi] 开始观战 game=${gameId}  url=${baseUrl}  interval=${interval}s  timeout=${timeout}s`);
   console.log(`[autoRunPi] 状态文件 ${stateFile}`);
@@ -127,13 +170,17 @@ async function poll() {
   }
 
   function triggerPiA() {
-    runPi("player_a", piA, { cwd: PROJECT_DIR });
+    runPi("player_a", buildPiA(options.aPrompt), { cwd: PROJECT_DIR });
     deadlineA = Date.now() + timeout * 1000;
   }
 
   function triggerPiB() {
-    runPi("player_b", piB, { cwd: PROJECT_DIR });
+    runPi("player_b", buildPiB(options.bPrompt), { cwd: PROJECT_DIR });
     deadlineB = Date.now() + timeout * 1000;
+  }
+
+  if (options.bootstrap) {
+    triggerPiA();
   }
 
   // eslint-disable-next-line no-constant-condition

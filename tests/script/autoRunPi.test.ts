@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPiInvocation,
+  extractGameId,
   parseOptions,
+  renderPrompt,
+  runPiCapture,
   runPi,
   stateFilePath,
 } from '../../script/autoRunPiCore.mjs';
@@ -39,6 +42,26 @@ describe('autoRunPi options', () => {
     }
   });
 
+  it('allows bootstrap mode to create the game before a game id exists', () => {
+    const result = parseOptions([
+      '--bootstrap',
+      '--a-session', '.pi/session/a.jsonl',
+      '--b-session', '.pi/session/b.jsonl',
+      '--a-name', 'player-a',
+      '--b-name', 'player-b',
+      '--a-start-prompt', 'create',
+      '--b-start-prompt', 'join {gameId}',
+    ]);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.bootstrap).toBe(true);
+      expect(result.options.gameId).toBeNull();
+      expect(result.options.aName).toBe('player-a');
+      expect(result.options.bStartPrompt).toBe('join {gameId}');
+    }
+  });
+
   it('keeps prompts and paths as argument values instead of shell text', () => {
     const invocation = buildPiInvocation({
       provider: 'new-api',
@@ -55,6 +78,26 @@ describe('autoRunPi options', () => {
       '--session', 'sessions/a "quoted".json',
       '--skill', '.pi/skills/skill',
       '-p', '到你了 && echo bad',
+    ]);
+  });
+
+  it('includes --name when building named pi invocations', () => {
+    const invocation = buildPiInvocation({
+      provider: 'new-api',
+      model: 'step-3.7-flash',
+      name: 'tactical-game-23-player-a',
+      session: '.pi/session/a.jsonl',
+      skill: '.pi/skills/skill',
+      prompt: 'create game',
+    });
+
+    expect(invocation.args).toEqual([
+      '--provider', 'new-api',
+      '--model', 'step-3.7-flash',
+      '--name', 'tactical-game-23-player-a',
+      '--session', '.pi/session/a.jsonl',
+      '--skill', '.pi/skills/skill',
+      '-p', 'create game',
     ]);
   });
 
@@ -79,5 +122,33 @@ describe('autoRunPi pi execution', () => {
     });
 
     expect(result).toBe(false);
+  });
+
+  it('captures pi output when bootstrapping a game', () => {
+    const result = runPiCapture('player_a start', buildPiInvocation({
+      provider: 'new-api',
+      model: 'm',
+      session: 'a.json',
+      skill: 'skill',
+      prompt: 'create',
+    }), {
+      cwd: 'C:/repo',
+      spawnSync: () => ({ status: 0, stdout: 'gameid: 9f2412f3-d221-48ab-92f5-0d2771a7ee7e\n', stderr: '' }),
+      log: () => {},
+      error: () => {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('9f2412f3-d221-48ab-92f5-0d2771a7ee7e');
+  });
+});
+
+describe('autoRunPi bootstrap helpers', () => {
+  it('extracts a game id from pi output', () => {
+    expect(extractGameId('创建好了，gameid:9f2412f3-d221-48ab-92f5-0d2771a7ee7e')).toBe('9f2412f3-d221-48ab-92f5-0d2771a7ee7e');
+  });
+
+  it('renders the bootstrap join prompt with the created game id', () => {
+    expect(renderPrompt('join gameid:{gameId}', '9f2412f3-d221-48ab-92f5-0d2771a7ee7e')).toBe('join gameid:9f2412f3-d221-48ab-92f5-0d2771a7ee7e');
   });
 });

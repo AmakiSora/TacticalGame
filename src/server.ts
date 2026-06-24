@@ -8,6 +8,7 @@ import { gamesRoutes } from './api/games.js';
 import { actionsRoutes } from './api/actions.js';
 import { eventsRoutes } from './api/events.js';
 import { mapsRoutes } from './api/maps.js';
+import { controlRoutes } from './api/control.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
@@ -19,6 +20,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(gamesRoutes);
   await app.register(actionsRoutes);
   await app.register(eventsRoutes);
+  await app.register(controlRoutes);
   await app.register(fastifyStatic, { root: PUBLIC_DIR, prefix: '/' });
   return app;
 }
@@ -50,6 +52,10 @@ if (isMain) {
       console.log(`    攻击          POST  ${base}/api/games/:id/attack`);
       console.log(`    治疗          POST  ${base}/api/games/:id/heal`);
       console.log(`    结束回合      POST  ${base}/api/games/:id/end-turn`);
+      console.log(`    控制台        GET   ${base}/control.html`);
+      if (!process.env.AUTO_CONTROL_TOKEN) {
+        console.log('    控制台警告    AUTO_CONTROL_TOKEN 未设置，仅允许本机访问控制 API');
+      }
       console.log('');
       console.log('='.repeat(60));
       console.log(`  Server listening on ${addr}`);

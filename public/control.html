@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>TacticalGame — 控制台</title>
+  <link rel="stylesheet" href="/control.css" />
+</head>
+<body>
+  <header>
+    <h1>自动对战控制台 <span class="version-badge"></span></h1>
+    <div class="toolbar">
+      <input id="control-token" type="password" placeholder="Control token" />
+      <button id="btn-save-token">保存 Token</button>
+      <span id="status-text">idle</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="status-strip">
+      <div><span>状态</span><strong id="state-status">-</strong></div>
+      <div><span>Game ID</span><strong id="state-game">-</strong></div>
+      <div><span>Seq</span><strong id="state-seq">0</strong></div>
+      <div><span>进程</span><strong id="state-child">-</strong></div>
+    </section>
+
+    <section class="actions">
+      <button id="btn-save-config">保存配置</button>
+      <button id="btn-start">启动</button>
+      <button id="btn-pause">暂停</button>
+      <button id="btn-resume">恢复</button>
+      <button id="btn-stop">停止</button>
+    </section>
+
+    <section class="grid">
+      <form id="config-form">
+        <fieldset>
+          <legend>全局</legend>
+          <label>Game ID <input id="game-id" name="gameId" /></label>
+          <label>Map ID <input id="map-id" name="mapId" /></label>
+          <label><input id="bootstrap" type="checkbox" /> Bootstrap</label>
+          <label>Interval <input id="interval" type="number" min="1" /></label>
+          <label>Timeout <input id="timeout" type="number" min="1" /></label>
+        </fieldset>
+
+        <fieldset data-side="player_a">
+          <legend>Player A</legend>
+          <label>Provider <input name="provider" /></label>
+          <label>Model <input name="model" /></label>
+          <label>Name <input name="name" /></label>
+          <label>Session <input name="session" /></label>
+          <label>Skill <input name="skill" /></label>
+          <label>Prompt <textarea name="prompt"></textarea></label>
+          <label>Start Prompt <textarea name="startPrompt"></textarea></label>
+          <label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>
+          <label>Advanced Command <textarea name="advancedCommand"></textarea></label>
+        </fieldset>
+
+        <fieldset data-side="player_b">
+          <legend>Player B</legend>
+          <label>Provider <input name="provider" /></label>
+          <label>Model <input name="model" /></label>
+          <label>Name <input name="name" /></label>
+          <label>Session <input name="session" /></label>
+          <label>Skill <input name="skill" /></label>
+          <label>Prompt <textarea name="prompt"></textarea></label>
+          <label>Start Prompt <textarea name="startPrompt"></textarea></label>
+          <label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>
+          <label>Advanced Command <textarea name="advancedCommand"></textarea></label>
+        </fieldset>
+      </form>
+
+      <aside class="manual">
+        <h2>手动指令</h2>
+        <select id="manual-side">
+          <option value="player_a">player_a</option>
+          <option value="player_b">player_b</option>
+        </select>
+        <textarea id="manual-prompt"></textarea>
+        <button id="btn-send-manual">发送</button>
+      </aside>
+    </section>
+
+    <section class="logs">
+      <div class="log-toolbar">
+        <select id="log-level">
+          <option value="">全部</option>
+          <option value="info">info</option>
+          <option value="warn">warn</option>
+          <option value="error">error</option>
+        </select>
+        <button id="btn-clear-view">清空视图</button>
+        <button id="btn-copy-logs">复制日志</button>
+      </div>
+      <pre id="log-output"></pre>
+    </section>
+  </main>
+
+  <script src="/version.js"></script>
+  <script src="/control.js"></script>
+</body>
+</html>

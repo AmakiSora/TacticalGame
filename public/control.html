@@ -2,96 +2,155 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>TacticalGame — 控制台</title>
+  <title>TacticalGame - 控制台</title>
   <link rel="stylesheet" href="/control.css" />
 </head>
 <body>
-  <header>
-    <h1>自动对战控制台 <span class="version-badge"></span></h1>
+  <header class="app-header">
+    <div class="title-block">
+      <h1>自动对战控制台 <span class="version-badge"></span></h1>
+      <p id="status-message">等待连接控制器</p>
+    </div>
     <div class="toolbar">
-      <input id="control-token" type="password" placeholder="Control token" />
-      <button id="btn-save-token">保存 Token</button>
-      <span id="status-text">idle</span>
+      <label class="token-field">
+        <span>Control token</span>
+        <input id="control-token" type="password" placeholder="Control token" autocomplete="off" />
+      </label>
+      <button id="btn-save-token" type="button">保存 Token</button>
+      <span id="status-text" class="status-pill">idle</span>
     </div>
   </header>
 
   <main>
-    <section class="status-strip">
-      <div><span>状态</span><strong id="state-status">-</strong></div>
-      <div><span>Game ID</span><strong id="state-game">-</strong></div>
-      <div><span>Seq</span><strong id="state-seq">0</strong></div>
-      <div><span>进程</span><strong id="state-child">-</strong></div>
+    <nav class="tabs" aria-label="控制台视图">
+      <button id="tab-monitor" class="tab-button active" type="button" aria-controls="panel-monitor" aria-selected="true">运行监控</button>
+      <button id="tab-config" class="tab-button" type="button" aria-controls="panel-config" aria-selected="false">配置管理</button>
+      <span id="config-dirty" class="dirty-indicator">配置已同步</span>
+    </nav>
+
+    <section id="panel-monitor" class="tab-panel active" aria-labelledby="tab-monitor">
+      <section class="status-strip" aria-label="控制器状态">
+        <div class="status-card status-card-primary">
+          <span>状态</span>
+          <strong id="state-status">-</strong>
+        </div>
+        <div class="status-card">
+          <span>Game ID</span>
+          <strong id="state-game">-</strong>
+        </div>
+        <div class="status-card">
+          <span>Seq</span>
+          <strong id="state-seq">0</strong>
+        </div>
+        <div class="status-card">
+          <span>进程</span>
+          <strong id="state-child">-</strong>
+        </div>
+      </section>
+
+      <section class="monitor-layout">
+        <aside class="operations-column">
+          <section class="panel actions-panel">
+            <div class="panel-heading">
+              <h2>控制</h2>
+              <span>启动会先保存当前配置</span>
+            </div>
+            <div class="actions">
+              <button id="btn-start" class="primary-action" type="button">启动</button>
+              <button id="btn-pause" type="button">暂停</button>
+              <button id="btn-resume" type="button">恢复</button>
+              <button id="btn-stop" class="danger-action" type="button">停止</button>
+            </div>
+          </section>
+
+          <section class="panel manual">
+            <div class="panel-heading">
+              <h2>手动指令</h2>
+              <span>直接调用指定玩家</span>
+            </div>
+            <label>
+              <span>目标玩家</span>
+              <select id="manual-side">
+                <option value="player_a">player_a</option>
+                <option value="player_b">player_b</option>
+              </select>
+            </label>
+            <label>
+              <span>Prompt</span>
+              <textarea id="manual-prompt" placeholder="输入一次性手动指令"></textarea>
+            </label>
+            <button id="btn-send-manual" type="button">发送</button>
+          </section>
+        </aside>
+
+        <section class="panel logs">
+          <div class="log-toolbar">
+            <div class="panel-heading">
+              <h2>日志</h2>
+              <span>按等级和文本过滤当前视图</span>
+            </div>
+            <div class="log-tools">
+              <select id="log-level" aria-label="日志等级">
+                <option value="">全部</option>
+                <option value="info">info</option>
+                <option value="warn">warn</option>
+                <option value="error">error</option>
+              </select>
+              <input id="log-search" type="search" placeholder="搜索日志" />
+              <label class="inline-check"><input id="auto-scroll-logs" type="checkbox" checked /> 自动滚动</label>
+              <button id="btn-copy-logs" type="button">复制日志</button>
+              <button id="btn-clear-view" type="button">清空视图</button>
+            </div>
+          </div>
+          <div id="log-output" class="log-output" role="log" aria-live="polite"></div>
+        </section>
+      </section>
     </section>
 
-    <section class="actions">
-      <button id="btn-save-config">保存配置</button>
-      <button id="btn-start">启动</button>
-      <button id="btn-pause">暂停</button>
-      <button id="btn-resume">恢复</button>
-      <button id="btn-stop">停止</button>
-    </section>
-
-    <section class="grid">
+    <section id="panel-config" class="tab-panel" aria-labelledby="tab-config" hidden>
       <form id="config-form">
         <fieldset>
           <legend>全局</legend>
-          <label>Game ID <input id="game-id" name="gameId" /></label>
-          <label>Map ID <input id="map-id" name="mapId" /></label>
-          <label><input id="bootstrap" type="checkbox" /> Bootstrap</label>
-          <label>Interval <input id="interval" type="number" min="1" /></label>
-          <label>Timeout <input id="timeout" type="number" min="1" /></label>
+          <div class="field-grid">
+            <label>Game ID <input id="game-id" name="gameId" /></label>
+            <label>Map ID <input id="map-id" name="mapId" /></label>
+            <label>Interval <input id="interval" type="number" min="1" /></label>
+            <label>Timeout <input id="timeout" type="number" min="1" /></label>
+          </div>
+          <label class="checkbox-label"><input id="bootstrap" type="checkbox" /> Bootstrap</label>
+          <button id="btn-save-config" type="button">保存配置</button>
         </fieldset>
 
         <fieldset data-side="player_a">
           <legend>Player A</legend>
-          <label>Provider <input name="provider" /></label>
-          <label>Model <input name="model" /></label>
-          <label>Name <input name="name" /></label>
-          <label>Session <input name="session" /></label>
-          <label>Skill <input name="skill" /></label>
+          <div class="field-grid">
+            <label>Provider <input name="provider" /></label>
+            <label>Model <input name="model" /></label>
+            <label>Name <input name="name" /></label>
+            <label>Session <input name="session" /></label>
+            <label>Skill <input name="skill" /></label>
+            <label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>
+          </div>
           <label>Prompt <textarea name="prompt"></textarea></label>
           <label>Start Prompt <textarea name="startPrompt"></textarea></label>
-          <label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>
           <label>Advanced Command <textarea name="advancedCommand"></textarea></label>
         </fieldset>
 
         <fieldset data-side="player_b">
           <legend>Player B</legend>
-          <label>Provider <input name="provider" /></label>
-          <label>Model <input name="model" /></label>
-          <label>Name <input name="name" /></label>
-          <label>Session <input name="session" /></label>
-          <label>Skill <input name="skill" /></label>
+          <div class="field-grid">
+            <label>Provider <input name="provider" /></label>
+            <label>Model <input name="model" /></label>
+            <label>Name <input name="name" /></label>
+            <label>Session <input name="session" /></label>
+            <label>Skill <input name="skill" /></label>
+            <label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>
+          </div>
           <label>Prompt <textarea name="prompt"></textarea></label>
           <label>Start Prompt <textarea name="startPrompt"></textarea></label>
-          <label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>
           <label>Advanced Command <textarea name="advancedCommand"></textarea></label>
         </fieldset>
       </form>
-
-      <aside class="manual">
-        <h2>手动指令</h2>
-        <select id="manual-side">
-          <option value="player_a">player_a</option>
-          <option value="player_b">player_b</option>
-        </select>
-        <textarea id="manual-prompt"></textarea>
-        <button id="btn-send-manual">发送</button>
-      </aside>
-    </section>
-
-    <section class="logs">
-      <div class="log-toolbar">
-        <select id="log-level">
-          <option value="">全部</option>
-          <option value="info">info</option>
-          <option value="warn">warn</option>
-          <option value="error">error</option>
-        </select>
-        <button id="btn-clear-view">清空视图</button>
-        <button id="btn-copy-logs">复制日志</button>
-      </div>
-      <pre id="log-output"></pre>
     </section>
   </main>
 

@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { pathToFileURL } from 'node:url';
 
 const DEFAULT_URL = 'http://localhost:3100';

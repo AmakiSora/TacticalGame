@@ -265,7 +265,7 @@ function renderControlPointCard(cp) {
       </div>
     </div>
     <div class="sel-stat-grid">
-      ${statItem('收入', `+${gameConfig?.balance?.controlPointIncome ?? 20}`, 'cost')}
+      ${statItem('收入', `+${gameConfig?.balance?.controlPointIncome ?? 12}`, 'cost')}
       ${statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : '')}
     </div>
     <div class="sel-coord">坐标 (${cp.q}, ${cp.r})</div>
@@ -417,8 +417,8 @@ function formatEventShort(ev) {
     case 'reset_actions': return `${playerName(p.owner)} 单位已重置`;
     case 'turn_end': return `轮到 ${playerName(p.nextOwner)}`;
     case 'game_over':
-      if (p.reason === 'turn_limit_draw') return '20回合裁决平局';
-      if (p.reason === 'turn_limit_score') return `${playerName(p.winner)} 20回合裁决获胜`;
+      if (p.reason === 'turn_limit_draw') return '15回合裁决平局';
+      if (p.reason === 'turn_limit_score') return `${playerName(p.winner)} 15回合裁决获胜`;
       return `${playerName(p.winner)} 获胜`;
     case 'name_rename': return `${p.playerId} 改名为 ${p.name}`;
     default: return JSON.stringify(p).slice(0, 100);

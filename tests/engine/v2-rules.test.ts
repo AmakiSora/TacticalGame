@@ -67,7 +67,7 @@ describe('hex V2 rules', () => {
     const result = deployUnit(game, bus, 'player_a', 'scout', game.headquarters.player_a.id, -8, 1);
 
     expect(result.ok).toBe(true);
-    expect(game.resources.player_a.supplies).toBe(40);
+    expect(game.resources.player_a.supplies).toBe(42);
     const deployed = game.units.find(u => u.type === 'scout' && u.q === -8 && u.r === 1)!;
     expect(deployed.hasMoved).toBe(true);
     expect(deployed.hasActed).toBe(false);
@@ -94,23 +94,23 @@ describe('hex V2 rules', () => {
     expect(game.events.find(e => e.type === 'game_over')!.payload.reason).toBe('headquarters_destroyed');
   });
 
-  it('does not adjudicate after player_a ends turn 20', () => {
+  it('does not adjudicate after player_a ends turn 15', () => {
     const { game, bus } = setup();
-    game.turn.turnNumber = 20;
+    game.turn.turnNumber = 15;
     game.turn.currentOwner = 'player_a';
 
     const result = endTurn(game, bus, 'player_a');
 
     expect(result.ok).toBe(true);
     expect(game.phase).toBe('waiting_command');
-    expect(game.turn.turnNumber).toBe(20);
+    expect(game.turn.turnNumber).toBe(15);
     expect(game.turn.currentOwner).toBe('player_b');
     expect(game.result).toBeNull();
   });
 
-  it('adjudicates by score after player_b ends turn 20 and captures first', () => {
+  it('adjudicates by score after player_b ends turn 15 and captures first', () => {
     const { game, bus } = setup();
-    game.turn.turnNumber = 20;
+    game.turn.turnNumber = 15;
     game.turn.currentOwner = 'player_b';
     game.resources.player_a.supplies = 0;
     game.resources.player_b.supplies = 0;
@@ -128,7 +128,7 @@ describe('hex V2 rules', () => {
 
     expect(result.ok).toBe(true);
     expect(game.phase).toBe('game_over');
-    expect(game.turn.turnNumber).toBe(20);
+    expect(game.turn.turnNumber).toBe(15);
     expect(game.turn.currentOwner).toBe('player_b');
     expect(game.winner).toBe('player_b');
     expect(game.result).toMatchObject({
@@ -147,7 +147,7 @@ describe('hex V2 rules', () => {
 
   it('records a draw when turn-limit adjudication scores are tied', () => {
     const { game, bus } = setup();
-    game.turn.turnNumber = 20;
+    game.turn.turnNumber = 15;
     game.turn.currentOwner = 'player_b';
     game.resources.player_a.supplies = 0;
     game.resources.player_b.supplies = 0;
@@ -160,7 +160,7 @@ describe('hex V2 rules', () => {
 
     expect(result.ok).toBe(true);
     expect(game.phase).toBe('game_over');
-    expect(game.turn.turnNumber).toBe(20);
+    expect(game.turn.turnNumber).toBe(15);
     expect(game.turn.currentOwner).toBe('player_b');
     expect(game.winner).toBeNull();
     expect(game.result).toMatchObject({ winner: null, reason: 'turn_limit_draw' });
@@ -205,7 +205,7 @@ describe('hex V2 rules', () => {
     ];
     const movers = pairs.map((pair, i) => ({
       id: `m${i}`, owner: 'player_a' as const, type: 'infantry' as const,
-      q: pair.from.q, r: pair.from.r, hp: 100, maxHp: 100, attack: 28, defense: 8,
+      q: pair.from.q, r: pair.from.r, hp: 100, maxHp: 100, attack: 30, defense: 8,
       moveRange: 3, attackRange: 1, cost: 45, alive: true,
       hasMoved: false, hasActed: false, actionSpent: false, canCapture: true,
     }));
@@ -237,7 +237,7 @@ describe('hex V2 rules', () => {
     game.units = game.units.filter(u => u.owner !== 'player_a');
     const unit = {
       id: 'u1', owner: 'player_a' as const, type: 'infantry' as const,
-      q: -7, r: 0, hp: 100, maxHp: 100, attack: 28, defense: 8,
+      q: -7, r: 0, hp: 100, maxHp: 100, attack: 30, defense: 8,
       moveRange: 3, attackRange: 1, cost: 45, alive: true,
       hasMoved: false, hasActed: false, actionSpent: false, canCapture: true,
     };

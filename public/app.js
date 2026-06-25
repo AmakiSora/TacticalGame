@@ -414,7 +414,7 @@ function renderControlPointCard(cp) {
       </div>
     </div>
     <div class="sel-stat-grid">
-      ${statItem('收入', '+20', 'cost')}
+      ${statItem('收入', `+${gameConfig?.balance?.controlPointIncome ?? 12}`, 'cost')}
       ${statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : '')}
     </div>
     <div class="sel-coord">坐标 (${cp.q}, ${cp.r})</div>
@@ -435,8 +435,8 @@ function formatEventShort(ev) {
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
     case 'turn_end': return `回合结束 -> ${playerName(p.nextOwner)} (${p.turnNumber})`;
     case 'game_over':
-      if (p.reason === 'turn_limit_draw') return '20回合裁决平局';
-      if (p.reason === 'turn_limit_score') return `20回合裁决 胜者:${playerName(p.winner)}`;
+      if (p.reason === 'turn_limit_draw') return '15回合裁决平局';
+      if (p.reason === 'turn_limit_score') return `15回合裁决 胜者:${playerName(p.winner)}`;
       return `游戏结束 胜者:${playerName(p.winner)}`;
     default: return ev.type;
   }
@@ -534,8 +534,8 @@ function renderSidebar() {
 }
 
 function resultText(result) {
-  if (result.reason === 'turn_limit_draw') return '20回合裁决平局';
-  if (result.reason === 'turn_limit_score') return `20回合裁决胜者: ${playerName(result.winner)}`;
+  if (result.reason === 'turn_limit_draw') return '15回合裁决平局';
+  if (result.reason === 'turn_limit_score') return `15回合裁决胜者: ${playerName(result.winner)}`;
   return `胜者: ${playerName(result.winner)}`;
 }
 

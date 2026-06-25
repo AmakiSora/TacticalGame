@@ -129,8 +129,15 @@ describe('V2 API', () => {
     const body = res.json();
     expect(body.events[0].type).toBe('game_start');
     expect(body.events[0].payload.map.grid).toBe('hex');
+    expect(body.events[0].payload.config.headquartersSpec).toMatchObject({ hp: 180, defense: 6 });
+    expect(body.events[0].payload.config.units.infantry).toMatchObject({ attack: 30, cost: 45 });
+    expect(body.events[0].payload.config.units.scout).toMatchObject({ hp: 65, attack: 16, cost: 38 });
+    expect(body.events[0].payload.config.units.heavy).toMatchObject({ hp: 150, attack: 38, defense: 13, cost: 92 });
+    expect(body.events[0].payload.config.units.ranger).toMatchObject({ hp: 72, attack: 44, cost: 78 });
+    expect(body.events[0].payload.config.units.support).toMatchObject({ hp: 82, attack: 10, healPower: 22, cost: 60 });
     expect(body.events[0].payload.config.balance.actionsPerTurn).toBe(5);
-    expect(body.events[0].payload.config.balance.maxTurns).toBe(20);
+    expect(body.events[0].payload.config.balance.controlPointIncome).toBe(12);
+    expect(body.events[0].payload.config.balance.maxTurns).toBe(15);
     await app.close();
   });
 
@@ -139,7 +146,7 @@ describe('V2 API', () => {
     const { gameId, playerAToken, playerBToken } = await createAndJoin(app);
 
     const game = globalStore.get(gameId)!;
-    game.turn.turnNumber = 20;
+    game.turn.turnNumber = 15;
     game.turn.currentOwner = 'player_b';
     game.resources.player_a.supplies = 0;
     game.resources.player_b.supplies = 10;
@@ -164,7 +171,7 @@ describe('V2 API', () => {
     const finalGame = finalRes.json() as any;
     expect(finalGame.tokens).toBeUndefined();
     expect(finalGame.phase).toBe('game_over');
-    expect(finalGame.turn.turnNumber).toBe(20);
+    expect(finalGame.turn.turnNumber).toBe(15);
     expect(finalGame.turn.currentOwner).toBe('player_b');
     expect(finalGame.result).toMatchObject({ winner: 'player_b', reason: 'turn_limit_score' });
 

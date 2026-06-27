@@ -70,15 +70,15 @@ describe('AI player setup', () => {
 });
 
 describe('AI player skill documentation', () => {
-  it('requires polling for future owned turns instead of waiting for human reminders', async () => {
+  it('teaches manual turn reasoning instead of delegating play to the script', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
-    expect(skill).toContain('## Mandatory Turn Loop');
-    expect(skill).toContain('Do not stop after ending one owned turn');
-    expect(skill).toContain('If `game.turn.currentOwner !== your owner`, sleep briefly and poll again');
-    expect(skill).toContain('Do not ask the human to say "your turn"');
-    expect(skill).toContain('After `POST /end-turn`, the correct next action is polling');
-    expect(skill).toContain('Only use `--once` when the user explicitly asks to play exactly one turn');
+    expect(skill).toContain('## Manual Turn Loop');
+    expect(skill).toContain('Do not run `node skill/ai-player.mjs` to delegate the turn');
+    expect(skill).toContain('Read the current game state before choosing each action');
+    expect(skill).toContain('Explain the chosen legal action briefly, then call the matching REST endpoint');
+    expect(skill).toContain('Refresh state after every successful action and reason again');
+    expect(skill).toContain('End the turn only after available useful legal actions are exhausted');
   });
 });
 

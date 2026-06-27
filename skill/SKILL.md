@@ -1,20 +1,25 @@
 ---
 name: play-hex-api-game
-description: Use when Codex needs to play, control, automate, or script a player in this repository's Hex V2 tactical control-point game through the REST API. Covers game creation/joining, token handling, legal pointy-top axial q/r actions, the per-turn action-point limit, turn loops, deployment, movement, combat, healing, and complete AI-vs-AI API play. Do not use old square-grid x/y, build, produce, sell, mining, or wall workflows.
+description: Use when Codex is asked to play, operate, control, or make decisions in this repository's Hex V2 tactical control-point game through the REST API.
 ---
 
 # Play Hex API Game
 
-Use this skill to operate the local Hex V2 game through HTTP. The objective is to play legal turns until the enemy headquarters is destroyed or the 20-round adjudication limit is reached.
+This skill teaches manual operation of the Hex V2 game. Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
 
-## Start Points
+Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exist for tests or automated demos, but this skill is for AI reasoning and direct game operation.
 
-- Start the server with `npm run dev`; the default base URL is `http://localhost:3100`.
-- Run an AI player with `node skill/ai-player.mjs`.
-- Create a new player A game: `node skill/ai-player.mjs --side a --name "AI A"`.
-- Join an existing game as player B: `node skill/ai-player.mjs --side b --game <gameId> --name "AI B"`.
-- Reconnect to an existing seat with `--game <gameId> --side a|b --token <token>`.
-- Normal AI play is continuous. Use `--once` only when the user explicitly asks to play exactly one turn.
+## Manual Turn Loop
+
+1. Read the current game state before choosing each action: `GET /api/games/:id`.
+2. If `winner` exists or `phase === "game_over"`, stop and report the result.
+3. If the game is not in `waiting_command`, wait briefly and read state again.
+4. If it is not your turn, wait briefly and read state again. Do not ask the human to say "your turn".
+5. If it is your turn, inspect units, resources, action points, control points, headquarters HP, and legal targets.
+6. Explain the chosen legal action briefly, then call the matching REST endpoint.
+7. Refresh state after every successful action and reason again.
+8. End the turn only after available useful legal actions are exhausted.
+9. After ending the turn, continue polling only when the user asked you to keep playing; otherwise report the turn result.
 
 Never continue without a token. `POST /api/games` and `POST /api/games/:id/join` are the only endpoints that return player tokens.
 
@@ -36,20 +41,6 @@ All state and action requests require `X-Player-Token: <token>`.
 
 If `POST /join` returns `game_already_full`, report that error. Do not fetch state with a missing token.
 
-## Mandatory Turn Loop
-
-Do not stop after ending one owned turn. Keep the player process active until the game is over, the turn budget is reached, or the user explicitly asks for `--once`.
-
-Required loop:
-
-1. `GET /api/games/:id`.
-2. If `winner` exists or `phase === "game_over"`, stop and report the result.
-3. If `phase !== "waiting_command"`, sleep briefly and poll again.
-4. If `game.turn.currentOwner !== your owner`, sleep briefly and poll again. Do not ask the human to say "your turn".
-5. If it is your turn, play a complete legal turn, call `/end-turn`, then immediately return to step 1.
-
-After `POST /end-turn`, the correct next action is polling. Ending a turn is not task completion; it only hands control to the opponent. Only use `--once` when the user explicitly asks to play exactly one turn.
-
 ## Rules To Remember
 
 - Coordinates are pointy-top axial hex `{ q, r }`.
@@ -60,36 +51,39 @@ After `POST /end-turn`, the correct next action is polling. Ending a turn is not
 - New current player receives base income plus owned control-point income after each turn switch.
 - Deploy only from your headquarters or owned control points into adjacent empty plain cells.
 - Destroying the enemy headquarters immediately wins.
-- If no headquarters is destroyed after both players complete turn 20 (player B ends turn 20), the server adjudicates by score. A true draw is only possible when scores are exactly tied.
-- Adjudication score is: enemy HQ damage × 4 + own HQ HP × 2 + owned control points × 120 + surviving army value × 2 + supplies × 1.
+- If no headquarters is destroyed after both players complete the configured max turn, the server adjudicates by score. A true draw is only possible when scores are exactly tied.
+- Adjudication score is: enemy HQ damage x 4 + own HQ HP x 2 + owned control points x 120 + surviving army value x 2 + supplies x 1.
 
-### Action Points (per-turn limit)
+### Action Points
 
-Each player has a limited number of **action points** per turn (`config.balance.actionsPerTurn`, currently **5**). Activating a unit costs one point; the limit caps how many different units a player can operate each turn and prevents a snowballing side from acting with a huge army.
+Each player has `config.balance.actionsPerTurn` action points per turn, currently 5.
 
-- **One action point = activate one unit.** The first deploy/move/attack/heal that touches a unit this turn spends a point and marks that unit activated.
-- A unit that is already activated can finish its remaining legal actions for **free** (e.g. move then attack, or move then heal) without spending more points.
-- **Deploy** always spends a point (the new unit is freshly activated; it cannot also move the same turn).
-- Once the budget is exhausted, only already-activated units may still act; end the turn after that.
-- The server returns `429` with code `action_limit_reached` when you try to activate a new unit while out of points. Track `game.turn.actionsUsed` against `game.config.balance.actionsPerTurn` and stop attempting new-unit actions once `actionsUsed >= actionsPerTurn`.
+- One action point activates one unit.
+- The first deploy, move, attack, or heal that touches a unit this turn spends one point.
+- An already activated unit can finish remaining legal actions for free, such as move then attack.
+- Deploy always spends one point; the new unit cannot move that same turn.
+- Once `game.turn.actionsUsed >= game.config.balance.actionsPerTurn`, stop trying to activate fresh units.
+- A `429 action_limit_reached` response means the action point budget is exhausted for new activations.
 
 ### Economy
 
-- Base income is `config.balance.baseIncome` (**10**); each owned control point adds `config.balance.controlPointIncome` (**15**) per turn.
-- With a 5-action cap, income above ~85/turn cannot all be spent on deployment, so hoarding supplies has diminishing value — spend on high-impact units rather than stockpiling.
+- Base income is `config.balance.baseIncome`.
+- Each owned control point adds `config.balance.controlPointIncome`.
+- With a 5-action cap, hoarded supplies cannot all become units immediately. Spend on high-impact deployments when action points and deploy hexes are available.
 
 Do not use V1 concepts: `x/y`, Manhattan distance, buildings, miners, production queues, walls, `/build`, `/produce`, or `/sell`.
 
-## Turn Heuristic
+## Decision Heuristic
 
 Use this order unless the user asks for a different style:
 
 1. Attack the enemy headquarters if any unit can hit it.
-2. Attack killable or low-HP enemies; prefer support, ranger, and capturing units. Avoid wasting many attacks on healthy heavy units when a point or HQ route is available.
+2. Attack killable or low-HP enemies; prefer support, ranger, and capturing units.
 3. Heal the most damaged friendly unit with support.
-4. Deploy strategically before ordinary movement when supplies and an action point remain, especially if supplies ≥ 90, unit count is not ahead, you own at least 2 control points, or the game has reached turn 8.
-5. Move infantry/scout toward neutral or enemy control points before turn 8. From turn 8 onward, or once you own 3+ points, move scout/ranger/infantry toward enemy HQ attack positions.
-6. From turn 15 onward, prioritize adjudication score: damage HQ, capture/hold points, preserve valuable units, and spend excess supplies.
-7. Once `actionsUsed >= actionsPerTurn`, stop trying to move/deploy fresh units; finish any free attacks from activated units, then end the turn.
+4. Deploy strategically before ordinary movement when supplies and an action point remain, especially if supplies are high, unit count is not ahead, you own at least 2 control points, or the game is late.
+5. Move infantry and scouts toward neutral or enemy control points early.
+6. In the late game, move scouts, rangers, and infantry toward enemy headquarters attack positions.
+7. Near adjudication, prioritize headquarters damage, captured points, valuable unit survival, and spending excess supplies.
+8. When no useful legal action remains, call `/end-turn`.
 
-Refresh state after every successful action. If an action fails, log the API error and continue to the next candidate; do not repeat the same failing action in a tight loop.
+Before every action, confirm the unit has the required movement/action availability, the target is in range, the destination is valid, and action points allow the activation.

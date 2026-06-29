@@ -2,7 +2,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { PlayerId, TerrainType, UnitType } from '../types.js';
+import type { ControlPointKind, PlayerId, TerrainType, UnitType } from '../types.js';
 import { isValidHex } from '../engine/hex.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,8 +33,15 @@ export interface TerrainCellConfig {
 export interface ControlPointConfig {
   id: string;
   name: string;
+  kind?: ControlPointKind;
   q: number;
   r: number;
+}
+
+export interface ControlPointTypeSpec {
+  income: number;
+  deployDiscount: number;
+  repairAmount: number;
 }
 
 export interface StartingUnitConfig {
@@ -72,8 +79,11 @@ export interface MapConfig {
       armyValue: number;
       supplies: number;
     };
+    controlPointTypes?: Record<ControlPointKind, ControlPointTypeSpec>;
   };
 }
+
+const CONTROL_POINT_KINDS = ['supply', 'forward_base', 'repair'] as const satisfies readonly ControlPointKind[];
 
 const maps = new Map<string, MapConfig>();
 
@@ -146,6 +156,17 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   for (const key of ['enemyHqDamage', 'ownHqHp', 'controlPoint', 'armyValue', 'supplies']) {
     assertNumber(weights, key, `Map "${id}".balance.adjudicationWeights`, 0);
   }
+  const controlPointTypes = 'controlPointTypes' in balance
+    ? asRecord(balance.controlPointTypes, `Map "${id}".balance.controlPointTypes`)
+    : null;
+  if (controlPointTypes) {
+    for (const kind of CONTROL_POINT_KINDS) {
+      const spec = asRecord(controlPointTypes[kind], `Map "${id}".balance.controlPointTypes.${kind}`);
+      assertNumber(spec, 'income', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
+      assertNumber(spec, 'deployDiscount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
+      assertNumber(spec, 'repairAmount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
+    }
+  }
 
   const hq = asRecord(c.headquarters, `Map "${id}".headquarters`);
   for (const player of ['player_a', 'player_b'] as PlayerId[]) {
@@ -173,12 +194,27 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   if (!Array.isArray(c.controlPoints) || c.controlPoints.length === 0) {
     throw new Error(`Map "${id}".controlPoints must be a non-empty array`);
   }
+  let typedControlPoints = 0;
   for (let i = 0; i < c.controlPoints.length; i++) {
     const cp = asRecord(c.controlPoints[i], `controlPoints[${i}]`);
     assertString(cp, 'id', `controlPoints[${i}]`);
     assertString(cp, 'name', `controlPoints[${i}]`);
+    if ('kind' in cp) {
+      if (!CONTROL_POINT_KINDS.includes(cp.kind as ControlPointKind)) {
+        throw new Error(`controlPoints[${i}].kind must be supply, forward_base, or repair`);
+      }
+      typedControlPoints += 1;
+    }
     const pos = assertPosition(cp, `controlPoints[${i}]`, radius);
     claim(pos, `controlPoints[${i}]`);
+  }
+  if (typedControlPoints > 0) {
+    if (!controlPointTypes) {
+      throw new Error(`Map "${id}".balance.controlPointTypes is required when control points use kind`);
+    }
+    if (typedControlPoints !== c.controlPoints.length) {
+      throw new Error(`Map "${id}".controlPoints must all define kind when any control point is typed`);
+    }
   }
 
   if (!Array.isArray(c.startingUnits)) throw new Error(`Map "${id}".startingUnits must be an array`);

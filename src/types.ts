@@ -11,6 +11,8 @@ export type GameOverReason = 'headquarters_destroyed' | 'turn_limit_score' | 'tu
 
 export type TerrainType = 'plain' | 'water' | 'blocker';
 
+export type ControlPointKind = 'supply' | 'forward_base' | 'repair';
+
 export interface Position {
   q: number;
   r: number;
@@ -55,6 +57,7 @@ export interface Headquarters {
 export interface ControlPoint {
   id: string;
   name: string;
+  kind?: ControlPointKind;
   q: number;
   r: number;
   owner: PlayerId | null;
@@ -86,6 +89,7 @@ export type EventType =
   | 'unit_death'
   | 'deploy'
   | 'control_point_captured'
+  | 'control_point_repair'
   | 'income'
   | 'reset_actions'
   | 'turn_end'

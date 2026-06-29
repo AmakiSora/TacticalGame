@@ -213,6 +213,33 @@ function actionsRemaining(game) {
   return Math.max(0, actionsPerTurn(game) - (game.turn?.actionsUsed ?? 0));
 }
 
+function controlPointEffect(game, point) {
+  if (!point?.kind) return null;
+  return game.config?.balance?.controlPointTypes?.[point.kind] || null;
+}
+
+function effectiveDeployCost(game, unitType, origin) {
+  const base = game.config.units[unitType].cost;
+  const discount = controlPointEffect(game, origin)?.deployDiscount || 0;
+  return Math.max(0, base - discount);
+}
+
+function controlPointPriority(game, point) {
+  const effect = controlPointEffect(game, point);
+  if (!effect) return 8;
+  if (point.kind === 'supply') return 16;
+  if (point.kind === 'forward_base') return 13;
+  if (point.kind === 'repair') return 11;
+  return effect.income || 8;
+}
+
+function nearestOwnedRepairPoint(game, owner, unit) {
+  if (unit.hp >= unit.maxHp * 0.7) return null;
+  return game.controlPoints
+    .filter(point => point.owner === owner && point.kind === 'repair' && (controlPointEffect(game, point)?.repairAmount || 0) > 0)
+    .sort((a, b) => hexDistance(unit, a) - hexDistance(unit, b))[0] || null;
+}
+
 /** Units the owner can still spend an action point on this turn (not yet activated). */
 function activatableUnits(game, owner) {
   return livingUnits(game, owner).filter(u => !u.actionSpent);
@@ -278,10 +305,15 @@ export function movementGoal(game, owner, unit) {
     return game.headquarters[enemy];
   }
 
+  const repairPoint = nearestOwnedRepairPoint(game, owner, unit);
+  if (repairPoint) return repairPoint;
+
   if (unit.canCapture) {
     const point = game.controlPoints
       .filter(p => p.owner !== owner)
-      .sort((a, b) => hexDistance(unit, a) - hexDistance(unit, b))[0];
+      .sort((a, b) =>
+        (controlPointPriority(game, b) - hexDistance(unit, b)) -
+        (controlPointPriority(game, a) - hexDistance(unit, a)))[0];
     if (point) return point;
   }
 
@@ -320,7 +352,7 @@ function deployOrigins(game, owner) {
   ].filter(origin => origin && origin.alive !== false);
 }
 
-function deployChoice(game, owner) {
+function deployChoice(game, owner, origins = deployOrigins(game, owner)) {
   const supplies = game.resources[owner].supplies;
   const friendly = livingUnits(game, owner);
   const damaged = friendly.filter(u => u.hp < u.maxHp * 0.65).length;
@@ -331,7 +363,8 @@ function deployChoice(game, owner) {
   if (damaged >= 2 && counts.support < 2) preferences.push('support');
   if (game.turn.turnNumber <= 3) preferences.push('scout', 'infantry');
   preferences.push('ranger', 'heavy', 'infantry', 'scout', 'support');
-  return preferences.find(type => specs[type] && supplies >= specs[type].cost) || null;
+  return preferences.find(type =>
+    specs[type] && origins.some(origin => supplies >= effectiveDeployCost(game, type, origin))) || null;
 }
 
 export function shouldStrategicDeploy(game, owner) {
@@ -346,19 +379,22 @@ export function shouldStrategicDeploy(game, owner) {
 
 async function tryDeploy(game, args, seat) {
   if (actionsRemaining(game) <= 0) return false;
-  const unitType = deployChoice(game, seat.owner);
+  const origins = deployOrigins(game, seat.owner);
+  const unitType = deployChoice(game, seat.owner, origins);
   if (!unitType) return false;
 
   const enemyHq = game.headquarters[otherPlayer(seat.owner)];
   const candidateMoves = [];
-  for (const origin of deployOrigins(game, seat.owner)) {
+  for (const origin of origins) {
+    const cost = effectiveDeployCost(game, unitType, origin);
+    if (game.resources[seat.owner].supplies < cost) continue;
     for (const pos of neighbors(origin)) {
       if (isEmptyPlain(game, pos)) {
-        candidateMoves.push({ origin, pos, distance: hexDistance(pos, enemyHq) });
+        candidateMoves.push({ origin, pos, distance: hexDistance(pos, enemyHq), cost });
       }
     }
   }
-  candidateMoves.sort((a, b) => a.distance - b.distance);
+  candidateMoves.sort((a, b) => (a.distance - b.distance) || (a.cost - b.cost));
   if (candidateMoves.length === 0) return false;
 
   const pick = candidateMoves[0];

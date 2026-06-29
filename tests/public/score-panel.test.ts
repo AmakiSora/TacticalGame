@@ -31,4 +31,13 @@ describe('adjudication score panels', () => {
       expect(source).toContain('scorePanelEl.innerHTML');
     }
   });
+
+  it('supports typed control point display and repair replay events', () => {
+    for (const file of ['public/app.js', 'public/play.js']) {
+      const source = read(file);
+      expect(source).toContain('control_point_repair');
+      expect(source).toContain('controlPointLabel');
+      expect(source).toContain('controlPointStats');
+    }
+  });
 });

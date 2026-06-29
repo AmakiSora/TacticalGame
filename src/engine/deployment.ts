@@ -6,6 +6,7 @@ import { hexDistance } from './hex.js';
 import { isDeployable, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
 import { createUnitFromConfig } from '../state/store.js';
+import { deployDiscountForOrigin } from './controlPoints.js';
 
 function deployOrigin(game: GameState, owner: PlayerId, fromId: string): Position | null {
   const hq = game.headquarters[owner];
@@ -41,20 +42,22 @@ export function deployUnit(
   if (!isDeployable(game, q, r)) {
     return { ok: false, code: 'invalid_terrain', message: 'deploy target is not empty plain terrain' };
   }
-  if (game.resources[owner].supplies < spec.cost) {
-    return { ok: false, code: 'insufficient_supplies', message: `need ${spec.cost} supplies` };
+  const discount = Math.min(spec.cost, deployDiscountForOrigin(game, owner, fromId));
+  const actualCost = spec.cost - discount;
+  if (game.resources[owner].supplies < actualCost) {
+    return { ok: false, code: 'insufficient_supplies', message: `need ${actualCost} supplies` };
   }
 
   game.turn.actionsUsed += 1;
 
-  game.resources[owner].supplies -= spec.cost;
+  game.resources[owner].supplies -= actualCost;
   const unit = createUnitFromConfig(game.config, owner, unitType, q, r);
   unit.hasMoved = true;
   unit.hasActed = false;
   unit.actionSpent = true;
   game.units.push(unit);
   appendEvent(game, bus, 'deploy', {
-    unitId: unit.id, owner, unitType, fromId, q, r, cost: spec.cost,
+    unitId: unit.id, owner, unitType, fromId, q, r, cost: actualCost, unitCost: spec.cost, discount,
     hp: unit.hp, attack: unit.attack, defense: unit.defense,
     moveRange: unit.moveRange, attackRange: unit.attackRange,
     canCapture: unit.canCapture, healPower: unit.healPower,

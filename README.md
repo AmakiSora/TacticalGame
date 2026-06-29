@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。两名玩家争夺地图据点获取补给，在总部或己方据点部署单位，最终摧毁敌方总部获胜。
 
-当前版本：`2.2.2`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
+当前版本：`2.3.0`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
 ## 技术栈
 
@@ -39,16 +39,17 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 ## 核心规则
 
 - 地图为尖顶六边形，坐标为 `{ q, r }`。
-- 当前内置地图为 `default`（六角前线）和 `desert`（裂谷控制区），半径均为 `8`；有效格满足 `max(abs(q), abs(r), abs(-q-r)) <= radius`。
+- 当前内置地图为 `default`（六角前线）、`desert`（裂谷控制区）和 `dual-lanes`（双线抉择），半径均为 `8`；有效格满足 `max(abs(q), abs(r), abs(-q-r)) <= radius`。
 - 地形：`plain` 可通行/部署，`water` 和 `blocker` 不可通行/部署。
-- 每方开局有总部、2 个步兵、1 个侦察兵、80 补给；不同地图可调整初始坐标。
+- 每方开局有总部；默认图和沙漠图提供 2 个步兵、1 个侦察兵、80 补给，`dual-lanes` 不提供免费单位而是给 208 补给让玩家自行部署。
 - **每回合最多消耗 5 个行动点**（`config.balance.actionsPerTurn`）。首次操作一个单位（部署/移动/攻击/治疗）消耗 1 点并「激活」该单位；同一单位在本回合内的后续动作免费。行动点用尽后，只能继续操作已激活的单位。这是为防止资源碾压方操作过多单位而设的硬上限。
 - 每个单位每回合可移动一次、行动一次。
 - 移动使用路径搜索，不能穿过水域、阻挡、单位或总部。
 - 攻击/治疗只按六边形距离判断，不做视线阻挡。
 - 只有步兵和侦察兵可占领据点；站在据点上结束己方回合即占领。
-- 回合切换后，新当前玩家获得基础收入 10 + 每个己方据点 15。
-- 可从己方总部或己方据点向相邻空白平地部署单位。
+- 回合切换后，新当前玩家获得基础收入 + 己方据点收入；旧地图使用统一 `controlPointIncome`，类型化据点地图按据点类型分别计算。
+- 可从己方总部或己方据点向相邻空白平地部署单位；`forward_base` 据点可按地图配置降低从该点部署的实际费用。
+- `repair` 据点会在拥有者行动开始时修复站上或距离 1 格内的己方受伤单位；总部和敌军不会被修复，每个单位每回合最多被据点修复一次。
 - 摧毁敌方总部立即获胜。
 - 若双方完成第 15 回合后仍未摧毁总部，系统按优势分裁决：敌方总部已损血×4 + 己方总部当前 HP×2 + 己方据点数×120 + 存活部队价值×2 + 剩余补给×1。分高者胜；完全同分才记录为平局。
 
@@ -64,7 +65,7 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 
 总部：HP 180，防御 6。
 
-> 经济说明：基础收入 10/回合，每个己方据点额外 +12。配合 5 行动点上限，囤积补给无法快速转化为兵力，避免雪球。
+> 经济说明：`default` 和 `desert` 仍使用基础收入 10/回合、每个己方据点额外 +12；`dual-lanes` 使用类型化据点收入，并以 208 开局补给替代免费初始单位。配合 5 行动点上限，囤积补给无法快速转化为兵力，避免雪球。
 
 ## REST API
 
@@ -99,9 +100,11 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 
 事件类型：
 
-`game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `control_point_captured`, `income`, `reset_actions`, `turn_end`, `headquarters_destroyed`, `game_over`, `name_rename`
+`game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `control_point_captured`, `control_point_repair`, `income`, `reset_actions`, `turn_end`, `headquarters_destroyed`, `game_over`, `name_rename`
 
 `game_start` 包含完整地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `headquarters_destroyed`、`turn_limit_score` 或 `turn_limit_draw`。
+
+`income` 事件保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。`deploy` 事件中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。`control_point_repair` 事件包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 
 ### 自动控制
 
@@ -130,7 +133,7 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
   "orientation": "pointy",
   "radius": 8,
   "terrainCells": [{ "q": 0, "r": 1, "terrain": "water" }],
-  "controlPoints": [{ "id": "cp_c", "name": "中央阵地", "q": 0, "r": 0 }],
+  "controlPoints": [{ "id": "cp_c", "name": "中央阵地", "q": 0, "r": 0, "kind": "supply" }],
   "headquarters": {
     "player_a": { "q": -8, "r": 0 },
     "player_b": { "q": 8, "r": 0 }
@@ -138,11 +141,28 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
   "startingUnits": [{ "owner": "player_a", "type": "infantry", "q": -7, "r": 0 }],
   "units": {},
   "headquartersSpec": { "hp": 180, "defense": 6 },
-  "balance": { "startingSupplies": 80, "baseIncome": 10, "controlPointIncome": 12, "damageVarianceRange": 3, "minimumDamage": 1, "healVarianceRange": 6, "actionsPerTurn": 5, "maxTurns": 15, "adjudicationWeights": { "enemyHqDamage": 4, "ownHqHp": 2, "controlPoint": 120, "armyValue": 2, "supplies": 1 } }
+  "balance": {
+    "startingSupplies": 80,
+    "baseIncome": 10,
+    "controlPointIncome": 12,
+    "controlPointTypes": {
+      "supply": { "income": 12, "deployDiscount": 0, "repairAmount": 0 },
+      "forward_base": { "income": 8, "deployDiscount": 8, "repairAmount": 0 },
+      "repair": { "income": 8, "deployDiscount": 0, "repairAmount": 10 }
+    },
+    "damageVarianceRange": 3,
+    "minimumDamage": 1,
+    "healVarianceRange": 6,
+    "actionsPerTurn": 5,
+    "maxTurns": 15,
+    "adjudicationWeights": { "enemyHqDamage": 4, "ownHqHp": 2, "controlPoint": 120, "armyValue": 2, "supplies": 1 }
+  }
 }
 ```
 
 未列在 `terrainCells` 的有效格默认为 `plain`。
+
+据点可选 `kind`：`supply`、`forward_base`、`repair`。如果地图没有任何据点写 `kind`，引擎使用旧规则：统一 `balance.controlPointIncome`、无部署折扣、无据点维修。如果任意据点写了 `kind`，则该地图所有据点都必须写 `kind`，并且 `balance.controlPointTypes` 必须完整配置三种类型的 `income`、`deployDiscount`、`repairAmount`。裁决分始终按据点数量计算，不按据点类型加权。
 
 ## AI 自动对战
 

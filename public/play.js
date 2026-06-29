@@ -5,6 +5,8 @@ const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
 const TERRAIN = { plain: '#111923', water: '#183a55', blocker: '#393f46' };
 const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
 const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP', headquarters: 'HQ' };
+const CONTROL_POINT_LABELS = { supply: 'SUP', forward_base: 'FWD', repair: 'REP' };
+const CONTROL_POINT_NAMES = { supply: '补给站', forward_base: '前线基地', repair: '维修站' };
 
 const $ = id => document.getElementById(id);
 const els = {
@@ -150,7 +152,7 @@ function applyEvent(s, ev) {
       break;
     case 'deploy':
       s.resources[p.owner].supplies -= p.cost || 0;
-      s.units.set(p.unitId, { id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r, hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense, moveRange: p.moveRange, attackRange: p.attackRange, alive: true, hasMoved: true, hasActed: false, actionSpent: true, canCapture: !!p.canCapture, healPower: p.healPower, cost: p.cost });
+      s.units.set(p.unitId, { id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r, hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense, moveRange: p.moveRange, attackRange: p.attackRange, alive: true, hasMoved: true, hasActed: false, actionSpent: true, canCapture: !!p.canCapture, healPower: p.healPower, cost: p.unitCost ?? p.cost });
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'move': { const u = s.units.get(p.unitId); if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
@@ -159,6 +161,7 @@ function applyEvent(s, ev) {
     case 'unit_death': { const u = s.units.get(p.unitId); if (u) u.alive = false; break; }
     case 'headquarters_destroyed': { const h = s.headquarters.get(p.headquartersId); if (h) h.alive = false; break; }
     case 'control_point_captured': { const cp = s.controlPoints.get(p.pointId); if (cp) cp.owner = p.owner; break; }
+    case 'control_point_repair': { const u = s.units.get(p.unitId); if (u) u.hp = p.unitHp; break; }
     case 'income': s.resources[p.owner].supplies += p.amount; break;
     case 'reset_actions':
       for (const u of s.units.values()) if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
@@ -224,6 +227,29 @@ function statItem(label, value, tone = '') {
   if (value == null) return '';
   return `<div class="sel-stat-card ${tone}"><span>${label}</span><strong>${esc(value)}</strong></div>`;
 }
+function controlPointEffect(cp) {
+  if (!cp?.kind) return null;
+  return gameConfig?.balance?.controlPointTypes?.[cp.kind] || null;
+}
+function controlPointLabel(cp) {
+  return CONTROL_POINT_LABELS[cp?.kind] || 'CP';
+}
+function controlPointStats(cp) {
+  const effect = controlPointEffect(cp);
+  const income = effect ? effect.income : gameConfig?.balance?.controlPointIncome ?? 12;
+  return [
+    statItem('类型', cp.kind ? CONTROL_POINT_NAMES[cp.kind] || cp.kind : '普通据点', ''),
+    statItem('收入', `+${income}`, 'cost'),
+    effect?.deployDiscount ? statItem('部署折扣', `-${effect.deployDiscount}`, 'move') : '',
+    effect?.repairAmount ? statItem('维修', `+${effect.repairAmount}`, 'heal') : '',
+    statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : ''),
+  ].join('');
+}
+function effectiveDeployCost(type, origin) {
+  const base = gameConfig.units[type].cost;
+  const discount = controlPointEffect(origin)?.deployDiscount || 0;
+  return Math.max(0, base - discount);
+}
 function renderEntityCard(ent) {
   const type = ent.type || 'headquarters';
   const title = UNIT_NAMES[type] || '指挥部';
@@ -265,8 +291,7 @@ function renderControlPointCard(cp) {
       </div>
     </div>
     <div class="sel-stat-grid">
-      ${statItem('收入', `+${gameConfig?.balance?.controlPointIncome ?? 12}`, 'cost')}
-      ${statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : '')}
+      ${controlPointStats(cp)}
     </div>
     <div class="sel-coord">坐标 (${cp.q}, ${cp.r})</div>
   </div>`;
@@ -288,7 +313,7 @@ function drawBoard() {
     const p = hexToPixel(cp.q, cp.r); pathHex(cp.q, cp.r, 8);
     ctx.fillStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a'; ctx.globalAlpha = .32; ctx.fill(); ctx.globalAlpha = 1;
     ctx.strokeStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#f0d77c'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('CP', p.x, p.y + 4);
+    ctx.fillStyle = '#f0d77c'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(controlPointLabel(cp), p.x, p.y + 4);
   }
   for (const hq of state.headquarters.values()) {
     const p = hexToPixel(hq.q, hq.r); pathHex(hq.q, hq.r, 5); ctx.fillStyle = hq.alive ? OWNER_COLOR[hq.owner] : '#555'; ctx.globalAlpha = hq.alive ? .78 : .3; ctx.fill(); ctx.globalAlpha = 1;
@@ -413,6 +438,7 @@ function formatEventShort(ev) {
     case 'unit_death': return `${UNIT_NAMES[p.unitType] || '单位'} 阵亡`;
     case 'headquarters_destroyed': return `${playerName(p.owner)} 指挥部被摧毁`;
     case 'control_point_captured': return `${playerName(p.owner)} 占领 ${p.name}`;
+    case 'control_point_repair': return `${p.pointName || '维修站'} 修复单位 +${p.amount}`;
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
     case 'reset_actions': return `${playerName(p.owner)} 单位已重置`;
     case 'turn_end': return `轮到 ${playerName(p.nextOwner)}`;
@@ -476,7 +502,7 @@ function selectDeployOrigin(origin) {
   renderSidebar(); drawBoard();
   if (origin.owner !== myPlayer && origin.owner !== undefined) return;
   if (state.turn.currentOwner !== myPlayer) return;
-  const items = Object.entries(gameConfig.units).map(([type, spec]) => ({ label: UNIT_NAMES[type], action: 'deploy', type, cost: spec.cost }));
+  const items = Object.entries(gameConfig.units).map(([type]) => ({ label: UNIT_NAMES[type], action: 'deploy', type, cost: effectiveDeployCost(type, origin) }));
   showPopup(origin, '部署单位', items, (_action, type) => {
     closePopup(); interactionMode = 'deploy_mode'; selectedOriginId = origin.id; selectedDeployType = type;
     rangeHighlights = deployCells(origin).map(p => ({ ...p, type: 'deploy', unitType: type }));

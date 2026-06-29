@@ -5,13 +5,37 @@ import { findReachableCells } from '../../src/engine/validation.js';
 import { moveUnit } from '../../src/engine/units.js';
 import { attackTarget, healTarget } from '../../src/engine/combat.js';
 import { deployUnit } from '../../src/engine/deployment.js';
-import { endTurn, joinGame } from '../../src/engine/engine.js';
+import { buildAdjudicationScores, endTurn, joinGame } from '../../src/engine/engine.js';
+import type { Unit } from '../../src/types.js';
 
 function setup() {
   const game = createInitialGame('g1');
   const bus = new EventBus();
   joinGame(game, bus, 'B');
   return { game, bus };
+}
+
+function testUnit(overrides: Partial<Unit>): Unit {
+  return {
+    id: 'unit',
+    owner: 'player_a',
+    type: 'infantry',
+    q: 0,
+    r: 0,
+    hp: 100,
+    maxHp: 100,
+    attack: 30,
+    defense: 8,
+    moveRange: 3,
+    attackRange: 1,
+    cost: 45,
+    alive: true,
+    hasMoved: false,
+    hasActed: false,
+    actionSpent: false,
+    canCapture: true,
+    ...overrides,
+  };
 }
 
 describe('hex V2 rules', () => {
@@ -51,6 +75,48 @@ describe('hex V2 rules', () => {
     expect(game.events.some(e => e.type === 'income')).toBe(true);
   });
 
+  it('uses typed control point income on typed maps while keeping score based on point count', () => {
+    const game = createInitialGame('g1', 'dual-lanes');
+    const bus = new EventBus();
+    joinGame(game, bus, 'B');
+    game.controlPoints.find(p => p.id === 'cp_nw')!.owner = 'player_b';
+    game.controlPoints.find(p => p.id === 'cp_nc')!.owner = 'player_b';
+    game.controlPoints.find(p => p.id === 'cp_ne')!.owner = 'player_b';
+    game.turn.currentOwner = 'player_a';
+    const beforeB = game.resources.player_b.supplies;
+
+    const result = endTurn(game, bus, 'player_a');
+
+    expect(result.ok).toBe(true);
+    expect(game.resources.player_b.supplies).toBe(beforeB + 10 + 12 + 8 + 12);
+    const income = game.events.find(e => e.type === 'income' && e.payload.owner === 'player_b')!;
+    expect(income.payload).toMatchObject({
+      base: 10,
+      control: 32,
+      controlPoints: 3,
+      amount: 42,
+    });
+    expect(income.payload.breakdown).toEqual([
+      expect.objectContaining({ pointId: 'cp_nw', kind: 'supply', amount: 12 }),
+      expect.objectContaining({ pointId: 'cp_nc', kind: 'repair', amount: 8 }),
+      expect.objectContaining({ pointId: 'cp_ne', kind: 'supply', amount: 12 }),
+    ]);
+    game.resources.player_a.supplies = 0;
+    game.resources.player_b.supplies = 0;
+    game.units = [];
+    const scores = buildAdjudicationScores(game);
+    expect(scores.player_b.controlPoints).toBe(3);
+    expect(scores.player_b.total).toBe(180 * 2 + 3 * 90);
+  });
+
+  it('starts dual-lanes with no free units and enough supplies for player deployment choices', () => {
+    const game = createInitialGame('g1', 'dual-lanes');
+
+    expect(game.units).toHaveLength(0);
+    expect(game.resources.player_a.supplies).toBe(208);
+    expect(game.resources.player_b.supplies).toBe(208);
+  });
+
   it('only infantry and scout can capture control points', () => {
     const { game, bus } = setup();
     const unit = game.units.find(u => u.owner === 'player_a' && u.type === 'infantry')!;
@@ -74,6 +140,52 @@ describe('hex V2 rules', () => {
     expect(deployed.actionSpent).toBe(true);
     expect(game.turn.actionsUsed).toBe(1);
     expect(game.events.at(-1)!.type).toBe('deploy');
+  });
+
+  it('discounts deployments from forward bases without changing unit army value', () => {
+    const game = createInitialGame('g1', 'dual-lanes');
+    const bus = new EventBus();
+    joinGame(game, bus, 'B');
+    const origin = game.controlPoints.find(p => p.id === 'cp_sw')!;
+    origin.owner = 'player_a';
+    game.resources.player_a.supplies = 38;
+
+    const result = deployUnit(game, bus, 'player_a', 'scout', origin.id, -5, 4);
+
+    expect(result.ok).toBe(true);
+    expect(game.resources.player_a.supplies).toBe(8);
+    expect(result.data?.cost).toBe(38);
+    expect(game.events.at(-1)).toMatchObject({
+      type: 'deploy',
+      payload: expect.objectContaining({ cost: 30, unitCost: 38, discount: 8 }),
+    });
+  });
+
+  it('repairs friendly units near owned repair points at the start of their turn', () => {
+    const game = createInitialGame('g1', 'dual-lanes');
+    const bus = new EventBus();
+    joinGame(game, bus, 'B');
+    game.controlPoints.find(p => p.id === 'cp_nc')!.owner = 'player_b';
+    const friendly = testUnit({ id: 'friendly', owner: 'player_b', q: 2, r: -3, hp: 40 });
+    const enemy = testUnit({ id: 'enemy', owner: 'player_a', q: 1, r: -4, hp: 40 });
+    game.units.push(friendly, enemy);
+    game.turn.currentOwner = 'player_a';
+
+    const result = endTurn(game, bus, 'player_a');
+
+    expect(result.ok).toBe(true);
+    expect(friendly.hp).toBe(50);
+    expect(enemy.hp).toBe(40);
+    expect(game.events).toContainEqual(expect.objectContaining({
+      type: 'control_point_repair',
+      payload: expect.objectContaining({
+        owner: 'player_b',
+        pointId: 'cp_nc',
+        unitId: friendly.id,
+        amount: 10,
+        unitHp: 50,
+      }),
+    }));
   });
 
   it('attacks by hex range and ends the game when HQ reaches zero hp', () => {

@@ -4,6 +4,8 @@ import type { AdjudicationScore, GameOverReason, GameState, PlayerId } from '../
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { appendEvent } from './events.js';
+import { hexDistance } from './hex.js';
+import { controlPointIncome, controlPointTypeSpec } from './controlPoints.js';
 
 function generateToken(): string {
   return randomBytes(16).toString('hex');
@@ -87,11 +89,43 @@ function resetActions(game: GameState, owner: PlayerId): void {
 
 function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): void {
   const base = game.config.balance.baseIncome;
-  const points = game.controlPoints.filter(p => p.owner === owner).length;
-  const control = points * game.config.balance.controlPointIncome;
+  const ownedPoints = game.controlPoints.filter(p => p.owner === owner);
+  const breakdown = ownedPoints.map(point => ({
+    pointId: point.id,
+    name: point.name,
+    kind: point.kind,
+    amount: controlPointIncome(game, point),
+  }));
+  const points = ownedPoints.length;
+  const control = breakdown.reduce((sum, item) => sum + item.amount, 0);
   const amount = base + control;
   game.resources[owner].supplies += amount;
-  appendEvent(game, bus, 'income', { owner, base, control, controlPoints: points, amount });
+  appendEvent(game, bus, 'income', { owner, base, control, controlPoints: points, amount, breakdown });
+}
+
+function repairFromControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
+  const repaired = new Set<string>();
+  for (const point of game.controlPoints) {
+    if (point.owner !== owner) continue;
+    const repairAmount = controlPointTypeSpec(game, point)?.repairAmount ?? 0;
+    if (repairAmount <= 0) continue;
+    for (const unit of game.units) {
+      if (unit.owner !== owner || !unit.alive || unit.hp >= unit.maxHp || repaired.has(unit.id)) continue;
+      if (hexDistance(point, unit) > 1) continue;
+      const amount = Math.min(repairAmount, unit.maxHp - unit.hp);
+      if (amount <= 0) continue;
+      unit.hp += amount;
+      repaired.add(unit.id);
+      appendEvent(game, bus, 'control_point_repair', {
+        owner,
+        pointId: point.id,
+        pointName: point.name,
+        unitId: unit.id,
+        amount,
+        unitHp: unit.hp,
+      });
+    }
+  }
 }
 
 function armyValue(game: GameState, owner: PlayerId): number {
@@ -171,6 +205,7 @@ export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result
   game.turn.currentOwner = next;
   game.turn.actionsUsed = 0;
   collectIncome(game, bus, next);
+  repairFromControlPoints(game, bus, next);
   appendEvent(game, bus, 'turn_end', { previousOwner: owner, nextOwner: next, turnNumber: game.turn.turnNumber });
   return { ok: true };
 }

@@ -1,0 +1,68 @@
+{
+  "name": "双线抉择",
+  "description": "半径8六边形战场，上路偏经济、下路偏前线部署，中部障碍迫使双方选择主攻路线",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 8,
+  "terrainCells": [
+    { "q": -2, "r": 0, "terrain": "blocker" },
+    { "q": -1, "r": 0, "terrain": "blocker" },
+    { "q": 0, "r": 0, "terrain": "blocker" },
+    { "q": 1, "r": 0, "terrain": "blocker" },
+    { "q": 2, "r": 0, "terrain": "blocker" },
+    { "q": -1, "r": -1, "terrain": "water" },
+    { "q": 0, "r": -1, "terrain": "water" },
+    { "q": 1, "r": -1, "terrain": "water" },
+    { "q": 2, "r": -1, "terrain": "water" },
+    { "q": -2, "r": 1, "terrain": "water" },
+    { "q": -1, "r": 1, "terrain": "water" },
+    { "q": 0, "r": 1, "terrain": "water" },
+    { "q": 1, "r": 1, "terrain": "water" }
+  ],
+  "controlPoints": [
+    { "id": "cp_nw", "name": "西北补给站", "kind": "supply", "q": -2, "r": -4 },
+    { "id": "cp_nc", "name": "北线维修站", "kind": "repair", "q": 2, "r": -4 },
+    { "id": "cp_ne", "name": "东北补给站", "kind": "supply", "q": 6, "r": -4 },
+    { "id": "cp_sw", "name": "西南前线基地", "kind": "forward_base", "q": -6, "r": 4 },
+    { "id": "cp_sc", "name": "南线维修站", "kind": "repair", "q": -2, "r": 4 },
+    { "id": "cp_se", "name": "东南前线基地", "kind": "forward_base", "q": 2, "r": 4 }
+  ],
+  "headquarters": {
+    "player_a": { "q": -7, "r": 0 },
+    "player_b": { "q": 7, "r": 0 }
+  },
+  "startingUnits": [],
+  "units": {
+    "infantry": { "hp": 100, "attack": 30, "defense": 8, "moveRange": 3, "attackRange": 1, "cost": 45, "canCapture": true },
+    "scout": { "hp": 65, "attack": 16, "defense": 4, "moveRange": 5, "attackRange": 1, "cost": 38, "canCapture": true },
+    "heavy": { "hp": 150, "attack": 38, "defense": 13, "moveRange": 2, "attackRange": 1, "cost": 92, "canCapture": false },
+    "ranger": { "hp": 72, "attack": 44, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 78, "canCapture": false },
+    "support": { "hp": 82, "attack": 10, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 60, "canCapture": false, "healPower": 22 }
+  },
+  "headquartersSpec": {
+    "hp": 180,
+    "defense": 6
+  },
+  "balance": {
+    "startingSupplies": 208,
+    "baseIncome": 10,
+    "controlPointIncome": 8,
+    "damageVarianceRange": 3,
+    "minimumDamage": 1,
+    "healVarianceRange": 6,
+    "actionsPerTurn": 5,
+    "maxTurns": 15,
+    "adjudicationWeights": {
+      "enemyHqDamage": 4,
+      "ownHqHp": 2,
+      "controlPoint": 90,
+      "armyValue": 2,
+      "supplies": 1
+    },
+    "controlPointTypes": {
+      "supply": { "income": 12, "deployDiscount": 0, "repairAmount": 0 },
+      "forward_base": { "income": 8, "deployDiscount": 8, "repairAmount": 0 },
+      "repair": { "income": 8, "deployDiscount": 0, "repairAmount": 10 }
+    }
+  }
+}

@@ -2,7 +2,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadMaps, resetConfig } from '../../src/config/loader.js';
+import { getMapConfig, loadMaps, resetConfig } from '../../src/config/loader.js';
+import { hexDistance } from '../../src/engine/hex.js';
 
 function validMap() {
   return {
@@ -46,6 +47,18 @@ function validMap() {
   };
 }
 
+function controlPointTypes() {
+  return {
+    supply: { income: 12, deployDiscount: 0, repairAmount: 0 },
+    forward_base: { income: 8, deployDiscount: 8, repairAmount: 0 },
+    repair: { income: 8, deployDiscount: 0, repairAmount: 10 },
+  };
+}
+
+function visualYAxisMirror(pos: { q: number; r: number }) {
+  return { q: -pos.q - pos.r, r: pos.r };
+}
+
 describe('map config loader', () => {
   it('requires maxTurns and adjudication weights', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
@@ -54,6 +67,118 @@ describe('map config loader', () => {
     writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
 
     expect(() => loadMaps(dir)).toThrow('balance.maxTurns is required');
+    resetConfig();
+  });
+
+  it('requires full control point type config when any control point is typed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as any;
+    map.controlPoints = [
+      { id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' },
+      { id: 'cp_b', name: 'Untyped', q: 0, r: 1 },
+    ];
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('balance.controlPointTypes is required');
+    resetConfig();
+  });
+
+  it('rejects mixed typed and untyped control points even with type config', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as any;
+    map.balance.controlPointTypes = controlPointTypes();
+    map.controlPoints = [
+      { id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' },
+      { id: 'cp_b', name: 'Untyped', q: 0, r: 1 },
+    ];
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('controlPoints must all define kind');
+    resetConfig();
+  });
+
+  it('requires every supported control point type to be configured', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as any;
+    map.controlPoints = [{ id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' }];
+    map.balance.controlPointTypes = controlPointTypes();
+    delete map.balance.controlPointTypes.repair;
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('balance.controlPointTypes.repair must be an object');
+    resetConfig();
+  });
+
+  it('loads dual-lanes as a typed control point map without changing legacy maps', () => {
+    resetConfig();
+    loadMaps();
+
+    const legacy = getMapConfig('default');
+    const dual = getMapConfig('dual-lanes');
+
+    expect(legacy.controlPoints.every(point => !('kind' in point))).toBe(true);
+    expect(legacy.balance.controlPointTypes).toBeUndefined();
+    expect(dual.controlPoints.map(point => point.kind)).toEqual([
+      'supply', 'repair', 'supply', 'forward_base', 'repair', 'forward_base',
+    ]);
+    expect(dual.startingUnits).toEqual([]);
+    expect(dual.balance.startingSupplies).toBe(208);
+    expect(dual.balance.controlPointTypes?.forward_base.deployDiscount).toBe(8);
+    const laneIncome = (ids: string[]) => ids.reduce((sum, id) => {
+      const point = dual.controlPoints.find(cp => cp.id === id)!;
+      return sum + dual.balance.controlPointTypes![point.kind!].income;
+    }, 0);
+    expect(laneIncome(['cp_nw', 'cp_nc', 'cp_ne'])).toBeGreaterThan(laneIncome(['cp_sw', 'cp_sc', 'cp_se']));
+    expect(['cp_nw', 'cp_nc', 'cp_ne']).toHaveLength(['cp_sw', 'cp_sc', 'cp_se'].length);
+    resetConfig();
+  });
+
+  it('keeps dual-lanes lane roles mirrored around the center axis', () => {
+    resetConfig();
+    loadMaps();
+
+    const dual = getMapConfig('dual-lanes');
+    const kindById = Object.fromEntries(dual.controlPoints.map(point => [point.id, point.kind]));
+
+    expect([kindById.cp_nw, kindById.cp_nc, kindById.cp_ne]).toEqual(['supply', 'repair', 'supply']);
+    expect([kindById.cp_sw, kindById.cp_sc, kindById.cp_se]).toEqual(['forward_base', 'repair', 'forward_base']);
+    expect(kindById.cp_nw).toBe(kindById.cp_ne);
+    expect(kindById.cp_sw).toBe(kindById.cp_se);
+    resetConfig();
+  });
+
+  it('spaces dual-lanes control points four hexes apart within each lane', () => {
+    resetConfig();
+    loadMaps();
+
+    const dual = getMapConfig('dual-lanes');
+    const byId = Object.fromEntries(dual.controlPoints.map(point => [point.id, point]));
+
+    expect(hexDistance(byId.cp_nw, byId.cp_nc)).toBe(4);
+    expect(hexDistance(byId.cp_nc, byId.cp_ne)).toBe(4);
+    expect(hexDistance(byId.cp_sw, byId.cp_sc)).toBe(4);
+    expect(hexDistance(byId.cp_sc, byId.cp_se)).toBe(4);
+    resetConfig();
+  });
+
+  it('keeps dual-lanes geometry symmetric around the visual y-axis', () => {
+    resetConfig();
+    loadMaps();
+
+    const dual = getMapConfig('dual-lanes');
+    for (const point of dual.controlPoints) {
+      const mirror = visualYAxisMirror(point);
+      const counterpart = dual.controlPoints.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
+      expect(counterpart, `${point.id} should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.kind).toBe(point.kind);
+    }
+
+    for (const cell of dual.terrainCells) {
+      const mirror = visualYAxisMirror(cell);
+      const counterpart = dual.terrainCells.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
+      expect(counterpart, `terrain (${cell.q},${cell.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.terrain).toBe(cell.terrain);
+    }
     resetConfig();
   });
 });

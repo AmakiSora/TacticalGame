@@ -69,6 +69,9 @@ Each player has `config.balance.actionsPerTurn` action points per turn, currentl
 
 - Base income is `config.balance.baseIncome`.
 - Each owned control point adds `config.balance.controlPointIncome`.
+- Typed control points may replace the flat income rule on maps that define `controlPoints[].kind` and `config.balance.controlPointTypes`.
+- For typed control points: `supply` is the economy route, `forward_base` can discount deployments from that point, and `repair` can restore nearby friendly units when that owner receives the turn.
+- Do not treat typed control points as extra adjudication score. Adjudication still counts owned control points by number using the configured control-point weight.
 - With a 5-action cap, hoarded supplies cannot all become units immediately. Spend on high-impact deployments when action points and deploy hexes are available.
 
 Do not use V1 concepts: `x/y`, Manhattan distance, buildings, miners, production queues, walls, `/build`, `/produce`, or `/sell`.
@@ -81,7 +84,7 @@ Use this order unless the user asks for a different style:
 2. Attack killable or low-HP enemies; prefer support, ranger, and capturing units.
 3. Heal the most damaged friendly unit with support.
 4. Deploy strategically before ordinary movement when supplies and an action point remain, especially if supplies are high, unit count is not ahead, you own at least 2 control points, or the game is late.
-5. Move infantry and scouts toward neutral or enemy control points early.
+5. Move infantry and scouts toward neutral or enemy control points early. On typed maps, favor `supply` early for income, `forward_base` when planning sustained pressure, and `repair` when wounded units can hold nearby.
 6. In the late game, move scouts, rangers, and infantry toward enemy headquarters attack positions.
 7. Near adjudication, prioritize headquarters damage, captured points, valuable unit survival, and spending excess supplies.
 8. When no useful legal action remains, call `/end-turn`.

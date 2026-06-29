@@ -80,19 +80,32 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('Refresh state after every successful action and reason again');
     expect(skill).toContain('End the turn only after available useful legal actions are exhausted');
   });
+
+  it('explains typed control point strategy', async () => {
+    const skill = await readFile('skill/SKILL.md', 'utf8');
+
+    expect(skill).toContain('Typed control points');
+    expect(skill).toContain('supply');
+    expect(skill).toContain('forward_base');
+    expect(skill).toContain('repair');
+  });
 });
 
 describe('AI player strategy', () => {
   it('deploys strategically before ordinary movement when supplies and actions remain', async () => {
     const app = await startTestServer();
-    const { gameId } = (await app.inject({ method: 'POST', url: '/api/games' })).json() as { gameId: string };
-    await app.inject({ method: 'POST', url: `/api/games/${gameId}/join` });
-    const game = globalStore.get(gameId)! as any;
-    game.resources.player_a.supplies = 120;
+    try {
+      const { gameId } = (await app.inject({ method: 'POST', url: '/api/games' })).json() as { gameId: string };
+      await app.inject({ method: 'POST', url: `/api/games/${gameId}/join` });
+      const game = globalStore.get(gameId)! as any;
+      game.resources.player_a.supplies = 120;
 
-    const ai = await import('../../skill/ai-player.mjs');
+      const ai = await import('../../skill/ai-player.mjs');
 
-    expect(ai.shouldStrategicDeploy(game, 'player_a')).toBe(true);
+      expect(ai.shouldStrategicDeploy(game, 'player_a')).toBe(true);
+    } finally {
+      await app.close();
+    }
   });
 
   it('targets the enemy headquarters in endgame push mode after turn 8 with three control points', async () => {
@@ -111,5 +124,48 @@ describe('AI player strategy', () => {
 
     expect(goal.id).toBe(game.headquarters.player_b.id);
     await app.close();
+  });
+
+  it('moves damaged units toward owned repair points on typed maps', async () => {
+    const app = await startTestServer();
+    try {
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/games',
+        payload: { mapId: 'dual-lanes' },
+      });
+      const { gameId } = createRes.json() as { gameId: string };
+      await app.inject({ method: 'POST', url: `/api/games/${gameId}/join` });
+      const game = globalStore.get(gameId)! as any;
+      const repair = game.controlPoints.find((point: any) => point.id === 'cp_nc');
+      repair.owner = 'player_a';
+      const damaged = {
+        id: 'damaged',
+        owner: 'player_a',
+        type: 'infantry',
+        q: -2,
+        r: -4,
+        hp: 40,
+        maxHp: 100,
+        attack: 30,
+        defense: 8,
+        moveRange: 3,
+        attackRange: 1,
+        cost: 45,
+        alive: true,
+        hasMoved: false,
+        hasActed: false,
+        actionSpent: false,
+        canCapture: true,
+      };
+      game.units.push(damaged);
+
+      const ai = await import('../../skill/ai-player.mjs');
+      const goal = ai.movementGoal(game, 'player_a', damaged);
+
+      expect(goal.id).toBe('cp_nc');
+    } finally {
+      await app.close();
+    }
   });
 });

@@ -10,6 +10,8 @@ const TERRAIN = {
 const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
 const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
 const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP', headquarters: 'HQ' };
+const CONTROL_POINT_LABELS = { supply: 'SUP', forward_base: 'FWD', repair: 'REP' };
+const CONTROL_POINT_NAMES = { supply: '补给站', forward_base: '前线基地', repair: '维修站' };
 const APP_VERSION = window.APP_VERSION;
 const REPLAY_EXPORT_FORMAT = 'hex-v2-replay';
 const REPLAY_SCHEMA_VERSION = APP_VERSION;
@@ -199,7 +201,7 @@ function applyEvent(s, ev) {
         hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense,
         moveRange: p.moveRange, attackRange: p.attackRange,
         alive: true, hasMoved: true, hasActed: false, actionSpent: true,
-        canCapture: !!p.canCapture, healPower: p.healPower, cost: p.cost,
+        canCapture: !!p.canCapture, healPower: p.healPower, cost: p.unitCost ?? p.cost,
       });
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -238,6 +240,11 @@ function applyEvent(s, ev) {
     case 'control_point_captured': {
       const cp = s.controlPoints.get(p.pointId);
       if (cp) cp.owner = p.owner;
+      break;
+    }
+    case 'control_point_repair': {
+      const u = s.units.get(p.unitId);
+      if (u) u.hp = p.unitHp;
       break;
     }
     case 'income':
@@ -320,7 +327,7 @@ function drawBoard() {
     ctx.fillStyle = '#f0d77c';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('CP', p.x, p.y + 4);
+    ctx.fillText(controlPointLabel(cp), p.x, p.y + 4);
   }
 
   for (const hq of state.headquarters.values()) {
@@ -372,6 +379,27 @@ function statItem(label, value, tone = '') {
   return `<div class="sel-stat-card ${tone}"><span>${label}</span><strong>${esc(value)}</strong></div>`;
 }
 
+function controlPointEffect(cp) {
+  if (!cp?.kind) return null;
+  return gameConfig?.balance?.controlPointTypes?.[cp.kind] || null;
+}
+
+function controlPointLabel(cp) {
+  return CONTROL_POINT_LABELS[cp?.kind] || 'CP';
+}
+
+function controlPointStats(cp) {
+  const effect = controlPointEffect(cp);
+  const income = effect ? effect.income : gameConfig?.balance?.controlPointIncome ?? 12;
+  return [
+    statItem('类型', cp.kind ? CONTROL_POINT_NAMES[cp.kind] || cp.kind : '普通据点', ''),
+    statItem('收入', `+${income}`, 'cost'),
+    effect?.deployDiscount ? statItem('部署折扣', `-${effect.deployDiscount}`, 'move') : '',
+    effect?.repairAmount ? statItem('维修', `+${effect.repairAmount}`, 'heal') : '',
+    statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : ''),
+  ].join('');
+}
+
 function renderEntityCard(ent) {
   const type = ent.type || 'headquarters';
   const title = UNIT_NAMES[type] || '指挥部';
@@ -414,8 +442,7 @@ function renderControlPointCard(cp) {
       </div>
     </div>
     <div class="sel-stat-grid">
-      ${statItem('收入', `+${gameConfig?.balance?.controlPointIncome ?? 12}`, 'cost')}
-      ${statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : '')}
+      ${controlPointStats(cp)}
     </div>
     <div class="sel-coord">坐标 (${cp.q}, ${cp.r})</div>
   </div>`;
@@ -432,6 +459,7 @@ function formatEventShort(ev) {
     case 'unit_death': return `单位阵亡 ${String(p.unitId).slice(0, 6)}`;
     case 'headquarters_destroyed': return `指挥部摧毁 ${p.owner}`;
     case 'control_point_captured': return `占领 ${p.name}`;
+    case 'control_point_repair': return `${p.pointName || '维修站'} 修复 ${String(p.unitId).slice(0, 6)} +${p.amount}`;
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
     case 'turn_end': return `回合结束 -> ${playerName(p.nextOwner)} (${p.turnNumber})`;
     case 'game_over':

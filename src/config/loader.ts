@@ -83,6 +83,20 @@ export interface MapConfig {
   };
 }
 
+export interface MapPreview {
+  radius: number;
+  terrainCells: TerrainCellConfig[];
+  controlPoints: ControlPointConfig[];
+  headquarters: Record<PlayerId, { q: number; r: number }>;
+}
+
+export interface MapListItem {
+  id: string;
+  name: string;
+  description: string;
+  preview: MapPreview;
+}
+
 const CONTROL_POINT_KINDS = ['supply', 'forward_base', 'repair'] as const satisfies readonly ControlPointKind[];
 
 const maps = new Map<string, MapConfig>();
@@ -257,8 +271,21 @@ export function getMapConfig(id: string): MapConfig {
   return config;
 }
 
-export function listMaps(): { id: string; name: string; description: string }[] {
-  return [...maps.entries()].map(([id, cfg]) => ({ id, name: cfg.name, description: cfg.description }));
+export function listMaps(): MapListItem[] {
+  return [...maps.entries()].map(([id, cfg]) => ({
+    id,
+    name: cfg.name,
+    description: cfg.description,
+    preview: {
+      radius: cfg.radius,
+      terrainCells: cfg.terrainCells.map(cell => ({ ...cell })),
+      controlPoints: cfg.controlPoints.map(point => ({ ...point })),
+      headquarters: {
+        player_a: { ...cfg.headquarters.player_a },
+        player_b: { ...cfg.headquarters.player_b },
+      },
+    },
+  }));
 }
 
 export function getDefaultMapConfig(): MapConfig {

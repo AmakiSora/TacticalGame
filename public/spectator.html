@@ -5,20 +5,24 @@
   <title>TacticalGame — 观战</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
-<body>
+<body class="spectator-shell">
   <header>
-    <h1>战棋对战观战 <span class="version-badge"></span></h1>
+    <div class="brand-block">
+      <h1>战棋对战观战 <span class="version-badge"></span></h1>
+      <div class="page-subtitle">实时局势与回放复盘</div>
+    </div>
     <div id="game-meta">
-      <select id="game-select"><option value="">-- 选择对局 --</option></select>
-      <button id="refresh-list">刷新列表</button>
-      <span id="status"></span>
-      <span id="file-actions">
-        <button id="btn-export-html" title="导出为独立 HTML 文件">导出 HTML</button>
+      <span class="toolbar-group primary-tools">
+        <select id="game-select"><option value="">-- 选择对局 --</option></select>
+        <button id="refresh-list">刷新列表</button>
+        <span id="status"></span>
+      </span>
+      <span id="file-actions" class="toolbar-group file-tools">
         <button id="btn-export-json" title="导出为 JSON 文件">导出 JSON</button>
         <button id="btn-import" title="从 JSON 文件导入对局">导入</button>
         <input type="file" id="import-file" accept=".json" hidden />
       </span>
-      <div id="settings-wrap">
+      <div id="settings-wrap" class="toolbar-group settings-tools">
         <button id="btn-settings" title="设置">&#9881;</button>
         <div id="settings-popover">
           <label class="toggle-row">
@@ -36,7 +40,7 @@
       </div>
     </div>
   </header>
-  <main>
+  <main class="spectator-main">
     <div id="selection-panel">
       <div id="selection-detail">点击或悬停棋盘查看单位、总部或据点信息</div>
     </div>

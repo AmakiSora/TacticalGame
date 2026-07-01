@@ -31,9 +31,14 @@ header {
   padding: 14px 28px;
   background: linear-gradient(135deg, #1a2530 0%, #16202b 100%);
   border-bottom: 1px solid #2a3a4a;
+  position: sticky;
+  top: 0;
+  z-index: 80;
 }
 header h1 { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
 header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6px; }
+.brand-block { display: flex; flex-direction: column; gap: 3px; }
+.page-subtitle { color: #7894a6; font-size: 12px; font-weight: 600; }
 .badge {
   padding: 4px 14px;
   border-radius: 20px;
@@ -204,11 +209,155 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .lobby-status.err { color: #cc6d6d; }
 .lobby-status.connecting { color: #6cf; }
 
+/* ══════════ map picker ══════════ */
+.create-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.name-field {
+  width: 100%;
+  max-width: 360px;
+  flex: none;
+}
+.map-field {
+  width: 100%;
+  flex: none;
+}
+.map-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+.map-card {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  min-height: 126px;
+  padding: 10px;
+  border: 1px solid #263849;
+  border-radius: 8px;
+  background: #0f1820;
+  color: #d8e0e8;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.map-card:hover {
+  border-color: #4d7892;
+  background: #13202a;
+}
+.map-card:focus-visible {
+  outline: 2px solid #80c7df;
+  outline-offset: 2px;
+}
+.map-card.selected-map {
+  border-color: #d6b34a;
+  background: #16222a;
+  box-shadow: inset 0 0 0 1px rgba(214,179,74,.28);
+}
+.map-preview {
+  width: 118px;
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #223342;
+  border-radius: 6px;
+  background: #090f15;
+}
+.map-preview.empty {
+  color: #668495;
+  font-size: 12px;
+}
+.map-preview svg {
+  width: 100%;
+  height: 100%;
+  max-height: 112px;
+  display: block;
+}
+.preview-hex {
+  stroke: #22313d;
+  stroke-width: .7;
+}
+.preview-hex.plain { fill: #16222d; }
+.preview-hex.water { fill: #1e5c7a; }
+.preview-hex.blocker { fill: #59616a; }
+.preview-marker {
+  stroke: #071016;
+  stroke-width: 1.2;
+}
+.preview-marker.cp { fill: #f0d77c; }
+.preview-marker.hq-a { fill: #66ccff; }
+.preview-marker.hq-b { fill: #ff9966; }
+.map-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  justify-content: center;
+}
+.map-card-name {
+  color: #e4edf4;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.map-card-desc {
+  color: #86a0af;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.map-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.map-card-meta span {
+  padding: 3px 6px;
+  border: 1px solid #2a3a4a;
+  border-radius: 4px;
+  background: #101922;
+  color: #a9bdc9;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.map-picker-empty {
+  padding: 12px;
+  border: 1px dashed #2a3a4a;
+  border-radius: 6px;
+  color: #668495;
+  font-size: 13px;
+}
+
 /* ══════════ main layout ══════════ */
-#game-ui { display: flex; padding: 20px 24px; gap: 20px; align-items: flex-start; }
+#game-ui {
+  display: grid;
+  grid-template-columns: minmax(200px, 240px) minmax(420px, auto) minmax(330px, 380px);
+  padding: 18px 24px 24px;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: center;
+}
 .hidden { display: none !important; }
 
 /* ══════════ board ══════════ */
+.board-panel {
+  background: #141c26;
+  border: 1px solid #1e2e3e;
+  border-radius: 8px;
+  padding: 10px;
+  max-width: 100%;
+}
 .board-wrap { position: relative; flex-shrink: 1; overflow: auto; max-width: 100%; }
 #board {
   background: #0a0e14;
@@ -216,6 +365,8 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   border-radius: 4px;
   cursor: crosshair;
   display: block;
+  max-width: 100%;
+  height: auto;
 }
 .cell-info {
   position: absolute;
@@ -331,7 +482,58 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 
 /* resources */
-.resources-display { display: flex; gap: 12px; font-size: 14px; }
+.resources-display { font-size: 14px; }
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.status-card,
+.resource-pill {
+  min-width: 0;
+  padding: 8px 10px;
+  background: #0f1820;
+  border: 1px solid #263849;
+  border-radius: 7px;
+}
+.status-card {
+  grid-column: 1 / -1;
+  border-left: 3px solid #7f98a9;
+}
+.status-card.mine {
+  border-left-color: #6dcc8a;
+  background: #10241b;
+}
+.status-card span,
+.resource-pill span {
+  display: block;
+  color: #7f98a9;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #d8e0e8;
+  font-size: 15px;
+}
+.resource-pill {
+  border-left: 3px solid #7f98a9;
+}
+.resource-pill.player-a { border-left-color: #66ccff; }
+.resource-pill.player-b { border-left-color: #ff9966; }
+.resource-pill.mine { box-shadow: inset 0 0 0 1px rgba(240,215,124,.35); }
+.resource-pill strong {
+  display: block;
+  margin-top: 4px;
+  color: #d8e0e8;
+  font: 800 18px "SF Mono", "Consolas", monospace;
+}
 .res-a { color: #6cf; }
 .res-b { color: #f86; }
 .res-me { font-weight: 700; text-decoration: underline; }
@@ -510,6 +712,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 
 @media (max-width: 1180px) {
   #game-ui {
+    display: flex;
     flex-wrap: wrap;
     justify-content: center;
   }
@@ -520,6 +723,10 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   }
   .board-wrap {
     order: 2;
+  }
+  .board-panel {
+    order: 2;
+    max-width: 760px;
   }
   #sidebar {
     width: 100%;
@@ -543,6 +750,23 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   #game-ui {
     padding: 12px;
     gap: 12px;
+  }
+  .board-panel {
+    padding: 8px;
+  }
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+  .status-card {
+    grid-column: auto;
+  }
+  .map-card {
+    grid-template-columns: 96px minmax(0, 1fr);
+    min-height: 112px;
+  }
+  .map-preview {
+    width: 96px;
+    min-height: 88px;
   }
 }
 

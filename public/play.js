@@ -11,7 +11,7 @@ const CONTROL_POINT_NAMES = { supply: '补给站', forward_base: '前线基地',
 const $ = id => document.getElementById(id);
 const els = {
   joinPanel: $('join-panel'), gameId: $('game-id'), createName: $('create-name'), joinName: $('join-name'),
-  mapSelect: $('map-select'), btnCreate: $('btn-create'), btnJoin: $('btn-join'), btnConnectCreate: $('btn-connect-create'),
+  mapSelect: $('map-select'), mapPicker: $('map-picker'), btnCreate: $('btn-create'), btnJoin: $('btn-join'), btnConnectCreate: $('btn-connect-create'),
   connStatus: $('conn-status'), createResult: $('create-result'), createdGameId: $('created-game-id'),
   createdToken: $('created-token'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
@@ -135,6 +135,122 @@ async function loadMapList() {
   const res = await fetch('/api/maps');
   const { maps } = await res.json();
   els.mapSelect.innerHTML = maps.map(m => `<option value="${esc(m.id)}">${esc(m.name)} - ${esc(m.description)}</option>`).join('');
+  renderMapPicker(maps);
+}
+
+function previewCells(radius) {
+  const cells = [];
+  for (let q = -radius; q <= radius; q++) {
+    for (let r = -radius; r <= radius; r++) {
+      if (Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r)) <= radius) cells.push({ q, r });
+    }
+  }
+  return cells;
+}
+
+function previewHexToRaw(q, r, size) {
+  return { x: size * SQRT3 * (q + r / 2), y: size * 1.5 * r };
+}
+
+function previewHexCornersRaw(q, r, size) {
+  const c = previewHexToRaw(q, r, size);
+  return Array.from({ length: 6 }, (_, i) => {
+    const a = Math.PI / 180 * (60 * i - 30);
+    return { x: c.x + size * Math.cos(a), y: c.y + size * Math.sin(a) };
+  });
+}
+
+function renderMapPreview(preview) {
+  if (!preview || !Number.isFinite(preview.radius)) {
+    return '<div class="map-preview empty">暂无预览</div>';
+  }
+
+  const size = 7;
+  const pad = 8;
+  const cells = previewCells(preview.radius);
+  const terrain = new Map((preview.terrainCells || []).map(cell => [hexKey(cell), cell.terrain]));
+  const allCorners = cells.flatMap(cell => previewHexCornersRaw(cell.q, cell.r, size));
+  const minX = Math.min(...allCorners.map(p => p.x));
+  const minY = Math.min(...allCorners.map(p => p.y));
+  const maxX = Math.max(...allCorners.map(p => p.x));
+  const maxY = Math.max(...allCorners.map(p => p.y));
+  const width = Math.ceil(maxX - minX + pad * 2);
+  const height = Math.ceil(maxY - minY + pad * 2);
+  const point = pos => {
+    const raw = previewHexToRaw(pos.q, pos.r, size);
+    return { x: raw.x - minX + pad, y: raw.y - minY + pad };
+  };
+  const polygon = cell => previewHexCornersRaw(cell.q, cell.r, size)
+    .map(p => `${(p.x - minX + pad).toFixed(1)},${(p.y - minY + pad).toFixed(1)}`)
+    .join(' ');
+  const hexes = cells.map(cell => {
+    const terrainClass = terrain.get(hexKey(cell)) || 'plain';
+    return `<polygon class="preview-hex ${terrainClass}" points="${polygon(cell)}"></polygon>`;
+  }).join('');
+  const controlPoints = (preview.controlPoints || []).map(cp => {
+    const p = point(cp);
+    return `<circle class="preview-marker cp" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"><title>${esc(cp.name)}</title></circle>`;
+  }).join('');
+  const headquarters = Object.entries(preview.headquarters || {}).map(([owner, pos]) => {
+    const p = point(pos);
+    const cls = owner === 'player_a' ? 'hq-a' : 'hq-b';
+    return `<rect class="preview-marker hq ${cls}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"></rect>`;
+  }).join('');
+
+  return `<div class="map-preview" aria-hidden="true">
+    <svg viewBox="0 0 ${width} ${height}" role="img" focusable="false">
+      ${hexes}${controlPoints}${headquarters}
+    </svg>
+  </div>`;
+}
+
+function syncMapSelection() {
+  if (!els.mapPicker) return;
+  const selected = els.mapSelect.value || 'default';
+  els.mapPicker.querySelectorAll('.map-card').forEach(card => {
+    const isSelected = card.dataset.mapId === selected;
+    card.classList.toggle('selected-map', isSelected);
+    card.setAttribute('aria-checked', String(isSelected));
+    card.tabIndex = isSelected ? 0 : -1;
+  });
+}
+
+function selectMap(mapId) {
+  els.mapSelect.value = mapId;
+  syncMapSelection();
+}
+
+function renderMapPicker(maps) {
+  if (!els.mapPicker) return;
+  if (!maps.length) {
+    els.mapPicker.innerHTML = '<div class="map-picker-empty">暂无可用地图</div>';
+    return;
+  }
+  const selected = els.mapSelect.value || maps[0].id;
+  els.mapSelect.value = selected;
+  els.mapPicker.innerHTML = maps.map(map => {
+    const isSelected = map.id === selected;
+    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
+    const radius = map.preview?.radius ?? '-';
+    return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}">
+      ${renderMapPreview(map.preview)}
+      <span class="map-card-copy">
+        <span class="map-card-name">${esc(map.name)}</span>
+        <span class="map-card-desc">${esc(map.description)}</span>
+        <span class="map-card-meta"><span>半径 ${esc(radius)}</span><span>${controlPointCount} 据点</span><span>双方 HQ</span></span>
+      </span>
+    </button>`;
+  }).join('');
+  els.mapPicker.querySelectorAll('.map-card').forEach(card => {
+    card.addEventListener('click', () => selectMap(card.dataset.mapId));
+    card.addEventListener('keydown', e => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        selectMap(card.dataset.mapId);
+      }
+    });
+  });
+  syncMapSelection();
 }
 
 function createEmptyState() {
@@ -418,7 +534,18 @@ function renderSidebar() {
   const owner = state.turn.currentOwner;
   els.turnBadge.textContent = `回合 ${state.turn.turnNumber} · ${playerName(owner)}`;
   els.turnBadge.classList.toggle('my-turn', owner === myPlayer);
-  els.resDisplay.innerHTML = `<span class="res-a ${myPlayer === 'player_a' ? 'res-me' : ''}">${esc(playerName('player_a'))}: ${state.resources.player_a.supplies}</span><span class="res-b ${myPlayer === 'player_b' ? 'res-me' : ''}">${esc(playerName('player_b'))}: ${state.resources.player_b.supplies}</span>`;
+  els.resDisplay.innerHTML = `<div class="status-grid">
+    <div class="status-card active-turn ${owner === myPlayer ? 'mine' : ''}">
+      <span>${owner === myPlayer ? '你的回合' : '等待对手'}</span>
+      <strong>${esc(playerName(owner))}</strong>
+    </div>
+    <div class="resource-pill player-a ${myPlayer === 'player_a' ? 'mine' : ''}">
+      <span>${esc(playerName('player_a'))}</span><strong>${state.resources.player_a.supplies}</strong>
+    </div>
+    <div class="resource-pill player-b ${myPlayer === 'player_b' ? 'mine' : ''}">
+      <span>${esc(playerName('player_b'))}</span><strong>${state.resources.player_b.supplies}</strong>
+    </div>
+  </div>`;
   renderActionsDisplay(owner);
   renderScorePanel();
   els.events.innerHTML = '';

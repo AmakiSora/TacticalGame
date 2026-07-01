@@ -27,13 +27,16 @@ describe('spectator import/export', () => {
     expect(source).toContain('导入失败');
   });
 
-  it('keeps the score panel in exported standalone HTML', () => {
+  it('only exposes JSON replay export from the spectator page', () => {
+    const html = readFileSync('public/spectator.html', 'utf-8');
     const source = appJs();
 
-    expect(source).toContain('<section id="score-panel"></section>');
-    expect(source).toContain('window.EMBEDDED_REPLAY=');
-    expect(source).toContain('window.APP_VERSION=${JSON.stringify(APP_VERSION)}');
-    expect(source).toContain('<span class="version-badge">v${APP_VERSION}</span>');
+    expect(html).not.toContain('id="btn-export-html"');
+    expect(source).not.toContain('function exportHtml');
+    expect(source).not.toContain('btnExportHtml');
+    expect(source).not.toContain('window.EMBEDDED_REPLAY=');
+    expect(source).not.toContain('window.APP_VERSION=${JSON.stringify(APP_VERSION)}');
+    expect(source).toContain('function exportJson');
     expect(source).not.toMatch(/version-badge">v\d+\.\d+\.\d+/);
   });
 

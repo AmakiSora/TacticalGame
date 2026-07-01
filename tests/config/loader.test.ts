@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getMapConfig, loadMaps, resetConfig } from '../../src/config/loader.js';
+import { getMapConfig, listMaps, loadMaps, resetConfig } from '../../src/config/loader.js';
 import { hexDistance } from '../../src/engine/hex.js';
 
 function validMap() {
@@ -130,6 +130,20 @@ describe('map config loader', () => {
     }, 0);
     expect(laneIncome(['cp_nw', 'cp_nc', 'cp_ne'])).toBeGreaterThan(laneIncome(['cp_sw', 'cp_sc', 'cp_se']));
     expect(['cp_nw', 'cp_nc', 'cp_ne']).toHaveLength(['cp_sw', 'cp_sc', 'cp_se'].length);
+    resetConfig();
+  });
+
+  it('includes lightweight preview geometry in map listings', () => {
+    resetConfig();
+    loadMaps();
+
+    const map = listMaps().find(item => item.id === 'default')!;
+
+    expect(map.preview.radius).toBe(8);
+    expect(map.preview.terrainCells).toContainEqual({ q: -1, r: -2, terrain: 'water' });
+    expect(map.preview.controlPoints).toContainEqual(expect.objectContaining({ name: '中央阵地', q: 0, r: 0 }));
+    expect(map.preview.headquarters.player_a).toEqual({ q: -8, r: 0 });
+    expect(map.preview.headquarters.player_b).toEqual({ q: 8, r: 0 });
     resetConfig();
   });
 

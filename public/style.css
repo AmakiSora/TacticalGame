@@ -4,6 +4,7 @@ body {
   font-family: -apple-system, "Segoe UI", "PingFang SC", sans-serif;
   background: #11161a;
   color: #d8e0e8;
+  min-height: 100vh;
 }
 
 .version-badge {
@@ -29,9 +30,23 @@ header {
   background: linear-gradient(135deg, #1a2530 0%, #16202b 100%);
   border-bottom: 1px solid #2a3a4a;
   flex-wrap: wrap; gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 80;
 }
 header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
+.brand-block { display: flex; flex-direction: column; gap: 3px; min-width: 220px; }
+.page-subtitle { color: #7894a6; font-size: 12px; font-weight: 600; }
 #game-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(15, 24, 32, .58);
+  border: 1px solid #243545;
+  border-radius: 8px;
+}
 #game-meta select, #game-meta button {
   padding: 5px 12px; background: #1e2e3e; color: #b0c8d8;
   border: 1px solid #2a3a4a; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .15s;
@@ -44,7 +59,6 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; 
 }
 #file-actions { display: inline-flex; gap: 6px; }
 #file-actions button { font-size: 12px; padding: 4px 10px; }
-#btn-export-html { border-color: #2a6a4a; }
 #btn-export-json { border-color: #2a4a8a; }
 #btn-import { border-color: #6a4a8a; }
 
@@ -112,8 +126,9 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; 
 
 /* Main layout */
 main {
-  display: flex;
-  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: minmax(190px, 220px) minmax(420px, auto) minmax(300px, 340px);
+  padding: 16px 20px 24px;
   gap: 16px;
   justify-content: center;
   align-items: flex-start;
@@ -193,6 +208,9 @@ main {
   border-radius: 4px 4px 0 0;
   image-rendering: pixelated;
   cursor: crosshair;
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 /* Replay controls */
@@ -314,6 +332,97 @@ main {
   padding: 12px 14px;
 }
 #sidebar h3 { margin: 0 0 8px; font-size: 13px; color: #7a9aaa; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.resource-card {
+  min-width: 0;
+  padding: 9px 10px;
+  background: #0f1820;
+  border: 1px solid #263849;
+  border-left-width: 3px;
+  border-radius: 7px;
+}
+.resource-card.player-a { border-left-color: #66ccff; }
+.resource-card.player-b { border-left-color: #ff9966; }
+.resource-card span,
+.turn-card span {
+  display: block;
+  color: #7f98a9;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.resource-card strong {
+  display: inline-block;
+  margin-top: 4px;
+  color: #d8e0e8;
+  font: 800 20px "SF Mono", "Consolas", monospace;
+}
+.resource-card em {
+  margin-left: 5px;
+  color: #7894a6;
+  font-size: 12px;
+  font-style: normal;
+}
+.cp-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.cp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 7px;
+  background: #0f1820;
+  border: 1px solid #263849;
+  border-radius: 999px;
+  color: #9ab0bd;
+  font-size: 11px;
+}
+.cp-chip strong {
+  color: #d8e0e8;
+  font-weight: 700;
+}
+.cp-chip.player-a { border-color: rgba(102,204,255,.45); }
+.cp-chip.player-b { border-color: rgba(255,153,102,.45); }
+.cp-chip.neutral { border-color: rgba(214,179,74,.45); color: #d6b34a; }
+.turn-card {
+  padding: 10px;
+  background: #0f1820;
+  border: 1px solid #263849;
+  border-left: 3px solid #7f98a9;
+  border-radius: 7px;
+}
+.turn-card.player-a { border-left-color: #66ccff; }
+.turn-card.player-b { border-left-color: #ff9966; }
+.turn-card > strong {
+  display: block;
+  margin-top: 5px;
+  color: #d8e0e8;
+  font-size: 16px;
+}
+.turn-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #243545;
+}
+.turn-meta strong { color: #9ec; font-variant-numeric: tabular-nums; }
+.result-note {
+  margin-top: 8px;
+  color: #f0d77c;
+  font-weight: 700;
+  font-size: 12px;
+}
 #events { list-style: none; padding: 0; margin: 0; font-size: 12px; max-height: 300px; overflow-y: auto; font-family: "SF Mono", "Consolas", "Cascadia Code", monospace; }
 #events li {
   padding: 4px 8px; margin: 2px 0;
@@ -457,6 +566,7 @@ main {
 
 @media (max-width: 1180px) {
   main {
+    display: flex;
     flex-wrap: wrap;
     justify-content: center;
   }
@@ -486,6 +596,17 @@ main {
   }
   #game-meta {
     width: 100%;
+  }
+  .toolbar-group {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .primary-tools select {
+    flex: 1;
+    min-width: 0;
+  }
+  #file-actions button {
+    flex: 1;
   }
   main {
     padding: 12px;

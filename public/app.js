@@ -54,7 +54,6 @@ const followLatestCb = document.getElementById('follow-latest');
 const refreshIntervalInput = document.getElementById('refresh-interval');
 const btnSettings = document.getElementById('btn-settings');
 const settingsPopover = document.getElementById('settings-popover');
-const btnExportHtml = document.getElementById('btn-export-html');
 const btnExportJson = document.getElementById('btn-export-json');
 const btnImport = document.getElementById('btn-import');
 const importFile = document.getElementById('import-file');
@@ -540,20 +539,28 @@ function renderScoreRow(owner, score) {
 
 function renderSidebar() {
   if (!state) return;
+  const controlPoints = [...state.controlPoints.values()]
+    .map(cp => `<span class="cp-chip ${cp.owner ? (cp.owner === 'player_a' ? 'player-a' : 'player-b') : 'neutral'}">${esc(cp.name)}<strong>${cp.owner ? esc(playerName(cp.owner)) : '中立'}</strong></span>`)
+    .join('');
   resourcesEl.innerHTML = `<h3>资源</h3>
-    <div>${playerNameControl('player_a')}: ${state.resources.player_a.supplies} 补给</div>
-    <div>${playerNameControl('player_b')}: ${state.resources.player_b.supplies} 补给</div>
-    <div style="margin-top:6px;color:#7a9aaa;font-size:12px">据点: ${[...state.controlPoints.values()].map(cp => `${cp.name}:${cp.owner ? playerName(cp.owner) : '中立'}`).join(' / ')}</div>`;
+    <div class="resource-grid">
+      <div class="resource-card player-a"><span>${playerNameControl('player_a')}</span><strong>${state.resources.player_a.supplies}</strong><em>补给</em></div>
+      <div class="resource-card player-b"><span>${playerNameControl('player_b')}</span><strong>${state.resources.player_b.supplies}</strong><em>补给</em></div>
+    </div>
+    <div class="cp-strip">${controlPoints || '<span class="cp-chip neutral">暂无据点</span>'}</div>`;
   renderScorePanel();
   const owner = state.turn.currentOwner;
   const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
   const actionsLine = maxActions
-    ? `<div style="margin-top:4px;color:#9ec">行动点: <strong>${state.turn.actionsUsed ?? 0}/${maxActions}</strong></div>`
+    ? `<div class="turn-meta"><span>行动点</span><strong>${state.turn.actionsUsed ?? 0}/${maxActions}</strong></div>`
     : '';
-  turnInfoEl.innerHTML = `<h3>回合 ${state.turn.turnNumber}</h3>
-    <div>当前: ${playerNameControl(owner)}</div>
-    ${actionsLine}
-    ${state.result ? `<div style="margin-top:6px;color:#f0d77c">${esc(resultText(state.result))}</div>` : ''}`;
+  turnInfoEl.innerHTML = `<h3>回合</h3>
+    <div class="turn-card ${owner === 'player_a' ? 'player-a' : 'player-b'}">
+      <span>第 ${state.turn.turnNumber} 回合</span>
+      <strong>${playerNameControl(owner)}</strong>
+      ${actionsLine}
+      ${state.result ? `<div class="result-note">${esc(resultText(state.result))}</div>` : ''}
+    </div>`;
 
   eventsEl.innerHTML = '';
   allEvents.forEach((ev, i) => {
@@ -784,12 +791,6 @@ function buildReplayExport() {
 function exportJson() {
   downloadFile(gameFilename('json'), JSON.stringify(buildReplayExport(), null, 2), 'application/json');
 }
-async function exportHtml() {
-  const replay = buildReplayExport();
-  const [cssText, jsText] = await Promise.all([fetch('/style.css').then(r => r.text()), fetch('/app.js').then(r => r.text())]);
-  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Hex Replay</title><style>${cssText}</style></head><body><header><h1>Hex Replay <span class="version-badge">v${APP_VERSION}</span></h1></header><main><div id="board-wrap"><canvas id="board"></canvas><div id="cell-info" class="cell-info"></div><div id="replay-controls"><div id="control-buttons"><button id="btn-start">⏮</button><button id="btn-prev">◀</button><button id="btn-play">▶</button><button id="btn-next">▶</button><button id="btn-end">⏭</button><select id="speed-select"><option value="500">1x</option></select><span id="step-info"></span></div><div id="timeline-wrap"><input type="range" id="timeline" min="0" max="0" value="0"><div id="timeline-markers"></div></div></div></div><aside id="sidebar"><section id="resources"></section><section id="score-panel"></section><section id="turn-info"></section><section id="event-detail"><div id="detail-content"></div></section><section id="event-log"><ul id="events"></ul></section></aside><div id="selection-panel"><div id="selection-detail"></div></div></main><select id="game-select"><option value="offline" selected>offline</option></select><button id="refresh-list"></button><span id="status"></span><button id="btn-export-html"></button><button id="btn-export-json"></button><button id="btn-import"></button><input id="import-file" type="file"><input id="auto-refresh" type="checkbox"><input id="follow-latest" type="checkbox"><input id="refresh-interval" value="5"><button id="btn-settings"></button><div id="settings-popover"></div><script>window.APP_VERSION=${JSON.stringify(APP_VERSION)};window.EMBEDDED_REPLAY=${JSON.stringify(replay)};window.EMBEDDED_EVENTS=window.EMBEDDED_REPLAY.events;window.fetch=(url)=>Promise.resolve(new Response(JSON.stringify(url.includes('/events')?{events:window.EMBEDDED_REPLAY.events}:{games:[{id:'offline',phase:'replay',turnNumber:0,currentOwner:'player_a',result:window.EMBEDDED_REPLAY.finalResult}]})));window.EventSource=function(){return {close(){}}};</script><script>${jsText}</script></body></html>`;
-  downloadFile(gameFilename('html'), html, 'text/html');
-}
 
 function normalizeImportedReplay(data) {
   const events = Array.isArray(data) ? data : data.events;
@@ -891,7 +892,6 @@ timeline.addEventListener('input', () => {
   rebuildToStep(step);
 });
 btnExportJson.addEventListener('click', exportJson);
-btnExportHtml.addEventListener('click', exportHtml);
 btnImport.addEventListener('click', importJson);
 autoRefreshCb.addEventListener('change', () => { if (autoRefreshCb.checked) startAutoRefresh(); else clearInterval(refreshTimer); });
 refreshIntervalInput.addEventListener('change', () => {

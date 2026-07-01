@@ -5,11 +5,14 @@
   <title>TacticalGame — 玩家控制台</title>
   <link rel="stylesheet" href="/play.css" />
 </head>
-<body>
+<body class="player-shell">
 
   <header>
-    <h1>六边形战棋 <span class="sub">玩家控制台</span> <span class="version-badge"></span></h1>
-  <div id="conn-status" class="badge">未连接</div>
+    <div class="brand-block">
+      <h1>六边形战棋 <span class="sub">玩家控制台</span> <span class="version-badge"></span></h1>
+      <div class="page-subtitle">回合指令与战场状态</div>
+    </div>
+    <div id="conn-status" class="badge">未连接</div>
 </header>
 
   <section id="join-panel" class="panel">
@@ -21,14 +24,15 @@
   </div>
 
   <div id="tab-create" class="lobby-tab-content active">
-    <div class="row">
-      <div class="field">
+    <div class="create-setup">
+      <div class="field name-field">
         <label>你的名称</label>
         <input id="create-name" placeholder="留空使用默认名称" maxlength="20" />
       </div>
-      <div class="field">
+      <div class="field map-field">
         <label>选择地图</label>
-        <select id="map-select"><option value="default">default</option></select>
+        <select id="map-select" hidden><option value="default">default</option></select>
+        <div id="map-picker" class="map-picker" role="radiogroup" aria-label="选择地图"></div>
       </div>
     </div>
     <button id="btn-create" class="btn primary" style="margin-top:14px;width:100%">创建新游戏</button>
@@ -70,10 +74,12 @@
     <div id="selection-detail" class="selection-detail">点击棋盘上的单位、总部或据点查看详情</div>
   </div>
 
-  <div class="board-wrap">
-    <canvas id="board" width="840" height="840"></canvas>
-    <div id="cell-info" class="cell-info"></div>
-    <div id="map-popup" class="map-popup hidden"></div>
+  <div class="board-panel">
+    <div class="board-wrap">
+      <canvas id="board" width="840" height="840"></canvas>
+      <div id="cell-info" class="cell-info"></div>
+      <div id="map-popup" class="map-popup hidden"></div>
+    </div>
   </div>
 
   <aside id="sidebar">

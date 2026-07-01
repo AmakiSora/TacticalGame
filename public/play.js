@@ -331,6 +331,12 @@ function reachable(unit) {
 function deployCells(origin) {
   return hexNeighbors(origin).filter(p => isPlain(p.q, p.r) && !occupied(p.q, p.r));
 }
+function attackRangeCells(unit) {
+  return state.cells
+    .map(c => ({ q: c.q, r: c.r, distance: hexDistance(unit, c) }))
+    .filter(c => c.distance > 0 && c.distance <= unit.attackRange)
+    .map(({ q, r }) => ({ q, r }));
+}
 
 function drawHpBar(x, y, width, hp, maxHp) {
   if (!maxHp || hp >= maxHp) return;
@@ -425,7 +431,7 @@ function drawBoard() {
   }
   for (const h of rangeHighlights) {
     pathHex(h.q, h.r, 3);
-    ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'attack' ? 'rgba(255,80,80,.20)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : 'rgba(80,220,180,.20)';
+    ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'attack' ? 'rgba(255,80,80,.28)' : h.type === 'attack-radius' ? 'rgba(255,80,80,.08)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : 'rgba(80,220,180,.20)';
     ctx.fill();
   }
   if (hoverCell) { pathHex(hoverCell.q, hoverCell.r, 2); ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fill(); }
@@ -623,7 +629,15 @@ function selectUnit(unit) {
   if (items.length) showPopup(unit, '单位操作', items, action => {
     closePopup();
     if (action === 'move') { interactionMode = 'move_mode'; rangeHighlights = reachable(unit).map(p => ({ ...p, type: 'move' })); }
-    if (action === 'attack') { interactionMode = 'attack_mode'; rangeHighlights = [...state.units.values(), ...state.headquarters.values()].filter(e => e.owner !== myPlayer && e.alive && hexDistance(unit, e) <= unit.attackRange).map(e => ({ q: e.q, r: e.r, type: 'attack' })); }
+    if (action === 'attack') {
+      interactionMode = 'attack_mode';
+      const inRange = attackRangeCells(unit);
+      rangeHighlights = inRange.map(p => {
+        const target = entityAt(p.q, p.r);
+        const isEnemy = target && target.owner !== myPlayer && target.alive;
+        return { ...p, type: isEnemy ? 'attack' : 'attack-radius' };
+      });
+    }
     if (action === 'heal') { interactionMode = 'heal_mode'; rangeHighlights = [...state.units.values()].filter(e => e.owner === myPlayer && e.alive && e.hp < e.maxHp && hexDistance(unit, e) <= unit.attackRange).map(e => ({ q: e.q, r: e.r, type: 'heal' })); }
     drawBoard();
   });
@@ -666,10 +680,13 @@ els.canvas.addEventListener('click', async () => {
     if (await apiAction(`/api/games/${gameId}/move`, { unitId: selectedUnitId, q: hoverCell.q, r: hoverCell.r })) afterAction('移动成功');
     return;
   }
-  if (interactionMode === 'attack_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
-    const target = entityAt(hoverCell.q, hoverCell.r);
-    if (target && await apiAction(`/api/games/${gameId}/attack`, { attackerId: selectedUnitId, targetId: target.id })) afterAction('攻击成功');
-    return;
+  if (interactionMode === 'attack_mode') {
+    const hit = rangeHighlights.find(h => h.q === hoverCell.q && h.r === hoverCell.r);
+    if (hit?.type === 'attack') {
+      const target = entityAt(hoverCell.q, hoverCell.r);
+      if (target && target.owner !== myPlayer && target.alive && await apiAction(`/api/games/${gameId}/attack`, { attackerId: selectedUnitId, targetId: target.id })) afterAction('攻击成功');
+      return;
+    }
   }
   if (interactionMode === 'heal_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
     if (unit && await apiAction(`/api/games/${gameId}/heal`, { supportId: selectedUnitId, targetId: unit.id })) afterAction('治疗成功');

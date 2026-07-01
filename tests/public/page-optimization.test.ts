@@ -33,6 +33,17 @@ describe('spectator and player page optimization', () => {
     expect(source).toContain('resource-pill');
   });
 
+  it('renders attack range as board cells and distinguishes enemy targets from radius', () => {
+    const source = read('public/play.js');
+
+    expect(source).toContain('function attackRangeCells(unit)');
+    expect(source).toContain("type: isEnemy ? 'attack' : 'attack-radius'");
+    expect(source).toContain("hit?.type === 'attack'");
+    expect(source).toContain('target.owner !== myPlayer');
+    expect(source).toContain("'attack-radius' ? 'rgba(255,80,80,.08)'");
+    expect(source).not.toContain('[...state.units.values(), ...state.headquarters.values()].filter(e => e.owner !== myPlayer && e.alive && hexDistance(unit, e) <= unit.attackRange)');
+  });
+
   it('uses map cards instead of a visible select when creating a game', () => {
     const html = read('public/play.html');
     const css = read('public/play.css');

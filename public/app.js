@@ -913,17 +913,6 @@ document.addEventListener('keydown', e => {
 });
 
 async function initializeApp() {
-  if (window.EMBEDDED_REPLAY || window.EMBEDDED_EVENTS) {
-    try {
-      const replay = normalizeImportedReplay(window.EMBEDDED_REPLAY || window.EMBEDDED_EVENTS);
-      window.EMBEDDED_EVENTS = replay.events;
-      loadImportedReplay(replay);
-      statusEl.textContent = `已加载离线回放 ${allEvents.length} 事件`;
-    } catch (err) {
-      statusEl.textContent = `导入失败: ${err.message}`;
-    }
-    return;
-  }
   await fetchGameList();
   startAutoRefresh();
 }

@@ -39,6 +39,10 @@ let layout = { minX: 0, minY: 0, width: 840, height: 840 };
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function defaultPlayerNames() { return { player_a: '玩家 A', player_b: '玩家 B' }; }
 function playerName(owner) { return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B'); }
+function maxTurnsLabel() {
+  const maxTurns = gameConfig?.balance?.maxTurns;
+  return Number.isFinite(maxTurns) && maxTurns > 0 ? `${maxTurns}回合` : '回合上限';
+}
 function statusBadge(text, cls) { els.connStatus.textContent = text; els.connStatus.className = `badge ${cls}`; }
 function toast(msg, type = 'info') {
   const t = $('toast'); t.textContent = msg; t.className = `show ${type}`;
@@ -443,8 +447,8 @@ function formatEventShort(ev) {
     case 'reset_actions': return `${playerName(p.owner)} 单位已重置`;
     case 'turn_end': return `轮到 ${playerName(p.nextOwner)}`;
     case 'game_over':
-      if (p.reason === 'turn_limit_draw') return '15回合裁决平局';
-      if (p.reason === 'turn_limit_score') return `${playerName(p.winner)} 15回合裁决获胜`;
+      if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
+      if (p.reason === 'turn_limit_score') return `${playerName(p.winner)} ${maxTurnsLabel()}裁决获胜`;
       return `${playerName(p.winner)} 获胜`;
     case 'name_rename': return `${p.playerId} 改名为 ${p.name}`;
     default: return JSON.stringify(p).slice(0, 100);

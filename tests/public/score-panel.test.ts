@@ -40,4 +40,13 @@ describe('adjudication score panels', () => {
       expect(source).toContain('controlPointStats');
     }
   });
+
+  it('uses configured max turns in front-end adjudication labels', () => {
+    for (const file of ['public/app.js', 'public/play.js']) {
+      const source = read(file);
+      expect(source).toContain('function maxTurnsLabel');
+      expect(source).toContain('gameConfig?.balance?.maxTurns');
+      expect(source).not.toContain('15回合裁决');
+    }
+  });
 });

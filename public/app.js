@@ -71,6 +71,11 @@ function playerName(owner) {
   return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B');
 }
 
+function maxTurnsLabel() {
+  const maxTurns = gameConfig?.balance?.maxTurns;
+  return Number.isFinite(maxTurns) && maxTurns > 0 ? `${maxTurns}回合` : '回合上限';
+}
+
 function playerNameControl(owner) {
   const cls = owner === 'player_a' ? 'player-a' : 'player-b';
   return `<button class="player-name ${cls}" data-rename-player="${owner}" title="更改玩家名字">${esc(playerName(owner))}</button>`;
@@ -463,8 +468,8 @@ function formatEventShort(ev) {
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
     case 'turn_end': return `回合结束 -> ${playerName(p.nextOwner)} (${p.turnNumber})`;
     case 'game_over':
-      if (p.reason === 'turn_limit_draw') return '15回合裁决平局';
-      if (p.reason === 'turn_limit_score') return `15回合裁决 胜者:${playerName(p.winner)}`;
+      if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
+      if (p.reason === 'turn_limit_score') return `${maxTurnsLabel()}裁决 胜者:${playerName(p.winner)}`;
       return `游戏结束 胜者:${playerName(p.winner)}`;
     default: return ev.type;
   }
@@ -562,8 +567,8 @@ function renderSidebar() {
 }
 
 function resultText(result) {
-  if (result.reason === 'turn_limit_draw') return '15回合裁决平局';
-  if (result.reason === 'turn_limit_score') return `15回合裁决胜者: ${playerName(result.winner)}`;
+  if (result.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
+  if (result.reason === 'turn_limit_score') return `${maxTurnsLabel()}裁决胜者: ${playerName(result.winner)}`;
   return `胜者: ${playerName(result.winner)}`;
 }
 

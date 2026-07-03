@@ -199,6 +199,11 @@ function entityAt(q, r) {
   return null;
 }
 
+function setCellTerrain(q, r, terrain) {
+  const cell = state.cells.find(c => c.q === q && c.r === r);
+  if (cell) cell.terrain = terrain;
+}
+
 function applyEvent(s, ev) {
   s.eventLog.push(ev);
   const p = ev.payload || {};
@@ -289,6 +294,13 @@ function applyEvent(s, ev) {
     case 'name_rename':
       playerNames[p.playerId] = p.name;
       break;
+    case 'demolish': {
+      setCellTerrain(p.q, p.r, p.toTerrain || 'plain');
+      const u = s.units.get(p.unitId);
+      if (u) { u.hasActed = true; u.actionSpent = true; }
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
+      break;
+    }
   }
 }
 
@@ -594,6 +606,7 @@ function formatEventShort(ev) {
       if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
       if (p.reason === 'turn_limit_score') return `${maxTurnsLabel()}裁决 胜者:${playerName(p.winner)}`;
       return `游戏结束 胜者:${playerName(p.winner)}`;
+    case 'demolish': return `爆破 (${p.q},${p.r})`;
     default: return ev.type;
   }
 }

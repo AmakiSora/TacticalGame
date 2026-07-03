@@ -88,6 +88,7 @@ export type EventType =
   | 'heal'
   | 'unit_death'
   | 'deploy'
+  | 'demolish'
   | 'control_point_captured'
   | 'control_point_repair'
   | 'income'
@@ -161,4 +162,5 @@ export type ApiErrorCode =
   | 'game_already_full'
   | 'game_not_started'
   | 'game_over'
-  | 'action_limit_reached';
+  | 'action_limit_reached'
+  | 'invalid_demolish';

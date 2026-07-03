@@ -266,4 +266,50 @@ describe('V2 API', () => {
     expect((blocked.json() as any).code).toBe('action_limit_reached');
     await app.close();
   });
+
+  it('demolishes adjacent blocker terrain through the action API', async () => {
+    const app = await startTestServer();
+    const { gameId, playerAToken: tokenA } = await createAndJoin(app);
+    const { globalStore } = await import('../../src/state/store.js');
+    const game = globalStore.get(gameId)!;
+    game.units = game.units.filter(u => u.owner !== 'player_a');
+    game.units.push({
+      id: 'api-heavy',
+      owner: 'player_a',
+      type: 'heavy',
+      q: -2,
+      r: 0,
+      hp: 150,
+      maxHp: 150,
+      attack: 38,
+      defense: 13,
+      moveRange: 2,
+      attackRange: 1,
+      cost: 92,
+      alive: true,
+      hasMoved: false,
+      hasActed: false,
+      actionSpent: false,
+      canCapture: false,
+    });
+    game.map.terrainCells.push({ q: -1, r: 0, terrain: 'blocker' });
+    const cell = game.cells.find(c => c.q === -1 && c.r === 0)!;
+    cell.terrain = 'blocker';
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${gameId}/demolish`,
+      headers: { 'X-Player-Token': tokenA },
+      payload: { unitId: 'api-heavy', q: -1, r: 0 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    expect(game.cells.find(c => c.q === -1 && c.r === 0)!.terrain).toBe('plain');
+    expect(game.events.at(-1)).toMatchObject({
+      type: 'demolish',
+      payload: expect.objectContaining({ unitId: 'api-heavy', q: -1, r: 0 }),
+    });
+    await app.close();
+  });
 });

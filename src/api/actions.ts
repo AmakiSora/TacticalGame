@@ -5,6 +5,7 @@ import { authenticate, statusForCode } from './auth.js';
 import { moveUnit } from '../engine/units.js';
 import { attackTarget, healTarget } from '../engine/combat.js';
 import { deployUnit } from '../engine/deployment.js';
+import { demolishTerrain } from '../engine/demolition.js';
 import { endTurn } from '../engine/engine.js';
 import type { Result } from '../engine/result.js';
 import type { AuthContext } from './auth.js';
@@ -45,6 +46,7 @@ interface DeployBody { unitType: UnitType; fromId: string; q: number; r: number 
 interface MoveBody { unitId: string; q: number; r: number }
 interface AttackBody { attackerId: string; targetId: string }
 interface HealBody { supportId: string; targetId: string }
+interface DemolishBody { unitId: string; q: number; r: number }
 
 export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: DeployBody }>('/api/games/:id/deploy', async (req, reply) => {
@@ -77,6 +79,15 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     if (!supportId || !targetId) return badRequest(reply, 'supportId and targetId required');
     return actionHandler(req, reply, ({ game, player }) =>
       healTarget(game, globalEventBus, player, supportId, targetId));
+  });
+
+  app.post<{ Params: { id: string }; Body: DemolishBody }>('/api/games/:id/demolish', async (req, reply) => {
+    const { unitId, q, r } = req.body || {};
+    if (!unitId || typeof q !== 'number' || typeof r !== 'number') {
+      return badRequest(reply, 'unitId, q, r required');
+    }
+    return actionHandler(req, reply, ({ game, player }) =>
+      demolishTerrain(game, globalEventBus, player, unitId, q, r));
   });
 
   app.post<{ Params: { id: string } }>('/api/games/:id/end-turn', async (req, reply) =>

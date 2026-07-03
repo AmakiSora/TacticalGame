@@ -309,6 +309,13 @@ function applyEvent(s, ev) {
       s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores };
       break;
     case 'name_rename': playerNames[p.playerId] = p.name; break;
+    case 'demolish': {
+      setCellTerrain(p.q, p.r, p.toTerrain || 'plain');
+      const u = s.units.get(p.unitId);
+      if (u) { u.hasActed = true; u.actionSpent = true; }
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
+      break;
+    }
   }
 }
 async function loadFullState() {
@@ -328,6 +335,15 @@ function entityAt(q, r, owner) {
   return null;
 }
 function occupied(q, r) { return !!entityAt(q, r); }
+
+function setCellTerrain(q, r, terrain) {
+  const cell = cellAt(q, r);
+  if (cell) cell.terrain = terrain;
+}
+function demolishableCells(unit) {
+  if (unit.type !== 'heavy' || unit.hasActed) return [];
+  return hexNeighbors(unit).filter(p => cellAt(p.q, p.r)?.terrain === 'blocker' && !occupied(p.q, p.r));
+}
 function reachable(unit) {
   const result = [], visited = new Set([hexKey(unit)]), queue = [{ q: unit.q, r: unit.r, d: 0 }];
   for (let i = 0; i < queue.length; i++) {
@@ -593,7 +609,7 @@ function drawBoard() {
   }
   for (const h of rangeHighlights) {
     pathHex(h.q, h.r, 3);
-    ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'attack' ? 'rgba(255,80,80,.28)' : h.type === 'attack-radius' ? 'rgba(255,80,80,.08)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : 'rgba(80,220,180,.20)';
+    ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'attack' ? 'rgba(255,80,80,.28)' : h.type === 'attack-radius' ? 'rgba(255,80,80,.08)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : h.type === 'demolish' ? 'rgba(255,170,70,.28)' : 'rgba(80,220,180,.20)';
     ctx.fill();
   }
   if (hoverCell) { pathHex(hoverCell.q, hoverCell.r, 2); ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fill(); }
@@ -739,6 +755,7 @@ function formatEventShort(ev) {
       if (p.reason === 'turn_limit_score') return `${playerName(p.winner)} ${maxTurnsLabel()}裁决获胜`;
       return `${playerName(p.winner)} 获胜`;
     case 'name_rename': return `${p.playerId} 改名为 ${p.name}`;
+    case 'demolish': return `${playerName(p.owner)} 爆破 (${p.q}, ${p.r})`;
     default: return JSON.stringify(p).slice(0, 100);
   }
 }
@@ -781,6 +798,7 @@ function selectUnit(unit) {
   const items = [];
   if (!unit.hasMoved) items.push({ label: '移动', action: 'move' });
   if (!unit.hasActed) items.push({ label: unit.type === 'support' ? '治疗' : '攻击', action: unit.type === 'support' ? 'heal' : 'attack' });
+  if (unit.type === 'heavy' && !unit.hasActed && demolishableCells(unit).length > 0) items.push({ label: '爆破', action: 'demolish' });
   if (items.length) showPopup(unit, '单位操作', items, action => {
     closePopup();
     if (action === 'move') { interactionMode = 'move_mode'; rangeHighlights = reachable(unit).map(p => ({ ...p, type: 'move' })); }
@@ -794,6 +812,10 @@ function selectUnit(unit) {
       });
     }
     if (action === 'heal') { interactionMode = 'heal_mode'; rangeHighlights = [...state.units.values()].filter(e => e.owner === myPlayer && e.alive && e.hp < e.maxHp && hexDistance(unit, e) <= unit.attackRange).map(e => ({ q: e.q, r: e.r, type: 'heal' })); }
+    if (action === 'demolish') {
+      interactionMode = 'demolish_mode';
+      rangeHighlights = demolishableCells(unit).map(p => ({ ...p, type: 'demolish' }));
+    }
     drawBoard();
   });
 }
@@ -845,6 +867,10 @@ els.canvas.addEventListener('click', async () => {
   }
   if (interactionMode === 'heal_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
     if (unit && await apiAction(`/api/games/${gameId}/heal`, { supportId: selectedUnitId, targetId: unit.id })) afterAction('治疗成功');
+    return;
+  }
+  if (interactionMode === 'demolish_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
+    if (await apiAction(`/api/games/${gameId}/demolish`, { unitId: selectedUnitId, q: hoverCell.q, r: hoverCell.r })) afterAction('爆破成功');
     return;
   }
   if (interactionMode === 'deploy_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {

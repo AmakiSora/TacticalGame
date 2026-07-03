@@ -39,7 +39,7 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 ## 核心规则
 
 - 地图为尖顶六边形，坐标为 `{ q, r }`。
-- 当前内置地图为 `default`（六角前线）、`desert`（裂谷控制区）和 `dual-lanes`（双线抉择），半径均为 `8`；有效格满足 `max(abs(q), abs(r), abs(-q-r)) <= radius`。
+- 当前内置地图为 `default`（六角前线）、`desert`（裂谷控制区）、`dual-lanes`（双线抉择）和 `breach`（破障行动），半径均为 `8`；有效格满足 `max(abs(q), abs(r), abs(-q-r)) <= radius`。
 - 地形：`plain` 可通行/部署，`water` 和 `blocker` 不可通行/部署。
 - 每方开局有总部；默认图和沙漠图提供 2 个步兵、1 个侦察兵、80 补给，`dual-lanes` 不提供免费单位而是给 208 补给让玩家自行部署。
 - **每回合最多消耗 5 个行动点**（`config.balance.actionsPerTurn`）。首次操作一个单位（部署/移动/攻击/治疗）消耗 1 点并「激活」该单位；同一单位在本回合内的后续动作免费。行动点用尽后，只能继续操作已激活的单位。这是为防止资源碾压方操作过多单位而设的硬上限。
@@ -50,6 +50,7 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 - 回合切换后，新当前玩家获得基础收入 + 己方据点收入；旧地图使用统一 `controlPointIncome`，类型化据点地图按据点类型分别计算。
 - 可从己方总部或己方据点向相邻空白平地部署单位；`forward_base` 据点可按地图配置降低从该点部署的实际费用。
 - `repair` 据点会在拥有者行动开始时修复站上或距离 1 格内的己方受伤单位；总部和敌军不会被修复，每个单位每回合最多被据点修复一次。
+- 重装单位可花费本回合行动爆破相邻 `blocker` 地形，将其永久变为 `plain`。爆破遵循行动点上限；已移动但未行动的重装可继续爆破，爆破后不能攻击或治疗。
 - 摧毁敌方总部立即获胜。
 - 若双方完成第 15 回合后仍未摧毁总部，系统按优势分裁决：敌方总部已损血×4 + 己方总部当前 HP×2 + 己方据点数×120 + 存活部队价值×2 + 剩余补给×1。分高者胜；完全同分才记录为平局。
 
@@ -90,6 +91,7 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 | `POST` | `/api/games/:id/move` | `{ unitId, q, r }` |
 | `POST` | `/api/games/:id/attack` | `{ attackerId, targetId }` |
 | `POST` | `/api/games/:id/heal` | `{ supportId, targetId }` |
+| `POST` | `/api/games/:id/demolish` | `{ unitId, q, r }` |
 | `POST` | `/api/games/:id/end-turn` | `{}` |
 
 旧版 `/build`、`/produce`、`/sell` 已移除。
@@ -100,11 +102,13 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 
 事件类型：
 
-`game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `control_point_captured`, `control_point_repair`, `income`, `reset_actions`, `turn_end`, `headquarters_destroyed`, `game_over`, `name_rename`
+`game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_repair`, `income`, `reset_actions`, `turn_end`, `headquarters_destroyed`, `game_over`, `name_rename`
 
 `game_start` 包含完整地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `headquarters_destroyed`、`turn_limit_score` 或 `turn_limit_draw`。
 
 `income` 事件保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。`deploy` 事件中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。`control_point_repair` 事件包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
+
+`demolish` 事件包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。
 
 ### 自动控制
 

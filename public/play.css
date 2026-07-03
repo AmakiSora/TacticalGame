@@ -415,6 +415,94 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .sel-token.player-a { background: rgba(80,170,220,.18); border-color: rgba(102,204,255,.55); color: #9de3ff; }
 .sel-token.player-b { background: rgba(230,130,80,.18); border-color: rgba(255,153,102,.55); color: #ffc29e; }
 .sel-token.cp { background: rgba(214,179,74,.18); border-color: rgba(214,179,74,.6); color: #f0d77c; }
+
+/* visual entity tokens */
+.visual-token {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  flex-shrink: 0;
+  background: #1a2a3a;
+  border: 1px solid #34546a;
+  color: #cfe8f6;
+}
+.visual-token.player-a { background: rgba(80,170,220,.18); border-color: rgba(102,204,255,.55); color: #9de3ff; }
+.visual-token.player-b { background: rgba(230,130,80,.18); border-color: rgba(255,153,102,.55); color: #ffc29e; }
+.visual-token.neutral { background: rgba(214,179,74,.18); border-color: rgba(214,179,74,.6); color: #f0d77c; }
+.token-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex-shrink: 0;
+}
+/* infantry: crosshair */
+.token-icon.infantry {
+  background: radial-gradient(circle, currentColor 2.5px, transparent 2.5px);
+  position: relative;
+}
+.token-icon.infantry::before, .token-icon.infantry::after {
+  content: ''; position: absolute; background: currentColor;
+}
+.token-icon.infantry::before { left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); }
+.token-icon.infantry::after { top: 50%; left: 0; right: 0; height: 2px; transform: translateY(-50%); }
+/* scout: triangle up */
+.token-icon.scout {
+  width: 0; height: 0; background: none;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 12px solid currentColor;
+}
+/* heavy: filled square */
+.token-icon.heavy { background: currentColor; border-radius: 2px; }
+/* ranger: diamond */
+.token-icon.ranger {
+  background: currentColor; border-radius: 2px;
+  transform: rotate(45deg); width: 10px; height: 10px; margin: 2px;
+}
+/* support: medical plus */
+.token-icon.support {
+  background:
+    linear-gradient(to right, transparent 5px, currentColor 5px, currentColor 7px, transparent 7px),
+    linear-gradient(to bottom, transparent 3px, currentColor 3px, currentColor 5px, transparent 5px);
+}
+/* headquarters: building */
+.token-icon.headquarters {
+  background: currentColor;
+  clip-path: polygon(0% 30%, 50% 0%, 100% 30%, 100% 100%, 0% 100%);
+}
+/* supply: concentric circles */
+.token-icon.supply {
+  background: radial-gradient(circle, currentColor 3px, transparent 3px);
+  border: 2px solid currentColor; border-radius: 50%; width: 12px; height: 12px;
+}
+/* forward_base: flag */
+.token-icon.forward_base {
+  background: linear-gradient(to right, currentColor 2px, transparent 2px),
+              linear-gradient(to bottom, transparent 2px, currentColor 2px, currentColor 7px, transparent 7px);
+}
+/* repair: wrench (circle + line) */
+.token-icon.repair {
+  background: radial-gradient(circle at 40% 40%, transparent 3px, currentColor 3px, currentColor 4px, transparent 4px);
+  position: relative;
+}
+.token-icon.repair::after {
+  content: ''; position: absolute;
+  bottom: 0; right: 0;
+  width: 2px; height: 7px;
+  background: currentColor;
+  transform: rotate(-45deg);
+  transform-origin: top left;
+}
+.token-label {
+  font: 700 9px -apple-system, "Microsoft YaHei", sans-serif;
+  line-height: 1;
+  text-transform: none;
+}
 .sel-title-wrap { min-width: 0; }
 .sel-type { font-weight: 800; font-size: 15px; color: #d8e0e8; line-height: 1.2; }
 .sel-owner { font-size: 12px; color: #7a9aaa; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

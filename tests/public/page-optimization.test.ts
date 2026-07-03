@@ -73,4 +73,37 @@ describe('spectator and player page optimization', () => {
     expect(css).toContain('.name-field');
     expect(css).toContain('width: 100%');
   });
+
+  it('renders visual entity markers instead of abbreviation-only board labels', () => {
+    const spectator = read('public/app.js');
+    const player = read('public/play.js');
+    const spectatorCss = read('public/style.css');
+    const playerCss = read('public/play.css');
+
+    for (const source of [spectator, player]) {
+      expect(source).toContain('function drawUnitGlyph');
+      expect(source).toContain('function drawControlPointGlyph');
+      expect(source).toContain('function drawUnitMarker');
+      expect(source).toContain('function drawHeadquartersMarker');
+      expect(source).toContain('function drawControlPointMarker');
+      expect(source).toContain('function entityTokenMarkup');
+      expect(source).toContain('function entityShortName');
+      expect(source).toContain('function entityTokenClass');
+    }
+
+    for (const css of [spectatorCss, playerCss]) {
+      expect(css).toContain('.visual-token');
+      expect(css).toContain('.token-icon');
+      expect(css).toContain('.token-label');
+      expect(css).toContain('.token-icon.infantry');
+      expect(css).toContain('.token-icon.scout');
+      expect(css).toContain('.token-icon.heavy');
+      expect(css).toContain('.token-icon.ranger');
+      expect(css).toContain('.token-icon.support');
+      expect(css).toContain('.token-icon.headquarters');
+      expect(css).toContain('.token-icon.supply');
+      expect(css).toContain('.token-icon.forward_base');
+      expect(css).toContain('.token-icon.repair');
+    }
+  });
 });

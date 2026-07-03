@@ -12,6 +12,22 @@ const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ra
 const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP', headquarters: 'HQ' };
 const CONTROL_POINT_LABELS = { supply: 'SUP', forward_base: 'FWD', repair: 'REP' };
 const CONTROL_POINT_NAMES = { supply: '补给站', forward_base: '前线基地', repair: '维修站' };
+const UNIT_SHORT_NAMES = { infantry: '步', scout: '侦', heavy: '重', ranger: '远', support: '支', headquarters: '部' };
+const CONTROL_POINT_SHORT_NAMES = { supply: '给', forward_base: '前', repair: '修' };
+function entityShortName(type) {
+  return UNIT_SHORT_NAMES[type] || CONTROL_POINT_SHORT_NAMES[type] || '?';
+}
+function entityTokenClass(type) {
+  return type || '';
+}
+function entityTokenMarkup(type, ownerClass, title) {
+  const cls = entityTokenClass(type);
+  const label = entityShortName(type);
+  return `<div class="visual-token ${ownerClass}">
+    <span class="token-icon ${cls}" title="${esc(title)}"></span>
+    <span class="token-label">${esc(label)}</span>
+  </div>`;
+}
 const APP_VERSION = window.APP_VERSION;
 const REPLAY_EXPORT_FORMAT = 'hex-v2-replay';
 const REPLAY_SCHEMA_VERSION = APP_VERSION;
@@ -297,6 +313,152 @@ function drawHpBar(x, y, width, hp, maxHp) {
   ctx.fillRect(x - width / 2, y, width * Math.max(0, hp / maxHp), 4);
 }
 
+function drawUnitGlyph(type, x, y) {
+  ctx.save();
+  ctx.fillStyle = '#071016';
+  ctx.strokeStyle = '#071016';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  switch (type) {
+    case 'infantry': {
+      ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5);
+      ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y);
+      ctx.stroke();
+      break;
+    }
+    case 'scout': {
+      ctx.moveTo(x, y - 6);
+      ctx.lineTo(x - 5, y + 4);
+      ctx.lineTo(x + 5, y + 4);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'heavy': {
+      ctx.fillRect(x - 5, y - 5, 10, 10);
+      break;
+    }
+    case 'ranger': {
+      ctx.moveTo(x, y - 6);
+      ctx.lineTo(x + 4, y);
+      ctx.lineTo(x, y + 6);
+      ctx.lineTo(x - 4, y);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'support': {
+      ctx.moveTo(x - 2, y - 5); ctx.lineTo(x + 2, y - 5);
+      ctx.lineTo(x + 2, y - 2); ctx.lineTo(x + 5, y - 2);
+      ctx.lineTo(x + 5, y + 2); ctx.lineTo(x + 2, y + 2);
+      ctx.lineTo(x + 2, y + 5); ctx.lineTo(x - 2, y + 5);
+      ctx.lineTo(x - 2, y + 2); ctx.lineTo(x - 5, y + 2);
+      ctx.lineTo(x - 5, y - 2); ctx.lineTo(x - 2, y - 2);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    default:
+      break;
+  }
+  ctx.restore();
+}
+
+function drawControlPointGlyph(kind, x, y) {
+  ctx.save();
+  ctx.fillStyle = '#071016';
+  ctx.strokeStyle = '#071016';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  switch (kind) {
+    case 'supply': {
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'forward_base': {
+      ctx.moveTo(x - 3, y + 6);
+      ctx.lineTo(x - 3, y - 6);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - 3, y - 6);
+      ctx.lineTo(x + 6, y - 2);
+      ctx.lineTo(x - 3, y + 2);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'repair': {
+      ctx.arc(x, y - 1, 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + 3, y + 3);
+      ctx.lineTo(x + 6, y + 6);
+      ctx.stroke();
+      break;
+    }
+    default:
+      break;
+  }
+  ctx.restore();
+}
+
+function drawUnitMarker(u) {
+  if (!u.alive) return;
+  const p = hexToPixel(u.q, u.r);
+  ctx.fillStyle = OWNER_COLOR[u.owner];
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, HEX_SIZE * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  drawUnitGlyph(u.type, p.x, p.y);
+  drawHpBar(p.x, p.y - 21, 34, u.hp, u.maxHp);
+  if (u.hasMoved || u.hasActed) {
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.beginPath();
+    ctx.arc(p.x + 12, p.y + 12, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawHeadquartersMarker(hq) {
+  const p = hexToPixel(hq.q, hq.r);
+  pathHex(hq.q, hq.r, 5);
+  ctx.fillStyle = hq.alive ? OWNER_COLOR[hq.owner] : '#555';
+  ctx.globalAlpha = hq.alive ? 0.78 : 0.3;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.fillStyle = '#071016';
+  ctx.beginPath();
+  ctx.fillRect(p.x - 6, p.y - 2, 12, 8);
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y - 8);
+  ctx.lineTo(p.x - 7, p.y - 2);
+  ctx.lineTo(p.x + 7, p.y - 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  drawHpBar(p.x, p.y - 25, 42, hq.hp, hq.maxHp);
+}
+
+function drawControlPointMarker(cp) {
+  const p = hexToPixel(cp.q, cp.r);
+  pathHex(cp.q, cp.r, 8);
+  ctx.fillStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a';
+  ctx.globalAlpha = 0.32;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  if (cp.kind) {
+    drawControlPointGlyph(cp.kind, p.x, p.y);
+  }
+}
+
 function drawBoard() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#0a0e14';
@@ -319,53 +481,15 @@ function drawBoard() {
   }
 
   for (const cp of state.controlPoints.values()) {
-    const p = hexToPixel(cp.q, cp.r);
-    pathHex(cp.q, cp.r, 8);
-    ctx.fillStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a';
-    ctx.globalAlpha = 0.32;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = '#f0d77c';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(controlPointLabel(cp), p.x, p.y + 4);
+    drawControlPointMarker(cp);
   }
 
   for (const hq of state.headquarters.values()) {
-    const p = hexToPixel(hq.q, hq.r);
-    pathHex(hq.q, hq.r, 5);
-    ctx.fillStyle = hq.alive ? OWNER_COLOR[hq.owner] : '#555';
-    ctx.globalAlpha = hq.alive ? 0.78 : 0.3;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#071016';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('HQ', p.x, p.y + 4);
-    drawHpBar(p.x, p.y - 25, 42, hq.hp, hq.maxHp);
+    drawHeadquartersMarker(hq);
   }
 
   for (const u of state.units.values()) {
-    if (!u.alive) continue;
-    const p = hexToPixel(u.q, u.r);
-    ctx.fillStyle = OWNER_COLOR[u.owner];
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, HEX_SIZE * 0.42, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#071016';
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(unitLabel(u.type), p.x, p.y + 4);
-    drawHpBar(p.x, p.y - 21, 34, u.hp, u.maxHp);
-    if (u.hasMoved || u.hasActed) {
-      ctx.fillStyle = 'rgba(0,0,0,.35)';
-      ctx.beginPath();
-      ctx.arc(p.x + 12, p.y + 12, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    drawUnitMarker(u);
   }
 }
 
@@ -419,7 +543,7 @@ function renderEntityCard(ent) {
   ].join('');
   return `<div class="sel-card">
     <div class="sel-head">
-      <div class="sel-token ${ownerClass}">${esc(UNIT_LABELS[type] || '?')}</div>
+      ${entityTokenMarkup(type, ownerClass, title)}
       <div class="sel-title-wrap">
         <div class="sel-type">${esc(title)}</div>
         <div class="sel-owner">${playerNameControl(ent.owner)}</div>
@@ -439,7 +563,7 @@ function renderControlPointCard(cp) {
   const ownerClass = cp.owner === 'player_a' ? 'player-a' : cp.owner === 'player_b' ? 'player-b' : 'neutral';
   return `<div class="sel-card">
     <div class="sel-head">
-      <div class="sel-token cp">CP</div>
+      ${entityTokenMarkup(cp.kind || 'supply', ownerClass, cp.name)}
       <div class="sel-title-wrap">
         <div class="sel-type">${esc(cp.name)}</div>
         <div class="sel-owner ${ownerClass}">${esc(owner)}</div>

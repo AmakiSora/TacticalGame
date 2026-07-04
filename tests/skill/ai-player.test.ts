@@ -81,6 +81,13 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('End the turn only after available useful legal actions are exhausted');
   });
 
+  it('is written for general agents instead of a Codex-specific client', async () => {
+    const skill = await readFile('skill/SKILL.md', 'utf8');
+
+    expect(skill).toContain('description: Use when an agent is asked');
+    expect(skill).not.toMatch(/\bCodex\b/);
+  });
+
   it('explains typed control point strategy', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
@@ -88,6 +95,17 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('supply');
     expect(skill).toContain('forward_base');
     expect(skill).toContain('repair');
+  });
+
+  it('documents heavy terrain demolition controls and constraints', async () => {
+    const skill = await readFile('skill/SKILL.md', 'utf8');
+
+    expect(skill).toContain('POST /api/games/:id/demolish');
+    expect(skill).toContain('{ "unitId": "...", "q": 0, "r": 0 }');
+    expect(skill).toContain('Only heavy units can demolish terrain');
+    expect(skill).toContain('adjacent blocker');
+    expect(skill).toContain('demolish');
+    expect(skill).toContain('action point');
   });
 });
 

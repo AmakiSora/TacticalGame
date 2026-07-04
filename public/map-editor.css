@@ -167,6 +167,14 @@ button.danger { border-color: rgba(214,90,74,.55); }
 .panel-heading span {
   color: var(--muted);
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.panel-heading .token-icon.hidden {
+  display: none;
 }
 
 label {
@@ -237,6 +245,64 @@ textarea {
 
 .validation-panel li + li {
   margin-top: 6px;
+}
+
+/* --- token icons (same shapes as style.css / play.css) --- */
+.token-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex-shrink: 0;
+  color: #071016;
+}
+.token-icon.infantry {
+  background: radial-gradient(circle, currentColor 2.5px, transparent 2.5px);
+  position: relative;
+}
+.token-icon.infantry::before, .token-icon.infantry::after {
+  content: ''; position: absolute; background: currentColor;
+}
+.token-icon.infantry::before { left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); }
+.token-icon.infantry::after { top: 50%; left: 0; right: 0; height: 2px; transform: translateY(-50%); }
+.token-icon.scout {
+  width: 0; height: 0; background: none;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 12px solid currentColor;
+}
+.token-icon.heavy { background: currentColor; border-radius: 2px; }
+.token-icon.ranger {
+  background: currentColor; border-radius: 2px;
+  transform: rotate(45deg); width: 10px; height: 10px; margin: 2px;
+}
+.token-icon.support {
+  background:
+    linear-gradient(to right, transparent 5px, currentColor 5px, currentColor 7px, transparent 7px),
+    linear-gradient(to bottom, transparent 3px, currentColor 3px, currentColor 5px, transparent 5px);
+}
+.token-icon.headquarters {
+  background: currentColor;
+  clip-path: polygon(0% 30%, 50% 0%, 100% 30%, 100% 100%, 0% 100%);
+}
+.token-icon.supply {
+  background: radial-gradient(circle, currentColor 3px, transparent 3px);
+  border: 2px solid currentColor; border-radius: 50%; width: 12px; height: 12px;
+}
+.token-icon.forward_base {
+  background: linear-gradient(to right, currentColor 2px, transparent 2px),
+              linear-gradient(to bottom, transparent 2px, currentColor 2px, currentColor 7px, transparent 7px);
+}
+.token-icon.repair {
+  background: radial-gradient(circle at 40% 40%, transparent 3px, currentColor 3px, currentColor 4px, transparent 4px);
+  position: relative;
+}
+.token-icon.repair::after {
+  content: ''; position: absolute;
+  bottom: 0; right: 0;
+  width: 2px; height: 7px;
+  background: currentColor;
+  transform: rotate(-45deg);
+  transform-origin: top left;
 }
 
 @media (max-width: 980px) {

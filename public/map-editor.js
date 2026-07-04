@@ -6,10 +6,8 @@
   const OWNER_COLORS = { player_a: '#66ccff', player_b: '#ff9966' };
   const UNIT_TYPES = ['infantry', 'scout', 'heavy', 'ranger', 'support'];
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
-  const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP' };
   const CONTROL_POINT_KINDS = ['supply', 'forward_base', 'repair'];
   const CONTROL_POINT_NAMES = { supply: '补给站', forward_base: '前线基地', repair: '维修站' };
-  const CONTROL_POINT_LABELS = { supply: 'SUP', forward_base: 'FWD', repair: 'REP' };
   const BALANCE_KEYS = [
     ['startingSupplies', '初始金币', 0],
     ['baseIncome', '每回合基础收入', 0],
@@ -534,6 +532,8 @@
     toolControlKind: $('tool-control-kind'),
     toolHint: $('tool-hint'),
     selectionTitle: $('selection-title'),
+    selectionIcon: $('selection-icon'),
+    selectionTitleText: $('selection-title-text'),
     selectionFields: $('selection-fields'),
     balanceFields: $('balance-fields'),
     unitSpecFields: $('unit-spec-fields'),
@@ -755,42 +755,135 @@
     for (const unit of config.startingUnits) drawUnit(unit);
   }
 
-  function drawToken(pos, fill, label, stroke = '#071016') {
-    const p = hexToPixel(pos.q, pos.r);
-    ctx.fillStyle = fill;
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+  function drawUnitGlyph(type, x, y) {
+    ctx.save();
     ctx.fillStyle = '#071016';
-    ctx.font = 'bold 10px Segoe UI, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, p.x, p.y);
+    ctx.strokeStyle = '#071016';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    switch (type) {
+      case 'infantry': {
+        ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5);
+        ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y);
+        ctx.stroke();
+        break;
+      }
+      case 'scout': {
+        ctx.moveTo(x, y - 6);
+        ctx.lineTo(x - 5, y + 4);
+        ctx.lineTo(x + 5, y + 4);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'heavy': {
+        ctx.fillRect(x - 5, y - 5, 10, 10);
+        break;
+      }
+      case 'ranger': {
+        ctx.moveTo(x, y - 6);
+        ctx.lineTo(x + 4, y);
+        ctx.lineTo(x, y + 6);
+        ctx.lineTo(x - 4, y);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'support': {
+        ctx.moveTo(x - 2, y - 5); ctx.lineTo(x + 2, y - 5);
+        ctx.lineTo(x + 2, y - 2); ctx.lineTo(x + 5, y - 2);
+        ctx.lineTo(x + 5, y + 2); ctx.lineTo(x + 2, y + 2);
+        ctx.lineTo(x + 2, y + 5); ctx.lineTo(x - 2, y + 5);
+        ctx.lineTo(x - 2, y + 2); ctx.lineTo(x - 5, y + 2);
+        ctx.lineTo(x - 5, y - 2); ctx.lineTo(x - 2, y - 2);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      default:
+        break;
+    }
+    ctx.restore();
+  }
+
+  function drawControlPointGlyph(kind, x, y) {
+    ctx.save();
+    ctx.fillStyle = '#071016';
+    ctx.strokeStyle = '#071016';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    switch (kind) {
+      case 'supply': {
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'forward_base': {
+        ctx.moveTo(x - 3, y + 6);
+        ctx.lineTo(x - 3, y - 6);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x - 3, y - 6);
+        ctx.lineTo(x + 6, y - 2);
+        ctx.lineTo(x - 3, y + 2);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'repair': {
+        ctx.arc(x, y - 1, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x + 3, y + 3);
+        ctx.lineTo(x + 6, y + 6);
+        ctx.stroke();
+        break;
+      }
+      default:
+        break;
+    }
+    ctx.restore();
   }
 
   function drawHeadquarters(player, hq) {
     const p = hexToPixel(hq.q, hq.r);
+    pathHex(hq.q, hq.r, 5);
     ctx.fillStyle = OWNER_COLORS[player];
-    ctx.strokeStyle = '#071016';
-    ctx.lineWidth = 2;
-    ctx.fillRect(p.x - 14, p.y - 14, 28, 28);
-    ctx.strokeRect(p.x - 14, p.y - 14, 28, 28);
+    ctx.globalAlpha = 0.78;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.save();
     ctx.fillStyle = '#071016';
-    ctx.font = 'bold 11px Segoe UI, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(player === 'player_a' ? 'A HQ' : 'B HQ', p.x, p.y);
+    ctx.beginPath();
+    ctx.fillRect(p.x - 6, p.y - 2, 12, 8);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 8);
+    ctx.lineTo(p.x - 7, p.y - 2);
+    ctx.lineTo(p.x + 7, p.y - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   function drawControlPoint(point) {
-    drawToken(point, '#d6b34a', CONTROL_POINT_LABELS[point.kind] || 'CP');
+    const p = hexToPixel(point.q, point.r);
+    pathHex(point.q, point.r, 6);
+    ctx.strokeStyle = '#d6b34a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    drawControlPointGlyph(point.kind || 'supply', p.x, p.y);
   }
 
   function drawUnit(unit) {
-    drawToken(unit, OWNER_COLORS[unit.owner] || '#d8e0e8', UNIT_LABELS[unit.type] || 'U');
+    const p = hexToPixel(unit.q, unit.r);
+    ctx.fillStyle = OWNER_COLORS[unit.owner] || '#d8e0e8';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, HEX_SIZE * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+    drawUnitGlyph(unit.type, p.x, p.y);
   }
 
   function bindNumberInput(input, getValue, setValue, min = 0) {
@@ -869,9 +962,20 @@
     });
   }
 
+  function setSelectionIcon(cls, color) {
+    els.selectionIcon.className = `token-icon ${cls}`;
+    els.selectionIcon.style.color = color || '';
+  }
+
+  function hideSelectionIcon() {
+    els.selectionIcon.className = 'token-icon hidden';
+    els.selectionIcon.style.color = '';
+  }
+
   function renderSelection() {
     if (!selected) {
-      els.selectionTitle.textContent = '未选择';
+      els.selectionTitleText.textContent = '未选择';
+      hideSelectionIcon();
       els.selectionFields.className = 'selection-fields empty';
       els.selectionFields.textContent = '点击棋盘上的格子或对象进行编辑';
       return;
@@ -879,7 +983,8 @@
     els.selectionFields.className = 'selection-fields';
     if (selected.type === 'cell') {
       const pos = selected.object;
-      els.selectionTitle.textContent = `格子 ${pos.q},${pos.r}`;
+      els.selectionTitleText.textContent = `格子 ${pos.q},${pos.r}`;
+      hideSelectionIcon();
       els.selectionFields.innerHTML = `<div class="field-grid compact">
         <label>地形 <select id="sel-terrain"><option value="plain">平地</option><option value="water">水域</option><option value="blocker">阻挡</option></select></label>
       </div>`;
@@ -893,7 +998,16 @@
         ? config.controlPoints[selected.index]
         : config.startingUnits[selected.index];
     selected.object = obj;
-    els.selectionTitle.textContent = selected.type === 'headquarters' ? `总部 ${selected.player}` : selected.type === 'controlPoint' ? `据点 ${obj.id}` : `${obj.owner} ${UNIT_NAMES[obj.type]}`;
+    if (selected.type === 'headquarters') {
+      els.selectionTitleText.textContent = `总部 ${selected.player}`;
+      setSelectionIcon('headquarters', OWNER_COLORS[selected.player]);
+    } else if (selected.type === 'controlPoint') {
+      els.selectionTitleText.textContent = `据点 ${obj.id}`;
+      setSelectionIcon(obj.kind || 'supply', '#d6b34a');
+    } else {
+      els.selectionTitleText.textContent = `${obj.owner} ${UNIT_NAMES[obj.type]}`;
+      setSelectionIcon(obj.type, OWNER_COLORS[obj.owner]);
+    }
     const base = `<div class="field-grid compact">
       <label>q <input id="sel-q" type="number" value="${esc(obj.q)}" /></label>
       <label>r <input id="sel-r" type="number" value="${esc(obj.r)}" /></label>

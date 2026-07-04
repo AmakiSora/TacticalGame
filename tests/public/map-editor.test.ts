@@ -54,6 +54,49 @@ describe('map editor page', () => {
     expect(source).not.toContain("els.canvas.addEventListener('wheel'");
   });
 
+  it('draws canvas entities with glyphs matching spectator and player pages', () => {
+    const source = read('public/map-editor.js');
+
+    // Glyph helpers exist (same shape vocabulary as app.js / play.js)
+    expect(source).toContain('function drawUnitGlyph(type, x, y)');
+    expect(source).toContain('function drawControlPointGlyph(kind, x, y)');
+
+    // Unit: circular piece + glyph (not text labels)
+    expect(source).toContain('HEX_SIZE * 0.42');
+    expect(source).not.toMatch(/UNIT_LABELS/);
+    expect(source).not.toMatch(/CONTROL_POINT_LABELS/);
+
+    // HQ: hex-filled with building glyph (not square with "HQ" text)
+    expect(source).not.toMatch(/fillRect.*HQ/);
+    expect(source).not.toContain("'A HQ'");
+    expect(source).not.toContain("'B HQ'");
+    expect(source).toMatch(/pathHex\(hq\.q, hq\.r, 5\)/);
+
+    // Control points: hex outline + glyph (not circular token with text)
+    expect(source).not.toMatch(/drawToken/);
+    expect(source).toMatch(/pathHex\(point\.q, point\.r, 6\)/);
+  });
+
+  it('shows a token-icon in the selection panel matching spectator page style', () => {
+    const html = read('public/map-editor.html');
+    const css = read('public/map-editor.css');
+
+    expect(html).toContain('id="selection-icon"');
+    expect(html).toContain('class="token-icon');
+    expect(html).toContain('id="selection-title-text"');
+
+    // Token icon CSS classes present for all entity types
+    expect(css).toContain('.token-icon.infantry');
+    expect(css).toContain('.token-icon.scout');
+    expect(css).toContain('.token-icon.heavy');
+    expect(css).toContain('.token-icon.ranger');
+    expect(css).toContain('.token-icon.support');
+    expect(css).toContain('.token-icon.headquarters');
+    expect(css).toContain('.token-icon.supply');
+    expect(css).toContain('.token-icon.forward_base');
+    expect(css).toContain('.token-icon.repair');
+  });
+
   it('exports legacy maps without forcing typed control points', () => {
     const core = loadCore();
     const legacy = JSON.parse(read('maps/default.json'));

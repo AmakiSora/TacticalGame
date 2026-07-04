@@ -1,6 +1,6 @@
 {
   "name": "破障行动",
-  "description": "中央石墙阻断东西直通路线，重装单位可爆破开路；两翼分布补给站、前线基地和维修站三种据点，考验多兵种协同与地形改造能力",
+  "description": "中央十字石墙阻断东西直通路线，重装单位可爆破开路；南北各三据点镜像分布，补给站、前线基地、维修站类型对等",
   "grid": "hex",
   "orientation": "pointy",
   "radius": 8,
@@ -8,11 +8,13 @@
     { "q": -5, "r": -3, "terrain": "water" },
     { "q": -4, "r": -4, "terrain": "water" },
     { "q": -3, "r": -5, "terrain": "water" },
-    { "q": 3, "r": 5, "terrain": "water" },
-    { "q": 4, "r": 4, "terrain": "water" },
     { "q": 5, "r": 3, "terrain": "water" },
-    { "q": -3, "r": 3, "terrain": "water" },
-    { "q": 3, "r": -3, "terrain": "water" },
+    { "q": 4, "r": 4, "terrain": "water" },
+    { "q": 3, "r": 5, "terrain": "water" },
+    { "q": -5, "r": -2, "terrain": "water" },
+    { "q": 5, "r": 2, "terrain": "water" },
+    { "q": -2, "r": 5, "terrain": "water" },
+    { "q": 2, "r": -5, "terrain": "water" },
     { "q": 0, "r": -3, "terrain": "blocker" },
     { "q": 0, "r": -2, "terrain": "blocker" },
     { "q": 0, "r": -1, "terrain": "blocker" },
@@ -21,18 +23,19 @@
     { "q": 0, "r": 2, "terrain": "blocker" },
     { "q": 0, "r": 3, "terrain": "blocker" },
     { "q": -1, "r": 0, "terrain": "blocker" },
-    { "q": 1, "r": 0, "terrain": "blocker" },
-    { "q": -1, "r": 1, "terrain": "blocker" },
-    { "q": 1, "r": -1, "terrain": "blocker" },
     { "q": -2, "r": 0, "terrain": "blocker" },
-    { "q": 2, "r": 0, "terrain": "blocker" }
+    { "q": 1, "r": 0, "terrain": "blocker" },
+    { "q": 2, "r": 0, "terrain": "blocker" },
+    { "q": -1, "r": 1, "terrain": "blocker" },
+    { "q": 1, "r": -1, "terrain": "blocker" }
   ],
   "controlPoints": [
     { "id": "cp_nw", "name": "西北补给站", "kind": "supply", "q": -4, "r": -3 },
-    { "id": "cp_n", "name": "北部维修站", "kind": "repair", "q": 1, "r": -5 },
+    { "id": "cp_se", "name": "东南补给站", "kind": "supply", "q": 4, "r": 3 },
+    { "id": "cp_n", "name": "北部维修站", "kind": "repair", "q": -1, "r": -5 },
+    { "id": "cp_s", "name": "南部维修站", "kind": "repair", "q": 1, "r": 5 },
     { "id": "cp_ne", "name": "东北前线基地", "kind": "forward_base", "q": 5, "r": -3 },
-    { "id": "cp_sw", "name": "西南前线基地", "kind": "forward_base", "q": -5, "r": 3 },
-    { "id": "cp_se", "name": "东南维修站", "kind": "repair", "q": 4, "r": 3 }
+    { "id": "cp_sw", "name": "西南前线基地", "kind": "forward_base", "q": -5, "r": 3 }
   ],
   "headquarters": {
     "player_a": { "q": -8, "r": 0 },

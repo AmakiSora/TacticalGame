@@ -27,6 +27,7 @@ npm run dev
 | `http://localhost:3100/play.html` | 创建/加入并手动操作 |
 | `http://localhost:3100/spectator.html` | 观战、导入回放、导出 JSON/HTML |
 | `http://localhost:3100/control.html` | 自动对战控制台 |
+| `http://localhost:3100/map-editor.html` | 本地导入、可视化编辑并导出地图 JSON |
 
 远程访问自动对战控制 API 时建议设置：
 
@@ -130,6 +131,8 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 ## 地图格式
 
 地图位于 `maps/`，文件名就是 `mapId`（例如 `default.json` 对应 `mapId: "default"`）。服务启动时会加载并校验地图配置，`GET /api/maps` 返回可选地图：
+
+浏览器地图编辑器位于 `http://localhost:3100/map-editor.html`。它只做本地导入、可视化编辑和导出 JSON；导出的文件需要手动放入 `maps/`，再重启服务或重新加载配置后使用。
 
 ```json
 {

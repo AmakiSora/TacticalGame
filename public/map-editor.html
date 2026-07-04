@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>TacticalGame - 地图编辑器</title>
+  <link rel="stylesheet" href="/map-editor.css" />
+</head>
+<body>
+  <header class="editor-header">
+    <div class="title-block">
+      <h1>地图编辑器</h1>
+      <p id="status-text">本地导入、编辑并导出 maps/*.json</p>
+    </div>
+    <div class="toolbar">
+      <button id="btn-new" type="button">新建</button>
+      <button id="btn-import" type="button">导入 JSON</button>
+      <button id="btn-export" type="button">导出 JSON</button>
+      <button id="btn-copy-json" type="button">复制 JSON</button>
+      <input id="import-file" type="file" accept="application/json,.json" hidden />
+      <span id="validation-badge" class="status-badge invalid">未校验</span>
+    </div>
+  </header>
+
+  <main class="editor-shell">
+    <section class="board-panel">
+      <div class="board-toolbar" aria-label="编辑工具">
+        <button class="tool-button active" type="button" data-tool="select">选择</button>
+        <button class="tool-button" type="button" data-tool="plain">平地</button>
+        <button class="tool-button" type="button" data-tool="water">水域</button>
+        <button class="tool-button" type="button" data-tool="blocker">阻挡</button>
+        <button class="tool-button" type="button" data-tool="hq">总部</button>
+        <button class="tool-button" type="button" data-tool="control">据点</button>
+        <button class="tool-button" type="button" data-tool="unit">初始单位</button>
+        <button class="tool-button danger" type="button" data-tool="delete">删除</button>
+        <span class="toolbar-spacer"></span>
+        <button id="btn-zoom-out" type="button" title="缩小">-</button>
+        <span id="zoom-label" class="zoom-label">100%</span>
+        <button id="btn-zoom-in" type="button" title="放大">+</button>
+        <button id="btn-zoom-reset" type="button">重置缩放</button>
+      </div>
+      <div class="board-wrap">
+        <canvas id="map-canvas" width="840" height="840"></canvas>
+      </div>
+      <div id="cell-readout" class="cell-readout">坐标 -</div>
+    </section>
+
+    <aside class="inspector">
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>工具</h2>
+          <span id="tool-hint">选择格子或对象</span>
+        </div>
+        <div class="field-grid compact">
+          <label>玩家
+            <select id="tool-owner">
+              <option value="player_a">player_a</option>
+              <option value="player_b">player_b</option>
+            </select>
+          </label>
+          <label>单位
+            <select id="tool-unit-type">
+              <option value="infantry">步兵</option>
+              <option value="scout">侦察兵</option>
+              <option value="heavy">重装</option>
+              <option value="ranger">远程兵</option>
+              <option value="support">支援兵</option>
+            </select>
+          </label>
+          <label>据点类型
+            <select id="tool-control-kind">
+              <option value="">普通据点</option>
+              <option value="supply">补给站</option>
+              <option value="forward_base">前线基地</option>
+              <option value="repair">维修站</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>地图</h2>
+          <span>全局属性</span>
+        </div>
+        <label>名称 <input id="map-name" /></label>
+        <label>描述 <textarea id="map-description"></textarea></label>
+        <div class="field-grid compact">
+          <label>半径 <input id="map-radius" type="number" min="1" step="1" /></label>
+          <label>网格 <input id="map-grid" value="hex" disabled /></label>
+          <label>方向 <input id="map-orientation" value="pointy" disabled /></label>
+        </div>
+      </section>
+
+      <section class="panel" id="selection-panel">
+        <div class="panel-heading">
+          <h2>选中对象</h2>
+          <span id="selection-title">未选择</span>
+        </div>
+        <div id="selection-fields" class="selection-fields empty">点击棋盘上的格子或对象进行编辑</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>平衡</h2>
+          <span>金币、回合、行动</span>
+        </div>
+        <div id="balance-fields" class="field-grid compact"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>单位规格</h2>
+          <span>部署费用和战斗属性</span>
+        </div>
+        <div id="unit-spec-fields" class="spec-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>据点类型</h2>
+          <span>收益、折扣、维修</span>
+        </div>
+        <div id="control-type-fields" class="spec-list"></div>
+      </section>
+
+      <section class="panel validation-panel" id="validation-panel">
+        <div class="panel-heading">
+          <h2>校验</h2>
+          <span id="validation-count">0 个问题</span>
+        </div>
+        <ul id="validation-list"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <script src="/map-editor.js"></script>
+</body>
+</html>

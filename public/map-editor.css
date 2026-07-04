@@ -1,0 +1,251 @@
+:root {
+  color-scheme: dark;
+  --bg: #0a0e14;
+  --panel: #111923;
+  --panel-2: #162231;
+  --line: #263848;
+  --text: #d8e0e8;
+  --muted: #8fa1ad;
+  --blue: #66ccff;
+  --orange: #ff9966;
+  --yellow: #d6b34a;
+  --green: #58c47b;
+  --red: #d65a4a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: #172433;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+button:hover { background: #223346; }
+button.active { border-color: var(--blue); color: #c6f0ff; background: #163247; }
+button.danger { border-color: rgba(214,90,74,.55); }
+
+.editor-header {
+  min-height: 72px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  background: #0d141d;
+}
+
+.title-block h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.title-block p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.toolbar, .board-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar-spacer {
+  flex: 1 1 24px;
+}
+
+.zoom-label {
+  min-width: 52px;
+  text-align: center;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.status-badge.valid {
+  color: #b9f0c8;
+  border-color: rgba(88,196,123,.6);
+  background: rgba(88,196,123,.12);
+}
+
+.status-badge.invalid {
+  color: #ffd0ca;
+  border-color: rgba(214,90,74,.65);
+  background: rgba(214,90,74,.12);
+}
+
+.editor-shell {
+  display: grid;
+  grid-template-columns: minmax(520px, 1fr) 420px;
+  gap: 16px;
+  padding: 16px;
+  height: calc(100vh - 72px);
+  min-height: 620px;
+}
+
+.board-panel {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.board-wrap {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #060a0f;
+}
+
+#map-canvas {
+  display: block;
+  max-width: none;
+  transform-origin: top left;
+}
+
+.cell-readout {
+  color: var(--muted);
+  min-height: 24px;
+}
+
+.inspector {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 14px;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.panel-heading h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.panel-heading span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0b121b;
+  color: var(--text);
+  padding: 8px;
+}
+
+textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.field-grid.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.selection-fields.empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.spec-list {
+  display: grid;
+  gap: 10px;
+}
+
+.spec-card {
+  border: 1px solid #20313d;
+  border-radius: 6px;
+  background: var(--panel-2);
+  padding: 10px;
+}
+
+.spec-card h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.validation-panel ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #ffd0ca;
+  font-size: 13px;
+}
+
+.validation-panel li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 980px) {
+  .editor-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .inspector {
+    overflow: visible;
+  }
+}

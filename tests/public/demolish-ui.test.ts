@@ -10,4 +10,10 @@ describe('demolish player UI wiring', () => {
     expect(source).toContain('/demolish');
     expect(source).toContain("'爆破'");
   });
+
+  it('applies demolish replay terrain changes to the active state argument', () => {
+    expect(source).toContain('function setCellTerrain(targetState, q, r, terrain)');
+    expect(source).toContain('targetState.cells.find');
+    expect(source).toContain("setCellTerrain(s, p.q, p.r, p.toTerrain || 'plain')");
+  });
 });

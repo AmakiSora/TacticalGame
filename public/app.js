@@ -199,8 +199,8 @@ function entityAt(q, r) {
   return null;
 }
 
-function setCellTerrain(q, r, terrain) {
-  const cell = state.cells.find(c => c.q === q && c.r === r);
+function setCellTerrain(targetState, q, r, terrain) {
+  const cell = targetState.cells.find(c => c.q === q && c.r === r);
   if (cell) cell.terrain = terrain;
 }
 
@@ -295,7 +295,7 @@ function applyEvent(s, ev) {
       playerNames[p.playerId] = p.name;
       break;
     case 'demolish': {
-      setCellTerrain(p.q, p.r, p.toTerrain || 'plain');
+      setCellTerrain(s, p.q, p.r, p.toTerrain || 'plain');
       const u = s.units.get(p.unitId);
       if (u) { u.hasActed = true; u.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;

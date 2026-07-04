@@ -9,4 +9,10 @@ describe('demolish spectator replay wiring', () => {
     expect(source).toContain('toTerrain');
     expect(source).toContain('爆破');
   });
+
+  it('applies terrain changes to the replay state being rebuilt', () => {
+    expect(source).toContain('function setCellTerrain(targetState, q, r, terrain)');
+    expect(source).toContain('targetState.cells.find');
+    expect(source).toContain("setCellTerrain(s, p.q, p.r, p.toTerrain || 'plain')");
+  });
 });

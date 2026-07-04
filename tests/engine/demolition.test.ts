@@ -97,4 +97,18 @@ describe('demolishable terrain', () => {
     expect(game.turn.actionsUsed).toBe(limit);
     expect(getTerrain(game, -1, 0)).toBe('plain');
   });
+
+  it('rejects adjacent targets outside the map bounds', () => {
+    const { game, bus, heavy } = setup();
+    heavy.q = -8;
+    heavy.r = 0;
+
+    const result = demolishTerrain(game, bus, 'player_a', heavy.id, -9, 0);
+
+    expect(result).toMatchObject({ ok: false, code: 'invalid_demolish' });
+    expect(game.turn.actionsUsed).toBe(0);
+    expect(heavy.hasActed).toBe(false);
+    expect(game.map.terrainCells.some(c => c.q === -9 && c.r === 0)).toBe(false);
+    expect(game.events.at(-1)?.type).not.toBe('demolish');
+  });
 });

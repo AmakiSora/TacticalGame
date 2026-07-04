@@ -59,6 +59,18 @@ function visualYAxisMirror(pos: { q: number; r: number }) {
   return { q: -pos.q - pos.r, r: pos.r };
 }
 
+function originReflection(pos: { q: number; r: number }) {
+  return { q: -pos.q, r: -pos.r };
+}
+
+function terrainAt(
+  map: { terrainCells: { q: number; r: number; terrain: string }[] },
+  q: number,
+  r: number,
+) {
+  return map.terrainCells.find(cell => cell.q === q && cell.r === r)?.terrain ?? 'plain';
+}
+
 describe('map config loader', () => {
   it('requires maxTurns and adjudication weights', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
@@ -191,6 +203,33 @@ describe('map config loader', () => {
       const mirror = visualYAxisMirror(cell);
       const counterpart = dual.terrainCells.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
       expect(counterpart, `terrain (${cell.q},${cell.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.terrain).toBe(cell.terrain);
+    }
+    resetConfig();
+  });
+
+  it('keeps breach blocked through the center with only edge lanes open', () => {
+    resetConfig();
+    loadMaps();
+
+    const breach = getMapConfig('breach');
+    const blockers = breach.terrainCells
+      .filter(cell => cell.terrain === 'blocker')
+      .map(cell => `${cell.q},${cell.r}`)
+      .sort();
+    const expectedBlockers = [-1, 0, 1]
+      .flatMap(q => Array.from({ length: 13 }, (_, index) => `${q},${index - 6}`))
+      .sort();
+
+    expect(blockers).toEqual(expectedBlockers);
+    for (const q of [-1, 0, 1]) {
+      expect(terrainAt(breach, q, -7)).toBe('plain');
+      expect(terrainAt(breach, q, 7)).toBe('plain');
+    }
+    for (const cell of breach.terrainCells) {
+      const mirror = originReflection(cell);
+      const counterpart = breach.terrainCells.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
+      expect(counterpart, `terrain (${cell.q},${cell.r}) should reflect to (${mirror.q},${mirror.r})`).toBeTruthy();
       expect(counterpart!.terrain).toBe(cell.terrain);
     }
     resetConfig();

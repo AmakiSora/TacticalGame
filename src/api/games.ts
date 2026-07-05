@@ -38,7 +38,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const game = createInitialGame(id, mapId);
     game.playerNames.player_a = name;
     globalStore.save(game);
-    console.log(`[game:create] gameId=${id} playerAToken=${game.tokens.player_a}`);
+    console.log(`[game:create] gameId=${id}`);
     return { gameId: id, playerAToken: game.tokens.player_a };
   });
 
@@ -52,10 +52,12 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!result.ok) {
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
-    console.log(`[game:join] gameId=${req.params.id} playerBToken=${game.tokens.player_b}`);
+    console.log(`[game:join] gameId=${req.params.id}`);
     return { playerBToken: game.tokens.player_b };
   });
 
+  // Rename is intentionally open (no auth) so spectators can set player names.
+  // Names are cosmetic and capped at 20 characters.
   app.patch<{ Params: { id: string }; Body: { playerId: string; name: string } }>('/api/games/:id/rename', async (req, reply) => {
     const game = globalStore.get(req.params.id);
     if (!game) {

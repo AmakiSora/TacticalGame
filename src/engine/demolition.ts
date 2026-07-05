@@ -29,7 +29,7 @@ export function demolishTerrain(
   if (!unit) return { ok: false, code: 'unit_not_found', message: 'unit not found' };
   if (unit.type !== 'heavy') return { ok: false, code: 'invalid_demolish', message: 'only heavy units can demolish terrain' };
   if (unit.hasActed) return { ok: false, code: 'invalid_demolish', message: 'already acted this turn' };
-  if (hexDistance(unit, { q, r }) !== 1) return { ok: false, code: 'invalid_demolish', message: 'target must be adjacent' };
+  if (hexDistance(unit, { q, r }) > 1) return { ok: false, code: 'invalid_demolish', message: 'target must be adjacent' };
   if (!isInBounds(game, q, r)) return { ok: false, code: 'invalid_demolish', message: 'target must be in bounds' };
   if (getTerrain(game, q, r) !== 'blocker') return { ok: false, code: 'invalid_demolish', message: 'target terrain is not blocker' };
   if (getCellOccupant(game, q, r) !== null) return { ok: false, code: 'invalid_demolish', message: 'target cell is occupied' };

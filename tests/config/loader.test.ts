@@ -217,15 +217,28 @@ describe('map config loader', () => {
       .filter(cell => cell.terrain === 'blocker')
       .map(cell => `${cell.q},${cell.r}`)
       .sort();
-    const expectedBlockers = [-1, 0, 1]
-      .flatMap(q => Array.from({ length: 13 }, (_, index) => `${q},${index - 6}`))
-      .sort();
+
+    // Cross-shaped wall: full vertical wall at q=0 (r=-7..7),
+    // horizontal arms at q=-1 (r=4,5,6) and q=1 (r=-6,-5,-4),
+    // plus center cross bar at r=-1,0,1 for q=-1 and q=1
+    const expectedBlockers = [
+      // q=0 full vertical wall
+      ...Array.from({ length: 15 }, (_, i) => `0,${i - 7}`),
+      // q=-1 horizontal arm (upper right) + center cross
+      '-1,-1', '-1,0', '-1,1', '-1,4', '-1,5', '-1,6',
+      // q=1 horizontal arm (lower left) + center cross
+      '1,-6', '1,-5', '1,-4', '1,-1', '1,0', '1,1',
+    ].sort();
 
     expect(blockers).toEqual(expectedBlockers);
-    for (const q of [-1, 0, 1]) {
-      expect(terrainAt(breach, q, -7)).toBe('plain');
-      expect(terrainAt(breach, q, 7)).toBe('plain');
-    }
+    // Edge lanes open at r=-7 and r=7 for q=-1 and q=1 (flanking the center wall)
+    expect(terrainAt(breach, -1, -7)).toBe('plain');
+    expect(terrainAt(breach, -1, 7)).toBe('plain');
+    expect(terrainAt(breach, 1, -7)).toBe('plain');
+    expect(terrainAt(breach, 1, 7)).toBe('plain');
+    // Center wall column reaches the map edge
+    expect(terrainAt(breach, 0, -7)).toBe('blocker');
+    expect(terrainAt(breach, 0, 7)).toBe('blocker');
     for (const cell of breach.terrainCells) {
       const mirror = originReflection(cell);
       const counterpart = breach.terrainCells.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);

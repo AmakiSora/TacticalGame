@@ -1,15 +1,11 @@
 // src/engine/engine.ts
-import { randomBytes } from 'node:crypto';
+import { generateToken } from '../state/store.js';
 import type { AdjudicationScore, GameOverReason, GameState, PlayerId } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { appendEvent } from './events.js';
 import { hexDistance } from './hex.js';
 import { controlPointIncome, controlPointTypeSpec } from './controlPoints.js';
-
-function generateToken(): string {
-  return randomBytes(16).toString('hex');
-}
 
 function otherPlayer(p: PlayerId): PlayerId {
   return p === 'player_a' ? 'player_b' : 'player_a';
@@ -67,7 +63,7 @@ export function joinGame(game: GameState, bus: EventBus, playerName?: string): R
 function captureControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
   for (const point of game.controlPoints) {
     const capturer = game.units.find(u =>
-      u.owner === owner && u.alive && (u.type === 'infantry' || u.type === 'scout') && u.q === point.q && u.r === point.r);
+      u.owner === owner && u.alive && u.canCapture && u.q === point.q && u.r === point.r);
     if (!capturer || point.owner === owner) continue;
     const previousOwner = point.owner;
     point.owner = owner;

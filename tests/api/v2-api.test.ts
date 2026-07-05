@@ -37,8 +37,8 @@ describe('V2 API', () => {
       });
       const joined = joinRes.json() as { playerBToken: string };
 
-      expect(log).toHaveBeenCalledWith(`[game:create] gameId=${created.gameId} playerAToken=${created.playerAToken}`);
-      expect(log).toHaveBeenCalledWith(`[game:join] gameId=${created.gameId} playerBToken=${joined.playerBToken}`);
+      expect(log).toHaveBeenCalledWith(`[game:create] gameId=${created.gameId}`);
+      expect(log).toHaveBeenCalledWith(`[game:join] gameId=${created.gameId}`);
     } finally {
       log.mockRestore();
       await app.close();

@@ -5,7 +5,7 @@ import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, UnitSpec } from '../config/loader.js';
 import { isValidHex } from '../engine/hex.js';
 
-function generateToken(): string {
+export function generateToken(): string {
   return randomBytes(16).toString('hex');
 }
 

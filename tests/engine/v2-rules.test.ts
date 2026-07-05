@@ -117,10 +117,11 @@ describe('hex V2 rules', () => {
     expect(game.resources.player_b.supplies).toBe(208);
   });
 
-  it('only infantry and scout can capture control points', () => {
+  it('only units with canCapture flag can capture control points', () => {
     const { game, bus } = setup();
     const unit = game.units.find(u => u.owner === 'player_a' && u.type === 'infantry')!;
     unit.type = 'heavy';
+    unit.canCapture = false;
     unit.q = -4; unit.r = 0;
 
     endTurn(game, bus, 'player_a');

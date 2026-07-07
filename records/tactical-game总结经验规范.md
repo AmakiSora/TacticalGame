@@ -17,25 +17,31 @@
 
 ## 文件命名规范
 
-每局对局产生 **3个文件**：
+每局对局产生以下文件：
 
 | 文件 | 谁生成 | 格式 | 示例 |
 |------|--------|------|------|
-| 对局回放 | 系统自动 | `tactical-game_{顺序号}_{日期}.json` | `tactical-game_3_20260609.json` |
-| 胜利方复盘 | 获胜AI | `tactical-game_{顺序号}_win_{自己的模型名}.md` | `tactical-game_3_win_longcat.md` |
-| 失败方复盘 | 失败AI | `tactical-game_{顺序号}_lose_{自己的模型名}.md` | `tactical-game_3_lose_mimo.md` |
+| 对局回放 | 系统自动 | `tg_{4位ID}_{日期}.json` | `tg_0003_20260609.json` |
+| 胜利方复盘 | 获胜AI | `tg_{4位ID}_win_{agent}@{模型名}.md` | `tg_0003_win_PI@longcat2.0.md` |
+| 失败方复盘 | 失败AI | `tg_{4位ID}_lose_{agent}@{模型名}.md` | `tg_0003_lose_PI@mimo2.5pro.md` |
 
 **关键规则：**
-- `{顺序号}` — 递增数字，同一局的所有文件共用同一个顺序号
+- `{4位ID}` — 递增数字，补零到4位（0001, 0002, ...），同一局的所有文件共用同一个 ID
 - `{日期}` — `YYYYMMDD` 格式，仅 .json 文件使用
-- `{自己的模型名}` — **写复盘的那个 AI 自己的模型名**，不是对手的名字
+- `{agent}` — 运行 AI 的客户端缩写，**全大写**：PI, CX(Codex), CC(Claude Code), QW(QoderWork), OMP(Oh my pi), WB(WorkBuddy), ZC(zcode), SCRIPT
+- `{模型名}` — **写复盘的那个 AI 自己的模型全名，统一小写**，不是对手的名字
+- agent 和模型名之间用 `@` 分隔
+- 跨多局的合并复盘用范围格式：`tg_0008-0010_win_SCRIPT@glm5.2.md`
 - .json 文件由系统生成，AI 不需要写
 
-**完整示例（第3局，LongCat赢了，Mimo输了）：**
+**已注册的模型短名（全小写）：**
+deepseekv4flash, deepseekv4pro, mimo2.5pro, gpt5.5, glm5.2, glm5.1, glm4.7, qwen3.6v35b, qwen3.7max, step3.7flash, longcat2.0, sensenova6.7fl, minimaxm3, hy3, fable5, agnes2.0flash
+
+**完整示例（第3局，LongCat用pi赢了，Mimo用pi输了）：**
 ```
-records/tactical-game_3_20260609.json       ← 系统生成的对局回放
-records/tactical-game_3_win_longcat.md      ← LongCat（胜方）写的复盘
-records/tactical-game_3_lose_mimo.md        ← Mimo（败方）写的复盘
+records/V2/tg_0003_20260609.json              ← 系统生成的对局回放
+records/V2/tg_0003_win_PI@longcat2.0.md       ← LongCat（胜方）写的复盘
+records/V2/tg_0003_lose_PI@mimo2.5pro.md      ← Mimo（败方）写的复盘
 ```
 
 ---
@@ -298,7 +304,7 @@ Turn 3: {操作}
 
 写完复盘后，逐项检查：
 
-- [ ] 文件命名符合 `tactical-game_{顺序号}_{结果}_{自己的模型名}.md`（注意：是自己的模型名，不是对手的）
+- [ ] 文件命名符合 `tg_{4位ID}_{结果}_{agent}@{模型名}.md`（注意：是自己的模型名，不是对手的）
 - [ ] 元数据完整（日期、游戏ID、角色、结果、回合数）
 - [ ] 有具体回合数、金币数、坐标（不能只有笼统描述）
 - [ ] 有回合时间线表格

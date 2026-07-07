@@ -279,7 +279,8 @@ function applyEvent(s, ev) {
   switch (ev.type) {
     case 'game_start':
       gameConfig = p.config; if (p.playerNames) playerNames = { ...p.playerNames };
-      s.cells = p.map.cells || [];
+      s.map = cloneMapPayload(p.map);
+      s.cells = s.map.cells || [];
       s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
       s.headquarters = new Map(Object.values(p.headquarters || {}).map(h => [h.id, { ...h }]));
       s.units = new Map((p.units || []).map(u => [u.id, { ...u }]));
@@ -339,6 +340,14 @@ function occupied(q, r) { return !!entityAt(q, r); }
 function setCellTerrain(targetState, q, r, terrain) {
   const cell = targetState.cells.find(c => c.q === q && c.r === r);
   if (cell) cell.terrain = terrain;
+}
+
+function cloneMapPayload(map = {}) {
+  return {
+    ...map,
+    cells: (map.cells || []).map(cell => ({ ...cell })),
+    terrainCells: (map.terrainCells || []).map(cell => ({ ...cell })),
+  };
 }
 function demolishableCells(unit) {
   if (unit.type !== 'heavy' || unit.hasActed) return [];

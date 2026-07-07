@@ -204,6 +204,14 @@ function setCellTerrain(targetState, q, r, terrain) {
   if (cell) cell.terrain = terrain;
 }
 
+function cloneMapPayload(map = {}) {
+  return {
+    ...map,
+    cells: (map.cells || []).map(cell => ({ ...cell })),
+    terrainCells: (map.terrainCells || []).map(cell => ({ ...cell })),
+  };
+}
+
 function applyEvent(s, ev) {
   s.eventLog.push(ev);
   const p = ev.payload || {};
@@ -211,8 +219,8 @@ function applyEvent(s, ev) {
     case 'game_start':
       gameConfig = p.config;
       if (p.playerNames) playerNames = p.playerNames;
-      s.map = p.map;
-      s.cells = p.map.cells || [];
+      s.map = cloneMapPayload(p.map);
+      s.cells = s.map.cells || [];
       s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
       s.headquarters = new Map(Object.values(p.headquarters || {}).map(h => [h.id, { ...h }]));
       s.units = new Map((p.units || []).map(u => [u.id, { ...u }]));

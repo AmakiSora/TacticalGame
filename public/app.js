@@ -878,7 +878,9 @@ function downloadFile(filename, content, mime) {
   URL.revokeObjectURL(a.href);
 }
 function gameFilename(ext) {
-  return `hex_game_${(gameSelect.value || 'unknown').slice(0, 8)}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.${ext}`;
+  const d = new Date();
+  const date = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  return `tg_0_${date}.${ext}`;
 }
 
 function latestGameOverResult() {

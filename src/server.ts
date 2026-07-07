@@ -40,6 +40,7 @@ if (isMain) {
       console.log('  页面:');
       console.log(`    观战页面      ${base}/spectator.html`);
       console.log(`    游戏页面      ${base}/play.html`);
+      console.log(`    地图编辑器    ${base}/map-editor.html`);
       console.log('');
       console.log('  API 端点:');
       console.log(`    地图列表      GET   ${base}/api/maps`);

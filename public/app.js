@@ -43,11 +43,17 @@ let pinnedReplayStep = false;
 let state = null;
 let hoverCell = null;
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
+let gamesList = [];
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const gameSelect = document.getElementById('game-select');
+const gamePicker = document.querySelector('.game-picker');
+const gamePickerButton = document.getElementById('game-picker-button');
+const gamePickerLabel = document.getElementById('game-picker-label');
+const gamePickerMenu = document.getElementById('game-picker-menu');
 const refreshBtn = document.getElementById('refresh-list');
+const deleteGameBtn = document.getElementById('delete-game');
 const statusEl = document.getElementById('status');
 const resourcesEl = document.getElementById('resources');
 const scorePanelEl = document.getElementById('score-panel');
@@ -780,9 +786,68 @@ function buildTimelineMarkers() {
   });
 }
 
+function gameOptionText(game) {
+  return `${game.id.slice(0, 8)} - ${game.phase} 回合${game.turnNumber}`;
+}
+
+function closeGamePicker() {
+  gamePicker.classList.remove('open');
+  gamePickerButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleGamePicker() {
+  const open = !gamePicker.classList.contains('open');
+  gamePicker.classList.toggle('open', open);
+  gamePickerButton.setAttribute('aria-expanded', String(open));
+}
+
+function syncGamePickerLabel() {
+  const selected = gamesList.find(g => g.id === gameSelect.value);
+  gamePickerLabel.textContent = selected ? gameOptionText(selected) : '-- 选择对局 --';
+  gamePickerMenu.querySelectorAll('.game-picker-option').forEach(option => {
+    option.classList.toggle('active', option.dataset.gameId === gameSelect.value);
+    option.setAttribute('aria-selected', String(option.dataset.gameId === gameSelect.value));
+  });
+}
+
+function renderGamePickerMenu() {
+  gamePickerMenu.replaceChildren();
+  if (gamesList.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'game-picker-empty';
+    empty.textContent = '暂无在线对局';
+    gamePickerMenu.append(empty);
+    syncGamePickerLabel();
+    return;
+  }
+  for (const game of gamesList) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'game-picker-option';
+    option.dataset.gameId = game.id;
+    option.setAttribute('role', 'option');
+    option.innerHTML = `<span class="game-id">${esc(game.id.slice(0, 8))}</span>
+      <span class="phase-badge">${esc(game.phase)}</span>
+      <span class="game-meta-line">回合 ${esc(game.turnNumber)} · ${esc(game.mapId || 'default')}</span>`;
+    option.addEventListener('click', () => selectGame(game.id));
+    gamePickerMenu.append(option);
+  }
+  syncGamePickerLabel();
+}
+
+async function selectGame(id) {
+  if (!id) return;
+  gameSelect.value = id;
+  syncGamePickerLabel();
+  closeGamePicker();
+  await loadGameState(id);
+  subscribeSse(id);
+}
+
 async function fetchGameList() {
   const res = await fetch('/api/games');
   const { games } = await res.json();
+  gamesList = games;
   const prev = gameSelect.value;
   gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
   for (const g of games) {
@@ -792,7 +857,58 @@ async function fetchGameList() {
     gameSelect.appendChild(opt);
   }
   if (prev && [...gameSelect.options].some(o => o.value === prev)) gameSelect.value = prev;
+  renderGamePickerMenu();
   return games;
+}
+
+function resetLoadedGame(message = '请选择在线对局') {
+  pausePlayback();
+  if (liveSse) liveSse.close();
+  liveSse = null;
+  pinnedReplayStep = false;
+  gameConfig = null;
+  playerNames = defaultPlayerNames();
+  allEvents = [];
+  currentStep = -1;
+  hoverCell = null;
+  state = createEmptyState();
+  buildTimelineMarkers();
+  drawBoard();
+  resourcesEl.innerHTML = '';
+  scorePanelEl.innerHTML = '';
+  turnInfoEl.innerHTML = '';
+  eventsEl.innerHTML = '';
+  detailEl.textContent = '选择对局后使用时间轴回放';
+  selDetailEl.textContent = '点击或悬停棋盘查看单位、总部或据点信息';
+  cellInfoEl.textContent = '';
+  updateControls();
+  statusEl.textContent = message;
+}
+
+async function deleteCurrentGame() {
+  const id = gameSelect.value;
+  if (!id || id === 'offline') {
+    statusEl.textContent = '请选择在线对局后再删除';
+    return;
+  }
+  const game = gamesList.find(g => g.id === id);
+  const phase = game?.phase || '未知';
+  const turnNumber = game?.turnNumber ?? '未知';
+  const ok = confirm(`确定删除对局 ${id}？\n阶段：${phase}\n回合：${turnNumber}\n\n该操作会删除内存与持久化文件中的对局，不能撤销。`);
+  if (!ok) return;
+
+  const headers = {};
+  const controlToken = localStorage.getItem('autoControlToken') || '';
+  if (controlToken) headers['x-control-token'] = controlToken;
+  const res = await fetch(`/api/games/${encodeURIComponent(id)}`, { method: 'DELETE', headers });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    statusEl.textContent = body.error || '删除失败';
+    return;
+  }
+  gameSelect.value = '';
+  resetLoadedGame('对局已删除');
+  await fetchGameList();
 }
 
 async function loadGameState(id) {
@@ -1022,11 +1138,27 @@ function startAutoRefresh() {
 }
 
 gameSelect.addEventListener('change', async () => {
-  if (!gameSelect.value) return;
-  await loadGameState(gameSelect.value);
-  subscribeSse(gameSelect.value);
+  await selectGame(gameSelect.value);
 });
+gamePickerButton.addEventListener('click', e => { e.stopPropagation(); toggleGamePicker(); });
+gamePickerButton.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleGamePicker();
+  }
+  if (e.key === 'Escape') closeGamePicker();
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    gamePicker.classList.add('open');
+    gamePickerButton.setAttribute('aria-expanded', 'true');
+    gamePickerMenu.querySelector('.game-picker-option')?.focus();
+  }
+});
+gamePickerMenu.addEventListener('click', e => e.stopPropagation());
+gamePickerMenu.addEventListener('keydown', e => e.stopPropagation());
 refreshBtn.addEventListener('click', fetchGameList);
+deleteGameBtn.addEventListener('click', deleteCurrentGame);
 btnStart.addEventListener('click', goToStart);
 btnPrev.addEventListener('click', () => { pausePlayback(); stepBackward(); });
 btnPlay.addEventListener('click', () => playing ? pausePlayback() : startPlayback());
@@ -1047,6 +1179,7 @@ refreshIntervalInput.addEventListener('change', () => {
 });
 btnSettings.addEventListener('click', e => { e.stopPropagation(); settingsPopover.classList.toggle('open'); });
 document.addEventListener('click', e => { if (!settingsPopover.contains(e.target) && e.target !== btnSettings) settingsPopover.classList.remove('open'); });
+document.addEventListener('click', e => { if (!gamePicker.contains(e.target)) closeGamePicker(); });
 document.addEventListener('click', e => {
   const target = e.target.closest('[data-rename-player]');
   if (!target) return;

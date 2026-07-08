@@ -10,6 +10,7 @@ import { endTurn } from '../engine/engine.js';
 import type { Result } from '../engine/result.js';
 import type { AuthContext } from './auth.js';
 import type { UnitType } from '../types.js';
+import { globalStore } from '../state/store.js';
 
 async function actionHandler(
   req: FastifyRequest<{ Params: { id: string } }>,
@@ -31,6 +32,7 @@ async function actionHandler(
   if (!result.ok) {
     return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
   }
+  globalStore.persist(ctx.game);
   return { ok: true };
 }
 

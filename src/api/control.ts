@@ -1,28 +1,7 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { PlayerId } from '../types.js';
 import { getAutoControlController } from '../control/singleton.js';
-
-function isLocalRequest(req: FastifyRequest): boolean {
-  const ip = req.ip;
-  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-}
-
-function authorize(req: FastifyRequest, reply: FastifyReply): boolean {
-  const configured = process.env.AUTO_CONTROL_TOKEN;
-  const queryToken = (req.query as { token?: string } | undefined)?.token;
-  const headerToken = req.headers['x-control-token'];
-  const supplied = typeof headerToken === 'string' ? headerToken : queryToken;
-
-  if (configured) {
-    if (supplied === configured) return true;
-    reply.code(401).send({ error: 'invalid control token', code: 'invalid_control_token' });
-    return false;
-  }
-
-  if (isLocalRequest(req)) return true;
-  reply.code(401).send({ error: 'AUTO_CONTROL_TOKEN is required for remote control access', code: 'control_token_required' });
-  return false;
-}
+import { authorizeControlRequest } from './controlAuth.js';
 
 function writeSse(reply: FastifyReply, data: unknown): void {
   reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -30,7 +9,7 @@ function writeSse(reply: FastifyReply, data: unknown): void {
 
 export async function controlRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('onRequest', async (req, reply) => {
-    if (req.url.startsWith('/api/control') && !authorize(req, reply)) {
+    if (req.url.startsWith('/api/control') && !authorizeControlRequest(req, reply)) {
       return reply;
     }
     return undefined;

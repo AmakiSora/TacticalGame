@@ -2,13 +2,13 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。两名玩家争夺地图据点获取补给，在总部或己方据点部署单位，最终摧毁敌方总部获胜。
 
-当前版本：`2.4.1`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
+当前版本：`2.4.2`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
 ## 技术栈
 
 - 后端：Node.js + TypeScript + Fastify
 - 前端：原生 HTML/CSS/JS + Canvas
-- 数据：内存存储，服务器重启后对局丢失
+- 数据：内存状态 + 本地持久化文件，服务器重启后恢复对局
 - 地图：`maps/*.json` V2 hex 配置
 - 对战记录：`records/` 保存导出的回放 JSON、复盘 Markdown 和 AI 日志
 
@@ -36,6 +36,18 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 ```
 
 未设置 `AUTO_CONTROL_TOKEN` 时，控制 API 只允许本机访问。
+
+## 对局持久化
+
+服务会把当前对局保存到 `runtime/games.json`，启动时自动恢复。`runtime/` 已在 `.gitignore` 中，不会上传 git。
+
+如需改保存位置：
+
+```bash
+TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
+```
+
+测试环境默认不启用持久化，除非显式设置 `TACTICAL_GAME_STATE_FILE`。
 
 ## 核心规则
 
@@ -83,6 +95,9 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 | `POST` | `/api/games/:id/join` | `{ name? }` | `{ playerBToken }` |
 | `GET` | `/api/games/:id` | token header | 完整状态，不含 token |
 | `PATCH` | `/api/games/:id/rename` | `{ playerId, name }` | `{ ok: true }` |
+| `DELETE` | `/api/games/:id` | control token | `{ ok: true }` |
+
+删除对局会同时删除内存状态和持久化文件中的记录。该接口复用自动控制权限：设置 `AUTO_CONTROL_TOKEN` 后需要 `X-Control-Token: <token>` 或 `?token=<token>`；未设置时仅允许本机请求。
 
 ### 操作
 

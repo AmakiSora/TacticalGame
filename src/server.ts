@@ -9,12 +9,14 @@ import { actionsRoutes } from './api/actions.js';
 import { eventsRoutes } from './api/events.js';
 import { mapsRoutes } from './api/maps.js';
 import { controlRoutes } from './api/control.js';
+import { globalStore } from './state/store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
 
 export async function buildServer(): Promise<FastifyInstance> {
   loadMaps();
+  globalStore.loadFromDisk();
   const app = Fastify({ logger: false });
   await app.register(mapsRoutes);
   await app.register(gamesRoutes);
@@ -48,6 +50,7 @@ if (isMain) {
       console.log(`    创建对局      POST  ${base}/api/games`);
       console.log(`    加入对局      POST  ${base}/api/games/:id/join`);
       console.log(`    查看对局      GET   ${base}/api/games/:id`);
+      console.log(`    删除对局      DEL   ${base}/api/games/:id`);
       console.log(`    部署          POST  ${base}/api/games/:id/deploy`);
       console.log(`    移动          POST  ${base}/api/games/:id/move`);
       console.log(`    攻击          POST  ${base}/api/games/:id/attack`);

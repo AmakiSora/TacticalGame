@@ -6,6 +6,7 @@ import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
 import { joinGame } from '../engine/engine.js';
 import { authenticate, sanitizeGameForResponse, statusForCode } from './auth.js';
+import { authorizeControlRequest } from './controlAuth.js';
 import { listMaps } from '../config/loader.js';
 
 export async function gamesRoutes(app: FastifyInstance): Promise<void> {
@@ -38,7 +39,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const game = createInitialGame(id, mapId);
     game.playerNames.player_a = name;
     globalStore.save(game);
-    console.log(`[game:create] gameId=${id}`);
+    console.log(`[game:create] gameId=${id} playerAToken=${game.tokens.player_a}`);
     return { gameId: id, playerAToken: game.tokens.player_a };
   });
 
@@ -52,7 +53,8 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!result.ok) {
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
-    console.log(`[game:join] gameId=${req.params.id}`);
+    globalStore.persist(game);
+    console.log(`[game:join] gameId=${req.params.id} playerBToken=${game.tokens.player_b}`);
     return { playerBToken: game.tokens.player_b };
   });
 
@@ -73,6 +75,18 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const trimmed = name.trim().slice(0, 20);
     game.playerNames[playerId] = trimmed;
     appendEvent(game, globalEventBus, 'name_rename', { playerId, name: trimmed });
+    globalStore.persist(game);
+    return { ok: true };
+  });
+
+  app.delete<{ Params: { id: string }; Querystring: { token?: string } }>('/api/games/:id', async (req, reply) => {
+    if (!authorizeControlRequest(req, reply)) return;
+    const game = globalStore.get(req.params.id);
+    if (!game) {
+      return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    }
+    globalStore.delete(req.params.id);
+    globalEventBus.clear(req.params.id);
     return { ok: true };
   });
 

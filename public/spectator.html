@@ -13,8 +13,15 @@
     </div>
     <div id="game-meta">
       <span class="toolbar-group primary-tools">
-        <select id="game-select"><option value="">-- 选择对局 --</option></select>
+        <span class="game-picker">
+          <select id="game-select" class="native-game-select" tabindex="-1" aria-hidden="true"><option value="">-- 选择对局 --</option></select>
+          <button id="game-picker-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="game-picker-label">-- 选择对局 --</span>
+          </button>
+          <div id="game-picker-menu" role="listbox" aria-label="选择对局"></div>
+        </span>
         <button id="refresh-list">刷新列表</button>
+        <button id="delete-game" class="danger" title="删除当前对局">删除</button>
         <span id="status"></span>
       </span>
       <span id="file-actions" class="toolbar-group file-tools">

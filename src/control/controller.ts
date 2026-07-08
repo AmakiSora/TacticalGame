@@ -251,6 +251,7 @@ export class AutoControlController {
       globalStore.save(game);
       const joined = joinGame(game, globalEventBus, this.config.players.player_b.name);
       if (!joined.ok) throw this.fail(joined.message);
+      globalStore.persist(game);
       this.config.gameId = game.id;
       this.writeConfig();
       this.log('info', `bootstrap gameId=${game.id}`);

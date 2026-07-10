@@ -28,7 +28,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       if (wantsSse && !closeAfterFlush) {
         const token = req.headers['x-player-token'] ?? req.query.token;
         if (typeof token === 'string' && token.length > 0) {
-          const isValid = game.tokens.player_a === token || game.tokens.player_b === token;
+          const isValid = Object.values(game.tokens).includes(token);
           if (!isValid) {
             return reply.code(401).send({ error: 'invalid token', code: 'invalid_token' });
           }

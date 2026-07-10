@@ -1,24 +1,38 @@
 // src/engine/engine.ts
-import { generateToken } from '../state/store.js';
-import type { AdjudicationScore, GameOverReason, GameState, PlayerId } from '../types.js';
+import type {
+  AdjudicationScore, EliminationReason, GameOverReason, GameRanking,
+  GameState, PlayerId, PlayerRecord,
+} from '../types.js';
+import { PLAYER_IDS } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { appendEvent } from './events.js';
 import { hexDistance } from './hex.js';
 import { controlPointIncome, controlPointTypeSpec } from './controlPoints.js';
+import { addLobbyPlayer, initializeLobbyGame } from '../state/store.js';
 
-function otherPlayer(p: PlayerId): PlayerId {
-  return p === 'player_a' ? 'player_b' : 'player_a';
+export function joinedPlayerIds(game: GameState): PlayerId[] {
+  return PLAYER_IDS.filter(id => game.players[id]);
+}
+
+export function activePlayerIds(game: GameState): PlayerId[] {
+  return game.turn.turnOrder.filter(id => game.players[id]?.status === 'active');
+}
+
+function syncLegacyTurnAliases(game: GameState): void {
+  // 旧测试和旧回放工具可能直接写 turnNumber/currentOwner；引擎入口统一折回新字段。
+  if (game.turn.currentOwner && game.turn.currentOwner !== game.turn.currentPlayerId) {
+    game.turn.currentPlayerId = game.turn.currentOwner;
+  }
+  if (game.turn.turnNumber !== game.turn.roundNumber) {
+    game.turn.roundNumber = game.turn.turnNumber;
+  }
 }
 
 function mapPayload(game: GameState) {
   return {
-    id: game.mapId,
-    name: game.config.name,
-    description: game.config.description,
-    grid: game.map.grid,
-    orientation: game.map.orientation,
-    radius: game.map.radius,
+    id: game.mapId, name: game.config.name, description: game.config.description,
+    grid: game.map.grid, orientation: game.map.orientation, radius: game.map.radius,
     terrainCells: game.map.terrainCells.map(c => ({ ...c })),
     cells: game.cells.map(c => ({ ...c })),
   };
@@ -28,47 +42,64 @@ function fullReplayPayload(game: GameState) {
   return {
     mapId: game.mapId,
     map: mapPayload(game),
+    players: structuredClone(game.players),
+    turnOrder: [...game.turn.turnOrder],
     controlPoints: game.controlPoints.map(p => ({ ...p })),
-    headquarters: {
-      player_a: { ...game.headquarters.player_a },
-      player_b: { ...game.headquarters.player_b },
-    },
+    headquarters: structuredClone(game.headquarters),
     units: game.units.map(u => ({ ...u })),
-    resources: {
-      player_a: { ...game.resources.player_a },
-      player_b: { ...game.resources.player_b },
-    },
-    firstPlayer: game.turn.currentOwner,
+    resources: structuredClone(game.resources),
+    firstPlayer: game.turn.currentPlayerId,
     playerNames: { ...game.playerNames },
     config: {
       units: structuredClone(game.config.units),
       headquartersSpec: { ...game.config.headquartersSpec },
-      balance: { ...game.config.balance },
+      balance: structuredClone(game.config.balance),
     },
   };
 }
 
-export function joinGame(game: GameState, bus: EventBus, playerName?: string): Result {
-  if (game.tokens.player_b !== '') {
-    return { ok: false, code: 'game_already_full', message: 'game already has 2 players' };
+export function startGame(game: GameState, bus: EventBus, random: () => number = Math.random): Result {
+  if (game.phase !== 'lobby') return { ok: false, code: 'game_already_started', message: 'game already started' };
+  const count = joinedPlayerIds(game).length;
+  if (count < 2) return { ok: false, code: 'lobby_not_ready', message: 'at least 2 players required' };
+  if (!game.config.supportedPlayerCounts.includes(count)) {
+    return { ok: false, code: 'unsupported_player_count', message: `map does not support ${count} players` };
   }
-  game.tokens.player_b = generateToken();
-  game.playerNames.player_b = playerName || '玩家 B';
-  game.phase = 'waiting_command';
-  game.turn.phase = 'waiting_command';
+  initializeLobbyGame(game, random);
+  appendEvent(game, bus, 'game_start', fullReplayPayload(game));
+  return { ok: true };
+}
+
+// 保留旧双人测试和旧内部调用所需的加入即开局行为。
+export function joinGame(game: GameState, bus: EventBus, playerName?: string): Result {
+  if (game.players.player_b) return { ok: false, code: 'game_already_full', message: 'game already has 2 players' };
+  const joined = addLobbyPlayer(game, playerName);
+  if (!joined) return { ok: false, code: 'game_already_full', message: 'game already full' };
+  for (const id of ['player_a', 'player_b'] as PlayerId[]) {
+    const player = game.players[id]!;
+    player.status = 'active';
+    player.spawnSlotId = game.config.layouts['2'][id === 'player_a' ? 0 : 1];
+    player.turnOrder = id === 'player_a' ? 0 : 1;
+  }
+  game.phase = 'active';
+  game.turn.phase = 'active';
+  game.turn.turnOrder = ['player_a', 'player_b'];
+  game.turn.currentPlayerId = 'player_a';
+  game.turn.currentOwner = 'player_a';
   appendEvent(game, bus, 'game_start', fullReplayPayload(game));
   return { ok: true };
 }
 
 function captureControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
   for (const point of game.controlPoints) {
-    const capturer = game.units.find(u =>
-      u.owner === owner && u.alive && u.canCapture && u.q === point.q && u.r === point.r);
+    const capturer = game.units.find(unit =>
+      unit.owner === owner && unit.alive && unit.canCapture && unit.q === point.q && unit.r === point.r);
     if (!capturer || point.owner === owner) continue;
     const previousOwner = point.owner;
     point.owner = owner;
     appendEvent(game, bus, 'control_point_captured', {
-      pointId: point.id, name: point.name, owner, previousOwner, unitId: capturer.id, q: point.q, r: point.r,
+      pointId: point.id, name: point.name, owner, previousOwner,
+      unitId: capturer.id, q: point.q, r: point.r,
     });
   }
 }
@@ -84,19 +115,20 @@ function resetActions(game: GameState, owner: PlayerId): void {
 }
 
 function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): void {
+  const resources = game.resources[owner];
+  if (!resources || game.players[owner]?.status !== 'active') return;
   const base = game.config.balance.baseIncome;
-  const ownedPoints = game.controlPoints.filter(p => p.owner === owner);
+  const ownedPoints = game.controlPoints.filter(point => point.owner === owner);
   const breakdown = ownedPoints.map(point => ({
-    pointId: point.id,
-    name: point.name,
-    kind: point.kind,
+    pointId: point.id, name: point.name, kind: point.kind,
     amount: controlPointIncome(game, point),
   }));
-  const points = ownedPoints.length;
   const control = breakdown.reduce((sum, item) => sum + item.amount, 0);
   const amount = base + control;
-  game.resources[owner].supplies += amount;
-  appendEvent(game, bus, 'income', { owner, base, control, controlPoints: points, amount, breakdown });
+  resources.supplies += amount;
+  appendEvent(game, bus, 'income', {
+    owner, base, control, controlPoints: ownedPoints.length, amount, breakdown,
+  });
 }
 
 function repairFromControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
@@ -113,12 +145,8 @@ function repairFromControlPoints(game: GameState, bus: EventBus, owner: PlayerId
       unit.hp += amount;
       repaired.add(unit.id);
       appendEvent(game, bus, 'control_point_repair', {
-        owner,
-        pointId: point.id,
-        pointName: point.name,
-        unitId: unit.id,
-        amount,
-        unitHp: unit.hp,
+        owner, pointId: point.id, pointName: point.name,
+        unitId: unit.id, amount, unitHp: unit.hp,
       });
     }
   }
@@ -126,26 +154,21 @@ function repairFromControlPoints(game: GameState, bus: EventBus, owner: PlayerId
 
 function armyValue(game: GameState, owner: PlayerId): number {
   return game.units
-    .filter(u => u.owner === owner && u.alive)
+    .filter(unit => unit.owner === owner && unit.alive)
     .reduce((sum, unit) => sum + Math.round(unit.cost * (unit.hp / unit.maxHp)), 0);
 }
 
 function scorePlayer(game: GameState, owner: PlayerId): AdjudicationScore {
-  const enemy = otherPlayer(owner);
   const weights = game.config.balance.adjudicationWeights;
-  const enemyHqDamage = game.headquarters[enemy].maxHp - game.headquarters[enemy].hp;
-  const ownHqHp = game.headquarters[owner].hp;
-  const controlPoints = game.controlPoints.filter(p => p.owner === owner).length;
+  const headquartersDamage = game.players[owner]?.stats.headquartersDamage ?? 0;
+  const ownHqHp = game.headquarters[owner]?.hp ?? 0;
+  const controlPoints = game.controlPoints.filter(point => point.owner === owner).length;
   const army = armyValue(game, owner);
-  const supplies = game.resources[owner].supplies;
+  const supplies = game.resources[owner]?.supplies ?? 0;
   return {
-    enemyHqDamage,
-    ownHqHp,
-    controlPoints,
-    armyValue: army,
-    supplies,
+    headquartersDamage, ownHqHp, controlPoints, armyValue: army, supplies,
     total:
-      enemyHqDamage * weights.enemyHqDamage +
+      headquartersDamage * weights.enemyHqDamage +
       ownHqHp * weights.ownHqHp +
       controlPoints * weights.controlPoint +
       army * weights.armyValue +
@@ -153,55 +176,151 @@ function scorePlayer(game: GameState, owner: PlayerId): AdjudicationScore {
   };
 }
 
-export function buildAdjudicationScores(game: GameState): Record<PlayerId, AdjudicationScore> {
-  return {
-    player_a: scorePlayer(game, 'player_a'),
-    player_b: scorePlayer(game, 'player_b'),
-  };
+export function buildAdjudicationScores(game: GameState): PlayerRecord<AdjudicationScore> {
+  const scores: PlayerRecord<AdjudicationScore> = {};
+  for (const id of joinedPlayerIds(game)) scores[id] = scorePlayer(game, id);
+  return scores;
 }
 
-export function endGame(
-  game: GameState,
-  bus: EventBus,
-  winner: PlayerId | null,
-  reason: GameOverReason,
-  scores?: Record<PlayerId, AdjudicationScore>,
-): void {
+function buildRankings(game: GameState, scores: PlayerRecord<AdjudicationScore>): GameRanking[] {
+  const sorted = joinedPlayerIds(game).sort((a, b) => {
+    const activeDelta = Number(game.players[b]?.status === 'active') - Number(game.players[a]?.status === 'active');
+    if (activeDelta !== 0) return activeDelta;
+    return (scores[b]?.total ?? 0) - (scores[a]?.total ?? 0);
+  });
+  return sorted.map((playerId, index) => ({
+    playerId, rank: index + 1, status: game.players[playerId]!.status, score: scores[playerId]!,
+  }));
+}
+
+export function endGame(game: GameState, bus: EventBus, winner: PlayerId | null, reason: GameOverReason): void {
+  const scores = buildAdjudicationScores(game);
+  const rankings = buildRankings(game, scores);
   game.phase = 'game_over';
   game.turn.phase = 'game_over';
   game.winner = winner;
-  game.result = scores ? { winner, reason, scores } : { winner, reason };
-  appendEvent(game, bus, 'game_over', { winner, reason, ...(scores ? { scores } : {}) });
+  game.result = { winner, reason, scores, rankings };
+  appendEvent(game, bus, 'game_over', { winner, reason, scores, rankings });
 }
 
-function maybeAdjudicate(game: GameState, bus: EventBus, endedOwner: PlayerId): boolean {
-  if (endedOwner !== 'player_b') return false;
-  if (game.turn.turnNumber < game.config.balance.maxTurns) return false;
+function nextActiveInOrder(game: GameState, owner: PlayerId, allowed?: Set<PlayerId>): PlayerId | null {
+  const order = game.turn.turnOrder;
+  const currentIndex = Math.max(0, order.indexOf(owner));
+  for (let offset = 1; offset <= order.length; offset++) {
+    const candidate = order[(currentIndex + offset) % order.length];
+    if (game.players[candidate]?.status !== 'active') continue;
+    if (allowed && !allowed.has(candidate)) continue;
+    return candidate;
+  }
+  return null;
+}
 
+function adjudicateAtTurnLimit(game: GameState, bus: EventBus): boolean {
+  if (game.turn.roundNumber < game.config.balance.maxTurns) return false;
   const scores = buildAdjudicationScores(game);
-  const a = scores.player_a.total;
-  const b = scores.player_b.total;
-  const winner = a === b ? null : a > b ? 'player_a' : 'player_b';
-  endGame(game, bus, winner, winner === null ? 'turn_limit_draw' : 'turn_limit_score', scores);
+  const active = activePlayerIds(game);
+  const top = Math.max(...active.map(id => scores[id]?.total ?? 0));
+  const leaders = active.filter(id => (scores[id]?.total ?? 0) === top);
+  endGame(game, bus, leaders.length === 1 ? leaders[0] : null, leaders.length === 1 ? 'turn_limit_score' : 'turn_limit_draw');
   return true;
 }
 
-export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result {
-  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
-  if (game.phase !== 'waiting_command') return { ok: false, code: 'game_not_started', message: 'game not in play' };
-  if (game.turn.currentOwner !== owner) return { ok: false, code: 'not_your_turn', message: 'not your turn' };
+function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): void {
+  const active = activePlayerIds(game);
+  if (active.length <= 1) {
+    endGame(game, bus, active[0] ?? null, 'last_player_standing');
+    return;
+  }
 
-  captureControlPoints(game, bus, owner);
-  resetActions(game, owner);
-  appendEvent(game, bus, 'reset_actions', { owner, actionsUsed: 0 });
-  if (maybeAdjudicate(game, bus, owner)) return { ok: true };
-
-  const next = otherPlayer(owner);
-  if (next === 'player_a') game.turn.turnNumber += 1;
+  const acted = new Set(game.turn.actedThisRound.filter(id => game.players[id]?.status === 'active'));
+  const remaining = new Set(active.filter(id => !acted.has(id)));
+  let next: PlayerId | null;
+  if (remaining.size > 0) {
+    next = nextActiveInOrder(game, previousOwner, remaining);
+  } else {
+    appendEvent(game, bus, 'round_end', { roundNumber: game.turn.roundNumber });
+    if (adjudicateAtTurnLimit(game, bus)) return;
+    game.turn.roundNumber += 1;
+    game.turn.turnNumber = game.turn.roundNumber;
+    game.turn.actedThisRound = [];
+    next = nextActiveInOrder(game, previousOwner);
+  }
+  if (!next) return;
+  game.turn.currentPlayerId = next;
   game.turn.currentOwner = next;
   game.turn.actionsUsed = 0;
   collectIncome(game, bus, next);
   repairFromControlPoints(game, bus, next);
-  appendEvent(game, bus, 'turn_end', { previousOwner: owner, nextOwner: next, turnNumber: game.turn.turnNumber });
+  appendEvent(game, bus, 'turn_end', {
+    previousOwner, nextOwner: next, previousPlayerId: previousOwner,
+    nextPlayerId: next, roundNumber: game.turn.roundNumber,
+    turnNumber: game.turn.roundNumber,
+  });
+}
+
+export function eliminatePlayer(
+  game: GameState,
+  bus: EventBus,
+  playerId: PlayerId,
+  reason: EliminationReason,
+  eliminatedBy: PlayerId | null,
+): Result {
+  const player = game.players[playerId];
+  if (!player || player.status !== 'active') {
+    return { ok: false, code: 'player_eliminated', message: 'player is not active' };
+  }
+  if (activePlayerIds(game).length <= 1) {
+    return { ok: false, code: 'invalid_move', message: 'cannot eliminate the last active player' };
+  }
+  player.status = 'eliminated';
+  player.eliminatedAt = Date.now();
+  player.eliminatedBy = eliminatedBy;
+  if (eliminatedBy && game.players[eliminatedBy]) game.players[eliminatedBy]!.stats.playersEliminated += 1;
+
+  const removedUnitIds = game.units.filter(unit => unit.owner === playerId).map(unit => unit.id);
+  game.units = game.units.filter(unit => unit.owner !== playerId);
+  const neutralizedPointIds: string[] = [];
+  for (const point of game.controlPoints) {
+    if (point.owner !== playerId) continue;
+    point.owner = null;
+    neutralizedPointIds.push(point.id);
+    appendEvent(game, bus, 'control_point_neutralized', { pointId: point.id, previousOwner: playerId });
+  }
+  const hq = game.headquarters[playerId];
+  if (hq) { hq.alive = false; hq.hp = 0; }
+  appendEvent(game, bus, 'player_eliminated', {
+    playerId, reason, eliminatedBy, removedUnitIds, neutralizedPointIds,
+  });
+
+  const active = activePlayerIds(game);
+  if (active.length === 1) {
+    endGame(game, bus, active[0], 'last_player_standing');
+  } else if (game.turn.currentPlayerId === playerId) {
+    if (!game.turn.actedThisRound.includes(playerId)) game.turn.actedThisRound.push(playerId);
+    advanceTurn(game, bus, playerId);
+  }
   return { ok: true };
+}
+
+export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result {
+  syncLegacyTurnAliases(game);
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
+  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: 'game not in play' };
+  if (game.players[owner]?.status !== 'active') return { ok: false, code: 'player_eliminated', message: 'player eliminated' };
+  if (game.turn.currentPlayerId !== owner) return { ok: false, code: 'not_your_turn', message: 'not your turn' };
+
+  captureControlPoints(game, bus, owner);
+  resetActions(game, owner);
+  appendEvent(game, bus, 'reset_actions', { owner, actionsUsed: 0 });
+  if (!game.turn.actedThisRound.includes(owner)) game.turn.actedThisRound.push(owner);
+  advanceTurn(game, bus, owner);
+  return { ok: true };
+}
+
+export function skipTurn(game: GameState, bus: EventBus): Result {
+  syncLegacyTurnAliases(game);
+  const owner = game.turn.currentPlayerId;
+  if (!owner) return { ok: false, code: 'game_not_started', message: 'game not in play' };
+  appendEvent(game, bus, 'turn_skipped', { playerId: owner, roundNumber: game.turn.roundNumber });
+  return endTurn(game, bus, owner);
 }

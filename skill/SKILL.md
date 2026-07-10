@@ -13,7 +13,7 @@ Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exis
 
 1. Read the current game state before choosing each action: `GET /api/games/:id`.
 2. If `winner` exists or `phase === "game_over"`, stop and report the result.
-3. If the game is not in `waiting_command`, wait briefly and read state again.
+3. If the game is not in `active`, wait briefly and read state again.
 4. If it is not your turn, wait briefly and read state again. Do not ask the human to say "your turn".
 5. If it is your turn, inspect units, resources, action points, control points, headquarters HP, and legal targets.
 6. Explain the chosen legal action briefly, then call the matching REST endpoint.
@@ -21,7 +21,7 @@ Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exis
 8. End the turn only after available useful legal actions are exhausted.
 9. After ending the turn, continue polling only when the user asked you to keep playing; otherwise report the turn result.
 
-Never continue without a token. `POST /api/games` and `POST /api/games/:id/join` are the only endpoints that return player tokens.
+Never continue without a player token for player actions. `POST /api/games` returns `hostToken` and optionally a player token; `POST /api/games/:id/join` returns the joined player token.
 
 ## API
 
@@ -29,8 +29,9 @@ All state and action requests require `X-Player-Token: <token>`.
 
 | Purpose | Method and path | Body |
 |---|---|---|
-| Create as player A | `POST /api/games` | `{ "mapId": "default", "name": "Agent A" }` |
-| Join as player B | `POST /api/games/:id/join` | `{ "name": "Agent B" }` |
+| Create lobby | `POST /api/games` | `{ "mapId": "default", "maxPlayers": 2, "participate": true, "playerName": "Agent A" }` |
+| Join lobby | `POST /api/games/:id/join` | `{ "name": "Agent B" }` |
+| Start game | `POST /api/games/:id/start` | host token header |
 | Read state | `GET /api/games/:id` | none |
 | Deploy | `POST /api/games/:id/deploy` | `{ "unitType": "infantry|scout|heavy|ranger|support", "fromId": "...", "q": 0, "r": 0 }` |
 | Move | `POST /api/games/:id/move` | `{ "unitId": "...", "q": 0, "r": 0 }` |
@@ -52,8 +53,8 @@ If `POST /join` returns `game_already_full`, report that error. Do not fetch sta
 - Infantry and scout capture control points when standing on them at the end of their owner's turn.
 - New current player receives base income plus owned control-point income after each turn switch.
 - Deploy only from your headquarters or owned control points into adjacent empty plain cells.
-- Destroying the enemy headquarters immediately wins.
-- If no headquarters is destroyed after both players complete the configured max turn, the server adjudicates by score. A true draw is only possible when scores are exactly tied.
+- Destroying a headquarters eliminates that player; only the last surviving player immediately wins.
+- If the configured max round is reached, only surviving players can win by adjudication score. A true draw is recorded when surviving leaders are exactly tied.
 - Adjudication score is: enemy HQ damage x 4 + own HQ HP x 2 + owned control points x 120 + surviving army value x 2 + supplies x 1.
 
 ### Action Points

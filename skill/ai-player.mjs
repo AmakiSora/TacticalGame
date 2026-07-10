@@ -9,6 +9,7 @@ const HEX_DIRECTIONS = [
   { q: -1, r: 1 },
   { q: 0, r: 1 },
 ];
+const PLAYER_IDS = ['player_a', 'player_b', 'player_c', 'player_d', 'player_e', 'player_f', 'player_g', 'player_h'];
 
 function parseArgs(argv) {
   const args = {
@@ -46,7 +47,7 @@ function parseArgs(argv) {
     }
   }
 
-  if (args.side !== 'a' && args.side !== 'b') throw new Error('--side must be a or b');
+  playerId(args.side);
   if (!Number.isFinite(args.maxTurns) || args.maxTurns < 1) throw new Error('--max-turns must be a positive number');
   if (!Number.isFinite(args.delayMs) || args.delayMs < 0) throw new Error('--delay-ms must be a non-negative number');
   args.url = args.url.replace(/\/+$/, '');
@@ -57,11 +58,11 @@ function printHelp() {
   console.log(`Usage:
   node skill/ai-player.mjs --side a [--url ${DEFAULT_URL}] [--map default]
   node skill/ai-player.mjs --side b --game <gameId>
-  node skill/ai-player.mjs --side a --game <gameId> --token <playerAToken>
+  node skill/ai-player.mjs --side player_c --game <gameId> --token <playerToken>
 
 Options:
   --url <url>          API base URL, default ${DEFAULT_URL}
-  --side <a|b>         Seat to play
+  --side <a-h|player_a-player_h> Seat to play
   --game <id>          Existing game id
   --token <token>      Existing player token
   --map <mapId>        Map id for new games, default default
@@ -73,11 +74,31 @@ Options:
 }
 
 function playerId(side) {
-  return side === 'a' ? 'player_a' : 'player_b';
+  if (PLAYER_IDS.includes(side)) return side;
+  if (/^[a-h]$/.test(side)) return `player_${side}`;
+  throw new Error('--side must be a-h or player_a-player_h');
 }
 
-function otherPlayer(owner) {
-  return owner === 'player_a' ? 'player_b' : 'player_a';
+function playerLabel(owner) {
+  return owner.replace('player_', '').toUpperCase();
+}
+
+function activePlayerIds(game) {
+  if (game.players) {
+    return PLAYER_IDS.filter(id => game.players[id]?.status === 'active');
+  }
+  return Object.keys(game.headquarters || {}).filter(id => game.headquarters[id]?.alive !== false);
+}
+
+function enemyPlayerIds(game, owner) {
+  return activePlayerIds(game).filter(id => id !== owner);
+}
+
+function nearestEnemyHeadquarters(game, owner, from) {
+  return enemyPlayerIds(game, owner)
+    .map(id => game.headquarters[id])
+    .filter(Boolean)
+    .sort((a, b) => hexDistance(from, a) - hexDistance(from, b))[0] || null;
 }
 
 function sleep(ms) {
@@ -108,33 +129,38 @@ async function request(baseUrl, method, path, body, token) {
 
 async function setupSeat(args) {
   const owner = playerId(args.side);
-  const name = args.name || `AI ${args.side.toUpperCase()}`;
+  const name = args.name || `AI ${playerLabel(owner)}`;
 
   if (args.game && args.token) {
     return { gameId: args.game, token: args.token, owner };
   }
 
-  if (args.game && args.side === 'a' && !args.token) {
-    throw new Error('--game without --token can only join as --side b');
-  }
-
-  if (args.game && args.side === 'b') {
+  if (args.game && !args.token) {
     try {
       const joined = await request(args.url, 'POST', `/api/games/${args.game}/join`, { name }, '');
-      if (!joined.playerBToken) throw new Error('join response did not include playerBToken');
-      console.log(`Joined game ${args.game} as player_b`);
-      return { gameId: args.game, token: joined.playerBToken, owner };
+      if (!joined.player?.token || !joined.player?.id) throw new Error('join response did not include player token');
+      if (joined.player.id !== owner) {
+        throw new Error(`joined as ${joined.player.id}, expected ${owner}; pass --token for an existing seat`);
+      }
+      console.log(`Joined game ${args.game} as ${joined.player.id}`);
+      return { gameId: args.game, token: joined.player.token, owner: joined.player.id };
     } catch (err) {
       const detail = err.data ? ` ${JSON.stringify(err.data)}` : '';
       throw new Error(`Failed to join game ${args.game}.${detail || ` ${err.message}`}`);
     }
   }
 
-  const created = await request(args.url, 'POST', '/api/games', { mapId: args.map, name }, '');
-  if (!created.gameId || !created.playerAToken) throw new Error('create response did not include gameId and playerAToken');
-  console.log(`Created game ${created.gameId} as player_a`);
-  console.log(`Token: ${created.playerAToken}`);
-  return { gameId: created.gameId, token: created.playerAToken, owner };
+  const created = await request(args.url, 'POST', '/api/games', {
+    mapId: args.map,
+    maxPlayers: 2,
+    participate: true,
+    playerName: name,
+  }, '');
+  if (!created.gameId || !created.player?.token || !created.player?.id) {
+    throw new Error('create response did not include gameId and player token');
+  }
+  console.log(`Created game ${created.gameId} as ${created.player.id}`);
+  return { gameId: created.gameId, token: created.player.token, owner: created.player.id };
 }
 
 function posKey(pos) {
@@ -246,11 +272,10 @@ function activatableUnits(game, owner) {
 }
 
 function enemyTargets(game, owner) {
-  const enemy = otherPlayer(owner);
   return [
-    ...game.units.filter(u => u.owner === enemy && u.alive).map(u => ({ kind: 'unit', entity: u })),
-    { kind: 'headquarters', entity: game.headquarters[enemy] },
-  ].filter(t => t.entity.alive);
+    ...game.units.filter(u => u.owner !== owner && u.alive && enemyPlayerIds(game, owner).includes(u.owner)).map(u => ({ kind: 'unit', entity: u })),
+    ...enemyPlayerIds(game, owner).map(id => ({ kind: 'headquarters', entity: game.headquarters[id] })),
+  ].filter(t => t.entity?.alive);
 }
 
 function targetScore(target) {
@@ -296,13 +321,13 @@ async function tryHeal(game, args, seat, unit) {
 }
 
 export function movementGoal(game, owner, unit) {
-  const enemy = otherPlayer(owner);
   const ownedPoints = game.controlPoints.filter(p => p.owner === owner).length;
   const endgamePush = game.turn.turnNumber >= 8 || ownedPoints >= 3;
   const adjudicationMode = game.turn.turnNumber >= 15;
+  const enemyHq = nearestEnemyHeadquarters(game, owner, unit);
 
-  if ((endgamePush || adjudicationMode) && ['scout', 'ranger', 'infantry'].includes(unit.type)) {
-    return game.headquarters[enemy];
+  if (enemyHq && (endgamePush || adjudicationMode) && ['scout', 'ranger', 'infantry'].includes(unit.type)) {
+    return enemyHq;
   }
 
   const repairPoint = nearestOwnedRepairPoint(game, owner, unit);
@@ -318,10 +343,10 @@ export function movementGoal(game, owner, unit) {
   }
 
   const vulnerableEnemy = game.units
-    .filter(u => u.owner === enemy && u.alive)
+    .filter(u => u.owner !== owner && u.alive && enemyPlayerIds(game, owner).includes(u.owner))
     .sort((a, b) => targetScore({ kind: 'unit', entity: b }) - targetScore({ kind: 'unit', entity: a }))[0];
   if (vulnerableEnemy && unit.type === 'ranger') return vulnerableEnemy;
-  return game.headquarters[enemy];
+  return enemyHq || game.controlPoints.find(p => p.owner !== owner) || unit;
 }
 
 async function tryMove(game, args, seat, unit) {
@@ -371,7 +396,7 @@ export function shouldStrategicDeploy(game, owner) {
   if (actionsRemaining(game) <= 0) return false;
   if (!deployChoice(game, owner)) return false;
   const friendly = livingUnits(game, owner).length;
-  const enemy = livingUnits(game, otherPlayer(owner)).length;
+  const enemy = enemyPlayerIds(game, owner).reduce((sum, id) => sum + livingUnits(game, id).length, 0);
   const ownedPoints = game.controlPoints.filter(p => p.owner === owner).length;
   const supplies = game.resources[owner].supplies;
   return supplies >= 90 || friendly <= enemy || ownedPoints >= 2 || game.turn.turnNumber >= 8;
@@ -383,7 +408,7 @@ async function tryDeploy(game, args, seat) {
   const unitType = deployChoice(game, seat.owner, origins);
   if (!unitType) return false;
 
-  const enemyHq = game.headquarters[otherPlayer(seat.owner)];
+  const enemyHq = nearestEnemyHeadquarters(game, seat.owner, origins[0]) || origins[0];
   const candidateMoves = [];
   for (const origin of origins) {
     const cost = effectiveDeployCost(game, unitType, origin);
@@ -495,12 +520,12 @@ async function main() {
       console.log(`Game over. Winner: ${game.winner}`);
       return;
     }
-    if (game.phase !== 'waiting_command') {
+    if (game.phase !== 'active') {
       console.log(`Waiting for game to start: ${game.phase}`);
       await sleep(args.delayMs);
       continue;
     }
-    if (game.turn.currentOwner !== seat.owner) {
+    if ((game.turn.currentPlayerId ?? game.turn.currentOwner) !== seat.owner) {
       await sleep(args.delayMs);
       continue;
     }

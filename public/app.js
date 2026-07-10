@@ -790,6 +790,16 @@ function gameOptionText(game) {
   return `${game.id.slice(0, 8)} - ${game.phase} 回合${game.turnNumber}`;
 }
 
+function normalizeListedGame(game) {
+  const id = game.id || game.gameId;
+  return {
+    ...game,
+    id,
+    gameId: game.gameId || id,
+    turnNumber: game.turnNumber ?? game.roundNumber ?? 1,
+  };
+}
+
 function closeGamePicker() {
   gamePicker.classList.remove('open');
   gamePickerButton.setAttribute('aria-expanded', 'false');
@@ -847,10 +857,10 @@ async function selectGame(id) {
 async function fetchGameList() {
   const res = await fetch('/api/games');
   const { games } = await res.json();
-  gamesList = games;
+  gamesList = (games || []).map(normalizeListedGame).filter(game => game.id);
   const prev = gameSelect.value;
   gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
-  for (const g of games) {
+  for (const g of gamesList) {
     const opt = document.createElement('option');
     opt.value = g.id;
     opt.textContent = `${g.id.slice(0, 8)} - ${g.phase} 回合${g.turnNumber}`;
@@ -858,7 +868,7 @@ async function fetchGameList() {
   }
   if (prev && [...gameSelect.options].some(o => o.value === prev)) gameSelect.value = prev;
   renderGamePickerMenu();
-  return games;
+  return gamesList;
 }
 
 function resetLoadedGame(message = '请选择在线对局') {
@@ -1193,7 +1203,14 @@ document.addEventListener('keydown', e => {
 });
 
 async function initializeApp() {
-  await fetchGameList();
+  const games = await fetchGameList();
+  const params = new URLSearchParams(window.location.search);
+  const requestedGameId = params.get('gameId') || params.get('game');
+  if (requestedGameId) {
+    const game = games.find(item => item.id === requestedGameId);
+    if (game) await selectGame(game.id);
+    else statusEl.textContent = `未找到对局 ${requestedGameId}`;
+  }
   startAutoRefresh();
 }
 

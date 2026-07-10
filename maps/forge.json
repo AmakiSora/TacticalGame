@@ -1,0 +1,71 @@
+{
+  "name": "熔炉之心",
+  "description": "半径5的10轮对角线地图，中央熔炉墙可由重装爆破打开",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 5,
+  "terrainCells": [
+    { "q": 1, "r": 0, "terrain": "blocker" },
+    { "q": -1, "r": 0, "terrain": "blocker" },
+    { "q": 0, "r": -1, "terrain": "blocker" },
+    { "q": 0, "r": 1, "terrain": "blocker" },
+    { "q": 2, "r": -1, "terrain": "blocker" },
+    { "q": -2, "r": 1, "terrain": "blocker" },
+    { "q": -3, "r": -2, "terrain": "water" },
+    { "q": 3, "r": 2, "terrain": "water" }
+  ],
+  "controlPoints": [
+    { "id": "cp_core", "name": "熔炉核心", "kind": "repair", "q": 0, "r": 0 },
+    { "id": "cp_aw", "name": "西南矿道", "kind": "supply", "q": -3, "r": 3 },
+    { "id": "cp_be", "name": "东北矿道", "kind": "supply", "q": 3, "r": -3 },
+    { "id": "cp_an", "name": "北西热井", "kind": "forward_base", "q": -2, "r": 0 },
+    { "id": "cp_bs", "name": "南东热井", "kind": "forward_base", "q": 2, "r": 0 }
+  ],
+  "headquarters": {
+    "player_a": { "q": -4, "r": 4 },
+    "player_b": { "q": 4, "r": -4 }
+  },
+  "startingUnits": [
+    { "owner": "player_a", "type": "infantry", "q": -4, "r": 3 },
+    { "owner": "player_a", "type": "scout", "q": -3, "r": 4 },
+    { "owner": "player_a", "type": "heavy", "q": -4, "r": 5 },
+    { "owner": "player_a", "type": "ranger", "q": -5, "r": 4 },
+    { "owner": "player_b", "type": "infantry", "q": 4, "r": -3 },
+    { "owner": "player_b", "type": "scout", "q": 3, "r": -4 },
+    { "owner": "player_b", "type": "heavy", "q": 4, "r": -5 },
+    { "owner": "player_b", "type": "ranger", "q": 5, "r": -4 }
+  ],
+  "units": {
+    "infantry": { "hp": 90, "attack": 28, "defense": 7, "moveRange": 3, "attackRange": 1, "cost": 42, "canCapture": true },
+    "scout": { "hp": 58, "attack": 15, "defense": 4, "moveRange": 5, "attackRange": 1, "cost": 35, "canCapture": true },
+    "heavy": { "hp": 140, "attack": 36, "defense": 12, "moveRange": 2, "attackRange": 1, "cost": 88, "canCapture": false },
+    "ranger": { "hp": 68, "attack": 40, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 72, "canCapture": false },
+    "support": { "hp": 78, "attack": 10, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 56, "canCapture": false, "healPower": 20 }
+  },
+  "headquartersSpec": {
+    "hp": 100,
+    "defense": 3
+  },
+  "balance": {
+    "startingSupplies": 75,
+    "baseIncome": 10,
+    "controlPointIncome": 10,
+    "damageVarianceRange": 3,
+    "minimumDamage": 1,
+    "healVarianceRange": 5,
+    "actionsPerTurn": 4,
+    "maxTurns": 10,
+    "adjudicationWeights": {
+      "enemyHqDamage": 4,
+      "ownHqHp": 2,
+      "controlPoint": 110,
+      "armyValue": 2,
+      "supplies": 1
+    },
+    "controlPointTypes": {
+      "supply": { "income": 12, "deployDiscount": 0, "repairAmount": 0 },
+      "forward_base": { "income": 8, "deployDiscount": 8, "repairAmount": 0 },
+      "repair": { "income": 8, "deployDiscount": 0, "repairAmount": 10 }
+    }
+  }
+}

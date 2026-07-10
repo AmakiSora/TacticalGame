@@ -71,11 +71,18 @@ function terrainAt(
   return map.terrainCells.find(cell => cell.q === q && cell.r === r)?.terrain ?? 'plain';
 }
 
+// 故意构造非法地图以触发校验错误：放宽 balance 与 controlPoints 字段形状，
+// 便于删除必填项或混入残缺据点。仅用于负面测试。
+type BrokenMap = {
+  balance: Record<string, unknown> & { controlPointTypes?: Record<string, unknown> };
+  controlPoints: Array<{ id: string; name: string; q: number; r: number; kind?: string }>;
+} & Record<string, unknown>;
+
 describe('map config loader', () => {
   it('requires maxTurns and adjudication weights', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
-    const map = validMap();
-    delete (map.balance as any).maxTurns;
+    const map = validMap() as unknown as BrokenMap;
+    delete map.balance.maxTurns;
     writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
 
     expect(() => loadMaps(dir)).toThrow('balance.maxTurns is required');
@@ -84,7 +91,7 @@ describe('map config loader', () => {
 
   it('requires full control point type config when any control point is typed', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
-    const map = validMap() as any;
+    const map = validMap() as unknown as BrokenMap;
     map.controlPoints = [
       { id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' },
       { id: 'cp_b', name: 'Untyped', q: 0, r: 1 },
@@ -97,7 +104,7 @@ describe('map config loader', () => {
 
   it('rejects mixed typed and untyped control points even with type config', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
-    const map = validMap() as any;
+    const map = validMap() as unknown as BrokenMap;
     map.balance.controlPointTypes = controlPointTypes();
     map.controlPoints = [
       { id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' },
@@ -111,10 +118,10 @@ describe('map config loader', () => {
 
   it('requires every supported control point type to be configured', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
-    const map = validMap() as any;
+    const map = validMap() as unknown as BrokenMap;
     map.controlPoints = [{ id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' }];
     map.balance.controlPointTypes = controlPointTypes();
-    delete map.balance.controlPointTypes.repair;
+    delete map.balance.controlPointTypes!.repair;
     writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
 
     expect(() => loadMaps(dir)).toThrow('balance.controlPointTypes.repair must be an object');
@@ -245,6 +252,116 @@ describe('map config loader', () => {
       expect(counterpart, `terrain (${cell.q},${cell.r}) should reflect to (${mirror.q},${mirror.r})`).toBeTruthy();
       expect(counterpart!.terrain).toBe(cell.terrain);
     }
+    resetConfig();
+  });
+
+  it('loads blitz map correctly and verifies its 10-turn quick play balance properties', () => {
+    resetConfig();
+    loadMaps();
+
+    const blitz = getMapConfig('blitz');
+    expect(blitz.name).toBe('三川夺秒');
+    expect(blitz.radius).toBe(6);
+    expect(blitz.balance.maxTurns).toBe(10);
+    expect(blitz.headquarters.player_a).toEqual({ q: -6, r: 0 });
+    expect(blitz.headquarters.player_b).toEqual({ q: 6, r: 0 });
+    expect(blitz.headquartersSpec.hp).toBe(110);
+    expect(blitz.headquartersSpec.defense).toBe(3);
+
+    // Verify perfect origin reflection symmetry of control points
+    for (const point of blitz.controlPoints) {
+      const mirror = originReflection(point);
+      const counterpart = blitz.controlPoints.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
+      expect(counterpart, `${point.id} should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.kind).toBe(point.kind);
+    }
+
+    // Verify perfect origin reflection symmetry of terrain cells
+    for (const cell of blitz.terrainCells) {
+      const mirror = originReflection(cell);
+      const counterpart = blitz.terrainCells.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
+      expect(counterpart, `terrain (${cell.q},${cell.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.terrain).toBe(cell.terrain);
+    }
+
+    // Verify perfect origin reflection symmetry of starting units (A unit at (q,r) -> B unit at (-q,-r) with same type)
+    for (const unit of blitz.startingUnits) {
+      const mirror = originReflection(unit);
+      const counterpart = blitz.startingUnits.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
+      expect(counterpart, `starting unit (${unit.q},${unit.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.type).toBe(unit.type);
+      expect(counterpart!.owner).toBe(unit.owner === 'player_a' ? 'player_b' : 'player_a');
+    }
+
+    resetConfig();
+  });
+
+  it('loads forge map with diagonal HQs and a demolishable forge ring for 10-turn play', () => {
+    resetConfig();
+    loadMaps();
+
+    const forge = getMapConfig('forge');
+    expect(forge.name).toBe('熔炉之心');
+    expect(forge.radius).toBe(5);
+    expect(forge.balance.maxTurns).toBe(10);
+    // 对角线总部：双方斜向对峙，距离为 8
+    expect(forge.headquarters.player_a).toEqual({ q: -4, r: 4 });
+    expect(forge.headquarters.player_b).toEqual({ q: 4, r: -4 });
+    expect(hexDistance(forge.headquarters.player_a, forge.headquarters.player_b)).toBe(8);
+    expect(forge.headquartersSpec.hp).toBe(100);
+    expect(forge.headquartersSpec.defense).toBe(3);
+
+    // 全部据点带类型，且关于原点 180° 对称、类型一致
+    expect(forge.controlPoints.length).toBe(5);
+    for (const point of forge.controlPoints) {
+      expect(point.kind).toBeTruthy();
+      const mirror = originReflection(point);
+      const counterpart = forge.controlPoints.find(c => c.q === mirror.q && c.r === mirror.r);
+      expect(counterpart, `${point.id} should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.kind).toBe(point.kind);
+    }
+    // 中央维修核心
+    const core = forge.controlPoints.find(c => c.id === 'cp_core')!;
+    expect(core.kind).toBe('repair');
+    expect({ q: core.q, r: core.r }).toEqual({ q: 0, r: 0 });
+
+    // 地形关于原点对称
+    for (const cell of forge.terrainCells) {
+      const mirror = originReflection(cell);
+      const counterpart = forge.terrainCells.find(c => c.q === mirror.q && c.r === mirror.r);
+      expect(counterpart, `terrain (${cell.q},${cell.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.terrain).toBe(cell.terrain);
+    }
+
+    // 熔炉环：核心的六个邻居中四块为阻挡，仅留对角线两道窄缝 (1,-1) 与 (-1,1)
+    expect(terrainAt(forge, 1, 0)).toBe('blocker');
+    expect(terrainAt(forge, 0, -1)).toBe('blocker');
+    expect(terrainAt(forge, -1, 0)).toBe('blocker');
+    expect(terrainAt(forge, 0, 1)).toBe('blocker');
+    expect(terrainAt(forge, 1, -1)).toBe('plain');
+    expect(terrainAt(forge, -1, 1)).toBe('plain');
+    // 两根石柱扼守缝隙
+    expect(terrainAt(forge, 2, -1)).toBe('blocker');
+    expect(terrainAt(forge, -2, 1)).toBe('blocker');
+    // 两汪熔岩封角
+    expect(terrainAt(forge, -3, -2)).toBe('water');
+    expect(terrainAt(forge, 3, 2)).toBe('water');
+
+    // 起始单位关于原点对称、类型一致、归属互换
+    expect(forge.startingUnits.length).toBe(8);
+    for (const unit of forge.startingUnits) {
+      const mirror = originReflection(unit);
+      const counterpart = forge.startingUnits.find(c => c.q === mirror.q && c.r === mirror.r);
+      expect(counterpart, `starting unit (${unit.q},${unit.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.type).toBe(unit.type);
+      expect(counterpart!.owner).toBe(unit.owner === 'player_a' ? 'player_b' : 'player_a');
+    }
+    // 每方各有一台重装，用于爆破熔炉墙
+    const aHeavy = forge.startingUnits.filter(u => u.owner === 'player_a' && u.type === 'heavy');
+    const bHeavy = forge.startingUnits.filter(u => u.owner === 'player_b' && u.type === 'heavy');
+    expect(aHeavy.length).toBe(1);
+    expect(bHeavy.length).toBe(1);
+
     resetConfig();
   });
 });

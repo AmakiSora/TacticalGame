@@ -202,9 +202,10 @@ describe('hex V2 rules', () => {
     expect(result.ok).toBe(true);
     expect(game.phase).toBe('game_over');
     expect(game.winner).toBe('player_a');
-    expect(game.result).toMatchObject({ winner: 'player_a', reason: 'headquarters_destroyed' });
+    expect(game.result).toMatchObject({ winner: 'player_a', reason: 'last_player_standing' });
     expect(game.events.some(e => e.type === 'headquarters_destroyed')).toBe(true);
-    expect(game.events.find(e => e.type === 'game_over')!.payload.reason).toBe('headquarters_destroyed');
+    expect(game.events.find(e => e.type === 'player_eliminated')!.payload.reason).toBe('headquarters_destroyed');
+    expect(game.events.find(e => e.type === 'game_over')!.payload.reason).toBe('last_player_standing');
   });
 
   it('does not adjudicate after player_a ends turn 15', () => {
@@ -215,7 +216,7 @@ describe('hex V2 rules', () => {
     const result = endTurn(game, bus, 'player_a');
 
     expect(result.ok).toBe(true);
-    expect(game.phase).toBe('waiting_command');
+    expect(game.phase).toBe('active');
     expect(game.turn.turnNumber).toBe(15);
     expect(game.turn.currentOwner).toBe('player_b');
     expect(game.result).toBeNull();
@@ -224,7 +225,10 @@ describe('hex V2 rules', () => {
   it('adjudicates by score after player_b ends turn 15 and captures first', () => {
     const { game, bus } = setup();
     game.turn.turnNumber = 15;
+    game.turn.roundNumber = 15;
     game.turn.currentOwner = 'player_b';
+    game.turn.currentPlayerId = 'player_b';
+    game.turn.actedThisRound = ['player_a'];
     game.resources.player_a.supplies = 0;
     game.resources.player_b.supplies = 0;
     game.headquarters.player_a.hp = 200;
@@ -261,7 +265,10 @@ describe('hex V2 rules', () => {
   it('records a draw when turn-limit adjudication scores are tied', () => {
     const { game, bus } = setup();
     game.turn.turnNumber = 15;
+    game.turn.roundNumber = 15;
     game.turn.currentOwner = 'player_b';
+    game.turn.currentPlayerId = 'player_b';
+    game.turn.actedThisRound = ['player_a'];
     game.resources.player_a.supplies = 0;
     game.resources.player_b.supplies = 0;
     game.units = [];

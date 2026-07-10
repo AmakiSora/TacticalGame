@@ -1,16 +1,24 @@
 // src/types.ts
 import type { MapConfig } from './config/loader.js';
 
-export type PlayerId = 'player_a' | 'player_b';
+export const PLAYER_IDS = [
+  'player_a', 'player_b', 'player_c', 'player_d',
+  'player_e', 'player_f', 'player_g', 'player_h',
+] as const;
+
+export type PlayerId = typeof PLAYER_IDS[number];
+export type PlayerRecord<T> = Partial<Record<PlayerId, T>>;
+
+export function isPlayerId(value: unknown): value is PlayerId {
+  return typeof value === 'string' && (PLAYER_IDS as readonly string[]).includes(value);
+}
 
 export type UnitType = 'infantry' | 'scout' | 'heavy' | 'ranger' | 'support';
-
-export type GamePhase = 'waiting_for_player' | 'waiting_command' | 'game_over';
-
-export type GameOverReason = 'headquarters_destroyed' | 'turn_limit_score' | 'turn_limit_draw';
-
+export type GamePhase = 'lobby' | 'active' | 'game_over';
+export type PlayerStatus = 'lobby' | 'active' | 'eliminated';
+export type GameOverReason = 'last_player_standing' | 'turn_limit_score' | 'turn_limit_draw';
+export type EliminationReason = 'headquarters_destroyed' | 'host_eliminated';
 export type TerrainType = 'plain' | 'water' | 'blocker';
-
 export type ControlPointKind = 'supply' | 'forward_base' | 'repair';
 
 export interface Position {
@@ -20,6 +28,24 @@ export interface Position {
 
 export interface Resources {
   supplies: number;
+}
+
+export interface PlayerStats {
+  headquartersDamage: number;
+  unitsDestroyed: number;
+  playersEliminated: number;
+}
+
+export interface PlayerState {
+  id: PlayerId;
+  name: string;
+  joinedAt: number;
+  status: PlayerStatus;
+  spawnSlotId: string | null;
+  turnOrder: number | null;
+  eliminatedAt: number | null;
+  eliminatedBy: PlayerId | null;
+  stats: PlayerStats;
 }
 
 export interface Unit {
@@ -75,13 +101,20 @@ export interface HexMapState {
 }
 
 export interface TurnState {
-  turnNumber: number;
-  currentOwner: PlayerId;
+  roundNumber: number;
+  currentPlayerId: PlayerId | null;
+  turnOrder: PlayerId[];
+  actedThisRound: PlayerId[];
   phase: GamePhase;
   actionsUsed: number;
+  // 旧页面和旧回放仍读取这两个字段，运行时始终与新字段同步。
+  turnNumber: number;
+  currentOwner: PlayerId | null;
 }
 
 export type EventType =
+  | 'player_joined'
+  | 'player_left'
   | 'game_start'
   | 'move'
   | 'attack'
@@ -90,11 +123,15 @@ export type EventType =
   | 'deploy'
   | 'demolish'
   | 'control_point_captured'
+  | 'control_point_neutralized'
   | 'control_point_repair'
   | 'income'
   | 'reset_actions'
+  | 'turn_skipped'
   | 'turn_end'
+  | 'round_end'
   | 'headquarters_destroyed'
+  | 'player_eliminated'
   | 'game_over'
   | 'name_rename';
 
@@ -106,7 +143,7 @@ export interface GameEvent {
 }
 
 export interface AdjudicationScore {
-  enemyHqDamage: number;
+  headquartersDamage: number;
   ownHqHp: number;
   controlPoints: number;
   armyValue: number;
@@ -114,10 +151,18 @@ export interface AdjudicationScore {
   total: number;
 }
 
+export interface GameRanking {
+  playerId: PlayerId;
+  rank: number;
+  status: PlayerStatus;
+  score: AdjudicationScore;
+}
+
 export interface GameResult {
   winner: PlayerId | null;
   reason: GameOverReason;
-  scores?: Record<PlayerId, AdjudicationScore>;
+  scores: PlayerRecord<AdjudicationScore>;
+  rankings: GameRanking[];
 }
 
 export interface GameState {
@@ -125,14 +170,17 @@ export interface GameState {
   mapId: string;
   config: MapConfig;
   phase: GamePhase;
+  maxPlayers: number;
+  hostToken: string;
+  players: PlayerRecord<PlayerState>;
   map: HexMapState;
   cells: MapCell[];
   controlPoints: ControlPoint[];
-  headquarters: Record<PlayerId, Headquarters>;
+  headquarters: PlayerRecord<Headquarters>;
   units: Unit[];
-  resources: Record<PlayerId, Resources>;
-  tokens: Record<PlayerId, string>;
-  playerNames: Record<PlayerId, string>;
+  resources: PlayerRecord<Resources>;
+  tokens: PlayerRecord<string>;
+  playerNames: PlayerRecord<string>;
   turn: TurnState;
   events: GameEvent[];
   winner: PlayerId | null;
@@ -158,9 +206,14 @@ export type ApiErrorCode =
   | 'invalid_heal'
   | 'invalid_deploy'
   | 'invalid_token'
+  | 'invalid_host_token'
   | 'game_not_found'
   | 'game_already_full'
+  | 'game_already_started'
   | 'game_not_started'
   | 'game_over'
+  | 'player_eliminated'
+  | 'lobby_not_ready'
+  | 'unsupported_player_count'
   | 'action_limit_reached'
   | 'invalid_demolish';

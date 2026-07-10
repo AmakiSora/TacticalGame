@@ -1,0 +1,69 @@
+{
+  "name": "三川夺秒",
+  "description": "半径6的10轮快节奏双人地图，三条河道压缩交战距离",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 6,
+  "terrainCells": [
+    { "q": -1, "r": -2, "terrain": "water" },
+    { "q": 1, "r": 2, "terrain": "water" },
+    { "q": -1, "r": 2, "terrain": "water" },
+    { "q": 1, "r": -2, "terrain": "water" },
+    { "q": -3, "r": 1, "terrain": "blocker" },
+    { "q": 3, "r": -1, "terrain": "blocker" },
+    { "q": -3, "r": 2, "terrain": "blocker" },
+    { "q": 3, "r": -2, "terrain": "blocker" }
+  ],
+  "controlPoints": [
+    { "id": "cp_w", "name": "西侧前哨", "kind": "supply", "q": -3, "r": 0 },
+    { "id": "cp_e", "name": "东侧前哨", "kind": "supply", "q": 3, "r": 0 },
+    { "id": "cp_nw", "name": "北西中继", "kind": "forward_base", "q": -1, "r": -3 },
+    { "id": "cp_se", "name": "南东中继", "kind": "forward_base", "q": 1, "r": 3 },
+    { "id": "cp_c", "name": "中央补给线", "kind": "repair", "q": 0, "r": 0 }
+  ],
+  "headquarters": {
+    "player_a": { "q": -6, "r": 0 },
+    "player_b": { "q": 6, "r": 0 }
+  },
+  "startingUnits": [
+    { "owner": "player_a", "type": "infantry", "q": -5, "r": 0 },
+    { "owner": "player_a", "type": "scout", "q": -5, "r": 1 },
+    { "owner": "player_a", "type": "ranger", "q": -5, "r": -1 },
+    { "owner": "player_b", "type": "infantry", "q": 5, "r": 0 },
+    { "owner": "player_b", "type": "scout", "q": 5, "r": -1 },
+    { "owner": "player_b", "type": "ranger", "q": 5, "r": 1 }
+  ],
+  "units": {
+    "infantry": { "hp": 92, "attack": 28, "defense": 7, "moveRange": 3, "attackRange": 1, "cost": 42, "canCapture": true },
+    "scout": { "hp": 60, "attack": 15, "defense": 4, "moveRange": 5, "attackRange": 1, "cost": 35, "canCapture": true },
+    "heavy": { "hp": 135, "attack": 36, "defense": 12, "moveRange": 2, "attackRange": 1, "cost": 86, "canCapture": false },
+    "ranger": { "hp": 68, "attack": 40, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 72, "canCapture": false },
+    "support": { "hp": 78, "attack": 10, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 56, "canCapture": false, "healPower": 20 }
+  },
+  "headquartersSpec": {
+    "hp": 110,
+    "defense": 3
+  },
+  "balance": {
+    "startingSupplies": 70,
+    "baseIncome": 12,
+    "controlPointIncome": 10,
+    "damageVarianceRange": 3,
+    "minimumDamage": 1,
+    "healVarianceRange": 5,
+    "actionsPerTurn": 4,
+    "maxTurns": 10,
+    "adjudicationWeights": {
+      "enemyHqDamage": 4,
+      "ownHqHp": 2,
+      "controlPoint": 100,
+      "armyValue": 2,
+      "supplies": 1
+    },
+    "controlPointTypes": {
+      "supply": { "income": 12, "deployDiscount": 0, "repairAmount": 0 },
+      "forward_base": { "income": 8, "deployDiscount": 8, "repairAmount": 0 },
+      "repair": { "income": 8, "deployDiscount": 0, "repairAmount": 10 }
+    }
+  }
+}

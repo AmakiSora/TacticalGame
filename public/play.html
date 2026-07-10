@@ -12,7 +12,7 @@
       <h1>六边形战棋 <span class="sub">玩家控制台</span> <span class="version-badge"></span></h1>
       <div class="page-subtitle">回合指令与战场状态</div>
     </div>
-    <div id="conn-status" class="badge">未连接</div>
+    <div id="conn-status" class="badge idle">未加入</div>
 </header>
 
   <section id="join-panel" class="panel">
@@ -29,6 +29,24 @@
         <label>你的名称</label>
         <input id="create-name" placeholder="留空使用默认名称" maxlength="20" />
       </div>
+      <div class="row">
+        <div class="field">
+          <label>最大玩家数</label>
+          <select id="max-players">
+            <option value="2">2 人</option>
+            <option value="3">3 人</option>
+            <option value="4">4 人</option>
+            <option value="5">5 人</option>
+            <option value="6">6 人</option>
+            <option value="7">7 人</option>
+            <option value="8">8 人</option>
+          </select>
+        </div>
+        <label class="field checkbox-field">
+          <span>房主参战</span>
+          <input id="host-participate" type="checkbox" checked />
+        </label>
+      </div>
       <div class="field map-field">
         <label>选择地图</label>
         <select id="map-select" hidden><option value="default">default</option></select>
@@ -43,11 +61,18 @@
         <button class="btn-copy" data-copy="created-game-id">复制</button>
       </div>
       <div class="info-row">
-        <span class="info-label">Token</span>
+        <span class="info-label">Host</span>
+        <code id="created-host-token" class="info-value"></code>
+        <button class="btn-copy" data-copy="created-host-token">复制</button>
+      </div>
+      <div class="info-row" id="created-player-token-row">
+        <span class="info-label">Player</span>
         <code id="created-token" class="info-value"></code>
         <button class="btn-copy" data-copy="created-token">复制</button>
       </div>
-      <p class="lobby-hint">请保存 Token，将 Game ID 发给对手。</p>
+      <p class="lobby-hint">请保存 Host Token，将 Game ID 发给其他玩家。</p>
+      <div id="lobby-summary" class="lobby-summary"></div>
+      <button id="btn-start-game" class="btn success" style="width:100%;margin-top:10px">开始游戏</button>
       <button id="btn-connect-create" class="btn success" style="width:100%;margin-top:10px">连接进入游戏</button>
     </div>
   </div>
@@ -64,6 +89,13 @@
     <button id="btn-join" class="btn primary" style="margin-top:14px;width:100%">加入游戏</button>
     <div id="join-result" class="lobby-result hidden">
       <p class="lobby-status" id="join-status-text"></p>
+      <div class="info-row" id="join-player-token-row">
+        <span class="info-label">Player</span>
+        <code id="join-player-token" class="info-value"></code>
+        <button class="btn-copy" data-copy="join-player-token">复制</button>
+      </div>
+      <div id="join-lobby-summary" class="lobby-summary"></div>
+      <button id="btn-connect-join" class="btn success" style="width:100%;margin-top:10px">进入游戏</button>
     </div>
   </div>
 </section>
@@ -125,6 +157,6 @@
 <toast id="toast"></toast>
 
 <script src="/version.js"></script>
-<script src="/play.js"></script>
+<script src="/play.js?v=3.0.0"></script>
 </body>
 </html>

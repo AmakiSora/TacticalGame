@@ -5,7 +5,7 @@ import type { Result } from './result.js';
 import { hexDistance } from './hex.js';
 import { consumeAction, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
-import { endGame } from './engine.js';
+import { eliminatePlayer } from './engine.js';
 
 type Target =
   | { kind: 'unit'; entity: Unit }
@@ -62,7 +62,11 @@ export function attackTarget(
   if (!spent.ok) return spent;
 
   const damage = computeDamage(game, attacker.attack, target.entity.defense);
+  const actualDamage = Math.min(target.entity.hp, damage);
   target.entity.hp = Math.max(0, target.entity.hp - damage);
+  if (target.kind === 'headquarters' && game.players[owner]) {
+    game.players[owner]!.stats.headquartersDamage += actualDamage;
+  }
   attacker.hasActed = true;
   appendEvent(game, bus, 'attack', {
     attackerId,
@@ -80,8 +84,9 @@ export function attackTarget(
       appendEvent(game, bus, 'headquarters_destroyed', {
         headquartersId: target.entity.id, owner: target.entity.owner, q: target.entity.q, r: target.entity.r,
       });
-      endGame(game, bus, owner, 'headquarters_destroyed');
+      eliminatePlayer(game, bus, target.entity.owner, 'headquarters_destroyed', owner);
     } else {
+      if (game.players[owner]) game.players[owner]!.stats.unitsDestroyed += 1;
       appendEvent(game, bus, 'unit_death', {
         unitId: target.entity.id,
         owner: target.entity.owner,

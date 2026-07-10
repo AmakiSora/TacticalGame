@@ -1,0 +1,89 @@
+{
+  "name": "八方环线",
+  "description": "支持2至8人的大型环形战场。外围出生位围绕中央指挥区分布，各人数布局均采用尽量分散的出生组合。",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 12,
+  "terrainCells": [
+    { "q": 2, "r": -1, "terrain": "blocker" },
+    { "q": 1, "r": 1, "terrain": "blocker" },
+    { "q": -1, "r": 2, "terrain": "blocker" },
+    { "q": -2, "r": 1, "terrain": "blocker" },
+    { "q": -1, "r": -1, "terrain": "blocker" },
+    { "q": 1, "r": -2, "terrain": "blocker" }
+  ],
+  "controlPoints": [
+    { "id": "cp_center", "name": "中央指挥区", "kind": "repair", "q": 0, "r": 0 },
+    { "id": "cp_e", "name": "东部补给站", "kind": "supply", "q": 5, "r": 0 },
+    { "id": "cp_ne", "name": "东北前线基地", "kind": "forward_base", "q": 5, "r": -5 },
+    { "id": "cp_nw", "name": "西北补给站", "kind": "supply", "q": 0, "r": -5 },
+    { "id": "cp_w", "name": "西部前线基地", "kind": "forward_base", "q": -5, "r": 0 },
+    { "id": "cp_sw", "name": "西南补给站", "kind": "supply", "q": -5, "r": 5 },
+    { "id": "cp_se", "name": "东南前线基地", "kind": "forward_base", "q": 0, "r": 5 }
+  ],
+  "spawnSlots": [
+    { "id": "slot_1", "headquarters": { "q": 12, "r": 0 }, "startingUnits": [
+      { "type": "infantry", "q": 11, "r": 0 }, { "type": "scout", "q": 11, "r": 1 }
+    ] },
+    { "id": "slot_2", "headquarters": { "q": 12, "r": -9 }, "startingUnits": [
+      { "type": "infantry", "q": 11, "r": -8 }, { "type": "scout", "q": 11, "r": -9 }
+    ] },
+    { "id": "slot_3", "headquarters": { "q": 6, "r": -12 }, "startingUnits": [
+      { "type": "infantry", "q": 5, "r": -11 }, { "type": "scout", "q": 6, "r": -11 }
+    ] },
+    { "id": "slot_4", "headquarters": { "q": -3, "r": -9 }, "startingUnits": [
+      { "type": "infantry", "q": -2, "r": -9 }, { "type": "scout", "q": -3, "r": -8 }
+    ] },
+    { "id": "slot_5", "headquarters": { "q": -12, "r": 0 }, "startingUnits": [
+      { "type": "infantry", "q": -11, "r": 0 }, { "type": "scout", "q": -11, "r": -1 }
+    ] },
+    { "id": "slot_6", "headquarters": { "q": -12, "r": 9 }, "startingUnits": [
+      { "type": "infantry", "q": -11, "r": 8 }, { "type": "scout", "q": -11, "r": 9 }
+    ] },
+    { "id": "slot_7", "headquarters": { "q": -6, "r": 12 }, "startingUnits": [
+      { "type": "infantry", "q": -5, "r": 11 }, { "type": "scout", "q": -6, "r": 11 }
+    ] },
+    { "id": "slot_8", "headquarters": { "q": 3, "r": 9 }, "startingUnits": [
+      { "type": "infantry", "q": 2, "r": 9 }, { "type": "scout", "q": 3, "r": 8 }
+    ] }
+  ],
+  "layouts": {
+    "2": ["slot_1", "slot_5"],
+    "3": ["slot_1", "slot_4", "slot_6"],
+    "4": ["slot_1", "slot_3", "slot_5", "slot_7"],
+    "5": ["slot_1", "slot_3", "slot_4", "slot_6", "slot_8"],
+    "6": ["slot_1", "slot_2", "slot_3", "slot_5", "slot_6", "slot_7"],
+    "7": ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5", "slot_6", "slot_8"],
+    "8": ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5", "slot_6", "slot_7", "slot_8"]
+  },
+  "units": {
+    "infantry": { "hp": 100, "attack": 30, "defense": 8, "moveRange": 3, "attackRange": 1, "cost": 45, "canCapture": true },
+    "scout": { "hp": 65, "attack": 16, "defense": 4, "moveRange": 5, "attackRange": 1, "cost": 38, "canCapture": true },
+    "heavy": { "hp": 150, "attack": 38, "defense": 13, "moveRange": 2, "attackRange": 1, "cost": 92, "canCapture": false },
+    "ranger": { "hp": 72, "attack": 44, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 78, "canCapture": false },
+    "support": { "hp": 82, "attack": 10, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 60, "canCapture": false, "healPower": 22 }
+  },
+  "headquartersSpec": { "hp": 180, "defense": 6 },
+  "balance": {
+    "startingSupplies": 100,
+    "baseIncome": 10,
+    "controlPointIncome": 10,
+    "damageVarianceRange": 3,
+    "minimumDamage": 1,
+    "healVarianceRange": 6,
+    "actionsPerTurn": 5,
+    "maxTurns": 18,
+    "adjudicationWeights": {
+      "enemyHqDamage": 4,
+      "ownHqHp": 2,
+      "controlPoint": 100,
+      "armyValue": 2,
+      "supplies": 1
+    },
+    "controlPointTypes": {
+      "supply": { "income": 14, "deployDiscount": 0, "repairAmount": 0 },
+      "forward_base": { "income": 8, "deployDiscount": 8, "repairAmount": 0 },
+      "repair": { "income": 8, "deployDiscount": 0, "repairAmount": 10 }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { PlayerId } from '../types.js';
+import { isPlayerId } from '../types.js';
 import { getAutoControlController } from '../control/singleton.js';
 import { authorizeControlRequest } from './controlAuth.js';
 
@@ -48,8 +49,8 @@ export async function controlRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: { side?: PlayerId; prompt?: string } }>('/api/control/manual', async (req, reply) => {
     const { side, prompt } = req.body ?? {};
-    if (side !== 'player_a' && side !== 'player_b') {
-      return reply.code(400).send({ error: 'side must be player_a or player_b', code: 'invalid_control_request' });
+    if (!isPlayerId(side)) {
+      return reply.code(400).send({ error: 'side must be player_a through player_h', code: 'invalid_control_request' });
     }
     if (!prompt || typeof prompt !== 'string') {
       return reply.code(400).send({ error: 'prompt is required', code: 'invalid_control_request' });

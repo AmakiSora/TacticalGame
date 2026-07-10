@@ -23,15 +23,36 @@ async function createAndJoin(app: Awaited<ReturnType<typeof buildServer>>) {
   const createRes = await app.inject({
     method: 'POST',
     url: '/api/games',
-    payload: { name: 'A' },
+    payload: { playerName: 'A' },
   });
-  const created = createRes.json() as { gameId: string; playerAToken: string };
+  const created = createRes.json() as {
+    gameId: string;
+    hostToken: string;
+    player: { id: 'player_a'; token: string };
+  };
   const joinRes = await app.inject({
     method: 'POST',
     url: `/api/games/${created.gameId}/join`,
     payload: { name: 'B' },
   });
-  return { ...created, playerBToken: (joinRes.json() as { playerBToken: string }).playerBToken };
+  const joined = joinRes.json() as { player: { id: 'player_b'; token: string } };
+  await app.inject({
+    method: 'POST',
+    url: `/api/games/${created.gameId}/start`,
+    headers: { 'x-host-token': created.hostToken },
+  });
+  const game = globalStore.get(created.gameId);
+  if (game) {
+    game.turn.currentPlayerId = 'player_a';
+    game.turn.currentOwner = 'player_a';
+    game.turn.actionsUsed = 0;
+  }
+  return {
+    gameId: created.gameId,
+    hostToken: created.hostToken,
+    playerAToken: created.player.token,
+    playerBToken: joined.player.token,
+  };
 }
 
 afterEach(() => {
@@ -64,7 +85,7 @@ describe('game persistence API', () => {
     const restoredApp = await buildServer();
     try {
       const list = await restoredApp.inject({ method: 'GET', url: '/api/games' });
-      expect(list.json().games.some((g: any) => g.id === gameId)).toBe(true);
+      expect(list.json().games.some((g: any) => g.gameId === gameId)).toBe(true);
 
       const detail = await restoredApp.inject({
         method: 'GET',

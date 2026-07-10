@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { startTestServer } from '../helpers.js';
+import { createGameAndJoin, startTestServer } from '../helpers.js';
 import { globalStore } from '../../src/state/store.js';
 
 function runAi(args: string[]): Promise<{ code: number | null; output: string }> {
@@ -45,7 +45,7 @@ describe('AI player setup', () => {
     }
   });
 
-  it('requires a token when connecting player A to an existing game', async () => {
+  it('rejects joining when the server assigns a different player id than requested', async () => {
     const app = await startTestServer();
     await app.listen({ port: 0, host: '127.0.0.1' });
     try {
@@ -62,7 +62,7 @@ describe('AI player setup', () => {
       ]);
 
       expect(result.code).toBe(1);
-      expect(result.output).toContain('--game without --token can only join as --side b');
+      expect(result.output).toContain('joined as player_b, expected player_a');
     } finally {
       await app.close();
     }
@@ -113,8 +113,7 @@ describe('AI player strategy', () => {
   it('deploys strategically before ordinary movement when supplies and actions remain', async () => {
     const app = await startTestServer();
     try {
-      const { gameId } = (await app.inject({ method: 'POST', url: '/api/games' })).json() as { gameId: string };
-      await app.inject({ method: 'POST', url: `/api/games/${gameId}/join` });
+      const { gameId } = await createGameAndJoin(app);
       const game = globalStore.get(gameId)! as any;
       game.resources.player_a.supplies = 120;
 
@@ -128,8 +127,7 @@ describe('AI player strategy', () => {
 
   it('targets the enemy headquarters in endgame push mode after turn 8 with three control points', async () => {
     const app = await startTestServer();
-    const { gameId } = (await app.inject({ method: 'POST', url: '/api/games' })).json() as { gameId: string };
-    await app.inject({ method: 'POST', url: `/api/games/${gameId}/join` });
+    const { gameId } = await createGameAndJoin(app);
     const game = globalStore.get(gameId)! as any;
     game.turn.turnNumber = 8;
     game.controlPoints[0].owner = 'player_a';
@@ -150,10 +148,16 @@ describe('AI player strategy', () => {
       const createRes = await app.inject({
         method: 'POST',
         url: '/api/games',
-        payload: { mapId: 'dual-lanes' },
+        payload: { mapId: 'dual-lanes', playerName: 'A' },
       });
-      const { gameId } = createRes.json() as { gameId: string };
-      await app.inject({ method: 'POST', url: `/api/games/${gameId}/join` });
+      const created = createRes.json() as { gameId: string; hostToken: string };
+      const { gameId } = created;
+      await app.inject({ method: 'POST', url: `/api/games/${gameId}/join`, payload: { name: 'B' } });
+      await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/start`,
+        headers: { 'X-Host-Token': created.hostToken },
+      });
       const game = globalStore.get(gameId)! as any;
       const repair = game.controlPoints.find((point: any) => point.id === 'cp_nc');
       repair.owner = 'player_a';

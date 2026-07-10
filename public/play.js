@@ -1,7 +1,11 @@
 const HEX_SIZE = 28;
 const PAD = 42;
 const SQRT3 = Math.sqrt(3);
-const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
+const PLAYER_IDS = ['player_a', 'player_b', 'player_c', 'player_d', 'player_e', 'player_f', 'player_g', 'player_h'];
+const OWNER_COLOR = {
+  player_a: '#66ccff', player_b: '#ff9966', player_c: '#a5d76e', player_d: '#d78cff',
+  player_e: '#ffd166', player_f: '#5eead4', player_g: '#f472b6', player_h: '#c4b5fd',
+};
 const TERRAIN = { plain: '#111923', water: '#183a55', blocker: '#393f46' };
 const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
 const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP', headquarters: 'HQ' };
@@ -27,9 +31,12 @@ function entityTokenMarkup(type, ownerClass, title) {
 const $ = id => document.getElementById(id);
 const els = {
   joinPanel: $('join-panel'), gameId: $('game-id'), createName: $('create-name'), joinName: $('join-name'),
-  mapSelect: $('map-select'), mapPicker: $('map-picker'), btnCreate: $('btn-create'), btnJoin: $('btn-join'), btnConnectCreate: $('btn-connect-create'),
+  mapSelect: $('map-select'), mapPicker: $('map-picker'), maxPlayers: $('max-players'), hostParticipate: $('host-participate'),
+  btnCreate: $('btn-create'), btnJoin: $('btn-join'), btnConnectCreate: $('btn-connect-create'), btnConnectJoin: $('btn-connect-join'), btnStartGame: $('btn-start-game'),
   connStatus: $('conn-status'), createResult: $('create-result'), createdGameId: $('created-game-id'),
-  createdToken: $('created-token'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
+  createdHostToken: $('created-host-token'), createdToken: $('created-token'), createdPlayerTokenRow: $('created-player-token-row'),
+  lobbySummary: $('lobby-summary'), joinLobbySummary: $('join-lobby-summary'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
+  joinPlayerToken: $('join-player-token'), joinPlayerTokenRow: $('join-player-token-row'),
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
   btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'),
@@ -42,8 +49,10 @@ let playerNames = defaultPlayerNames();
 let state = null;
 let gameId = null;
 let myToken = null;
+let hostToken = null;
 let myPlayer = null;
 let sse = null;
+let lobbyPollTimer = null;
 let hoverCell = null;
 let selectedUnitId = null;
 let selectedOriginId = null;
@@ -51,10 +60,22 @@ let selectedDeployType = null;
 let interactionMode = 'idle';
 let rangeHighlights = [];
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
+let availableMaps = [];
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function defaultPlayerNames() { return { player_a: '玩家 A', player_b: '玩家 B' }; }
-function playerName(owner) { return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B'); }
+function defaultPlayerNames() { return Object.fromEntries(PLAYER_IDS.map((id, index) => [id, `玩家 ${String.fromCharCode(65 + index)}`])); }
+function playerName(owner) { return playerNames[owner] || defaultPlayerNames()[owner] || owner || '未知玩家'; }
+function playerClass(owner) { return owner ? owner.replace('_', '-') : 'neutral'; }
+function joinedPlayerIds() {
+  const fromPlayers = state?.players ? PLAYER_IDS.filter(id => state.players[id]) : [];
+  if (fromPlayers.length) return fromPlayers;
+  const owners = new Set([
+    ...[...(state?.headquarters?.values?.() || [])].map(h => h.owner),
+    ...[...(state?.units?.values?.() || [])].map(u => u.owner),
+    ...Object.keys(state?.resources || {}),
+  ].filter(Boolean));
+  return PLAYER_IDS.filter(id => owners.has(id));
+}
 function maxTurnsLabel() {
   const maxTurns = gameConfig?.balance?.maxTurns;
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${maxTurns}回合` : '回合上限';
@@ -136,12 +157,16 @@ function pathHex(q, r, inset = 0) {
 
 const API = {
   async post(path, body) {
-    const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Player-Token': myToken }, body: JSON.stringify(body) });
+    const headers = { 'Content-Type': 'application/json' };
+    if (myToken) headers['X-Player-Token'] = myToken;
+    const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) });
     const data = await res.json();
     return { ok: res.ok, status: res.status, data };
   },
   async get(path) {
-    const res = await fetch(path, { headers: { 'X-Player-Token': myToken } });
+    const headers = {};
+    if (myToken) headers['X-Player-Token'] = myToken;
+    const res = await fetch(path, { headers });
     const data = await res.json();
     return { ok: res.ok, status: res.status, data };
   },
@@ -150,8 +175,17 @@ const API = {
 async function loadMapList() {
   const res = await fetch('/api/maps');
   const { maps } = await res.json();
+  availableMaps = maps || [];
   els.mapSelect.innerHTML = maps.map(m => `<option value="${esc(m.id)}">${esc(m.name)} - ${esc(m.description)}</option>`).join('');
   renderMapPicker(maps);
+  syncMaxPlayersOptions();
+}
+function persistSession() {
+  try {
+    localStorage.setItem('tacticalGame.session', JSON.stringify({ gameId, myToken, myPlayer, hostToken }));
+  } catch {
+    // 浏览器禁用本地存储时不影响本局操作。
+  }
 }
 
 function previewCells(radius) {
@@ -234,6 +268,19 @@ function syncMapSelection() {
 function selectMap(mapId) {
   els.mapSelect.value = mapId;
   syncMapSelection();
+  syncMaxPlayersOptions();
+}
+
+function syncMaxPlayersOptions() {
+  if (!els.maxPlayers) return;
+  const map = availableMaps.find(item => item.id === els.mapSelect.value);
+  const supported = new Set(map?.preview?.supportedPlayerCounts || [2]);
+  for (const option of els.maxPlayers.options) {
+    option.disabled = !supported.has(Number(option.value));
+  }
+  if (!supported.has(Number(els.maxPlayers.value))) {
+    els.maxPlayers.value = String(Math.min(...supported));
+  }
 }
 
 function renderMapPicker(maps) {
@@ -246,14 +293,15 @@ function renderMapPicker(maps) {
   els.mapSelect.value = selected;
   els.mapPicker.innerHTML = maps.map(map => {
     const isSelected = map.id === selected;
-    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
-    const radius = map.preview?.radius ?? '-';
+	    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
+	    const radius = map.preview?.radius ?? '-';
+	    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
     return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}">
       ${renderMapPreview(map.preview)}
       <span class="map-card-copy">
         <span class="map-card-name">${esc(map.name)}</span>
         <span class="map-card-desc">${esc(map.description)}</span>
-        <span class="map-card-meta"><span>半径 ${esc(radius)}</span><span>${controlPointCount} 据点</span><span>双方 HQ</span></span>
+	        <span class="map-card-meta"><span>半径 ${esc(radius)}</span><span>${controlPointCount} 据点</span><span>${esc(counts)} 人</span></span>
       </span>
     </button>`;
   }).join('');
@@ -270,7 +318,18 @@ function renderMapPicker(maps) {
 }
 
 function createEmptyState() {
-  return { cells: [], controlPoints: new Map(), headquarters: new Map(), units: new Map(), resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } }, turn: { turnNumber: 1, currentOwner: 'player_a', actionsUsed: 0 }, winner: null, result: null, eventLog: [] };
+  return {
+    players: {},
+    cells: [],
+    controlPoints: new Map(),
+    headquarters: new Map(),
+    units: new Map(),
+    resources: {},
+    turn: { roundNumber: 1, turnNumber: 1, currentPlayerId: null, currentOwner: null, turnOrder: [], actionsUsed: 0 },
+    winner: null,
+    result: null,
+    eventLog: [],
+  };
 }
 function applyEvent(s, ev) {
   if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
@@ -279,6 +338,10 @@ function applyEvent(s, ev) {
   switch (ev.type) {
     case 'game_start':
       gameConfig = p.config; if (p.playerNames) playerNames = { ...p.playerNames };
+      s.players = JSON.parse(JSON.stringify(p.players || {}));
+      s.turn.turnOrder = [...(p.turnOrder || [])];
+      s.turn.currentPlayerId = p.firstPlayer || s.turn.turnOrder[0] || null;
+      s.turn.currentOwner = s.turn.currentPlayerId;
       s.map = cloneMapPayload(p.map);
       s.cells = s.map.cells || [];
       s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
@@ -288,6 +351,7 @@ function applyEvent(s, ev) {
       computeLayout(s.cells);
       break;
     case 'deploy':
+      if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies -= p.cost || 0;
       s.units.set(p.unitId, { id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r, hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense, moveRange: p.moveRange, attackRange: p.attackRange, alive: true, hasMoved: true, hasActed: false, actionSpent: true, canCapture: !!p.canCapture, healPower: p.healPower, cost: p.unitCost ?? p.cost });
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
@@ -299,12 +363,34 @@ function applyEvent(s, ev) {
     case 'headquarters_destroyed': { const h = s.headquarters.get(p.headquartersId); if (h) h.alive = false; break; }
     case 'control_point_captured': { const cp = s.controlPoints.get(p.pointId); if (cp) cp.owner = p.owner; break; }
     case 'control_point_repair': { const u = s.units.get(p.unitId); if (u) u.hp = p.unitHp; break; }
-    case 'income': s.resources[p.owner].supplies += p.amount; break;
+    case 'income':
+      if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
+      s.resources[p.owner].supplies += p.amount;
+      break;
     case 'reset_actions':
       for (const u of s.units.values()) if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
-    case 'turn_end': s.turn.currentOwner = p.nextOwner; s.turn.turnNumber = p.turnNumber; s.turn.actionsUsed = 0; break;
+    case 'turn_end':
+      s.turn.currentOwner = p.nextPlayerId || p.nextOwner;
+      s.turn.currentPlayerId = p.nextPlayerId || p.nextOwner;
+      s.turn.roundNumber = p.roundNumber || p.turnNumber;
+      s.turn.turnNumber = p.turnNumber || p.roundNumber;
+      s.turn.actionsUsed = 0;
+      break;
+    case 'player_eliminated':
+      if (s.players[p.playerId]) s.players[p.playerId].status = 'eliminated';
+      for (const id of p.removedUnitIds || []) s.units.delete(id);
+      for (const pointId of p.neutralizedPointIds || []) {
+        const cp = s.controlPoints.get(pointId);
+        if (cp) cp.owner = null;
+      }
+      break;
+    case 'control_point_neutralized': {
+      const cp = s.controlPoints.get(p.pointId);
+      if (cp) cp.owner = null;
+      break;
+    }
     case 'game_over':
       s.winner = p.winner;
       s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores };
@@ -482,7 +568,7 @@ function drawControlPointGlyph(kind, x, y) {
 function drawUnitMarker(u) {
   if (!u.alive) return;
   const p = hexToPixel(u.q, u.r);
-  ctx.fillStyle = OWNER_COLOR[u.owner];
+  ctx.fillStyle = OWNER_COLOR[u.owner] || '#9aa7b2';
   ctx.beginPath();
   ctx.arc(p.x, p.y, HEX_SIZE * .42, 0, Math.PI * 2);
   ctx.fill();
@@ -499,7 +585,7 @@ function drawUnitMarker(u) {
 function drawHeadquartersMarker(hq) {
   const p = hexToPixel(hq.q, hq.r);
   pathHex(hq.q, hq.r, 5);
-  ctx.fillStyle = hq.alive ? OWNER_COLOR[hq.owner] : "#555";
+  ctx.fillStyle = hq.alive ? (OWNER_COLOR[hq.owner] || '#9aa7b2') : "#555";
   ctx.globalAlpha = hq.alive ? .78 : .3;
   ctx.fill();
   ctx.globalAlpha = 1;
@@ -520,11 +606,11 @@ function drawHeadquartersMarker(hq) {
 function drawControlPointMarker(cp) {
   const p = hexToPixel(cp.q, cp.r);
   pathHex(cp.q, cp.r, 8);
-  ctx.fillStyle = cp.owner ? OWNER_COLOR[cp.owner] : "#d6b34a";
+  ctx.fillStyle = cp.owner ? (OWNER_COLOR[cp.owner] || '#9aa7b2') : "#d6b34a";
   ctx.globalAlpha = .32;
   ctx.fill();
   ctx.globalAlpha = 1;
-  ctx.strokeStyle = cp.owner ? OWNER_COLOR[cp.owner] : "#d6b34a";
+  ctx.strokeStyle = cp.owner ? (OWNER_COLOR[cp.owner] || '#9aa7b2') : "#d6b34a";
   ctx.lineWidth = 2;
   ctx.stroke();
   if (cp.kind) {
@@ -566,7 +652,7 @@ function effectiveDeployCost(type, origin) {
 function renderEntityCard(ent) {
   const type = ent.type || 'headquarters';
   const title = UNIT_NAMES[type] || '指挥部';
-  const ownerClass = ent.owner === 'player_a' ? 'player-a' : 'player-b';
+  const ownerClass = playerClass(ent.owner);
   const hpPct = Math.max(0, Math.min(100, ent.maxHp ? (ent.hp / ent.maxHp) * 100 : 0));
   const stats = [
     statItem('攻击', ent.attack, 'attack'),
@@ -594,7 +680,7 @@ function renderEntityCard(ent) {
 }
 function renderControlPointCard(cp) {
   const owner = cp.owner ? playerName(cp.owner) : '中立';
-  const ownerClass = cp.owner === 'player_a' ? 'player-a' : cp.owner === 'player_b' ? 'player-b' : 'neutral';
+  const ownerClass = cp.owner ? playerClass(cp.owner) : 'neutral';
   return `<div class="sel-card">
     <div class="sel-head">
       ${entityTokenMarkup(cp.kind || 'supply', ownerClass, cp.name)}
@@ -653,11 +739,11 @@ function renderActionsDisplay(owner) {
 function playerScore(owner) {
   const weights = gameConfig?.balance?.adjudicationWeights;
   if (!weights || !state) return null;
-  const enemy = owner === 'player_a' ? 'player_b' : 'player_a';
   const ownHq = [...state.headquarters.values()].find(h => h.owner === owner);
-  const enemyHq = [...state.headquarters.values()].find(h => h.owner === enemy);
-  if (!ownHq || !enemyHq) return null;
-  const enemyHqDamage = Math.max(0, (enemyHq.maxHp || 0) - (enemyHq.hp || 0));
+  if (!ownHq) return null;
+  const headquartersDamage = state.players?.[owner]?.stats?.headquartersDamage ?? [...state.headquarters.values()]
+    .filter(h => h.owner !== owner)
+    .reduce((sum, hq) => sum + Math.max(0, (hq.maxHp || 0) - (hq.hp || 0)), 0);
   const ownHqHp = Math.max(0, ownHq.hp || 0);
   const controlPoints = [...state.controlPoints.values()].filter(p => p.owner === owner).length;
   const armyValue = [...state.units.values()]
@@ -665,13 +751,14 @@ function playerScore(owner) {
     .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
   const supplies = state.resources?.[owner]?.supplies || 0;
   return {
-    enemyHqDamage,
+    headquartersDamage,
+    enemyHqDamage: headquartersDamage,
     ownHqHp,
     controlPoints,
     armyValue,
     supplies,
     total:
-      enemyHqDamage * weights.enemyHqDamage +
+      headquartersDamage * weights.enemyHqDamage +
       ownHqHp * weights.ownHqHp +
       controlPoints * weights.controlPoint +
       armyValue * weights.armyValue +
@@ -680,20 +767,20 @@ function playerScore(owner) {
 }
 
 function computeAdjudicationScores() {
-  const playerA = playerScore('player_a');
-  const playerB = playerScore('player_b');
-  return playerA && playerB ? { player_a: playerA, player_b: playerB } : null;
+  const scores = Object.fromEntries(joinedPlayerIds().map(id => [id, playerScore(id)]).filter(([, score]) => score));
+  return Object.keys(scores).length ? scores : null;
 }
 
 function scoreBreakdown(score) {
-  return `HQ伤害 ${score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
+  return `HQ伤害 ${score.headquartersDamage ?? score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
 }
 
 function renderScoreRow(owner, score) {
-  const cls = owner === 'player_a' ? 'player-a' : 'player-b';
+  const cls = playerClass(owner);
   const mine = owner === myPlayer ? ' mine' : '';
+  const status = state.players?.[owner]?.status === 'eliminated' ? ' · 已淘汰' : '';
   return `<div class="score-row ${cls}${mine}">
-    <div class="score-row-head"><span>${esc(playerName(owner))}${owner === myPlayer ? '（你）' : ''}</span><strong>${score.total}</strong></div>
+    <div class="score-row-head"><span>${esc(playerName(owner))}${owner === myPlayer ? '（你）' : ''}${status}</span><strong>${score.total}</strong></div>
     <div class="score-breakdown">${esc(scoreBreakdown(score))}</div>
   </div>`;
 }
@@ -706,31 +793,33 @@ function renderScorePanel() {
     scorePanelEl.innerHTML = '<h3>裁决分</h3><div class="score-empty">等待对局开始</div>';
     return;
   }
-  const a = scores.player_a;
-  const b = scores.player_b;
-  const leader = a.total === b.total ? '当前平分' : `${playerName(a.total > b.total ? 'player_a' : 'player_b')} 领先 ${Math.abs(a.total - b.total)}`;
+  const rows = Object.entries(scores).sort((a, b) => b[1].total - a[1].total);
+  const leader = rows.length > 1 && rows[0][1].total === rows[1][1].total
+    ? '当前最高分并列'
+    : `${playerName(rows[0][0])} 领先 ${rows[1] ? Math.abs(rows[0][1].total - rows[1][1].total) : 0}`;
   scorePanelEl.innerHTML = `<h3>裁决分</h3>
     <div class="score-leader">${esc(leader)}</div>
-    ${renderScoreRow('player_a', a)}
-    ${renderScoreRow('player_b', b)}`;
+    ${rows.map(([owner, score]) => renderScoreRow(owner, score)).join('')}`;
 }
 
 function renderSidebar() {
   if (!state) return;
-  const owner = state.turn.currentOwner;
-  els.turnBadge.textContent = `回合 ${state.turn.turnNumber} · ${playerName(owner)}`;
+  const owner = state.turn.currentPlayerId || state.turn.currentOwner;
+  els.turnBadge.textContent = `回合 ${state.turn.roundNumber || state.turn.turnNumber} · ${playerName(owner)}`;
   els.turnBadge.classList.toggle('my-turn', owner === myPlayer);
+  const resourceRows = joinedPlayerIds().map(id => {
+    const color = OWNER_COLOR[id] || '#9aa7b2';
+    const supplies = state.resources?.[id]?.supplies ?? 0;
+    return `<div class="resource-pill ${playerClass(id)} ${myPlayer === id ? 'mine' : ''}" style="border-left-color:${esc(color)}">
+      <span>${esc(playerName(id))}</span><strong>${supplies}</strong>
+    </div>`;
+  }).join('');
   els.resDisplay.innerHTML = `<div class="status-grid">
     <div class="status-card active-turn ${owner === myPlayer ? 'mine' : ''}">
       <span>${owner === myPlayer ? '你的回合' : '等待对手'}</span>
       <strong>${esc(playerName(owner))}</strong>
     </div>
-    <div class="resource-pill player-a ${myPlayer === 'player_a' ? 'mine' : ''}">
-      <span>${esc(playerName('player_a'))}</span><strong>${state.resources.player_a.supplies}</strong>
-    </div>
-    <div class="resource-pill player-b ${myPlayer === 'player_b' ? 'mine' : ''}">
-      <span>${esc(playerName('player_b'))}</span><strong>${state.resources.player_b.supplies}</strong>
-    </div>
+    ${resourceRows}
   </div>`;
   renderActionsDisplay(owner);
   renderScorePanel();
@@ -803,7 +892,7 @@ async function afterAction(msg) {
 function selectUnit(unit) {
   selectedUnitId = unit.id; selectedOriginId = null; selectedDeployType = null; interactionMode = 'unit_selected'; rangeHighlights = [];
   renderSidebar(); drawBoard();
-  if (unit.owner !== myPlayer || state.turn.currentOwner !== myPlayer) return;
+  if (unit.owner !== myPlayer || (state.turn.currentPlayerId || state.turn.currentOwner) !== myPlayer) return;
   const items = [];
   if (!unit.hasMoved) items.push({ label: '移动', action: 'move' });
   if (!unit.hasActed) items.push({ label: unit.type === 'support' ? '治疗' : '攻击', action: unit.type === 'support' ? 'heal' : 'attack' });
@@ -832,7 +921,7 @@ function selectDeployOrigin(origin) {
   selectedOriginId = origin.id; selectedUnitId = null; selectedDeployType = null; interactionMode = 'deploy_origin'; rangeHighlights = [];
   renderSidebar(); drawBoard();
   if (origin.owner !== myPlayer && origin.owner !== undefined) return;
-  if (state.turn.currentOwner !== myPlayer) return;
+  if ((state.turn.currentPlayerId || state.turn.currentOwner) !== myPlayer) return;
   const items = Object.entries(gameConfig.units).map(([type]) => ({ label: UNIT_NAMES[type], action: 'deploy', type, cost: effectiveDeployCost(type, origin) }));
   showPopup(origin, '部署单位', items, (_action, type) => {
     closePopup(); interactionMode = 'deploy_mode'; selectedOriginId = origin.id; selectedDeployType = type;
@@ -897,10 +986,89 @@ els.canvas.addEventListener('click', async () => {
 function subscribeSse() {
   if (sse) sse.close();
   const lastSeq = state?.eventLog.at(-1)?.seq ?? 0;
-  sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}&token=${encodeURIComponent(myToken)}`);
+  const tokenQuery = myToken ? `&token=${encodeURIComponent(myToken)}` : '';
+  sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}${tokenQuery}`);
   sse.onmessage = e => { applyEvent(state, JSON.parse(e.data)); drawBoard(); renderSidebar(); };
   sse.onerror = () => statusBadge('SSE 断开', 'err');
   sse.onopen = () => statusBadge('已连接', 'ok');
+}
+
+function subscribeLobbyStart() {
+  if (sse) sse.close();
+  const tokenQuery = myToken ? `&token=${encodeURIComponent(myToken)}` : '';
+  sse = new EventSource(`/api/games/${gameId}/events?after=0${tokenQuery}`);
+  sse.onmessage = async e => {
+    const event = JSON.parse(e.data);
+    if (event.type !== 'game_start') return;
+    if (els.joinStatusText) els.joinStatusText.textContent = '房主已开始，正在进入游戏…';
+    await enterGame();
+  };
+  sse.onerror = () => statusBadge('大厅中', 'idle');
+  sse.onopen = () => statusBadge('大厅中', 'idle');
+}
+
+function lobbySummaryMarkup(lobby) {
+  const players = lobby.players || [];
+  const supported = (lobby.supportedPlayerCounts || []).join('/');
+  return `<div class="lobby-summary-head">
+    <span>${esc(lobby.phase === 'active' ? '已开始' : '等待开局')}</span>
+    <strong>${players.length}/${lobby.maxPlayers}</strong>
+  </div>
+  <div class="lobby-summary-meta">地图 ${esc(lobby.mapId)} · 支持 ${esc(supported)} 人</div>
+  <div class="lobby-player-list">${players.map(player => `<span class="lobby-player" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}">${esc(player.name || player.id)}</span>`).join('')}</div>`;
+}
+
+function renderLobbySummary(lobby, target = els.lobbySummary) {
+  if (!target || !lobby) return;
+  target.innerHTML = lobbySummaryMarkup(lobby);
+}
+
+async function refreshLobbySummary() {
+  if (!gameId) return null;
+  const res = await fetch(`/api/games/${gameId}/lobby`);
+  const data = await res.json();
+  if (res.ok) {
+    renderLobbySummary(data, els.lobbySummary);
+    renderLobbySummary(data, els.joinLobbySummary);
+  }
+  return res.ok ? data : null;
+}
+
+function stopLobbyPolling() {
+  if (lobbyPollTimer) clearInterval(lobbyPollTimer);
+  lobbyPollTimer = null;
+}
+
+function startLobbyPolling() {
+  stopLobbyPolling();
+  lobbyPollTimer = setInterval(async () => {
+    try {
+      const lobby = await refreshLobbySummary();
+      if (lobby?.phase !== 'active') return;
+      stopLobbyPolling();
+      if (els.joinStatusText) els.joinStatusText.textContent = '房主已开始，正在进入游戏…';
+      await enterGame();
+    } catch {
+      statusBadge('大厅中', 'idle');
+    }
+  }, 1500);
+}
+
+async function startHostedGame() {
+  if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
+  const res = await fetch(`/api/games/${gameId}/start`, {
+    method: 'POST',
+    headers: { 'X-Host-Token': hostToken },
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error || '开始失败', 'err');
+  toast('对局已开始', 'ok');
+  stopLobbyPolling();
+  if (!myToken) {
+    window.location.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
+    return;
+  }
+  await enterGame();
 }
 
 els.btnEndTurn.addEventListener('click', async () => { if (await apiAction(`/api/games/${gameId}/end-turn`, {})) afterAction('回合结束'); });
@@ -908,14 +1076,34 @@ els.btnRefresh.addEventListener('click', async () => { await loadFullState(); dr
 els.btnCreate.addEventListener('click', async () => {
   els.btnCreate.disabled = true;
   try {
-    const res = await fetch('/api/games', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mapId: els.mapSelect.value || 'default', name: els.createName.value.trim() || undefined }) });
+    const res = await fetch('/api/games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mapId: els.mapSelect.value || 'default',
+        maxPlayers: Number(els.maxPlayers?.value || 2),
+        participate: els.hostParticipate?.checked !== false,
+        playerName: els.createName.value.trim() || undefined,
+      }),
+    });
     const data = await res.json();
     if (!res.ok) {
       toast(data.error || '创建失败', 'err');
       return;
     }
-    myToken = data.playerAToken; myPlayer = 'player_a'; gameId = data.gameId;
-    els.createdGameId.textContent = gameId; els.createdToken.textContent = myToken; els.createResult.classList.remove('hidden');
+    gameId = data.gameId;
+    hostToken = data.hostToken;
+    myToken = data.player?.token || null;
+    myPlayer = data.player?.id || null;
+    persistSession();
+    els.createdGameId.textContent = gameId;
+    els.createdHostToken.textContent = hostToken;
+    els.createdToken.textContent = myToken || '未参战';
+    els.createdPlayerTokenRow.classList.toggle('hidden', !myToken);
+    renderLobbySummary(data.lobby, els.lobbySummary);
+    els.createResult.classList.remove('hidden');
+    statusBadge('大厅中', 'idle');
+    startLobbyPolling();
   } catch {
     toast('创建失败：无法连接服务器', 'err');
   } finally {
@@ -924,19 +1112,58 @@ els.btnCreate.addEventListener('click', async () => {
 });
 els.btnJoin.addEventListener('click', async () => {
   const gid = els.gameId.value.trim(); if (!gid) return;
+  stopLobbyPolling();
   const res = await fetch(`/api/games/${gid}/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: els.joinName.value.trim() || undefined }) });
   const data = await res.json();
   if (!res.ok) { els.joinStatusText.textContent = `加入失败: ${data.error}`; els.joinResult.classList.remove('hidden'); return; }
-  myToken = data.playerBToken; myPlayer = 'player_b'; gameId = gid;
-  await enterGame();
+  myToken = data.player.token;
+  myPlayer = data.player.id;
+  gameId = gid;
+  hostToken = null;
+  persistSession();
+  els.joinStatusText.textContent = data.lobby?.phase === 'active' ? '加入成功，正在进入游戏…' : '加入成功，等待房主开始';
+  els.joinPlayerToken.textContent = myToken;
+  els.joinPlayerTokenRow.classList.remove('hidden');
+  els.joinResult.classList.remove('hidden');
+  renderLobbySummary(data.lobby, els.joinLobbySummary);
+  statusBadge(data.lobby?.phase === 'active' ? '正在进入' : '大厅中', 'idle');
+  if (data.lobby?.phase === 'active') await enterGame();
+  else {
+    startLobbyPolling();
+    subscribeLobbyStart();
+  }
 });
+els.btnStartGame.addEventListener('click', startHostedGame);
 els.btnConnectCreate.addEventListener('click', enterGame);
+els.btnConnectJoin?.addEventListener('click', enterGame);
 async function enterGame() {
   const ok = await loadFullState();
-  if (!ok) return toast('无法加载游戏状态', 'err');
+  if (!ok || !state.cells.length) {
+    await refreshLobbySummary();
+    return toast('对局尚未开始', 'info');
+  }
+  if (!myToken) {
+    window.location.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
+    return;
+  }
+  stopLobbyPolling();
+  if (sse) { sse.close(); sse = null; }
   els.joinPanel.classList.add('hidden'); els.gameUI.classList.remove('hidden');
   subscribeSse(); drawBoard(); renderSidebar(); statusBadge('已连接', 'ok');
 }
+function ensureJoinConnectButton() {
+  if (!els.joinResult || els.btnConnectJoin) return;
+  const btn = document.createElement('button');
+  btn.id = 'btn-connect-join';
+  btn.className = 'btn success';
+  btn.style.width = '100%';
+  btn.style.marginTop = '10px';
+  btn.textContent = '进入游戏';
+  btn.addEventListener('click', enterGame);
+  els.joinResult.appendChild(btn);
+  els.btnConnectJoin = btn;
+}
+ensureJoinConnectButton();
 document.querySelectorAll('.lobby-tab').forEach(tab => tab.addEventListener('click', () => {
   document.querySelectorAll('.lobby-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.lobby-tab-content').forEach(c => c.classList.remove('active'));

@@ -51,6 +51,18 @@ export interface StartingUnitConfig {
   r: number;
 }
 
+export interface SpawnUnitConfig {
+  type: UnitType;
+  q: number;
+  r: number;
+}
+
+export interface SpawnSlotConfig {
+  id: string;
+  headquarters: { q: number; r: number };
+  startingUnits: SpawnUnitConfig[];
+}
+
 export interface MapConfig {
   name: string;
   description: string;
@@ -59,8 +71,11 @@ export interface MapConfig {
   radius: number;
   terrainCells: TerrainCellConfig[];
   controlPoints: ControlPointConfig[];
-  headquarters: Record<PlayerId, { q: number; r: number }>;
+  headquarters: Record<'player_a' | 'player_b', { q: number; r: number }>;
   startingUnits: StartingUnitConfig[];
+  spawnSlots: SpawnSlotConfig[];
+  layouts: Record<string, string[]>;
+  supportedPlayerCounts: number[];
   units: Record<UnitType, UnitSpec>;
   headquartersSpec: HeadquartersSpec;
   balance: {
@@ -87,7 +102,9 @@ export interface MapPreview {
   radius: number;
   terrainCells: TerrainCellConfig[];
   controlPoints: ControlPointConfig[];
-  headquarters: Record<PlayerId, { q: number; r: number }>;
+  headquarters: Record<'player_a' | 'player_b', { q: number; r: number }>;
+  spawnSlots: SpawnSlotConfig[];
+  supportedPlayerCounts: number[];
 }
 
 export interface MapListItem {
@@ -100,6 +117,44 @@ export interface MapListItem {
 const CONTROL_POINT_KINDS = ['supply', 'forward_base', 'repair'] as const satisfies readonly ControlPointKind[];
 
 const maps = new Map<string, MapConfig>();
+
+function normalizeMapConfig(config: unknown): unknown {
+  const c = asRecord(config, 'Map');
+  if (Array.isArray(c.spawnSlots)) {
+    const slots = c.spawnSlots as SpawnSlotConfig[];
+    const first = slots[0];
+    const second = slots[1] ?? slots[0];
+    return {
+      ...c,
+      headquarters: c.headquarters ?? {
+        player_a: first?.headquarters,
+        player_b: second?.headquarters,
+      },
+      startingUnits: c.startingUnits ?? [
+        ...(first?.startingUnits ?? []).map(unit => ({ ...unit, owner: 'player_a' })),
+        ...(second?.startingUnits ?? []).map(unit => ({ ...unit, owner: 'player_b' })),
+      ],
+      layouts: c.layouts ?? { 2: slots.slice(0, 2).map(slot => slot.id) },
+      supportedPlayerCounts: c.supportedPlayerCounts,
+    };
+  }
+
+  const headquarters = asRecord(c.headquarters, 'headquarters');
+  const startingUnits = Array.isArray(c.startingUnits) ? c.startingUnits as StartingUnitConfig[] : [];
+  const spawnSlots: SpawnSlotConfig[] = ['player_a', 'player_b'].map(player => ({
+    id: `slot_${player.slice(-1)}`,
+    headquarters: { ...(headquarters[player] as { q: number; r: number }) },
+    startingUnits: startingUnits
+      .filter(unit => unit.owner === player)
+      .map(({ owner: _owner, ...unit }) => ({ ...unit })),
+  }));
+  return {
+    ...c,
+    spawnSlots,
+    layouts: { 2: spawnSlots.map(slot => slot.id) },
+    supportedPlayerCounts: [2],
+  };
+}
 
 function asRecord(value: unknown, ctx: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -242,6 +297,41 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     claim(pos, `startingUnits[${i}]`);
   }
 
+  if (!Array.isArray(c.spawnSlots) || c.spawnSlots.length < 2 || c.spawnSlots.length > 8) {
+    throw new Error(`Map "${id}".spawnSlots must contain 2-8 slots`);
+  }
+  const spawnIds = new Set<string>();
+  for (let i = 0; i < c.spawnSlots.length; i++) {
+    const slot = asRecord(c.spawnSlots[i], `spawnSlots[${i}]`);
+    const slotId = assertString(slot, 'id', `spawnSlots[${i}]`);
+    if (spawnIds.has(slotId)) throw new Error(`spawnSlots[${i}].id must be unique`);
+    spawnIds.add(slotId);
+    assertPosition(asRecord(slot.headquarters, `spawnSlots[${i}].headquarters`), `spawnSlots[${i}].headquarters`, radius);
+    if (!Array.isArray(slot.startingUnits)) throw new Error(`spawnSlots[${i}].startingUnits must be an array`);
+    for (let j = 0; j < slot.startingUnits.length; j++) {
+      const unit = asRecord(slot.startingUnits[j], `spawnSlots[${i}].startingUnits[${j}]`);
+      if (!['infantry', 'scout', 'heavy', 'ranger', 'support'].includes(String(unit.type))) {
+        throw new Error(`spawnSlots[${i}].startingUnits[${j}].type invalid`);
+      }
+      assertPosition(unit, `spawnSlots[${i}].startingUnits[${j}]`, radius);
+    }
+  }
+  const layouts = asRecord(c.layouts, `Map "${id}".layouts`);
+  const supportedCounts: number[] = [];
+  for (const [countText, value] of Object.entries(layouts)) {
+    const count = Number(countText);
+    if (!Number.isInteger(count) || count < 2 || count > 8 || !Array.isArray(value) || value.length !== count) {
+      throw new Error(`Map "${id}".layouts.${countText} must contain exactly ${countText} slots`);
+    }
+    const unique = new Set(value);
+    if (unique.size !== value.length || value.some(slotId => typeof slotId !== 'string' || !spawnIds.has(slotId))) {
+      throw new Error(`Map "${id}".layouts.${countText} contains invalid slots`);
+    }
+    supportedCounts.push(count);
+  }
+  supportedCounts.sort((a, b) => a - b);
+  c.supportedPlayerCounts = supportedCounts;
+
   void name;
   void description;
 }
@@ -259,7 +349,7 @@ export function loadMaps(mapsDir?: string): void {
   for (const file of files) {
     const id = basename(file, '.json');
     const raw = readFileSync(join(dir, file), 'utf-8');
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = normalizeMapConfig(JSON.parse(raw) as unknown);
     validateMap(id, parsed);
     maps.set(id, parsed as MapConfig);
   }
@@ -284,6 +374,12 @@ export function listMaps(): MapListItem[] {
         player_a: { ...cfg.headquarters.player_a },
         player_b: { ...cfg.headquarters.player_b },
       },
+      spawnSlots: cfg.spawnSlots.map(slot => ({
+        ...slot,
+        headquarters: { ...slot.headquarters },
+        startingUnits: slot.startingUnits.map(unit => ({ ...unit })),
+      })),
+      supportedPlayerCounts: [...cfg.supportedPlayerCounts],
     },
   }));
 }

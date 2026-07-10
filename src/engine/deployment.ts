@@ -10,7 +10,7 @@ import { deployDiscountForOrigin } from './controlPoints.js';
 
 function deployOrigin(game: GameState, owner: PlayerId, fromId: string): Position | null {
   const hq = game.headquarters[owner];
-  if (hq.id === fromId && hq.alive) return hq;
+  if (hq?.id === fromId && hq.alive) return hq;
   const point = game.controlPoints.find(p => p.id === fromId && p.owner === owner);
   return point ?? null;
 }
@@ -44,13 +44,15 @@ export function deployUnit(
   }
   const discount = Math.min(spec.cost, deployDiscountForOrigin(game, owner, fromId));
   const actualCost = spec.cost - discount;
-  if (game.resources[owner].supplies < actualCost) {
+  const resources = game.resources[owner];
+  if (!resources) return { ok: false, code: 'player_eliminated', message: 'player has no resources' };
+  if (resources.supplies < actualCost) {
     return { ok: false, code: 'insufficient_supplies', message: `need ${actualCost} supplies` };
   }
 
   game.turn.actionsUsed += 1;
 
-  game.resources[owner].supplies -= actualCost;
+  resources.supplies -= actualCost;
   const unit = createUnitFromConfig(game.config, owner, unitType, q, r);
   unit.hasMoved = true;
   unit.hasActed = false;

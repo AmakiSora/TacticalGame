@@ -80,8 +80,9 @@ describe('AutoControlController', () => {
 
       expect(game.playerNames).toEqual({ player_a: 'A Bot', player_b: 'B Bot' });
       expect(calls).toHaveLength(2);
-      expect(calls[0].args.at(-1)).toContain(`you are player_a ${result.gameId} ${game.tokens.player_a}`);
-      expect(calls[1].args.at(-1)).toContain(`you are player_b ${result.gameId} ${game.tokens.player_b}`);
+      const prompts = calls.map(call => String(call.args.at(-1)));
+      expect(prompts.some(prompt => prompt.includes(`you are player_a ${result.gameId} ${game.tokens.player_a}`))).toBe(true);
+      expect(prompts.some(prompt => prompt.includes(`you are player_b ${result.gameId} ${game.tokens.player_b}`))).toBe(true);
       expect(controller.getStatus().status).toBe('running');
     } finally {
       cleanup(runtimeDir);

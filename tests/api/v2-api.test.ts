@@ -6,19 +6,40 @@ async function createAndJoin(app: Awaited<ReturnType<typeof startTestServer>>) {
   const createRes = await app.inject({
     method: 'POST',
     url: '/api/games',
-    payload: { name: 'A' },
+    payload: { playerName: 'A' },
   });
-  const created = createRes.json() as { gameId: string; playerAToken: string };
+  const created = createRes.json() as {
+    gameId: string;
+    hostToken: string;
+    player: { id: 'player_a'; token: string };
+  };
   const joinRes = await app.inject({
     method: 'POST',
     url: `/api/games/${created.gameId}/join`,
     payload: { name: 'B' },
   });
-  return { ...created, playerBToken: (joinRes.json() as { playerBToken: string }).playerBToken };
+  const joined = joinRes.json() as { player: { id: 'player_b'; token: string } };
+  await app.inject({
+    method: 'POST',
+    url: `/api/games/${created.gameId}/start`,
+    headers: { 'X-Host-Token': created.hostToken },
+  });
+  const game = globalStore.get(created.gameId);
+  if (game) {
+    game.turn.currentPlayerId = 'player_a';
+    game.turn.currentOwner = 'player_a';
+    game.turn.actionsUsed = 0;
+  }
+  return {
+    gameId: created.gameId,
+    hostToken: created.hostToken,
+    playerAToken: created.player.token,
+    playerBToken: joined.player.token,
+  };
 }
 
 describe('V2 API', () => {
-  it('logs game id and player tokens when creating and joining a game', async () => {
+  it('does not log raw player or host tokens when creating and joining a game', async () => {
     const app = await startTestServer();
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -28,17 +49,19 @@ describe('V2 API', () => {
         url: '/api/games',
         payload: { name: 'A' },
       });
-      const created = createRes.json() as { gameId: string; playerAToken: string };
+      const created = createRes.json() as { gameId: string; hostToken: string; player: { token: string } };
 
       const joinRes = await app.inject({
         method: 'POST',
         url: `/api/games/${created.gameId}/join`,
         payload: { name: 'B' },
       });
-      const joined = joinRes.json() as { playerBToken: string };
+      const joined = joinRes.json() as { player: { token: string } };
 
-      expect(log).toHaveBeenCalledWith(`[game:create] gameId=${created.gameId} playerAToken=${created.playerAToken}`);
-      expect(log).toHaveBeenCalledWith(`[game:join] gameId=${created.gameId} playerBToken=${joined.playerBToken}`);
+      const output = log.mock.calls.flat().join('\n');
+      expect(output).not.toContain(created.hostToken);
+      expect(output).not.toContain(created.player.token);
+      expect(output).not.toContain(joined.player.token);
     } finally {
       log.mockRestore();
       await app.close();
@@ -74,11 +97,12 @@ describe('V2 API', () => {
     })).json();
 
     const hqA = game.headquarters.player_a;
+    const deployCell = hqA.q < 0 ? { q: hqA.q, r: hqA.r + 1 } : { q: hqA.q, r: hqA.r - 1 };
     const deploy = await app.inject({
       method: 'POST',
       url: `/api/games/${gameId}/deploy`,
       headers: { 'X-Player-Token': playerAToken },
-      payload: { unitType: 'support', fromId: hqA.id, q: -8, r: 1 },
+      payload: { unitType: 'support', fromId: hqA.id, q: deployCell.q, r: deployCell.r },
     });
     expect(deploy.statusCode).toBe(200);
 
@@ -88,11 +112,12 @@ describe('V2 API', () => {
       headers: { 'X-Player-Token': playerAToken },
     })).json();
     const scout = game.units.find((u: any) => u.owner === 'player_a' && u.type === 'scout');
+    const scoutTarget = hqA.q < 0 ? { q: -4, r: 0 } : { q: 4, r: 0 };
     const move = await app.inject({
       method: 'POST',
       url: `/api/games/${gameId}/move`,
       headers: { 'X-Player-Token': playerAToken },
-      payload: { unitId: scout.id, q: -4, r: 0 },
+      payload: { unitId: scout.id, q: scoutTarget.q, r: scoutTarget.r },
     });
     expect(move.statusCode).toBe(200);
 
@@ -127,17 +152,17 @@ describe('V2 API', () => {
     const res = await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.events[0].type).toBe('game_start');
-    expect(body.events[0].payload.map.grid).toBe('hex');
-    expect(body.events[0].payload.config.headquartersSpec).toMatchObject({ hp: 180, defense: 6 });
-    expect(body.events[0].payload.config.units.infantry).toMatchObject({ attack: 30, cost: 45 });
-    expect(body.events[0].payload.config.units.scout).toMatchObject({ hp: 65, attack: 16, cost: 38 });
-    expect(body.events[0].payload.config.units.heavy).toMatchObject({ hp: 150, attack: 38, defense: 13, cost: 92 });
-    expect(body.events[0].payload.config.units.ranger).toMatchObject({ hp: 72, attack: 44, cost: 78 });
-    expect(body.events[0].payload.config.units.support).toMatchObject({ hp: 82, attack: 10, healPower: 22, cost: 60 });
-    expect(body.events[0].payload.config.balance.actionsPerTurn).toBe(5);
-    expect(body.events[0].payload.config.balance.controlPointIncome).toBe(12);
-    expect(body.events[0].payload.config.balance.maxTurns).toBe(15);
+    const gameStart = body.events.find((event: any) => event.type === 'game_start');
+    expect(gameStart.payload.map.grid).toBe('hex');
+    expect(gameStart.payload.config.headquartersSpec).toMatchObject({ hp: 180, defense: 6 });
+    expect(gameStart.payload.config.units.infantry).toMatchObject({ attack: 30, cost: 45 });
+    expect(gameStart.payload.config.units.scout).toMatchObject({ hp: 65, attack: 16, cost: 38 });
+    expect(gameStart.payload.config.units.heavy).toMatchObject({ hp: 150, attack: 38, defense: 13, cost: 92 });
+    expect(gameStart.payload.config.units.ranger).toMatchObject({ hp: 72, attack: 44, cost: 78 });
+    expect(gameStart.payload.config.units.support).toMatchObject({ hp: 82, attack: 10, healPower: 22, cost: 60 });
+    expect(gameStart.payload.config.balance.actionsPerTurn).toBe(5);
+    expect(gameStart.payload.config.balance.controlPointIncome).toBe(12);
+    expect(gameStart.payload.config.balance.maxTurns).toBe(15);
     await app.close();
   });
 
@@ -147,7 +172,10 @@ describe('V2 API', () => {
 
     const game = globalStore.get(gameId)!;
     game.turn.turnNumber = 15;
+    game.turn.roundNumber = 15;
     game.turn.currentOwner = 'player_b';
+    game.turn.currentPlayerId = 'player_b';
+    game.turn.actedThisRound = ['player_a'];
     game.resources.player_a.supplies = 0;
     game.resources.player_b.supplies = 10;
     game.units = [];
@@ -183,14 +211,15 @@ describe('V2 API', () => {
     await app.close();
   });
 
-  it('allows spectators to rename players through the event stream', async () => {
+  it('allows players to rename themselves through the event stream', async () => {
     const app = await startTestServer();
-    const { gameId } = await createAndJoin(app);
+    const { gameId, playerAToken } = await createAndJoin(app);
 
     const rename = await app.inject({
       method: 'PATCH',
-      url: `/api/games/${gameId}/rename`,
-      payload: { playerId: 'player_a', name: 'Blue Commander' },
+      url: `/api/games/${gameId}/player`,
+      headers: { 'X-Player-Token': playerAToken },
+      payload: { name: 'Blue Commander' },
     });
     expect(rename.statusCode).toBe(200);
 
@@ -202,7 +231,7 @@ describe('V2 API', () => {
     });
 
     const listRes = await app.inject({ method: 'GET', url: '/api/games' });
-    expect(listRes.json().games.find((g: any) => g.id === gameId).playerNames.player_a).toBe('Blue Commander');
+    expect(listRes.json().games.find((g: any) => g.gameId === gameId).playerNames.player_a).toBe('Blue Commander');
     await app.close();
   });
 
@@ -210,19 +239,21 @@ describe('V2 API', () => {
     const app = await startTestServer();
     const { gameId, playerAToken } = await createAndJoin(app);
     let eventsBody = (await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` })).json();
-    const scout = eventsBody.events[0].payload.units.find((u: any) => u.owner === 'player_a' && u.type === 'scout');
+    const gameStart = eventsBody.events.find((event: any) => event.type === 'game_start');
+    const scout = gameStart.payload.units.find((u: any) => u.owner === 'player_a' && u.type === 'scout');
     const initial = { q: scout.q, r: scout.r };
 
     const move = await app.inject({
       method: 'POST',
       url: `/api/games/${gameId}/move`,
       headers: { 'X-Player-Token': playerAToken },
-      payload: { unitId: scout.id, q: -4, r: 0 },
+      payload: { unitId: scout.id, q: scout.q < 0 ? -4 : 4, r: 0 },
     });
     expect(move.statusCode).toBe(200);
 
     eventsBody = (await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` })).json();
-    const replayScout = eventsBody.events[0].payload.units.find((u: any) => u.id === scout.id);
+    const replayStart = eventsBody.events.find((event: any) => event.type === 'game_start');
+    const replayScout = replayStart.payload.units.find((u: any) => u.id === scout.id);
     expect({ q: replayScout.q, r: replayScout.r }).toEqual(initial);
     await app.close();
   });
@@ -230,37 +261,16 @@ describe('V2 API', () => {
   it('rejects actions past the per-turn action limit with 429 action_limit_reached', async () => {
     const app = await startTestServer();
     const { gameId, playerAToken } = await createAndJoin(app);
-    const fetchGame = () => app.inject({
-      method: 'GET', url: `/api/games/${gameId}`, headers: { 'X-Player-Token': playerAToken },
-    });
+    const game = globalStore.get(gameId)!;
+    const hqA = game.headquarters.player_a!;
+    game.turn.actionsUsed = game.config.balance.actionsPerTurn;
 
-    // Move all 3 starting units out of the HQ ring (3 action points), freeing
-    // (-7,0) and (-7,-1) as deploy cells, then deploy 2 scouts there (2 more = 5 total).
-    let game = (await fetchGame()).json() as any;
-    const hqA = game.headquarters.player_a;
-    const starters = game.units.filter((u: any) => u.owner === 'player_a');
-    for (const u of starters) {
-      const res = await app.inject({
-        method: 'POST', url: `/api/games/${gameId}/move`,
-        headers: { 'X-Player-Token': playerAToken },
-        payload: { unitId: u.id, q: u.q + 1, r: u.r },
-      });
-      expect(res.statusCode).toBe(200);
-    }
-    for (const cell of [{ q: -7, r: 0 }, { q: -7, r: -1 }]) {
-      const res = await app.inject({
-        method: 'POST', url: `/api/games/${gameId}/deploy`,
-        headers: { 'X-Player-Token': playerAToken },
-        payload: { unitType: 'scout', fromId: hqA.id, q: cell.q, r: cell.r },
-      });
-      expect(res.statusCode).toBe(200);
-    }
-
-    // 6th action (any deploy) is rejected with the action-limit code.
+    // 已用满行动点后，下一次行动会被统一拒绝。
+    const deployCell = hqA.q < 0 ? { q: hqA.q, r: hqA.r + 1 } : { q: hqA.q, r: hqA.r - 1 };
     const blocked = await app.inject({
       method: 'POST', url: `/api/games/${gameId}/deploy`,
       headers: { 'X-Player-Token': playerAToken },
-      payload: { unitType: 'scout', fromId: hqA.id, q: -8, r: 1 },
+      payload: { unitType: 'scout', fromId: hqA.id, q: deployCell.q, r: deployCell.r },
     });
     expect(blocked.statusCode).toBe(429);
     expect((blocked.json() as any).code).toBe('action_limit_reached');

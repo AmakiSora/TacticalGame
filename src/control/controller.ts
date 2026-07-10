@@ -3,10 +3,11 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { GameEvent, PlayerId } from '../types.js';
+import type { GameEvent, PlayerId, PlayerRecord } from '../types.js';
+import { PLAYER_IDS } from '../types.js';
 import { globalEventBus } from '../events/bus.js';
-import { globalStore, createInitialGame } from '../state/store.js';
-import { joinGame } from '../engine/engine.js';
+import { addLobbyPlayer, createLobby, globalStore } from '../state/store.js';
+import { startGame } from '../engine/engine.js';
 
 export type ControlStatus = 'idle' | 'bootstrapping' | 'running' | 'paused' | 'stopping' | 'stopped' | 'game_over' | 'error';
 export type LogLevel = 'info' | 'warn' | 'error';
@@ -28,9 +29,10 @@ export interface AutoControlConfig {
   gameId: string | null;
   bootstrap: boolean;
   mapId: string;
+  playerCount: number;
   intervalSeconds: number;
   timeoutSeconds: number;
-  players: Record<PlayerId, PlayerCommandConfig>;
+  players: PlayerRecord<PlayerCommandConfig>;
 }
 
 export interface CommandInvocation {
@@ -113,19 +115,24 @@ export function parseCommandLine(line: string): CommandInvocation {
 }
 
 function defaultPlayer(side: PlayerId): PlayerCommandConfig {
+  const suffix = side.replace('player_', '');
   return {
     provider: side === 'player_a' ? 'new-api' : 'deepseek',
     model: side === 'player_a' ? 'step-3.7-flash' : 'deepseekv4flash',
-    name: side === 'player_a' ? 'tactical-game-player-a' : 'tactical-game-player-b',
-    session: side === 'player_a' ? '.pi/session/player-a.jsonl' : '.pi/session/player-b.jsonl',
+    name: `tactical-game-${side.replace('_', '-')}`,
+    session: `.pi/session/player-${suffix}.jsonl`,
     skill: DEFAULT_SKILL,
     prompt: '到你了',
     startPrompt: side === 'player_a'
       ? '你是 player_a，gameId:{gameId}，token:{token}。你叫{name}，现在开始认真思考并进行你的回合。'
-      : '你是 player_b，gameId:{gameId}，token:{token}。你叫{name}，等待并在轮到你时认真思考行动。',
+      : '你是 {side}，gameId:{gameId}，token:{token}。你叫{name}，等待并在轮到你时认真思考行动。',
     commandMode: 'fields',
     advancedCommand: '',
   };
+}
+
+function defaultPlayers(): PlayerRecord<PlayerCommandConfig> {
+  return Object.fromEntries(PLAYER_IDS.map(id => [id, defaultPlayer(id)])) as PlayerRecord<PlayerCommandConfig>;
 }
 
 function defaultConfig(): AutoControlConfig {
@@ -133,12 +140,10 @@ function defaultConfig(): AutoControlConfig {
     gameId: null,
     bootstrap: true,
     mapId: 'default',
+    playerCount: 2,
     intervalSeconds: 2,
     timeoutSeconds: 10,
-    players: {
-      player_a: defaultPlayer('player_a'),
-      player_b: defaultPlayer('player_b'),
-    },
+    players: defaultPlayers(),
   };
 }
 
@@ -147,13 +152,15 @@ function mergePlayer(base: PlayerCommandConfig, patch?: Partial<PlayerCommandCon
 }
 
 function mergeConfig(base: AutoControlConfig, patch: Partial<AutoControlConfig>): AutoControlConfig {
+  const mergedPlayers: PlayerRecord<PlayerCommandConfig> = {};
+  for (const id of PLAYER_IDS) {
+    mergedPlayers[id] = mergePlayer(base.players[id] ?? defaultPlayer(id), patch.players?.[id]);
+  }
   return {
     ...base,
     ...patch,
-    players: {
-      player_a: mergePlayer(base.players.player_a, patch.players?.player_a),
-      player_b: mergePlayer(base.players.player_b, patch.players?.player_b),
-    },
+    playerCount: Math.max(2, Math.min(8, Math.trunc(patch.playerCount ?? base.playerCount ?? 2))),
+    players: mergedPlayers,
   };
 }
 
@@ -180,7 +187,7 @@ export function resolveCommandInvocation(invocation: CommandInvocation, piCliPat
       ? join(process.env.APPDATA, 'npm', 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js')
       : ''
   );
-  if (!cliPath || !existsSync(cliPath)) return invocation;
+  if (!cliPath || (!piCliPath && !existsSync(cliPath))) return invocation;
   return { command: process.execPath, args: [cliPath, ...invocation.args] };
 }
 
@@ -246,21 +253,27 @@ export class AutoControlController {
     this.log('info', 'control start');
 
     if (this.config.bootstrap) {
-      const game = createInitialGame(randomUUID(), this.config.mapId);
-      game.playerNames.player_a = this.config.players.player_a.name;
+      const game = createLobby(randomUUID(), this.config.mapId, {
+        maxPlayers: this.config.playerCount,
+        participate: false,
+      });
       globalStore.save(game);
-      const joined = joinGame(game, globalEventBus, this.config.players.player_b.name);
-      if (!joined.ok) throw this.fail(joined.message);
+      for (const playerId of PLAYER_IDS.slice(0, this.config.playerCount)) {
+        const playerConfig = this.config.players[playerId] ?? defaultPlayer(playerId);
+        const joined = addLobbyPlayer(game, playerConfig.name);
+        if (!joined) throw this.fail(`failed to join ${playerId}`);
+      }
+      const started = startGame(game, globalEventBus);
+      if (!started.ok) throw this.fail(started.message);
       globalStore.persist(game);
       this.config.gameId = game.id;
       this.writeConfig();
       this.log('info', `bootstrap gameId=${game.id}`);
-      const aPrompt = this.renderPrompt(this.config.players.player_a.startPrompt, 'player_a');
-      const bPrompt = this.renderPrompt(this.config.players.player_b.startPrompt, 'player_b');
-      const startedA = await this.runForSide('player_a', aPrompt);
-      if (startedA.code !== 0) throw this.fail('player_a start prompt failed');
-      const startedB = await this.runForSide('player_b', bPrompt);
-      if (startedB.code !== 0) throw this.fail('player_b start prompt failed');
+      for (const playerId of game.turn.turnOrder) {
+        const playerConfig = this.config.players[playerId] ?? defaultPlayer(playerId);
+        const result = await this.runForSide(playerId, this.renderPrompt(playerConfig.startPrompt, playerId));
+        if (result.code !== 0) throw this.fail(`${playerId} start prompt failed`);
+      }
     }
 
     this.status = 'running';
@@ -314,9 +327,12 @@ export class AutoControlController {
       this.persistState();
       return;
     }
-    const previousOwner = event.payload.previousOwner;
-    if (previousOwner === 'player_b') await this.runForSide('player_a', this.renderPrompt(this.config.players.player_a.prompt, 'player_a'));
-    if (previousOwner === 'player_a') await this.runForSide('player_b', this.renderPrompt(this.config.players.player_b.prompt, 'player_b'));
+    const nextPlayerId = event.payload.nextPlayerId ?? event.payload.nextOwner;
+    if (typeof nextPlayerId === 'string' && PLAYER_IDS.includes(nextPlayerId as PlayerId)) {
+      const playerId = nextPlayerId as PlayerId;
+      const playerConfig = this.config.players[playerId];
+      if (playerConfig) await this.runForSide(playerId, this.renderPrompt(playerConfig.prompt, playerId));
+    }
     this.persistState();
   }
 
@@ -366,6 +382,7 @@ export class AutoControlController {
 
   private buildInvocation(side: PlayerId, prompt: string): CommandInvocation {
     const player = this.config.players[side];
+    if (!player) throw new Error(`player ${side} is not configured`);
     if (player.commandMode === 'advanced' && player.advancedCommand.trim()) {
       return parseCommandLine(player.advancedCommand.replaceAll('{prompt}', prompt).replaceAll('{gameId}', this.config.gameId ?? ''));
     }
@@ -384,12 +401,13 @@ export class AutoControlController {
 
   private renderPrompt(prompt: string, side: PlayerId): string {
     const token = this.config.gameId ? (globalStore.get(this.config.gameId)?.tokens[side] ?? '') : '';
+    const player = this.config.players[side] ?? defaultPlayer(side);
     return prompt
       .replaceAll('{gameId}', this.config.gameId ?? '')
       .replaceAll('{token}', token)
       .replaceAll('{side}', side)
       .replaceAll('{owner}', side)
-      .replaceAll('{name}', this.config.players[side].name);
+      .replaceAll('{name}', player.name);
   }
 
   private fail(message: string): Error {

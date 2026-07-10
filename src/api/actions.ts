@@ -22,10 +22,13 @@ async function actionHandler(
   if (ctx.game.phase === 'game_over') {
     return reply.code(statusForCode('game_over')).send({ error: 'game over', code: 'game_over' });
   }
-  if (ctx.game.phase !== 'waiting_command') {
+  if (ctx.game.phase !== 'active') {
     return reply.code(statusForCode('game_not_started')).send({ error: 'game not started', code: 'game_not_started' });
   }
-  if (ctx.game.turn.currentOwner !== ctx.player) {
+  if (ctx.game.players[ctx.player]?.status !== 'active') {
+    return reply.code(statusForCode('player_eliminated')).send({ error: 'player eliminated', code: 'player_eliminated' });
+  }
+  if (ctx.game.turn.currentPlayerId !== ctx.player) {
     return reply.code(statusForCode('not_your_turn')).send({ error: 'not your turn', code: 'not_your_turn' });
   }
   const result = action(ctx);

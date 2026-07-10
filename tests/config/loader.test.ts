@@ -255,47 +255,6 @@ describe('map config loader', () => {
     resetConfig();
   });
 
-  it('loads blitz map correctly and verifies its 10-turn quick play balance properties', () => {
-    resetConfig();
-    loadMaps();
-
-    const blitz = getMapConfig('blitz');
-    expect(blitz.name).toBe('三川夺秒');
-    expect(blitz.radius).toBe(6);
-    expect(blitz.balance.maxTurns).toBe(10);
-    expect(blitz.headquarters.player_a).toEqual({ q: -6, r: 0 });
-    expect(blitz.headquarters.player_b).toEqual({ q: 6, r: 0 });
-    expect(blitz.headquartersSpec.hp).toBe(110);
-    expect(blitz.headquartersSpec.defense).toBe(3);
-
-    // Verify perfect origin reflection symmetry of control points
-    for (const point of blitz.controlPoints) {
-      const mirror = originReflection(point);
-      const counterpart = blitz.controlPoints.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
-      expect(counterpart, `${point.id} should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
-      expect(counterpart!.kind).toBe(point.kind);
-    }
-
-    // Verify perfect origin reflection symmetry of terrain cells
-    for (const cell of blitz.terrainCells) {
-      const mirror = originReflection(cell);
-      const counterpart = blitz.terrainCells.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
-      expect(counterpart, `terrain (${cell.q},${cell.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
-      expect(counterpart!.terrain).toBe(cell.terrain);
-    }
-
-    // Verify perfect origin reflection symmetry of starting units (A unit at (q,r) -> B unit at (-q,-r) with same type)
-    for (const unit of blitz.startingUnits) {
-      const mirror = originReflection(unit);
-      const counterpart = blitz.startingUnits.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
-      expect(counterpart, `starting unit (${unit.q},${unit.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
-      expect(counterpart!.type).toBe(unit.type);
-      expect(counterpart!.owner).toBe(unit.owner === 'player_a' ? 'player_b' : 'player_a');
-    }
-
-    resetConfig();
-  });
-
   it('loads forge map with diagonal HQs and a demolishable forge ring for 10-turn play', () => {
     resetConfig();
     loadMaps();

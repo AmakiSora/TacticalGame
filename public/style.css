@@ -796,16 +796,6 @@ main {
 .player-name:hover { border-bottom-color: rgba(255,255,255,.7); }
 
 /* Adjudication score */
-#score-panel .score-leader {
-  padding: 6px 8px;
-  margin-bottom: 8px;
-  background: #0f1a24;
-  border: 1px solid #2a3a4a;
-  border-radius: 6px;
-  color: #f0d77c;
-  font-weight: 700;
-  font-size: 13px;
-}
 .score-row {
   padding: 8px;
   margin-top: 8px;
@@ -828,6 +818,28 @@ main {
   justify-content: space-between;
   gap: 8px;
   font-size: 13px;
+}
+.score-row-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.score-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 6px;
+  background: #172431;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  color: #f0d77c;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1;
 }
 .score-row-head strong {
   color: #d8e0e8;

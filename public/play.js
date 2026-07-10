@@ -775,12 +775,18 @@ function scoreBreakdown(score) {
   return `HQ伤害 ${score.headquartersDamage ?? score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
 }
 
-function renderScoreRow(owner, score) {
+function scoreRank(rows, index) {
+  const score = rows[index]?.[1]?.total ?? 0;
+  const firstIndex = rows.findIndex(([, rowScore]) => (rowScore.total ?? 0) === score);
+  return firstIndex + 1;
+}
+
+function renderScoreRow(owner, score, rank) {
   const cls = playerClass(owner);
   const mine = owner === myPlayer ? ' mine' : '';
   const status = state.players?.[owner]?.status === 'eliminated' ? ' · 已淘汰' : '';
   return `<div class="score-row ${cls}${mine}">
-    <div class="score-row-head"><span>${esc(playerName(owner))}${owner === myPlayer ? '（你）' : ''}${status}</span><strong>${score.total}</strong></div>
+    <div class="score-row-head"><span><em class="score-rank">#${rank}</em>${esc(playerName(owner))}${owner === myPlayer ? '（你）' : ''}${status}</span><strong>${score.total}</strong></div>
     <div class="score-breakdown">${esc(scoreBreakdown(score))}</div>
   </div>`;
 }
@@ -790,16 +796,12 @@ function renderScorePanel() {
   if (!scorePanelEl) return;
   const scores = computeAdjudicationScores();
   if (!scores) {
-    scorePanelEl.innerHTML = '<h3>裁决分</h3><div class="score-empty">等待对局开始</div>';
+    scorePanelEl.innerHTML = '<h3>分数排行榜</h3><div class="score-empty">等待对局开始</div>';
     return;
   }
   const rows = Object.entries(scores).sort((a, b) => b[1].total - a[1].total);
-  const leader = rows.length > 1 && rows[0][1].total === rows[1][1].total
-    ? '当前最高分并列'
-    : `${playerName(rows[0][0])} 领先 ${rows[1] ? Math.abs(rows[0][1].total - rows[1][1].total) : 0}`;
-  scorePanelEl.innerHTML = `<h3>裁决分</h3>
-    <div class="score-leader">${esc(leader)}</div>
-    ${rows.map(([owner, score]) => renderScoreRow(owner, score)).join('')}`;
+  scorePanelEl.innerHTML = `<h3>分数排行榜</h3>
+    ${rows.map(([owner, score], index) => renderScoreRow(owner, score, scoreRank(rows, index))).join('')}`;
 }
 
 function renderSidebar() {

@@ -706,22 +706,24 @@ function renderScorePanel() {
   if (!scorePanelEl) return;
   const scores = state?.result?.scores || computeAdjudicationScores();
   if (!scores) {
-    scorePanelEl.innerHTML = '<h3>裁决分</h3><div class="score-empty">等待对局开始</div>';
+    scorePanelEl.innerHTML = '<h3>分数排行榜</h3><div class="score-empty">等待对局开始</div>';
     return;
   }
   const rows = Object.entries(scores).sort(([, a], [, b]) => (b.total ?? 0) - (a.total ?? 0));
-  const [leaderOwner, leaderScore] = rows[0];
-  const tied = rows.filter(([, score]) => score.total === leaderScore.total).length > 1;
-  const leader = tied ? '当前平分' : `${playerName(leaderOwner)} 领先 ${Math.abs((leaderScore.total ?? 0) - (rows[1]?.[1]?.total ?? 0))}`;
-  scorePanelEl.innerHTML = `<h3>裁决分</h3>
-    <div class="score-leader">${esc(leader)}</div>
-    ${rows.map(([owner, score]) => renderScoreRow(owner, score)).join('')}`;
+  scorePanelEl.innerHTML = `<h3>分数排行榜</h3>
+    ${rows.map(([owner, score], index) => renderScoreRow(owner, score, scoreRank(rows, index))).join('')}`;
 }
 
-function renderScoreRow(owner, score) {
+function scoreRank(rows, index) {
+  const score = rows[index]?.[1]?.total ?? 0;
+  const firstIndex = rows.findIndex(([, rowScore]) => (rowScore.total ?? 0) === score);
+  return firstIndex + 1;
+}
+
+function renderScoreRow(owner, score, rank) {
   const cls = ownerClass(owner);
   return `<div class="score-row ${cls}">
-    <div class="score-row-head"><span>${playerNameControl(owner)}</span><strong>${score.total}</strong></div>
+    <div class="score-row-head"><span><em class="score-rank">#${rank}</em>${playerNameControl(owner)}</span><strong>${score.total}</strong></div>
     <div class="score-breakdown">${esc(scoreBreakdown(score))}</div>
   </div>`;
 }

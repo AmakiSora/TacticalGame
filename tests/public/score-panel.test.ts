@@ -32,6 +32,16 @@ describe('adjudication score panels', () => {
     }
   });
 
+  it('renders adjudication scores as a leaderboard without a separate lead summary', () => {
+    for (const file of ['public/app.js', 'public/play.js']) {
+      const source = read(file);
+      expect(source).toContain('<h3>分数排行榜</h3>');
+      expect(source).toContain('score-rank');
+      expect(source).not.toContain('score-leader');
+      expect(source).not.toContain('领先');
+    }
+  });
+
   it('supports typed control point display and repair replay events', () => {
     for (const file of ['public/app.js', 'public/play.js']) {
       const source = read(file);

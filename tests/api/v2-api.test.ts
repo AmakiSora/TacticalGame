@@ -235,6 +235,29 @@ describe('V2 API', () => {
     await app.close();
   });
 
+  it('allows the spectator host controls to rename any player through the event stream', async () => {
+    const app = await startTestServer();
+    const { gameId } = await createAndJoin(app);
+
+    const rename = await app.inject({
+      method: 'PATCH',
+      url: `/api/games/${gameId}/rename`,
+      payload: { playerId: 'player_b', name: 'Orange Commander' },
+    });
+    expect(rename.statusCode).toBe(200);
+
+    const eventsRes = await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` });
+    const eventsBody = eventsRes.json();
+    expect(eventsBody.events.at(-1)).toMatchObject({
+      type: 'name_rename',
+      payload: { playerId: 'player_b', name: 'Orange Commander' },
+    });
+
+    const listRes = await app.inject({ method: 'GET', url: '/api/games' });
+    expect(listRes.json().games.find((g: any) => g.gameId === gameId).playerNames.player_b).toBe('Orange Commander');
+    await app.close();
+  });
+
   it('keeps game_start replay payload immutable after later actions', async () => {
     const app = await startTestServer();
     const { gameId, playerAToken } = await createAndJoin(app);

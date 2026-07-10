@@ -49,4 +49,28 @@ describe('adjudication score panels', () => {
       expect(source).not.toContain('15回合裁决');
     }
   });
+
+  it('renders spectator scores and resources for every joined player', () => {
+    const source = read('public/app.js');
+
+    expect(source).toContain('const PLAYER_IDS = [');
+    expect(source).toContain('function joinedPlayerIds()');
+    expect(source).toContain('function ownerClass(owner)');
+    expect(source).toContain('function ownerColor(owner)');
+    expect(source).toContain('Object.fromEntries(players.map(owner => [owner, playerScore(owner)]))');
+    expect(source).toContain('Object.entries(state.resources || {})');
+    expect(source).not.toContain("const enemy = owner === 'player_a' ? 'player_b' : 'player_a';");
+    expect(source).not.toContain('state.resources.player_a.supplies');
+    expect(source).not.toContain('state.resources.player_b.supplies');
+  });
+
+  it('sends spectator rename requests to the host rename endpoint with the control token', () => {
+    const source = read('public/app.js');
+    const renameBody = source.slice(source.indexOf('async function renamePlayer'), source.indexOf('function downloadFile'));
+
+    expect(renameBody).toContain("localStorage.getItem('autoControlToken')");
+    expect(renameBody).toContain("headers['x-control-token'] = controlToken");
+    expect(renameBody).toContain('/rename');
+    expect(renameBody).toContain('playerId, name');
+  });
 });

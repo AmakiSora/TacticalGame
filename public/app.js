@@ -7,7 +7,20 @@ const TERRAIN = {
   water: '#183a55',
   blocker: '#393f46',
 };
-const OWNER_COLOR = { player_a: '#66ccff', player_b: '#ff9966' };
+const PLAYER_IDS = [
+  'player_a', 'player_b', 'player_c', 'player_d',
+  'player_e', 'player_f', 'player_g', 'player_h',
+];
+const OWNER_COLORS = {
+  player_a: '#66ccff',
+  player_b: '#ff9966',
+  player_c: '#9fdf6f',
+  player_d: '#d98cff',
+  player_e: '#ffd166',
+  player_f: '#72e0d1',
+  player_g: '#f27a9a',
+  player_h: '#a7b7ff',
+};
 const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
 const UNIT_LABELS = { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP', headquarters: 'HQ' };
 const CONTROL_POINT_LABELS = { supply: 'SUP', forward_base: 'FWD', repair: 'REP' };
@@ -84,12 +97,17 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function playerLabel(owner) {
+  const index = PLAYER_IDS.indexOf(owner);
+  return index >= 0 ? String.fromCharCode(65 + index) : String(owner || '?').replace(/^player_/, '').toUpperCase();
+}
+
 function defaultPlayerNames() {
-  return { player_a: '玩家 A', player_b: '玩家 B' };
+  return Object.fromEntries(PLAYER_IDS.map(owner => [owner, `玩家 ${playerLabel(owner)}`]));
 }
 
 function playerName(owner) {
-  return playerNames[owner] || (owner === 'player_a' ? '玩家 A' : '玩家 B');
+  return playerNames[owner] || `玩家 ${playerLabel(owner)}`;
 }
 
 function maxTurnsLabel() {
@@ -98,8 +116,24 @@ function maxTurnsLabel() {
 }
 
 function playerNameControl(owner) {
-  const cls = owner === 'player_a' ? 'player-a' : 'player-b';
-  return `<button class="player-name ${cls}" data-rename-player="${owner}" title="更改玩家名字">${esc(playerName(owner))}</button>`;
+  return `<button class="player-name ${ownerClass(owner)}" data-rename-player="${owner}" title="更改玩家名字">${esc(playerName(owner))}</button>`;
+}
+
+function ownerClass(owner) {
+  return owner ? String(owner).replace(/_/g, '-') : 'neutral';
+}
+
+function ownerColor(owner) {
+  return OWNER_COLORS[owner] || '#9aa7b3';
+}
+
+function joinedPlayerIds() {
+  if (!state) return [];
+  const seen = new Set();
+  for (const owner of Object.keys(state.resources || {})) seen.add(owner);
+  for (const hq of state.headquarters?.values?.() || []) seen.add(hq.owner);
+  for (const unit of state.units?.values?.() || []) seen.add(unit.owner);
+  return PLAYER_IDS.filter(owner => seen.has(owner));
 }
 
 function key(pos) { return `${pos.q},${pos.r}`; }
@@ -191,7 +225,7 @@ function createEmptyState() {
     controlPoints: new Map(),
     headquarters: new Map(),
     units: new Map(),
-    resources: { player_a: { supplies: 0 }, player_b: { supplies: 0 } },
+    resources: {},
     turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command', actionsUsed: 0 },
     winner: null,
     result: null,
@@ -234,6 +268,7 @@ function applyEvent(s, ev) {
       computeLayout(s.cells);
       break;
     case 'deploy':
+      if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies -= p.cost || 0;
       s.units.set(p.unitId, {
         id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r,
@@ -287,6 +322,7 @@ function applyEvent(s, ev) {
       break;
     }
     case 'income':
+      if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies += p.amount;
       break;
     case 'reset_actions':
@@ -303,7 +339,7 @@ function applyEvent(s, ev) {
     case 'game_over':
       s.turn.phase = 'game_over';
       s.winner = p.winner;
-      s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores };
+      s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores, rankings: p.rankings };
       break;
     case 'name_rename':
       playerNames[p.playerId] = p.name;
@@ -435,7 +471,7 @@ function drawControlPointGlyph(kind, x, y) {
 function drawUnitMarker(u) {
   if (!u.alive) return;
   const p = hexToPixel(u.q, u.r);
-  ctx.fillStyle = OWNER_COLOR[u.owner];
+  ctx.fillStyle = ownerColor(u.owner);
   ctx.beginPath();
   ctx.arc(p.x, p.y, HEX_SIZE * 0.42, 0, Math.PI * 2);
   ctx.fill();
@@ -452,7 +488,7 @@ function drawUnitMarker(u) {
 function drawHeadquartersMarker(hq) {
   const p = hexToPixel(hq.q, hq.r);
   pathHex(hq.q, hq.r, 5);
-  ctx.fillStyle = hq.alive ? OWNER_COLOR[hq.owner] : '#555';
+  ctx.fillStyle = hq.alive ? ownerColor(hq.owner) : '#555';
   ctx.globalAlpha = hq.alive ? 0.78 : 0.3;
   ctx.fill();
   ctx.globalAlpha = 1;
@@ -473,11 +509,11 @@ function drawHeadquartersMarker(hq) {
 function drawControlPointMarker(cp) {
   const p = hexToPixel(cp.q, cp.r);
   pathHex(cp.q, cp.r, 8);
-  ctx.fillStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a';
+  ctx.fillStyle = cp.owner ? ownerColor(cp.owner) : '#d6b34a';
   ctx.globalAlpha = 0.32;
   ctx.fill();
   ctx.globalAlpha = 1;
-  ctx.strokeStyle = cp.owner ? OWNER_COLOR[cp.owner] : '#d6b34a';
+  ctx.strokeStyle = cp.owner ? ownerColor(cp.owner) : '#d6b34a';
   ctx.lineWidth = 2;
   ctx.stroke();
   if (cp.kind) {
@@ -557,7 +593,7 @@ function controlPointStats(cp) {
 function renderEntityCard(ent) {
   const type = ent.type || 'headquarters';
   const title = UNIT_NAMES[type] || '指挥部';
-  const ownerClass = ent.owner === 'player_a' ? 'player-a' : 'player-b';
+  const entityOwnerClass = ownerClass(ent.owner);
   const hpPct = Math.max(0, Math.min(100, ent.maxHp ? (ent.hp / ent.maxHp) * 100 : 0));
   const stats = [
     statItem('攻击', ent.attack, 'attack'),
@@ -569,7 +605,7 @@ function renderEntityCard(ent) {
   ].join('');
   return `<div class="sel-card">
     <div class="sel-head">
-      ${entityTokenMarkup(type, ownerClass, title)}
+      ${entityTokenMarkup(type, entityOwnerClass, title)}
       <div class="sel-title-wrap">
         <div class="sel-type">${esc(title)}</div>
         <div class="sel-owner">${playerNameControl(ent.owner)}</div>
@@ -586,13 +622,13 @@ function renderEntityCard(ent) {
 
 function renderControlPointCard(cp) {
   const owner = cp.owner ? playerName(cp.owner) : '中立';
-  const ownerClass = cp.owner === 'player_a' ? 'player-a' : cp.owner === 'player_b' ? 'player-b' : 'neutral';
+  const cpOwnerClass = cp.owner ? ownerClass(cp.owner) : 'neutral';
   return `<div class="sel-card">
     <div class="sel-head">
-      ${entityTokenMarkup(cp.kind || 'supply', ownerClass, cp.name)}
+      ${entityTokenMarkup(cp.kind || 'supply', cpOwnerClass, cp.name)}
       <div class="sel-title-wrap">
         <div class="sel-type">${esc(cp.name)}</div>
-        <div class="sel-owner ${ownerClass}">${esc(owner)}</div>
+        <div class="sel-owner ${cpOwnerClass}">${esc(owner)}</div>
       </div>
     </div>
     <div class="sel-stat-grid">
@@ -628,11 +664,11 @@ function formatEventShort(ev) {
 function playerScore(owner) {
   const weights = gameConfig?.balance?.adjudicationWeights;
   if (!weights || !state) return null;
-  const enemy = owner === 'player_a' ? 'player_b' : 'player_a';
   const ownHq = [...state.headquarters.values()].find(h => h.owner === owner);
-  const enemyHq = [...state.headquarters.values()].find(h => h.owner === enemy);
-  if (!ownHq || !enemyHq) return null;
-  const enemyHqDamage = Math.max(0, (enemyHq.maxHp || 0) - (enemyHq.hp || 0));
+  if (!ownHq) return null;
+  const headquartersDamage = [...state.headquarters.values()]
+    .filter(h => h.owner !== owner)
+    .reduce((sum, hq) => sum + Math.max(0, (hq.maxHp || 0) - (hq.hp || 0)), 0);
   const ownHqHp = Math.max(0, ownHq.hp || 0);
   const controlPoints = [...state.controlPoints.values()].filter(p => p.owner === owner).length;
   const armyValue = [...state.units.values()]
@@ -640,13 +676,13 @@ function playerScore(owner) {
     .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
   const supplies = state.resources?.[owner]?.supplies || 0;
   return {
-    enemyHqDamage,
+    headquartersDamage,
     ownHqHp,
     controlPoints,
     armyValue,
     supplies,
     total:
-      enemyHqDamage * weights.enemyHqDamage +
+      headquartersDamage * weights.enemyHqDamage +
       ownHqHp * weights.ownHqHp +
       controlPoints * weights.controlPoint +
       armyValue * weights.armyValue +
@@ -655,33 +691,35 @@ function playerScore(owner) {
 }
 
 function computeAdjudicationScores() {
-  const playerA = playerScore('player_a');
-  const playerB = playerScore('player_b');
-  return playerA && playerB ? { player_a: playerA, player_b: playerB } : null;
+  const players = joinedPlayerIds();
+  if (players.length < 2) return null;
+  const scores = Object.fromEntries(players.map(owner => [owner, playerScore(owner)]));
+  return Object.values(scores).every(Boolean) ? scores : null;
 }
 
 function scoreBreakdown(score) {
-  return `HQ伤害 ${score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
+  const hqDamage = score.headquartersDamage ?? score.enemyHqDamage ?? 0;
+  return `HQ伤害 ${hqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
 }
 
 function renderScorePanel() {
   if (!scorePanelEl) return;
-  const scores = computeAdjudicationScores();
+  const scores = state?.result?.scores || computeAdjudicationScores();
   if (!scores) {
     scorePanelEl.innerHTML = '<h3>裁决分</h3><div class="score-empty">等待对局开始</div>';
     return;
   }
-  const a = scores.player_a;
-  const b = scores.player_b;
-  const leader = a.total === b.total ? '当前平分' : `${playerName(a.total > b.total ? 'player_a' : 'player_b')} 领先 ${Math.abs(a.total - b.total)}`;
+  const rows = Object.entries(scores).sort(([, a], [, b]) => (b.total ?? 0) - (a.total ?? 0));
+  const [leaderOwner, leaderScore] = rows[0];
+  const tied = rows.filter(([, score]) => score.total === leaderScore.total).length > 1;
+  const leader = tied ? '当前平分' : `${playerName(leaderOwner)} 领先 ${Math.abs((leaderScore.total ?? 0) - (rows[1]?.[1]?.total ?? 0))}`;
   scorePanelEl.innerHTML = `<h3>裁决分</h3>
     <div class="score-leader">${esc(leader)}</div>
-    ${renderScoreRow('player_a', a)}
-    ${renderScoreRow('player_b', b)}`;
+    ${rows.map(([owner, score]) => renderScoreRow(owner, score)).join('')}`;
 }
 
 function renderScoreRow(owner, score) {
-  const cls = owner === 'player_a' ? 'player-a' : 'player-b';
+  const cls = ownerClass(owner);
   return `<div class="score-row ${cls}">
     <div class="score-row-head"><span>${playerNameControl(owner)}</span><strong>${score.total}</strong></div>
     <div class="score-breakdown">${esc(scoreBreakdown(score))}</div>
@@ -691,12 +729,15 @@ function renderScoreRow(owner, score) {
 function renderSidebar() {
   if (!state) return;
   const controlPoints = [...state.controlPoints.values()]
-    .map(cp => `<span class="cp-chip ${cp.owner ? (cp.owner === 'player_a' ? 'player-a' : 'player-b') : 'neutral'}">${esc(cp.name)}<strong>${cp.owner ? esc(playerName(cp.owner)) : '中立'}</strong></span>`)
+    .map(cp => `<span class="cp-chip ${cp.owner ? ownerClass(cp.owner) : 'neutral'}">${esc(cp.name)}<strong>${cp.owner ? esc(playerName(cp.owner)) : '中立'}</strong></span>`)
+    .join('');
+  const resourceCards = Object.entries(state.resources || {})
+    .filter(([owner]) => PLAYER_IDS.includes(owner))
+    .map(([owner, resource]) => `<div class="resource-card ${ownerClass(owner)}"><span>${playerNameControl(owner)}</span><strong>${resource.supplies ?? 0}</strong><em>补给</em></div>`)
     .join('');
   resourcesEl.innerHTML = `<h3>资源</h3>
     <div class="resource-grid">
-      <div class="resource-card player-a"><span>${playerNameControl('player_a')}</span><strong>${state.resources.player_a.supplies}</strong><em>补给</em></div>
-      <div class="resource-card player-b"><span>${playerNameControl('player_b')}</span><strong>${state.resources.player_b.supplies}</strong><em>补给</em></div>
+      ${resourceCards || '<div class="resource-empty">等待对局开始</div>'}
     </div>
     <div class="cp-strip">${controlPoints || '<span class="cp-chip neutral">暂无据点</span>'}</div>`;
   renderScorePanel();
@@ -706,7 +747,7 @@ function renderSidebar() {
     ? `<div class="turn-meta"><span>行动点</span><strong>${state.turn.actionsUsed ?? 0}/${maxActions}</strong></div>`
     : '';
   turnInfoEl.innerHTML = `<h3>回合</h3>
-    <div class="turn-card ${owner === 'player_a' ? 'player-a' : 'player-b'}">
+    <div class="turn-card ${ownerClass(owner)}">
       <span>第 ${state.turn.turnNumber} 回合</span>
       <strong>${playerNameControl(owner)}</strong>
       ${actionsLine}
@@ -990,9 +1031,12 @@ async function renamePlayer(playerId) {
     statusEl.textContent = '名字不能为空';
     return;
   }
+  const headers = { 'Content-Type': 'application/json' };
+  const controlToken = localStorage.getItem('autoControlToken') || '';
+  if (controlToken) headers['x-control-token'] = controlToken;
   const res = await fetch(`/api/games/${gameSelect.value}/rename`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ playerId, name }),
   });
   if (!res.ok) {

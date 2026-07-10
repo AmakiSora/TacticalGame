@@ -141,6 +141,23 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  app.patch<{ Params: { id: string }; Body: { playerId?: string; name?: string } }>('/api/games/:id/rename', async (req, reply) => {
+    if (!authorizeControlRequest(req, reply)) return;
+    const game = globalStore.get(req.params.id);
+    if (!game) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    const playerId = req.body?.playerId;
+    if (!isPlayerId(playerId) || !game.players[playerId]) {
+      return reply.code(400).send({ error: 'valid playerId required', code: 'invalid_move' });
+    }
+    const name = req.body?.name?.trim().slice(0, 20);
+    if (!name) return reply.code(400).send({ error: 'name is required', code: 'invalid_move' });
+    game.players[playerId]!.name = name;
+    game.playerNames[playerId] = name;
+    appendEvent(game, globalEventBus, 'name_rename', { playerId, name });
+    globalStore.persist(game);
+    return { ok: true };
+  });
+
   app.delete<{ Params: { id: string }; Querystring: { token?: string } }>('/api/games/:id', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     if (!globalStore.get(req.params.id)) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });

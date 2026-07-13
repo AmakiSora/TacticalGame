@@ -69,6 +69,7 @@ describe('adjudication score panels', () => {
     expect(source).toContain('function ownerColor(owner)');
     expect(source).toContain('Object.fromEntries(players.map(owner => [owner, playerScore(owner)]))');
     expect(source).toContain('Object.entries(state.resources || {})');
+    expect(source).toContain("state.players?.[owner]?.stats?.headquartersDamage");
     expect(source).not.toContain("const enemy = owner === 'player_a' ? 'player_b' : 'player_a';");
     expect(source).not.toContain('state.resources.player_a.supplies');
     expect(source).not.toContain('state.resources.player_b.supplies');

@@ -129,7 +129,7 @@ function ownerColor(owner) {
 
 function joinedPlayerIds() {
   if (!state) return [];
-  const seen = new Set();
+  const seen = new Set(Object.keys(state.players || {}));
   for (const owner of Object.keys(state.resources || {})) seen.add(owner);
   for (const hq of state.headquarters?.values?.() || []) seen.add(hq.owner);
   for (const unit of state.units?.values?.() || []) seen.add(unit.owner);
@@ -220,13 +220,22 @@ function hexCornersRaw(q, r) {
 
 function createEmptyState() {
   return {
+    players: {},
     map: { radius: 8, cells: [], terrainCells: [] },
     cells: [],
     controlPoints: new Map(),
     headquarters: new Map(),
     units: new Map(),
     resources: {},
-    turn: { turnNumber: 1, currentOwner: 'player_a', phase: 'waiting_command', actionsUsed: 0 },
+    turn: {
+      roundNumber: 1,
+      turnNumber: 1,
+      currentPlayerId: null,
+      currentOwner: null,
+      turnOrder: [],
+      phase: 'waiting_command',
+      actionsUsed: 0,
+    },
     winner: null,
     result: null,
     eventLog: [],
@@ -253,12 +262,21 @@ function cloneMapPayload(map = {}) {
 }
 
 function applyEvent(s, ev) {
+  if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
   s.eventLog.push(ev);
   const p = ev.payload || {};
   switch (ev.type) {
     case 'game_start':
       gameConfig = p.config;
-      if (p.playerNames) playerNames = p.playerNames;
+      if (p.playerNames) playerNames = { ...p.playerNames };
+      s.players = JSON.parse(JSON.stringify(p.players || {}));
+      s.turn.turnOrder = [...(p.turnOrder || [])];
+      s.turn.currentPlayerId = p.firstPlayer || s.turn.turnOrder[0] || null;
+      s.turn.currentOwner = s.turn.currentPlayerId;
+      s.turn.roundNumber = 1;
+      s.turn.turnNumber = 1;
+      s.turn.phase = 'active';
+      s.turn.actionsUsed = 0;
       s.map = cloneMapPayload(p.map);
       s.cells = s.map.cells || [];
       s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
@@ -287,9 +305,19 @@ function applyEvent(s, ev) {
     }
     case 'attack': {
       const target = s.units.get(p.targetId) || s.headquarters.get(p.targetId);
-      if (target) target.hp = p.targetHp;
       const a = s.units.get(p.attackerId);
+      const previousHp = target ? target.hp : null;
+      if (target) target.hp = p.targetHp;
       if (a) { a.hasActed = true; a.actionSpent = true; }
+      // Track cumulative HQ damage for adjudication scoring (matches server stats).
+      if (target && previousHp != null && (p.targetKind === 'headquarters' || s.headquarters.has(p.targetId)) && a) {
+        const player = s.players[a.owner];
+        if (player) {
+          if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0 };
+          const actualDamage = Math.max(0, previousHp - (Number(p.targetHp) || 0));
+          player.stats.headquartersDamage += actualDamage;
+        }
+      }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     }
@@ -332,10 +360,36 @@ function applyEvent(s, ev) {
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'turn_end':
-      s.turn.currentOwner = p.nextOwner;
-      s.turn.turnNumber = p.turnNumber;
+      s.turn.currentOwner = p.nextPlayerId || p.nextOwner;
+      s.turn.currentPlayerId = p.nextPlayerId || p.nextOwner;
+      s.turn.roundNumber = p.roundNumber || p.turnNumber;
+      s.turn.turnNumber = p.turnNumber || p.roundNumber;
       s.turn.actionsUsed = 0;
       break;
+    case 'round_end':
+      // Round boundary marker; turn_end that follows carries the new round number.
+      break;
+    case 'turn_skipped':
+      break;
+    case 'player_eliminated':
+      if (s.players[p.playerId]) s.players[p.playerId].status = 'eliminated';
+      for (const id of p.removedUnitIds || []) s.units.delete(id);
+      for (const hq of s.headquarters.values()) {
+        if (hq.owner === p.playerId) {
+          hq.hp = 0;
+          hq.alive = false;
+        }
+      }
+      for (const pointId of p.neutralizedPointIds || []) {
+        const cp = s.controlPoints.get(pointId);
+        if (cp) cp.owner = null;
+      }
+      break;
+    case 'control_point_neutralized': {
+      const cp = s.controlPoints.get(p.pointId);
+      if (cp) cp.owner = null;
+      break;
+    }
     case 'game_over':
       s.turn.phase = 'game_over';
       s.winner = p.winner;
@@ -647,14 +701,19 @@ function formatEventShort(ev) {
     case 'attack': return `攻击 ${String(p.targetId).slice(0, 6)} 伤害:${p.damage}`;
     case 'heal': return `治疗 ${String(p.targetId).slice(0, 6)} +${p.amount}`;
     case 'unit_death': return `单位阵亡 ${String(p.unitId).slice(0, 6)}`;
-    case 'headquarters_destroyed': return `指挥部摧毁 ${p.owner}`;
+    case 'headquarters_destroyed': return `指挥部摧毁 ${playerName(p.owner)}`;
+    case 'player_eliminated': return `${playerName(p.playerId)} 被淘汰`;
+    case 'control_point_neutralized': return `据点中立 ${p.pointId || ''}`;
     case 'control_point_captured': return `占领 ${p.name}`;
     case 'control_point_repair': return `${p.pointName || '维修站'} 修复 ${String(p.unitId).slice(0, 6)} +${p.amount}`;
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
-    case 'turn_end': return `回合结束 -> ${playerName(p.nextOwner)} (${p.turnNumber})`;
+    case 'turn_end': return `回合结束 -> ${playerName(p.nextPlayerId || p.nextOwner)} (${p.turnNumber || p.roundNumber})`;
+    case 'round_end': return `第 ${p.roundNumber || '?'} 轮结束`;
+    case 'turn_skipped': return `跳过 ${playerName(p.playerId)}`;
     case 'game_over':
       if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
       if (p.reason === 'turn_limit_score') return `${maxTurnsLabel()}裁决 胜者:${playerName(p.winner)}`;
+      if (p.reason === 'last_player_standing') return `最后存活 胜者:${playerName(p.winner)}`;
       return `游戏结束 胜者:${playerName(p.winner)}`;
     case 'demolish': return `爆破 (${p.q},${p.r})`;
     default: return ev.type;
@@ -666,9 +725,14 @@ function playerScore(owner) {
   if (!weights || !state) return null;
   const ownHq = [...state.headquarters.values()].find(h => h.owner === owner);
   if (!ownHq) return null;
-  const headquartersDamage = [...state.headquarters.values()]
-    .filter(h => h.owner !== owner)
-    .reduce((sum, hq) => sum + Math.max(0, (hq.maxHp || 0) - (hq.hp || 0)), 0);
+  // Prefer per-player cumulative HQ damage from attack events (server-compatible).
+  // Fall back to total enemy HQ damage only when stats are unavailable (legacy replays).
+  const tracked = state.players?.[owner]?.stats?.headquartersDamage;
+  const headquartersDamage = typeof tracked === 'number'
+    ? tracked
+    : [...state.headquarters.values()]
+      .filter(h => h.owner !== owner)
+      .reduce((sum, hq) => sum + Math.max(0, (hq.maxHp || 0) - (hq.hp || 0)), 0);
   const ownHqHp = Math.max(0, ownHq.hp || 0);
   const controlPoints = [...state.controlPoints.values()].filter(p => p.owner === owner).length;
   const armyValue = [...state.units.values()]
@@ -677,6 +741,7 @@ function playerScore(owner) {
   const supplies = state.resources?.[owner]?.supplies || 0;
   return {
     headquartersDamage,
+    enemyHqDamage: headquartersDamage,
     ownHqHp,
     controlPoints,
     armyValue,
@@ -709,9 +774,17 @@ function renderScorePanel() {
     scorePanelEl.innerHTML = '<h3>分数排行榜</h3><div class="score-empty">等待对局开始</div>';
     return;
   }
-  const rows = Object.entries(scores).sort(([, a], [, b]) => (b.total ?? 0) - (a.total ?? 0));
+  const resultRanks = new Map((state?.result?.rankings || []).map(row => [row.playerId, row.rank]));
+  const rows = Object.entries(scores).sort(([ownerA, scoreA], [ownerB, scoreB]) => {
+    const rankA = resultRanks.get(ownerA);
+    const rankB = resultRanks.get(ownerB);
+    if (typeof rankA === 'number' && typeof rankB === 'number') return rankA - rankB;
+    if (typeof rankA === 'number') return -1;
+    if (typeof rankB === 'number') return 1;
+    return (scoreB.total ?? 0) - (scoreA.total ?? 0);
+  });
   scorePanelEl.innerHTML = `<h3>分数排行榜</h3>
-    ${rows.map(([owner, score], index) => renderScoreRow(owner, score, scoreRank(rows, index))).join('')}`;
+    ${rows.map(([owner, score], index) => renderScoreRow(owner, score, resultRanks.get(owner) ?? scoreRank(rows, index))).join('')}`;
 }
 
 function scoreRank(rows, index) {
@@ -722,8 +795,9 @@ function scoreRank(rows, index) {
 
 function renderScoreRow(owner, score, rank) {
   const cls = ownerClass(owner);
-  return `<div class="score-row ${cls}">
-    <div class="score-row-head"><span><em class="score-rank">#${rank}</em>${playerNameControl(owner)}</span><strong>${score.total}</strong></div>
+  const eliminated = state?.players?.[owner]?.status === 'eliminated';
+  return `<div class="score-row ${cls}${eliminated ? ' eliminated' : ''}">
+    <div class="score-row-head"><span><em class="score-rank">#${rank}</em>${playerNameControl(owner)}${eliminated ? ' <em class="score-status">已淘汰</em>' : ''}</span><strong>${score.total}</strong></div>
     <div class="score-breakdown">${esc(scoreBreakdown(score))}</div>
   </div>`;
 }
@@ -743,7 +817,7 @@ function renderSidebar() {
     </div>
     <div class="cp-strip">${controlPoints || '<span class="cp-chip neutral">暂无据点</span>'}</div>`;
   renderScorePanel();
-  const owner = state.turn.currentOwner;
+  const owner = state.turn.currentPlayerId || state.turn.currentOwner;
   const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
   const actionsLine = maxActions
     ? `<div class="turn-meta"><span>行动点</span><strong>${state.turn.actionsUsed ?? 0}/${maxActions}</strong></div>`

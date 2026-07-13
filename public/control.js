@@ -6,6 +6,8 @@ const logSearch = document.getElementById('log-search');
 const autoScrollLogs = document.getElementById('auto-scroll-logs');
 const configForm = document.getElementById('config-form');
 const configDirty = document.getElementById('config-dirty');
+const playerFields = document.getElementById('player-fields');
+const PLAYER_IDS = ['player_a', 'player_b', 'player_c', 'player_d', 'player_e', 'player_f', 'player_g', 'player_h'];
 const logs = [];
 let lastLogSeq = 0;
 let currentStatus = 'idle';
@@ -13,6 +15,8 @@ let busy = false;
 let dirty = false;
 let logStream = null;
 let pollTimer = null;
+/** Keep full multi-seat player configs even when the UI only shows the active count. */
+let playerConfigCache = {};
 
 function token() {
   return localStorage.getItem('autoControlToken') || '';
@@ -74,19 +78,83 @@ function updateControls(status = currentStatus) {
   document.getElementById('btn-send-manual').disabled = busy;
 }
 
-function fillPlayer(side, player) {
-  const fieldset = document.querySelector(`fieldset[data-side="${side}"]`);
-  for (const key of ['provider', 'model', 'name', 'session', 'skill', 'prompt', 'startPrompt', 'commandMode', 'advancedCommand']) {
-    const el = fieldset.querySelector(`[name="${key}"]`);
-    el.value = player[key] || '';
+function emptyPlayer() {
+  return {
+    provider: '',
+    model: '',
+    name: '',
+    session: '',
+    skill: '',
+    prompt: '',
+    startPrompt: '',
+    commandMode: 'fields',
+    advancedCommand: '',
+  };
+}
+
+function playerLegend(side) {
+  return 'Player ' + side.replace('player_', '').toUpperCase();
+}
+
+function ensurePlayerFields(count) {
+  const activeCount = Math.max(2, Math.min(8, Number(count) || 2));
+  const existing = new Map(
+    [...playerFields.querySelectorAll('fieldset[data-side]')].map(fs => [fs.dataset.side, fs]),
+  );
+
+  for (const [side, fieldset] of existing) {
+    playerConfigCache[side] = readPlayerFromFieldset(fieldset);
+  }
+
+  playerFields.replaceChildren();
+  for (let i = 0; i < activeCount; i++) {
+    const side = PLAYER_IDS[i];
+    const fieldset = document.createElement('fieldset');
+    fieldset.dataset.side = side;
+    fieldset.innerHTML =
+      '<legend>' + playerLegend(side) + '</legend>' +
+      '<div class="field-grid">' +
+      '<label>Provider <input name="provider" /></label>' +
+      '<label>Model <input name="model" /></label>' +
+      '<label>Name <input name="name" /></label>' +
+      '<label>Session <input name="session" /></label>' +
+      '<label>Skill <input name="skill" /></label>' +
+      '<label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>' +
+      '</div>' +
+      '<label>Prompt <textarea name="prompt"></textarea></label>' +
+      '<label>Start Prompt <textarea name="startPrompt"></textarea></label>' +
+      '<label>Advanced Command <textarea name="advancedCommand"></textarea></label>';
+    playerFields.append(fieldset);
+    fillPlayerFieldset(fieldset, playerConfigCache[side] || emptyPlayer());
+  }
+
+  const manualSide = document.getElementById('manual-side');
+  if (manualSide) {
+    const current = manualSide.value;
+    manualSide.replaceChildren();
+    for (let i = 0; i < activeCount; i++) {
+      const side = PLAYER_IDS[i];
+      const option = document.createElement('option');
+      option.value = side;
+      option.textContent = side;
+      manualSide.append(option);
+    }
+    if ([...manualSide.options].some(o => o.value === current)) manualSide.value = current;
   }
 }
 
-function readPlayer(side) {
-  const fieldset = document.querySelector(`fieldset[data-side="${side}"]`);
-  const player = {};
+function fillPlayerFieldset(fieldset, player) {
   for (const key of ['provider', 'model', 'name', 'session', 'skill', 'prompt', 'startPrompt', 'commandMode', 'advancedCommand']) {
-    player[key] = fieldset.querySelector(`[name="${key}"]`).value;
+    const el = fieldset.querySelector('[name="' + key + '"]');
+    if (el) el.value = player?.[key] || '';
+  }
+}
+
+function readPlayerFromFieldset(fieldset) {
+  const player = emptyPlayer();
+  for (const key of Object.keys(player)) {
+    const el = fieldset.querySelector('[name="' + key + '"]');
+    if (el) player[key] = el.value;
   }
   return player;
 }
@@ -97,22 +165,34 @@ function fillConfig(config) {
   document.getElementById('bootstrap').checked = Boolean(config.bootstrap);
   document.getElementById('interval').value = config.intervalSeconds;
   document.getElementById('timeout').value = config.timeoutSeconds;
-  fillPlayer('player_a', config.players.player_a);
-  fillPlayer('player_b', config.players.player_b);
+
+  playerConfigCache = {};
+  for (const side of PLAYER_IDS) {
+    playerConfigCache[side] = Object.assign(emptyPlayer(), config.players?.[side] || {});
+  }
+  const playerCount = Math.max(2, Math.min(8, Number(config.playerCount) || 2));
+  document.getElementById('player-count').value = String(playerCount);
+  ensurePlayerFields(playerCount);
   setDirty(false);
 }
 
 function readConfig() {
+  const playerCount = Math.max(2, Math.min(8, Number(document.getElementById('player-count').value) || 2));
+  for (const fieldset of playerFields.querySelectorAll('fieldset[data-side]')) {
+    playerConfigCache[fieldset.dataset.side] = readPlayerFromFieldset(fieldset);
+  }
+  const players = {};
+  for (const side of PLAYER_IDS) {
+    players[side] = Object.assign(emptyPlayer(), playerConfigCache[side] || {});
+  }
   return {
     gameId: document.getElementById('game-id').value || null,
     mapId: document.getElementById('map-id').value || 'default',
     bootstrap: document.getElementById('bootstrap').checked,
+    playerCount: playerCount,
     intervalSeconds: Number(document.getElementById('interval').value) || 2,
     timeoutSeconds: Number(document.getElementById('timeout').value) || 10,
-    players: {
-      player_a: readPlayer('player_a'),
-      player_b: readPlayer('player_b'),
-    },
+    players: players,
   };
 }
 
@@ -121,7 +201,7 @@ function renderStatus(status) {
   document.getElementById('state-game').textContent = status.gameId || '-';
   document.getElementById('state-seq').textContent = status.lastSeq || 0;
   document.getElementById('state-child').textContent = status.runningChild || '-';
-  setStatus(status.status, status.runningChild ? `运行中: ${status.runningChild}` : `控制器状态: ${status.status}`);
+  setStatus(status.status, status.runningChild ? ('运行中: ' + status.runningChild) : ('控制器状态: ' + status.status));
   updateControls(status.status);
 }
 
@@ -135,7 +215,7 @@ function appendLogs(entries) {
 }
 
 function formatLogEntry(entry) {
-  return `${entry.seq} ${new Date(entry.timestamp).toLocaleTimeString()} ${entry.level} ${entry.message}`;
+  return entry.seq + ' ' + new Date(entry.timestamp).toLocaleTimeString() + ' ' + entry.level + ' ' + entry.message;
 }
 
 function filteredLogs() {
@@ -160,7 +240,7 @@ function renderLogs() {
   const fragment = document.createDocumentFragment();
   for (const entry of visible) {
     const line = document.createElement('div');
-    line.className = `log-line ${entry.level}`;
+    line.className = 'log-line ' + entry.level;
 
     const seq = document.createElement('span');
     seq.className = 'log-seq';
@@ -199,7 +279,7 @@ async function refresh(options = {}) {
 }
 
 async function loadLogs() {
-  const data = await api(`/api/control/logs?after=${lastLogSeq}`);
+  const data = await api('/api/control/logs?after=' + lastLogSeq);
   appendLogs(data.logs);
 }
 
@@ -213,8 +293,8 @@ function startLogStream() {
     pollTimer = setInterval(loadLogs, 1500);
     return;
   }
-  const qs = token() ? `?token=${encodeURIComponent(token())}` : '';
-  logStream = new EventSource(`/api/control/logs/stream${qs}`);
+  const qs = token() ? ('?token=' + encodeURIComponent(token())) : '';
+  logStream = new EventSource('/api/control/logs/stream' + qs);
   logStream.onmessage = ev => {
     const payload = JSON.parse(ev.data);
     if (payload.status) renderStatus(payload.status);
@@ -254,6 +334,10 @@ document.getElementById('tab-config').onclick = () => setActiveTab('config');
 
 configForm.addEventListener('input', () => setDirty(true));
 configForm.addEventListener('change', () => setDirty(true));
+document.getElementById('player-count').addEventListener('change', () => {
+  ensurePlayerFields(document.getElementById('player-count').value);
+  setDirty(true);
+});
 
 document.getElementById('btn-save-token').onclick = async () => {
   await runAction('正在刷新控制器状态...', async () => {
@@ -311,8 +395,9 @@ autoScrollLogs.onchange = () => {
   }
 };
 
-if (window.APP_VERSION) document.querySelector('.version-badge').textContent = `v${window.APP_VERSION}`;
+if (window.APP_VERSION) document.querySelector('.version-badge').textContent = 'v' + window.APP_VERSION;
 tokenInput.value = token();
+ensurePlayerFields(2);
 setActiveTab(localStorage.getItem('autoControlActiveTab') || 'monitor');
 updateControls(currentStatus);
 refresh({ forceConfig: true }).then(startLogStream).catch(err => setStatus('error', err.message));

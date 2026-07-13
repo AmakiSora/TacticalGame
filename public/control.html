@@ -73,6 +73,12 @@
               <select id="manual-side">
                 <option value="player_a">player_a</option>
                 <option value="player_b">player_b</option>
+                <option value="player_c">player_c</option>
+                <option value="player_d">player_d</option>
+                <option value="player_e">player_e</option>
+                <option value="player_f">player_f</option>
+                <option value="player_g">player_g</option>
+                <option value="player_h">player_h</option>
               </select>
             </label>
             <label>
@@ -114,6 +120,17 @@
           <div class="field-grid">
             <label>Game ID <input id="game-id" name="gameId" /></label>
             <label>Map ID <input id="map-id" name="mapId" /></label>
+            <label>Players
+              <select id="player-count" name="playerCount">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+              </select>
+            </label>
             <label>Interval <input id="interval" type="number" min="1" /></label>
             <label>Timeout <input id="timeout" type="number" min="1" /></label>
           </div>
@@ -121,35 +138,7 @@
           <button id="btn-save-config" type="button">保存配置</button>
         </fieldset>
 
-        <fieldset data-side="player_a">
-          <legend>Player A</legend>
-          <div class="field-grid">
-            <label>Provider <input name="provider" /></label>
-            <label>Model <input name="model" /></label>
-            <label>Name <input name="name" /></label>
-            <label>Session <input name="session" /></label>
-            <label>Skill <input name="skill" /></label>
-            <label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>
-          </div>
-          <label>Prompt <textarea name="prompt"></textarea></label>
-          <label>Start Prompt <textarea name="startPrompt"></textarea></label>
-          <label>Advanced Command <textarea name="advancedCommand"></textarea></label>
-        </fieldset>
-
-        <fieldset data-side="player_b">
-          <legend>Player B</legend>
-          <div class="field-grid">
-            <label>Provider <input name="provider" /></label>
-            <label>Model <input name="model" /></label>
-            <label>Name <input name="name" /></label>
-            <label>Session <input name="session" /></label>
-            <label>Skill <input name="skill" /></label>
-            <label>Command Mode <select name="commandMode"><option value="fields">fields</option><option value="advanced">advanced</option></select></label>
-          </div>
-          <label>Prompt <textarea name="prompt"></textarea></label>
-          <label>Start Prompt <textarea name="startPrompt"></textarea></label>
-          <label>Advanced Command <textarea name="advancedCommand"></textarea></label>
-        </fieldset>
+        <div id="player-fields" class="player-fields"></div>
       </form>
     </section>
   </main>

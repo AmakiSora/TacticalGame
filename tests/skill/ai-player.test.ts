@@ -1,20 +1,20 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createGameAndJoin, startTestServer } from '../helpers.js';
 import { globalStore } from '../../src/state/store.js';
 
 function runAi(args: string[]): Promise<{ code: number | null; output: string }> {
-  return new Promise(resolve => {
-    const child = spawn(process.execPath, ['skill/ai-player.mjs', ...args], {
-      cwd: process.cwd(),
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let output = '';
-    child.stdout.on('data', data => { output += data.toString(); });
-    child.stderr.on('data', data => { output += data.toString(); });
-    child.on('exit', code => resolve({ code, output }));
+  const { promise, resolve } = Promise.withResolvers<{ code: number | null; output: string }>();
+  const child = spawn(process.execPath, ['skill/ai-player.mjs', ...args], {
+    cwd: process.cwd(),
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  let output = '';
+  child.stdout.on('data', data => { output += data.toString(); });
+  child.stderr.on('data', data => { output += data.toString(); });
+  child.on('exit', code => resolve({ code, output }));
+  return promise;
 }
 
 describe('AI player setup', () => {
@@ -67,6 +67,90 @@ describe('AI player setup', () => {
       await app.close();
     }
   });
+
+  it('exits when an existing seat token is invalid', async () => {
+    const app = await startTestServer();
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    try {
+      const address = app.server.address();
+      if (!address || typeof address === 'string') throw new Error('server did not bind to a TCP port');
+      const createRes = await app.inject({ method: 'POST', url: '/api/games' });
+      const { gameId } = createRes.json() as { gameId: string };
+
+      const result = await runAi([
+        '--url', `http://127.0.0.1:${address.port}`,
+        '--side', 'a',
+        '--game', gameId,
+        '--token', 'invalid-token',
+        '--once',
+        '--delay-ms', '0',
+      ]);
+
+      expect(result.code).toBe(1);
+      expect(result.output).toContain('GET');
+      expect(result.output).toContain('invalid_token');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('does not use host controls to force another player to lose a turn', async () => {
+    const source = await readFile('skill/ai-player.mjs', 'utf8');
+    expect(source).not.toContain('/host/skip-turn');
+  });
+
+  it('auto-starts a full lobby when the host seat holds a host token', async () => {
+    const app = await startTestServer();
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    try {
+      const address = app.server.address();
+      if (!address || typeof address === 'string') throw new Error('server did not bind to a TCP port');
+      const baseUrl = `http://127.0.0.1:${address.port}`;
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/games',
+        payload: { mapId: 'default', maxPlayers: 2, playerName: 'AI-A' },
+      });
+      const created = createRes.json() as {
+        gameId: string;
+        hostToken: string;
+        player: { id: string; token: string };
+      };
+      await app.inject({
+        method: 'POST',
+        url: `/api/games/${created.gameId}/join`,
+        payload: { name: 'AI-B' },
+      });
+
+      // 固定 player_a 为先手，测试不依赖房主跳过其他玩家回合。
+      const random = vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.999)
+        .mockReturnValueOnce(0)
+        .mockReturnValue(0);
+      const result = await runAi([
+        '--url', baseUrl,
+        '--side', 'a',
+        '--game', created.gameId,
+        '--token', created.player.token,
+        '--host-token', created.hostToken,
+        '--once',
+        '--delay-ms', '0',
+        '--max-turns', '1',
+      ]);
+      random.mockRestore();
+
+      expect(result.code).toBe(0);
+      expect(result.output).toContain(`Started game ${created.gameId}`);
+      expect(result.output).toMatch(/End turn|Game over/);
+      const game = globalStore.get(created.gameId)!;
+      expect(game.phase).not.toBe('lobby');
+      expect(game.events.some(event => event.type === 'turn_skipped')).toBe(false);
+    } finally {
+      vi.restoreAllMocks();
+      await app.close();
+    }
+  });
 });
 
 describe('AI player skill documentation', () => {
@@ -86,6 +170,25 @@ describe('AI player skill documentation', () => {
 
     expect(skill).toContain('description: Use when an agent is asked');
     expect(skill).not.toMatch(/\bCodex\b/);
+  });
+
+  it('documents multiplayer lobby flow and host/player separation', async () => {
+    const skill = await readFile('skill/SKILL.md', 'utf8');
+
+    expect(skill).toContain('3.0.0');
+    expect(skill).toContain('## Multiplayer Setup');
+    expect(skill).toContain('player_a');
+    expect(skill).toContain('player_h');
+    expect(skill).toContain('maxPlayers');
+    expect(skill).toContain('hostToken');
+    expect(skill).toContain('X-Host-Token');
+    expect(skill).toContain('POST /api/games/:id/start');
+    expect(skill).toContain('GET /api/games/:id/lobby');
+    expect(skill).toContain('POST /api/games/:id/leave');
+    expect(skill).toContain('last_player_standing');
+    expect(skill).toContain('multiplayer-ring');
+    expect(skill).toContain('Never hardcode a single rival as `player_b`');
+    expect(skill).not.toContain('Score only against living rivals');
   });
 
   it('explains typed control point strategy', async () => {

@@ -17,11 +17,14 @@ function parseArgs(argv) {
     side: 'a',
     game: '',
     token: '',
+    hostToken: '',
     map: 'default',
     name: '',
+    maxPlayers: 2,
     maxTurns: 80,
     delayMs: 500,
     once: false,
+    autoStart: true,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -34,11 +37,14 @@ function parseArgs(argv) {
     else if (arg === '--side') args.side = next();
     else if (arg === '--game') args.game = next();
     else if (arg === '--token') args.token = next();
+    else if (arg === '--host-token') args.hostToken = next();
     else if (arg === '--map') args.map = next();
     else if (arg === '--name') args.name = next();
+    else if (arg === '--max-players') args.maxPlayers = Number(next());
     else if (arg === '--max-turns') args.maxTurns = Number(next());
     else if (arg === '--delay-ms') args.delayMs = Number(next());
     else if (arg === '--once') args.once = true;
+    else if (arg === '--no-auto-start') args.autoStart = false;
     else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -48,6 +54,9 @@ function parseArgs(argv) {
   }
 
   playerId(args.side);
+  if (!Number.isInteger(args.maxPlayers) || args.maxPlayers < 2 || args.maxPlayers > 8) {
+    throw new Error('--max-players must be an integer from 2 to 8');
+  }
   if (!Number.isFinite(args.maxTurns) || args.maxTurns < 1) throw new Error('--max-turns must be a positive number');
   if (!Number.isFinite(args.delayMs) || args.delayMs < 0) throw new Error('--delay-ms must be a non-negative number');
   args.url = args.url.replace(/\/+$/, '');
@@ -56,20 +65,23 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`Usage:
-  node skill/ai-player.mjs --side a [--url ${DEFAULT_URL}] [--map default]
+  node skill/ai-player.mjs --side a [--url ${DEFAULT_URL}] [--map default] [--max-players 2]
   node skill/ai-player.mjs --side b --game <gameId>
   node skill/ai-player.mjs --side player_c --game <gameId> --token <playerToken>
 
 Options:
   --url <url>          API base URL, default ${DEFAULT_URL}
-  --side <a-h|player_a-player_h> Seat to play
+  --side <a-h|player_a-player_h> Expected seat when joining; create always becomes player_a
   --game <id>          Existing game id
   --token <token>      Existing player token
+  --host-token <token> Host token used to auto-start a lobby
   --map <mapId>        Map id for new games, default default
+  --max-players <n>    Lobby size for new games, 2-8, default 2
   --name <name>        Player display name
-  --max-turns <n>      Stop after this many observed turns, default 80
+  --max-turns <n>      Stop after this many owned turns, default 80
   --delay-ms <n>       Poll delay while waiting, default 500
-  --once              Play at most one owned turn
+  --once               Play at most one owned turn
+  --no-auto-start      Do not call /start even when a host token is available
 `);
 }
 
@@ -105,10 +117,11 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function request(baseUrl, method, path, body, token) {
+async function request(baseUrl, method, path, body, token, hostToken) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers['X-Player-Token'] = token;
+  if (hostToken) headers['X-Host-Token'] = hostToken;
   const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
@@ -128,39 +141,62 @@ async function request(baseUrl, method, path, body, token) {
 }
 
 async function setupSeat(args) {
-  const owner = playerId(args.side);
-  const name = args.name || `AI ${playerLabel(owner)}`;
+  const expectedOwner = playerId(args.side);
+  const name = args.name || `AI ${playerLabel(expectedOwner)}`;
 
   if (args.game && args.token) {
-    return { gameId: args.game, token: args.token, owner };
+    return {
+      gameId: args.game,
+      token: args.token,
+      owner: expectedOwner,
+      hostToken: args.hostToken || '',
+      autoStart: args.autoStart && Boolean(args.hostToken),
+    };
   }
 
   if (args.game && !args.token) {
     try {
       const joined = await request(args.url, 'POST', `/api/games/${args.game}/join`, { name }, '');
       if (!joined.player?.token || !joined.player?.id) throw new Error('join response did not include player token');
-      if (joined.player.id !== owner) {
-        throw new Error(`joined as ${joined.player.id}, expected ${owner}; pass --token for an existing seat`);
+      if (joined.player.id !== expectedOwner) {
+        throw new Error(`joined as ${joined.player.id}, expected ${expectedOwner}; pass --token for an existing seat`);
       }
       console.log(`Joined game ${args.game} as ${joined.player.id}`);
-      return { gameId: args.game, token: joined.player.token, owner: joined.player.id };
+      return {
+        gameId: args.game,
+        token: joined.player.token,
+        owner: joined.player.id,
+        hostToken: args.hostToken || '',
+        autoStart: args.autoStart && Boolean(args.hostToken),
+      };
     } catch (err) {
       const detail = err.data ? ` ${JSON.stringify(err.data)}` : '';
       throw new Error(`Failed to join game ${args.game}.${detail || ` ${err.message}`}`);
     }
   }
 
+  if (expectedOwner !== 'player_a') {
+    throw new Error('creating a lobby always assigns player_a; pass --game to join another seat');
+  }
+
   const created = await request(args.url, 'POST', '/api/games', {
     mapId: args.map,
-    maxPlayers: 2,
+    maxPlayers: args.maxPlayers,
     participate: true,
     playerName: name,
   }, '');
-  if (!created.gameId || !created.player?.token || !created.player?.id) {
-    throw new Error('create response did not include gameId and player token');
+  if (!created.gameId || !created.player?.token || !created.player?.id || !created.hostToken) {
+    throw new Error('create response did not include gameId, hostToken, and player token');
   }
-  console.log(`Created game ${created.gameId} as ${created.player.id}`);
-  return { gameId: created.gameId, token: created.player.token, owner: created.player.id };
+  console.log(`Created lobby ${created.gameId} as ${created.player.id} (maxPlayers=${args.maxPlayers})`);
+  console.log(`Host token: ${created.hostToken}`);
+  return {
+    gameId: created.gameId,
+    token: created.player.token,
+    owner: created.player.id,
+    hostToken: created.hostToken,
+    autoStart: args.autoStart,
+  };
 }
 
 function posKey(pos) {
@@ -437,8 +473,34 @@ async function readGame(args, seat) {
   return request(args.url, 'GET', `/api/games/${seat.gameId}`, undefined, seat.token);
 }
 
+async function readLobby(args, seat) {
+  return request(args.url, 'GET', `/api/games/${seat.gameId}/lobby`, undefined, '');
+}
+
 async function refreshAfterAction(args, seat) {
   return readGame(args, seat);
+}
+
+async function tryStartLobby(args, seat) {
+  if (!seat.autoStart || !seat.hostToken) return false;
+  try {
+    const lobby = await readLobby(args, seat);
+    if (lobby.phase !== 'lobby') return false;
+    const count = lobby.playerCount || 0;
+    const maxPlayers = lobby.maxPlayers || 0;
+    // 默认等人满再开局，避免 4 人房在 2 人时提前 start。
+    if (count < 2 || (maxPlayers > 0 && count < maxPlayers)) {
+      console.log(`Waiting for more players before start: ${count}/${maxPlayers || '?'}`);
+      return false;
+    }
+    await request(args.url, 'POST', `/api/games/${seat.gameId}/start`, {}, undefined, seat.hostToken);
+    console.log(`Started game ${seat.gameId} with ${count} players`);
+    return true;
+  } catch (err) {
+    if (err.data?.code === 'lobby_not_ready' || err.data?.code === 'game_already_started') return false;
+    console.error(`Start failed: ${err.message}`);
+    return false;
+  }
 }
 
 async function playOwnedTurn(game, args, seat) {
@@ -515,16 +577,32 @@ async function main() {
 
   let playedTurns = 0;
   while (playedTurns < args.maxTurns) {
-    let game = await readGame(args, seat);
+    const game = await readGame(args, seat);
+
     if (game.winner || game.phase === 'game_over') {
       console.log(`Game over. Winner: ${game.winner}`);
       return;
     }
+
+    const self = game.players?.[seat.owner];
+    if (self && self.status && self.status !== 'active' && game.phase === 'active') {
+      console.log(`Eliminated as ${seat.owner} (status=${self.status}).`);
+      return;
+    }
+
+    if (game.phase === 'lobby') {
+      await tryStartLobby(args, seat);
+      console.log(`Waiting for game to start: lobby`);
+      await sleep(args.delayMs);
+      continue;
+    }
+
     if (game.phase !== 'active') {
       console.log(`Waiting for game to start: ${game.phase}`);
       await sleep(args.delayMs);
       continue;
     }
+
     if ((game.turn.currentPlayerId ?? game.turn.currentOwner) !== seat.owner) {
       await sleep(args.delayMs);
       continue;

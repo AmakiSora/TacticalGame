@@ -14,6 +14,8 @@ describe('control page', () => {
     expect(html).toContain('id="btn-pause"');
     expect(html).toContain('id="btn-resume"');
     expect(html).toContain('id="map-id"');
+    expect(html).toContain('id="player-count"');
+    expect(html).toContain('id="player-fields"');
     expect(html).toContain('id="manual-side"');
     expect(html).toContain('id="log-output"');
   });

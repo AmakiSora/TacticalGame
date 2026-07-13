@@ -614,8 +614,7 @@ main {
 .resource-card.player-g { border-left-color: #f27a9a; }
 .resource-card.player-h { border-left-color: #a7b7ff; }
 .resource-empty { color: #7894a6; font-size: 12px; }
-.resource-card span,
-.turn-card span {
+.resource-card span {
   display: block;
   color: #7f98a9;
   font-size: 11px;
@@ -634,39 +633,8 @@ main {
   font-size: 12px;
   font-style: normal;
 }
-.cp-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-.cp-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 4px 7px;
-  background: #0f1820;
-  border: 1px solid #263849;
-  border-radius: 999px;
-  color: #9ab0bd;
-  font-size: 11px;
-}
-.cp-chip strong {
-  color: #d8e0e8;
-  font-weight: 700;
-}
-.cp-chip.player-a { border-color: rgba(102,204,255,.45); }
-.cp-chip.player-b { border-color: rgba(255,153,102,.45); }
-.cp-chip.player-c { border-color: rgba(159,223,111,.45); }
-.cp-chip.player-d { border-color: rgba(217,140,255,.45); }
-.cp-chip.player-e { border-color: rgba(255,209,102,.45); }
-.cp-chip.player-f { border-color: rgba(114,224,209,.45); }
-.cp-chip.player-g { border-color: rgba(242,122,154,.45); }
-.cp-chip.player-h { border-color: rgba(167,183,255,.45); }
-.cp-chip.neutral { border-color: rgba(214,179,74,.45); color: #d6b34a; }
 .turn-card {
-  padding: 10px;
+  padding: 10px 12px;
   background: #0f1820;
   border: 1px solid #263849;
   border-left: 3px solid #7f98a9;
@@ -680,11 +648,35 @@ main {
 .turn-card.player-f { border-left-color: #72e0d1; }
 .turn-card.player-g { border-left-color: #f27a9a; }
 .turn-card.player-h { border-left-color: #a7b7ff; }
-.turn-card > strong {
+.turn-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.turn-count {
   display: block;
-  margin-top: 5px;
-  color: #d8e0e8;
-  font-size: 16px;
+  color: #e8f4ff;
+  font: 800 28px/1 "SF Mono", "Consolas", "Cascadia Code", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  text-shadow: 0 0 18px rgba(120, 190, 255, 0.18);
+}
+.turn-player {
+  display: block;
+  min-width: 0;
+  color: #c5d4de;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+}
+.turn-player .player-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: baseline;
 }
 .turn-meta {
   display: flex;
@@ -693,6 +685,9 @@ main {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid #243545;
+  color: #7f98a9;
+  font-size: 11px;
+  font-weight: 700;
 }
 .turn-meta strong { color: #9ec; font-variant-numeric: tabular-nums; }
 .result-note {

@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.0.0`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
+This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.0.1`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
 
 Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exist for tests or automated demos, but this skill is for agent reasoning and direct game operation.
 
@@ -36,7 +36,7 @@ Typical flow:
 4. Host starts when at least 2 players are present and the map supports that count: `POST /api/games/:id/start` with `X-Host-Token`.
 5. Play until elimination leaves one survivor, or adjudication at the map max round.
 
-Map support is not universal: most maps are 2-player only. Use `multiplayer-ring` (or any map whose `supportedPlayerCounts` includes the chosen size) for 3-8 player games. Creating with an unsupported `maxPlayers` returns `unsupported_player_count`.
+Map support is not universal: most maps are 2-player only. Use `multiplayer-ring` for 2/3/6-player games (symmetric ring spawns), or any map whose `supportedPlayerCounts` includes the chosen size. Creating with an unsupported `maxPlayers` returns `unsupported_player_count`.
 
 ## API
 

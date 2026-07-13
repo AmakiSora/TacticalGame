@@ -159,6 +159,7 @@ describe('map config loader', () => {
     const map = listMaps().find(item => item.id === 'default')!;
 
     expect(map.preview.radius).toBe(8);
+    expect(map.preview.maxTurns).toBe(15);
     expect(map.preview.terrainCells).toContainEqual({ q: -1, r: -2, terrain: 'water' });
     expect(map.preview.controlPoints).toContainEqual(expect.objectContaining({ name: '中央阵地', q: 0, r: 0 }));
     expect(map.preview.headquarters.player_a).toEqual({ q: -8, r: 0 });

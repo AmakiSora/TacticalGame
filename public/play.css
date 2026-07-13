@@ -605,21 +605,51 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 
 /* turn badge */
 .turn-badge {
-  display: inline-block;
-  padding: 6px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 14px;
   background: #1a2a3a;
   border: 1px solid #2a4a6a;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 700;
+  border-radius: 8px;
   color: #9ec;
   margin-bottom: 10px;
+}
+.turn-badge .turn-count {
+  display: block;
+  color: #e8f4ff;
+  font: 800 26px/1 "SF Mono", "Consolas", "Cascadia Code", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  text-shadow: 0 0 16px rgba(120, 190, 255, 0.2);
+}
+.turn-badge .turn-player {
+  display: block;
+  min-width: 0;
+  color: #b7c9d4;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .turn-badge.my-turn {
   background: #1a3a2a;
   border-color: #2a6a4a;
   color: #8da;
   animation: pulse 1.5s infinite;
+}
+.turn-badge.my-turn .turn-count {
+  color: #b8f0c8;
+  text-shadow: 0 0 16px rgba(90, 200, 120, 0.28);
+}
+.turn-badge.my-turn .turn-player {
+  color: #a8d8b8;
 }
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(60,180,100,.3); }

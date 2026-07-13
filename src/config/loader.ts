@@ -100,6 +100,7 @@ export interface MapConfig {
 
 export interface MapPreview {
   radius: number;
+  maxTurns: number;
   terrainCells: TerrainCellConfig[];
   controlPoints: ControlPointConfig[];
   headquarters: Record<'player_a' | 'player_b', { q: number; r: number }>;
@@ -368,6 +369,7 @@ export function listMaps(): MapListItem[] {
     description: cfg.description,
     preview: {
       radius: cfg.radius,
+      maxTurns: cfg.balance.maxTurns,
       terrainCells: cfg.terrainCells.map(cell => ({ ...cell })),
       controlPoints: cfg.controlPoints.map(point => ({ ...point })),
       headquarters: {

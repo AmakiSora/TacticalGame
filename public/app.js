@@ -114,6 +114,14 @@ function maxTurnsLabel() {
   const maxTurns = gameConfig?.balance?.maxTurns;
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${maxTurns}回合` : '回合上限';
 }
+function currentTurnNumber() {
+  return state?.turn?.roundNumber || state?.turn?.turnNumber || 0;
+}
+function turnProgressLabel() {
+  const current = currentTurnNumber();
+  const maxTurns = gameConfig?.balance?.maxTurns;
+  return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
+}
 
 function playerNameControl(owner) {
   return `<button class="player-name ${ownerClass(owner)}" data-rename-player="${owner}" title="更改玩家名字">${esc(playerName(owner))}</button>`;
@@ -804,9 +812,6 @@ function renderScoreRow(owner, score, rank) {
 
 function renderSidebar() {
   if (!state) return;
-  const controlPoints = [...state.controlPoints.values()]
-    .map(cp => `<span class="cp-chip ${cp.owner ? ownerClass(cp.owner) : 'neutral'}">${esc(cp.name)}<strong>${cp.owner ? esc(playerName(cp.owner)) : '中立'}</strong></span>`)
-    .join('');
   const resourceCards = Object.entries(state.resources || {})
     .filter(([owner]) => PLAYER_IDS.includes(owner))
     .map(([owner, resource]) => `<div class="resource-card ${ownerClass(owner)}"><span>${playerNameControl(owner)}</span><strong>${resource.supplies ?? 0}</strong><em>补给</em></div>`)
@@ -814,8 +819,7 @@ function renderSidebar() {
   resourcesEl.innerHTML = `<h3>资源</h3>
     <div class="resource-grid">
       ${resourceCards || '<div class="resource-empty">等待对局开始</div>'}
-    </div>
-    <div class="cp-strip">${controlPoints || '<span class="cp-chip neutral">暂无据点</span>'}</div>`;
+    </div>`;
   renderScorePanel();
   const owner = state.turn.currentPlayerId || state.turn.currentOwner;
   const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
@@ -824,8 +828,10 @@ function renderSidebar() {
     : '';
   turnInfoEl.innerHTML = `<h3>回合</h3>
     <div class="turn-card ${ownerClass(owner)}">
-      <span>第 ${state.turn.turnNumber} 回合</span>
-      <strong>${playerNameControl(owner)}</strong>
+      <div class="turn-head">
+        <strong class="turn-count">${esc(turnProgressLabel())}</strong>
+        <span class="turn-player">${playerNameControl(owner)}</span>
+      </div>
       ${actionsLine}
       ${state.result ? `<div class="result-note">${esc(resultText(state.result))}</div>` : ''}
     </div>`;

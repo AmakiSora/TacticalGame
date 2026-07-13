@@ -80,6 +80,14 @@ function maxTurnsLabel() {
   const maxTurns = gameConfig?.balance?.maxTurns;
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${maxTurns}回合` : '回合上限';
 }
+function currentTurnNumber() {
+  return state?.turn?.roundNumber || state?.turn?.turnNumber || 0;
+}
+function turnProgressLabel() {
+  const current = currentTurnNumber();
+  const maxTurns = gameConfig?.balance?.maxTurns;
+  return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
+}
 function statusBadge(text, cls) { els.connStatus.textContent = text; els.connStatus.className = `badge ${cls}`; }
 function toast(msg, type = 'info') {
   const t = $('toast'); t.textContent = msg; t.className = `show ${type}`;
@@ -295,13 +303,14 @@ function renderMapPicker(maps) {
     const isSelected = map.id === selected;
 	    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
 	    const radius = map.preview?.radius ?? '-';
+		    const maxTurns = map.preview?.maxTurns ?? '-';
 	    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
     return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}">
       ${renderMapPreview(map.preview)}
       <span class="map-card-copy">
         <span class="map-card-name">${esc(map.name)}</span>
         <span class="map-card-desc">${esc(map.description)}</span>
-	        <span class="map-card-meta"><span>半径 ${esc(radius)}</span><span>${controlPointCount} 据点</span><span>${esc(counts)} 人</span></span>
+	        <span class="map-card-meta"><span>半径 ${esc(radius)}</span><span>${controlPointCount} 据点</span><span>${esc(counts)} 人</span><span>${esc(maxTurns)} 回合</span></span>
       </span>
     </button>`;
   }).join('');
@@ -807,7 +816,7 @@ function renderScorePanel() {
 function renderSidebar() {
   if (!state) return;
   const owner = state.turn.currentPlayerId || state.turn.currentOwner;
-  els.turnBadge.textContent = `回合 ${state.turn.roundNumber || state.turn.turnNumber} · ${playerName(owner)}`;
+  els.turnBadge.innerHTML = `<strong class="turn-count">${esc(turnProgressLabel())}</strong><span class="turn-player">${esc(playerName(owner))}</span>`;
   els.turnBadge.classList.toggle('my-turn', owner === myPlayer);
   const resourceRows = joinedPlayerIds().map(id => {
     const color = OWNER_COLOR[id] || '#9aa7b2';

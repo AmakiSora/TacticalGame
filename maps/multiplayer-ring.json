@@ -1,9 +1,9 @@
 {
-  "name": "八方环线",
-  "description": "支持2至8人的大型环形战场。外围出生位围绕中央指挥区分布，各人数布局均采用尽量分散的出生组合。",
+  "name": "六方环线",
+  "description": "支持2、3、6人的对称环形战场。出生位位于六边形六个顶点，2人相对、3人隔位、6人全开，保证旋转对称。",
   "grid": "hex",
   "orientation": "pointy",
-  "radius": 12,
+  "radius": 8,
   "terrainCells": [
     { "q": 2, "r": -1, "terrain": "blocker" },
     { "q": 1, "r": 1, "terrain": "blocker" },
@@ -14,47 +14,37 @@
   ],
   "controlPoints": [
     { "id": "cp_center", "name": "中央指挥区", "kind": "repair", "q": 0, "r": 0 },
-    { "id": "cp_e", "name": "东部补给站", "kind": "supply", "q": 5, "r": 0 },
-    { "id": "cp_ne", "name": "东北前线基地", "kind": "forward_base", "q": 5, "r": -5 },
-    { "id": "cp_nw", "name": "西北补给站", "kind": "supply", "q": 0, "r": -5 },
-    { "id": "cp_w", "name": "西部前线基地", "kind": "forward_base", "q": -5, "r": 0 },
-    { "id": "cp_sw", "name": "西南补给站", "kind": "supply", "q": -5, "r": 5 },
-    { "id": "cp_se", "name": "东南前线基地", "kind": "forward_base", "q": 0, "r": 5 }
+    { "id": "cp_e", "name": "东部补给站", "kind": "supply", "q": 3, "r": 0 },
+    { "id": "cp_ne", "name": "东北前线基地", "kind": "forward_base", "q": 3, "r": -3 },
+    { "id": "cp_nw", "name": "西北补给站", "kind": "supply", "q": 0, "r": -3 },
+    { "id": "cp_w", "name": "西部前线基地", "kind": "forward_base", "q": -3, "r": 0 },
+    { "id": "cp_sw", "name": "西南补给站", "kind": "supply", "q": -3, "r": 3 },
+    { "id": "cp_se", "name": "东南前线基地", "kind": "forward_base", "q": 0, "r": 3 }
   ],
   "spawnSlots": [
-    { "id": "slot_1", "headquarters": { "q": 12, "r": 0 }, "startingUnits": [
-      { "type": "infantry", "q": 11, "r": 0 }, { "type": "scout", "q": 11, "r": 1 }
+    { "id": "slot_1", "headquarters": { "q": 8, "r": 0 }, "startingUnits": [
+      { "type": "infantry", "q": 7, "r": 0 }, { "type": "scout", "q": 7, "r": 1 }
     ] },
-    { "id": "slot_2", "headquarters": { "q": 12, "r": -9 }, "startingUnits": [
-      { "type": "infantry", "q": 11, "r": -8 }, { "type": "scout", "q": 11, "r": -9 }
+    { "id": "slot_2", "headquarters": { "q": 8, "r": -8 }, "startingUnits": [
+      { "type": "infantry", "q": 7, "r": -7 }, { "type": "scout", "q": 8, "r": -7 }
     ] },
-    { "id": "slot_3", "headquarters": { "q": 6, "r": -12 }, "startingUnits": [
-      { "type": "infantry", "q": 5, "r": -11 }, { "type": "scout", "q": 6, "r": -11 }
+    { "id": "slot_3", "headquarters": { "q": 0, "r": -8 }, "startingUnits": [
+      { "type": "infantry", "q": 0, "r": -7 }, { "type": "scout", "q": 1, "r": -8 }
     ] },
-    { "id": "slot_4", "headquarters": { "q": -3, "r": -9 }, "startingUnits": [
-      { "type": "infantry", "q": -2, "r": -9 }, { "type": "scout", "q": -3, "r": -8 }
+    { "id": "slot_4", "headquarters": { "q": -8, "r": 0 }, "startingUnits": [
+      { "type": "infantry", "q": -7, "r": 0 }, { "type": "scout", "q": -7, "r": -1 }
     ] },
-    { "id": "slot_5", "headquarters": { "q": -12, "r": 0 }, "startingUnits": [
-      { "type": "infantry", "q": -11, "r": 0 }, { "type": "scout", "q": -11, "r": -1 }
+    { "id": "slot_5", "headquarters": { "q": -8, "r": 8 }, "startingUnits": [
+      { "type": "infantry", "q": -7, "r": 7 }, { "type": "scout", "q": -8, "r": 7 }
     ] },
-    { "id": "slot_6", "headquarters": { "q": -12, "r": 9 }, "startingUnits": [
-      { "type": "infantry", "q": -11, "r": 8 }, { "type": "scout", "q": -11, "r": 9 }
-    ] },
-    { "id": "slot_7", "headquarters": { "q": -6, "r": 12 }, "startingUnits": [
-      { "type": "infantry", "q": -5, "r": 11 }, { "type": "scout", "q": -6, "r": 11 }
-    ] },
-    { "id": "slot_8", "headquarters": { "q": 3, "r": 9 }, "startingUnits": [
-      { "type": "infantry", "q": 2, "r": 9 }, { "type": "scout", "q": 3, "r": 8 }
+    { "id": "slot_6", "headquarters": { "q": 0, "r": 8 }, "startingUnits": [
+      { "type": "infantry", "q": 0, "r": 7 }, { "type": "scout", "q": -1, "r": 8 }
     ] }
   ],
   "layouts": {
-    "2": ["slot_1", "slot_5"],
-    "3": ["slot_1", "slot_4", "slot_6"],
-    "4": ["slot_1", "slot_3", "slot_5", "slot_7"],
-    "5": ["slot_1", "slot_3", "slot_4", "slot_6", "slot_8"],
-    "6": ["slot_1", "slot_2", "slot_3", "slot_5", "slot_6", "slot_7"],
-    "7": ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5", "slot_6", "slot_8"],
-    "8": ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5", "slot_6", "slot_7", "slot_8"]
+    "2": ["slot_1", "slot_4"],
+    "3": ["slot_1", "slot_3", "slot_5"],
+    "6": ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5", "slot_6"]
   },
   "units": {
     "infantry": { "hp": 100, "attack": 30, "defense": 8, "moveRange": 3, "attackRange": 1, "cost": 45, "canCapture": true },

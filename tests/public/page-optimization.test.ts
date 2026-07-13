@@ -22,7 +22,18 @@ describe('spectator and player page optimization', () => {
 
     expect(source).toContain('resource-grid');
     expect(source).toContain('turn-card');
-    expect(source).toContain('cp-strip');
+    expect(source).not.toContain('cp-strip');
+  });
+
+  it('shows turn progress as current/max with player name on the right', () => {
+    for (const file of ['public/app.js', 'public/play.js']) {
+      const source = read(file);
+      expect(source).toContain('function turnProgressLabel');
+      expect(source).toContain('turn-count');
+      expect(source).toContain('turn-player');
+      expect(source).not.toContain('第 ${state.turn.turnNumber} 回合');
+    }
+    expect(read('public/play.js')).not.toContain('回合 ${state.turn.roundNumber || state.turn.turnNumber}');
   });
 
   it('renders player turn resources as stable status cards', () => {
@@ -60,6 +71,8 @@ describe('spectator and player page optimization', () => {
     expect(source).toContain('selected-map');
     expect(source).toContain('preview.controlPoints');
     expect(source).toContain('preview.headquarters');
+    expect(source).toContain('preview?.maxTurns');
+    expect(source).toContain('回合');
   });
 
   it('stacks create name above full-width map selection', () => {

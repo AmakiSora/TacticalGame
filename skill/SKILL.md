@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.0.1`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
+This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.0.2`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
 
 Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exist for tests or automated demos, but this skill is for agent reasoning and direct game operation.
 

@@ -896,7 +896,14 @@ function syncMobileChrome() {
   const drawerEvents = document.getElementById('drawer-events');
   if (drawerEvents && els.events) drawerEvents.innerHTML = els.events.innerHTML;
   const drawerSel = document.getElementById('drawer-selection');
-  if (drawerSel && els.selDetail) drawerSel.innerHTML = els.selDetail.innerHTML;
+  if (drawerSel) {
+    let ent = null;
+    if (selectedUnitId) ent = state?.units?.get(selectedUnitId);
+    if (!ent && selectedOriginId) ent = state?.headquarters?.get(selectedOriginId) || state?.controlPoints?.get(selectedOriginId);
+    if (ent && 'hp' in ent) drawerSel.innerHTML = renderEntityCard(ent);
+    else if (ent) drawerSel.innerHTML = renderControlPointCard(ent);
+    else drawerSel.innerHTML = '<div class="sel-note">未选中单位或据点</div>';
+  }
   const drawerHints = document.getElementById('drawer-hints');
   const hints = document.querySelector('#action-hints .hint-list');
   if (drawerHints && hints) drawerHints.innerHTML = hints.innerHTML;
@@ -931,17 +938,59 @@ function formatEventShort(ev) {
 function renderSelectionInfo(ent) {
   if (!ent && selectedUnitId) ent = state.units.get(selectedUnitId);
   if (!ent && selectedOriginId) ent = state.headquarters.get(selectedOriginId) || state.controlPoints.get(selectedOriginId);
-  if (!ent) { els.selDetail.textContent = '点击己方单位执行移动/攻击/治疗；点击己方 HQ 或据点部署单位。'; return; }
-  if ('hp' in ent) {
-    els.selDetail.innerHTML = renderEntityCard(ent);
-  } else {
-    els.selDetail.innerHTML = renderControlPointCard(ent);
+  if (!ent) {
+    els.selDetail.innerHTML = '<span class="sel-summary-text">点击棋盘上的单位、总部或据点查看详情</span>';
+    return;
   }
+  els.selDetail.innerHTML = renderSelectionSummary(ent);
+}
+
+function renderSelectionSummary(ent) {
+  if ('hp' in ent) {
+    const type = ent.type || 'headquarters';
+    const title = UNIT_NAMES[type] || '指挥部';
+    return `<span class="sel-summary-line">
+      <strong>${esc(title)}</strong>
+      <span class="sel-summary-meta">${esc(playerName(ent.owner))} · HP ${Math.max(0, ent.hp)}/${ent.maxHp} · (${ent.q},${ent.r})</span>
+      <span class="sel-summary-hint">详情 ▾</span>
+    </span>`;
+  }
+  const owner = ent.owner ? playerName(ent.owner) : '中立';
+  return `<span class="sel-summary-line">
+    <strong>${esc(ent.name || '据点')}</strong>
+    <span class="sel-summary-meta">${esc(owner)} · (${ent.q},${ent.r})</span>
+    <span class="sel-summary-hint">详情 ▾</span>
+  </span>`;
 }
 
 function showPopup(cell, title, items, cb) {
-  const p = canvasToCssPoint(hexToPixel(cell.q, cell.r));
+  const dock = $('action-dock');
   const popup = $('map-popup');
+  if (dock) {
+    // mobile: bottom action strip — never covers the board
+    dock.innerHTML = `<div class="action-dock-title">${esc(title)}</div>` +
+      items.map(i => `<button type="button" class="action-dock-btn" data-action="${esc(i.action)}" data-type="${esc(i.type || '')}">
+        <span>${esc(i.label)}</span>${i.cost != null ? `<span class="map-popup-cost">${i.cost}</span>` : ''}
+      </button>`).join('') +
+      `<button type="button" class="action-dock-btn action-dock-cancel" data-action="__cancel">取消</button>`;
+    dock.classList.remove('hidden');
+    if (popup) popup.classList.add('hidden');
+    dock.querySelectorAll('button').forEach(btn => {
+      let fired = false;
+      const run = (ev) => {
+        if (fired) return;
+        fired = true;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (btn.dataset.action === '__cancel') { deselect(); return; }
+        cb(btn.dataset.action, btn.dataset.type);
+      };
+      btn.addEventListener('pointerup', run);
+      btn.addEventListener('click', run);
+    });
+    return;
+  }
+  const p = canvasToCssPoint(hexToPixel(cell.q, cell.r));
   popup.style.left = `${p.x + 18}px`; popup.style.top = `${p.y - 10}px`;
   popup.innerHTML = `<div class="map-popup-title">${esc(title)}</div>` + items.map(i => `<button class="map-popup-btn" data-action="${esc(i.action)}" data-type="${esc(i.type || '')}"><span>${esc(i.label)}</span>${i.cost != null ? `<span class="map-popup-cost">${i.cost}</span>` : ''}</button>`).join('');
   popup.classList.remove('hidden');
@@ -954,13 +1003,20 @@ function showPopup(cell, title, items, cb) {
       ev.stopPropagation();
       cb(btn.dataset.action, btn.dataset.type);
     };
-    // pointerup first so pan capture cannot eat the action on touch devices
     btn.addEventListener('pointerup', run);
     btn.addEventListener('click', run);
   });
   requestAnimationFrame(() => clampPopupInViewport(popup));
 }
-function closePopup() { $('map-popup').classList.add('hidden'); }
+function closePopup() {
+  const popup = $('map-popup');
+  if (popup) popup.classList.add('hidden');
+  const dock = $('action-dock');
+  if (dock) {
+    dock.classList.add('hidden');
+    dock.innerHTML = '';
+  }
+}
 function deselect() { selectedUnitId = null; selectedOriginId = null; selectedDeployType = null; interactionMode = 'idle'; rangeHighlights = []; closePopup(); renderSidebar(); drawBoard(); }
 
 async function apiAction(path, body) {
@@ -1086,7 +1142,7 @@ function midpoint(a, b) {
 function onPointerDown(e) {
   if (!boardViewport) return;
   // popup / zoom UI must receive real clicks; preventDefault would suppress them
-  if (e.target.closest?.('.zoom-controls, .map-popup, button, a, input, select, label')) return;
+  if (e.target.closest?.('.zoom-controls, .map-popup, .action-dock, button, a, input, select, label')) return;
   boardViewport.setPointerCapture?.(e.pointerId);
   gesture.pointers.set(e.pointerId, e);
   gesture.moved = false;

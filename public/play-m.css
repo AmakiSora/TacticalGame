@@ -1588,8 +1588,97 @@ body.player-m-shell .board-viewport {
 }
 body.player-m-shell .turn-strip,
 body.player-m-shell .selection-summary,
+body.player-m-shell .action-dock,
 body.player-m-shell .replay-bar,
 body.player-m-shell .bottom-bar {
   width: 100%;
   box-sizing: border-box;
+}
+
+/* compact selection strip + bottom action dock (do not cover board) */
+body.player-m-shell .selection-summary {
+  min-height: 40px;
+  padding: 8px 12px;
+  max-height: 56px;
+  overflow: hidden;
+}
+body.player-m-shell .sel-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+}
+body.player-m-shell .sel-summary-line strong {
+  color: #9ec;
+  font-size: 13px;
+}
+body.player-m-shell .sel-summary-meta {
+  color: #8aa0b0;
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.player-m-shell .sel-summary-hint {
+  color: #6a8a9a;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: auto;
+}
+body.player-m-shell .sel-summary-text {
+  color: #7a9aaa;
+  font-size: 12px;
+}
+body.player-m-shell .action-dock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #16202b;
+  border-top: 1px solid #2a3a4a;
+  flex-shrink: 0;
+  z-index: 45;
+}
+body.player-m-shell .action-dock.hidden { display: none !important; }
+body.player-m-shell .action-dock-title {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: #7a9aaa;
+  margin-bottom: 2px;
+}
+body.player-m-shell .action-dock-btn {
+  flex: 1 1 auto;
+  min-width: 72px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #2a4a6a;
+  background: #1a2a3a;
+  color: #d8e0e8;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+body.player-m-shell .action-dock-btn:active {
+  filter: brightness(1.15);
+}
+body.player-m-shell .action-dock-cancel {
+  border-color: #4a3030;
+  background: #2a1a1a;
+  color: #e0a8a0;
+  flex: 0 0 auto;
+}
+body.player-m-shell #map-popup {
+  max-width: min(220px, 70vw);
 }

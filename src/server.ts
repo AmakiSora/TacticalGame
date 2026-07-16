@@ -100,7 +100,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   return app;
 }
 
-const isMain = import.meta.url === `file:///${resolve(process.argv[1]).replace(/\\/g, '/')}`;
+const isMain = process.argv[1] !== undefined && ( import.meta.url === 'file://' + resolve(process.argv[1]) || import.meta.url.endsWith('/dist/server.js'));
 if (isMain) {
   const config = readRuntimeConfig();
   buildServer()

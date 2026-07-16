@@ -101,7 +101,7 @@
   </section>
 
   <main id="game-ui" class="hidden m-game">
-    <div id="turn-strip" class="turn-strip">
+    <div id="turn-strip" class="turn-strip" aria-label="对局状态">
       <div id="turn-badge" class="turn-badge">
         <strong class="turn-count">—</strong>
         <span class="turn-player">等待对局</span>
@@ -181,6 +181,10 @@
         <section class="drawer-section">
           <h3>选中</h3>
           <div id="drawer-selection"></div>
+        </section>
+        <section class="drawer-section">
+          <h3>补给</h3>
+          <div id="drawer-resources"></div>
         </section>
         <section class="drawer-section">
           <h3>局势</h3>

@@ -73,9 +73,24 @@ describe('mobile website pages', () => {
     const playCss = read('public/play-m.css');
     const spectatorCss = read('public/spectator-m.css');
     expect(playCss).toContain('align-items: stretch');
-    expect(playCss).toContain('mobile board width fix');
     expect(spectatorCss).toContain('align-items: stretch');
     expect(spectatorCss).toContain('mobile board width fix');
+  });
+
+  it('uses a compact mobile turn strip for round / AP / supplies', () => {
+    const play = read('public/play-m.html');
+    const playJs = read('public/play-m.js');
+    const playCss = read('public/play-m.css');
+
+    expect(play).toContain('id="turn-strip"');
+    expect(play).toContain('id="actions-display"');
+    expect(play).toContain('id="resources-display"');
+    expect(play).toContain('id="drawer-resources"');
+    expect(playJs).toContain('hud-chip');
+    expect(playJs).toContain('renderResourceListHtml');
+    expect(playJs).toContain('turn-kicker');
+    expect(playCss).toContain('grid-template-columns: minmax(0, 1.35fr) auto auto');
+    expect(playCss).toContain('.hud-chip');
   });
 
 });

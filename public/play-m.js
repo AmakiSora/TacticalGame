@@ -784,11 +784,13 @@ function renderActionsDisplay(owner) {
   const exhausted = remaining === 0;
   els.actionsDisplay.classList.toggle('exhausted', isMine && exhausted);
   els.actionsDisplay.classList.toggle('mine', isMine);
-  if (isMine) {
-    els.actionsDisplay.innerHTML = `<span class="actions-label">行动点</span><span class="actions-count ${exhausted ? 'zero' : ''}">${remaining}/${max}</span>${exhausted ? '<span class="actions-hint">已用尽，仅可继续操作已行动单位</span>' : ''}`;
-  } else {
-    els.actionsDisplay.innerHTML = `<span class="actions-label">行动点</span><span class="actions-count">${used}/${max} 已用</span>`;
-  }
+  const value = isMine ? `${remaining}/${max}` : `${used}/${max}`;
+  const sub = isMine ? (exhausted ? '已用尽' : '剩余') : '本回合已用';
+  els.actionsDisplay.innerHTML = `<div class="hud-chip hud-ap${isMine ? ' mine' : ''}${exhausted && isMine ? ' exhausted' : ''}">
+    <span class="hud-label">行动</span>
+    <strong class="hud-value${exhausted && isMine ? ' zero' : ''}">${value}</strong>
+    <span class="hud-sub">${sub}</span>
+  </div>`;
 }
 
 function playerScore(owner) {
@@ -859,25 +861,48 @@ function renderScorePanel() {
     ${rows.map(([owner, score], index) => renderScoreRow(owner, score, scoreRank(rows, index))).join('')}`;
 }
 
-function renderSidebar() {
-  if (!state) return;
-  const owner = state.turn.currentPlayerId || state.turn.currentOwner;
-  els.turnBadge.innerHTML = `<strong class="turn-count">${esc(turnProgressLabel())}</strong><span class="turn-player">${esc(playerName(owner))}</span>`;
-  els.turnBadge.classList.toggle('my-turn', owner === myPlayer);
+function renderResourceListHtml(owner) {
   const resourceRows = joinedPlayerIds().map(id => {
     const color = OWNER_COLOR[id] || '#9aa7b2';
     const supplies = state.resources?.[id]?.supplies ?? 0;
     return `<div class="resource-pill ${playerClass(id)} ${myPlayer === id ? 'mine' : ''}" style="border-left-color:${esc(color)}">
-      <span>${esc(playerName(id))}</span><strong>${supplies}</strong>
+      <span>${esc(playerName(id))}${myPlayer === id ? '（你）' : ''}</span><strong>${supplies}</strong>
     </div>`;
   }).join('');
-  els.resDisplay.innerHTML = `<div class="status-grid">
+  return `<div class="status-grid drawer-resource-grid">
     <div class="status-card active-turn ${owner === myPlayer ? 'mine' : ''}">
-      <span>${owner === myPlayer ? '你的回合' : '等待对手'}</span>
-      <strong>${esc(playerName(owner))}</strong>
+      <span>${owner === myPlayer ? '你的回合' : '当前行动'}</span>
+      <strong>${esc(playerName(owner) || '—')}</strong>
     </div>
     ${resourceRows}
   </div>`;
+}
+
+function renderSidebar() {
+  if (!state) return;
+  const owner = state.turn.currentPlayerId || state.turn.currentOwner;
+  const mine = owner === myPlayer;
+  els.turnBadge.innerHTML = `
+    <span class="turn-kicker">${mine ? '你的回合' : '等待中'}</span>
+    <strong class="turn-count">${esc(turnProgressLabel())}</strong>
+    <span class="turn-player">${esc(playerName(owner) || '—')}</span>`;
+  els.turnBadge.classList.toggle('my-turn', mine);
+
+  // Compact top strip: only my supplies (full multiplayer list lives in drawer)
+  const mySupplies = myPlayer != null ? (state.resources?.[myPlayer]?.supplies ?? 0) : null;
+  if (mySupplies == null) {
+    els.resDisplay.innerHTML = '';
+  } else {
+    els.resDisplay.innerHTML = `<div class="hud-chip hud-supply mine">
+      <span class="hud-label">补给</span>
+      <strong class="hud-value">${mySupplies}</strong>
+      <span class="hud-sub">我的</span>
+    </div>`;
+  }
+
+  const drawerResources = document.getElementById('drawer-resources');
+  if (drawerResources) drawerResources.innerHTML = renderResourceListHtml(owner);
+
   renderActionsDisplay(owner);
   renderScorePanel();
   els.events.innerHTML = '';

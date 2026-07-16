@@ -187,8 +187,13 @@ function clampBoardScale(s) {
 }
 function fitBoardToViewport() {
   if (!boardViewport || !canvas.width) return;
-  const vw = boardViewport.clientWidth || 1;
-  const vh = boardViewport.clientHeight || 1;
+  const vw = boardViewport.clientWidth;
+  const vh = boardViewport.clientHeight;
+  // absolute children can leave stage at 0x0 until layout stretch applies
+  if (vw < 2 || vh < 2) {
+    requestAnimationFrame(fitBoardToViewport);
+    return;
+  }
   const sx = vw / canvas.width;
   const sy = vh / canvas.height;
   boardScale = clampBoardScale(Math.min(sx, sy) * 0.96);

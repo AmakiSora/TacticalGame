@@ -68,4 +68,14 @@ describe('mobile website pages', () => {
     expect(play).not.toContain('player-m-shell');
     expect(spectator).not.toContain('spectator-m-shell');
   });
+
+  it('keeps mobile board stage full width against desktop align-items', () => {
+    const playCss = read('public/play-m.css');
+    const spectatorCss = read('public/spectator-m.css');
+    expect(playCss).toContain('align-items: stretch');
+    expect(playCss).toContain('mobile board width fix');
+    expect(spectatorCss).toContain('align-items: stretch');
+    expect(spectatorCss).toContain('mobile board width fix');
+  });
+
 });

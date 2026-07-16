@@ -1569,3 +1569,27 @@ body.player-m-shell .board-world .map-popup {
   position: absolute;
 }
 body.player-m-shell #m-data-mounts { display: none !important; }
+
+/* mobile board width fix — desktop #game-ui sets align-items:flex-start which
+   collapses .board-stage to 0 width because its children are position:absolute */
+body.player-m-shell #game-ui.m-game {
+  align-items: stretch !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+body.player-m-shell .board-stage {
+  width: 100%;
+  align-self: stretch;
+  min-width: 0;
+}
+body.player-m-shell .board-viewport {
+  width: 100%;
+  height: 100%;
+}
+body.player-m-shell .turn-strip,
+body.player-m-shell .selection-summary,
+body.player-m-shell .replay-bar,
+body.player-m-shell .bottom-bar {
+  width: 100%;
+  box-sizing: border-box;
+}

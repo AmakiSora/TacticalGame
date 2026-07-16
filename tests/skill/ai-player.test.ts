@@ -200,6 +200,17 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('repair');
   });
 
+  it('documents percentage-based comeback supplies and their tactical use', async () => {
+    const skill = await readFile('skill/SKILL.md', 'utf8');
+
+    expect(skill).toContain('config.balance.comebackSupply');
+    expect(skill).toContain('(leaderScore - playerScore) / leaderScore * 100 >= scoreGapPercent');
+    expect(skill).toContain('one shared pre-grant snapshot');
+    expect(skill).toContain('final round goes directly to adjudication without a grant');
+    expect(skill).toContain('comeback_supply');
+    expect(skill).toContain('do not assume the grant repeats');
+  });
+
   it('documents heavy terrain demolition controls and constraints', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 

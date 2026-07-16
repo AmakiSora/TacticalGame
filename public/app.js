@@ -92,6 +92,9 @@ const settingsPopover = document.getElementById('settings-popover');
 const btnExportJson = document.getElementById('btn-export-json');
 const btnImport = document.getElementById('btn-import');
 const importFile = document.getElementById('import-file');
+const settingsControlToken = document.getElementById('settings-control-token');
+const btnSaveControlToken = document.getElementById('btn-save-control-token');
+
 
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1318,8 +1321,35 @@ refreshIntervalInput.addEventListener('change', () => {
   refreshInterval = Math.max(1, Math.min(60, Number(refreshIntervalInput.value) || 5)) * 1000;
   if (autoRefreshCb.checked) startAutoRefresh();
 });
-btnSettings.addEventListener('click', e => { e.stopPropagation(); settingsPopover.classList.toggle('open'); });
+btnSettings.addEventListener('click', e => {
+  e.stopPropagation();
+  fillControlTokenSettings();
+  settingsPopover.classList.toggle('open');
+});
 document.addEventListener('click', e => { if (!settingsPopover.contains(e.target) && e.target !== btnSettings) settingsPopover.classList.remove('open'); });
+btnSaveControlToken?.addEventListener('click', e => {
+  e.stopPropagation();
+  saveControlTokenFromSettings();
+});
+function fillControlTokenSettings() {
+  if (!settingsControlToken) return;
+  try {
+    settingsControlToken.value = localStorage.getItem('autoControlToken') || '';
+  } catch {
+    settingsControlToken.value = '';
+  }
+}
+
+function saveControlTokenFromSettings() {
+  if (!settingsControlToken) return;
+  try {
+    localStorage.setItem('autoControlToken', settingsControlToken.value);
+    statusEl.textContent = 'Control token 已保存';
+  } catch {
+    statusEl.textContent = '无法写入本地存储';
+  }
+}
+
 document.addEventListener('click', e => { if (!gamePicker.contains(e.target)) closeGamePicker(); });
 document.addEventListener('click', e => {
   const target = e.target.closest('[data-rename-player]');

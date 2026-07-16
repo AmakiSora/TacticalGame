@@ -41,6 +41,10 @@ const els = {
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
   btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'),
   selDetail: $('selection-detail'), events: $('events'), scorePanel: $('score-panel'),
+  btnSettings: $('btn-settings'), settingsPopover: $('settings-popover'),
+  settingsControlToken: $('settings-control-token'), btnSaveControlToken: $('btn-save-control-token'),
+  settingsGameId: $('settings-game-id'), settingsPlayerToken: $('settings-player-token'), settingsHostToken: $('settings-host-token'),
+  btnSaveSession: $('btn-save-session'), btnEnterSession: $('btn-enter-session'), btnClearSession: $('btn-clear-session'),
 };
 const ctx = els.canvas.getContext('2d');
 
@@ -194,6 +198,98 @@ function persistSession() {
   } catch {
     // 浏览器禁用本地存储时不影响本局操作。
   }
+}
+
+function readStoredSession() {
+  try {
+    const raw = localStorage.getItem('tacticalGame.session');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      gameId: parsed.gameId || null,
+      myToken: parsed.myToken || null,
+      myPlayer: parsed.myPlayer || null,
+      hostToken: parsed.hostToken || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function fillSettingsFromSession() {
+  if (els.settingsControlToken) {
+    try {
+      els.settingsControlToken.value = localStorage.getItem('autoControlToken') || '';
+    } catch {
+      els.settingsControlToken.value = '';
+    }
+  }
+  if (els.settingsGameId) els.settingsGameId.value = gameId || '';
+  if (els.settingsPlayerToken) els.settingsPlayerToken.value = myToken || '';
+  if (els.settingsHostToken) els.settingsHostToken.value = hostToken || '';
+}
+
+function saveControlToken() {
+  if (!els.settingsControlToken) return;
+  try {
+    localStorage.setItem('autoControlToken', els.settingsControlToken.value);
+    toast('Control token 已保存', 'ok');
+  } catch {
+    toast('无法写入本地存储', 'err');
+  }
+}
+
+function applySessionFieldsFromSettings() {
+  const nextGameId = (els.settingsGameId?.value || '').trim();
+  if (!nextGameId) {
+    toast('请填写 Game ID', 'err');
+    return false;
+  }
+  gameId = nextGameId;
+  myToken = (els.settingsPlayerToken?.value || '').trim() || null;
+  hostToken = (els.settingsHostToken?.value || '').trim() || null;
+  // 仅保存 token 时无法可靠推断座位，保留已有 myPlayer。
+  return true;
+}
+
+function saveSessionFromSettings() {
+  if (!applySessionFieldsFromSettings()) return false;
+  persistSession();
+  fillSettingsFromSession();
+  toast('会话已保存', 'ok');
+  return true;
+}
+
+function clearSessionFromSettings() {
+  gameId = null;
+  myToken = null;
+  hostToken = null;
+  myPlayer = null;
+  try {
+    localStorage.removeItem('tacticalGame.session');
+  } catch {
+    // 浏览器禁用本地存储时只清内存。
+  }
+  fillSettingsFromSession();
+  toast('会话已清除', 'ok');
+}
+
+async function enterGameFromSettings() {
+  if (!applySessionFieldsFromSettings()) return;
+  persistSession();
+  if (els.gameId) els.gameId.value = gameId;
+  await enterGame();
+}
+
+function restoreSessionIntoMemory() {
+  const session = readStoredSession();
+  if (!session?.gameId) return;
+  gameId = session.gameId;
+  myToken = session.myToken;
+  myPlayer = session.myPlayer;
+  hostToken = session.hostToken;
+  if (els.gameId) els.gameId.value = gameId;
 }
 
 function previewCells(radius) {
@@ -1186,4 +1282,33 @@ document.querySelectorAll('.lobby-tab').forEach(tab => tab.addEventListener('cli
 document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', () => navigator.clipboard.writeText($(btn.dataset.copy).textContent)));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
 document.addEventListener('click', e => { const popup = $('map-popup'); if (!popup.classList.contains('hidden') && !popup.contains(e.target) && e.target !== els.canvas) closePopup(); });
+els.btnSettings?.addEventListener('click', e => {
+  e.stopPropagation();
+  fillSettingsFromSession();
+  els.settingsPopover?.classList.toggle('open');
+});
+document.addEventListener('click', e => {
+  if (!els.settingsPopover || !els.btnSettings) return;
+  if (!els.settingsPopover.contains(e.target) && e.target !== els.btnSettings) {
+    els.settingsPopover.classList.remove('open');
+  }
+});
+els.btnSaveControlToken?.addEventListener('click', e => {
+  e.stopPropagation();
+  saveControlToken();
+});
+els.btnSaveSession?.addEventListener('click', e => {
+  e.stopPropagation();
+  saveSessionFromSettings();
+});
+els.btnEnterSession?.addEventListener('click', e => {
+  e.stopPropagation();
+  enterGameFromSettings();
+});
+els.btnClearSession?.addEventListener('click', e => {
+  e.stopPropagation();
+  clearSessionFromSettings();
+});
+restoreSessionIntoMemory();
+fillSettingsFromSession();
 loadMapList();

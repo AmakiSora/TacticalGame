@@ -12,7 +12,37 @@
       <h1>六边形战棋 <span class="sub">玩家控制台</span> <span class="version-badge"></span></h1>
       <div class="page-subtitle">回合指令与战场状态</div>
     </div>
-    <div id="conn-status" class="badge idle">未加入</div>
+    <div class="header-actions">
+      <div id="conn-status" class="badge idle">未加入</div>
+      <div id="settings-wrap" class="settings-tools">
+        <button id="btn-settings" type="button" title="设置">&#9881;</button>
+        <div id="settings-popover">
+          <label class="setting-field">
+            <span>Control token</span>
+            <input id="settings-control-token" type="password" placeholder="Control token" autocomplete="off" />
+          </label>
+          <button id="btn-save-control-token" type="button" class="settings-action">保存 Token</button>
+          <div class="settings-divider"></div>
+          <label class="setting-field">
+            <span>Game ID</span>
+            <input id="settings-game-id" type="text" placeholder="对局 ID" autocomplete="off" />
+          </label>
+          <label class="setting-field">
+            <span>Player token</span>
+            <input id="settings-player-token" type="password" placeholder="Player token" autocomplete="off" />
+          </label>
+          <label class="setting-field">
+            <span>Host token（可选）</span>
+            <input id="settings-host-token" type="password" placeholder="Host token" autocomplete="off" />
+          </label>
+          <div class="settings-actions">
+            <button id="btn-save-session" type="button" class="settings-action">保存会话</button>
+            <button id="btn-enter-session" type="button" class="settings-action">进入游戏</button>
+            <button id="btn-clear-session" type="button" class="settings-action">清除会话</button>
+          </div>
+        </div>
+      </div>
+    </div>
 </header>
 
   <section id="join-panel" class="panel">
@@ -157,6 +187,6 @@
 <toast id="toast"></toast>
 
 <script src="/version.js"></script>
-<script src="/play.js?v=3.0.3"></script>
+<script src="/play.js?v=3.0.4"></script>
 </body>
 </html>

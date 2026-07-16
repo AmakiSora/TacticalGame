@@ -1,5 +1,5 @@
 # Build the TypeScript service with its locked development dependencies.
-FROM node:20.19.4-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 
 WORKDIR /app
 
@@ -11,14 +11,14 @@ COPY src ./src
 RUN npm run build
 
 # Install the runtime dependency set separately to keep the final image small.
-FROM node:20.19.4-bookworm-slim AS production-deps
+FROM node:24-bookworm-slim AS production-deps
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-FROM node:20.19.4-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
 WORKDIR /app

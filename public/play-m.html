@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TacticalGame — 玩家（手机）</title>
+  <link rel="stylesheet" href="/play-m.css" />
+</head>
+<body class="player-m-shell">
+
+  <header class="m-header">
+    <div class="brand-block">
+      <h1>六边形战棋 <span class="sub">手机</span> <span class="version-badge"></span></h1>
+    </div>
+    <div id="conn-status" class="badge idle">未加入</div>
+  </header>
+
+  <section id="join-panel" class="panel lobby-panel">
+    <h2>游戏大厅</h2>
+
+    <div class="lobby-tabs">
+      <button class="lobby-tab active" data-tab="create">创建游戏</button>
+      <button class="lobby-tab" data-tab="join">加入游戏</button>
+    </div>
+
+    <div id="tab-create" class="lobby-tab-content active">
+      <div class="create-setup">
+        <div class="field name-field">
+          <label>你的名称</label>
+          <input id="create-name" placeholder="留空使用默认名称" maxlength="20" />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>最大玩家数</label>
+            <select id="max-players">
+              <option value="2">2 人</option>
+              <option value="3">3 人</option>
+              <option value="4">4 人</option>
+              <option value="5">5 人</option>
+              <option value="6">6 人</option>
+              <option value="7">7 人</option>
+              <option value="8">8 人</option>
+            </select>
+          </div>
+          <label class="field checkbox-field">
+            <span>房主参战</span>
+            <input id="host-participate" type="checkbox" checked />
+          </label>
+        </div>
+        <div class="field map-field">
+          <label>选择地图</label>
+          <select id="map-select" hidden><option value="default">default</option></select>
+          <div id="map-picker" class="map-picker" role="radiogroup" aria-label="选择地图"></div>
+        </div>
+      </div>
+      <button id="btn-create" class="btn primary" style="margin-top:14px;width:100%">创建新游戏</button>
+      <div id="create-result" class="lobby-result hidden">
+        <div class="info-row">
+          <span class="info-label">Game ID</span>
+          <code id="created-game-id" class="info-value"></code>
+          <button class="btn-copy" data-copy="created-game-id">复制</button>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Host</span>
+          <code id="created-host-token" class="info-value"></code>
+          <button class="btn-copy" data-copy="created-host-token">复制</button>
+        </div>
+        <div class="info-row" id="created-player-token-row">
+          <span class="info-label">Player</span>
+          <code id="created-token" class="info-value"></code>
+          <button class="btn-copy" data-copy="created-token">复制</button>
+        </div>
+        <p class="lobby-hint">请保存 Host Token，将 Game ID 发给其他玩家。</p>
+        <div id="lobby-summary" class="lobby-summary"></div>
+        <button id="btn-start-game" class="btn success" style="width:100%;margin-top:10px">开始游戏</button>
+        <button id="btn-connect-create" class="btn success" style="width:100%;margin-top:10px">连接进入游戏</button>
+      </div>
+    </div>
+
+    <div id="tab-join" class="lobby-tab-content">
+      <div class="field">
+        <label>游戏 ID</label>
+        <input id="game-id" placeholder="粘贴 Game ID…" />
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>你的名称</label>
+        <input id="join-name" placeholder="留空使用默认名称" maxlength="20" />
+      </div>
+      <button id="btn-join" class="btn primary" style="margin-top:14px;width:100%">加入游戏</button>
+      <div id="join-result" class="lobby-result hidden">
+        <p class="lobby-status" id="join-status-text"></p>
+        <div class="info-row" id="join-player-token-row">
+          <span class="info-label">Player</span>
+          <code id="join-player-token" class="info-value"></code>
+          <button class="btn-copy" data-copy="join-player-token">复制</button>
+        </div>
+        <div id="join-lobby-summary" class="lobby-summary"></div>
+        <button id="btn-connect-join" class="btn success" style="width:100%;margin-top:10px">进入游戏</button>
+      </div>
+    </div>
+  </section>
+
+  <main id="game-ui" class="hidden m-game">
+    <div id="turn-strip" class="turn-strip">
+      <div id="turn-badge" class="turn-badge">
+        <strong class="turn-count">—</strong>
+        <span class="turn-player">等待对局</span>
+      </div>
+      <div id="actions-display" class="actions-display strip-actions"></div>
+      <div id="resources-display" class="resources-display strip-resources"></div>
+    </div>
+
+    <div id="board-stage" class="board-stage">
+      <div id="board-viewport" class="board-viewport">
+        <div id="board-world" class="board-world">
+          <canvas id="board" width="840" height="840"></canvas>
+          <div id="cell-info" class="cell-info"></div>
+          <div id="map-popup" class="map-popup hidden"></div>
+        </div>
+      </div>
+      <div id="zoom-controls" class="zoom-controls">
+        <button type="button" id="btn-zoom-in" class="zoom-btn" title="放大">+</button>
+        <button type="button" id="btn-zoom-out" class="zoom-btn" title="缩小">−</button>
+        <button type="button" id="btn-zoom-reset" class="zoom-btn" title="重置">↺</button>
+      </div>
+    </div>
+
+    <button type="button" id="selection-summary" class="selection-summary">
+      <div id="selection-detail" class="selection-detail">点击棋盘上的单位、总部或据点查看详情</div>
+    </button>
+
+    <div id="m-data-mounts" class="hidden" aria-hidden="true">
+      <div id="selection-panel" class="selection-panel"></div>
+      <aside id="sidebar">
+        <section id="turn-resources"></section>
+        <section id="score-panel"></section>
+        <section id="action-hints">
+          <h3>操作</h3>
+          <div class="hint-list">
+            <div class="hint"><span class="hint-key">行动点</span> 每回合最多 5 点；部署/移动/攻击/治疗首次操作一个单位消耗 1 点，同单位的后续动作免费</div>
+            <div class="hint"><span class="hint-key">点击己方单位</span> 弹出移动/攻击/治疗选项</div>
+            <div class="hint"><span class="hint-key">选择选项后</span> 点击高亮六边形执行</div>
+            <div class="hint"><span class="hint-key">点击己方 HQ/据点</span> 弹出部署菜单</div>
+            <div class="hint"><span class="hint-key">步兵/侦察兵</span> 站上据点并结束回合即可占领</div>
+            <div class="hint"><span class="hint-key">摧毁敌方 HQ</span> 获得胜利</div>
+            <div class="hint"><span class="hint-key">取消</span> 底栏「取消」或 Esc</div>
+          </div>
+        </section>
+        <section id="quick-actions" class="hidden">
+          <div class="btn-grid">
+            <button id="btn-end-turn" class="btn warning">结束回合</button>
+            <button id="btn-refresh" class="btn">刷新状态</button>
+          </div>
+        </section>
+        <section id="event-log">
+          <h3>事件流</h3>
+          <ul id="events"></ul>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <nav id="bottom-bar" class="bottom-bar hidden">
+    <button type="button" id="btn-drawer-info" class="bar-btn" data-drawer="info">信息</button>
+    <button type="button" id="btn-cancel" class="bar-btn">取消</button>
+    <button type="button" id="btn-end-turn-bar" class="bar-btn bar-btn-primary">结束回合</button>
+    <button type="button" id="btn-drawer-more" class="bar-btn" data-drawer="more">更多</button>
+  </nav>
+
+  <div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
+  <aside id="drawer" class="drawer hidden" aria-hidden="true">
+    <div class="drawer-handle"></div>
+    <div class="drawer-header">
+      <h2 id="drawer-title">信息</h2>
+      <button type="button" id="drawer-close" class="drawer-close" aria-label="关闭">×</button>
+    </div>
+    <div id="drawer-body" class="drawer-body">
+      <div id="drawer-panel-info" class="drawer-panel hidden">
+        <section class="drawer-section">
+          <h3>选中</h3>
+          <div id="drawer-selection"></div>
+        </section>
+        <section class="drawer-section">
+          <h3>局势</h3>
+          <div id="drawer-score"></div>
+        </section>
+        <section class="drawer-section">
+          <button id="btn-refresh-drawer" class="btn" style="width:100%">刷新状态</button>
+        </section>
+      </div>
+      <div id="drawer-panel-more" class="drawer-panel hidden">
+        <section class="drawer-section">
+          <h3>事件流</h3>
+          <ul id="drawer-events" class="event-list"></ul>
+        </section>
+        <section class="drawer-section">
+          <h3>操作提示</h3>
+          <div id="drawer-hints"></div>
+        </section>
+      </div>
+    </div>
+  </aside>
+
+  <toast id="toast"></toast>
+
+  <script src="/version.js"></script>
+  <script src="/play-m.js?v=3.0.3"></script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TacticalGame — 观战（手机）</title>
+  <link rel="stylesheet" href="/spectator-m.css" />
+</head>
+<body class="spectator-m-shell">
+
+  <header class="m-header">
+    <div class="brand-block">
+      <h1>观战 <span class="version-badge"></span></h1>
+    </div>
+    <button type="button" id="game-summary-btn" class="game-summary-btn" data-drawer="game">
+      <span id="game-picker-label">-- 选择对局 --</span>
+    </button>
+    <button type="button" id="btn-settings" class="icon-btn" title="设置" data-drawer="settings">&#9881;</button>
+  </header>
+
+  <select id="game-select" class="native-game-select" hidden tabindex="-1" aria-hidden="true">
+    <option value="">-- 选择对局 --</option>
+  </select>
+  <div id="game-picker-menu" class="hidden" role="listbox" aria-label="选择对局"></div>
+  <button id="game-picker-button" type="button" hidden aria-hidden="true"></button>
+
+  <div id="turn-strip" class="turn-strip">
+    <div id="turn-info" class="turn-strip-inner"></div>
+    <span id="status" class="strip-status"></span>
+  </div>
+
+  <main class="m-game spectator-m-main">
+    <div id="board-stage" class="board-stage">
+      <div id="board-viewport" class="board-viewport">
+        <div id="board-world" class="board-world">
+          <div id="board-wrap">
+            <canvas id="board" width="840" height="840"></canvas>
+            <div id="cell-info" class="cell-info"></div>
+          </div>
+        </div>
+      </div>
+      <div id="zoom-controls" class="zoom-controls">
+        <button type="button" id="btn-zoom-in" class="zoom-btn" title="放大">+</button>
+        <button type="button" id="btn-zoom-out" class="zoom-btn" title="缩小">−</button>
+        <button type="button" id="btn-zoom-reset" class="zoom-btn" title="重置">↺</button>
+      </div>
+    </div>
+
+    <button type="button" id="action-summary" class="selection-summary" data-drawer="events">
+      <div id="detail-content" class="selection-detail">选择对局后使用时间轴回放</div>
+    </button>
+
+    <div id="replay-bar" class="replay-bar">
+      <div id="timeline-wrap" class="timeline-wrap">
+        <input type="range" id="timeline" min="0" max="0" value="0" />
+        <div id="timeline-markers"></div>
+      </div>
+      <div id="control-buttons" class="control-buttons">
+        <button id="btn-start" title="回到开始">⏮</button>
+        <button id="btn-prev" title="上一步">◀</button>
+        <button id="btn-play" title="播放/暂停">▶</button>
+        <button id="btn-next" title="下一步">▶</button>
+        <button id="btn-end" title="跳到末尾">⏭</button>
+        <select id="speed-select" title="播放速度">
+          <option value="1000">0.5x</option>
+          <option value="500" selected>1x</option>
+          <option value="200">2.5x</option>
+          <option value="100">5x</option>
+          <option value="50">10x</option>
+        </select>
+        <span id="step-info">0 / 0</span>
+      </div>
+    </div>
+
+    <div id="m-data-mounts" class="hidden" aria-hidden="true">
+      <div id="selection-panel">
+        <div id="selection-detail">点击棋盘查看单位、总部或据点信息</div>
+      </div>
+      <div id="replay-controls"></div>
+      <aside id="sidebar">
+        <section id="resources"></section>
+        <section id="score-panel"></section>
+        <section id="event-detail">
+          <h3>当前操作</h3>
+        </section>
+        <section id="event-log">
+          <h3>事件流</h3>
+          <ul id="events"></ul>
+        </section>
+      </aside>
+      <span id="file-actions">
+        <button id="btn-export-json" title="导出为 JSON 文件">导出 JSON</button>
+        <button id="btn-import" title="从 JSON 文件导入对局">导入</button>
+        <input type="file" id="import-file" accept=".json" hidden />
+      </span>
+      <button id="refresh-list" hidden>刷新列表</button>
+      <button id="delete-game" hidden class="danger">删除</button>
+      <div id="settings-wrap" hidden>
+        <div id="settings-popover">
+          <label class="toggle-row">
+            <span>自动刷新</span>
+            <span class="toggle"><input type="checkbox" id="auto-refresh" checked /><span class="slider"></span></span>
+          </label>
+          <label class="setting-row">
+            刷新间隔 <input type="number" id="refresh-interval" min="1" max="60" value="5" /> 秒
+          </label>
+          <label class="toggle-row">
+            <span>跟随最新</span>
+            <span class="toggle"><input type="checkbox" id="follow-latest" /><span class="slider"></span></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <nav id="bottom-bar" class="bottom-bar">
+    <button type="button" class="bar-btn" data-drawer="game">对局</button>
+    <button type="button" class="bar-btn" data-drawer="situation">局势</button>
+    <button type="button" class="bar-btn" data-drawer="events">事件</button>
+  </nav>
+
+  <div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
+  <aside id="drawer" class="drawer hidden" aria-hidden="true">
+    <div class="drawer-handle"></div>
+    <div class="drawer-header">
+      <h2 id="drawer-title">对局</h2>
+      <button type="button" id="drawer-close" class="drawer-close" aria-label="关闭">×</button>
+    </div>
+    <div id="drawer-body" class="drawer-body">
+      <div id="drawer-panel-game" class="drawer-panel hidden">
+        <section class="drawer-section">
+          <h3>选择对局</h3>
+          <div id="drawer-game-list" class="drawer-game-list"></div>
+          <button type="button" id="btn-refresh-list-drawer" class="btn" style="width:100%;margin-top:8px">刷新列表</button>
+          <button type="button" id="btn-delete-drawer" class="btn danger" style="width:100%;margin-top:8px">删除当前对局</button>
+        </section>
+        <section class="drawer-section">
+          <h3>导入 / 导出</h3>
+          <div class="btn-row">
+            <button type="button" id="btn-export-drawer" class="btn">导出 JSON</button>
+            <button type="button" id="btn-import-drawer" class="btn">导入</button>
+          </div>
+        </section>
+      </div>
+      <div id="drawer-panel-situation" class="drawer-panel hidden">
+        <section class="drawer-section">
+          <h3>资源</h3>
+          <div id="drawer-resources"></div>
+        </section>
+        <section class="drawer-section">
+          <h3>计分</h3>
+          <div id="drawer-score"></div>
+        </section>
+        <section class="drawer-section">
+          <h3>选中</h3>
+          <div id="drawer-selection"></div>
+        </section>
+      </div>
+      <div id="drawer-panel-events" class="drawer-panel hidden">
+        <section class="drawer-section">
+          <h3>当前操作</h3>
+          <div id="drawer-event-detail"></div>
+        </section>
+        <section class="drawer-section">
+          <h3>事件流</h3>
+          <ul id="drawer-events" class="event-list"></ul>
+        </section>
+      </div>
+      <div id="drawer-panel-settings" class="drawer-panel hidden">
+        <section class="drawer-section settings-panel">
+          <label class="toggle-row">
+            <span>自动刷新</span>
+            <span class="toggle"><input type="checkbox" id="auto-refresh-drawer" checked /><span class="slider"></span></span>
+          </label>
+          <label class="setting-row">
+            刷新间隔 <input type="number" id="refresh-interval-drawer" min="1" max="60" value="5" /> 秒
+          </label>
+          <label class="toggle-row">
+            <span>跟随最新</span>
+            <span class="toggle"><input type="checkbox" id="follow-latest-drawer" /><span class="slider"></span></span>
+          </label>
+        </section>
+      </div>
+    </div>
+  </aside>
+
+  <script src="/version.js"></script>
+  <script src="/spectator-m.js?v=3.0.3"></script>
+</body>
+</html>

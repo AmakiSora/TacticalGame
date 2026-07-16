@@ -1002,8 +1002,7 @@ els.canvas.addEventListener('click', async () => {
 function subscribeSse() {
   if (sse) sse.close();
   const lastSeq = state?.eventLog.at(-1)?.seq ?? 0;
-  const tokenQuery = myToken ? `&token=${encodeURIComponent(myToken)}` : '';
-  sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}${tokenQuery}`);
+  sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}`);
   sse.onmessage = e => { applyEvent(state, JSON.parse(e.data)); drawBoard(); renderSidebar(); };
   sse.onerror = () => statusBadge('SSE 断开', 'err');
   sse.onopen = () => statusBadge('已连接', 'ok');
@@ -1011,8 +1010,7 @@ function subscribeSse() {
 
 function subscribeLobbyStart() {
   if (sse) sse.close();
-  const tokenQuery = myToken ? `&token=${encodeURIComponent(myToken)}` : '';
-  sse = new EventSource(`/api/games/${gameId}/events?after=0${tokenQuery}`);
+  sse = new EventSource(`/api/games/${gameId}/events?after=0`);
   sse.onmessage = async e => {
     const event = JSON.parse(e.data);
     if (event.type !== 'game_start') return;

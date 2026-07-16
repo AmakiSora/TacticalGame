@@ -1,0 +1,41 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: "3100"
+      HOST: "0.0.0.0"
+      TACTICAL_GAME_STATE_FILE: /app/runtime/games.json
+      AUTO_CONTROL_TOKEN: ${AUTO_CONTROL_TOKEN:?Set AUTO_CONTROL_TOKEN in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - tactical-game-runtime:/app/runtime
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/readyz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  proxy:
+    image: caddy:2.10.0-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      CADDY_AUTH_USER: ${CADDY_AUTH_USER:?Set CADDY_AUTH_USER in .env}
+      CADDY_AUTH_HASH: ${CADDY_AUTH_HASH:?Set CADDY_AUTH_HASH in .env}
+    ports:
+      - "${PROXY_PORT:-8080}:80"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+    init: true
+
+volumes:
+  tactical-game-runtime:
+    name: tactical-game-runtime

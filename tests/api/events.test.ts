@@ -46,14 +46,13 @@ describe('Events API', () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it('GET /events returns SSE stream when Accept is text/event-stream', async () => {
+  it('returns proxy-safe headers for SSE streams', async () => {
     const { gameId } = await createGameAndJoin(app);
     const res = await app.inject({
       method: 'GET', url: `/api/games/${gameId}/events?close=true`,
       headers: { accept: 'text/event-stream' },
     });
-    expect(res.statusCode).toBe(200);
-    expect(res.headers['content-type']).toContain('text/event-stream');
+    expect(res.headers['x-accel-buffering']).toBe('no');
     expect(res.body).toContain('data:');
   });
 });

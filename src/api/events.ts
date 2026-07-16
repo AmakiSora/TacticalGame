@@ -5,11 +5,21 @@ import { globalEventBus } from '../events/bus.js';
 import type { GameEvent } from '../types.js';
 
 const MAX_SSE_PER_GAME = 20;
+const HEARTBEAT_MS = 25_000;
 const sseCounts = new Map<string, number>();
+const activeConnections = new Set<() => void>();
 
 function writeSseEvent(reply: FastifyReply, event: GameEvent): void {
   const payload = JSON.stringify(event);
   reply.raw.write(`data: ${payload}\n\n`);
+}
+
+function writeHeartbeat(reply: FastifyReply): void {
+  reply.raw.write(': heartbeat\n\n');
+}
+
+export function closeSseConnections(): void {
+  for (const close of [...activeConnections]) close();
 }
 
 export async function eventsRoutes(app: FastifyInstance): Promise<void> {
@@ -53,7 +63,9 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         'content-type': 'text/event-stream',
         'cache-control': 'no-cache',
         connection: 'keep-alive',
+        'x-accel-buffering': 'no',
       });
+      reply.hijack();
 
       // Send all existing events
       for (const ev of filtered) {
@@ -66,23 +78,32 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
           writeSseEvent(reply, ev);
         }
       });
-
-      // Clean up when the client disconnects
-      req.raw.on('close', () => {
+      const heartbeat = setInterval(() => {
+        if (!reply.raw.writableEnded) writeHeartbeat(reply);
+      }, HEARTBEAT_MS);
+      heartbeat.unref();
+      let cleanedUp = false;
+      const cleanup = () => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        clearInterval(heartbeat);
         unsubscribe();
+        activeConnections.delete(close);
         const count = sseCounts.get(game.id) ?? 1;
         if (count <= 1) sseCounts.delete(game.id);
         else sseCounts.set(game.id, count - 1);
-      });
+      };
+      const close = () => {
+        cleanup();
+        if (!reply.raw.writableEnded) reply.raw.end();
+      };
+      activeConnections.add(close);
 
-      // For test clients: close after flushing historical events
-      if (closeAfterFlush) {
-        unsubscribe();
-        const count = sseCounts.get(game.id) ?? 1;
-        if (count <= 1) sseCounts.delete(game.id);
-        else sseCounts.set(game.id, count - 1);
-        reply.raw.end();
-      }
+      // Clean up when the client disconnects.
+      req.raw.once('close', cleanup);
+
+      // For test clients: close after flushing historical events.
+      if (closeAfterFlush) close();
     },
   );
 }

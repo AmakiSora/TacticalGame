@@ -148,6 +148,24 @@ describe('map editor page', () => {
     expect(errors).toContain('Map "broken".balance.comebackSupply.amountPerRound must be a number >= 1');
   });
 
+  it('rejects comeback startRound above maxTurns and formats the message', () => {
+    const core = loadCore();
+    const config = core.createDefaultMapConfig();
+    config.balance.maxTurns = 10;
+    config.balance.comebackSupply = { startRound: 12, scoreGapPercent: 40, amountPerRound: 20 };
+
+    const errors = core.validateMapConfig(config, 'broken');
+    expect(errors).toContain('Map "broken".balance.comebackSupply.startRound must be <= balance.maxTurns');
+    expect(core.formatValidationError(errors[0])).toBe('追赶补给配置的开始轮次不能大于最大回合。');
+  });
+
+  it('clamps bound number inputs with min and max', () => {
+    const source = read('public/map-editor.js');
+    expect(source).toContain('function clampBoundNumber');
+    expect(source).toContain('clampBoundNumber(input.value, input.min, input.max)');
+    expect(source).toContain('comebackSupplyDraft');
+  });
+
   it('validates positions, overlap, typed point consistency, and numeric ranges', () => {
     const core = loadCore();
     const config = core.createDefaultMapConfig();

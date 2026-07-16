@@ -331,6 +331,15 @@
       if (comeback.scoreGapPercent > 100) {
         errors.push(`${mapName}.balance.comebackSupply.scoreGapPercent must be <= 100`);
       }
+      const maxTurns = balance.maxTurns;
+      if (
+        Number.isInteger(comeback.startRound)
+        && typeof maxTurns === 'number'
+        && Number.isInteger(maxTurns)
+        && comeback.startRound > maxTurns
+      ) {
+        errors.push(`${mapName}.balance.comebackSupply.startRound must be <= balance.maxTurns`);
+      }
     }
 
     const hq = record(c.headquarters, `${mapName}.headquarters`);
@@ -471,6 +480,8 @@
     if (match) return `${humanContext(match[1])}的${humanField(match[2])}必须是整数。`;
     match = error.match(/^(.+)\.scoreGapPercent must be <= 100$/);
     if (match) return `${humanContext(match[1])}的分差百分比不能超过 100。`;
+    match = error.match(/^(.+)\.startRound must be <= balance\.maxTurns$/);
+    if (match) return `${humanContext(match[1])}的开始轮次不能大于最大回合。`;
     match = error.match(/^(.+) \((-?\d+),(-?\d+)\) is outside radius (\d+)$/);
     if (match) return `${humanContext(match[1])} 的坐标 (${match[2]},${match[3]}) 超出地图半径 ${match[4]}。`;
     match = error.match(/^(.+) overlaps another fixed map object at (-?\d+),(-?\d+)$/);
@@ -933,22 +944,38 @@
     els.mapRadius.value = config.radius;
   }
 
+  // 关闭追赶补给时暂存参数，重新启用时恢复，避免用户只是临时关掉开关就丢配置。
+  let comebackSupplyDraft = null;
+
+  function defaultComebackSupply() {
+    return { startRound: 3, scoreGapPercent: 40, amountPerRound: 20 };
+  }
+
+  function clampBoundNumber(raw, min, max) {
+    let value = Math.max(Number(min || 0), Number(raw) || 0);
+    if (max !== '' && max != null && Number.isFinite(Number(max))) {
+      value = Math.min(Number(max), value);
+    }
+    return value;
+  }
+
   function renderBalanceFields() {
     const comeback = config.balance.comebackSupply;
+    const draft = comeback || comebackSupplyDraft || defaultComebackSupply();
     els.balanceFields.innerHTML = [
       ...BALANCE_KEYS.map(([key, label, min]) => fieldHtml(`balance:${key}`, label, config.balance[key], min)),
       ...WEIGHT_KEYS.map(([key, label]) => fieldHtml(`weight:${key}`, `裁决 ${label}`, config.balance.adjudicationWeights[key], 0)),
       fieldHtml('hq:hp', '总部 HP', config.headquartersSpec.hp, 1),
       fieldHtml('hq:defense', '总部防御', config.headquartersSpec.defense, 0),
       `<label class="toggle-field">启用追赶补给 <input id="comeback-enabled" type="checkbox"${comeback ? ' checked' : ''} /></label>`,
-      fieldHtml('comeback:startRound', '追赶开始轮次', comeback?.startRound ?? 3, 1, null, !comeback),
-      fieldHtml('comeback:scoreGapPercent', '追赶分差百分比', comeback?.scoreGapPercent ?? 40, 1, 100, !comeback),
-      fieldHtml('comeback:amountPerRound', '追赶每轮补给', comeback?.amountPerRound ?? 20, 1, null, !comeback),
+      fieldHtml('comeback:startRound', '追赶开始轮次', draft.startRound ?? 3, 1, null, !comeback),
+      fieldHtml('comeback:scoreGapPercent', '追赶分差百分比', draft.scoreGapPercent ?? 40, 1, 100, !comeback),
+      fieldHtml('comeback:amountPerRound', '追赶每轮补给', draft.amountPerRound ?? 20, 1, null, !comeback),
     ].join('');
     els.balanceFields.querySelectorAll('input[data-bind]').forEach(input => {
       input.addEventListener('change', () => {
         const [group, key] = input.dataset.bind.split(':');
-        const value = Math.max(Number(input.min || 0), Number(input.value) || 0);
+        const value = clampBoundNumber(input.value, input.min, input.max);
         if (group === 'balance') config.balance[key] = value;
         if (group === 'weight') config.balance.adjudicationWeights[key] = value;
         if (group === 'hq') config.headquartersSpec[key] = value;
@@ -958,8 +985,12 @@
     });
     document.getElementById('comeback-enabled').addEventListener('change', event => {
       if (event.target.checked) {
-        config.balance.comebackSupply = { startRound: 3, scoreGapPercent: 40, amountPerRound: 20 };
-      } else {
+        config.balance.comebackSupply = {
+          ...(comebackSupplyDraft || defaultComebackSupply()),
+        };
+        comebackSupplyDraft = null;
+      } else if (config.balance.comebackSupply) {
+        comebackSupplyDraft = { ...config.balance.comebackSupply };
         delete config.balance.comebackSupply;
       }
       syncAll();
@@ -1145,6 +1176,7 @@
     reader.onload = () => {
       try {
         config = normalizeImportedMap(JSON.parse(reader.result));
+        comebackSupplyDraft = null;
         selected = null;
         syncAll();
         setStatus(`已导入 ${file.name}`);
@@ -1185,6 +1217,7 @@
   $('btn-new').addEventListener('click', () => {
     if (!confirm('新建会清空当前编辑内容，是否继续？')) return;
     config = createDefaultMapConfig();
+    comebackSupplyDraft = null;
     selected = null;
     syncAll();
     setStatus('已新建地图');

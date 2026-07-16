@@ -51,6 +51,14 @@ describe('adjudication score panels', () => {
     }
   });
 
+  it('replays and labels comeback supply events on both front ends', () => {
+    for (const file of ['public/app.js', 'public/play.js']) {
+      const source = read(file);
+      expect(source).toContain("case 'comeback_supply'");
+      expect(source).toContain('追赶补给 +${p.amount}（落后${p.scoreGapPercent}%）');
+    }
+  });
+
   it('uses configured max turns in front-end adjudication labels', () => {
     for (const file of ['public/app.js', 'public/play.js']) {
       const source = read(file);

@@ -174,6 +174,13 @@
         };
       }
     }
+    if (sourceBalance.comebackSupply && typeof sourceBalance.comebackSupply === 'object') {
+      normalized.balance.comebackSupply = {
+        startRound: numberOrDefault(sourceBalance.comebackSupply.startRound, 3),
+        scoreGapPercent: numberOrDefault(sourceBalance.comebackSupply.scoreGapPercent, 40),
+        amountPerRound: numberOrDefault(sourceBalance.comebackSupply.amountPerRound, 20),
+      };
+    }
     return normalized;
   }
 
@@ -187,6 +194,13 @@
     for (const [key] of BALANCE_KEYS) balance[key] = Number(config.balance?.[key] ?? 0);
     balance.adjudicationWeights = {};
     for (const [key] of WEIGHT_KEYS) balance.adjudicationWeights[key] = Number(config.balance?.adjudicationWeights?.[key] ?? 0);
+    if (config.balance?.comebackSupply) {
+      balance.comebackSupply = {
+        startRound: Number(config.balance.comebackSupply.startRound),
+        scoreGapPercent: Number(config.balance.comebackSupply.scoreGapPercent),
+        amountPerRound: Number(config.balance.comebackSupply.amountPerRound),
+      };
+    }
     if (typed) {
       balance.controlPointTypes = {};
       const types = config.balance?.controlPointTypes || defaultControlPointTypes();
@@ -308,6 +322,16 @@
         num(spec, 'repairAmount', `${mapName}.balance.controlPointTypes.${kind}`, 0);
       }
     }
+    if ('comebackSupply' in balance) {
+      const comeback = record(balance.comebackSupply, `${mapName}.balance.comebackSupply`);
+      for (const key of ['startRound', 'scoreGapPercent', 'amountPerRound']) {
+        const value = num(comeback, key, `${mapName}.balance.comebackSupply`, 1);
+        if (!Number.isInteger(value)) errors.push(`${mapName}.balance.comebackSupply.${key} must be an integer`);
+      }
+      if (comeback.scoreGapPercent > 100) {
+        errors.push(`${mapName}.balance.comebackSupply.scoreGapPercent must be <= 100`);
+      }
+    }
 
     const hq = record(c.headquarters, `${mapName}.headquarters`);
     const occupied = new Set();
@@ -402,6 +426,9 @@
       income: '收入',
       deployDiscount: '部署折扣',
       repairAmount: '维修量',
+      startRound: '开始轮次',
+      scoreGapPercent: '分差百分比',
+      amountPerRound: '每轮补给量',
     };
     return names[key] || key;
   }
@@ -427,6 +454,7 @@
     if (text === 'balance') return '平衡设置';
     if (text === 'balance.adjudicationWeights') return '裁决权重';
     if (text === 'balance.controlPointTypes') return '据点类型配置';
+    if (text === 'balance.comebackSupply') return '追赶补给配置';
     return text;
   }
 
@@ -439,6 +467,10 @@
     if (match) return `${humanContext(match[1])}的${humanField(match[2])}必须是大于等于 ${match[3]} 的数字。`;
     match = error.match(/^(.+) q\/r must be integers$/);
     if (match) return `${humanContext(match[1])} 的 q/r 坐标必须是整数。`;
+    match = error.match(/^(.+)\.(\w+) must be an integer$/);
+    if (match) return `${humanContext(match[1])}的${humanField(match[2])}必须是整数。`;
+    match = error.match(/^(.+)\.scoreGapPercent must be <= 100$/);
+    if (match) return `${humanContext(match[1])}的分差百分比不能超过 100。`;
     match = error.match(/^(.+) \((-?\d+),(-?\d+)\) is outside radius (\d+)$/);
     if (match) return `${humanContext(match[1])} 的坐标 (${match[2]},${match[3]}) 超出地图半径 ${match[4]}。`;
     match = error.match(/^(.+) overlaps another fixed map object at (-?\d+),(-?\d+)$/);
@@ -902,11 +934,16 @@
   }
 
   function renderBalanceFields() {
+    const comeback = config.balance.comebackSupply;
     els.balanceFields.innerHTML = [
       ...BALANCE_KEYS.map(([key, label, min]) => fieldHtml(`balance:${key}`, label, config.balance[key], min)),
       ...WEIGHT_KEYS.map(([key, label]) => fieldHtml(`weight:${key}`, `裁决 ${label}`, config.balance.adjudicationWeights[key], 0)),
       fieldHtml('hq:hp', '总部 HP', config.headquartersSpec.hp, 1),
       fieldHtml('hq:defense', '总部防御', config.headquartersSpec.defense, 0),
+      `<label class="toggle-field">启用追赶补给 <input id="comeback-enabled" type="checkbox"${comeback ? ' checked' : ''} /></label>`,
+      fieldHtml('comeback:startRound', '追赶开始轮次', comeback?.startRound ?? 3, 1, null, !comeback),
+      fieldHtml('comeback:scoreGapPercent', '追赶分差百分比', comeback?.scoreGapPercent ?? 40, 1, 100, !comeback),
+      fieldHtml('comeback:amountPerRound', '追赶每轮补给', comeback?.amountPerRound ?? 20, 1, null, !comeback),
     ].join('');
     els.balanceFields.querySelectorAll('input[data-bind]').forEach(input => {
       input.addEventListener('change', () => {
@@ -915,13 +952,22 @@
         if (group === 'balance') config.balance[key] = value;
         if (group === 'weight') config.balance.adjudicationWeights[key] = value;
         if (group === 'hq') config.headquartersSpec[key] = value;
+        if (group === 'comeback' && config.balance.comebackSupply) config.balance.comebackSupply[key] = value;
         syncAll();
       });
     });
+    document.getElementById('comeback-enabled').addEventListener('change', event => {
+      if (event.target.checked) {
+        config.balance.comebackSupply = { startRound: 3, scoreGapPercent: 40, amountPerRound: 20 };
+      } else {
+        delete config.balance.comebackSupply;
+      }
+      syncAll();
+    });
   }
 
-  function fieldHtml(bind, label, value, min) {
-    return `<label>${esc(label)} <input data-bind="${esc(bind)}" type="number" min="${min}" value="${esc(value)}" /></label>`;
+  function fieldHtml(bind, label, value, min, max = null, disabled = false) {
+    return `<label>${esc(label)} <input data-bind="${esc(bind)}" type="number" min="${min}"${max === null ? '' : ` max="${max}"`}${disabled ? ' disabled' : ''} value="${esc(value)}" /></label>`;
   }
 
   function renderUnitSpecs() {

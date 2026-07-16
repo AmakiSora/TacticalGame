@@ -376,6 +376,10 @@ function applyEvent(s, ev) {
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies += p.amount;
       break;
+    case 'comeback_supply':
+      if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
+      s.resources[p.owner].supplies += p.amount;
+      break;
     case 'reset_actions':
       for (const u of s.units.values()) if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
@@ -857,6 +861,7 @@ function formatEventShort(ev) {
     case 'control_point_captured': return `${playerName(p.owner)} 占领 ${p.name}`;
     case 'control_point_repair': return `${p.pointName || '维修站'} 修复单位 +${p.amount}`;
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
+    case 'comeback_supply': return `${playerName(p.owner)} 追赶补给 +${p.amount}（落后${p.scoreGapPercent}%）`;
     case 'reset_actions': return `${playerName(p.owner)} 单位已重置`;
     case 'turn_end': return `轮到 ${playerName(p.nextOwner)}`;
     case 'game_over':

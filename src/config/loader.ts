@@ -44,6 +44,12 @@ export interface ControlPointTypeSpec {
   repairAmount: number;
 }
 
+export interface ComebackSupplySpec {
+  startRound: number;
+  scoreGapPercent: number;
+  amountPerRound: number;
+}
+
 export interface StartingUnitConfig {
   owner: PlayerId;
   type: UnitType;
@@ -95,6 +101,7 @@ export interface MapConfig {
       supplies: number;
     };
     controlPointTypes?: Record<ControlPointKind, ControlPointTypeSpec>;
+    comebackSupply?: ComebackSupplySpec;
   };
 }
 
@@ -235,6 +242,18 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
       assertNumber(spec, 'income', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
       assertNumber(spec, 'deployDiscount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
       assertNumber(spec, 'repairAmount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
+    }
+  }
+  if ('comebackSupply' in balance) {
+    const comeback = asRecord(balance.comebackSupply, `Map "${id}".balance.comebackSupply`);
+    for (const key of ['startRound', 'scoreGapPercent', 'amountPerRound']) {
+      const value = assertNumber(comeback, key, `Map "${id}".balance.comebackSupply`, 1);
+      if (!Number.isInteger(value)) {
+        throw new Error(`Map "${id}".balance.comebackSupply.${key} must be an integer`);
+      }
+    }
+    if ((comeback.scoreGapPercent as number) > 100) {
+      throw new Error(`Map "${id}".balance.comebackSupply.scoreGapPercent must be <= 100`);
     }
   }
 

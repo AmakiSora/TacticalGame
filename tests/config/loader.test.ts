@@ -79,6 +79,37 @@ type BrokenMap = {
 } & Record<string, unknown>;
 
 describe('map config loader', () => {
+  it('loads and validates optional comeback supply configuration', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap();
+    map.balance.comebackSupply = { startRound: 3, scoreGapPercent: 40, amountPerRound: 20 };
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    loadMaps(dir);
+    expect(getMapConfig('default').balance.comebackSupply).toEqual({
+      startRound: 3,
+      scoreGapPercent: 40,
+      amountPerRound: 20,
+    });
+    resetConfig();
+  });
+
+  it.each([
+    [{ startRound: 3, scoreGapPercent: 40 }, 'amountPerRound must be a number >= 1'],
+    [{ startRound: 0, scoreGapPercent: 40, amountPerRound: 20 }, 'startRound must be a number >= 1'],
+    [{ startRound: 3, scoreGapPercent: 101, amountPerRound: 20 }, 'scoreGapPercent must be <= 100'],
+    [{ startRound: 3, scoreGapPercent: 40.5, amountPerRound: 20 }, 'scoreGapPercent must be an integer'],
+    [{ startRound: 3, scoreGapPercent: 40, amountPerRound: 0 }, 'amountPerRound must be a number >= 1'],
+  ])('rejects invalid comeback supply configuration %#', (comebackSupply, message) => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap();
+    map.balance.comebackSupply = comebackSupply;
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow(message);
+    resetConfig();
+  });
+
   it('requires maxTurns and adjudication weights', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as unknown as BrokenMap;

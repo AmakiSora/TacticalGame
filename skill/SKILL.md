@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.0.2`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
+This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.0.3`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
 
 Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exist for tests or automated demos, but this skill is for agent reasoning and direct game operation.
 
@@ -81,11 +81,11 @@ If `POST /join` returns `game_already_full` or `game_already_started`, report th
 - Only the last surviving player immediately wins (`last_player_standing`).
 - Turns rotate through `turn.turnOrder` among living players; whole-round completion is tracked by `turn.roundNumber`.
 - If the configured max round is reached, only surviving players can win by adjudication score. A true draw is recorded when surviving leaders are exactly tied.
-- Adjudication score is: enemy HQ damage x 4 + own HQ HP x 2 + owned control points x 120 + surviving army value x 2 + supplies x 1. In multiplayer, enemy HQ damage is cumulative against all opponents.
+- Adjudication score uses `config.balance.adjudicationWeights` for enemy HQ damage, own HQ HP, owned control points, surviving army value, and supplies. In multiplayer, enemy HQ damage is cumulative against all opponents.
 
 ### Action Points
 
-Each player has `config.balance.actionsPerTurn` action points per turn, currently 5.
+Each player has `config.balance.actionsPerTurn` action points per turn. Always read the current map value.
 
 - One action point activates one unit.
 - The first deploy, move, attack, heal, or demolish that touches a unit this turn spends one point.
@@ -101,9 +101,10 @@ Each player has `config.balance.actionsPerTurn` action points per turn, currentl
 - Base income is `config.balance.baseIncome`.
 - Each owned control point adds `config.balance.controlPointIncome`.
 - Typed control points may replace the flat income rule on maps that define `controlPoints[].kind` and `config.balance.controlPointTypes`.
+- Maps with `config.balance.comebackSupply` grant `amountPerRound` supplies after a non-final whole round when a living player's score gap reaches `scoreGapPercent`; the `comeback_supply` event reports the grant and exact gap.
 - Typed control points: `supply` is the economy route, `forward_base` can discount deployments from that point, and `repair` can restore nearby friendly units when that owner receives the turn.
 - Do not treat typed control points as extra adjudication score. Adjudication still counts owned control points by number using the configured control-point weight.
-- With a 5-action cap, hoarded supplies cannot all become units immediately. Spend on high-impact deployments when action points and deploy hexes are available.
+- Hoarded supplies cannot all become units immediately when the action cap is tight. Spend on high-impact deployments when action points and deploy hexes are available.
 
 Do not use V1 concepts: `x/y`, Manhattan distance, buildings, miners, production queues, walls, `/build`, `/produce`, or `/sell`.
 

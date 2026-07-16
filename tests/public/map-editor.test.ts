@@ -122,6 +122,32 @@ describe('map editor page', () => {
     expect(core.validateMapConfig(serialized, 'dual-lanes')).toEqual([]);
   });
 
+  it('preserves optional comeback supply configuration and omits it when disabled', () => {
+    const core = loadCore();
+    const multiplayer = JSON.parse(read('maps/multiplayer-ring.json'));
+
+    const serialized = core.serializeMapConfig(core.normalizeImportedMap(multiplayer));
+    expect(serialized.balance.comebackSupply).toEqual({
+      startRound: 3,
+      scoreGapPercent: 40,
+      amountPerRound: 20,
+    });
+
+    const defaults = core.serializeMapConfig(core.createDefaultMapConfig());
+    expect(defaults.balance.comebackSupply).toBeUndefined();
+  });
+
+  it('validates comeback supply integer and percentage ranges', () => {
+    const core = loadCore();
+    const config = core.createDefaultMapConfig();
+    config.balance.comebackSupply = { startRound: 2.5, scoreGapPercent: 101, amountPerRound: 0 };
+
+    const errors = core.validateMapConfig(config, 'broken');
+    expect(errors).toContain('Map "broken".balance.comebackSupply.startRound must be an integer');
+    expect(errors).toContain('Map "broken".balance.comebackSupply.scoreGapPercent must be <= 100');
+    expect(errors).toContain('Map "broken".balance.comebackSupply.amountPerRound must be a number >= 1');
+  });
+
   it('validates positions, overlap, typed point consistency, and numeric ranges', () => {
     const core = loadCore();
     const config = core.createDefaultMapConfig();

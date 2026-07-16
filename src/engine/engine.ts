@@ -225,6 +225,39 @@ function adjudicateAtTurnLimit(game: GameState, bus: EventBus): boolean {
   return true;
 }
 
+function grantComebackSupplies(game: GameState, bus: EventBus): void {
+  const config = game.config.balance.comebackSupply;
+  if (!config || game.turn.roundNumber < config.startRound) return;
+
+  const active = activePlayerIds(game);
+  const scores = buildAdjudicationScores(game);
+  const leaderScore = Math.max(...active.map(id => scores[id]?.total ?? 0));
+  if (leaderScore <= 0) return;
+
+  // 所有玩家必须使用发放前的同一份分数快照判断，避免事件顺序改变资格。
+  const recipients = active.map(owner => {
+    const playerScore = scores[owner]?.total ?? 0;
+    const scoreGap = leaderScore - playerScore;
+    return { owner, playerScore, scoreGap };
+  }).filter(({ scoreGap }) =>
+    scoreGap > 0 && scoreGap * 100 >= leaderScore * config.scoreGapPercent);
+
+  for (const { owner, playerScore, scoreGap } of recipients) {
+    const resources = game.resources[owner];
+    if (!resources) continue;
+    resources.supplies += config.amountPerRound;
+    appendEvent(game, bus, 'comeback_supply', {
+      owner,
+      roundNumber: game.turn.roundNumber,
+      amount: config.amountPerRound,
+      leaderScore,
+      playerScore,
+      scoreGap,
+      scoreGapPercent: Math.round((scoreGap / leaderScore) * 1000) / 10,
+    });
+  }
+}
+
 function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): void {
   const active = activePlayerIds(game);
   if (active.length <= 1) {
@@ -240,6 +273,7 @@ function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): v
   } else {
     appendEvent(game, bus, 'round_end', { roundNumber: game.turn.roundNumber });
     if (adjudicateAtTurnLimit(game, bus)) return;
+    grantComebackSupplies(game, bus);
     game.turn.roundNumber += 1;
     game.turn.turnNumber = game.turn.roundNumber;
     game.turn.actedThisRound = [];

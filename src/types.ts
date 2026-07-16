@@ -126,6 +126,7 @@ export type EventType =
   | 'control_point_neutralized'
   | 'control_point_repair'
   | 'income'
+  | 'comeback_supply'
   | 'reset_actions'
   | 'turn_skipped'
   | 'turn_end'

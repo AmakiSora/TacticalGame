@@ -101,7 +101,10 @@ Each player has `config.balance.actionsPerTurn` action points per turn. Always r
 - Base income is `config.balance.baseIncome`.
 - Each owned control point adds `config.balance.controlPointIncome`.
 - Typed control points may replace the flat income rule on maps that define `controlPoints[].kind` and `config.balance.controlPointTypes`.
-- Maps with `config.balance.comebackSupply` grant `amountPerRound` supplies after a non-final whole round when a living player's score gap reaches `scoreGapPercent`; the `comeback_supply` event reports the grant and exact gap.
+- Maps may define `config.balance.comebackSupply` with `startRound`, `scoreGapPercent`, and `amountPerRound`. The mechanism is disabled when this object is absent.
+- After each non-final whole round at or after `startRound`, compare every living player against the highest adjudication score from one shared pre-grant snapshot. A player qualifies when `(leaderScore - playerScore) / leaderScore * 100 >= scoreGapPercent`.
+- Every qualifying living player receives `amountPerRound`; leaders, tied leaders, and eliminated players receive nothing. The configured final round goes directly to adjudication without a grant.
+- A `comeback_supply` event reports `owner`, `amount`, `leaderScore`, `playerScore`, `scoreGap`, and `scoreGapPercent`. Refresh state after this event because supplies have already been added before the next player's ordinary income.
 - Typed control points: `supply` is the economy route, `forward_base` can discount deployments from that point, and `repair` can restore nearby friendly units when that owner receives the turn.
 - Do not treat typed control points as extra adjudication score. Adjudication still counts owned control points by number using the configured control-point weight.
 - Hoarded supplies cannot all become units immediately when the action cap is tight. Spend on high-impact deployments when action points and deploy hexes are available.
@@ -117,6 +120,7 @@ Use this order unless the user asks for a different style:
 3. Heal the most damaged friendly unit with support.
 4. Demolish an adjacent blocker with a heavy when it opens a route to control points, deployment space, attack lanes, or an enemy headquarters.
 5. Deploy strategically before ordinary movement when supplies and an action point remain, especially if supplies are high, unit count is not ahead of the strongest living rival, you own at least 2 control points, or the game is late.
+   If comeback supplies restore deployment capacity, use them to rebuild a viable force or contest income-producing points; do not assume the grant repeats if the score gap falls below the configured percentage.
 6. Move infantry and scouts toward neutral or enemy control points early. On typed maps, favor `supply` early for income, `forward_base` when planning sustained pressure, and `repair` when wounded units can hold nearby.
 7. In the late game, move scouts, rangers, and infantry toward the best enemy headquarters attack positions.
 8. Near adjudication, prioritize headquarters damage, captured points, valuable unit survival, and spending excess supplies. Only living rivals remain valid targets, but headquarters damage already dealt to eliminated rivals still counts toward the cumulative score.

@@ -945,7 +945,19 @@ function showPopup(cell, title, items, cb) {
   popup.style.left = `${p.x + 18}px`; popup.style.top = `${p.y - 10}px`;
   popup.innerHTML = `<div class="map-popup-title">${esc(title)}</div>` + items.map(i => `<button class="map-popup-btn" data-action="${esc(i.action)}" data-type="${esc(i.type || '')}"><span>${esc(i.label)}</span>${i.cost != null ? `<span class="map-popup-cost">${i.cost}</span>` : ''}</button>`).join('');
   popup.classList.remove('hidden');
-  popup.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => cb(btn.dataset.action, btn.dataset.type)));
+  popup.querySelectorAll('button').forEach(btn => {
+    let fired = false;
+    const run = (ev) => {
+      if (fired) return;
+      fired = true;
+      ev.preventDefault();
+      ev.stopPropagation();
+      cb(btn.dataset.action, btn.dataset.type);
+    };
+    // pointerup first so pan capture cannot eat the action on touch devices
+    btn.addEventListener('pointerup', run);
+    btn.addEventListener('click', run);
+  });
   requestAnimationFrame(() => clampPopupInViewport(popup));
 }
 function closePopup() { $('map-popup').classList.add('hidden'); }
@@ -1061,6 +1073,7 @@ const gesture = {
   originScale: 1,
   pinchDist: 0,
   moved: false,
+  downEvent: null,
 };
 function pointerList() { return [...gesture.pointers.values()]; }
 function dist(a, b) {
@@ -1071,7 +1084,9 @@ function midpoint(a, b) {
   return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
 }
 function onPointerDown(e) {
-  if (!boardViewport || e.target.closest?.('.zoom-controls')) return;
+  if (!boardViewport) return;
+  // popup / zoom UI must receive real clicks; preventDefault would suppress them
+  if (e.target.closest?.('.zoom-controls, .map-popup, button, a, input, select, label')) return;
   boardViewport.setPointerCapture?.(e.pointerId);
   gesture.pointers.set(e.pointerId, e);
   gesture.moved = false;
@@ -1081,6 +1096,7 @@ function onPointerDown(e) {
     gesture.startY = e.clientY;
     gesture.originPanX = boardPanX;
     gesture.originPanY = boardPanY;
+    gesture.downEvent = e;
   } else if (gesture.pointers.size >= 2) {
     const [a, b] = pointerList();
     gesture.mode = 'pinch';
@@ -1091,6 +1107,7 @@ function onPointerDown(e) {
     const mid = midpoint(a, b);
     gesture.startX = mid.x;
     gesture.startY = mid.y;
+    gesture.downEvent = null;
   }
   e.preventDefault();
 }
@@ -1131,10 +1148,14 @@ async function onPointerUp(e) {
   const wasTap = gesture.mode === 'pan' && !gesture.moved && gesture.pointers.size === 1;
   gesture.pointers.delete(e.pointerId);
   if (wasTap && state) {
-    const pt = eventToCanvasPoint(e);
+    const src = gesture.downEvent || e;
+    const pt = eventToCanvasPoint(src);
     const h = pixelToHex(pt.x, pt.y);
     const cell = cellAt(h.q, h.r) ? h : null;
+    gesture.downEvent = null;
     await handleBoardTap(cell);
+  } else {
+    gesture.downEvent = null;
   }
   if (gesture.pointers.size === 0) gesture.mode = 'none';
   else if (gesture.pointers.size === 1) {
@@ -1364,7 +1385,14 @@ document.querySelectorAll('.lobby-tab').forEach(tab => tab.addEventListener('cli
 }));
 document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', () => navigator.clipboard.writeText($(btn.dataset.copy).textContent)));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
-document.addEventListener('click', e => { const popup = $('map-popup'); if (!popup.classList.contains('hidden') && !popup.contains(e.target) && e.target !== els.canvas) closePopup(); });
+document.addEventListener('click', e => {
+  const popup = $('map-popup');
+  if (!popup || popup.classList.contains('hidden')) return;
+  if (popup.contains(e.target)) return;
+  closePopup();
+});
+document.getElementById('map-popup')?.addEventListener('pointerdown', e => e.stopPropagation());
+document.getElementById('map-popup')?.addEventListener('click', e => e.stopPropagation());
 
 // mobile chrome: drawers, bottom bar, zoom buttons
 const DRAWER_TITLES = { info: '信息', more: '更多' };

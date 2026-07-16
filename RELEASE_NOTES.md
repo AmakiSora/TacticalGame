@@ -7,8 +7,11 @@
 - 观战页右上角设置弹层新增 Control token 输入与保存，写入 `localStorage.autoControlToken`，与自动控制台共用，支持删除对局、改名等管理操作。
 - 玩家页右上角新增设置弹层：可保存 Control token，并提供完整会话恢复字段（Game ID、Player token、可选 Host token）。
 - 玩家页支持从设置保存/清除会话、进入游戏；启动时回填本地会话但不自动进局，避免错误凭证刷 401。
-- 前端脚本缓存参数同步到 `3.1.0`，版本展示与包版本统一。
-- 补充 `tests/public/settings-token.test.ts` 静态契约测试，覆盖观战/玩家设置中的 token 与会话入口。
+- 新增单机部署栈：`Dockerfile`、`compose.yml`、`.env.example`、`deploy/DEPLOYMENT.md` 与 CI 工作流，应用直接暴露 `0.0.0.0:3123`。
+- 运行时升级到 Node.js 24：`package.json` engines、`Dockerfile`、CI 与 `@types/node` 同步调整。
+- SSE 事件流加固：25 秒 heartbeat、连接清理、`x-accel-buffering: no` 与 `reply.hijack()`，降低长连接被中间层缓冲或挂起的风险。
+- Hex API / AI 工具改为面向远程部署：要求显式 `--url` 或 `TACTICAL_GAME_URL`，不再默认连接本机 `localhost`。
+- 补充部署相关服务端、SSE 与 skill 测试覆盖。
 
 ## 3.0.3
 

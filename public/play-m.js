@@ -1464,7 +1464,54 @@ document.querySelectorAll('.lobby-tab').forEach(tab => tab.addEventListener('cli
   document.querySelectorAll('.lobby-tab-content').forEach(c => c.classList.remove('active'));
   tab.classList.add('active'); $(`tab-${tab.dataset.tab}`).classList.add('active');
 }));
-document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', () => navigator.clipboard.writeText($(btn.dataset.copy).textContent)));
+async function copyText(text) {
+  const value = String(text ?? '').trim();
+  if (!value) throw new Error('empty');
+
+  // Clipboard API needs secure context (https/localhost). Phones often open via LAN IP over http.
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  // Fallback: temporary textarea + execCommand (works on many mobile browsers over http)
+  const ta = document.createElement('textarea');
+  ta.value = value;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '0';
+  ta.style.left = '0';
+  ta.style.width = '1px';
+  ta.style.height = '1px';
+  ta.style.padding = '0';
+  ta.style.border = '0';
+  ta.style.outline = '0';
+  ta.style.boxShadow = 'none';
+  ta.style.background = 'transparent';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } finally {
+    document.body.removeChild(ta);
+  }
+  if (!ok) throw new Error('copy failed');
+}
+
+document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', async () => {
+  const el = $(btn.dataset.copy);
+  const text = el?.textContent ?? '';
+  try {
+    await copyText(text);
+    toast('已复制', 'ok');
+  } catch {
+    toast('复制失败，请长按文本手动复制', 'error');
+  }
+}));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
 document.addEventListener('click', e => {
   const popup = $('map-popup');

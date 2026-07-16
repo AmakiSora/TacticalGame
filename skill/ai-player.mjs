@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-const DEFAULT_URL = 'http://localhost:3100';
+const DEFAULT_URL = process.env.TACTICAL_GAME_URL || '';
 const HEX_DIRECTIONS = [
   { q: 1, r: 0 },
   { q: 1, r: -1 },
@@ -59,18 +59,19 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(args.maxTurns) || args.maxTurns < 1) throw new Error('--max-turns must be a positive number');
   if (!Number.isFinite(args.delayMs) || args.delayMs < 0) throw new Error('--delay-ms must be a non-negative number');
+  if (!args.url) throw new Error('--url is required (or set TACTICAL_GAME_URL)');
   args.url = args.url.replace(/\/+$/, '');
   return args;
 }
 
 function printHelp() {
   console.log(`Usage:
-  node skill/ai-player.mjs --side a [--url ${DEFAULT_URL}] [--map default] [--max-players 2]
-  node skill/ai-player.mjs --side b --game <gameId>
-  node skill/ai-player.mjs --side player_c --game <gameId> --token <playerToken>
+  node skill/ai-player.mjs --url <serverUrl> --side a [--map default] [--max-players 2]
+  node skill/ai-player.mjs --url <serverUrl> --side b --game <gameId>
+  node skill/ai-player.mjs --url <serverUrl> --side player_c --game <gameId> --token <playerToken>
 
 Options:
-  --url <url>          API base URL, default ${DEFAULT_URL}
+  --url <url>          API base URL; required unless TACTICAL_GAME_URL is set
   --side <a-h|player_a-player_h> Expected seat when joining; create always becomes player_a
   --game <id>          Existing game id
   --token <token>      Existing player token

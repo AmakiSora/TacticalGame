@@ -9,9 +9,21 @@ This skill teaches manual operation of the Hex V2 multiplayer game (app version 
 
 Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exist for tests or automated demos, but this skill is for agent reasoning and direct game operation.
 
+## Remote Server Target
+
+Before calling any API, read the cloud server address from the current user prompt and construct `BASE_URL`:
+
+- If the user provides only an IP address, use `http://<IP>:3123`.
+- If the user provides a complete `http://` or `https://` origin, use it as given.
+- Remove any trailing slash, then treat every `/api/...` path below as relative to `BASE_URL`.
+- Verify `GET ${BASE_URL}/readyz` returns `200` before creating, joining, or resuming a game.
+- If the prompt does not contain a server address, ask for it. Never fall back to `localhost` and never start a local server.
+
+Keep player and host tokens in their request headers. Never place them in URLs or print them. The direct HTTP deployment does not encrypt tokens, so use only the server and network access authorized by the user.
+
 ## Manual Turn Loop
 
-1. Read the current game state before choosing each action: `GET /api/games/:id`.
+1. Read the current game state before choosing each action: `GET ${BASE_URL}/api/games/:id`.
 2. If `winner` exists or `phase === "game_over"`, stop and report the result.
 3. If `phase === "lobby"`, wait for enough players, then the host must `POST /api/games/:id/start` with `X-Host-Token`. Joiners only wait until `phase === "active"`.
 4. If you are eliminated (`players[yourId].status !== "active"`), stop acting and report elimination.
@@ -23,6 +35,8 @@ Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exis
 10. After ending the turn, continue polling only when the user asked you to keep playing; otherwise report the turn result.
 
 Never continue without a player token for player actions. `POST /api/games` returns `hostToken` and optionally a player token when `participate` is true; `POST /api/games/:id/join` returns the joined player token. Host identity is separate from player identity: a host may create with `participate: false` and never receive a player token.
+
+For a transient network error or `502`/`503`, wait briefly, probe `${BASE_URL}/readyz`, then fetch the game again with the existing player token. Do not create a replacement game or join again. For `429 rate_limit`, back off before retrying; do not confuse it with `429 action_limit_reached`. If using SSE, reconnect from the last received sequence with `?after=<seq>` and do not add a token query parameter.
 
 ## Multiplayer Setup
 

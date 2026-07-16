@@ -1509,7 +1509,7 @@ document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('clic
     await copyText(text);
     toast('已复制', 'ok');
   } catch {
-    toast('复制失败，请长按文本手动复制', 'error');
+    toast('复制失败，请长按文本手动复制', 'err');
   }
 }));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });

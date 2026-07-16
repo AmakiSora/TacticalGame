@@ -73,8 +73,9 @@ describe('mobile website pages', () => {
     const playCss = read('public/play-m.css');
     const spectatorCss = read('public/spectator-m.css');
     expect(playCss).toContain('align-items: stretch');
+    expect(playCss).toContain('body.player-m-shell .board-stage');
     expect(spectatorCss).toContain('align-items: stretch');
-    expect(spectatorCss).toContain('mobile board width fix');
+    expect(spectatorCss).toContain('body.spectator-m-shell .board-stage');
   });
 
   it('uses a compact mobile turn strip for round / AP / supplies', () => {
@@ -91,6 +92,23 @@ describe('mobile website pages', () => {
     expect(playJs).toContain('turn-kicker');
     expect(playCss).toContain('grid-template-columns: minmax(0, 1.35fr) auto auto');
     expect(playCss).toContain('.hud-chip');
+  });
+
+  it('aligns spectator mobile chrome with the player hud language', () => {
+    const spectator = read('public/spectator-m.html');
+    const spectatorJs = read('public/spectator-m.js');
+    const spectatorCss = read('public/spectator-m.css');
+
+    expect(spectator).toContain('id="turn-strip"');
+    expect(spectator).toContain('id="actions-display"');
+    expect(spectator).toContain('class="hud-chip hud-status strip-status"');
+    expect(spectator).toContain('id="action-summary"');
+    expect(spectatorJs).toContain('hud-chip');
+    expect(spectatorJs).toContain('turn-kicker');
+    expect(spectatorJs).toContain('sel-summary-line');
+    expect(spectatorCss).toContain('grid-template-columns: minmax(0, 1.35fr) auto auto');
+    expect(spectatorCss).toContain('.hud-chip');
+    expect(spectatorCss).toContain('align-items: stretch');
   });
 
 });

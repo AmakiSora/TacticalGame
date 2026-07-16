@@ -24,9 +24,13 @@
   <div id="game-picker-menu" class="hidden" role="listbox" aria-label="选择对局"></div>
   <button id="game-picker-button" type="button" hidden aria-hidden="true"></button>
 
-  <div id="turn-strip" class="turn-strip">
-    <div id="turn-info" class="turn-strip-inner"></div>
-    <span id="status" class="strip-status"></span>
+  <div id="turn-strip" class="turn-strip" aria-label="对局状态">
+    <div id="turn-info" class="turn-badge"></div>
+    <div id="actions-display" class="actions-display strip-actions"></div>
+    <div class="hud-chip hud-status strip-status">
+      <span class="hud-label">状态</span>
+      <strong id="status" class="hud-value">—</strong>
+    </div>
   </div>
 
   <main class="m-game spectator-m-main">
@@ -47,7 +51,9 @@
     </div>
 
     <button type="button" id="action-summary" class="selection-summary" data-drawer="events">
-      <div id="detail-content" class="selection-detail">选择对局后使用时间轴回放</div>
+      <div id="detail-content" class="selection-detail">
+        <span class="sel-summary-text">选择对局后使用时间轴回放</span>
+      </div>
     </button>
 
     <div id="replay-bar" class="replay-bar">

@@ -850,25 +850,35 @@ function renderSidebar() {
     .filter(([owner]) => PLAYER_IDS.includes(owner))
     .map(([owner, resource]) => `<div class="resource-card ${ownerClass(owner)}"><span>${playerNameControl(owner)}</span><strong>${resource.supplies ?? 0}</strong><em>补给</em></div>`)
     .join('');
-  resourcesEl.innerHTML = `<h3>资源</h3>
-    <div class="resource-grid">
+  resourcesEl.innerHTML = `<div class="resource-grid">
       ${resourceCards || '<div class="resource-empty">等待对局开始</div>'}
     </div>`;
   renderScorePanel();
+
   const owner = state.turn.currentPlayerId || state.turn.currentOwner;
   const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
-  const actionsLine = maxActions
-    ? `<div class="turn-meta"><span>行动点</span><strong>${state.turn.actionsUsed ?? 0}/${maxActions}</strong></div>`
-    : '';
-  turnInfoEl.innerHTML = `<h3>回合</h3>
-    <div class="turn-card ${ownerClass(owner)}">
-      <div class="turn-head">
-        <strong class="turn-count">${esc(turnProgressLabel())}</strong>
-        <span class="turn-player">${playerNameControl(owner)}</span>
-      </div>
-      ${actionsLine}
-      ${state.result ? `<div class="result-note">${esc(resultText(state.result))}</div>` : ''}
-    </div>`;
+  const used = state.turn.actionsUsed ?? 0;
+  const remaining = maxActions ? Math.max(0, maxActions - used) : 0;
+  const exhausted = maxActions > 0 && remaining === 0;
+
+  turnInfoEl.innerHTML = `
+    <span class="turn-kicker">${state.result ? '已结束' : '当前回合'}</span>
+    <strong class="turn-count">${esc(turnProgressLabel())}</strong>
+    <span class="turn-player">${esc(playerName(owner) || '—')}</span>`;
+  turnInfoEl.className = `turn-badge ${ownerClass(owner)}${state.result ? ' finished' : ''}`;
+
+  const actionsDisplay = document.getElementById('actions-display');
+  if (actionsDisplay) {
+    if (!maxActions) {
+      actionsDisplay.innerHTML = '';
+    } else {
+      actionsDisplay.innerHTML = `<div class="hud-chip hud-ap${exhausted ? ' exhausted' : ''}">
+        <span class="hud-label">行动</span>
+        <strong class="hud-value${exhausted ? ' zero' : ''}">${used}/${maxActions}</strong>
+        <span class="hud-sub">本回合已用</span>
+      </div>`;
+    }
+  }
 
   eventsEl.innerHTML = '';
   allEvents.forEach((ev, i) => {
@@ -901,7 +911,13 @@ function syncMobileChrome() {
     });
   }
   const drawerDetail = document.getElementById('drawer-event-detail');
-  if (drawerDetail && detailEl) drawerDetail.innerHTML = detailEl.innerHTML;
+  if (drawerDetail && detailEl) {
+    // full payload stays in drawer; strip uses compact summary from renderDetail
+    if (state && currentStep >= 0 && currentStep < allEvents.length) {
+      const ev = allEvents[currentStep];
+      drawerDetail.innerHTML = `<span class="ev-type ${ev.type}">${esc(ev.type)}</span><span style="color:#888">#${ev.seq}</span><span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>`;
+    }
+  }
   renderDrawerGameList();
 }
 
@@ -913,15 +929,24 @@ function resultText(result) {
 
 function renderDetail() {
   if (!state || currentStep < 0 || currentStep >= allEvents.length) {
-    detailEl.innerHTML = '<span style="color:#666">无操作</span>';
+    detailEl.innerHTML = '<span class="sel-summary-text">选择对局后使用时间轴回放</span>';
     const drawerDetail = document.getElementById('drawer-event-detail');
-    if (drawerDetail) drawerDetail.innerHTML = detailEl.innerHTML;
+    if (drawerDetail) drawerDetail.innerHTML = '<span style="color:#666">无操作</span>';
     return;
   }
   const ev = allEvents[currentStep];
-  detailEl.innerHTML = `<span class="ev-type ${ev.type}">${esc(ev.type)}</span><span style="color:#888">#${ev.seq}</span><span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>`;
+  const note = state.result && currentStep === allEvents.length - 1
+    ? ` · ${resultText(state.result)}`
+    : '';
+  detailEl.innerHTML = `<div class="sel-summary-line">
+    <strong>${esc(ev.type)}</strong>
+    <span class="sel-summary-meta">#${ev.seq} · ${esc(formatEventShort(ev))}${esc(note)}</span>
+    <span class="sel-summary-hint">详情 ▾</span>
+  </div>`;
   const drawerDetail = document.getElementById('drawer-event-detail');
-  if (drawerDetail) drawerDetail.innerHTML = detailEl.innerHTML;
+  if (drawerDetail) {
+    drawerDetail.innerHTML = `<span class="ev-type ${ev.type}">${esc(ev.type)}</span><span style="color:#888">#${ev.seq}</span><span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>`;
+  }
 }
 
 function updateControls() {
@@ -1295,13 +1320,17 @@ gestureTarget.addEventListener('wheel', e => {
 
 function renderSelectionInfo(ent, cp) {
   if (!ent && !cp) {
-    selDetailEl.textContent = '点击或悬停棋盘查看单位、指挥部或据点信息';
+    selDetailEl.innerHTML = '<div class="sel-note">点击棋盘查看单位、指挥部或据点信息</div>';
+    const drawerSel = document.getElementById('drawer-selection');
+    if (drawerSel) drawerSel.innerHTML = selDetailEl.innerHTML;
     return;
   }
   let html = '';
   if (cp) html += renderControlPointCard(cp);
   if (ent) html += renderEntityCard(ent);
   selDetailEl.innerHTML = html;
+  const drawerSel = document.getElementById('drawer-selection');
+  if (drawerSel) drawerSel.innerHTML = html;
 }
 
 async function renamePlayer(playerId) {

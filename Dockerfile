@@ -35,6 +35,6 @@ RUN groupadd --system tactical && useradd --system --gid tactical --home-dir /ap
 
 USER tactical
 
-EXPOSE 3100
+EXPOSE 3123
 
 CMD ["npm", "start"]

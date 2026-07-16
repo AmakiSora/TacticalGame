@@ -10,6 +10,9 @@ describe('production server configuration', () => {
 
     expect(readRuntimeConfig()).toMatchObject({ host: '0.0.0.0', port: 3100, trustProxy: false });
 
+    process.env.PORT = '3123';
+    expect(readRuntimeConfig()).toMatchObject({ port: 3123 });
+
     if (originalPort === undefined) delete process.env.PORT;
     else process.env.PORT = originalPort;
     if (originalHost === undefined) delete process.env.HOST;

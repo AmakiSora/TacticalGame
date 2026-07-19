@@ -1117,7 +1117,7 @@ function subscribeLobbyStart() {
   sse.onopen = () => statusBadge('大厅中', 'idle');
 }
 
-function lobbySummaryMarkup(lobby) {
+function lobbySummaryMarkup(lobby, canKick = false) {
   const players = lobby.players || [];
   const supported = (lobby.supportedPlayerCounts || []).join('/');
   return `<div class="lobby-summary-head">
@@ -1125,12 +1125,12 @@ function lobbySummaryMarkup(lobby) {
     <strong>${players.length}/${lobby.maxPlayers}</strong>
   </div>
   <div class="lobby-summary-meta">地图 ${esc(lobby.mapId)} · 支持 ${esc(supported)} 人</div>
-  <div class="lobby-player-list">${players.map(player => `<span class="lobby-player" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}">${esc(player.name || player.id)}</span>`).join('')}</div>`;
+  <div class="lobby-player-list">${players.map(player => `<span class="lobby-player" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}"><span>${esc(player.name || player.id)}</span>${canKick && lobby.phase === 'lobby' && player.id !== myPlayer ? `<button type="button" class="lobby-kick" data-kick-player="${esc(player.id)}">踢出</button>` : ''}</span>`).join('')}</div>`;
 }
 
-function renderLobbySummary(lobby, target = els.lobbySummary) {
+function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target === els.lobbySummary && Boolean(hostToken)) {
   if (!target || !lobby) return;
-  target.innerHTML = lobbySummaryMarkup(lobby);
+  target.innerHTML = lobbySummaryMarkup(lobby, canKick);
 }
 
 async function refreshLobbySummary() {
@@ -1138,10 +1138,27 @@ async function refreshLobbySummary() {
   const res = await fetch(`/api/games/${gameId}/lobby`);
   const data = await res.json();
   if (res.ok) {
-    renderLobbySummary(data, els.lobbySummary);
+    renderLobbySummary(data, els.lobbySummary, Boolean(hostToken));
     renderLobbySummary(data, els.joinLobbySummary);
   }
   return res.ok ? data : null;
+}
+
+function handleLobbyRemoval(lobby) {
+  if (!myPlayer || !lobby || lobby.phase !== 'lobby') return false;
+  if ((lobby.players || []).some(player => player.id === myPlayer)) return false;
+  stopLobbyPolling();
+  if (sse) { sse.close(); sse = null; }
+  myToken = null;
+  myPlayer = null;
+  persistSession();
+  if (els.joinStatusText) els.joinStatusText.textContent = '你已被房主移出大厅';
+  if (els.joinPlayerToken) els.joinPlayerToken.textContent = '';
+  els.joinPlayerTokenRow?.classList.add('hidden');
+  els.joinResult?.classList.remove('hidden');
+  statusBadge('已移出', 'err');
+  toast('你已被房主移出大厅', 'err');
+  return true;
 }
 
 function stopLobbyPolling() {
@@ -1154,6 +1171,7 @@ function startLobbyPolling() {
   lobbyPollTimer = setInterval(async () => {
     try {
       const lobby = await refreshLobbySummary();
+      if (handleLobbyRemoval(lobby)) return;
       if (lobby?.phase !== 'active') return;
       stopLobbyPolling();
       if (els.joinStatusText) els.joinStatusText.textContent = '房主已开始，正在进入游戏…';
@@ -1162,6 +1180,19 @@ function startLobbyPolling() {
       statusBadge('大厅中', 'idle');
     }
   }, 1500);
+}
+
+async function kickLobbyPlayer(playerId) {
+  if (!gameId || !hostToken || !playerId) return;
+  if (!window.confirm('确定要将该玩家移出大厅吗？')) return;
+  const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}`, {
+    method: 'DELETE',
+    headers: { 'X-Host-Token': hostToken },
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error || '踢出失败', 'err');
+  renderLobbySummary(data.lobby, els.lobbySummary, true);
+  toast('玩家已移出大厅', 'ok');
 }
 
 async function startHostedGame() {
@@ -1210,7 +1241,7 @@ els.btnCreate.addEventListener('click', async () => {
     els.createdHostToken.textContent = hostToken;
     els.createdToken.textContent = myToken || '未参战';
     els.createdPlayerTokenRow.classList.toggle('hidden', !myToken);
-    renderLobbySummary(data.lobby, els.lobbySummary);
+    renderLobbySummary(data.lobby, els.lobbySummary, true);
     els.createResult.classList.remove('hidden');
     statusBadge('大厅中', 'idle');
     startLobbyPolling();
@@ -1249,7 +1280,8 @@ els.btnConnectJoin?.addEventListener('click', enterGame);
 async function enterGame() {
   const ok = await loadFullState();
   if (!ok || !state.cells.length) {
-    await refreshLobbySummary();
+    const lobby = await refreshLobbySummary();
+    if (handleLobbyRemoval(lobby)) return;
     return toast('对局尚未开始', 'info');
   }
   if (!myToken) {
@@ -1279,6 +1311,12 @@ document.querySelectorAll('.lobby-tab').forEach(tab => tab.addEventListener('cli
   document.querySelectorAll('.lobby-tab-content').forEach(c => c.classList.remove('active'));
   tab.classList.add('active'); $(`tab-${tab.dataset.tab}`).classList.add('active');
 }));
+document.addEventListener('click', e => {
+  const button = e.target.closest?.('[data-kick-player]');
+  if (!button) return;
+  e.preventDefault();
+  kickLobbyPlayer(button.dataset.kickPlayer);
+});
 document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', () => navigator.clipboard.writeText($(btn.dataset.copy).textContent)));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
 document.addEventListener('click', e => { const popup = $('map-popup'); if (!popup.classList.contains('hidden') && !popup.contains(e.target) && e.target !== els.canvas) closePopup(); });

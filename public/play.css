@@ -333,6 +333,9 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   margin-top: 8px;
 }
 .lobby-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 4px 7px;
   border: 1px solid #2a3a4a;
   border-radius: 5px;
@@ -340,6 +343,16 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   color: #cbd8e2;
   font-size: 12px;
 }
+.lobby-kick {
+  padding: 1px 5px;
+  border: 1px solid #633b42;
+  border-radius: 3px;
+  background: #26171b;
+  color: #d98c97;
+  font-size: 11px;
+  cursor: pointer;
+}
+.lobby-kick:hover { border-color: #a44e5c; background: #3a1d24; color: #f0b0b8; }
 
 /* ══════════ map picker ══════════ */
 .create-setup {

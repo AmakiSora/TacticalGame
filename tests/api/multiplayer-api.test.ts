@@ -79,6 +79,58 @@ describe('multiplayer lobby API', () => {
     expect(res.json().code).toBe('unsupported_player_count');
   });
 
+  it('lets the host kick a lobby player before the game starts', async () => {
+    app = await startTestServer();
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      payload: { mapId: 'multiplayer-ring', maxPlayers: 3, participate: true, playerName: 'A' },
+    });
+    const created = createRes.json() as { gameId: string; hostToken: string };
+    const joinRes = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/join`,
+      payload: { name: 'B' },
+    });
+    const playerB = joinRes.json().player as { id: PlayerId; token: string };
+
+    const kickRes = await app.inject({
+      method: 'DELETE',
+      url: `/api/games/${created.gameId}/players/${playerB.id}`,
+      headers: { 'X-Host-Token': created.hostToken },
+    });
+    expect(kickRes.statusCode).toBe(200);
+    expect(kickRes.json().lobby.players.map((player: { id: PlayerId }) => player.id)).toEqual(['player_a']);
+
+    const game = globalStore.get(created.gameId)!;
+    expect(game.events.at(-1)).toMatchObject({
+      type: 'player_left',
+      payload: { playerId: playerB.id, reason: 'host' },
+    });
+
+    const kickedState = await app.inject({
+      method: 'GET',
+      url: `/api/games/${created.gameId}`,
+      headers: { 'X-Player-Token': playerB.token },
+    });
+    expect(kickedState.statusCode).toBe(401);
+  });
+
+  it('rejects host kicks after the game starts', async () => {
+    app = await startTestServer();
+    const lobby = await createThreePlayerLobby(app);
+    const game = globalStore.get(lobby.gameId)!;
+    const victim = game.turn.turnOrder[1];
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/games/${lobby.gameId}/players/${victim}`,
+      headers: { 'X-Host-Token': lobby.hostToken },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('game_already_started');
+  });
+
   it('lets the host eliminate a player mid-match without ending a 3-player game', async () => {
     app = await startTestServer();
     const lobby = await createThreePlayerLobby(app);

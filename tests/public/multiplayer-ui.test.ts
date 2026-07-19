@@ -46,4 +46,13 @@ describe('multiplayer UI wiring', () => {
     expect(source).not.toContain("player_a: readPlayer('player_a')");
     expect(source).not.toContain("player_b: readPlayer('player_b')");
   });
+
+  it('renders host lobby kick controls and calls the lobby-only endpoint', () => {
+    const source = read('public/play.js');
+    expect(source).toContain('data-kick-player');
+    expect(source).toContain('lobby.phase === \'lobby\'');
+    expect(source).toContain("method: 'DELETE'");
+    expect(source).toContain('/players/${encodeURIComponent(playerId)}');
+    expect(source).toContain('你已被房主移出大厅');
+  });
 });

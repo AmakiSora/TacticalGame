@@ -102,7 +102,10 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.delete<{ Params: { id: string; playerId: string } }>('/api/games/:id/players/:playerId', async (req, reply) => {
     const game = authenticateHost(req, reply);
     if (!game) return;
-    if (!isPlayerId(req.params.playerId) || !removeLobbyPlayer(game, req.params.playerId)) {
+    if (game.phase !== 'lobby') {
+      return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
+    }
+    if (!isPlayerId(req.params.playerId) || !game.players[req.params.playerId] || !removeLobbyPlayer(game, req.params.playerId)) {
       return reply.code(400).send({ error: 'invalid lobby player', code: 'invalid_move' });
     }
     appendEvent(game, globalEventBus, 'player_left', { playerId: req.params.playerId, reason: 'host' });

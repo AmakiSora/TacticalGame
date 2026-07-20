@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { loadMaps } from './config/loader.js';
 import { gamesRoutes } from './api/games.js';
@@ -100,7 +100,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   return app;
 }
 
-const isMain = process.argv[1] !== undefined && ( import.meta.url === 'file://' + resolve(process.argv[1]) || import.meta.url.endsWith('/dist/server.js'));
+const isMain = process.argv[1] !== undefined && (import.meta.url === pathToFileURL(resolve(process.argv[1])).href || import.meta.url.endsWith('/dist/server.js'));
 if (isMain) {
   const config = readRuntimeConfig();
   buildServer()

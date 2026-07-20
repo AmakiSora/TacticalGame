@@ -6,6 +6,9 @@
 
 - 新增 `spectator2.html` 全息观战台：提供新版棋盘、事件时间轴、实时 SSE 观战、回放导入/导出、据点与排行榜信息展示。
 - 新版观战台支持多玩家、类型化据点、总部与单位状态、事件详情和 Control token 管理操作。
+- 大厅新增房主踢出玩家功能：大厅玩家列表追加踢出按钮（对房主自身隐藏），新增 `DELETE /api/games/:id/players/:playerId` 踢出接口并在开局后拒绝执行；被踢玩家自动退出大厅并收到通知，补充对应 API 与 UI 测试。
+- 新增 `deploy/deploy.py` 远程部署脚本：通过 SFTP + Docker Compose 将项目同步到远程服务器并自动重启。
+- 服务端启动入口改用 `pathToFileURL` 替代 `'file://' + resolve()` 字符串拼接，修复 Windows 下 `isMain` 判断失败的路径格式问题。
 
 ## 3.1.0
 

@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>TacticalGame — 观测穹顶</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@500;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    /* 观战页第三版：悬浮观测穹顶 —— 深紫黑 HUD，棋盘为中心天体 */
+    :root {
+      --s3-void: #0b0914;
+      --s3-nebula: #151025;
+      --s3-nebula-soft: #1c1630;
+      --s3-rim: #2a2340;
+      --s3-frost: #e8f4ff;
+      --s3-mist: #9bb0c9;
+      --s3-ice: #7dd3fc;
+      --s3-ice-soft: rgba(125, 211, 252, .16);
+      --s3-violet: #a78bfa;
+      --s3-violet-soft: rgba(167, 139, 250, .18);
+      --s3-flare: #f0abfc;
+      --s3-glass: rgba(21, 16, 37, .72);
+      --s3-shadow: 0 20px 50px rgba(3, 2, 12, .55);
+      --s3-radius: 22px;
+      --s3-font-display: "Orbitron", "Segoe UI", sans-serif;
+      --s3-font-body: "Sora", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --s3-font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body.spectator3-shell {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: var(--s3-frost);
+      font-family: var(--s3-font-body);
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(125, 211, 252, .12), transparent 55%),
+        radial-gradient(circle at 12% 80%, rgba(167, 139, 250, .1), transparent 28rem),
+        radial-gradient(circle at 88% 30%, rgba(240, 171, 252, .07), transparent 24rem),
+        var(--s3-void);
+    }
+
+    /* 星尘层 */
+    body.spectator3-shell::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: .55;
+      background-image:
+        radial-gradient(1px 1px at 8% 18%, rgba(232, 244, 255, .55), transparent),
+        radial-gradient(1px 1px at 22% 62%, rgba(125, 211, 252, .4), transparent),
+        radial-gradient(1.5px 1.5px at 41% 28%, rgba(232, 244, 255, .35), transparent),
+        radial-gradient(1px 1px at 58% 74%, rgba(167, 139, 250, .45), transparent),
+        radial-gradient(1px 1px at 73% 16%, rgba(232, 244, 255, .4), transparent),
+        radial-gradient(1.5px 1.5px at 86% 52%, rgba(125, 211, 252, .35), transparent),
+        radial-gradient(1px 1px at 94% 88%, rgba(240, 171, 252, .4), transparent);
+    }
+
+    body.spectator3-shell > * { position: relative; z-index: 1; }
+
+    .spectator3-shell button,
+    .spectator3-shell select,
+    .spectator3-shell input { font: inherit; }
+
+    .spectator3-shell button:focus-visible,
+    .spectator3-shell select:focus-visible,
+    .spectator3-shell input:focus-visible {
+      outline: 2px solid var(--s3-ice);
+      outline-offset: 2px;
+    }
+
+    /* ========== 顶部悬浮轨 ========== */
+    .spectator3-shell .dome-rail {
+      position: sticky;
+      top: 0;
+      z-index: 90;
+      display: grid;
+      grid-template-columns: minmax(200px, .9fr) minmax(0, 1.6fr);
+      gap: 16px 28px;
+      align-items: center;
+      margin: 12px clamp(12px, 2.5vw, 36px) 0;
+      padding: 14px clamp(14px, 2vw, 28px);
+      border: 1px solid rgba(125, 211, 252, .18);
+      border-radius: 999px;
+      background: var(--s3-glass);
+      box-shadow: var(--s3-shadow), inset 0 1px 0 rgba(255, 255, 255, .06);
+      backdrop-filter: blur(18px) saturate(1.2);
+      animation: s3-rail-in .55s cubic-bezier(.2, .85, .2, 1) both;
+    }
+
+    .spectator3-shell .brand-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+      padding-left: 4px;
+    }
+
+    .spectator3-shell .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--s3-ice);
+      font-family: var(--s3-font-display);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+    }
+
+    .spectator3-shell .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--s3-ice);
+      box-shadow: 0 0 0 0 rgba(125, 211, 252, .55);
+      animation: s3-pulse 2s ease-out infinite;
+    }
+
+    .spectator3-shell .brand-block h1 {
+      margin: 0;
+      color: var(--s3-frost);
+      font-family: var(--s3-font-display);
+      font-size: clamp(15px, 1.8vw, 22px);
+      font-weight: 800;
+      letter-spacing: .04em;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+
+    .spectator3-shell .brand-block h1 em {
+      margin-left: .2em;
+      color: var(--s3-violet);
+      font-style: normal;
+      font-weight: 500;
+    }
+
+    .spectator3-shell .version-badge {
+      margin-left: 8px;
+      padding: 2px 8px;
+      border: 1px solid rgba(125, 211, 252, .28);
+      border-radius: 999px;
+      background: rgba(125, 211, 252, .08);
+      color: var(--s3-mist);
+      font-family: var(--s3-font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      transform: translateY(-1px);
+    }
+
+    .spectator3-shell .page-subtitle {
+      color: var(--s3-mist);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .04em;
+    }
+
+    .spectator3-shell #game-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .spectator3-shell .toolbar-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .spectator3-shell .primary-tools {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .spectator3-shell .game-picker {
+      position: relative;
+      display: flex;
+      min-width: 200px;
+      max-width: 320px;
+      height: 40px;
+      align-items: center;
+      border: 1px solid rgba(125, 211, 252, .22);
+      border-radius: 999px;
+      background: rgba(11, 9, 20, .55);
+      box-shadow: none;
+    }
+
+    .spectator3-shell .game-picker::before {
+      width: 6px;
+      height: 6px;
+      margin-left: 14px;
+      border-radius: 50%;
+      background: var(--s3-violet);
+      box-shadow: 0 0 10px rgba(167, 139, 250, .7);
+    }
+
+    .spectator3-shell .game-picker::after {
+      right: 16px;
+      width: 7px;
+      height: 7px;
+      border-color: var(--s3-ice);
+    }
+
+    .spectator3-shell .game-picker:focus-within {
+      border-color: var(--s3-ice);
+      box-shadow: 0 0 0 3px var(--s3-ice-soft);
+    }
+
+    .spectator3-shell #game-meta select,
+    .spectator3-shell #game-meta button {
+      min-height: 36px;
+      padding: 7px 14px;
+      border: 1px solid rgba(125, 211, 252, .16);
+      border-radius: 999px;
+      background: rgba(11, 9, 20, .45);
+      color: var(--s3-frost);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      transition: background .2s ease, border-color .2s ease, transform .2s ease, color .2s ease, box-shadow .2s ease;
+    }
+
+    .spectator3-shell #game-meta button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(125, 211, 252, .45);
+      background: rgba(125, 211, 252, .12);
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(125, 211, 252, .12);
+    }
+
+    .spectator3-shell #game-meta .game-picker #game-picker-button {
+      width: 100%;
+      min-height: 38px;
+      padding: 8px 36px 8px 10px;
+      border: 0;
+      background: transparent;
+      color: var(--s3-frost);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .spectator3-shell #game-meta .game-picker #game-picker-button:hover {
+      transform: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .spectator3-shell #game-picker-menu {
+      top: calc(100% + 12px);
+      width: min(460px, calc(100vw - 32px));
+      max-height: 360px;
+      padding: 10px;
+      border: 1px solid rgba(125, 211, 252, .2);
+      border-radius: 18px;
+      background: #120e22;
+      box-shadow: var(--s3-shadow);
+    }
+
+    .spectator3-shell .game-picker.open #game-picker-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      animation: s3-pop .2s cubic-bezier(.2, .85, .2, 1);
+    }
+
+    .spectator3-shell #game-picker-menu .game-picker-option {
+      min-height: 0;
+      padding: 11px 14px;
+      border: 0;
+      border-left: 3px solid transparent;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .03);
+      color: var(--s3-frost);
+    }
+
+    .spectator3-shell #game-picker-menu .game-picker-option:hover,
+    .spectator3-shell #game-picker-menu .game-picker-option.active {
+      border-color: var(--s3-ice);
+      background: var(--s3-ice-soft);
+    }
+
+    .spectator3-shell .game-picker-option .game-id {
+      font-family: var(--s3-font-mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+    }
+
+    .spectator3-shell .game-picker-option .game-meta-line { color: var(--s3-mist); }
+
+    .spectator3-shell .game-picker-option .phase-badge {
+      border: 1px solid rgba(167, 139, 250, .35);
+      border-radius: 999px;
+      background: var(--s3-violet-soft);
+      color: var(--s3-violet);
+    }
+
+    .spectator3-shell #game-meta button.danger {
+      border-color: rgba(240, 171, 252, .4);
+      color: var(--s3-flare);
+    }
+
+    .spectator3-shell #game-meta button.danger:hover {
+      border-color: var(--s3-flare);
+      background: rgba(240, 171, 252, .16);
+      color: #fff;
+    }
+
+    .spectator3-shell #file-actions { white-space: nowrap; }
+    .spectator3-shell #settings-wrap { margin-left: 0; position: relative; }
+
+    .spectator3-shell #btn-settings {
+      width: 38px;
+      height: 38px;
+      min-height: 38px;
+      padding: 0;
+      border-radius: 50%;
+      font-size: 16px;
+    }
+
+    .spectator3-shell #status {
+      min-height: 14px;
+      color: var(--s3-mist);
+      font-family: var(--s3-font-mono);
+      font-size: 10px;
+      letter-spacing: .06em;
+    }
+
+    /* 设置浮层 */
+    .spectator3-shell #settings-popover {
+      top: calc(100% + 12px);
+      right: 0;
+      min-width: 280px;
+      padding: 18px;
+      gap: 12px;
+      border: 1px solid rgba(125, 211, 252, .2);
+      border-radius: 18px;
+      background: #120e22;
+      box-shadow: var(--s3-shadow);
+    }
+
+    .spectator3-shell #settings-popover.open { animation: s3-pop .2s cubic-bezier(.2, .85, .2, 1); }
+    .spectator3-shell #settings-popover label { color: var(--s3-frost); }
+    .spectator3-shell #settings-popover .settings-divider { background: var(--s3-rim); }
+
+    .spectator3-shell .slider {
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .12);
+    }
+
+    .spectator3-shell .slider::before {
+      border-radius: 50%;
+      background: var(--s3-mist);
+    }
+
+    .spectator3-shell .toggle input:checked + .slider { background: var(--s3-ice); }
+    .spectator3-shell .toggle input:checked + .slider::before { background: #0b0914; }
+
+    .spectator3-shell #settings-popover input[type="number"],
+    .spectator3-shell #settings-popover .setting-field input[type="password"],
+    .spectator3-shell #settings-popover .setting-field input[type="text"] {
+      border: 1px solid rgba(125, 211, 252, .2);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, .28);
+      color: var(--s3-frost);
+    }
+
+    .spectator3-shell #settings-popover .settings-action {
+      border: 1px solid var(--s3-ice);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--s3-ice);
+    }
+
+    .spectator3-shell #settings-popover .settings-action:hover {
+      background: var(--s3-ice);
+      color: #0b0914;
+    }
+
+    /* ========== 主舞台：三列穹顶 ========== */
+    .spectator3-shell .spectator-main {
+      display: grid;
+      grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(280px, 340px);
+      grid-template-areas: "orbit-left stage orbit-right";
+      width: min(1920px, 100%);
+      min-height: 0;
+      margin: 0 auto;
+      padding: clamp(14px, 2vw, 28px) clamp(12px, 2.5vw, 36px) 40px;
+      gap: clamp(12px, 1.6vw, 24px);
+      align-items: start;
+    }
+
+    /* 左右轨道浮卡列 */
+    .spectator3-shell .orbit-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+      position: sticky;
+      top: 88px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .spectator3-shell .orbit-left {
+      grid-area: orbit-left;
+      animation: s3-slide-left .6s .08s cubic-bezier(.2, .85, .2, 1) both;
+    }
+
+    .spectator3-shell .orbit-right {
+      grid-area: orbit-right;
+      animation: s3-slide-right .6s .12s cubic-bezier(.2, .85, .2, 1) both;
+    }
+
+    .spectator3-shell .float-card {
+      position: relative;
+      padding: 16px 16px 14px;
+      border: 1px solid rgba(125, 211, 252, .14);
+      border-radius: var(--s3-radius);
+      background: var(--s3-glass);
+      box-shadow: 0 14px 36px rgba(3, 2, 12, .35);
+      backdrop-filter: blur(14px) saturate(1.15);
+      overflow: hidden;
+    }
+
+    .spectator3-shell .float-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 18px;
+      right: 18px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(125, 211, 252, .55), transparent);
+    }
+
+    .spectator3-shell .float-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: radial-gradient(circle at 100% 0%, rgba(167, 139, 250, .08), transparent 42%);
+    }
+
+    .spectator3-shell .card-kicker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 12px;
+      color: var(--s3-mist);
+      font-family: var(--s3-font-display);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .spectator3-shell .card-kicker::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--s3-ice);
+      box-shadow: 0 0 8px rgba(125, 211, 252, .6);
+    }
+
+    .spectator3-shell #sidebar {
+      display: contents;
+      width: auto;
+      max-height: none;
+      overflow: visible;
+      position: static;
+      gap: 0;
+    }
+
+    .spectator3-shell #sidebar section,
+    .spectator3-shell #selection-panel,
+    .spectator3-shell #event-detail,
+    .spectator3-shell #event-log {
+      width: auto;
+      padding: 16px;
+      border: 1px solid rgba(125, 211, 252, .14);
+      border-radius: var(--s3-radius);
+      background: var(--s3-glass);
+      box-shadow: 0 14px 36px rgba(3, 2, 12, .35);
+      backdrop-filter: blur(14px) saturate(1.15);
+    }
+
+    .spectator3-shell #turn-info:empty::after,
+    .spectator3-shell #resources:empty::after,
+    .spectator3-shell #score-panel:empty::after {
+      display: block;
+      color: var(--s3-mist);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+    }
+
+    .spectator3-shell #turn-info:empty::after { content: '回合数据 · 等待对局接入'; }
+    .spectator3-shell #resources:empty::after { content: '资源态势 · 等待对局接入'; }
+    .spectator3-shell #score-panel:empty::after { content: '积分排行 · 等待对局接入'; }
+
+    .spectator3-shell #sidebar h3,
+    .spectator3-shell .panel-heading,
+    .spectator3-shell #event-detail h3,
+    .spectator3-shell #event-log h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 12px;
+      color: var(--s3-mist);
+      font-family: var(--s3-font-display);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .spectator3-shell #selection-detail {
+      color: var(--s3-mist);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    /* 注入卡片在穹顶主题下的微调 */
+    .spectator3-shell .resource-card,
+    .spectator3-shell .score-row,
+    .spectator3-shell .turn-card,
+    .spectator3-shell .sel-stat-card {
+      border-radius: 12px;
+      background: rgba(11, 9, 20, .55);
+      border-color: rgba(125, 211, 252, .12);
+    }
+
+    .spectator3-shell .resource-card span,
+    .spectator3-shell .sel-stat-card span,
+    .spectator3-shell .sel-coord,
+    .spectator3-shell .sel-note,
+    .spectator3-shell .score-breakdown {
+      color: var(--s3-mist);
+    }
+
+    .spectator3-shell .resource-card strong,
+    .spectator3-shell .sel-stat-card strong,
+    .spectator3-shell .score-row strong {
+      color: var(--s3-frost);
+    }
+
+    .spectator3-shell .sel-hp-bar {
+      background: #1a1020;
+      border-color: #3a2848;
+    }
+
+    /* 覆盖 style.css 对 selection-panel 的固定宽度 */
+    .spectator3-shell #selection-panel {
+      width: 100%;
+      max-width: none;
+      flex-shrink: 1;
+      position: relative;
+    }
+
+    /* ========== 中央穹顶舞台 ========== */
+    .spectator3-shell .dome-stage {
+      grid-area: stage;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      animation: s3-stage-in .65s cubic-bezier(.2, .85, .2, 1) both;
+    }
+
+    .spectator3-shell .stage-kicker {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 8px;
+      color: var(--s3-mist);
+      font-family: var(--s3-font-display);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+
+    .spectator3-shell .stage-kicker .coord-hint {
+      font-family: var(--s3-font-mono);
+      letter-spacing: .08em;
+      color: rgba(155, 176, 201, .7);
+    }
+
+    /* 方位环 + 棋盘 */
+    .spectator3-shell .dome-orbit {
+      position: relative;
+      display: grid;
+      place-items: center;
+      padding: clamp(18px, 2.4vw, 36px);
+      isolation: isolate;
+    }
+
+    /* 外层慢转虚线轨道 */
+    .spectator3-shell .orbit-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      border: 1px dashed rgba(125, 211, 252, .22);
+      animation: s3-spin 120s linear infinite;
+    }
+
+    .spectator3-shell .orbit-ring.inner {
+      inset: 6%;
+      border-color: rgba(167, 139, 250, .18);
+      animation-duration: 90s;
+      animation-direction: reverse;
+    }
+
+    /* 方位刻度 */
+    .spectator3-shell .bearing {
+      position: absolute;
+      z-index: 2;
+      color: var(--s3-ice);
+      font-family: var(--s3-font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .2em;
+      text-shadow: 0 0 12px rgba(125, 211, 252, .45);
+      pointer-events: none;
+    }
+
+    .spectator3-shell .bearing.n { top: 4px; left: 50%; transform: translateX(-50%); }
+    .spectator3-shell .bearing.e { right: 6px; top: 50%; transform: translateY(-50%); }
+    .spectator3-shell .bearing.s { bottom: 4px; left: 50%; transform: translateX(-50%); }
+    .spectator3-shell .bearing.w { left: 6px; top: 50%; transform: translateY(-50%); }
+
+    .spectator3-shell .board-frame {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 900px;
+      padding: 10px;
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(125, 211, 252, .1), transparent 55%),
+        linear-gradient(160deg, rgba(28, 22, 48, .95), rgba(11, 9, 20, .98));
+      border: 1px solid rgba(125, 211, 252, .22);
+      box-shadow:
+        0 0 0 1px rgba(167, 139, 250, .08),
+        0 24px 60px rgba(3, 2, 12, .5),
+        inset 0 1px 0 rgba(255, 255, 255, .05);
+    }
+
+    /* live 脉冲外环 */
+    .spectator3-shell .board-frame::before {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 30px;
+      pointer-events: none;
+      border: 1px solid transparent;
+      background:
+        linear-gradient(var(--s3-nebula), var(--s3-nebula)) padding-box,
+        linear-gradient(135deg, rgba(125, 211, 252, .55), rgba(167, 139, 250, .15), rgba(240, 171, 252, .4)) border-box;
+      opacity: .85;
+      animation: s3-rim-glow 4s ease-in-out infinite;
+      z-index: -1;
+    }
+
+    .spectator3-shell #board-wrap {
+      position: relative;
+      display: flex;
+      width: 100%;
+      max-width: none;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 0;
+      background: #080612;
+    }
+
+    .spectator3-shell #board {
+      display: block;
+      width: 100%;
+      max-width: none;
+      height: auto;
+      border: 0;
+      border-radius: 0;
+      background: #0a0e14;
+      cursor: crosshair;
+      image-rendering: auto;
+    }
+
+    .spectator3-shell .cell-info {
+      right: 14px;
+      bottom: 14px;
+      z-index: 4;
+      padding: 6px 10px;
+      border: 1px solid rgba(125, 211, 252, .25);
+      border-radius: 999px;
+      background: rgba(11, 9, 20, .88);
+      color: var(--s3-frost);
+      font: 600 11px var(--s3-font-mono);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, .35);
+    }
+
+    /* 回放控制 —— 悬浮胶囊 */
+    .spectator3-shell #replay-controls {
+      display: grid;
+      grid-template-columns: auto minmax(140px, 1fr);
+      gap: 12px 18px;
+      align-items: center;
+      margin: 0 auto;
+      width: 100%;
+      max-width: 900px;
+      padding: 12px 16px 14px;
+      border: 1px solid rgba(125, 211, 252, .18);
+      border-radius: 999px;
+      background: var(--s3-glass);
+      color: var(--s3-frost);
+      box-shadow: var(--s3-shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .spectator3-shell #control-buttons {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin: 0;
+    }
+
+    .spectator3-shell #control-buttons button {
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(125, 211, 252, .18);
+      border-radius: 50%;
+      background: rgba(11, 9, 20, .45);
+      color: var(--s3-frost);
+      font-size: 12px;
+      transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+
+    .spectator3-shell #control-buttons button:hover {
+      transform: translateY(-1px) scale(1.05);
+      border-color: var(--s3-ice);
+      background: var(--s3-ice-soft);
+      color: #fff;
+    }
+
+    .spectator3-shell #control-buttons #btn-play {
+      width: 42px;
+      height: 42px;
+      border: 0;
+      background: linear-gradient(145deg, var(--s3-ice), #4db8e8);
+      color: #0b0914;
+      box-shadow: 0 8px 20px rgba(125, 211, 252, .3);
+      font-weight: 700;
+    }
+
+    .spectator3-shell #control-buttons #btn-play.active {
+      background: linear-gradient(145deg, var(--s3-violet), #7c5cf0);
+      color: #fff;
+      animation: s3-play 1.5s ease-in-out infinite;
+    }
+
+    .spectator3-shell #control-buttons button.active {
+      border-color: var(--s3-violet);
+      background: var(--s3-violet-soft);
+      color: var(--s3-violet);
+    }
+
+    .spectator3-shell #speed-select {
+      height: 32px;
+      padding: 4px 8px;
+      border: 1px solid rgba(125, 211, 252, .18);
+      border-radius: 999px;
+      background: rgba(11, 9, 20, .45);
+      color: var(--s3-frost);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .spectator3-shell #step-info {
+      margin-left: 4px;
+      color: var(--s3-mist);
+      font: 600 11px var(--s3-font-mono);
+      white-space: nowrap;
+    }
+
+    .spectator3-shell #timeline-wrap { height: 34px; }
+    .spectator3-shell #timeline { height: 28px; }
+
+    .spectator3-shell #timeline::-webkit-slider-runnable-track {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(125, 211, 252, .18);
+    }
+
+    .spectator3-shell #timeline::-webkit-slider-thumb {
+      width: 16px;
+      height: 16px;
+      margin-top: -5.5px;
+      border: 2px solid #0b0914;
+      border-radius: 50%;
+      background: var(--s3-ice);
+      box-shadow: 0 0 12px rgba(125, 211, 252, .55);
+    }
+
+    .spectator3-shell #timeline::-moz-range-track {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(125, 211, 252, .18);
+      border: none;
+    }
+
+    .spectator3-shell #timeline::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #0b0914;
+      border-radius: 50%;
+      background: var(--s3-ice);
+      box-shadow: 0 0 12px rgba(125, 211, 252, .55);
+    }
+
+    .spectator3-shell #timeline-markers { top: 3px; }
+    .spectator3-shell #timeline-markers .marker {
+      top: 8px;
+      width: 2px;
+      height: 10px;
+      opacity: .7;
+      border-radius: 1px;
+    }
+
+    /* 事件流 */
+    .spectator3-shell #events {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      max-height: min(42vh, 420px);
+      overflow-y: auto;
+    }
+
+    .spectator3-shell #events li {
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      border-left: 2px solid transparent;
+      border-radius: 8px;
+      color: var(--s3-mist);
+      font-family: var(--s3-font-mono);
+      font-size: 11px;
+      line-height: 1.4;
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+
+    .spectator3-shell #events li:hover {
+      background: rgba(125, 211, 252, .08);
+      color: var(--s3-frost);
+    }
+
+    .spectator3-shell #events li.active {
+      border-left-color: var(--s3-violet);
+      background: var(--s3-violet-soft);
+      color: var(--s3-frost);
+    }
+
+    .spectator3-shell #detail-content {
+      color: var(--s3-mist);
+      font-size: 12px;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .spectator3-shell #detail-content .ev-type {
+      display: inline-block;
+      margin-right: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--s3-ice-soft);
+      color: var(--s3-ice);
+      font-family: var(--s3-font-mono);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .spectator3-shell #detail-content .ev-payload {
+      display: block;
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(11, 9, 20, .55);
+      color: var(--s3-mist);
+      font-family: var(--s3-font-mono);
+      font-size: 11px;
+      white-space: pre-wrap;
+    }
+
+    /* 滚动条 */
+    .spectator3-shell .orbit-column::-webkit-scrollbar,
+    .spectator3-shell #events::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .spectator3-shell .orbit-column::-webkit-scrollbar-thumb,
+    .spectator3-shell #events::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background: rgba(125, 211, 252, .25);
+    }
+
+    /* ========== 动画 ========== */
+    @keyframes s3-rail-in {
+      from { opacity: 0; transform: translateY(-18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes s3-stage-in {
+      from { opacity: 0; transform: scale(.94); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes s3-slide-left {
+      from { opacity: 0; transform: translateX(-22px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes s3-slide-right {
+      from { opacity: 0; transform: translateX(22px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes s3-pop {
+      from { opacity: 0; transform: translateY(-6px) scale(.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes s3-pulse {
+      0% { box-shadow: 0 0 0 0 rgba(125, 211, 252, .55); }
+      70% { box-shadow: 0 0 0 10px rgba(125, 211, 252, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0); }
+    }
+
+    @keyframes s3-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes s3-rim-glow {
+      0%, 100% { opacity: .55; filter: brightness(1); }
+      50% { opacity: 1; filter: brightness(1.15); }
+    }
+
+    @keyframes s3-play {
+      0%, 100% { box-shadow: 0 8px 20px rgba(167, 139, 250, .35); }
+      50% { box-shadow: 0 8px 28px rgba(167, 139, 250, .65); }
+    }
+
+    /* ========== 响应式 ========== */
+    @media (max-width: 1180px) {
+      .spectator3-shell .dome-rail {
+        grid-template-columns: 1fr;
+        border-radius: 24px;
+        gap: 12px;
+      }
+
+      .spectator3-shell #game-meta { justify-content: flex-start; }
+
+      .spectator3-shell .spectator-main {
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+        grid-template-areas:
+          "stage stage"
+          "orbit-left orbit-right";
+      }
+
+      .spectator3-shell .orbit-column {
+        position: static;
+        max-height: none;
+      }
+
+      .spectator3-shell .orbit-ring,
+      .spectator3-shell .bearing { display: none; }
+
+      .spectator3-shell .dome-orbit { padding: 8px; }
+    }
+
+    @media (max-width: 820px) {
+      .spectator3-shell .spectator-main {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "stage"
+          "orbit-left"
+          "orbit-right";
+      }
+
+      .spectator3-shell #replay-controls {
+        grid-template-columns: 1fr;
+        border-radius: 22px;
+      }
+
+      .spectator3-shell .brand-block h1 { white-space: normal; }
+
+      .spectator3-shell .game-picker {
+        min-width: 0;
+        width: 100%;
+        max-width: none;
+      }
+
+      .spectator3-shell .primary-tools { width: 100%; }
+    }
+
+    @media (max-width: 560px) {
+      .spectator3-shell .dome-rail {
+        margin: 8px 8px 0;
+        padding: 12px;
+        border-radius: 18px;
+      }
+
+      .spectator3-shell .spectator-main {
+        padding: 12px 8px 28px;
+      }
+
+      .spectator3-shell #control-buttons {
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .spectator3-shell *,
+      .spectator3-shell *::before,
+      .spectator3-shell *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+
+      .spectator3-shell .orbit-ring {
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="spectator3-shell">
+  <!-- 顶部悬浮观测轨 -->
+  <header class="dome-rail">
+    <div class="brand-block">
+      <div class="eyebrow"><span class="live-dot" aria-hidden="true"></span>OBSERVATORY LINK</div>
+      <h1>观测穹顶<em>Dome</em><span class="version-badge"></span></h1>
+      <div class="page-subtitle">全域棋盘居中 · 情报卡环绕 · 实时/回放同步</div>
+    </div>
+    <div id="game-meta" aria-label="观战工具栏">
+      <span class="toolbar-group primary-tools">
+        <span class="game-picker">
+          <select id="game-select" class="native-game-select" tabindex="-1" aria-hidden="true"><option value="">-- 选择对局 --</option></select>
+          <button id="game-picker-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="game-picker-label">-- 选择对局 --</span>
+          </button>
+          <div id="game-picker-menu" role="listbox" aria-label="选择对局"></div>
+        </span>
+        <button id="refresh-list" type="button">刷新</button>
+        <button id="delete-game" class="danger" type="button" title="删除当前对局">删除</button>
+        <span id="status" role="status" aria-live="polite"></span>
+      </span>
+      <span id="file-actions" class="toolbar-group file-tools">
+        <button id="btn-export-json" type="button" title="导出为 JSON 文件">导出</button>
+        <button id="btn-import" type="button" title="从 JSON 文件导入对局">导入</button>
+        <input type="file" id="import-file" accept=".json" hidden />
+      </span>
+      <div id="settings-wrap" class="toolbar-group settings-tools">
+        <button id="btn-settings" type="button" title="设置" aria-label="打开观战设置">⚙</button>
+        <div id="settings-popover">
+          <label class="toggle-row">
+            <span>自动刷新</span>
+            <span class="toggle"><input type="checkbox" id="auto-refresh" checked /><span class="slider"></span></span>
+          </label>
+          <label class="setting-row">
+            刷新间隔 <input type="number" id="refresh-interval" min="1" max="60" value="5" /> 秒
+          </label>
+          <label class="toggle-row">
+            <span>跟随最新</span>
+            <span class="toggle"><input type="checkbox" id="follow-latest" /><span class="slider"></span></span>
+          </label>
+          <div class="settings-divider"></div>
+          <label class="setting-field">
+            <span>Control token</span>
+            <input id="settings-control-token" type="password" placeholder="Control token" autocomplete="off" />
+          </label>
+          <button id="btn-save-control-token" type="button" class="settings-action">保存 Token</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="spectator-main">
+    <!-- 左轨道：战况浮卡 -->
+    <div class="orbit-column orbit-left" aria-label="战况情报">
+      <aside id="sidebar">
+        <section id="turn-info"></section>
+        <section id="resources"></section>
+        <section id="score-panel"></section>
+        <section id="selection-panel">
+          <h2 class="panel-heading">目标情报</h2>
+          <div id="selection-detail">点击或悬停棋盘，查看单位、总部或据点信息</div>
+        </section>
+      </aside>
+    </div>
+
+    <!-- 中央穹顶：棋盘 + 回放 -->
+    <section class="dome-stage" aria-label="观测舞台">
+      <div class="stage-kicker">
+        <span>Tactical Dome / 观测舞台</span>
+        <span class="coord-hint">AXIAL · N↑</span>
+      </div>
+
+      <div class="dome-orbit">
+        <div class="orbit-ring" aria-hidden="true"></div>
+        <div class="orbit-ring inner" aria-hidden="true"></div>
+        <span class="bearing n" aria-hidden="true">N</span>
+        <span class="bearing e" aria-hidden="true">E</span>
+        <span class="bearing s" aria-hidden="true">S</span>
+        <span class="bearing w" aria-hidden="true">W</span>
+
+        <div class="board-frame">
+          <div id="board-wrap">
+            <canvas id="board" width="840" height="840"></canvas>
+            <div id="cell-info" class="cell-info"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="replay-controls">
+        <div id="control-buttons">
+          <button id="btn-start" type="button" title="回到开始" aria-label="回到开始">⏮</button>
+          <button id="btn-prev" type="button" title="上一步（左方向键）" aria-label="上一步">◀</button>
+          <button id="btn-play" type="button" title="播放或暂停（空格键）" aria-label="播放或暂停">▶</button>
+          <button id="btn-next" type="button" title="下一步（右方向键）" aria-label="下一步">▶</button>
+          <button id="btn-end" type="button" title="跳到末尾" aria-label="跳到末尾">⏭</button>
+          <select id="speed-select" title="播放速度" aria-label="播放速度">
+            <option value="1000">0.5x</option>
+            <option value="500" selected>1x</option>
+            <option value="200">2.5x</option>
+            <option value="100">5x</option>
+            <option value="50">10x</option>
+          </select>
+          <span id="step-info">0 / 0</span>
+        </div>
+        <div id="timeline-wrap">
+          <input type="range" id="timeline" min="0" max="0" value="0" aria-label="回放时间轴" />
+          <div id="timeline-markers"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右轨道：事件浮卡 -->
+    <div class="orbit-column orbit-right" aria-label="行动战报">
+      <section id="event-detail">
+        <h3>当前行动</h3>
+        <div id="detail-content">选择对局后使用时间轴回放</div>
+      </section>
+      <section id="event-log">
+        <h3>事件流</h3>
+        <ul id="events"></ul>
+      </section>
+    </div>
+  </main>
+
+  <script src="/version.js"></script>
+  <script src="/app.js?v=3.1.0"></script>
+  <script>
+    /* 观测穹顶棋盘皮肤：仅 spectator3 覆盖绘制，不改 app.js */
+    (function applyDomeBoardSkin() {
+      if (!document.body.classList.contains('spectator3-shell')) return;
+
+      // 地形与阵营色：贴近深紫星图，而非默认灰蓝战术图
+      Object.assign(TERRAIN, {
+        plain: '#12101f',
+        water: '#0d2744',
+        blocker: '#2a2038',
+      });
+      Object.assign(OWNER_COLORS, {
+        player_a: '#7dd3fc',
+        player_b: '#fb923c',
+        player_c: '#a3e635',
+        player_d: '#c084fc',
+        player_e: '#fbbf24',
+        player_f: '#2dd4bf',
+        player_g: '#f472b6',
+        player_h: '#93c5fd',
+      });
+
+      const DOME = {
+        void: '#07060f',
+        voidGlow: 'rgba(125, 211, 252, 0.08)',
+        plainFill: '#141122',
+        plainEdge: 'rgba(125, 211, 252, 0.16)',
+        plainInner: 'rgba(167, 139, 250, 0.05)',
+        waterFill: '#0a1f38',
+        waterEdge: 'rgba(56, 189, 248, 0.55)',
+        waterSheen: 'rgba(125, 211, 252, 0.12)',
+        blockerFill: '#241a33',
+        blockerEdge: 'rgba(167, 139, 250, 0.42)',
+        blockerFacet: 'rgba(240, 171, 252, 0.08)',
+        hover: 'rgba(125, 211, 252, 0.14)',
+        hoverEdge: 'rgba(125, 211, 252, 0.7)',
+        glyph: '#0b0914',
+        hpTrack: 'rgba(8, 6, 16, 0.88)',
+        hpHealthy: '#34d399',
+        hpWounded: '#fbbf24',
+        hpCritical: '#fb7185',
+        spent: 'rgba(7, 6, 15, 0.45)',
+        neutralCp: '#f0abfc',
+      };
+
+      function withAlpha(hex, alpha) {
+        const raw = String(hex || '').replace('#', '');
+        if (raw.length !== 6) return `rgba(155, 176, 201, ${alpha})`;
+        const n = parseInt(raw, 16);
+        const r = (n >> 16) & 255;
+        const g = (n >> 8) & 255;
+        const b = n & 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+
+      function fillHexGradient(q, r, inset, colorTop, colorBottom) {
+        const pts = hexCorners(q, r, inset);
+        const minY = Math.min(...pts.map(p => p.y));
+        const maxY = Math.max(...pts.map(p => p.y));
+        const grad = ctx.createLinearGradient(0, minY, 0, maxY);
+        grad.addColorStop(0, colorTop);
+        grad.addColorStop(1, colorBottom);
+        pathHex(q, r, inset);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      function strokeHex(q, r, inset, color, width) {
+        pathHex(q, r, inset);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.stroke();
+      }
+
+      function drawTerrainCell(cell) {
+        const terrain = cell.terrain || 'plain';
+        if (terrain === 'water') {
+          fillHexGradient(cell.q, cell.r, 1, '#123552', DOME.waterFill);
+          // 水面微光
+          const p = hexToPixel(cell.q, cell.r);
+          const sheen = ctx.createRadialGradient(p.x - 4, p.y - 5, 2, p.x, p.y, HEX_SIZE * 0.75);
+          sheen.addColorStop(0, DOME.waterSheen);
+          sheen.addColorStop(1, 'rgba(0,0,0,0)');
+          pathHex(cell.q, cell.r, 2);
+          ctx.fillStyle = sheen;
+          ctx.fill();
+          strokeHex(cell.q, cell.r, 1.5, DOME.waterEdge, 1.2);
+          return;
+        }
+        if (terrain === 'blocker') {
+          fillHexGradient(cell.q, cell.r, 1, '#352746', DOME.blockerFill);
+          // 岩面切角高光
+          const pts = hexCorners(cell.q, cell.r, 6);
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          ctx.lineTo(pts[1].x, pts[1].y);
+          ctx.lineTo(pts[2].x, pts[2].y);
+          ctx.closePath();
+          ctx.fillStyle = DOME.blockerFacet;
+          ctx.fill();
+          strokeHex(cell.q, cell.r, 1.5, DOME.blockerEdge, 1.35);
+          return;
+        }
+        // plain：星图格
+        fillHexGradient(cell.q, cell.r, 1, '#1a1630', DOME.plainFill);
+        pathHex(cell.q, cell.r, 4);
+        ctx.fillStyle = DOME.plainInner;
+        ctx.fill();
+        strokeHex(cell.q, cell.r, 1, DOME.plainEdge, 1);
+      }
+
+      function drawDomeHpBar(x, y, width, hp, maxHp) {
+        if (!maxHp || hp >= maxHp) return;
+        const h = 5;
+        const ratio = Math.max(0, Math.min(1, hp / maxHp));
+        const fill = ratio > 0.5 ? DOME.hpHealthy : ratio > 0.25 ? DOME.hpWounded : DOME.hpCritical;
+        const left = x - width / 2;
+        ctx.save();
+        ctx.fillStyle = DOME.hpTrack;
+        ctx.fillRect(left, y, width, h);
+        ctx.fillStyle = fill;
+        ctx.shadowColor = fill;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(left, y, Math.max(2, width * ratio), h);
+        ctx.restore();
+      }
+
+      function drawDomeUnitGlyph(type, x, y) {
+        ctx.save();
+        ctx.fillStyle = DOME.glyph;
+        ctx.strokeStyle = DOME.glyph;
+        ctx.lineWidth = 1.6;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        switch (type) {
+          case 'infantry': {
+            // 十字星
+            ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6);
+            ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y);
+            ctx.moveTo(x - 3.5, y - 3.5); ctx.lineTo(x + 3.5, y + 3.5);
+            ctx.moveTo(x + 3.5, y - 3.5); ctx.lineTo(x - 3.5, y + 3.5);
+            ctx.stroke();
+            break;
+          }
+          case 'scout': {
+            // 上行尖锥
+            ctx.moveTo(x, y - 7);
+            ctx.lineTo(x - 5.5, y + 5);
+            ctx.lineTo(x + 5.5, y + 5);
+            ctx.closePath();
+            ctx.fill();
+            break;
+          }
+          case 'heavy': {
+            // 厚六边形装甲
+            for (let i = 0; i < 6; i++) {
+              const a = Math.PI / 180 * (60 * i - 30);
+              const px = x + 6 * Math.cos(a);
+              const py = y + 6 * Math.sin(a);
+              if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            break;
+          }
+          case 'ranger': {
+            // 菱形准星
+            ctx.moveTo(x, y - 7);
+            ctx.lineTo(x + 5, y);
+            ctx.lineTo(x, y + 7);
+            ctx.lineTo(x - 5, y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+            ctx.fillStyle = withAlpha(DOME.glyph, 0.35);
+            ctx.fill();
+            break;
+          }
+          case 'support': {
+            // 加号医疗
+            ctx.fillRect(x - 2.2, y - 6, 4.4, 12);
+            ctx.fillRect(x - 6, y - 2.2, 12, 4.4);
+            break;
+          }
+          default:
+            break;
+        }
+        ctx.restore();
+      }
+
+      function drawDomeControlPointGlyph(kind, x, y, accent) {
+        ctx.save();
+        ctx.strokeStyle = DOME.glyph;
+        ctx.fillStyle = DOME.glyph;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        switch (kind) {
+          case 'supply': {
+            ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+            ctx.fill();
+            // 轨道点
+            ctx.fillStyle = accent || DOME.neutralCp;
+            ctx.beginPath();
+            ctx.arc(x + 6.5, y, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+          }
+          case 'forward_base': {
+            ctx.moveTo(x - 4, y + 6);
+            ctx.lineTo(x - 4, y - 6);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x - 4, y - 6);
+            ctx.lineTo(x + 7, y - 1.5);
+            ctx.lineTo(x - 4, y + 3);
+            ctx.closePath();
+            ctx.fill();
+            break;
+          }
+          case 'repair': {
+            ctx.arc(x - 0.5, y - 1, 4.2, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x + 2.5, y + 2.5);
+            ctx.lineTo(x + 6.5, y + 6.5);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            break;
+          }
+          default:
+            break;
+        }
+        ctx.restore();
+      }
+
+      window.drawHpBar = function drawDomeHpBarPublic(x, y, width, hp, maxHp) {
+        drawDomeHpBar(x, y, width, hp, maxHp);
+      };
+
+      window.drawUnitGlyph = function drawDomeUnitGlyphPublic(type, x, y) {
+        drawDomeUnitGlyph(type, x, y);
+      };
+
+      window.drawControlPointGlyph = function drawDomeControlPointGlyphPublic(kind, x, y) {
+        drawDomeControlPointGlyph(kind, x, y, DOME.neutralCp);
+      };
+
+      window.drawUnitMarker = function drawDomeUnitMarker(u) {
+        if (!u.alive) return;
+        const p = hexToPixel(u.q, u.r);
+        const color = ownerColor(u.owner);
+        const radius = HEX_SIZE * 0.44;
+
+        // 外圈辉光
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = withAlpha(color, 0.95);
+        ctx.fill();
+        ctx.restore();
+
+        // 内环切面
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius * 0.78, 0, Math.PI * 2);
+        ctx.fillStyle = withAlpha('#0b0914', 0.18);
+        ctx.fill();
+
+        // 六边形描边，区别于旧版纯圆点
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 180 * (60 * i - 30);
+          const px = p.x + radius * 0.92 * Math.cos(a);
+          const py = p.y + radius * 0.92 * Math.sin(a);
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = withAlpha('#ffffff', 0.28);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        drawDomeUnitGlyph(u.type, p.x, p.y);
+        drawDomeHpBar(p.x, p.y - 22, 36, u.hp, u.maxHp);
+
+        if (u.hasMoved || u.hasActed) {
+          ctx.fillStyle = DOME.spent;
+          ctx.beginPath();
+          ctx.arc(p.x + 11, p.y + 11, 5.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = withAlpha(color, 0.5);
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      };
+
+      window.drawHeadquartersMarker = function drawDomeHeadquartersMarker(hq) {
+        const p = hexToPixel(hq.q, hq.r);
+        const color = hq.alive ? ownerColor(hq.owner) : '#55556a';
+
+        // 底座六边形光晕
+        pathHex(hq.q, hq.r, 3);
+        ctx.fillStyle = withAlpha(color, hq.alive ? 0.22 : 0.08);
+        ctx.fill();
+        strokeHex(hq.q, hq.r, 3, withAlpha(color, hq.alive ? 0.85 : 0.25), 2);
+
+        // 中心菱形堡垒
+        ctx.save();
+        ctx.globalAlpha = hq.alive ? 1 : 0.35;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = hq.alive ? 14 : 0;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - 11);
+        ctx.lineTo(p.x + 10, p.y);
+        ctx.lineTo(p.x, p.y + 11);
+        ctx.lineTo(p.x - 10, p.y);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.restore();
+
+        // 顶部塔标
+        ctx.save();
+        ctx.globalAlpha = hq.alive ? 1 : 0.35;
+        ctx.fillStyle = DOME.glyph;
+        ctx.fillRect(p.x - 3.5, p.y - 2, 7, 8);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - 9);
+        ctx.lineTo(p.x - 5, p.y - 2);
+        ctx.lineTo(p.x + 5, p.y - 2);
+        ctx.closePath();
+        ctx.fill();
+        // 塔尖光点
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y - 10, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        drawDomeHpBar(p.x, p.y - 26, 44, hq.hp, hq.maxHp);
+      };
+
+      window.drawControlPointMarker = function drawDomeControlPointMarker(cp) {
+        const p = hexToPixel(cp.q, cp.r);
+        const color = cp.owner ? ownerColor(cp.owner) : DOME.neutralCp;
+
+        // 外环轨道
+        pathHex(cp.q, cp.r, 7);
+        ctx.fillStyle = withAlpha(color, 0.14);
+        ctx.fill();
+        strokeHex(cp.q, cp.r, 7, withAlpha(color, 0.75), 1.6);
+
+        // 内环虚线感
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, HEX_SIZE * 0.34, 0, Math.PI * 2);
+        ctx.strokeStyle = withAlpha(color, 0.55);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.restore();
+
+        // 核心盘
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, HEX_SIZE * 0.22, 0, Math.PI * 2);
+        ctx.fillStyle = withAlpha(color, 0.9);
+        ctx.fill();
+
+        if (cp.kind) drawDomeControlPointGlyph(cp.kind, p.x, p.y, color);
+      };
+
+      window.drawBoard = function drawDomeBoard() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 深空底 + 中心星云
+        const bg = ctx.createRadialGradient(
+          canvas.width * 0.5, canvas.height * 0.45, 20,
+          canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.62
+        );
+        bg.addColorStop(0, '#12101f');
+        bg.addColorStop(0.45, DOME.void);
+        bg.addColorStop(1, '#05040a');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 稀疏星点
+        ctx.save();
+        ctx.fillStyle = 'rgba(232, 244, 255, 0.35)';
+        const stars = [
+          [0.12, 0.18], [0.22, 0.72], [0.35, 0.12], [0.48, 0.84],
+          [0.63, 0.22], [0.78, 0.66], [0.88, 0.3], [0.17, 0.48],
+          [0.71, 0.1], [0.91, 0.82], [0.4, 0.56], [0.55, 0.38],
+        ];
+        for (const [sx, sy] of stars) {
+          ctx.beginPath();
+          ctx.arc(canvas.width * sx, canvas.height * sy, sx + sy > 1 ? 1.2 : 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        if (!state || state.cells.length === 0) return;
+
+        for (const cell of state.cells) drawTerrainCell(cell);
+
+        if (hoverCell) {
+          pathHex(hoverCell.q, hoverCell.r, 1);
+          ctx.fillStyle = DOME.hover;
+          ctx.fill();
+          strokeHex(hoverCell.q, hoverCell.r, 1, DOME.hoverEdge, 1.6);
+        }
+
+        for (const cp of state.controlPoints.values()) drawControlPointMarker(cp);
+        for (const hq of state.headquarters.values()) drawHeadquartersMarker(hq);
+        for (const u of state.units.values()) drawUnitMarker(u);
+      };
+
+      // 若已有状态，立即用新皮肤重绘
+      if (typeof drawBoard === 'function') drawBoard();
+    })();
+  </script>
+</body>
+</html>

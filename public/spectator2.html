@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>TacticalGame — 战术直播台</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    /* 观战页第二版：战术广播台主题 */
+    :root {
+      --s2-ink: #06111d;
+      --s2-navy: #0a1b2c;
+      --s2-panel: #10283b;
+      --s2-panel-soft: #153247;
+      --s2-line: rgba(190, 213, 222, .18);
+      --s2-paper: #f3efe5;
+      --s2-muted: #96aab4;
+      --s2-orange: #ff6b35;
+      --s2-orange-soft: rgba(255, 107, 53, .16);
+      --s2-lime: #bddc78;
+      --s2-shadow: 0 24px 60px rgba(0, 0, 0, .28);
+      --s2-radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body.spectator2-shell {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: var(--s2-paper);
+      background:
+        radial-gradient(circle at 12% 6%, rgba(255, 107, 53, .11), transparent 25rem),
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+        var(--s2-ink);
+      background-size: auto, 44px 44px, 44px 44px, auto;
+      font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    body.spectator2-shell::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background: linear-gradient(120deg, transparent 0 61%, rgba(255,255,255,.025) 61% 61.2%, transparent 61.2%);
+    }
+
+    .spectator2-shell button,
+    .spectator2-shell select,
+    .spectator2-shell input { font: inherit; }
+
+    .spectator2-shell button:focus-visible,
+    .spectator2-shell select:focus-visible,
+    .spectator2-shell input:focus-visible {
+      outline: 2px solid var(--s2-orange);
+      outline-offset: 2px;
+    }
+
+    /* 顶部赛事信息与工具区 */
+    .spectator2-shell .broadcast-header {
+      position: relative;
+      z-index: 80;
+      display: block;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .spectator2-shell .broadcast-strip {
+      display: flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 clamp(16px, 3vw, 48px);
+      color: #adbdc5;
+      background: var(--s2-orange);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .spectator2-shell .broadcast-strip span:first-child { color: #fff; }
+
+    .spectator2-shell .broadcast-strip .strip-rule {
+      height: 1px;
+      margin: 0 14px;
+      background: rgba(255,255,255,.5);
+      flex: 1;
+    }
+
+    .spectator2-shell .broadcast-strip .strip-code { color: rgba(255,255,255,.78); }
+
+    .spectator2-shell .header-main {
+      display: grid;
+      grid-template-columns: minmax(270px, .72fr) minmax(560px, 1.45fr);
+      gap: clamp(20px, 4vw, 72px);
+      align-items: end;
+      padding: 22px clamp(16px, 3vw, 48px) 24px;
+      background: rgba(6, 17, 29, .9);
+      border-bottom: 1px solid var(--s2-line);
+      backdrop-filter: blur(18px);
+    }
+
+    .spectator2-shell .brand-block {
+      display: block;
+      min-width: 0;
+    }
+
+    .spectator2-shell .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 7px;
+      color: var(--s2-lime);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+    }
+
+    .spectator2-shell .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--s2-lime);
+      box-shadow: 0 0 0 0 rgba(189, 220, 120, .55);
+      animation: s2-live 2s infinite;
+    }
+
+    .spectator2-shell .brand-block h1 {
+      margin: 0;
+      color: var(--s2-paper);
+      font-size: clamp(25px, 2.8vw, 42px);
+      font-weight: 900;
+      line-height: .95;
+      letter-spacing: -.045em;
+      white-space: normal;
+    }
+
+    .spectator2-shell .brand-block h1 em {
+      margin-left: .18em;
+      color: var(--s2-orange);
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 400;
+    }
+
+    .spectator2-shell .version-badge {
+      margin-left: 10px;
+      padding: 3px 7px;
+      transform: translateY(-2px);
+      border: 1px solid rgba(243, 239, 229, .2);
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      color: #b9cad1;
+      font-size: 10px;
+      letter-spacing: .04em;
+    }
+
+    .spectator2-shell .page-subtitle {
+      margin-top: 9px;
+      color: var(--s2-muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .08em;
+    }
+
+    .spectator2-shell #game-meta {
+      display: grid;
+      grid-template-columns: minmax(300px, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .spectator2-shell .toolbar-group {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+      gap: 6px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .spectator2-shell .primary-tools {
+      display: grid;
+      grid-template-columns: minmax(190px, 1fr) auto auto;
+    }
+
+    .spectator2-shell .game-picker {
+      position: relative;
+      display: flex;
+      min-width: 0;
+      max-width: none;
+      height: 44px;
+      align-items: center;
+      border: 1px solid rgba(243, 239, 229, .24);
+      border-radius: 3px;
+      background: rgba(255,255,255,.055);
+      box-shadow: none;
+    }
+
+    .spectator2-shell .game-picker::before {
+      width: 4px;
+      height: 20px;
+      margin-left: 12px;
+      border-radius: 0;
+      background: var(--s2-orange);
+      box-shadow: none;
+    }
+
+    .spectator2-shell .game-picker::after {
+      right: 15px;
+      width: 7px;
+      height: 7px;
+      border-color: var(--s2-paper);
+    }
+
+    .spectator2-shell .game-picker:focus-within {
+      border-color: var(--s2-orange);
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, .12);
+    }
+
+    .spectator2-shell #game-meta select,
+    .spectator2-shell #game-meta button {
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid rgba(243, 239, 229, .17);
+      border-radius: 3px;
+      background: rgba(255,255,255,.055);
+      color: #dce5e8;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .03em;
+      transition: background .2s ease, border-color .2s ease, transform .2s ease, color .2s ease;
+    }
+
+    .spectator2-shell #game-meta button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(243, 239, 229, .42);
+      background: rgba(255,255,255,.11);
+      color: #fff;
+    }
+
+    .spectator2-shell #game-meta .game-picker #game-picker-button {
+      width: 100%;
+      min-height: 42px;
+      padding: 8px 36px 8px 10px;
+      border: 0;
+      background: transparent;
+      color: var(--s2-paper);
+      font-size: 12px;
+      letter-spacing: .02em;
+    }
+
+    .spectator2-shell #game-meta .game-picker #game-picker-button:hover {
+      transform: none;
+      background: transparent;
+    }
+
+    .spectator2-shell #game-picker-menu {
+      top: calc(100% + 10px);
+      width: min(480px, calc(100vw - 32px));
+      max-height: 360px;
+      padding: 10px;
+      border: 1px solid rgba(243, 239, 229, .2);
+      border-radius: 6px;
+      background: #0c2031;
+      box-shadow: var(--s2-shadow);
+    }
+
+    .spectator2-shell .game-picker.open #game-picker-menu {
+      display: flex;
+      gap: 5px;
+      animation: s2-pop .18s ease-out;
+    }
+
+    .spectator2-shell #game-picker-menu .game-picker-option {
+      min-height: 0;
+      padding: 11px 12px;
+      border: 0;
+      border-left: 3px solid transparent;
+      border-radius: 2px;
+      background: rgba(255,255,255,.045);
+      color: var(--s2-paper);
+    }
+
+    .spectator2-shell #game-picker-menu .game-picker-option:hover,
+    .spectator2-shell #game-picker-menu .game-picker-option.active {
+      border-color: var(--s2-orange);
+      background: rgba(255, 107, 53, .12);
+    }
+
+    .spectator2-shell .game-picker-option .game-id { font-size: 12px; letter-spacing: .08em; }
+    .spectator2-shell .game-picker-option .game-meta-line { color: var(--s2-muted); }
+    .spectator2-shell .game-picker-option .phase-badge {
+      border: 1px solid rgba(189,220,120,.28);
+      border-radius: 2px;
+      background: rgba(189,220,120,.1);
+      color: var(--s2-lime);
+    }
+
+    .spectator2-shell #game-meta button.danger {
+      border-color: rgba(255,107,53,.5);
+      color: #ff9b76;
+    }
+
+    .spectator2-shell #game-meta button.danger:hover {
+      border-color: var(--s2-orange);
+      background: var(--s2-orange);
+      color: white;
+    }
+
+    .spectator2-shell #file-actions { white-space: nowrap; }
+    .spectator2-shell #file-actions button { min-height: 38px; padding: 8px 10px; }
+    .spectator2-shell #settings-wrap { margin-left: 0; }
+
+    .spectator2-shell #btn-settings {
+      width: 40px;
+      height: 40px;
+      min-height: 40px;
+      padding: 0;
+      border-radius: 50%;
+      font-size: 17px;
+    }
+
+    .spectator2-shell #status {
+      grid-column: 1 / -1;
+      min-height: 15px;
+      padding-left: 1px;
+      color: var(--s2-muted);
+      font-size: 10px;
+      letter-spacing: .08em;
+    }
+
+    /* 设置浮层 */
+    .spectator2-shell #settings-popover {
+      top: calc(100% + 10px);
+      min-width: 280px;
+      padding: 18px;
+      gap: 13px;
+      border: 1px solid rgba(243,239,229,.18);
+      border-radius: 6px;
+      background: #10283b;
+      box-shadow: var(--s2-shadow);
+    }
+
+    .spectator2-shell #settings-popover.open { animation: s2-pop .18s ease-out; }
+    .spectator2-shell #settings-popover label { color: #d6e0e4; }
+    .spectator2-shell #settings-popover .settings-divider { background: var(--s2-line); }
+
+    .spectator2-shell .slider {
+      border-radius: 2px;
+      background: rgba(255,255,255,.13);
+    }
+
+    .spectator2-shell .slider::before {
+      border-radius: 1px;
+      background: #91a1a9;
+    }
+
+    .spectator2-shell .toggle input:checked + .slider { background: var(--s2-orange); }
+    .spectator2-shell .toggle input:checked + .slider::before { background: white; }
+
+    .spectator2-shell #settings-popover input[type="number"],
+    .spectator2-shell #settings-popover .setting-field input[type="password"],
+    .spectator2-shell #settings-popover .setting-field input[type="text"] {
+      border: 1px solid rgba(243,239,229,.2);
+      border-radius: 2px;
+      background: rgba(0,0,0,.2);
+      color: var(--s2-paper);
+    }
+
+    .spectator2-shell #settings-popover .settings-action {
+      border: 1px solid var(--s2-orange);
+      border-radius: 2px;
+      background: transparent;
+      color: #ff9b76;
+    }
+
+    .spectator2-shell #settings-popover .settings-action:hover {
+      background: var(--s2-orange);
+      color: white;
+    }
+
+    /* 主舞台采用转播画面加情报栏的非对称布局 */
+    .spectator2-shell .spectator-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(310px, 370px);
+      grid-template-areas:
+        "stage intel"
+        "dispatch dispatch";
+      width: min(1880px, 100%);
+      min-height: 0;
+      margin: 0 auto;
+      padding: clamp(16px, 2.4vw, 38px) clamp(16px, 3vw, 48px) 48px;
+      gap: clamp(16px, 2vw, 30px);
+      align-items: start;
+    }
+
+    .spectator2-shell .board-column {
+      grid-area: stage;
+      min-width: 0;
+      animation: s2-rise .55s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .spectator2-shell .section-kicker {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: var(--s2-muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+
+    .spectator2-shell .section-kicker::after {
+      content: '';
+      height: 1px;
+      background: var(--s2-line);
+      flex: 1;
+    }
+
+    .spectator2-shell .board-frame {
+      position: relative;
+      padding: clamp(8px, 1.1vw, 16px);
+      overflow: hidden;
+      border: 1px solid rgba(243,239,229,.17);
+      border-radius: var(--s2-radius) var(--s2-radius) 0 0;
+      background: #d8d2bf;
+      box-shadow: var(--s2-shadow);
+    }
+
+    .spectator2-shell .board-frame::before,
+    .spectator2-shell .board-frame::after {
+      content: '';
+      position: absolute;
+      z-index: 3;
+      width: 42px;
+      height: 42px;
+      pointer-events: none;
+    }
+
+    .spectator2-shell .board-frame::before {
+      top: 7px;
+      left: 7px;
+      border-top: 2px solid var(--s2-orange);
+      border-left: 2px solid var(--s2-orange);
+    }
+
+    .spectator2-shell .board-frame::after {
+      right: 7px;
+      bottom: 7px;
+      border-right: 2px solid var(--s2-orange);
+      border-bottom: 2px solid var(--s2-orange);
+    }
+
+    .spectator2-shell #board-wrap {
+      position: relative;
+      display: flex;
+      width: 100%;
+      max-width: none;
+      overflow: hidden;
+      border: 0;
+      background: #d8d2bf;
+    }
+
+    .spectator2-shell #board {
+      display: block;
+      width: 100%;
+      max-width: none;
+      height: auto;
+      border: 0;
+      border-radius: 0;
+      background: #d8d2bf;
+      cursor: crosshair;
+      image-rendering: auto;
+    }
+
+    .spectator2-shell .scan-line {
+      position: absolute;
+      z-index: 2;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 2px;
+      pointer-events: none;
+      opacity: .42;
+      background: linear-gradient(90deg, transparent, var(--s2-orange) 30%, #fff 50%, var(--s2-orange) 70%, transparent);
+      box-shadow: 0 0 18px rgba(255,107,53,.5);
+      animation: s2-scan 7s linear infinite;
+    }
+
+    .spectator2-shell .cell-info {
+      right: 16px;
+      bottom: 16px;
+      z-index: 4;
+      padding: 7px 10px;
+      border: 1px solid rgba(243,239,229,.2);
+      border-radius: 2px;
+      background: rgba(6,17,29,.88);
+      color: #d8e2e5;
+      font: 700 11px "Cascadia Mono", Consolas, monospace;
+      backdrop-filter: blur(6px);
+    }
+
+    /* 回放控制台 */
+    .spectator2-shell #replay-controls {
+      display: grid;
+      grid-template-columns: auto minmax(160px, 1fr);
+      gap: 12px 20px;
+      align-items: center;
+      padding: 14px clamp(14px, 2vw, 24px) 16px;
+      border: 1px solid rgba(243,239,229,.17);
+      border-top: 0;
+      border-radius: 0 0 var(--s2-radius) var(--s2-radius);
+      background: var(--s2-paper);
+      color: var(--s2-ink);
+      box-shadow: var(--s2-shadow);
+    }
+
+    .spectator2-shell #control-buttons {
+      display: flex;
+      gap: 5px;
+      margin: 0;
+    }
+
+    .spectator2-shell #control-buttons button {
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(6,17,29,.2);
+      border-radius: 50%;
+      background: transparent;
+      color: var(--s2-navy);
+      font-size: 12px;
+      transition: transform .18s ease, background .18s ease, color .18s ease;
+    }
+
+    .spectator2-shell #control-buttons button:hover {
+      transform: scale(1.08);
+      border-color: var(--s2-navy);
+      background: var(--s2-navy);
+      color: white;
+    }
+
+    .spectator2-shell #control-buttons #btn-play {
+      width: 42px;
+      height: 42px;
+      border: 0;
+      background: var(--s2-orange);
+      color: white;
+      box-shadow: 0 6px 16px rgba(255,107,53,.28);
+    }
+
+    .spectator2-shell #control-buttons #btn-play.active {
+      background: var(--s2-navy);
+      animation: s2-play 1.4s infinite;
+    }
+
+    .spectator2-shell #speed-select {
+      height: 34px;
+      padding: 4px 7px;
+      border: 1px solid rgba(6,17,29,.2);
+      border-radius: 2px;
+      background: transparent;
+      color: var(--s2-navy);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .spectator2-shell #step-info {
+      margin-left: 5px;
+      color: #53636a;
+      font: 800 11px "Cascadia Mono", Consolas, monospace;
+      white-space: nowrap;
+    }
+
+    .spectator2-shell #timeline-wrap { height: 34px; }
+    .spectator2-shell #timeline { height: 28px; }
+
+    .spectator2-shell #timeline::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 0;
+      background: rgba(6,17,29,.18);
+    }
+
+    .spectator2-shell #timeline::-webkit-slider-thumb {
+      width: 14px;
+      height: 22px;
+      margin-top: -9px;
+      border: 3px solid var(--s2-paper);
+      border-radius: 1px;
+      background: var(--s2-orange);
+      box-shadow: 0 0 0 1px var(--s2-orange);
+    }
+
+    .spectator2-shell #timeline::-moz-range-track {
+      height: 4px;
+      border-radius: 0;
+      background: rgba(6,17,29,.18);
+    }
+
+    .spectator2-shell #timeline::-moz-range-thumb {
+      width: 10px;
+      height: 18px;
+      border: 3px solid var(--s2-paper);
+      border-radius: 1px;
+      background: var(--s2-orange);
+      box-shadow: 0 0 0 1px var(--s2-orange);
+    }
+
+    .spectator2-shell #timeline-markers { top: 3px; }
+    .spectator2-shell #timeline-markers .marker { top: 8px; width: 2px; height: 10px; opacity: .6; }
+
+    /* 右侧实时情报栏 */
+    .spectator2-shell #sidebar {
+      grid-area: intel;
+      position: sticky;
+      top: 18px;
+      display: grid;
+      width: auto;
+      max-height: calc(100vh - 36px);
+      gap: 12px;
+      overflow-y: auto;
+      padding-right: 4px;
+      animation: s2-rise .55s .1s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .spectator2-shell #sidebar section,
+    .spectator2-shell #selection-panel {
+      position: relative;
+      width: auto;
+      padding: 18px;
+      border: 1px solid var(--s2-line);
+      border-radius: 4px;
+      background: rgba(16,40,59,.82);
+      box-shadow: 0 12px 30px rgba(0,0,0,.13);
+      backdrop-filter: blur(10px);
+    }
+
+    .spectator2-shell #sidebar section::before,
+    .spectator2-shell #selection-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 34px;
+      height: 2px;
+      background: var(--s2-orange);
+    }
+
+    .spectator2-shell #turn-info:empty::after,
+    .spectator2-shell #resources:empty::after,
+    .spectator2-shell #score-panel:empty::after {
+      display: block;
+      color: #8298a2;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .spectator2-shell #turn-info:empty::after { content: '回合数据  ·  等待接入对局'; }
+    .spectator2-shell #resources:empty::after { content: '资源态势  ·  等待接入对局'; }
+    .spectator2-shell #score-panel:empty::after { content: '积分排行  ·  等待接入对局'; }
+
+    .spectator2-shell #sidebar h3,
+    .spectator2-shell .panel-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 13px;
+      color: #b9c9d0;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .spectator2-shell #turn-info { order: 1; }
+    .spectator2-shell #resources { order: 2; }
+    .spectator2-shell #score-panel { order: 3; }
+    .spectator2-shell #selection-panel { order: 4; }
+
+    .spectator2-shell #selection-detail {
+      color: var(--s2-muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .spectator2-shell .resource-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
+
+    .spectator2-shell .resource-card,
+    .spectator2-shell .score-row,
+    .spectator2-shell .turn-card,
+    .spectator2-shell .sel-stat-card {
+      border: 0;
+      border-radius: 2px;
+      background: rgba(3,14,24,.44);
+    }
+
+    .spectator2-shell .resource-card {
+      padding: 10px;
+      border-top: 2px solid #6f8793;
+    }
+
+    .spectator2-shell .resource-card.player-a { border-top-color: #66ccff; }
+    .spectator2-shell .resource-card.player-b { border-top-color: #ff9966; }
+    .spectator2-shell .resource-card.player-c { border-top-color: #9fdf6f; }
+    .spectator2-shell .resource-card.player-d { border-top-color: #d98cff; }
+    .spectator2-shell .resource-card.player-e { border-top-color: #ffd166; }
+    .spectator2-shell .resource-card.player-f { border-top-color: #72e0d1; }
+    .spectator2-shell .resource-card.player-g { border-top-color: #f27a9a; }
+    .spectator2-shell .resource-card.player-h { border-top-color: #a7b7ff; }
+
+    .spectator2-shell .resource-card span { color: #91a6af; font-size: 10px; }
+    .spectator2-shell .resource-card strong { color: var(--s2-paper); font-size: 22px; }
+    .spectator2-shell .resource-card em { color: #738b96; }
+
+    .spectator2-shell .turn-card {
+      padding: 15px;
+      border-left: 4px solid #6f8793;
+      background: linear-gradient(105deg, rgba(255,255,255,.07), rgba(255,255,255,.015));
+    }
+
+    .spectator2-shell .turn-head {
+      display: grid;
+      grid-template-columns: auto minmax(0,1fr);
+      align-items: end;
+      gap: 14px;
+    }
+
+    .spectator2-shell .turn-count {
+      color: var(--s2-paper);
+      font-size: 34px;
+      text-shadow: none;
+    }
+
+    .spectator2-shell .turn-player { padding-bottom: 3px; text-align: right; }
+    .spectator2-shell .turn-meta { border-color: var(--s2-line); color: #8fa4ad; }
+    .spectator2-shell .turn-meta strong { color: var(--s2-lime); }
+
+    .spectator2-shell .score-row {
+      margin-top: 6px;
+      padding: 10px;
+      border-left: 2px solid #667f8b;
+    }
+
+    .spectator2-shell .score-rank {
+      min-width: 28px;
+      height: 20px;
+      border: 0;
+      border-radius: 2px;
+      background: var(--s2-orange-soft);
+      color: #ff9c78;
+    }
+
+    .spectator2-shell .score-row-head strong { color: var(--s2-paper); }
+    .spectator2-shell .score-breakdown { color: #79909b; }
+
+    .spectator2-shell .player-name { color: inherit; }
+    .spectator2-shell .sel-card { gap: 10px; }
+    .spectator2-shell .sel-card + .sel-card { border-color: var(--s2-line); }
+
+    .spectator2-shell .visual-token,
+    .spectator2-shell .sel-token {
+      border-radius: 50%;
+      background: rgba(255,255,255,.06);
+    }
+
+    .spectator2-shell .sel-type { color: var(--s2-paper); }
+    .spectator2-shell .sel-owner { color: #869ca6; }
+    .spectator2-shell .sel-hp-bar { height: 5px; border: 0; border-radius: 0; }
+    .spectator2-shell .sel-hp-fill { border-radius: 0; }
+    .spectator2-shell .sel-stat-grid { gap: 5px; }
+    .spectator2-shell .sel-stat-card { padding: 7px; }
+    .spectator2-shell .sel-stat-card span { color: #708994; }
+    .spectator2-shell .sel-stat-card strong { color: var(--s2-paper); }
+
+    /* 底部战报台 */
+    .spectator2-shell .dispatch-desk {
+      grid-area: dispatch;
+      display: grid;
+      grid-template-columns: minmax(260px, .75fr) minmax(420px, 1.65fr);
+      gap: 1px;
+      overflow: hidden;
+      border: 1px solid var(--s2-line);
+      border-radius: var(--s2-radius);
+      background: var(--s2-line);
+      box-shadow: var(--s2-shadow);
+      animation: s2-rise .55s .18s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .spectator2-shell .dispatch-desk section {
+      min-width: 0;
+      padding: 20px;
+      background: #0d2233;
+    }
+
+    .spectator2-shell .dispatch-desk h3 {
+      margin: 0 0 13px;
+      color: #b9c9d0;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .spectator2-shell #event-detail {
+      border: 0;
+      border-radius: 0;
+      background: #122c40;
+    }
+
+    .spectator2-shell #detail-content {
+      max-height: 220px;
+      color: #cbd7db;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .spectator2-shell #detail-content .ev-type { border-radius: 2px; }
+    .spectator2-shell #detail-content .ev-payload {
+      margin-top: 9px;
+      padding: 10px;
+      border-left: 2px solid var(--s2-orange);
+      border-radius: 0;
+      background: rgba(0,0,0,.2);
+      color: #9fb1b8;
+    }
+
+    .spectator2-shell #events {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(190px, 240px);
+      gap: 7px;
+      max-height: none;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0 0 8px;
+      font-family: "Cascadia Mono", Consolas, monospace;
+    }
+
+    .spectator2-shell #events li {
+      min-height: 62px;
+      margin: 0;
+      padding: 12px;
+      border: 1px solid rgba(243,239,229,.11);
+      border-top: 3px solid #3a5a7a;
+      border-left-width: 1px;
+      border-radius: 2px;
+      background: rgba(0,0,0,.16);
+      color: #8fa5ae;
+      line-height: 1.5;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .spectator2-shell #events li:hover {
+      transform: translateY(-2px);
+      background: rgba(255,255,255,.055);
+    }
+
+    .spectator2-shell #events li.active {
+      border-color: var(--s2-orange);
+      border-top-color: var(--s2-orange);
+      background: var(--s2-orange-soft);
+      color: #ffd7c8;
+      animation: s2-event .25s ease-out;
+    }
+
+    .spectator2-shell #events li[data-type="attack"],
+    .spectator2-shell #events li[data-type="unit_death"],
+    .spectator2-shell #events li[data-type="headquarters_destroyed"] { border-top-color: #e36b66; }
+    .spectator2-shell #events li[data-type="move"] { border-top-color: #70a5d8; }
+    .spectator2-shell #events li[data-type="deploy"] { border-top-color: #e2b85e; }
+    .spectator2-shell #events li[data-type="control_point_captured"] { border-top-color: #75bd8d; }
+    .spectator2-shell #events li[data-type="income"] { border-top-color: #d09a65; }
+    .spectator2-shell #events li[data-type="heal"] { border-top-color: #95c977; }
+
+    /* 右栏与底部统一为战术档案纸主题 */
+    .spectator2-shell #sidebar section,
+    .spectator2-shell #selection-panel {
+      border-color: rgba(20,37,50,.48);
+      border-radius: 3px;
+      background:
+        linear-gradient(rgba(20,37,50,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(20,37,50,.035) 1px, transparent 1px),
+        #e7e2d1;
+      background-size: 22px 22px, 22px 22px, auto;
+      color: #142532;
+      box-shadow: 8px 10px 0 rgba(0,0,0,.12);
+      backdrop-filter: none;
+    }
+
+    .spectator2-shell #sidebar section::before,
+    .spectator2-shell #selection-panel::before {
+      top: -1px;
+      left: 16px;
+      width: 52px;
+      height: 5px;
+      background: var(--s2-orange);
+    }
+
+    .spectator2-shell #turn-info:empty::after,
+    .spectator2-shell #resources:empty::after,
+    .spectator2-shell #score-panel:empty::after {
+      color: rgba(20,37,50,.58);
+    }
+
+    .spectator2-shell #sidebar h3,
+    .spectator2-shell .panel-heading {
+      margin-bottom: 14px;
+      padding-bottom: 9px;
+      border-bottom: 1px dashed rgba(20,37,50,.28);
+      color: #142532;
+    }
+
+    .spectator2-shell #sidebar h3::before,
+    .spectator2-shell .panel-heading::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      flex: 0 0 7px;
+      background: var(--s2-orange);
+      transform: rotate(45deg);
+    }
+
+    .spectator2-shell #selection-detail {
+      color: rgba(20,37,50,.7);
+    }
+
+    .spectator2-shell .resource-grid { gap: 8px; }
+
+    .spectator2-shell .resource-card {
+      padding: 10px 9px;
+      border: 1px solid rgba(20,37,50,.2);
+      border-left: 4px solid #71808a;
+      border-radius: 1px;
+      background: rgba(255,255,255,.28);
+    }
+
+    .spectator2-shell .resource-card.player-a { border-top-color: rgba(20,37,50,.2); border-left-color: #168db8; }
+    .spectator2-shell .resource-card.player-b { border-top-color: rgba(20,37,50,.2); border-left-color: #d96336; }
+    .spectator2-shell .resource-card.player-c { border-top-color: rgba(20,37,50,.2); border-left-color: #719c3a; }
+    .spectator2-shell .resource-card.player-d { border-top-color: rgba(20,37,50,.2); border-left-color: #a968c5; }
+    .spectator2-shell .resource-card.player-e { border-top-color: rgba(20,37,50,.2); border-left-color: #c89423; }
+    .spectator2-shell .resource-card.player-f { border-top-color: rgba(20,37,50,.2); border-left-color: #36998e; }
+    .spectator2-shell .resource-card.player-g { border-top-color: rgba(20,37,50,.2); border-left-color: #c85172; }
+    .spectator2-shell .resource-card.player-h { border-top-color: rgba(20,37,50,.2); border-left-color: #6778c5; }
+
+    .spectator2-shell .resource-card span { color: rgba(20,37,50,.64); }
+    .spectator2-shell .resource-card strong { color: #142532; }
+    .spectator2-shell .resource-card em { color: rgba(20,37,50,.52); }
+
+    .spectator2-shell .turn-card {
+      border: 1px solid rgba(20,37,50,.24);
+      border-left: 5px solid #71808a;
+      border-radius: 1px;
+      background: rgba(255,255,255,.3);
+      box-shadow: inset 0 -1px 0 rgba(20,37,50,.08);
+    }
+
+    .spectator2-shell .turn-card.player-a { border-left-color: #168db8; }
+    .spectator2-shell .turn-card.player-b { border-left-color: #d96336; }
+    .spectator2-shell .turn-card.player-c { border-left-color: #719c3a; }
+    .spectator2-shell .turn-card.player-d { border-left-color: #a968c5; }
+    .spectator2-shell .turn-card.player-e { border-left-color: #c89423; }
+    .spectator2-shell .turn-card.player-f { border-left-color: #36998e; }
+    .spectator2-shell .turn-card.player-g { border-left-color: #c85172; }
+    .spectator2-shell .turn-card.player-h { border-left-color: #6778c5; }
+
+    .spectator2-shell .turn-count { color: #142532; }
+    .spectator2-shell .turn-player { color: rgba(20,37,50,.72); }
+    .spectator2-shell .turn-meta {
+      border-color: rgba(20,37,50,.2);
+      color: rgba(20,37,50,.62);
+    }
+    .spectator2-shell .turn-meta strong { color: #506d25; }
+    .spectator2-shell .result-note { color: #a14d28; }
+
+    .spectator2-shell .score-row {
+      border: 1px solid rgba(20,37,50,.18);
+      border-left: 3px solid #71808a;
+      border-radius: 1px;
+      background: rgba(255,255,255,.2);
+    }
+
+    .spectator2-shell .score-row.player-a { border-left-color: #168db8; }
+    .spectator2-shell .score-row.player-b { border-left-color: #d96336; }
+    .spectator2-shell .score-row.player-c { border-left-color: #719c3a; }
+    .spectator2-shell .score-row.player-d { border-left-color: #a968c5; }
+    .spectator2-shell .score-row.player-e { border-left-color: #c89423; }
+    .spectator2-shell .score-row.player-f { border-left-color: #36998e; }
+    .spectator2-shell .score-row.player-g { border-left-color: #c85172; }
+    .spectator2-shell .score-row.player-h { border-left-color: #6778c5; }
+
+    .spectator2-shell .score-rank {
+      background: #142532;
+      color: #f6f1e4;
+    }
+
+    .spectator2-shell .score-row-head strong { color: #142532; }
+    .spectator2-shell .score-breakdown { color: rgba(20,37,50,.58); }
+    .spectator2-shell .score-empty,
+    .spectator2-shell .resource-empty { color: rgba(20,37,50,.56); }
+
+    .spectator2-shell #sidebar .player-name.player-a,
+    .spectator2-shell #selection-panel .player-name.player-a,
+    .spectator2-shell #selection-panel .sel-owner.player-a { color: #0879a2; }
+    .spectator2-shell #sidebar .player-name.player-b,
+    .spectator2-shell #selection-panel .player-name.player-b,
+    .spectator2-shell #selection-panel .sel-owner.player-b { color: #ba4d23; }
+    .spectator2-shell #sidebar .player-name.player-c,
+    .spectator2-shell #selection-panel .player-name.player-c,
+    .spectator2-shell #selection-panel .sel-owner.player-c { color: #557e27; }
+    .spectator2-shell #sidebar .player-name.player-d,
+    .spectator2-shell #selection-panel .player-name.player-d,
+    .spectator2-shell #selection-panel .sel-owner.player-d { color: #8c4dad; }
+    .spectator2-shell #sidebar .player-name.player-e,
+    .spectator2-shell #selection-panel .player-name.player-e,
+    .spectator2-shell #selection-panel .sel-owner.player-e { color: #9c6b08; }
+    .spectator2-shell #sidebar .player-name.player-f,
+    .spectator2-shell #selection-panel .player-name.player-f,
+    .spectator2-shell #selection-panel .sel-owner.player-f { color: #197f75; }
+    .spectator2-shell #sidebar .player-name.player-g,
+    .spectator2-shell #selection-panel .player-name.player-g,
+    .spectator2-shell #selection-panel .sel-owner.player-g { color: #a63858; }
+    .spectator2-shell #sidebar .player-name.player-h,
+    .spectator2-shell #selection-panel .player-name.player-h,
+    .spectator2-shell #selection-panel .sel-owner.player-h { color: #4d5fac; }
+
+    .spectator2-shell #selection-panel .sel-card + .sel-card {
+      border-color: rgba(20,37,50,.2);
+    }
+
+    .spectator2-shell #selection-panel .visual-token,
+    .spectator2-shell #selection-panel .sel-token {
+      background: rgba(255,255,255,.42);
+      box-shadow: 3px 3px 0 rgba(20,37,50,.12);
+    }
+
+    .spectator2-shell #selection-panel .sel-type,
+    .spectator2-shell #selection-panel .sel-hp-label strong { color: #142532; }
+    .spectator2-shell #selection-panel .sel-owner,
+    .spectator2-shell #selection-panel .sel-hp-label,
+    .spectator2-shell #selection-panel .sel-coord,
+    .spectator2-shell #selection-panel .sel-note { color: rgba(20,37,50,.58); }
+    .spectator2-shell #selection-panel .sel-hp-bar { background: rgba(20,37,50,.16); }
+    .spectator2-shell #selection-panel .sel-stat-card {
+      border: 1px solid rgba(20,37,50,.16);
+      background: rgba(255,255,255,.3);
+    }
+    .spectator2-shell #selection-panel .sel-stat-card span { color: rgba(20,37,50,.54); }
+    .spectator2-shell #selection-panel .sel-stat-card strong { color: #142532; }
+
+    .spectator2-shell .dispatch-desk {
+      gap: 0;
+      border: 1px solid rgba(20,37,50,.62);
+      border-top: 6px solid var(--s2-orange);
+      border-radius: 3px;
+      background: #d0cbb9;
+      box-shadow: 10px 12px 0 rgba(0,0,0,.16);
+    }
+
+    .spectator2-shell .dispatch-desk section {
+      background:
+        repeating-linear-gradient(0deg, transparent 0 25px, rgba(20,37,50,.055) 25px 26px),
+        #e7e2d1;
+      color: #142532;
+    }
+
+    .spectator2-shell .dispatch-desk h3 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(20,37,50,.28);
+      color: #142532;
+    }
+
+    .spectator2-shell .dispatch-desk h3::before {
+      content: '';
+      width: 18px;
+      height: 5px;
+      background: var(--s2-orange);
+    }
+
+    .spectator2-shell #event-detail {
+      border-right: 1px dashed rgba(20,37,50,.36);
+      background:
+        linear-gradient(135deg, rgba(20,37,50,.035) 25%, transparent 25%) 0 0 / 12px 12px,
+        #dcd7c6;
+    }
+
+    .spectator2-shell #detail-content {
+      color: #243946;
+    }
+
+    .spectator2-shell #detail-content .ev-payload {
+      border: 1px solid rgba(20,37,50,.2);
+      border-left: 4px solid var(--s2-orange);
+      background: rgba(255,255,255,.3);
+      color: rgba(20,37,50,.7);
+    }
+
+    .spectator2-shell #events li {
+      border: 1px solid rgba(20,37,50,.24);
+      border-top: 4px solid #596e78;
+      border-left-width: 1px;
+      border-radius: 1px;
+      background: rgba(255,255,255,.32);
+      color: rgba(20,37,50,.72);
+      box-shadow: 3px 3px 0 rgba(20,37,50,.09);
+    }
+
+    .spectator2-shell #events li:hover {
+      background: #f3eee0;
+      color: #142532;
+      box-shadow: 5px 5px 0 rgba(20,37,50,.13);
+    }
+
+    .spectator2-shell #events li.active {
+      border-color: #142532;
+      border-top-color: var(--s2-orange);
+      background: #142532;
+      color: #f6f1e4;
+      box-shadow: 5px 5px 0 rgba(255,107,53,.25);
+    }
+
+    .spectator2-shell #sidebar::-webkit-scrollbar-track,
+    .spectator2-shell #events::-webkit-scrollbar-track { background: rgba(231,226,209,.55); }
+    .spectator2-shell #sidebar::-webkit-scrollbar-thumb,
+    .spectator2-shell #events::-webkit-scrollbar-thumb { background: rgba(20,37,50,.45); }
+
+    .spectator2-shell ::-webkit-scrollbar { width: 7px; height: 7px; }
+    .spectator2-shell ::-webkit-scrollbar-track { background: rgba(0,0,0,.18); }
+    .spectator2-shell ::-webkit-scrollbar-thumb { border-radius: 0; background: #3e5866; }
+    .spectator2-shell ::-webkit-scrollbar-thumb:hover { background: var(--s2-orange); }
+
+    @keyframes s2-live {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(189,220,120,.48); }
+      50% { box-shadow: 0 0 0 7px rgba(189,220,120,0); }
+    }
+
+    @keyframes s2-pop {
+      from { opacity: 0; transform: translateY(-6px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes s2-rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes s2-scan {
+      0% { top: 1%; opacity: 0; }
+      8%, 88% { opacity: .38; }
+      100% { top: 99%; opacity: 0; }
+    }
+
+    @keyframes s2-play {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(6,17,29,.25); }
+      50% { box-shadow: 0 0 0 8px rgba(6,17,29,0); }
+    }
+
+    @keyframes s2-event {
+      from { transform: translateY(4px); }
+      to { transform: translateY(0); }
+    }
+
+    @media (max-width: 1180px) {
+      .spectator2-shell .header-main {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+
+      .spectator2-shell .spectator-main {
+        grid-template-columns: 1fr;
+        grid-template-areas: "stage" "intel" "dispatch";
+      }
+
+      .spectator2-shell #sidebar {
+        position: static;
+        grid-template-columns: repeat(2, minmax(0,1fr));
+        max-height: none;
+        padding-right: 0;
+      }
+
+      .spectator2-shell #selection-panel { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 760px) {
+      .spectator2-shell .broadcast-strip { padding: 0 14px; }
+      .spectator2-shell .header-main { padding: 18px 14px; gap: 18px; }
+      .spectator2-shell .page-subtitle { line-height: 1.5; }
+
+      .spectator2-shell #game-meta {
+        grid-template-columns: 1fr auto;
+      }
+
+      .spectator2-shell .primary-tools {
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(0,1fr) auto auto;
+        width: 100%;
+      }
+
+      .spectator2-shell #file-actions { width: auto; }
+      .spectator2-shell .spectator-main { display: grid; padding: 16px 12px 30px; }
+      .spectator2-shell .board-frame { padding: 6px; border-radius: 10px 10px 0 0; }
+
+      .spectator2-shell #replay-controls {
+        grid-template-columns: 1fr;
+        border-radius: 0 0 10px 10px;
+      }
+
+      .spectator2-shell #control-buttons { justify-content: center; flex-wrap: wrap; }
+      .spectator2-shell #step-info { margin-left: auto; }
+      .spectator2-shell #sidebar { grid-template-columns: 1fr; }
+      .spectator2-shell #selection-panel { grid-column: auto; }
+
+      .spectator2-shell .dispatch-desk {
+        grid-template-columns: 1fr;
+        border-radius: 10px;
+      }
+
+      .spectator2-shell #events { grid-auto-columns: minmax(170px, 78vw); }
+    }
+
+    @media (max-width: 480px) {
+      .spectator2-shell .brand-block h1 { font-size: 27px; }
+      .spectator2-shell .primary-tools { grid-template-columns: 1fr auto; }
+      .spectator2-shell .game-picker { grid-column: 1 / -1; }
+      .spectator2-shell #file-actions button { padding-inline: 8px; }
+      .spectator2-shell #sidebar section,
+      .spectator2-shell #selection-panel,
+      .spectator2-shell .dispatch-desk section { padding: 15px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .spectator2-shell *,
+      .spectator2-shell *::before,
+      .spectator2-shell *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body class="spectator2-shell">
+  <header class="broadcast-header">
+    <div class="broadcast-strip" aria-hidden="true">
+      <span>Live tactical broadcast</span>
+      <span class="strip-rule"></span>
+      <span class="strip-code">TG // OBS-02</span>
+    </div>
+    <div class="header-main">
+      <div class="brand-block">
+        <div class="eyebrow"><span class="live-dot"></span>战局实时接入</div>
+        <h1>战场观察室<em>Live</em><span class="version-badge"></span></h1>
+        <div class="page-subtitle">全域棋盘、战况数据与行动记录同步播报</div>
+      </div>
+      <div id="game-meta" aria-label="观战工具栏">
+        <span class="toolbar-group primary-tools">
+          <span class="game-picker">
+            <select id="game-select" class="native-game-select" tabindex="-1" aria-hidden="true"><option value="">-- 选择对局 --</option></select>
+            <button id="game-picker-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span id="game-picker-label">-- 选择对局 --</span>
+            </button>
+            <div id="game-picker-menu" role="listbox" aria-label="选择对局"></div>
+          </span>
+          <button id="refresh-list" type="button">刷新</button>
+          <button id="delete-game" class="danger" type="button" title="删除当前对局">删除</button>
+          <span id="status" role="status" aria-live="polite"></span>
+        </span>
+        <span id="file-actions" class="toolbar-group file-tools">
+          <button id="btn-export-json" type="button" title="导出为 JSON 文件">导出</button>
+          <button id="btn-import" type="button" title="从 JSON 文件导入对局">导入</button>
+          <input type="file" id="import-file" accept=".json" hidden />
+        </span>
+        <div id="settings-wrap" class="toolbar-group settings-tools">
+          <button id="btn-settings" type="button" title="设置" aria-label="打开观战设置">⚙</button>
+          <div id="settings-popover">
+            <label class="toggle-row">
+              <span>自动刷新</span>
+              <span class="toggle"><input type="checkbox" id="auto-refresh" checked /><span class="slider"></span></span>
+            </label>
+            <label class="setting-row">
+              刷新间隔 <input type="number" id="refresh-interval" min="1" max="60" value="5" /> 秒
+            </label>
+            <label class="toggle-row">
+              <span>跟随最新</span>
+              <span class="toggle"><input type="checkbox" id="follow-latest" /><span class="slider"></span></span>
+            </label>
+            <div class="settings-divider"></div>
+            <label class="setting-field">
+              <span>Control token</span>
+              <input id="settings-control-token" type="password" placeholder="Control token" autocomplete="off" />
+            </label>
+            <button id="btn-save-control-token" type="button" class="settings-action">保存 Token</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="spectator-main">
+    <section class="board-column" aria-label="战术棋盘与回放控制">
+      <div class="section-kicker">Operational map / 全域战术图</div>
+      <div class="board-frame">
+        <div id="board-wrap">
+          <canvas id="board" width="840" height="840"></canvas>
+          <div class="scan-line" aria-hidden="true"></div>
+          <div id="cell-info" class="cell-info"></div>
+        </div>
+      </div>
+      <div id="replay-controls">
+        <div id="control-buttons">
+          <button id="btn-start" type="button" title="回到开始" aria-label="回到开始">⏮</button>
+          <button id="btn-prev" type="button" title="上一步（左方向键）" aria-label="上一步">◀</button>
+          <button id="btn-play" type="button" title="播放或暂停（空格键）" aria-label="播放或暂停">▶</button>
+          <button id="btn-next" type="button" title="下一步（右方向键）" aria-label="下一步">▶</button>
+          <button id="btn-end" type="button" title="跳到末尾" aria-label="跳到末尾">⏭</button>
+          <select id="speed-select" title="播放速度" aria-label="播放速度">
+            <option value="1000">0.5x</option>
+            <option value="500" selected>1x</option>
+            <option value="200">2.5x</option>
+            <option value="100">5x</option>
+            <option value="50">10x</option>
+          </select>
+          <span id="step-info">0 / 0</span>
+        </div>
+        <div id="timeline-wrap">
+          <input type="range" id="timeline" min="0" max="0" value="0" aria-label="回放时间轴" />
+          <div id="timeline-markers"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside id="sidebar" aria-label="实时战场情报">
+      <section id="turn-info"></section>
+      <section id="resources"></section>
+      <section id="score-panel"></section>
+      <section id="selection-panel">
+        <h2 class="panel-heading">目标情报</h2>
+        <div id="selection-detail">点击或悬停棋盘，查看单位、总部或据点信息</div>
+      </section>
+    </aside>
+
+    <section class="dispatch-desk" aria-label="行动战报">
+      <section id="event-detail">
+        <h3>当前行动 / Active dispatch</h3>
+        <div id="detail-content">选择对局后使用时间轴回放</div>
+      </section>
+      <section id="event-log">
+        <h3>事件流 / Timeline feed</h3>
+        <ul id="events"></ul>
+      </section>
+    </section>
+  </main>
+
+  <script src="/version.js"></script>
+  <script src="/app.js?v=3.1.0"></script>
+  <script>
+    /* 第二版观战页专属棋盘渲染，不影响原观战页 */
+    (() => {
+      const MAP_COLORS = {
+        background: '#c8c3b0',
+        plainA: '#e5e0cf',
+        plainB: '#dad6c4',
+        plainLine: '#a8aa9f',
+        water: '#2f6070',
+        waterLine: '#75a4ad',
+        blocker: '#29333a',
+        blockerLine: '#59646a',
+        ink: '#142532',
+        paper: '#f6f1e4',
+        signal: '#ff6b35',
+        neutral: '#d69d3b',
+      };
+
+      function mapHexPath(q, r, inset = 2) {
+        const points = hexCorners(q, r, inset);
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.closePath();
+      }
+
+      function drawMapBackdrop() {
+        ctx.fillStyle = MAP_COLORS.background;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(20,37,50,.075)';
+        ctx.lineWidth = 1;
+        for (let x = -canvas.height; x < canvas.width; x += 38) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x + canvas.height, canvas.height);
+          ctx.stroke();
+        }
+
+        const rings = [70, 115, 165, 220];
+        const anchors = [
+          [canvas.width * .18, canvas.height * .24],
+          [canvas.width * .78, canvas.height * .68],
+        ];
+        ctx.strokeStyle = 'rgba(20,37,50,.09)';
+        for (const [x, y] of anchors) {
+          for (const radius of rings) {
+            ctx.beginPath();
+            ctx.ellipse(x, y, radius * 1.2, radius * .72, -.22, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
+
+      function drawEmptyMapState() {
+        drawMapBackdrop();
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.strokeStyle = 'rgba(20,37,50,.28)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(0, 0, 82, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(-105, 0); ctx.lineTo(-40, 0);
+        ctx.moveTo(40, 0); ctx.lineTo(105, 0);
+        ctx.moveTo(0, -105); ctx.lineTo(0, -40);
+        ctx.moveTo(0, 40); ctx.lineTo(0, 105);
+        ctx.stroke();
+        ctx.fillStyle = MAP_COLORS.ink;
+        ctx.textAlign = 'center';
+        ctx.font = '900 15px "Cascadia Mono", Consolas, monospace';
+        ctx.fillText('AWAITING MATCH FEED', 0, -3);
+        ctx.fillStyle = 'rgba(20,37,50,.58)';
+        ctx.font = '700 11px "Microsoft YaHei", sans-serif';
+        ctx.fillText('等待接入对局数据', 0, 18);
+        ctx.restore();
+      }
+
+      function drawWaterTexture(cell) {
+        const p = hexToPixel(cell.q, cell.r);
+        ctx.save();
+        mapHexPath(cell.q, cell.r, 3);
+        ctx.clip();
+        ctx.strokeStyle = MAP_COLORS.waterLine;
+        ctx.globalAlpha = .42;
+        ctx.lineWidth = 1;
+        for (let y = p.y - 17; y <= p.y + 17; y += 7) {
+          ctx.beginPath();
+          ctx.moveTo(p.x - 25, y);
+          ctx.bezierCurveTo(p.x - 13, y - 4, p.x - 4, y + 4, p.x + 7, y);
+          ctx.bezierCurveTo(p.x + 16, y - 4, p.x + 21, y + 2, p.x + 27, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawBlockerTexture(cell) {
+        const p = hexToPixel(cell.q, cell.r);
+        ctx.save();
+        mapHexPath(cell.q, cell.r, 3);
+        ctx.clip();
+        ctx.strokeStyle = MAP_COLORS.blockerLine;
+        ctx.globalAlpha = .55;
+        ctx.lineWidth = 3;
+        for (let offset = -38; offset <= 38; offset += 11) {
+          ctx.beginPath();
+          ctx.moveTo(p.x - 32 + offset, p.y + 27);
+          ctx.lineTo(p.x + 4 + offset, p.y - 27);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawTerrainCell(cell) {
+        const parity = Math.abs(cell.q * 3 + cell.r) % 2;
+        mapHexPath(cell.q, cell.r, 2.2);
+        if (cell.terrain === 'water') ctx.fillStyle = MAP_COLORS.water;
+        else if (cell.terrain === 'blocker') ctx.fillStyle = MAP_COLORS.blocker;
+        else ctx.fillStyle = parity ? MAP_COLORS.plainA : MAP_COLORS.plainB;
+        ctx.fill();
+
+        ctx.strokeStyle = cell.terrain === 'plain' || !cell.terrain
+          ? MAP_COLORS.plainLine
+          : 'rgba(246,241,228,.34)';
+        ctx.lineWidth = .9;
+        ctx.stroke();
+
+        if (cell.terrain === 'water') drawWaterTexture(cell);
+        if (cell.terrain === 'blocker') drawBlockerTexture(cell);
+
+        if ((cell.q === 0 || cell.r === 0) && (Math.abs(cell.q + cell.r) % 3 === 0)) {
+          const p = hexToPixel(cell.q, cell.r);
+          ctx.fillStyle = cell.terrain === 'water' || cell.terrain === 'blocker'
+            ? 'rgba(246,241,228,.45)'
+            : 'rgba(20,37,50,.35)';
+          ctx.font = '700 6px "Cascadia Mono", Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${cell.q}:${cell.r}`, p.x, p.y + 18);
+        }
+      }
+
+      function drawSegmentHealth(x, y, width, hp, maxHp, segments = 5) {
+        if (!maxHp) return;
+        const ratio = Math.max(0, Math.min(1, hp / maxHp));
+        const active = Math.ceil(ratio * segments);
+        const gap = 2;
+        const segmentWidth = (width - gap * (segments - 1)) / segments;
+        const tone = ratio > .5 ? '#527b4e' : ratio > .25 ? '#c28635' : '#c44d3e';
+
+        ctx.save();
+        for (let i = 0; i < segments; i++) {
+          ctx.fillStyle = i < active ? tone : 'rgba(20,37,50,.18)';
+          ctx.fillRect(x - width / 2 + i * (segmentWidth + gap), y, segmentWidth, 3);
+        }
+        ctx.restore();
+      }
+
+      function traceChamferedToken(x, y, width = 34, height = 26) {
+        const cut = 5;
+        ctx.beginPath();
+        ctx.moveTo(x - width / 2 + cut, y - height / 2);
+        ctx.lineTo(x + width / 2 - cut, y - height / 2);
+        ctx.lineTo(x + width / 2, y - height / 2 + cut);
+        ctx.lineTo(x + width / 2, y + height / 2 - cut);
+        ctx.lineTo(x + width / 2 - cut, y + height / 2);
+        ctx.lineTo(x - width / 2 + cut, y + height / 2);
+        ctx.lineTo(x - width / 2, y + height / 2 - cut);
+        ctx.lineTo(x - width / 2, y - height / 2 + cut);
+        ctx.closePath();
+      }
+
+      function drawMilitaryGlyph(type, x, y) {
+        ctx.save();
+        ctx.strokeStyle = MAP_COLORS.paper;
+        ctx.fillStyle = MAP_COLORS.paper;
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+
+        switch (type) {
+          case 'infantry':
+            ctx.moveTo(x - 7, y - 6); ctx.lineTo(x + 7, y + 6);
+            ctx.moveTo(x + 7, y - 6); ctx.lineTo(x - 7, y + 6);
+            ctx.stroke();
+            break;
+          case 'scout':
+            ctx.moveTo(x - 8, y + 4); ctx.lineTo(x, y - 6); ctx.lineTo(x + 8, y + 4);
+            ctx.moveTo(x - 5, y + 7); ctx.lineTo(x, y + 1); ctx.lineTo(x + 5, y + 7);
+            ctx.stroke();
+            break;
+          case 'heavy':
+            ctx.strokeRect(x - 8, y - 6, 16, 12);
+            ctx.beginPath();
+            ctx.moveTo(x - 8, y); ctx.lineTo(x + 8, y);
+            ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6);
+            ctx.stroke();
+            break;
+          case 'ranger':
+            ctx.arc(x, y, 7, 0, Math.PI * 2);
+            ctx.moveTo(x - 10, y); ctx.lineTo(x + 10, y);
+            ctx.moveTo(x, y - 10); ctx.lineTo(x, y + 10);
+            ctx.stroke();
+            break;
+          case 'support':
+            ctx.fillRect(x - 2, y - 8, 4, 16);
+            ctx.fillRect(x - 8, y - 2, 16, 4);
+            break;
+          default:
+            ctx.arc(x, y, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawMilitaryUnit(unit) {
+        if (!unit.alive) return;
+        const p = hexToPixel(unit.q, unit.r);
+        const color = ownerColor(unit.owner);
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(20,37,50,.3)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetY = 3;
+        traceChamferedToken(p.x, p.y, 35, 27);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = MAP_COLORS.ink;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        drawMilitaryGlyph(unit.type, p.x, p.y - 1);
+
+        ctx.fillStyle = MAP_COLORS.ink;
+        ctx.fillRect(p.x - 15, p.y + 9, 30, 7);
+        ctx.fillStyle = MAP_COLORS.paper;
+        ctx.textAlign = 'center';
+        ctx.font = '900 6px "Cascadia Mono", Consolas, monospace';
+        ctx.fillText(unitLabel(unit.type), p.x, p.y + 15);
+
+        if (unit.hasMoved || unit.hasActed) {
+          ctx.globalAlpha = .58;
+          ctx.fillStyle = MAP_COLORS.ink;
+          traceChamferedToken(p.x, p.y, 35, 27);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = MAP_COLORS.paper;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x - 10, p.y + 7);
+          ctx.lineTo(p.x + 10, p.y - 7);
+          ctx.stroke();
+        }
+
+        drawSegmentHealth(p.x, p.y - 19, 34, unit.hp, unit.maxHp);
+        ctx.restore();
+      }
+
+      function drawCommandNode(hq) {
+        const p = hexToPixel(hq.q, hq.r);
+        const color = hq.alive ? ownerColor(hq.owner) : '#777b78';
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(20,37,50,.32)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - 22);
+        ctx.lineTo(p.x + 18, p.y - 12);
+        ctx.lineTo(p.x + 15, p.y + 13);
+        ctx.lineTo(p.x, p.y + 22);
+        ctx.lineTo(p.x - 15, p.y + 13);
+        ctx.lineTo(p.x - 18, p.y - 12);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.globalAlpha = hq.alive ? 1 : .48;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = MAP_COLORS.ink;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.strokeStyle = MAP_COLORS.paper;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 9, p.y + 8);
+        ctx.lineTo(p.x - 9, p.y - 4);
+        ctx.lineTo(p.x, p.y - 11);
+        ctx.lineTo(p.x + 9, p.y - 4);
+        ctx.lineTo(p.x + 9, p.y + 8);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x - 12, p.y + 8);
+        ctx.lineTo(p.x + 12, p.y + 8);
+        ctx.stroke();
+
+        ctx.fillStyle = MAP_COLORS.ink;
+        ctx.fillRect(p.x - 12, p.y + 13, 24, 7);
+        ctx.fillStyle = MAP_COLORS.paper;
+        ctx.textAlign = 'center';
+        ctx.font = '900 6px "Cascadia Mono", Consolas, monospace';
+        ctx.fillText('HQ', p.x, p.y + 19);
+        drawSegmentHealth(p.x, p.y - 28, 44, hq.hp, hq.maxHp, 7);
+        ctx.restore();
+      }
+
+      function drawBeaconGlyph(kind, x, y, ink) {
+        ctx.save();
+        ctx.strokeStyle = ink;
+        ctx.fillStyle = ink;
+        ctx.lineWidth = 1.7;
+        ctx.beginPath();
+        if (kind === 'supply') {
+          ctx.arc(x, y, 5, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (kind === 'forward_base') {
+          ctx.moveTo(x - 4, y + 7); ctx.lineTo(x - 4, y - 7);
+          ctx.lineTo(x + 6, y - 3); ctx.lineTo(x - 4, y + 1);
+          ctx.stroke();
+        } else {
+          ctx.arc(x - 1, y - 2, 4, 0, Math.PI * 2);
+          ctx.moveTo(x + 2, y + 2); ctx.lineTo(x + 7, y + 7);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawTacticalBeacon(cp) {
+        const p = hexToPixel(cp.q, cp.r);
+        const color = cp.owner ? ownerColor(cp.owner) : MAP_COLORS.neutral;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = MAP_COLORS.paper;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.fillRect(-12, -12, 24, 24);
+        ctx.strokeRect(-12, -12, 24, 24);
+        ctx.restore();
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 23, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        drawBeaconGlyph(cp.kind, p.x, p.y, MAP_COLORS.ink);
+        ctx.restore();
+      }
+
+      function drawHoverTarget() {
+        if (!hoverCell) return;
+        const p = hexToPixel(hoverCell.q, hoverCell.r);
+        ctx.save();
+        mapHexPath(hoverCell.q, hoverCell.r, .8);
+        ctx.fillStyle = 'rgba(255,107,53,.15)';
+        ctx.fill();
+        ctx.strokeStyle = MAP_COLORS.signal;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x - 10, p.y); ctx.lineTo(p.x + 10, p.y);
+        ctx.moveTo(p.x, p.y - 10); ctx.lineTo(p.x, p.y + 10);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      drawBoard = function drawBroadcastMap() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!state || state.cells.length === 0) {
+          drawEmptyMapState();
+          return;
+        }
+
+        drawMapBackdrop();
+        for (const cell of state.cells) drawTerrainCell(cell);
+        drawHoverTarget();
+        for (const cp of state.controlPoints.values()) drawTacticalBeacon(cp);
+        for (const hq of state.headquarters.values()) drawCommandNode(hq);
+        for (const unit of state.units.values()) drawMilitaryUnit(unit);
+      };
+
+      /* 原脚本初次绘制完成后，立即切换为新版地图 */
+      drawBoard();
+    })();
+  </script>
+</body>
+</html>

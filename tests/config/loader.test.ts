@@ -287,23 +287,23 @@ describe('map config loader', () => {
     resetConfig();
   });
 
-  it('loads forge map with diagonal HQs and a demolishable forge ring for 10-turn play', () => {
+  it('loads forge map with diagonal HQs and a demolishable forge wall for 10-turn play', () => {
     resetConfig();
     loadMaps();
 
     const forge = getMapConfig('forge');
-    expect(forge.name).toBe('熔炉之心');
-    expect(forge.radius).toBe(5);
+    expect(forge.name).toBe('熔炉重铸');
+    expect(forge.radius).toBe(6);
     expect(forge.balance.maxTurns).toBe(10);
-    // 对角线总部：双方斜向对峙，距离为 8
-    expect(forge.headquarters.player_a).toEqual({ q: -4, r: 4 });
-    expect(forge.headquarters.player_b).toEqual({ q: 4, r: -4 });
-    expect(hexDistance(forge.headquarters.player_a, forge.headquarters.player_b)).toBe(8);
+    // 对角线总部：双方斜向对峙，距离为 10
+    expect(forge.headquarters.player_a).toEqual({ q: -5, r: 5 });
+    expect(forge.headquarters.player_b).toEqual({ q: 5, r: -5 });
+    expect(hexDistance(forge.headquarters.player_a, forge.headquarters.player_b)).toBe(10);
     expect(forge.headquartersSpec.hp).toBe(100);
     expect(forge.headquartersSpec.defense).toBe(3);
 
-    // 全部据点带类型，且关于原点 180° 对称、类型一致
-    expect(forge.controlPoints.length).toBe(5);
+    // 6 个据点（偶数），全部带类型，关于原点 180° 对称、类型一致
+    expect(forge.controlPoints.length).toBe(6);
     for (const point of forge.controlPoints) {
       expect(point.kind).toBeTruthy();
       const mirror = originReflection(point);
@@ -311,10 +311,14 @@ describe('map config loader', () => {
       expect(counterpart, `${point.id} should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
       expect(counterpart!.kind).toBe(point.kind);
     }
-    // 中央维修核心
-    const core = forge.controlPoints.find(c => c.id === 'cp_core')!;
-    expect(core.kind).toBe('repair');
-    expect({ q: core.q, r: core.r }).toEqual({ q: 0, r: 0 });
+    // 两个对称维修站，各靠近一方总部（距离对称）
+    const repairA = forge.controlPoints.find(c => c.id === 'cp_repair_a')!;
+    const repairB = forge.controlPoints.find(c => c.id === 'cp_repair_b')!;
+    expect(repairA.kind).toBe('repair');
+    expect(repairB.kind).toBe('repair');
+    // repair_a 距 A 总部 = repair_b 距 B 总部（对称性）
+    expect(hexDistance(repairA, forge.headquarters.player_a)).toBe(hexDistance(repairB, forge.headquarters.player_b));
+    expect(hexDistance(repairA, forge.headquarters.player_b)).toBe(hexDistance(repairB, forge.headquarters.player_a));
 
     // 地形关于原点对称
     for (const cell of forge.terrainCells) {
@@ -324,19 +328,21 @@ describe('map config loader', () => {
       expect(counterpart!.terrain).toBe(cell.terrain);
     }
 
-    // 熔炉环：核心的六个邻居中四块为阻挡，仅留对角线两道窄缝 (1,-1) 与 (-1,1)
+    // 中央熔炉墙十字：阻断直通路线
+    expect(terrainAt(forge, 0, 0)).toBe('blocker');
     expect(terrainAt(forge, 1, 0)).toBe('blocker');
-    expect(terrainAt(forge, 0, -1)).toBe('blocker');
     expect(terrainAt(forge, -1, 0)).toBe('blocker');
+    expect(terrainAt(forge, 0, -1)).toBe('blocker');
     expect(terrainAt(forge, 0, 1)).toBe('blocker');
-    expect(terrainAt(forge, 1, -1)).toBe('plain');
-    expect(terrainAt(forge, -1, 1)).toBe('plain');
-    // 两根石柱扼守缝隙
+    // 延伸石柱
     expect(terrainAt(forge, 2, -1)).toBe('blocker');
     expect(terrainAt(forge, -2, 1)).toBe('blocker');
-    // 两汪熔岩封角
-    expect(terrainAt(forge, -3, -2)).toBe('water');
-    expect(terrainAt(forge, 3, 2)).toBe('water');
+    // 对角线窄缝仍可通行
+    expect(terrainAt(forge, 1, -1)).toBe('plain');
+    expect(terrainAt(forge, -1, 1)).toBe('plain');
+    // 水域封角
+    expect(terrainAt(forge, -4, -2)).toBe('water');
+    expect(terrainAt(forge, 4, 2)).toBe('water');
 
     // 起始单位关于原点对称、类型一致、归属互换
     expect(forge.startingUnits.length).toBe(8);

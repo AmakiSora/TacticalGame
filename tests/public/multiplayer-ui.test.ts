@@ -55,4 +55,13 @@ describe('multiplayer UI wiring', () => {
     expect(source).toContain('/players/${encodeURIComponent(playerId)}');
     expect(source).toContain('你已被房主移出大厅');
   });
+
+  it('play page copy buttons toast after clipboard write', () => {
+    const source = read('public/play.js');
+    expect(source).toContain(".btn-copy");
+    expect(source).toContain('navigator.clipboard.writeText');
+    expect(source).toContain("toast('已复制'");
+    expect(source).toContain("toast('复制失败'");
+    expect(source).toContain("classList.add('copied')");
+  });
 });

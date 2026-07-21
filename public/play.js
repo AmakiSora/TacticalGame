@@ -1317,7 +1317,20 @@ document.addEventListener('click', e => {
   e.preventDefault();
   kickLobbyPlayer(button.dataset.kickPlayer);
 });
-document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', () => navigator.clipboard.writeText($(btn.dataset.copy).textContent)));
+document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', async () => {
+  const text = $(btn.dataset.copy)?.textContent || '';
+  if (!text) return toast('没有可复制的内容', 'err');
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('unsupported');
+    await navigator.clipboard.writeText(text);
+    btn.classList.add('copied');
+    clearTimeout(btn._copiedTimer);
+    btn._copiedTimer = setTimeout(() => btn.classList.remove('copied'), 1500);
+    toast('已复制', 'ok');
+  } catch {
+    toast('复制失败', 'err');
+  }
+}));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
 document.addEventListener('click', e => { const popup = $('map-popup'); if (!popup.classList.contains('hidden') && !popup.contains(e.target) && e.target !== els.canvas) closePopup(); });
 els.btnSettings?.addEventListener('click', e => {

@@ -1,0 +1,208 @@
+{
+  "name": "危险距离",
+  "description": "半径5的近距离双人决斗图。双方HQ仅隔4格，但被一堵空心的墙阻断。唯一的突破口是重装兵的爆破。节奏缓慢(1行动/回合)，每一次出手都至关重要。裁决偏重HQ伤害——这是纯粹的攻城对决。",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 5,
+  "terrainCells": [
+    {
+      "q": -2,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -1,
+      "terrain": "blocker"
+    }
+  ],
+  "controlPoints": [
+    {
+      "id": "cp_1",
+      "name": "据点 1",
+      "q": -3,
+      "r": 0
+    },
+    {
+      "id": "cp_2",
+      "name": "据点 2",
+      "q": 3,
+      "r": 0
+    }
+  ],
+  "headquarters": {
+    "player_a": {
+      "q": -2,
+      "r": 0
+    },
+    "player_b": {
+      "q": 2,
+      "r": 0
+    }
+  },
+  "startingUnits": [
+    {
+      "owner": "player_a",
+      "type": "scout",
+      "q": -5,
+      "r": 5
+    },
+    {
+      "owner": "player_a",
+      "type": "scout",
+      "q": -5,
+      "r": 4
+    },
+    {
+      "owner": "player_b",
+      "type": "scout",
+      "q": 5,
+      "r": -5
+    },
+    {
+      "owner": "player_b",
+      "type": "scout",
+      "q": 5,
+      "r": -4
+    }
+  ],
+  "units": {
+    "infantry": {
+      "hp": 100,
+      "attack": 30,
+      "defense": 8,
+      "moveRange": 3,
+      "attackRange": 1,
+      "cost": 45,
+      "canCapture": true
+    },
+    "scout": {
+      "hp": 65,
+      "attack": 16,
+      "defense": 4,
+      "moveRange": 3,
+      "attackRange": 1,
+      "cost": 38,
+      "canCapture": true
+    },
+    "heavy": {
+      "hp": 150,
+      "attack": 40,
+      "defense": 13,
+      "moveRange": 2,
+      "attackRange": 1,
+      "cost": 50,
+      "canCapture": false
+    },
+    "ranger": {
+      "hp": 72,
+      "attack": 44,
+      "defense": 3,
+      "moveRange": 2,
+      "attackRange": 3,
+      "cost": 78,
+      "canCapture": false
+    },
+    "support": {
+      "hp": 82,
+      "attack": 10,
+      "defense": 5,
+      "moveRange": 3,
+      "attackRange": 1,
+      "cost": 60,
+      "canCapture": false,
+      "healPower": 22
+    }
+  },
+  "headquartersSpec": {
+    "hp": 120,
+    "defense": 4
+  },
+  "balance": {
+    "startingSupplies": 20,
+    "baseIncome": 6,
+    "controlPointIncome": 0,
+    "damageVarianceRange": 3,
+    "minimumDamage": 1,
+    "healVarianceRange": 6,
+    "actionsPerTurn": 1,
+    "maxTurns": 30,
+    "adjudicationWeights": {
+      "enemyHqDamage": 20,
+      "ownHqHp": 1,
+      "controlPoint": 30,
+      "armyValue": 1,
+      "supplies": 0
+    }
+  }
+}

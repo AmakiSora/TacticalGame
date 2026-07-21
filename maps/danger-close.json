@@ -90,12 +90,14 @@
     {
       "id": "cp_1",
       "name": "据点 1",
+      "kind": "supply",
       "q": -3,
       "r": 0
     },
     {
       "id": "cp_2",
       "name": "据点 2",
+      "kind": "supply",
       "q": 3,
       "r": 0
     }
@@ -203,6 +205,23 @@
       "controlPoint": 30,
       "armyValue": 1,
       "supplies": 0
+    },
+    "controlPointTypes": {
+      "supply": {
+        "income": 8,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "forward_base": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "repair": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      }
     }
   }
 }

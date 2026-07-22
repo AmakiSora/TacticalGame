@@ -1317,16 +1317,36 @@ document.addEventListener('click', e => {
   e.preventDefault();
   kickLobbyPlayer(button.dataset.kickPlayer);
 });
+function copyText(text) {
+  // 优先使用 Clipboard API，回退到 execCommand
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
+function onCopySuccess(btn) {
+  btn.classList.add('copied');
+  clearTimeout(btn._copiedTimer);
+  btn._copiedTimer = setTimeout(() => btn.classList.remove('copied'), 1500);
+  toast('已复制', 'ok');
+}
+
 document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', async () => {
   const text = $(btn.dataset.copy)?.textContent || '';
   if (!text) return toast('没有可复制的内容', 'err');
   try {
-    if (!navigator.clipboard?.writeText) throw new Error('unsupported');
-    await navigator.clipboard.writeText(text);
-    btn.classList.add('copied');
-    clearTimeout(btn._copiedTimer);
-    btn._copiedTimer = setTimeout(() => btn.classList.remove('copied'), 1500);
-    toast('已复制', 'ok');
+    await copyText(text);
+    onCopySuccess(btn);
   } catch {
     toast('复制失败', 'err');
   }

@@ -75,6 +75,14 @@
     return (centre - margin) / denom;
   }
 
+  function isDrawMatch(match) {
+    return match.reason === 'turn_limit_draw' || Boolean(match.reviewFlags?.deadlock);
+  }
+
+  function isRankedMatch(match) {
+    return Boolean(match.completed);
+  }
+
   function getFilters() {
     return {
       version: el.filterVersion.value,
@@ -144,7 +152,10 @@
       if (m.completed) completed += 1;
       roundsSum += m.rounds || 0;
 
+      if (!isRankedMatch(m)) continue;
+
       const parts = m.participants || [];
+      const isDraw = isDrawMatch(m);
       for (const p of parts) {
         if (!models.has(p.model)) models.set(p.model, emptyModel(p.model));
         const b = models.get(p.model);
@@ -153,7 +164,6 @@
         b.recent.push(m.recordId);
         if (b.recent.length > 8) b.recent.shift();
 
-        const isDraw = m.reason === 'turn_limit_draw' || m.reviewFlags?.deadlock;
         if (isDraw) b.draws += 1;
         else if (p.isWinner || p.rank === 1) b.wins += 1;
         else if (p.rank != null || m.completed) b.losses += 1;
@@ -177,7 +187,7 @@
         }
         const ag = agents.get(p.agent);
         ag.games += 1;
-        if (p.isWinner || p.rank === 1) ag.wins += 1;
+        if (!isDraw && (p.isWinner || p.rank === 1)) ag.wins += 1;
         ag.models[p.model] = (ag.models[p.model] || 0) + 1;
 
         for (const opp of parts) {
@@ -310,7 +320,7 @@
         const label = REASON_LABELS[name] || name;
         const w = Math.round((count / max) * 100);
         return `<div class="bar-row">
-          <div class="name" title="${name}">${label}</div>
+          <div class="name" title="${escapeAttr(name)}">${escapeHtml(label)}</div>
           <div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div>
           <div class="count">${count}</div>
         </div>`;
@@ -425,19 +435,24 @@
     const body = el.matchTable.querySelector('tbody');
     body.innerHTML = sorted
       .map(m => {
+        const isDraw = isDrawMatch(m);
         const chips = (m.participants || [])
           .slice()
           .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
           .map(p => {
-            const cls = p.isWinner || p.rank === 1 ? 'chip winner' : 'chip';
+            const cls = !isDraw && (p.isWinner || p.rank === 1) ? 'chip winner' : 'chip';
             const rk = p.rank != null ? `#${p.rank}` : '';
             return `<span class="${cls}" title="${escapeAttr(p.displayName)}"><span class="rk">${rk}</span>${escapeHtml(p.model)}<span class="rk">${escapeHtml(p.agent)}</span></span>`;
           })
           .join('');
-        const winnerPart = (m.participants || []).find(p => p.isWinner || p.rank === 1);
-        const winnerLabel = winnerPart
-          ? `${winnerPart.model} (${winnerPart.agent})`
-          : m.winner || '—';
+        const winnerPart = isDraw
+          ? null
+          : (m.participants || []).find(p => p.isWinner || p.rank === 1);
+        const winnerLabel = isDraw
+          ? (m.reviewFlags?.deadlock ? '僵局' : '平局')
+          : winnerPart
+            ? `${winnerPart.model} (${winnerPart.agent})`
+            : m.winner || '—';
         return `<tr>
           <td><strong>${escapeHtml(m.recordId)}</strong></td>
           <td>${fmtDate(m.date)}</td>

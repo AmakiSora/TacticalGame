@@ -10,7 +10,7 @@
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = dirname(SCRIPT_DIR);
@@ -553,7 +553,15 @@ function emptyModelBucket(model) {
   };
 }
 
-function aggregate(matches) {
+export function isDrawMatch(match) {
+  return match.reason === 'turn_limit_draw' || Boolean(match.reviewFlags?.deadlock);
+}
+
+export function isRankedMatch(match) {
+  return Boolean(match.completed);
+}
+
+export function aggregate(matches) {
   const overview = {
     matchCount: 0,
     completedCount: 0,
@@ -616,8 +624,13 @@ function aggregate(matches) {
       (mapBucket.playerCounts[match.playerCount] || 0) + 1;
     mapBucket.avgRoundsSum += match.eventStats?.rounds || 0;
 
+    // Incomplete replays remain visible in the overview and match list, but do
+    // not count as attempts or losses in competitive rankings.
+    if (!isRankedMatch(match)) continue;
+
     // pairwise model matchups within this game
     const parts = match.participants || [];
+    const isDraw = isDrawMatch(match);
     for (const p of parts) {
       if (!models.has(p.model)) models.set(p.model, emptyModelBucket(p.model));
       const b = models.get(p.model);
@@ -628,7 +641,6 @@ function aggregate(matches) {
       b.recent.push(match.recordId);
       if (b.recent.length > 8) b.recent.shift();
 
-      const isDraw = match.reason === 'turn_limit_draw' || match.reviewFlags?.deadlock;
       if (isDraw) b.draws += 1;
       else if (p.isWinner || p.rank === 1) b.wins += 1;
       else if (p.rank != null || match.completed) b.losses += 1;
@@ -653,7 +665,7 @@ function aggregate(matches) {
       }
       const ag = agents.get(p.agent);
       ag.games += 1;
-      if (p.isWinner || p.rank === 1) ag.wins += 1;
+      if (!isDraw && (p.isWinner || p.rank === 1)) ag.wins += 1;
       ag.models[p.model] = (ag.models[p.model] || 0) + 1;
 
       // head-to-head: count vs every other participant
@@ -858,7 +870,6 @@ function main() {
   const payload = {
     generatedAt: new Date().toISOString(),
     source: {
-      recordsDir: opts.records.replace(/\\/g, '/'),
       versions: opts.versions,
       replayCount: matches.filter(m => !m.error).length,
       parseErrors: matches.filter(m => m.error).length,
@@ -894,4 +905,5 @@ function main() {
   }
 }
 
-main();
+const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (isMain) main();

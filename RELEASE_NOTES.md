@@ -3,6 +3,13 @@
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
 
+## 3.1.4
+
+- 新增离线统计看板 `stats.html`：以模型排行为主体，展示胜率、前三率、均名次、Wilson 评分、对位矩阵、Agent 排行、地图/结束原因分布与对局列表。
+- 新增 `script/generateStats.mjs` 与 `npm run stats`：扫描 `records/V2`、`records/V3` 回放及复盘文件名，生成前端只读的 `public/data/stats.json`，统计数据与运行时 API 解耦。
+- 统计页支持版本/地图/人数/模型筛选与搜索；兼容早期仅含 winner 的回放，并从 companion 复盘文件补全 agent/model 身份。
+- 玩家页与观战页补充统计入口；README 增加统计页与数据生成说明。
+
 ## 3.1.3
 
 - 新增双人短局地图「危险距离」(danger-close)：半径5，双方HQ仅隔4格但被空心墙阻断，重装单位必须爆破开路；1行动点/回合的慢节奏攻城对决。

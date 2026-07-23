@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。
 
-当前版本：`3.1.3`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
+当前版本：`3.1.4`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
 ## 技术栈
 
@@ -284,7 +284,7 @@ node script/autoRunPi.mjs --bootstrap --a-session .pi/session/player-a.jsonl --b
 
 - 观战页可以从在线对局导出回放 JSON 或离线 HTML。
 - 导出的 JSON 可在观战页重新导入并按事件流回放。
-- 历史对战记录放在 `records/V1` 和 `records/V2`；V2 记录包含 `schemaVersion`，便于后续回放兼容。历史回放的 `schemaVersion` 表示导出时的回放格式，不随应用版本批量改写。
+- 历史对战记录放在 `records/V1`、`records/V2` 和 `records/V3`；V2/V3 记录包含 `schemaVersion`，便于后续回放兼容。历史回放的 `schemaVersion` 表示导出时的回放格式，不随应用版本批量改写。
 
 ## 测试
 

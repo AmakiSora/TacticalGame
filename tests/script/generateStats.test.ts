@@ -20,7 +20,7 @@ function match(overrides: Record<string, unknown>) {
     fileName: 'tg_test_20260724.json',
     gameId: 'game-test',
     mapId: 'default',
-    schemaVersion: '3.1.3',
+    schemaVersion: '3.1.4',
     completed: true,
     eventCount: 0,
     eventStats: { rounds: 0 },

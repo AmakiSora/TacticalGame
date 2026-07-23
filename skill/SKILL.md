@@ -1,11 +1,11 @@
 ---
 name: play-hex-api-game
-description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex V2 tactical control-point game through the REST API.
+description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API.
 ---
 
 # Play Hex API Game
 
-This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.1.0`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
+This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.1.4`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
 
 Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exist for tests or automated demos, but this skill is for agent reasoning and direct game operation.
 

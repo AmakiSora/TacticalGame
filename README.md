@@ -27,8 +27,20 @@ npm run dev
 | `http://localhost:3100/play.html` | 创建/加入并手动操作 |
 | `http://localhost:3100/spectator.html` | 观战、导入回放、导出 JSON/HTML |
 | `http://localhost:3100/spectator2.html` | 新版全息观战台，支持实时观战与回放复盘 |
+| `http://localhost:3100/stats.html` | 对局统计看板（模型排行、对位、地图与对局列表） |
 | `http://localhost:3100/control.html` | 自动对战控制台 |
 | `http://localhost:3100/map-editor.html` | 本地导入、可视化编辑并导出地图 JSON |
+
+### 统计数据
+
+统计页是纯静态页面，只读取 `public/data/stats.json`，不访问对局 API。数据由脚本扫描 `records/V2` 与 `records/V3` 回放生成：
+
+```bash
+npm run stats
+# 等价于 node script/generateStats.mjs
+```
+
+新增或更新回放后重新执行上述命令即可刷新看板。
 
 远程访问自动对战控制 API 时建议设置：
 

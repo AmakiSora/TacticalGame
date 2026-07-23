@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TacticalGame — 统计看板</title>
+  <link rel="stylesheet" href="/stats.css" />
+  <script src="/version.js" defer></script>
+  <script src="/stats.js" defer></script>
+</head>
+<body class="stats-shell">
+  <header>
+    <div class="brand-block">
+      <h1>对局统计看板 <span class="version-badge"></span></h1>
+      <div class="page-subtitle">基于 records 回放生成 · 模型排行为主</div>
+    </div>
+    <nav class="page-nav" aria-label="站点导航">
+      <a href="/play.html">玩家</a>
+      <a href="/spectator.html">观战</a>
+      <a href="/spectator2.html">全息观战</a>
+      <a href="/control.html">控制台</a>
+      <a href="/map-editor.html">地图编辑</a>
+      <a href="/stats.html" class="active">统计</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="meta-bar panel">
+      <div class="meta-item">
+        <span>数据生成时间</span>
+        <strong id="generated-at">—</strong>
+      </div>
+      <div class="meta-item">
+        <span>回放局数</span>
+        <strong id="source-count">—</strong>
+      </div>
+      <div class="meta-item">
+        <span>日期范围</span>
+        <strong id="date-range">—</strong>
+      </div>
+      <div class="meta-item status-item">
+        <span>状态</span>
+        <strong id="load-status" class="status-pill">加载中…</strong>
+      </div>
+      <div class="meta-actions">
+        <button id="btn-reload" type="button">重新加载</button>
+      </div>
+    </section>
+
+    <section id="kpi-grid" class="kpi-grid" aria-label="总览指标"></section>
+
+    <section class="panel filters-panel">
+      <div class="panel-heading">
+        <h2>筛选</h2>
+        <span>影响模型榜、对位与对局列表</span>
+      </div>
+      <div class="filters">
+        <label>
+          <span>版本</span>
+          <select id="filter-version">
+            <option value="">全部</option>
+            <option value="V2">V2</option>
+            <option value="V3">V3</option>
+          </select>
+        </label>
+        <label>
+          <span>地图</span>
+          <select id="filter-map">
+            <option value="">全部</option>
+          </select>
+        </label>
+        <label>
+          <span>人数</span>
+          <select id="filter-players">
+            <option value="">全部</option>
+          </select>
+        </label>
+        <label>
+          <span>模型</span>
+          <select id="filter-model">
+            <option value="">全部</option>
+          </select>
+        </label>
+        <label class="grow">
+          <span>搜索对局 / 名称</span>
+          <input id="filter-search" type="search" placeholder="tg_0041 / hy3 / player_a…" autocomplete="off" />
+        </label>
+        <button id="btn-reset-filters" type="button" class="ghost">重置</button>
+      </div>
+    </section>
+
+    <section class="panel focus-panel">
+      <div class="panel-heading">
+        <h2>模型排行榜</h2>
+        <span>按 Wilson 下限评分排序 · 小样本不会虚高</span>
+      </div>
+      <div class="table-wrap">
+        <table id="model-table" class="data-table">
+          <thead>
+            <tr>
+              <th data-sort="rank">#</th>
+              <th data-sort="model">模型</th>
+              <th data-sort="games" class="num">场次</th>
+              <th data-sort="wins" class="num">胜</th>
+              <th data-sort="losses" class="num">负</th>
+              <th data-sort="draws" class="num">平/僵</th>
+              <th data-sort="winRate" class="num">胜率</th>
+              <th data-sort="top3Rate" class="num">前三率</th>
+              <th data-sort="avgRank" class="num">均名次</th>
+              <th data-sort="avgScore" class="num">均分</th>
+              <th data-sort="avgHqDamage" class="num">均HQ伤</th>
+              <th data-sort="rating" class="num">评分</th>
+              <th>常用 Agent</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="hint">点击模型行可查看对位矩阵与近期对局。评分 = Wilson 95% 下限，兼顾胜率与样本数。</p>
+    </section>
+
+    <section class="two-col">
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>对位矩阵</h2>
+          <span id="matchup-title">选择模型查看</span>
+        </div>
+        <div id="matchup-body" class="empty-block">点击上方模型行</div>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Agent 排行</h2>
+          <span>运行客户端维度</span>
+        </div>
+        <div class="table-wrap">
+          <table id="agent-table" class="data-table compact">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th class="num">场次</th>
+                <th class="num">胜</th>
+                <th class="num">胜率</th>
+                <th>模型分布</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section class="two-col">
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>地图分布</h2>
+          <span>局数与结束原因</span>
+        </div>
+        <div id="map-bars" class="bar-list"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>结束原因</h2>
+          <span>筛选后实时汇总</span>
+        </div>
+        <div id="reason-bars" class="bar-list"></div>
+      </section>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>对局列表</h2>
+        <span id="match-count-label">0 局</span>
+      </div>
+      <div class="table-wrap">
+        <table id="match-table" class="data-table">
+          <thead>
+            <tr>
+              <th data-msort="recordId">对局</th>
+              <th data-msort="date">日期</th>
+              <th data-msort="version">版本</th>
+              <th data-msort="mapId">地图</th>
+              <th data-msort="playerCount" class="num">人数</th>
+              <th>参赛模型</th>
+              <th>胜者</th>
+              <th data-msort="reason">结束</th>
+              <th data-msort="rounds" class="num">整轮</th>
+              <th data-msort="schemaVersion">schema</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    数据文件 <code>/data/stats.json</code> · 重新生成：
+    <code>npm run stats</code> 或 <code>node script/generateStats.mjs</code>
+  </footer>
+</body>
+</html>

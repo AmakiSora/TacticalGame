@@ -1,18 +1,48 @@
 #!/usr/bin/env python3
-"""Deploy tactical-game to remote server via SFTP + Docker Compose."""
+"""Deploy tactical-game to remote server via SFTP + Docker Compose.
+
+Credentials are read from deploy/.env.deploy (not tracked in git).
+Copy deploy/.env.deploy.example to deploy/.env.deploy and fill in the values.
+"""
 
 import paramiko
 import os
 import secrets
 import re
 import sys
+from pathlib import Path
 
-HOST = "117.72.181.8"
-PORT = 22
-USERNAME = "root"
-PASSWORD = "!9617Cos"
-REMOTE_BASE = "/srv/tactical-game"
-LOCAL_BASE = "C:/cosmos/github/game"
+ENV_FILE = Path(__file__).resolve().parent / ".env.deploy"
+
+
+def load_env():
+    """Load deploy credentials from .env.deploy file."""
+    if not ENV_FILE.exists():
+        print(f"ERROR: {ENV_FILE} not found.")
+        print(f"Copy deploy/.env.deploy.example to deploy/.env.deploy and fill in the values.")
+        sys.exit(1)
+
+    env = {}
+    with open(ENV_FILE, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, _, val = line.partition("=")
+                env[key.strip()] = val.strip()
+    return env
+
+
+# --- Load credentials from .env.deploy ---
+env = load_env()
+
+HOST = env.get("DEPLOY_HOST") or sys.exit("ERROR: DEPLOY_HOST not set in .env.deploy")
+PORT = int(env.get("DEPLOY_PORT", "22"))
+USERNAME = env.get("DEPLOY_USER", "root")
+PASSWORD = env.get("DEPLOY_PASSWORD", "")
+REMOTE_BASE = env.get("DEPLOY_REMOTE_BASE", "/srv/tactical-game")
+LOCAL_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 EXCLUDE_PATTERNS = [
     r'\.git$', r'\.git/.*', r'node_modules/', r'node_modules$',
@@ -54,7 +84,6 @@ def transfer_files(sftp):
         for f in files:
             local_path = os.path.join(root, f)
 
-            # Skip special device paths
             try:
                 rel_path = os.path.relpath(local_path, LOCAL_BASE).replace("\\", "/")
             except ValueError:
@@ -63,15 +92,12 @@ def transfer_files(sftp):
             if should_exclude(rel_path):
                 continue
 
-            # Normalize path separators for remote
             remote_path = f"{REMOTE_BASE}/{rel_path}"
             remote_dir = os.path.dirname(remote_path)
 
-            # Ensure remote directory exists
             try:
                 sftp.stat(remote_dir)
             except FileNotFoundError:
-                # Create directory tree
                 parts = remote_dir.replace(REMOTE_BASE, "").strip("/").split("/")
                 if parts and parts[0]:
                     path = REMOTE_BASE
@@ -93,7 +119,11 @@ def transfer_files(sftp):
 
 
 def main():
-    print("Connecting to server...")
+    if not PASSWORD:
+        print("ERROR: DEPLOY_PASSWORD is not set in .env.deploy")
+        sys.exit(1)
+
+    print(f"Connecting to {HOST}:{PORT} as {USERNAME}...")
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(HOST, PORT, USERNAME, PASSWORD, timeout=15)
@@ -110,7 +140,7 @@ def main():
     sftp.close()
     print(f"Transferred {file_count} files ({total_size / 1024 / 1024:.1f} MB)")
 
-    # Create .env file
+    # Create .env file on remote
     token = secrets.token_hex(32)
     print(f"Creating .env with AUTO_CONTROL_TOKEN={token}")
     env_content = f"AUTO_CONTROL_TOKEN={token}\nLOG_LEVEL=info\n"
@@ -124,7 +154,6 @@ def main():
     stdin, stdout, stderr = client.exec_command(
         f"cd {REMOTE_BASE} && docker compose up --build --detach 2>&1"
     )
-    # Stream output
     for line in iter(stdout.readline, ""):
         print(f"  {line}", end="")
     exit_code = stdout.channel.recv_exit_status()
@@ -150,7 +179,7 @@ def main():
         print(f"  -> {out}")
 
     client.close()
-    print("\nAll done! Server is running at http://117.72.181.8:3123")
+    print(f"\nAll done! Server is running at http://{HOST}:3123")
 
 
 if __name__ == "__main__":

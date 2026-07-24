@@ -3,6 +3,13 @@
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
 
+## 3.1.5
+
+- 对局状态 API 增加权威 live 裁决计分板：`GET /api/games/:id` 在剥离 token 后附加 `adjudication`（`maxTurns`、`weights`、`scores`、`rankings`、`leaders`、`margin`），由引擎 `buildAdjudicationSnapshot` 统一计算。
+- 玩家页优先展示服务端裁决总分，并在加载完整状态、SSE 事件与操作成功后合并刷新；终局平局时按存活并列 top 填充 `leaders`，避免写成空数组。
+- 观战页继续用事件重建本地计分，终局优先 `result.scores` / `result.rankings`，不额外伪造半残 `adjudication` 快照。
+- Hex API Game Skill 说明 AI 应信任服务端 `adjudication` 总分，breakdown 仅用于优先级判断；补充对应文档与 API/前端契约测试。
+
 ## 3.1.4
 
 - 新增离线统计看板 `stats.html`：以模型排行为主体，展示胜率、前三率、均名次、Wilson 评分、对位矩阵、Agent 排行、地图/结束原因分布与对局列表。

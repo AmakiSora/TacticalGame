@@ -166,6 +166,26 @@ export interface GameResult {
   rankings: GameRanking[];
 }
 
+export interface AdjudicationWeights {
+  enemyHqDamage: number;
+  ownHqHp: number;
+  controlPoint: number;
+  armyValue: number;
+  supplies: number;
+}
+
+/** Live adjudication snapshot attached to GET /api/games/:id responses. */
+export interface AdjudicationSnapshot {
+  maxTurns: number;
+  weights: AdjudicationWeights;
+  scores: PlayerRecord<AdjudicationScore>;
+  rankings: GameRanking[];
+  /** Highest-scoring living players; falls back to all joined seats in lobby. */
+  leaders: PlayerId[];
+  /** Score gap from rank-1 total to rank-2 total among the same contender pool. */
+  margin: number;
+}
+
 export interface GameState {
   id: string;
   mapId: string;

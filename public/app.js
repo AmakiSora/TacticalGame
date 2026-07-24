@@ -778,6 +778,17 @@ function computeAdjudicationScores() {
   return Object.values(scores).every(Boolean) ? scores : null;
 }
 
+/** Final `result.scores` when present, else recompute from reconstructed event state. */
+function liveAdjudicationScores() {
+  if (state?.result?.scores && Object.keys(state.result.scores).length > 0) return state.result.scores;
+  return computeAdjudicationScores();
+}
+
+function liveAdjudicationRankings() {
+  const rows = state?.result?.rankings || [];
+  return Array.isArray(rows) ? rows : [];
+}
+
 function scoreBreakdown(score) {
   const hqDamage = score.headquartersDamage ?? score.enemyHqDamage ?? 0;
   return `HQ伤害 ${hqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
@@ -785,12 +796,12 @@ function scoreBreakdown(score) {
 
 function renderScorePanel() {
   if (!scorePanelEl) return;
-  const scores = state?.result?.scores || computeAdjudicationScores();
+  const scores = liveAdjudicationScores();
   if (!scores) {
     scorePanelEl.innerHTML = '<h3>分数排行榜</h3><div class="score-empty">等待对局开始</div>';
     return;
   }
-  const resultRanks = new Map((state?.result?.rankings || []).map(row => [row.playerId, row.rank]));
+  const resultRanks = new Map(liveAdjudicationRankings().map(row => [row.playerId, row.rank]));
   const rows = Object.entries(scores).sort(([ownerA, scoreA], [ownerB, scoreB]) => {
     const rankA = resultRanks.get(ownerA);
     const rankB = resultRanks.get(ownerB);

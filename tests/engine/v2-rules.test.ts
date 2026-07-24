@@ -5,7 +5,7 @@ import { findReachableCells } from '../../src/engine/validation.js';
 import { moveUnit } from '../../src/engine/units.js';
 import { attackTarget, healTarget } from '../../src/engine/combat.js';
 import { deployUnit } from '../../src/engine/deployment.js';
-import { buildAdjudicationScores, endTurn, joinGame } from '../../src/engine/engine.js';
+import { buildAdjudicationScores, buildAdjudicationSnapshot, endTurn, joinGame } from '../../src/engine/engine.js';
 import type { Unit } from '../../src/types.js';
 
 function setup() {
@@ -107,6 +107,12 @@ describe('hex V2 rules', () => {
     const scores = buildAdjudicationScores(game);
     expect(scores.player_b.controlPoints).toBe(3);
     expect(scores.player_b.total).toBe(180 * 2 + 3 * 90);
+    const snapshot = buildAdjudicationSnapshot(game);
+    expect(snapshot.scores).toEqual(scores);
+    expect(snapshot.maxTurns).toBe(game.config.balance.maxTurns);
+    expect(snapshot.weights).toEqual(game.config.balance.adjudicationWeights);
+    expect(snapshot.leaders).toEqual(['player_b']);
+    expect(snapshot.margin).toBe(scores.player_b.total - scores.player_a.total);
   });
 
   it('starts dual-lanes with no free units and enough supplies for player deployment choices', () => {

@@ -1,6 +1,6 @@
 // src/engine/engine.ts
 import type {
-  AdjudicationScore, EliminationReason, GameOverReason, GameRanking,
+  AdjudicationScore, AdjudicationSnapshot, EliminationReason, GameOverReason, GameRanking,
   GameState, PlayerId, PlayerRecord,
 } from '../types.js';
 import { PLAYER_IDS } from '../types.js';
@@ -191,6 +191,27 @@ function buildRankings(game: GameState, scores: PlayerRecord<AdjudicationScore>)
   return sorted.map((playerId, index) => ({
     playerId, rank: index + 1, status: game.players[playerId]!.status, score: scores[playerId]!,
   }));
+}
+
+/** Authoritative live scoreboard for API consumers and AI agents. */
+export function buildAdjudicationSnapshot(game: GameState): AdjudicationSnapshot {
+  const scores = buildAdjudicationScores(game);
+  const rankings = buildRankings(game, scores);
+  const contenders = activePlayerIds(game);
+  const pool = contenders.length > 0 ? contenders : joinedPlayerIds(game);
+  const totals = pool.map(id => scores[id]?.total ?? 0);
+  const top = totals.length > 0 ? Math.max(...totals) : 0;
+  const leaders = pool.filter(id => (scores[id]?.total ?? 0) === top);
+  const sortedTotals = [...totals].sort((a, b) => b - a);
+  const margin = sortedTotals.length >= 2 ? sortedTotals[0] - sortedTotals[1] : (sortedTotals[0] ?? 0);
+  return {
+    maxTurns: game.config.balance.maxTurns,
+    weights: { ...game.config.balance.adjudicationWeights },
+    scores,
+    rankings,
+    leaders,
+    margin,
+  };
 }
 
 export function endGame(game: GameState, bus: EventBus, winner: PlayerId | null, reason: GameOverReason): void {

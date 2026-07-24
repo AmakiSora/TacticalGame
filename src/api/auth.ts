@@ -4,6 +4,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { GameState, PlayerId } from '../types.js';
 import { PLAYER_IDS } from '../types.js';
 import { globalStore } from '../state/store.js';
+import { buildAdjudicationSnapshot } from '../engine/engine.js';
 
 const errorStatus: Record<string, number> = {
   game_not_found: 404,
@@ -72,5 +73,7 @@ export function authenticateHost(
 
 export function sanitizeGameForResponse(game: GameState): unknown {
   const { tokens: _tokens, hostToken: _hostToken, ...rest } = game;
-  return structuredClone(rest);
+  const body = structuredClone(rest) as Record<string, unknown>;
+  body.adjudication = buildAdjudicationSnapshot(game);
+  return body;
 }

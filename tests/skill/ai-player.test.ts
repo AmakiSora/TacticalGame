@@ -188,6 +188,8 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('last_player_standing');
     expect(skill).toContain('multiplayer-ring');
     expect(skill).toContain('Never hardcode a single rival as `player_b`');
+    expect(skill).toContain('live `adjudication` snapshot');
+    expect(skill).toContain('Trust these server totals instead of recomputing them');
     expect(skill).not.toContain('Score only against living rivals');
   });
 

@@ -433,6 +433,7 @@ function createEmptyState() {
     turn: { roundNumber: 1, turnNumber: 1, currentPlayerId: null, currentOwner: null, turnOrder: [], actionsUsed: 0 },
     winner: null,
     result: null,
+    adjudication: null,
     eventLog: [],
   };
 }
@@ -502,7 +503,15 @@ function applyEvent(s, ev) {
     }
     case 'game_over':
       s.winner = p.winner;
-      s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores };
+      s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores, rankings: p.rankings };
+      if (p.scores) {
+        s.adjudication = {
+          ...(s.adjudication || {}),
+          scores: p.scores,
+          rankings: p.rankings || s.adjudication?.rankings || [],
+          leaders: leadersFromGameOverPayload(p),
+        };
+      }
       break;
     case 'name_rename': playerNames[p.playerId] = p.name; break;
     case 'demolish': {
@@ -514,13 +523,53 @@ function applyEvent(s, ev) {
     }
   }
 }
+/** Leaders among the adjudication contender pool (active seats, else all scored seats). */
+function leadersFromGameOverPayload(p) {
+  if (p?.winner) return [p.winner];
+  const scores = p?.scores || {};
+  const rankings = Array.isArray(p?.rankings) ? p.rankings : [];
+  const activeIds = rankings.filter(row => row.status === 'active').map(row => row.playerId);
+  const pool = activeIds.length > 0 ? activeIds : Object.keys(scores);
+  if (pool.length === 0) return [];
+  const top = Math.max(...pool.map(id => scores[id]?.total ?? 0));
+  return pool.filter(id => (scores[id]?.total ?? 0) === top);
+}
+
 async function loadFullState() {
   const { ok, data } = await API.get(`/api/games/${gameId}/events`);
   if (!ok) return false;
   playerNames = defaultPlayerNames();
   state = createEmptyState();
   for (const ev of data.events) applyEvent(state, ev);
+  await refreshAdjudication();
   return true;
+}
+
+let adjudicationRefreshInFlight = null;
+let adjudicationRefreshQueued = false;
+
+/** Pull authoritative live scoreboard from GET /api/games/:id when a player token is available. */
+async function refreshAdjudication() {
+  if (!gameId || !myToken || !state) return false;
+  // Coalesce concurrent SSE bursts into one GET.
+  if (adjudicationRefreshInFlight) {
+    adjudicationRefreshQueued = true;
+    return adjudicationRefreshInFlight;
+  }
+  adjudicationRefreshInFlight = (async () => {
+    try {
+      do {
+        adjudicationRefreshQueued = false;
+        const { ok, data } = await API.get(`/api/games/${gameId}`);
+        if (!ok || !data?.adjudication || !state) return false;
+        state.adjudication = data.adjudication;
+      } while (adjudicationRefreshQueued);
+      return true;
+    } finally {
+      adjudicationRefreshInFlight = null;
+    }
+  })();
+  return adjudicationRefreshInFlight;
 }
 
 function cellAt(q, r) { return state.cells.find(c => c.q === q && c.r === r); }
@@ -880,6 +929,19 @@ function computeAdjudicationScores() {
   return Object.keys(scores).length ? scores : null;
 }
 
+/** Prefer server `adjudication` / final `result`, else recompute from local event state. */
+function liveAdjudicationScores() {
+  const serverScores = state?.adjudication?.scores;
+  if (serverScores && Object.keys(serverScores).length > 0) return serverScores;
+  if (state?.result?.scores && Object.keys(state.result.scores).length > 0) return state.result.scores;
+  return computeAdjudicationScores();
+}
+
+function liveAdjudicationRankings() {
+  const rows = state?.adjudication?.rankings || state?.result?.rankings || [];
+  return Array.isArray(rows) ? rows : [];
+}
+
 function scoreBreakdown(score) {
   return `HQ伤害 ${score.headquartersDamage ?? score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
 }
@@ -903,14 +965,22 @@ function renderScoreRow(owner, score, rank) {
 function renderScorePanel() {
   const scorePanelEl = els.scorePanel;
   if (!scorePanelEl) return;
-  const scores = computeAdjudicationScores();
+  const scores = liveAdjudicationScores();
   if (!scores) {
     scorePanelEl.innerHTML = '<h3>分数排行榜</h3><div class="score-empty">等待对局开始</div>';
     return;
   }
-  const rows = Object.entries(scores).sort((a, b) => b[1].total - a[1].total);
+  const resultRanks = new Map(liveAdjudicationRankings().map(row => [row.playerId, row.rank]));
+  const rows = Object.entries(scores).sort(([ownerA, scoreA], [ownerB, scoreB]) => {
+    const rankA = resultRanks.get(ownerA);
+    const rankB = resultRanks.get(ownerB);
+    if (typeof rankA === 'number' && typeof rankB === 'number') return rankA - rankB;
+    if (typeof rankA === 'number') return -1;
+    if (typeof rankB === 'number') return 1;
+    return (scoreB.total ?? 0) - (scoreA.total ?? 0);
+  });
   scorePanelEl.innerHTML = `<h3>分数排行榜</h3>
-    ${rows.map(([owner, score], index) => renderScoreRow(owner, score, scoreRank(rows, index))).join('')}`;
+    ${rows.map(([owner, score], index) => renderScoreRow(owner, score, resultRanks.get(owner) ?? scoreRank(rows, index))).join('')}`;
 }
 
 function renderSidebar() {
@@ -998,7 +1068,9 @@ async function apiAction(path, body) {
   return ok;
 }
 async function afterAction(msg) {
-  toast(msg, 'ok'); deselect();
+  toast(msg, 'ok');
+  await refreshAdjudication();
+  deselect();
 }
 
 function selectUnit(unit) {
@@ -1099,7 +1171,12 @@ function subscribeSse() {
   if (sse) sse.close();
   const lastSeq = state?.eventLog.at(-1)?.seq ?? 0;
   sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}`);
-  sse.onmessage = e => { applyEvent(state, JSON.parse(e.data)); drawBoard(); renderSidebar(); };
+  sse.onmessage = async e => {
+    applyEvent(state, JSON.parse(e.data));
+    await refreshAdjudication();
+    drawBoard();
+    renderSidebar();
+  };
   sse.onerror = () => statusBadge('SSE 断开', 'err');
   sse.onopen = () => statusBadge('已连接', 'ok');
 }

@@ -166,6 +166,58 @@ describe('V2 API', () => {
     await app.close();
   });
 
+  it('includes a live adjudication scoreboard on game state responses', async () => {
+    const app = await startTestServer();
+    const { gameId, playerAToken } = await createAndJoin(app);
+
+    const game = globalStore.get(gameId)!;
+    game.resources.player_a.supplies = 0;
+    game.resources.player_b.supplies = 10;
+    game.units = [];
+    game.controlPoints.forEach((p: any) => { p.owner = null; });
+    game.headquarters.player_a.hp = 200;
+    game.headquarters.player_b.hp = 200;
+    game.players.player_a!.stats.headquartersDamage = 0;
+    game.players.player_b!.stats.headquartersDamage = 0;
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/games/${gameId}`,
+      headers: { 'X-Player-Token': playerAToken },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as any;
+    expect(body.tokens).toBeUndefined();
+    expect(body.hostToken).toBeUndefined();
+    const weights = game.config.balance.adjudicationWeights;
+    expect(body.adjudication).toMatchObject({
+      maxTurns: game.config.balance.maxTurns,
+      weights,
+      leaders: ['player_b'],
+      margin: 10 * weights.supplies,
+      scores: {
+        player_a: expect.objectContaining({
+          headquartersDamage: 0,
+          ownHqHp: 200,
+          controlPoints: 0,
+          armyValue: 0,
+          supplies: 0,
+          total: 200 * weights.ownHqHp,
+        }),
+        player_b: expect.objectContaining({
+          headquartersDamage: 0,
+          ownHqHp: 200,
+          controlPoints: 0,
+          armyValue: 0,
+          supplies: 10,
+          total: 200 * weights.ownHqHp + 10 * weights.supplies,
+        }),
+      },
+    });
+    expect(body.adjudication.rankings.map((row: any) => row.playerId)).toEqual(['player_b', 'player_a']);
+    await app.close();
+  });
+
   it('returns adjudication result and replay reason after the turn limit', async () => {
     const app = await startTestServer();
     const { gameId, playerAToken, playerBToken } = await createAndJoin(app);
@@ -202,6 +254,10 @@ describe('V2 API', () => {
     expect(finalGame.turn.turnNumber).toBe(15);
     expect(finalGame.turn.currentOwner).toBe('player_b');
     expect(finalGame.result).toMatchObject({ winner: 'player_b', reason: 'turn_limit_score' });
+    expect(finalGame.adjudication).toMatchObject({
+      leaders: ['player_b'],
+      scores: finalGame.result.scores,
+    });
 
     const eventsBody = (await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` })).json();
     expect(eventsBody.events.at(-1)).toMatchObject({

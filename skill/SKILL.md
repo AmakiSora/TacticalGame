@@ -28,7 +28,7 @@ Keep player and host tokens in their request headers. Never place them in URLs o
 3. If `phase === "lobby"`, wait for enough players, then the host must `POST /api/games/:id/start` with `X-Host-Token`. Joiners only wait until `phase === "active"`.
 4. If you are eliminated (`players[yourId].status !== "active"`), stop acting and report elimination.
 5. If it is not your turn (`turn.currentPlayerId` is not you), wait briefly and read state again. Do not ask the human to say "your turn".
-6. If it is your turn, inspect units, resources, action points, control points, all living opponents' headquarters HP, and legal targets.
+6. If it is your turn, inspect units, resources, action points, control points, all living opponents' headquarters HP, the live `adjudication` scoreboard, and legal targets.
 7. Explain the chosen legal action briefly, then call the matching REST endpoint.
 8. Refresh state after every successful action and reason again.
 9. End the turn only after available useful legal actions are exhausted.
@@ -96,6 +96,7 @@ If `POST /join` returns `game_already_full` or `game_already_started`, report th
 - Turns rotate through `turn.turnOrder` among living players; whole-round completion is tracked by `turn.roundNumber`.
 - If the configured max round is reached, only surviving players can win by adjudication score. A true draw is recorded when surviving leaders are exactly tied.
 - Adjudication score uses `config.balance.adjudicationWeights` for enemy HQ damage, own HQ HP, owned control points, surviving army value, and supplies. In multiplayer, enemy HQ damage is cumulative against all opponents.
+- `GET /api/games/:id` includes a live `adjudication` snapshot: `maxTurns`, `weights`, per-player `scores` (with `total` and breakdown fields), `rankings`, `leaders`, and `margin`. Trust these server totals instead of recomputing them. Use the breakdown only to decide what to prioritize (HQ damage vs points vs army vs supplies). Final `result.scores` remains the end-of-game record.
 
 ### Action Points
 
@@ -137,7 +138,7 @@ Use this order unless the user asks for a different style:
    If comeback supplies restore deployment capacity, use them to rebuild a viable force or contest income-producing points; do not assume the grant repeats if the score gap falls below the configured percentage.
 6. Move infantry and scouts toward neutral or enemy control points early. On typed maps, favor `supply` early for income, `forward_base` when planning sustained pressure, and `repair` when wounded units can hold nearby.
 7. In the late game, move scouts, rangers, and infantry toward the best enemy headquarters attack positions.
-8. Near adjudication, prioritize headquarters damage, captured points, valuable unit survival, and spending excess supplies. Only living rivals remain valid targets, but headquarters damage already dealt to eliminated rivals still counts toward the cumulative score.
+8. Near adjudication, read `adjudication.scores` / `leaders` / `margin` and prioritize headquarters damage, captured points, valuable unit survival, and spending excess supplies. Only living rivals remain valid targets, but headquarters damage already dealt to eliminated rivals still counts toward the cumulative score.
 9. When no useful legal action remains, call `/end-turn`.
 
 Before every action, confirm the unit has the required movement/action availability, the target is in range, the destination is valid, and action points allow the activation.

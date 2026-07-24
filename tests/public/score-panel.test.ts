@@ -27,9 +27,28 @@ describe('adjudication score panels', () => {
     for (const file of ['public/app.js', 'public/play.js']) {
       const source = read(file);
       expect(source).toContain('function computeAdjudicationScores');
+      expect(source).toContain('function liveAdjudicationScores');
       expect(source).toContain('function renderScorePanel');
       expect(source).toContain('scorePanelEl.innerHTML');
+      expect(source).toContain('state?.result?.scores');
     }
+  });
+
+  it('play client prefers server adjudication and refreshes from GET /api/games/:id', () => {
+    const source = read('public/play.js');
+    expect(source).toContain('function refreshAdjudication');
+    expect(source).toContain('state.adjudication = data.adjudication');
+    expect(source).toContain('await refreshAdjudication()');
+    expect(source).toContain('state?.adjudication?.scores');
+    expect(source).toContain('function leadersFromGameOverPayload');
+  });
+
+  it('spectator client uses final result scores then local recompute only', () => {
+    const source = read('public/app.js');
+    expect(source).toContain('function liveAdjudicationScores');
+    expect(source).toContain('state?.result?.scores');
+    expect(source).not.toContain('state?.adjudication?.scores');
+    expect(source).not.toContain('function refreshAdjudication');
   });
 
   it('renders adjudication scores as a leaderboard without a separate lead summary', () => {

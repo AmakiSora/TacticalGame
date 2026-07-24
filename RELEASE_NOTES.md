@@ -9,6 +9,8 @@
 - 玩家页优先展示服务端裁决总分，并在加载完整状态、SSE 事件与操作成功后合并刷新；终局平局时按存活并列 top 填充 `leaders`，避免写成空数组。
 - 观战页继续用事件重建本地计分，终局优先 `result.scores` / `result.rankings`，不额外伪造半残 `adjudication` 快照。
 - Hex API Game Skill 说明 AI 应信任服务端 `adjudication` 总分，breakdown 仅用于优先级判断；补充对应文档与 API/前端契约测试。
+- 重平衡多张地图的 `adjudicationWeights`，让限回合裁决更偏向「压总部 / 推进」而非纯占点囤兵：`default`/`desert` 改为 5/2/90/2/1；`breach` 将 `ownHqHp` 从 5 降到 2；`forge` 改为 7/2/75/2/1；`multiplayer-ring` 据点权重 100→75。`dual-lanes`、`danger-close` 维持原配置。
+- README 裁决说明改为按地图权重计算，不再写死 ×4/×120；示例 JSON 与 default 对齐。历史 `records/` 回放仍保留导出时权重，不批量改写。
 
 ## 3.1.4
 

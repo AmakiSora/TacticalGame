@@ -79,7 +79,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 - 重装单位可花费本回合行动爆破相邻 `blocker` 地形，将其永久变为 `plain`。爆破遵循行动点上限；已移动但未行动的重装可继续爆破，爆破后不能攻击或治疗。
 - 总部归零的玩家被淘汰，其单位移除、据点转为中立、资源冻结；对局继续。
 - 仅剩一名存活玩家时立即获胜。
-- 达到地图配置的最大轮数时，仅存活玩家参与裁决：累计总部伤害×4 + 己方总部当前 HP×2 + 己方据点数×120 + 存活部队价值×2 + 剩余补给×1。唯一最高分获胜，并列最高则平局。
+- 达到地图配置的最大轮数时，仅存活玩家参与裁决。分数按地图 `balance.adjudicationWeights` 计算：累计总部伤害×W_dmg + 己方总部当前 HP×W_hp + 己方据点数×W_cp + 存活部队价值×W_army + 剩余补给×W_sup。权重因图而异（例如 default 为 5/2/90/2/1）；唯一最高分获胜，并列最高则平局。
 
 ## 单位
 
@@ -197,7 +197,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
     "healVarianceRange": 6,
     "actionsPerTurn": 5,
     "maxTurns": 15,
-    "adjudicationWeights": { "enemyHqDamage": 4, "ownHqHp": 2, "controlPoint": 120, "armyValue": 2, "supplies": 1 }
+    "adjudicationWeights": { "enemyHqDamage": 5, "ownHqHp": 2, "controlPoint": 90, "armyValue": 2, "supplies": 1 }
   }
 }
 ```

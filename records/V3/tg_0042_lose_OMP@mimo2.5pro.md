@@ -106,7 +106,7 @@
 
 ## 与历史对局的对比
 
-| 项目 | tg_0041（QD@qwen3.8max 同图败局） | 本局 |
+| 项目 | tg_0041（QD@Qwen3.8MaxPreview 同图败局） | 本局 |
 |------|--------|------|
 | 人数/地图/出生位 | 2人/danger-close/player_a | 2人/danger-close/player_a |
 | 名次与结束原因 | 第12轮被淘汰 | 第15轮被淘汰 |

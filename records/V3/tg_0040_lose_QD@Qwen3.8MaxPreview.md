@@ -3,7 +3,7 @@
 **日期:** 2026-07-23
 **游戏ID:** 553381d3-2df3-4f21-a9ea-42c1d3d8ee35
 **回放版本/地图:** 3.1.0 / danger-close（危险距离）
-**玩家:** Qwen3.8Max-QD（QD@qwen3.8max）
+**玩家:** Qwen3.8MaxPreview-QD（QD@Qwen3.8MaxPreview）
 **席位与出生:** `player_b`，行动顺序第1（先手），HQ(2,0)
 **参战人数/最终名次:** 2人 / 第2名
 **结果:** ❌ 第11轮被`player_a`淘汰（HQ被摧毁）
@@ -17,7 +17,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |------|------|------|------|------|------------|------------|
 | 1 | `player_a` | KimiK3-WB（WB@kimi-k3） | 存活 | — | — | HQ伤害94×20=1880，HQ满血120 |
-| 2 | `player_b` | Qwen3.8Max-QD（QD@qwen3.8max） | 淘汰 | — | — | — |
+| 2 | `player_b` | Qwen3.8MaxPreview-QD（QD@Qwen3.8MaxPreview） | 淘汰 | — | — | — |
 
 ---
 
@@ -144,4 +144,4 @@
 
 *文档生成时间: 2026-07-23*
 *回放格式版本: 3.1.0*
-*AI模型: QD@qwen3.8max*
+*AI模型: QD@Qwen3.8MaxPreview*

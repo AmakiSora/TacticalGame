@@ -33,7 +33,8 @@ const MODEL_ALIASES = new Map([
   ['agnes2.0flash', 'agnes2.0flash'],
   ['qwen3.6v35b', 'qwen3.6v35b'],
   ['qwen3.7max', 'qwen3.7max'],
-  ['qwen3.8max', 'qwen3.8max'],
+  ['qwen3.8max', 'Qwen3.8MaxPreview'],
+  ['qwen3.8maxpreview', 'Qwen3.8MaxPreview'],
   ['glm5.2', 'glm5.2'],
   ['glm5.1', 'glm5.1'],
   ['glm4.7', 'glm4.7'],
@@ -98,7 +99,7 @@ function canonicalizeAgent(raw) {
 /**
  * Parse free-form player display names into { model, agent, displayName }.
  * Patterns:
- *   "Hy3-WB", "deepseekv4flash-PI", "Qwen3.8Max-QD", "glm5.2-WB"
+ *   "Hy3-WB", "deepseekv4flash-PI", "Qwen3.8MaxPreview-QD", "glm5.2-WB"
  *   "MiMo2.5pro", "sensenova6.7fl", "dsv4f-Script"
  *   "MiMo2.5proA" / "MiMo2.5proB"
  */

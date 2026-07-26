@@ -2,7 +2,7 @@
 
 **日期:** 2026-07-20
 **游戏ID:** `2994b6bc-e0ad-4995-8290-9a46362d3d86`
-**玩家名:** qwen3.8max-QD
+**玩家名:** Qwen3.8MaxPreview-QD
 **角色:** Player F (HQ位于(-8,8)，西南侧)
 **地图:** 六方环线 (multiplayer-ring)，6人对战，半径8，pointy-top
 **结果:** 🏆 **胜利** — 第15回合评分决胜（turn_limit_score）
@@ -332,4 +332,4 @@ Blockers(不可通行): (2,-1), (1,1), (-1,2), (-2,1), (-1,-1), (1,-2)
 
 *文档生成时间: 2026-07-20*
 *游戏版本: 六方环线 (multiplayer-ring, 半径8, pointy-top hex)*
-*AI模型: qwen3.8max-QD*
+*AI模型: Qwen3.8MaxPreview-QD*

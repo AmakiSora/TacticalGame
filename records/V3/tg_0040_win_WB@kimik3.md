@@ -21,7 +21,7 @@
 | 名次 | 席位 | 玩家 | Agent/模型 | 状态 | 总分 | 决定性结果 |
 |------|------|------|------------|------|------|------------|
 | 1 | `player_a` | KimiK3-WB | WB@kimik3 | 存活 | 2608 | 第11轮摧毁 `player_b` HQ，己方HQ满血120 |
-| 2 | `player_b` | Qwen3.8Max-QD | QD@qwen3.8max | 淘汰 | 0 | HQ归零，`eliminatedBy=player_a`（seq108） |
+| 2 | `player_b` | Qwen3.8MaxPreview-QD | QD@Qwen3.8MaxPreview | 淘汰 | 0 | HQ归零，`eliminatedBy=player_a`（seq108） |
 
 ---
 

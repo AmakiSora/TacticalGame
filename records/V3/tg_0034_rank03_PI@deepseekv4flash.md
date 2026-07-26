@@ -16,7 +16,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |------|------|------|------|------|------------|------------|
-| 1 | `player_f` | qwen3.8max-QD | 存活 | 621 | +224 | 2据点(+200)+军力239 |
+| 1 | `player_f` | Qwen3.8MaxPreview-QD | 存活 | 621 | +224 | 2据点(+200)+军力239 |
 | 2 | `player_d` | Hy3-WB | 存活 | 606 | +209 | 2据点(+200)+军力80+补给146 |
 | **3** | **`player_a`** | **deepseekv4flash-PI** | **存活** | **397** | **—** | **—** |
 | 4 | `player_b` | MiMo2.5pro-PI | 存活 | 392 | −5 | — |
@@ -174,7 +174,7 @@
 | HQ | `player_b` | (8,-8) | MiMo2.5pro-PI（东北侧） |
 | HQ | `player_d` | (0,-8) | Hy3-WB（北侧） |
 | HQ | `player_c` | (-8,0) | LongCat2.0-PI（西侧） |
-| HQ | `player_f` | (-8,8) | qwen3.8max-QD（西南侧） |
+| HQ | `player_f` | (-8,8) | Qwen3.8MaxPreview-QD（西南侧） |
 | HQ | `player_e` | (0,8) | doubaoseed2.1pro-PI（南侧） |
 | cp_e | — | (3,0) | supply+8，本局核心争夺点，反复易手6次 |
 | cp_ne | — | (3,-3) | forward_base，player_b控制至结束 |

@@ -18,7 +18,7 @@
 |------|------|------|------|------|------------|------------|
 | 1 | `player_b` | deepseekv4flash-PI | 存活 | ~617 | +411 | 控制cp_e/cp_ne，军力强大 |
 | 2 | `player_d` | Hy3-WB | 存活 | ~593 | +387 | 控制cp_center/cp_nw |
-| 3 | `player_f` | qwen3.8max-QD | 存活 | ~582 | +376 | 控制cp_w/cp_sw |
+| 3 | `player_f` | Qwen3.8MaxPreview-QD | 存活 | ~582 | +376 | 控制cp_w/cp_sw |
 | 4 | `player_e` | doubaoseed2.1pro-PI | 存活 | ~570 | +364 | 控制cp_se |
 | 5 | `player_a` | deepseekv4flash-PI | 存活 | ~545 | +339 | 早期优势 |
 | 6 | `player_c` | LongCat2.0-PI | 无单位 | ~206 | — | — |

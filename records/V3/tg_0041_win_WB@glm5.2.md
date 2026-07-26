@@ -20,7 +20,7 @@
 
 | 席位 | 玩家名 | agent@模型 | spawnSlot | HQ坐标 | turnOrder | 最终状态 |
 |------|--------|-----------|-----------|--------|-----------|----------|
-| `player_a` | Qwen3.8Max-QD | QD@qwen3.8max | slot_b | (2,0) | 1 | 淘汰（HQ归零） |
+| `player_a` | Qwen3.8MaxPreview-QD | QD@Qwen3.8MaxPreview | slot_b | (2,0) | 1 | 淘汰（HQ归零） |
 | `player_b` | glm5.2-WB | WB@glm5.2 | slot_a | (-2,0) | 0 | 存活（冠军） |
 
 > 关键：`player_b` 被分配到 `slot_a`（左侧 HQ -2,0），而非按字母对应的右侧。出生位须以 `players.X.spawnSlotId` + `headquarters.X` 为准，不能凭 player 字母猜侧。

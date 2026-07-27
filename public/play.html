@@ -127,6 +127,17 @@
       <input id="join-name" placeholder="留空使用默认名称" maxlength="20" />
     </div>
     <button id="btn-join" class="btn primary" style="margin-top:14px;width:100%">加入游戏</button>
+    <section class="available-games-section" aria-labelledby="available-games-title">
+      <div class="available-games-head">
+        <h3 id="available-games-title">等待加入的对局</h3>
+        <button id="btn-refresh-games" class="available-games-refresh" type="button" title="刷新对局" aria-label="刷新对局">
+          <img src="/icons/lucide/rotate-ccw.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+      <div id="available-games" class="available-games" aria-live="polite">
+        <p class="available-games-state">正在检测…</p>
+      </div>
+    </section>
     <div id="join-result" class="lobby-result hidden">
       <p class="lobby-status" id="join-status-text"></p>
       <div class="info-row" id="join-player-token-row">

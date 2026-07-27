@@ -64,4 +64,21 @@ describe('multiplayer UI wiring', () => {
     expect(source).toContain("toast('复制失败'");
     expect(source).toContain("classList.add('copied')");
   });
+
+  it('lists joinable lobbies and fills the game id on desktop and mobile', () => {
+    for (const suffix of ['', '-m']) {
+      const html = read(`public/play${suffix}.html`);
+      const source = read(`public/play${suffix}.js`);
+      const css = read(`public/play${suffix}.css`);
+
+      expect(html).toContain('id="available-games"');
+      expect(html).toContain('id="btn-refresh-games"');
+      expect(source).toContain("fetch('/api/games')");
+      expect(source).toContain("game.phase === 'lobby'");
+      expect(source).toContain('game.playerCount < game.maxPlayers');
+      expect(source).toContain('data-available-game-id');
+      expect(source).toContain('els.gameId.value = availableGame.dataset.availableGameId');
+      expect(css).toContain('.available-game');
+    }
+  });
 });

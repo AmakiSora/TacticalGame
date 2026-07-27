@@ -354,6 +354,79 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 .lobby-kick:hover { border-color: #a44e5c; background: #3a1d24; color: #f0b0b8; }
 
+.available-games-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #2a3a4a;
+}
+.available-games-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+.available-games-head h3 {
+  color: #9bb3c4;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.available-games-refresh {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  background: #16222d;
+  cursor: pointer;
+}
+.available-games-refresh:hover { border-color: #4a7188; background: #1d3040; }
+.available-games-refresh:disabled { opacity: .55; cursor: wait; }
+.available-games-refresh img { width: 15px; height: 15px; filter: invert(78%) sepia(13%) saturate(535%) hue-rotate(158deg); }
+.available-games-refresh.refreshing img { animation: available-games-spin .8s linear infinite; }
+.available-games { display: grid; gap: 7px; }
+.available-game {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 10px 12px;
+  border: 1px solid #273a4a;
+  border-radius: 6px;
+  background: #101922;
+  color: #d8e0e8;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.available-game:hover, .available-game:focus-visible { border-color: #4a8aaa; background: #142431; outline: none; }
+.available-game.selected { border-color: #6aaf8a; background: #13281f; }
+.available-game-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #a8d7c2;
+  font: 600 12px "SF Mono", "Consolas", monospace;
+  white-space: nowrap;
+}
+.available-game-seats { color: #d8e0e8; font-size: 12px; font-weight: 700; }
+.available-game-map { color: #668495; font-size: 11px; }
+.available-game-action { color: #70a7c4; font-size: 11px; font-weight: 700; }
+.available-games-state {
+  padding: 16px 10px;
+  border: 1px dashed #2a3a4a;
+  border-radius: 6px;
+  color: #668495;
+  font-size: 12px;
+  text-align: center;
+}
+@keyframes available-games-spin { to { transform: rotate(360deg); } }
+
 /* ══════════ map picker ══════════ */
 .create-setup {
   display: flex;

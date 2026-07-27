@@ -37,6 +37,7 @@ const els = {
   createdHostToken: $('created-host-token'), createdToken: $('created-token'), createdPlayerTokenRow: $('created-player-token-row'),
   lobbySummary: $('lobby-summary'), joinLobbySummary: $('join-lobby-summary'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
   joinPlayerToken: $('join-player-token'), joinPlayerTokenRow: $('join-player-token-row'),
+  availableGames: $('available-games'), btnRefreshGames: $('btn-refresh-games'),
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
   btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'),
@@ -57,6 +58,8 @@ let hostToken = null;
 let myPlayer = null;
 let sse = null;
 let lobbyPollTimer = null;
+let availableGamesTimer = null;
+let availableGamesLoading = false;
 let hoverCell = null;
 let selectedUnitId = null;
 let selectedOriginId = null;
@@ -1486,6 +1489,62 @@ function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target =
   target.innerHTML = lobbySummaryMarkup(lobby, canKick);
 }
 
+function renderAvailableGames(games) {
+  if (!els.availableGames) return;
+  const joinableGames = games
+    .filter(game => game.phase === 'lobby' && game.playerCount < game.maxPlayers)
+    .reverse();
+  if (!joinableGames.length) {
+    els.availableGames.innerHTML = '<p class="available-games-state">暂无等待加入的对局</p>';
+    return;
+  }
+  const selectedId = els.gameId.value.trim();
+  els.availableGames.innerHTML = joinableGames.map(game => {
+    const id = String(game.gameId || '');
+    const selected = id === selectedId;
+    return `<button type="button" class="available-game${selected ? ' selected' : ''}" data-available-game-id="${esc(id)}" aria-pressed="${selected}" title="${esc(id)}">
+      <span class="available-game-id">${esc(id)}</span>
+      <span class="available-game-seats">${esc(game.playerCount)}/${esc(game.maxPlayers)} 人</span>
+      <span class="available-game-map">地图 ${esc(game.mapId || 'default')}</span>
+      <span class="available-game-action">选择</span>
+    </button>`;
+  }).join('');
+}
+
+async function refreshAvailableGames() {
+  if (!els.availableGames || availableGamesLoading) return;
+  availableGamesLoading = true;
+  els.btnRefreshGames?.classList.add('refreshing');
+  if (els.btnRefreshGames) els.btnRefreshGames.disabled = true;
+  try {
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error('request failed');
+    const data = await res.json();
+    renderAvailableGames(Array.isArray(data.games) ? data.games : []);
+  } catch {
+    if (!els.availableGames.querySelector('.available-game')) {
+      els.availableGames.innerHTML = '<p class="available-games-state">暂时无法获取对局</p>';
+    }
+  } finally {
+    availableGamesLoading = false;
+    els.btnRefreshGames?.classList.remove('refreshing');
+    if (els.btnRefreshGames) els.btnRefreshGames.disabled = false;
+  }
+}
+
+function startAvailableGamesRefresh() {
+  refreshAvailableGames();
+  if (availableGamesTimer) clearInterval(availableGamesTimer);
+  availableGamesTimer = setInterval(() => {
+    if (!document.hidden && !els.joinPanel.classList.contains('hidden')) refreshAvailableGames();
+  }, 5000);
+}
+
+function stopAvailableGamesRefresh() {
+  if (availableGamesTimer) clearInterval(availableGamesTimer);
+  availableGamesTimer = null;
+}
+
 async function refreshLobbySummary() {
   if (!gameId) return null;
   const res = await fetch(`/api/games/${gameId}/lobby`);
@@ -1598,6 +1657,7 @@ els.btnCreate.addEventListener('click', async () => {
     els.createResult.classList.remove('hidden');
     statusBadge('大厅中', 'idle');
     startLobbyPolling();
+    refreshAvailableGames();
   } catch {
     toast('创建失败：无法连接服务器', 'err');
   } finally {
@@ -1609,7 +1669,7 @@ els.btnJoin.addEventListener('click', async () => {
   stopLobbyPolling();
   const res = await fetch(`/api/games/${gid}/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: els.joinName.value.trim() || undefined }) });
   const data = await res.json();
-  if (!res.ok) { els.joinStatusText.textContent = `加入失败: ${data.error}`; els.joinResult.classList.remove('hidden'); return; }
+  if (!res.ok) { els.joinStatusText.textContent = `加入失败: ${data.error}`; els.joinResult.classList.remove('hidden'); refreshAvailableGames(); return; }
   myToken = data.player.token;
   myPlayer = data.player.id;
   gameId = gid;
@@ -1620,6 +1680,7 @@ els.btnJoin.addEventListener('click', async () => {
   els.joinPlayerTokenRow.classList.remove('hidden');
   els.joinResult.classList.remove('hidden');
   renderLobbySummary(data.lobby, els.joinLobbySummary);
+  refreshAvailableGames();
   statusBadge(data.lobby?.phase === 'active' ? '正在进入' : '大厅中', 'idle');
   if (data.lobby?.phase === 'active') await enterGame();
   else {
@@ -1642,6 +1703,7 @@ async function enterGame() {
     return;
   }
   stopLobbyPolling();
+  stopAvailableGamesRefresh();
   if (sse) { sse.close(); sse = null; }
   els.joinPanel.classList.add('hidden'); els.gameUI.classList.remove('hidden');
   const bar = document.getElementById('bottom-bar');
@@ -1666,8 +1728,20 @@ document.querySelectorAll('.lobby-tab').forEach(tab => tab.addEventListener('cli
   document.querySelectorAll('.lobby-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.lobby-tab-content').forEach(c => c.classList.remove('active'));
   tab.classList.add('active'); $(`tab-${tab.dataset.tab}`).classList.add('active');
+  if (tab.dataset.tab === 'join') refreshAvailableGames();
 }));
+els.btnRefreshGames?.addEventListener('click', refreshAvailableGames);
 document.addEventListener('click', e => {
+  const availableGame = e.target.closest?.('[data-available-game-id]');
+  if (availableGame) {
+    els.gameId.value = availableGame.dataset.availableGameId;
+    els.availableGames.querySelectorAll('.available-game').forEach(button => {
+      const selected = button === availableGame;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    return;
+  }
   const button = e.target.closest?.('[data-kick-player]');
   if (!button) return;
   e.preventDefault();
@@ -1802,3 +1876,4 @@ window.addEventListener('resize', () => {
 });
 
 loadMapList();
+startAvailableGamesRefresh();

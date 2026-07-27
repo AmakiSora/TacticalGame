@@ -43,6 +43,40 @@ describe('mobile website pages', () => {
     expect(spectator).toContain('id="drawer"');
     expect(spectator).toContain('href="/spectator-m.css"');
     expect(spectator).toContain('/spectator-m.js');
+    expect(play).toContain('/mobile-icons.css');
+    expect(spectator).toContain('/mobile-icons.css');
+  });
+
+  it('uses consistent Lucide assets instead of font glyphs for mobile icon buttons', () => {
+    const play = read('public/play-m.html');
+    const spectator = read('public/spectator-m.html');
+    const spectatorJs = read('public/spectator-m.js');
+    const icons = read('public/mobile-icons.css');
+
+    for (const icon of ['settings', 'plus', 'minus', 'reset', 'close']) {
+      expect(play).toContain(`icon-${icon}`);
+      expect(spectator).toContain(`icon-${icon}`);
+    }
+    for (const icon of ['skip-back', 'chevron-left', 'play', 'chevron-right', 'skip-forward']) {
+      expect(spectator).toContain(`icon-${icon}`);
+    }
+    expect(spectatorJs).toContain("classList.toggle('icon-pause', playing)");
+    expect(play).not.toContain('&#9881;');
+    expect(spectator).not.toMatch(/[⚙↺⏮◀▶⏭×]/);
+    expect(icons).toContain("url('/icons/lucide/settings.svg')");
+  });
+
+  it('provides consistent page switching in both mobile settings drawers', () => {
+    const play = read('public/play-m.html');
+    const spectator = read('public/spectator-m.html');
+
+    for (const html of [play, spectator]) {
+      expect(html).toContain('class="mobile-page-switcher"');
+      expect(html).toContain('href="/play-m.html"');
+      expect(html).toContain('href="/spectator-m.html"');
+      expect(html).toContain('href="/stats.html"');
+      expect(html).toContain('aria-current="page"');
+    }
   });
 
   it('implements pointer pan/pinch and board transform on mobile scripts', () => {
@@ -148,9 +182,14 @@ describe('mobile website pages', () => {
   it('keeps spectator scoring and control-token settings on mobile', () => {
     const html = read('public/spectator-m.html');
     const source = read('public/spectator-m.js');
+    const css = read('public/spectator-m.css');
 
     expect(html).toContain('id="settings-control-token"');
     expect(html).toContain('id="btn-save-control-token"');
+    expect(html).toContain('class="setting-value"');
+    expect(html).toContain('class="btn settings-save-button"');
+    expect(css).toContain('#refresh-interval-drawer');
+    expect(css).toContain('.settings-save-button');
     expect(source).toContain('function liveAdjudicationScores');
     expect(source).toContain('function liveAdjudicationRankings');
     expect(source).toContain("localStorage.setItem('autoControlToken'");

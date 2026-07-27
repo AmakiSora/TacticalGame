@@ -23,6 +23,10 @@
     reasonBars: document.getElementById('reason-bars'),
     matchTable: document.getElementById('match-table'),
     matchCountLabel: document.getElementById('match-count-label'),
+    modelSortMobile: document.getElementById('model-sort-mobile'),
+    modelSortDirection: document.getElementById('model-sort-direction'),
+    matchSortMobile: document.getElementById('match-sort-mobile'),
+    matchSortDirection: document.getElementById('match-sort-direction'),
   };
 
   /** @type {any} */
@@ -338,19 +342,19 @@
       .map(r => {
         const selected = selectedModel === r.model ? 'selected' : '';
         return `<tr data-model="${escapeAttr(r.model)}" class="${selected}">
-          <td class="num">${r.rank}</td>
-          <td class="model-name">${escapeHtml(r.model)}</td>
-          <td class="num">${r.games}</td>
-          <td class="num win">${r.wins}</td>
-          <td class="num loss">${r.losses}</td>
-          <td class="num">${r.draws}</td>
-          <td class="num"><span class="pill-rate">${pct(r.winRate)}</span></td>
-          <td class="num">${pct(r.top3Rate)}</td>
-          <td class="num">${r.avgRank == null ? '—' : fmtNum(r.avgRank, 2)}</td>
-          <td class="num">${r.avgScore == null ? '—' : fmtNum(r.avgScore, 0)}</td>
-          <td class="num">${r.avgHqDamage == null ? '—' : fmtNum(r.avgHqDamage, 0)}</td>
-          <td class="num">${fmtNum(r.rating, 3)}</td>
-          <td class="muted">${escapeHtml(topAgents(r.agents))}</td>
+          <td class="num" data-label="排名">${r.rank}</td>
+          <td class="model-name" data-label="模型">${escapeHtml(r.model)}</td>
+          <td class="num" data-label="场次">${r.games}</td>
+          <td class="num win" data-label="胜">${r.wins}</td>
+          <td class="num loss" data-label="负">${r.losses}</td>
+          <td class="num" data-label="平 / 僵">${r.draws}</td>
+          <td class="num" data-label="胜率"><span class="pill-rate">${pct(r.winRate)}</span></td>
+          <td class="num" data-label="前三率">${pct(r.top3Rate)}</td>
+          <td class="num" data-label="平均名次">${r.avgRank == null ? '—' : fmtNum(r.avgRank, 2)}</td>
+          <td class="num" data-label="平均分">${r.avgScore == null ? '—' : fmtNum(r.avgScore, 0)}</td>
+          <td class="num" data-label="平均 HQ 伤害">${r.avgHqDamage == null ? '—' : fmtNum(r.avgHqDamage, 0)}</td>
+          <td class="num" data-label="评分">${fmtNum(r.rating, 3)}</td>
+          <td class="muted" data-label="常用 Agent">${escapeHtml(topAgents(r.agents))}</td>
         </tr>`;
       })
       .join('');
@@ -370,11 +374,11 @@
           .map(([m, c]) => `<span class="tag">${escapeHtml(m)}×${c}</span>`)
           .join('');
         return `<tr>
-          <td><strong>${escapeHtml(a.agent)}</strong></td>
-          <td class="num">${a.games}</td>
-          <td class="num win">${a.wins}</td>
-          <td class="num">${pct(a.winRate)}</td>
-          <td>${models}</td>
+          <td data-label="Agent"><strong>${escapeHtml(a.agent)}</strong></td>
+          <td class="num" data-label="场次">${a.games}</td>
+          <td class="num win" data-label="胜">${a.wins}</td>
+          <td class="num" data-label="胜率">${pct(a.winRate)}</td>
+          <td data-label="模型分布">${models}</td>
         </tr>`;
       })
       .join('');
@@ -417,10 +421,10 @@
         ${vs
           .map(
             v => `<tr>
-            <td>${escapeHtml(v.opp)}</td>
-            <td class="num">${v.games}</td>
-            <td class="num">${v.wins}</td>
-            <td class="num">${pct(v.wr)}</td>
+            <td data-label="对手模型">${escapeHtml(v.opp)}</td>
+            <td class="num" data-label="交手">${v.games}</td>
+            <td class="num" data-label="占优">${v.wins}</td>
+            <td class="num" data-label="占优率">${pct(v.wr)}</td>
           </tr>`,
           )
           .join('')}
@@ -454,16 +458,16 @@
             ? `${winnerPart.model} (${winnerPart.agent})`
             : m.winner || '—';
         return `<tr>
-          <td><strong>${escapeHtml(m.recordId)}</strong></td>
-          <td>${fmtDate(m.date)}</td>
-          <td>${escapeHtml(m.version)}</td>
-          <td>${escapeHtml(m.mapId)}</td>
-          <td class="num">${m.playerCount}</td>
-          <td><div class="participant-chips">${chips}</div></td>
-          <td class="win">${escapeHtml(winnerLabel)}</td>
-          <td>${escapeHtml(REASON_LABELS[m.reason] || m.reason || '—')}</td>
-          <td class="num">${m.rounds ?? '—'}</td>
-          <td class="muted">${escapeHtml(m.schemaVersion || '—')}</td>
+          <td data-label="对局"><strong>${escapeHtml(m.recordId)}</strong></td>
+          <td data-label="日期">${fmtDate(m.date)}</td>
+          <td data-label="版本">${escapeHtml(m.version)}</td>
+          <td data-label="地图">${escapeHtml(m.mapId)}</td>
+          <td class="num" data-label="人数">${m.playerCount}</td>
+          <td data-label="参赛模型"><div class="participant-chips">${chips}</div></td>
+          <td class="win" data-label="胜者">${escapeHtml(winnerLabel)}</td>
+          <td data-label="结束">${escapeHtml(REASON_LABELS[m.reason] || m.reason || '—')}</td>
+          <td class="num" data-label="整轮">${m.rounds ?? '—'}</td>
+          <td class="muted" data-label="Schema">${escapeHtml(m.schemaVersion || '—')}</td>
         </tr>`;
       })
       .join('');
@@ -507,6 +511,22 @@
     renderBars(el.reasonBars, agg.overview.reasonDist);
     renderMatchup(selectedModel, agg.modelLeaderboard);
     renderMatches(filteredMatches);
+    syncMobileSortControls();
+  }
+
+  function syncSortControl(select, button, sort) {
+    if (!select || !button) return;
+    select.value = sort.key;
+    const descending = sort.dir === 'desc';
+    const icon = button.querySelector('.ui-icon');
+    icon?.classList.toggle('icon-arrow-down', descending);
+    icon?.classList.toggle('icon-arrow-up', !descending);
+    button.setAttribute('aria-label', `当前${descending ? '降序' : '升序'}，切换排序方向`);
+  }
+
+  function syncMobileSortControls() {
+    syncSortControl(el.modelSortMobile, el.modelSortDirection, modelSort);
+    syncSortControl(el.matchSortMobile, el.matchSortDirection, matchSort);
   }
 
   function escapeHtml(s) {
@@ -589,6 +609,16 @@
     applyAndRender();
   });
 
+  el.modelSortMobile?.addEventListener('change', () => {
+    const key = el.modelSortMobile.value;
+    modelSort = { key, dir: key === 'model' || key === 'avgRank' ? 'asc' : 'desc' };
+    applyAndRender();
+  });
+  el.modelSortDirection?.addEventListener('click', () => {
+    modelSort.dir = modelSort.dir === 'asc' ? 'desc' : 'asc';
+    applyAndRender();
+  });
+
   el.matchTable.querySelector('thead').addEventListener('click', e => {
     const th = e.target.closest('th[data-msort]');
     if (!th) return;
@@ -598,6 +628,19 @@
       matchSort.key = key;
       matchSort.dir = key === 'recordId' || key === 'mapId' || key === 'reason' ? 'asc' : 'desc';
     }
+    applyAndRender();
+  });
+
+  el.matchSortMobile?.addEventListener('change', () => {
+    const key = el.matchSortMobile.value;
+    matchSort = {
+      key,
+      dir: key === 'recordId' || key === 'mapId' || key === 'reason' ? 'asc' : 'desc',
+    };
+    applyAndRender();
+  });
+  el.matchSortDirection?.addEventListener('click', () => {
+    matchSort.dir = matchSort.dir === 'asc' ? 'desc' : 'asc';
     applyAndRender();
   });
 

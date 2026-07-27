@@ -1,0 +1,30 @@
+.ui-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  background: currentColor;
+  pointer-events: none;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+
+.icon-only {
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.ui-icon.icon-settings { --icon: url('/icons/lucide/settings.svg'); }
+.ui-icon.icon-plus { --icon: url('/icons/lucide/plus.svg'); }
+.ui-icon.icon-minus { --icon: url('/icons/lucide/minus.svg'); }
+.ui-icon.icon-reset { --icon: url('/icons/lucide/rotate-ccw.svg'); }
+.ui-icon.icon-skip-back { --icon: url('/icons/lucide/skip-back.svg'); }
+.ui-icon.icon-chevron-left { --icon: url('/icons/lucide/chevron-left.svg'); }
+.ui-icon.icon-play { --icon: url('/icons/lucide/play.svg'); }
+.ui-icon.icon-pause { --icon: url('/icons/lucide/pause.svg'); }
+.ui-icon.icon-chevron-right { --icon: url('/icons/lucide/chevron-right.svg'); }
+.ui-icon.icon-skip-forward { --icon: url('/icons/lucide/skip-forward.svg'); }
+.ui-icon.icon-close { --icon: url('/icons/lucide/x.svg'); }
+.ui-icon.icon-arrow-down { --icon: url('/icons/lucide/arrow-down.svg'); }
+.ui-icon.icon-arrow-up { --icon: url('/icons/lucide/arrow-up.svg'); }

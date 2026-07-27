@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>TacticalGame — 观战（手机）</title>
   <link rel="stylesheet" href="/spectator-m.css" />
+  <link rel="stylesheet" href="/mobile-icons.css" />
 </head>
 <body class="spectator-m-shell">
 
@@ -15,7 +16,7 @@
     <button type="button" id="game-summary-btn" class="game-summary-btn" data-drawer="game">
       <span id="game-picker-label">-- 选择对局 --</span>
     </button>
-    <button type="button" id="btn-settings" class="icon-btn" title="设置" data-drawer="settings">&#9881;</button>
+    <button type="button" id="btn-settings" class="icon-btn icon-only" title="设置" aria-label="设置" data-drawer="settings"><span class="ui-icon icon-settings" aria-hidden="true"></span></button>
   </header>
 
   <select id="game-select" class="native-game-select" hidden tabindex="-1" aria-hidden="true">
@@ -44,9 +45,9 @@
         </div>
       </div>
       <div id="zoom-controls" class="zoom-controls">
-        <button type="button" id="btn-zoom-in" class="zoom-btn" title="放大">+</button>
-        <button type="button" id="btn-zoom-out" class="zoom-btn" title="缩小">−</button>
-        <button type="button" id="btn-zoom-reset" class="zoom-btn" title="重置">↺</button>
+        <button type="button" id="btn-zoom-in" class="zoom-btn icon-only" title="放大" aria-label="放大"><span class="ui-icon icon-plus" aria-hidden="true"></span></button>
+        <button type="button" id="btn-zoom-out" class="zoom-btn icon-only" title="缩小" aria-label="缩小"><span class="ui-icon icon-minus" aria-hidden="true"></span></button>
+        <button type="button" id="btn-zoom-reset" class="zoom-btn icon-only" title="重置视图" aria-label="重置视图"><span class="ui-icon icon-reset" aria-hidden="true"></span></button>
       </div>
     </div>
 
@@ -62,11 +63,11 @@
         <div id="timeline-markers"></div>
       </div>
       <div id="control-buttons" class="control-buttons">
-        <button id="btn-start" title="回到开始">⏮</button>
-        <button id="btn-prev" title="上一步">◀</button>
-        <button id="btn-play" title="播放/暂停">▶</button>
-        <button id="btn-next" title="下一步">▶</button>
-        <button id="btn-end" title="跳到末尾">⏭</button>
+        <button id="btn-start" class="icon-only" title="回到开始" aria-label="回到开始"><span class="ui-icon icon-skip-back" aria-hidden="true"></span></button>
+        <button id="btn-prev" class="icon-only" title="上一步" aria-label="上一步"><span class="ui-icon icon-chevron-left" aria-hidden="true"></span></button>
+        <button id="btn-play" class="icon-only" title="播放" aria-label="播放"><span class="ui-icon icon-play" aria-hidden="true"></span></button>
+        <button id="btn-next" class="icon-only" title="下一步" aria-label="下一步"><span class="ui-icon icon-chevron-right" aria-hidden="true"></span></button>
+        <button id="btn-end" class="icon-only" title="跳到末尾" aria-label="跳到末尾"><span class="ui-icon icon-skip-forward" aria-hidden="true"></span></button>
         <select id="speed-select" title="播放速度">
           <option value="1000">0.5x</option>
           <option value="500" selected>1x</option>
@@ -130,7 +131,7 @@
     <div class="drawer-handle"></div>
     <div class="drawer-header">
       <h2 id="drawer-title">对局</h2>
-      <button type="button" id="drawer-close" class="drawer-close" aria-label="关闭">×</button>
+      <button type="button" id="drawer-close" class="drawer-close icon-only" title="关闭" aria-label="关闭"><span class="ui-icon icon-close" aria-hidden="true"></span></button>
     </div>
     <div id="drawer-body" class="drawer-body">
       <div id="drawer-panel-game" class="drawer-panel hidden">
@@ -140,10 +141,6 @@
           <button type="button" id="btn-refresh-list-drawer" class="btn" style="width:100%;margin-top:8px">刷新列表</button>
           <button type="button" id="btn-delete-drawer" class="btn danger" style="width:100%;margin-top:8px">删除当前对局</button>
         </section>
-        <nav class="mobile-links" aria-label="站点导航">
-          <a href="/stats.html">统计</a>
-          <a href="/play-m.html">玩家控制台</a>
-        </nav>
         <section class="drawer-section">
           <h3>导入 / 导出</h3>
           <div class="btn-row">
@@ -177,24 +174,35 @@
         </section>
       </div>
       <div id="drawer-panel-settings" class="drawer-panel hidden">
+        <nav class="mobile-page-switcher" aria-label="页面切换">
+          <a href="/play-m.html">玩家</a>
+          <a href="/spectator-m.html" class="active" aria-current="page">观战</a>
+          <a href="/stats.html">统计</a>
+        </nav>
         <section class="drawer-section settings-panel">
+          <h3>回放设置</h3>
           <label class="toggle-row">
             <span>自动刷新</span>
             <span class="toggle"><input type="checkbox" id="auto-refresh-drawer" checked /><span class="slider"></span></span>
           </label>
           <label class="setting-row">
-            刷新间隔 <input type="number" id="refresh-interval-drawer" min="1" max="60" value="5" /> 秒
+            <span>刷新间隔</span>
+            <span class="setting-value">
+              <input type="number" id="refresh-interval-drawer" min="1" max="60" value="5" inputmode="numeric" aria-label="刷新间隔（秒）" />
+              <span>秒</span>
+            </span>
           </label>
           <label class="toggle-row">
             <span>跟随最新</span>
             <span class="toggle"><input type="checkbox" id="follow-latest-drawer" /><span class="slider"></span></span>
           </label>
           <div class="settings-divider"></div>
+          <h3>访问凭证</h3>
           <label class="setting-field">
             <span>Control token</span>
             <input id="settings-control-token" type="password" placeholder="Control token" autocomplete="off" />
           </label>
-          <button id="btn-save-control-token" type="button" class="btn">保存 Token</button>
+          <button id="btn-save-control-token" type="button" class="btn settings-save-button">保存 Token</button>
         </section>
       </div>
     </div>

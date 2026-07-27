@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>TacticalGame — 玩家（手机）</title>
   <link rel="stylesheet" href="/play-m.css" />
+  <link rel="stylesheet" href="/mobile-icons.css" />
 </head>
 <body class="player-m-shell">
 
@@ -14,7 +15,7 @@
     </div>
     <div class="m-header-actions">
       <div id="conn-status" class="badge idle">未加入</div>
-      <button type="button" id="btn-settings" class="icon-btn" title="设置" aria-label="设置" data-drawer="settings">&#9881;</button>
+      <button type="button" id="btn-settings" class="icon-btn icon-only" title="设置" aria-label="设置" data-drawer="settings"><span class="ui-icon icon-settings" aria-hidden="true"></span></button>
     </div>
   </header>
 
@@ -122,9 +123,9 @@
         </div>
       </div>
       <div id="zoom-controls" class="zoom-controls">
-        <button type="button" id="btn-zoom-in" class="zoom-btn" title="放大">+</button>
-        <button type="button" id="btn-zoom-out" class="zoom-btn" title="缩小">−</button>
-        <button type="button" id="btn-zoom-reset" class="zoom-btn" title="重置">↺</button>
+        <button type="button" id="btn-zoom-in" class="zoom-btn icon-only" title="放大" aria-label="放大"><span class="ui-icon icon-plus" aria-hidden="true"></span></button>
+        <button type="button" id="btn-zoom-out" class="zoom-btn icon-only" title="缩小" aria-label="缩小"><span class="ui-icon icon-minus" aria-hidden="true"></span></button>
+        <button type="button" id="btn-zoom-reset" class="zoom-btn icon-only" title="重置视图" aria-label="重置视图"><span class="ui-icon icon-reset" aria-hidden="true"></span></button>
       </div>
     </div>
 
@@ -177,7 +178,7 @@
     <div class="drawer-handle"></div>
     <div class="drawer-header">
       <h2 id="drawer-title">信息</h2>
-      <button type="button" id="drawer-close" class="drawer-close" aria-label="关闭">×</button>
+      <button type="button" id="drawer-close" class="drawer-close icon-only" title="关闭" aria-label="关闭"><span class="ui-icon icon-close" aria-hidden="true"></span></button>
     </div>
     <div id="drawer-body" class="drawer-body">
       <div id="drawer-panel-info" class="drawer-panel hidden">
@@ -208,6 +209,11 @@
         </section>
       </div>
       <div id="drawer-panel-settings" class="drawer-panel hidden">
+        <nav class="mobile-page-switcher" aria-label="页面切换">
+          <a href="/play-m.html" class="active" aria-current="page">玩家</a>
+          <a href="/spectator-m.html">观战</a>
+          <a href="/stats.html">统计</a>
+        </nav>
         <section class="drawer-section settings-panel">
           <h3>访问凭证</h3>
           <label class="setting-field">
@@ -236,10 +242,6 @@
             <button id="btn-clear-session" type="button" class="btn danger">清除会话</button>
           </div>
         </section>
-        <nav class="mobile-links" aria-label="站点导航">
-          <a href="/stats.html">统计</a>
-          <a href="/spectator-m.html">观战</a>
-        </nav>
       </div>
     </div>
   </aside>

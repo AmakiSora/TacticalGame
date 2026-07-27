@@ -2,9 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>TacticalGame — 统计看板</title>
   <link rel="stylesheet" href="/stats.css" />
+  <link rel="stylesheet" href="/mobile-icons.css" />
   <script src="/version.js" defer></script>
   <script src="/stats.js" defer></script>
 </head>
@@ -91,8 +92,23 @@
 
     <section class="panel focus-panel">
       <div class="panel-heading">
-        <h2>模型排行榜</h2>
-        <span>按 Wilson 下限评分排序 · 小样本不会虚高</span>
+        <div class="panel-heading-copy">
+          <h2>模型排行榜</h2>
+          <span>按 Wilson 下限评分排序 · 小样本不会虚高</span>
+        </div>
+        <div class="mobile-sort" aria-label="模型排行榜排序">
+          <label for="model-sort-mobile">排序</label>
+          <select id="model-sort-mobile">
+            <option value="rating">评分</option>
+            <option value="games">场次</option>
+            <option value="wins">胜场</option>
+            <option value="winRate">胜率</option>
+            <option value="top3Rate">前三率</option>
+            <option value="avgRank">平均名次</option>
+            <option value="model">模型名称</option>
+          </select>
+          <button id="model-sort-direction" class="icon-only" type="button" title="切换排序方向" aria-label="当前降序，切换排序方向"><span class="ui-icon icon-arrow-down" aria-hidden="true"></span></button>
+        </div>
       </div>
       <div class="table-wrap">
         <table id="model-table" class="data-table">
@@ -168,8 +184,22 @@
 
     <section class="panel">
       <div class="panel-heading">
-        <h2>对局列表</h2>
-        <span id="match-count-label">0 局</span>
+        <div class="panel-heading-copy">
+          <h2>对局列表</h2>
+          <span id="match-count-label">0 局</span>
+        </div>
+        <div class="mobile-sort" aria-label="对局列表排序">
+          <label for="match-sort-mobile">排序</label>
+          <select id="match-sort-mobile">
+            <option value="date">日期</option>
+            <option value="recordId">对局编号</option>
+            <option value="mapId">地图</option>
+            <option value="playerCount">人数</option>
+            <option value="rounds">整轮</option>
+            <option value="reason">结束原因</option>
+          </select>
+          <button id="match-sort-direction" class="icon-only" type="button" title="切换排序方向" aria-label="当前降序，切换排序方向"><span class="ui-icon icon-arrow-down" aria-hidden="true"></span></button>
+        </div>
       </div>
       <div class="table-wrap">
         <table id="match-table" class="data-table">

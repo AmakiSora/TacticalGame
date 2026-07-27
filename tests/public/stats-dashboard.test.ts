@@ -15,4 +15,24 @@ describe('stats dashboard', () => {
 
     expect(stats.source.recordsDir).toBeUndefined();
   });
+
+  it('provides card labels and touch sorting for narrow screens', () => {
+    const html = readFileSync('public/stats.html', 'utf8');
+    const source = readFileSync('public/stats.js', 'utf8');
+    const css = readFileSync('public/stats.css', 'utf8');
+
+    expect(html).toContain('id="model-sort-mobile"');
+    expect(html).toContain('id="match-sort-mobile"');
+    expect(html).toContain('id="model-sort-direction"');
+    expect(html).toContain('id="match-sort-direction"');
+    expect(source).toContain('data-label="模型"');
+    expect(source).toContain('data-label="参赛模型"');
+    expect(source).toContain('function syncMobileSortControls');
+    expect(css).toContain('@media (max-width: 720px)');
+    expect(css).toContain('content: attr(data-label)');
+    expect(css).toContain('.mobile-sort');
+    expect(html).toContain('/mobile-icons.css');
+    expect(html).toContain('icon-arrow-down');
+    expect(source).toContain("classList.toggle('icon-arrow-up'");
+  });
 });

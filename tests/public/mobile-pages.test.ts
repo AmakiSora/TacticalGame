@@ -1,0 +1,159 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+function read(path: string): string {
+  return readFileSync(path, 'utf-8');
+}
+
+describe('mobile website pages', () => {
+  it('adds viewport meta and narrow-screen redirects on desktop pages', () => {
+    const play = read('public/play.html');
+    const spectator = read('public/spectator.html');
+
+    expect(play).toContain('name="viewport"');
+    expect(play).toContain('width=device-width');
+    expect(play).toContain('/play-m.html');
+    expect(play).toContain("matchMedia('(max-width: 820px)')");
+
+    expect(spectator).toContain('name="viewport"');
+    expect(spectator).toContain('/spectator-m.html');
+    expect(spectator).toContain("matchMedia('(max-width: 820px)')");
+  });
+
+  it('ships independent mobile shells with board-first chrome', () => {
+    const play = read('public/play-m.html');
+    const spectator = read('public/spectator-m.html');
+
+    expect(play).toContain('name="viewport"');
+    expect(play).toContain('class="player-m-shell"');
+    expect(play).toContain('id="bottom-bar"');
+    expect(play).toContain('id="board-viewport"');
+    expect(play).toContain('id="board-world"');
+    expect(play).toContain('id="drawer"');
+    expect(play).toContain('id="btn-cancel"');
+    expect(play).toContain('id="btn-end-turn-bar"');
+    expect(play).toContain('href="/play-m.css"');
+    expect(play).toContain('/play-m.js');
+
+    expect(spectator).toContain('name="viewport"');
+    expect(spectator).toContain('class="spectator-m-shell"');
+    expect(spectator).toContain('id="bottom-bar"');
+    expect(spectator).toContain('id="board-viewport"');
+    expect(spectator).toContain('id="replay-bar"');
+    expect(spectator).toContain('id="drawer"');
+    expect(spectator).toContain('href="/spectator-m.css"');
+    expect(spectator).toContain('/spectator-m.js');
+  });
+
+  it('implements pointer pan/pinch and board transform on mobile scripts', () => {
+    for (const file of ['public/play-m.js', 'public/spectator-m.js']) {
+      const source = read(file);
+      expect(source).toContain('pointerdown');
+      expect(source).toContain('setBoardTransform');
+      expect(source).toContain('fitBoardToViewport');
+      expect(source).toContain('boardScale');
+      expect(source).toContain('TAP_MOVE_THRESHOLD');
+      expect(source).toContain('openDrawer');
+    }
+    expect(read('public/play-m.js')).toContain('handleBoardTap');
+    expect(read('public/play-m.js')).toContain('btn-end-turn-bar');
+    expect(read('public/spectator-m.js')).toContain('renderDrawerGameList');
+  });
+
+  it('keeps desktop shells intact for existing optimization tests', () => {
+    const play = read('public/play.html');
+    const spectator = read('public/spectator.html');
+    expect(play).toContain('class="player-shell"');
+    expect(spectator).toContain('class="spectator-shell"');
+    expect(play).not.toContain('player-m-shell');
+    expect(spectator).not.toContain('spectator-m-shell');
+  });
+
+  it('keeps mobile board stage full width against desktop align-items', () => {
+    const playCss = read('public/play-m.css');
+    const spectatorCss = read('public/spectator-m.css');
+    expect(playCss).toContain('align-items: stretch');
+    expect(playCss).toContain('body.player-m-shell .board-stage');
+    expect(spectatorCss).toContain('align-items: stretch');
+    expect(spectatorCss).toContain('body.spectator-m-shell .board-stage');
+  });
+
+  it('does not pin the desktop cell tooltip inside transformed mobile boards', () => {
+    const playCss = read('public/play-m.css');
+    const spectatorCss = read('public/spectator-m.css');
+
+    expect(playCss).toMatch(/body\.player-m-shell \.cell-info\s*{\s*display:\s*none;/);
+    expect(spectatorCss).toMatch(/body\.spectator-m-shell \.cell-info\s*{\s*display:\s*none;/);
+    expect(playCss).not.toMatch(/body\.player-m-shell \.cell-info\s*{[^}]*position:\s*fixed;/s);
+    expect(spectatorCss).not.toMatch(/body\.spectator-m-shell \.cell-info\s*{[^}]*position:\s*fixed;/s);
+  });
+
+  it('uses a compact mobile turn strip for round / AP / supplies', () => {
+    const play = read('public/play-m.html');
+    const playJs = read('public/play-m.js');
+    const playCss = read('public/play-m.css');
+
+    expect(play).toContain('id="turn-strip"');
+    expect(play).toContain('id="actions-display"');
+    expect(play).toContain('id="resources-display"');
+    expect(play).toContain('id="drawer-resources"');
+    expect(playJs).toContain('hud-chip');
+    expect(playJs).toContain('renderResourceListHtml');
+    expect(playJs).toContain('turn-kicker');
+    expect(playCss).toContain('grid-template-columns: minmax(0, 1.35fr) auto auto');
+    expect(playCss).toContain('.hud-chip');
+  });
+
+  it('aligns spectator mobile chrome with the player hud language', () => {
+    const spectator = read('public/spectator-m.html');
+    const spectatorJs = read('public/spectator-m.js');
+    const spectatorCss = read('public/spectator-m.css');
+
+    expect(spectator).toContain('id="turn-strip"');
+    expect(spectator).toContain('id="actions-display"');
+    expect(spectator).toContain('class="hud-chip hud-status strip-status"');
+    expect(spectator).toContain('id="action-summary"');
+    expect(spectatorJs).toContain('hud-chip');
+    expect(spectatorJs).toContain('turn-kicker');
+    expect(spectatorJs).toContain('sel-summary-line');
+    expect(spectatorCss).toContain('grid-template-columns: minmax(0, 1.35fr) auto auto');
+    expect(spectatorCss).toContain('.hud-chip');
+    expect(spectatorCss).toContain('align-items: stretch');
+  });
+
+  it('keeps the mobile player client aligned with current multiplayer features', () => {
+    const html = read('public/play-m.html');
+    const source = read('public/play-m.js');
+
+    for (const id of [
+      'settings-control-token',
+      'settings-game-id',
+      'settings-player-token',
+      'settings-host-token',
+      'btn-save-session',
+      'btn-enter-session',
+      'btn-clear-session',
+    ]) {
+      expect(html).toContain(`id="${id}"`);
+    }
+    expect(source).toContain('function refreshAdjudication');
+    expect(source).toContain('function liveAdjudicationScores');
+    expect(source).toContain('data-kick-player');
+    expect(source).toContain("method: 'DELETE'");
+    expect(source).toContain("localStorage.getItem('tacticalGame.session')");
+    expect(source).toContain("localStorage.setItem('autoControlToken'");
+    expect(source).not.toContain('const tokenQuery = myToken');
+  });
+
+  it('keeps spectator scoring and control-token settings on mobile', () => {
+    const html = read('public/spectator-m.html');
+    const source = read('public/spectator-m.js');
+
+    expect(html).toContain('id="settings-control-token"');
+    expect(html).toContain('id="btn-save-control-token"');
+    expect(source).toContain('function liveAdjudicationScores');
+    expect(source).toContain('function liveAdjudicationRankings');
+    expect(source).toContain("localStorage.setItem('autoControlToken'");
+  });
+
+});

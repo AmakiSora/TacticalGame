@@ -42,6 +42,7 @@ PORT = int(env.get("DEPLOY_PORT", "22"))
 USERNAME = env.get("DEPLOY_USER", "root")
 PASSWORD = env.get("DEPLOY_PASSWORD", "")
 REMOTE_BASE = env.get("DEPLOY_REMOTE_BASE", "/srv/tactical-game")
+CONTROL_TOKEN = env.get("CONTROL_TOKEN", "")
 LOCAL_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 EXCLUDE_PATTERNS = [
@@ -141,8 +142,12 @@ def main():
     print(f"Transferred {file_count} files ({total_size / 1024 / 1024:.1f} MB)")
 
     # Create .env file on remote
-    token = secrets.token_hex(32)
-    print(f"Creating .env with AUTO_CONTROL_TOKEN={token}")
+    if CONTROL_TOKEN:
+        token = CONTROL_TOKEN
+        print(f"Using pre-configured AUTO_CONTROL_TOKEN from .env.deploy")
+    else:
+        token = secrets.token_hex(32)
+        print(f"Generated new AUTO_CONTROL_TOKEN={token}")
     env_content = f"AUTO_CONTROL_TOKEN={token}\nLOG_LEVEL=info\n"
     stdin, stdout, stderr = client.exec_command(
         f"cat > {REMOTE_BASE}/.env << 'ENVEOF'\n{env_content}ENVEOF"

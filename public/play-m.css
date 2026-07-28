@@ -89,23 +89,64 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 .field input:focus, select:focus { border-color: #4a8aaa; }
 .checkbox-field {
-  justify-content: flex-end;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  min-height: 56px;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 68px;
+  flex: none;
+  cursor: pointer;
 }
-.checkbox-field span {
+.checkbox-field > span {
   font-size: 12px;
   color: #7a9aaa;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0;
+  line-height: 1;
 }
-.checkbox-field input {
-  width: 18px;
-  height: 18px;
-  accent-color: #6dcc8a;
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 26px;
+  flex: none;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: #2a3a4a;
+  border-radius: 26px;
+  transition: background .2s ease;
+}
+.switch-slider::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: #8aa0ae;
+  border-radius: 50%;
+  transition: transform .2s ease, background .2s ease;
+}
+.switch input:checked + .switch-slider {
+  background: #2d5a3e;
+}
+.switch input:checked + .switch-slider::before {
+  transform: translateX(18px);
+  background: #6dcc8a;
+}
+.switch input:focus-visible + .switch-slider {
+  outline: 2px solid #80c7df;
+  outline-offset: 2px;
 }
 
 /* ══════════ buttons ══════════ */
@@ -364,9 +405,14 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   flex-direction: column;
   gap: 14px;
 }
+.create-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
 .name-field {
   width: 100%;
-  max-width: 360px;
   flex: none;
 }
 .map-field {
@@ -380,12 +426,12 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   margin-top: 2px;
 }
 .map-card {
-  display: grid;
-  grid-template-columns: 118px minmax(0, 1fr);
+  position: relative;
+  display: flex;
   align-items: stretch;
   gap: 12px;
   width: 100%;
-  min-height: 126px;
+  height: 110px;
   padding: 10px;
   border: 1px solid #263849;
   border-radius: 8px;
@@ -394,6 +440,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   text-align: left;
   cursor: pointer;
   transition: border-color .15s, background .15s, box-shadow .15s;
+  overflow: visible;
 }
 .map-card:hover {
   border-color: #4d7892;
@@ -409,8 +456,9 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   box-shadow: inset 0 0 0 1px rgba(214,179,74,.28);
 }
 .map-preview {
+  flex: none;
   width: 118px;
-  min-height: 104px;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -426,7 +474,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .map-preview svg {
   width: 100%;
   height: 100%;
-  max-height: 112px;
+  max-height: none;
   display: block;
 }
 .preview-hex {
@@ -446,38 +494,49 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .map-card-copy {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
-  justify-content: center;
+  flex: 1;
+  overflow: hidden;
 }
 .map-card-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.map-card-name-zh {
   color: #e4edf4;
   font-size: 15px;
   font-weight: 800;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.map-card-desc {
-  color: #86a0af;
-  font-size: 12px;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
+.map-card-name-en {
+  color: #668495;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .map-card-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 2px;
 }
-.map-card-meta span {
-  padding: 3px 6px;
+.meta-tag {
+  padding: 2px 6px;
   border: 1px solid #2a3a4a;
   border-radius: 4px;
   background: #101922;
   color: #a9bdc9;
   font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-weight: 600;
+  line-height: 1.3;
   white-space: nowrap;
 }
 .map-picker-empty {
@@ -486,6 +545,74 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   border-radius: 6px;
   color: #668495;
   font-size: 13px;
+}
+.map-card-tooltip {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  top: auto;
+  bottom: 100%;
+  margin-bottom: 8px;
+  width: min(280px, calc(100vw - 48px));
+  padding: 12px 14px;
+  border: 1px solid #3a5064;
+  border-radius: 8px;
+  background: #14202b;
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  color: #c8d6e0;
+  font-size: 12px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease, visibility 0s linear .15s;
+  pointer-events: none;
+}
+.map-card:hover .map-card-tooltip,
+.map-card:focus-visible .map-card-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+.tooltip-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #e4edf4;
+  line-height: 1.2;
+}
+.tooltip-id {
+  font-weight: 500;
+  font-size: 11px;
+  color: #668495;
+  margin-left: 6px;
+}
+.tooltip-desc {
+  color: #8ba0b0;
+  line-height: 1.5;
+}
+.tooltip-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 6px;
+  border-top: 1px solid #253544;
+}
+.tooltip-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.tooltip-stat b {
+  min-width: 38px;
+  font-weight: 700;
+  color: #d6b34a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
 }
 
 /* ══════════ main layout ══════════ */
@@ -1042,12 +1169,10 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
     grid-column: auto;
   }
   .map-card {
-    grid-template-columns: 96px minmax(0, 1fr);
-    min-height: 112px;
+    height: 104px;
   }
   .map-preview {
     width: 96px;
-    min-height: 88px;
   }
 }
 
@@ -1117,6 +1242,18 @@ body.player-m-shell .field input,
 body.player-m-shell .field select {
   min-height: 44px;
   font-size: 16px; /* avoid iOS zoom */
+}
+body.player-m-shell .create-row {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+body.player-m-shell .checkbox-field {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 0;
 }
 body.player-m-shell .map-picker {
   grid-template-columns: minmax(0, 1fr);

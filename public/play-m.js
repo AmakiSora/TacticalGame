@@ -445,13 +445,30 @@ function renderMapPicker(maps) {
 	    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
 	    const radius = map.preview?.radius ?? '-';
 		    const maxTurns = map.preview?.maxTurns ?? '-';
+		    const actionsPerTurn = map.preview?.actionsPerTurn ?? '-';
 	    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
-    return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}">
+    return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}" aria-label="${esc(map.name)} (${esc(map.id)})">
       ${renderMapPreview(map.preview)}
       <span class="map-card-copy">
-        <span class="map-card-name">${esc(map.name)}</span>
-        <span class="map-card-desc">${esc(map.description)}</span>
-	        <span class="map-card-meta"><span>半径 ${esc(radius)}</span><span>${controlPointCount} 据点</span><span>${esc(counts)} 人</span><span>${esc(maxTurns)} 回合</span></span>
+        <span class="map-card-name"><span class="map-card-name-zh">${esc(map.name)}</span><span class="map-card-name-en">${esc(map.id)}</span></span>
+        <span class="map-card-meta">
+          <span class="meta-tag" data-label="地图半径">⊘${esc(radius)}</span>
+          <span class="meta-tag" data-label="据点数">⬡${controlPointCount}</span>
+          <span class="meta-tag" data-label="玩家数">⚑${esc(counts)}</span>
+          <span class="meta-tag" data-label="每回合行动点">♟${esc(actionsPerTurn)}</span>
+          <span class="meta-tag" data-label="最大回合数">⏱${esc(maxTurns)}</span>
+        </span>
+      </span>
+      <span class="map-card-tooltip" role="tooltip">
+        <span class="tooltip-name">${esc(map.name)} <span class="tooltip-id">${esc(map.id)}</span></span>
+        <span class="tooltip-desc">${esc(map.description)}</span>
+        <span class="tooltip-stats">
+          <span class="tooltip-stat"><b>⊘ ${esc(radius)}</b>地图半径</span>
+          <span class="tooltip-stat"><b>⬡ ${controlPointCount}</b>据点数</span>
+          <span class="tooltip-stat"><b>⚑ ${esc(counts)}</b>玩家数</span>
+          <span class="tooltip-stat"><b>♟ ${esc(actionsPerTurn)}</b>每回合行动点</span>
+          <span class="tooltip-stat"><b>⏱ ${esc(maxTurns)}</b>最大回合数</span>
+        </span>
       </span>
     </button>`;
   }).join('');

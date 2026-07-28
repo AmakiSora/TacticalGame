@@ -29,11 +29,11 @@
 
     <div id="tab-create" class="lobby-tab-content active">
       <div class="create-setup">
-        <div class="field name-field">
-          <label>你的名称</label>
-          <input id="create-name" placeholder="留空使用默认名称" maxlength="20" />
-        </div>
-        <div class="row">
+        <div class="create-row">
+          <div class="field name-field">
+            <label>你的名称</label>
+            <input id="create-name" placeholder="留空使用默认名称" maxlength="20" />
+          </div>
           <div class="field">
             <label>最大玩家数</label>
             <select id="max-players">
@@ -48,7 +48,10 @@
           </div>
           <label class="field checkbox-field">
             <span>房主参战</span>
-            <input id="host-participate" type="checkbox" checked />
+            <span class="switch">
+              <input id="host-participate" type="checkbox" checked />
+              <span class="switch-slider"></span>
+            </span>
           </label>
         </div>
         <div class="field map-field">

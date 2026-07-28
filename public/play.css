@@ -55,6 +55,27 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   align-items: center;
   gap: 10px;
 }
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.page-nav a {
+  text-decoration: none;
+  color: #9bb3c4;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: #14202a;
+}
+.page-nav a:hover { color: #d8e0e8; border-color: #2a3a4a; }
+.page-nav a.active {
+  color: #9ec;
+  border-color: #2a5a4a;
+  background: #123028;
+}
 #settings-wrap { position: relative; }
 #btn-settings {
   width: 32px; height: 32px;

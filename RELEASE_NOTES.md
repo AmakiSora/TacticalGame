@@ -3,6 +3,16 @@
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
 
+
+
+## 3.1.6
+
+- 新增移动端玩家页与观战页：桌面端页面检测窄屏后自动跳转至 `/play-m.html` / `/spectator-m.html`，移动版适配触控操作与紧凑布局。
+- 移动端导航与统计 UI 优化：header 和统计入口适配小屏，样式统一深色卡片风格。
+- 大厅新增可加入对局列表：创建/加入页下方展示当前服务器公开大厅，显示地图、人数和状态，支持一键刷新并加入尚未开局的公开对局，替代手动输入 Game ID。
+- 裁决权重跨地图重平衡：`default` / `desert` 改为 5/2/90/2/1，`breach` 己方总部权重从 5 降至 2，`forge` 改为 7/2/75/2/1，`multiplayer-ring` 据点权重 100→75，`dual-lanes` 与 `danger-close` 维持原配置。
+- 模型名称修正：回放记录中的 `qwen3.8max` 统一更名为 `Qwen3.8MaxPreview`。
+- 统计看板更新至 56 场对局，覆盖至 3.1.5 版本回放，新增模型排行数据。
 ## 3.1.5
 
 - 对局状态 API 增加权威 live 裁决计分板：`GET /api/games/:id` 在剥离 token 后附加 `adjudication`（`maxTurns`、`weights`、`scores`、`rankings`、`leaders`、`margin`），由引擎 `buildAdjudicationSnapshot` 统一计算。

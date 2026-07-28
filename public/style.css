@@ -38,14 +38,44 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; 
 .brand-block { display: flex; flex-direction: column; gap: 3px; min-width: 220px; }
 .page-subtitle { color: #7894a6; font-size: 12px; font-weight: 600; }
 #game-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.page-nav a {
+  text-decoration: none;
+  color: #9bb3c4;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: #14202a;
+}
+.page-nav a:hover { color: #d8e0e8; border-color: #2a3a4a; }
+.page-nav a.active {
+  color: #9ec;
+  border-color: #2a5a4a;
+  background: #123028;
+}
 .toolbar-group {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px;
-  background: rgba(15, 24, 32, .58);
-  border: 1px solid #243545;
-  border-radius: 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.file-tools::before,
+.settings-tools::before {
+  content: '';
+  width: 1px;
+  height: 22px;
+  margin: 0 4px 0 2px;
+  background: #2a3a4a;
+  flex: 0 0 auto;
 }
 .game-picker {
   position: relative;
@@ -87,7 +117,7 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; 
   box-shadow: 0 0 0 3px rgba(102,204,255,.14), 0 6px 18px rgba(0,0,0,.24);
 }
 #game-meta select, #game-meta button {
-  padding: 5px 12px; background: #1e2e3e; color: #b0c8d8;
+  min-height: 34px; padding: 5px 12px; background: #1e2e3e; color: #b0c8d8;
   border: 1px solid #2a3a4a; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .15s;
 }
 #game-meta .game-picker select {
@@ -215,9 +245,9 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; 
 #btn-import { border-color: #6a4a8a; }
 
 /* Settings popover */
-#settings-wrap { position: relative; margin-left: 8px; }
+#settings-wrap { position: relative; }
 #btn-settings {
-  width: 32px; height: 32px;
+  width: 34px; height: 34px;
   background: #1e2e3e; color: #b0c8d8;
   border: 1px solid #2a3a4a; border-radius: 6px;
   cursor: pointer; font-size: 18px;
@@ -946,6 +976,10 @@ main {
   .toolbar-group {
     width: 100%;
     justify-content: stretch;
+  }
+  .file-tools::before,
+  .settings-tools::before {
+    display: none;
   }
   .primary-tools select {
     flex: 1;

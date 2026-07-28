@@ -1090,9 +1090,18 @@ async function selectGame(id) {
 }
 
 async function fetchGameList() {
-  const res = await fetch('/api/games');
-  const { games } = await res.json();
-  gamesList = (games || []).map(normalizeListedGame).filter(game => game.id);
+  let payload;
+  try {
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    payload = await res.json();
+  } catch {
+    statusEl.textContent = '无法获取对局列表';
+    return gamesList;
+  }
+  const { games } = payload || {};
+  gamesList = (games || []).map(normalizeListedGame)
+    .filter(game => typeof game.id === 'string' && game.id.length > 0);
   const prev = gameSelect.value;
   gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
   for (const g of gamesList) {
@@ -1103,6 +1112,7 @@ async function fetchGameList() {
   }
   if (prev && [...gameSelect.options].some(o => o.value === prev)) gameSelect.value = prev;
   renderGamePickerMenu();
+  if (prev && gameSelect.value !== prev) resetLoadedGame('当前对局已不在线');
   return gamesList;
 }
 
@@ -1665,12 +1675,10 @@ function renderDrawerGameList() {
     </button>`;
   }).join('');
   list.querySelectorAll('.drawer-game-option[data-id]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
-      if (!id || !gameSelect) return;
-      gameSelect.value = id;
-      gameSelect.dispatchEvent(new Event('change'));
-      if (gamePickerLabel) gamePickerLabel.textContent = id;
+      if (!id) return;
+      await selectGame(id);
       closeDrawer();
     });
   });
@@ -1726,10 +1734,3 @@ document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
 });
 document.getElementById('btn-zoom-reset')?.addEventListener('click', () => fitBoardToViewport());
 window.addEventListener('resize', () => fitBoardToViewport());
-
-// keep picker label in header in sync when select changes
-if (gameSelect) {
-  gameSelect.addEventListener('change', () => {
-    if (gamePickerLabel) gamePickerLabel.textContent = gameSelect.value || '-- 选择对局 --';
-  });
-}

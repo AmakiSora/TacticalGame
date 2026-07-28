@@ -997,9 +997,18 @@ async function selectGame(id) {
 }
 
 async function fetchGameList() {
-  const res = await fetch('/api/games');
-  const { games } = await res.json();
-  gamesList = (games || []).map(normalizeListedGame).filter(game => game.id);
+  let payload;
+  try {
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    payload = await res.json();
+  } catch {
+    statusEl.textContent = '无法获取对局列表';
+    return gamesList;
+  }
+  const { games } = payload || {};
+  gamesList = (games || []).map(normalizeListedGame)
+    .filter(game => typeof game.id === 'string' && game.id.length > 0);
   const prev = gameSelect.value;
   gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
   for (const g of gamesList) {
@@ -1010,6 +1019,7 @@ async function fetchGameList() {
   }
   if (prev && [...gameSelect.options].some(o => o.value === prev)) gameSelect.value = prev;
   renderGamePickerMenu();
+  if (prev && gameSelect.value !== prev) resetLoadedGame('当前对局已不在线');
   return gamesList;
 }
 
@@ -1282,9 +1292,7 @@ async function autoRefreshTick() {
   if (!autoRefreshCb.checked) return;
   const games = await fetchGameList();
   if (followLatestCb.checked && games[0] && games[0].id !== gameSelect.value) {
-    gameSelect.value = games[0].id;
-    await loadGameState(games[0].id);
-    subscribeSse(games[0].id);
+    await selectGame(games[0].id);
   }
 }
 function startAutoRefresh() {

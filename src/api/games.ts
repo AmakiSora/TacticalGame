@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { globalStore, createLobby, addLobbyPlayer, removeLobbyPlayer } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
-import { eliminatePlayer, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
+import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
 import {
   authenticate, authenticateHost, sanitizeGameForResponse, statusForCode,
 } from './auth.js';
@@ -159,6 +159,16 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     appendEvent(game, globalEventBus, 'name_rename', { playerId, name });
     globalStore.persist(game);
     return { ok: true };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/games/:id/force-adjudicate', async (req, reply) => {
+    if (!authorizeControlRequest(req, reply)) return;
+    const game = globalStore.get(req.params.id);
+    if (!game) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    const result = forceAdjudication(game, globalEventBus);
+    if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
+    globalStore.persist(game);
+    return { ok: true, result: game.result };
   });
 
   app.delete<{ Params: { id: string }; Querystring: { token?: string } }>('/api/games/:id', async (req, reply) => {

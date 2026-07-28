@@ -267,6 +267,51 @@ describe('V2 API', () => {
     await app.close();
   });
 
+  it('lets an authorized spectator force adjudication at the current score', async () => {
+    const previousToken = process.env.AUTO_CONTROL_TOKEN;
+    process.env.AUTO_CONTROL_TOKEN = 'force-secret';
+    const app = await startTestServer();
+    try {
+      const { gameId } = await createAndJoin(app);
+      const game = globalStore.get(gameId)!;
+      game.resources.player_a.supplies += 25;
+
+      const rejected = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/force-adjudicate`,
+      });
+      expect(rejected.statusCode).toBe(401);
+
+      const adjudicated = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/force-adjudicate`,
+        headers: { 'x-control-token': 'force-secret' },
+      });
+      expect(adjudicated.statusCode).toBe(200);
+      expect(adjudicated.json().result).toMatchObject({
+        winner: 'player_a',
+        reason: 'forced_adjudication_score',
+      });
+      expect(game.phase).toBe('game_over');
+      expect(game.events.at(-1)).toMatchObject({
+        type: 'game_over',
+        payload: expect.objectContaining({ winner: 'player_a', reason: 'forced_adjudication_score' }),
+      });
+
+      const repeated = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/force-adjudicate`,
+        headers: { 'x-control-token': 'force-secret' },
+      });
+      expect(repeated.statusCode).toBe(409);
+      expect(repeated.json().code).toBe('game_over');
+    } finally {
+      await app.close();
+      if (previousToken === undefined) delete process.env.AUTO_CONTROL_TOKEN;
+      else process.env.AUTO_CONTROL_TOKEN = previousToken;
+    }
+  });
+
   it('allows players to rename themselves through the event stream', async () => {
     const app = await startTestServer();
     const { gameId, playerAToken } = await createAndJoin(app);

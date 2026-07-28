@@ -16,7 +16,12 @@ export function isPlayerId(value: unknown): value is PlayerId {
 export type UnitType = 'infantry' | 'scout' | 'heavy' | 'ranger' | 'support';
 export type GamePhase = 'lobby' | 'active' | 'game_over';
 export type PlayerStatus = 'lobby' | 'active' | 'eliminated';
-export type GameOverReason = 'last_player_standing' | 'turn_limit_score' | 'turn_limit_draw';
+export type GameOverReason =
+  | 'last_player_standing'
+  | 'turn_limit_score'
+  | 'turn_limit_draw'
+  | 'forced_adjudication_score'
+  | 'forced_adjudication_draw';
 export type EliminationReason = 'headquarters_destroyed' | 'host_eliminated';
 export type TerrainType = 'plain' | 'water' | 'blocker';
 export type ControlPointKind = 'supply' | 'forward_base' | 'repair';

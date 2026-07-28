@@ -117,9 +117,10 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 | `DELETE` | `/api/games/:id/players/:playerId` | host token header | `{ ok: true, lobby }` |
 | `POST` | `/api/games/:id/host/skip-turn` | host token header | `{ ok: true }` |
 | `POST` | `/api/games/:id/host/eliminate` | `{ playerId }` + host token header | `{ ok: true }` |
+| `POST` | `/api/games/:id/force-adjudicate` | control token | `{ ok: true, result }` |
 | `DELETE` | `/api/games/:id` | control token | `{ ok: true }` |
 
-删除对局会同时删除内存状态和持久化文件中的记录。该接口复用自动控制权限：设置 `AUTO_CONTROL_TOKEN` 后需要 `X-Control-Token: <token>` 或 `?token=<token>`；未设置时仅允许本机请求。
+强制裁决仅适用于进行中的对局，按请求时存活玩家的裁决总分决定胜者；最高分并列则平局。删除和强制裁决接口复用自动控制权限：设置 `AUTO_CONTROL_TOKEN` 后需要 `X-Control-Token: <token>` 或 `?token=<token>`；未设置时仅允许本机请求。删除对局会同时删除内存状态和持久化文件中的记录。
 
 ### 操作
 
@@ -142,7 +143,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 `player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
 
-`game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score` 或 `turn_limit_draw`。
+`game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。
 
 `income` 事件保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。`deploy` 事件中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。`control_point_repair` 事件包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 

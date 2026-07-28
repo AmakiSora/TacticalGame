@@ -5,7 +5,7 @@ import { findReachableCells } from '../../src/engine/validation.js';
 import { moveUnit } from '../../src/engine/units.js';
 import { attackTarget, healTarget } from '../../src/engine/combat.js';
 import { deployUnit } from '../../src/engine/deployment.js';
-import { buildAdjudicationScores, buildAdjudicationSnapshot, endTurn, joinGame } from '../../src/engine/engine.js';
+import { buildAdjudicationScores, buildAdjudicationSnapshot, endTurn, forceAdjudication, joinGame } from '../../src/engine/engine.js';
 import type { Unit } from '../../src/types.js';
 
 function setup() {
@@ -113,6 +113,33 @@ describe('hex V2 rules', () => {
     expect(snapshot.weights).toEqual(game.config.balance.adjudicationWeights);
     expect(snapshot.leaders).toEqual(['player_b']);
     expect(snapshot.margin).toBe(scores.player_b.total - scores.player_a.total);
+  });
+
+  it('force-adjudicates an active game using the current scores', () => {
+    const { game, bus } = setup();
+    game.resources.player_a.supplies += 25;
+
+    const result = forceAdjudication(game, bus);
+
+    expect(result.ok).toBe(true);
+    expect(game.phase).toBe('game_over');
+    expect(game.result).toMatchObject({
+      winner: 'player_a',
+      reason: 'forced_adjudication_score',
+    });
+    expect(game.result!.scores.player_a!.total).toBeGreaterThan(game.result!.scores.player_b!.total);
+    expect(game.events.at(-1)).toMatchObject({
+      type: 'game_over',
+      payload: expect.objectContaining({ winner: 'player_a', reason: 'forced_adjudication_score' }),
+    });
+    expect(forceAdjudication(game, bus)).toMatchObject({ ok: false, code: 'game_over' });
+  });
+
+  it('records a draw when forced adjudication has tied leaders', () => {
+    const { game, bus } = setup();
+
+    expect(forceAdjudication(game, bus).ok).toBe(true);
+    expect(game.result).toMatchObject({ winner: null, reason: 'forced_adjudication_draw' });
   });
 
   it('starts dual-lanes with no free units and enough supplies for player deployment choices', () => {

@@ -21,6 +21,20 @@ describe('settings token input', () => {
     expect(css).toContain('.setting-field');
   });
 
+  it('offers control-token protected forced adjudication on every spectator page', () => {
+    for (const htmlFile of ['public/spectator.html', 'public/spectator-m.html', 'public/spectator2.html']) {
+      expect(read(htmlFile)).toContain('id="force-adjudicate"');
+      expect(read(htmlFile)).toContain('强制裁决');
+    }
+    for (const sourceFile of ['public/app.js', 'public/spectator-m.js', 'public/spectator2.html']) {
+      const source = read(sourceFile);
+      expect(source).toContain('/force-adjudicate');
+      expect(source).toContain("headers['x-control-token'] = controlToken");
+      expect(source).toContain('确定强制裁决当前对局');
+      expect(source).toContain("selected?.phase !== 'active'");
+    }
+  });
+
   it('lets play settings manage control token and full session restore', () => {
     const html = read('public/play.html');
     const source = read('public/play.js');

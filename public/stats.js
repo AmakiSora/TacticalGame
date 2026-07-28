@@ -41,6 +41,8 @@
     last_player_standing: '最后生还',
     turn_limit_score: '轮数裁决',
     turn_limit_draw: '轮数平局',
+    forced_adjudication_score: '强制裁决',
+    forced_adjudication_draw: '强制裁决平局',
     headquarters_destroyed: '摧毁总部',
     incomplete: '未完赛',
     unknown: '未知',
@@ -80,7 +82,7 @@
   }
 
   function isDrawMatch(match) {
-    return match.reason === 'turn_limit_draw' || Boolean(match.reviewFlags?.deadlock);
+    return match.reason === 'turn_limit_draw' || match.reason === 'forced_adjudication_draw' || Boolean(match.reviewFlags?.deadlock);
   }
 
   function isRankedMatch(match) {

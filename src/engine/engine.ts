@@ -224,6 +224,22 @@ export function endGame(game: GameState, bus: EventBus, winner: PlayerId | null,
   appendEvent(game, bus, 'game_over', { winner, reason, scores, rankings });
 }
 
+/** Ends an active match immediately using the current adjudication scores. */
+export function forceAdjudication(game: GameState, bus: EventBus): Result {
+  if (game.phase === 'lobby') return { ok: false, code: 'game_not_started', message: 'game has not started' };
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
+
+  const snapshot = buildAdjudicationSnapshot(game);
+  const winner = snapshot.leaders.length === 1 ? snapshot.leaders[0]! : null;
+  endGame(
+    game,
+    bus,
+    winner,
+    winner ? 'forced_adjudication_score' : 'forced_adjudication_draw',
+  );
+  return { ok: true };
+}
+
 function nextActiveInOrder(game: GameState, owner: PlayerId, allowed?: Set<PlayerId>): PlayerId | null {
   const order = game.turn.turnOrder;
   const currentIndex = Math.max(0, order.indexOf(owner));

@@ -212,6 +212,9 @@
     .rail-btn:active { transform: translateY(0); }
     .rail-btn.danger { color: #ff9db4; border-color: rgba(255, 92, 122, .35); }
     .rail-btn.danger:hover { background: rgba(255, 92, 122, .12); border-color: rgba(255, 92, 122, .6); box-shadow: 0 6px 16px rgba(255, 92, 122, .18); }
+    .rail-btn.adjudicate { color: #ffd486; border-color: rgba(255, 179, 71, .4); }
+    .rail-btn.adjudicate:hover:not(:disabled) { background: rgba(255, 179, 71, .12); border-color: rgba(255, 179, 71, .7); box-shadow: 0 6px 16px rgba(255, 179, 71, .16); }
+    .rail-btn:disabled { cursor: not-allowed; opacity: .42; transform: none; box-shadow: none; }
     .rail-btn.busy { pointer-events: none; opacity: .6; }
     .rail-btn.busy::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); border-top-color: var(--ink); animation: spin .7s linear infinite; vertical-align: -1px; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -681,6 +684,9 @@
           <button id="refresh-list" class="rail-btn" type="button">刷新列表</button>
           <button id="delete-game" class="rail-btn danger" type="button" title="删除当前对局">删除对局</button>
         </div>
+        <div class="rail-row">
+          <button id="force-adjudicate" class="rail-btn adjudicate" type="button" title="按当前分数结束对局" disabled>强制裁决</button>
+        </div>
       </section>
       <section class="rail-block">
         <h2>回放文件</h2>
@@ -818,6 +824,7 @@
   const gamePickerLabel = document.getElementById('game-picker-label');
   const gamePickerMenu = document.getElementById('game-picker-menu');
   const refreshBtn = document.getElementById('refresh-list');
+  const forceAdjudicateBtn = document.getElementById('force-adjudicate');
   const deleteGameBtn = document.getElementById('delete-game');
   const statusEl = document.getElementById('status');
   const livePill = document.getElementById('live-pill');
@@ -1771,6 +1778,8 @@
       case 'round_end': return `第 ${p.roundNumber || '?'} 轮结束`;
       case 'turn_skipped': return `跳过 ${playerName(p.playerId)}`;
       case 'game_over':
+        if (p.reason === 'forced_adjudication_draw') return '强制裁决平局';
+        if (p.reason === 'forced_adjudication_score') return `强制裁决 胜者:${playerName(p.winner)}`;
         if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
         if (p.reason === 'turn_limit_score') return `${maxTurnsLabel()}裁决 胜者:${playerName(p.winner)}`;
         if (p.reason === 'last_player_standing') return `最后存活 胜者:${playerName(p.winner)}`;
@@ -1864,6 +1873,8 @@
 
   /* ================= 侧栏渲染 ================= */
   function resultText(result) {
+    if (result.reason === 'forced_adjudication_draw') return '强制裁决平局';
+    if (result.reason === 'forced_adjudication_score') return `强制裁决胜者: ${playerName(result.winner)}`;
     if (result.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
     if (result.reason === 'turn_limit_score') return `${maxTurnsLabel()}裁决胜者: ${playerName(result.winner)}`;
     return `胜者: ${playerName(result.winner)}`;
@@ -2043,6 +2054,11 @@
       option.classList.toggle('active', option.dataset.gameId === gameSelect.value);
       option.setAttribute('aria-selected', String(option.dataset.gameId === gameSelect.value));
     });
+    updateForceAdjudicateButton();
+  }
+  function updateForceAdjudicateButton() {
+    const selected = gamesList.find(game => game.id === gameSelect.value);
+    forceAdjudicateBtn.disabled = selected?.phase !== 'active';
   }
   function renderGamePickerMenu() {
     gamePickerMenu.replaceChildren();
@@ -2116,8 +2132,46 @@
     cellInfoEl.classList.remove('show');
     renderWinnerBanner();
     updateControls();
+    updateForceAdjudicateButton();
     setLive('offline', '未连接');
     statusEl.textContent = message;
+  }
+  async function forceAdjudicateCurrentGame() {
+    const id = gameSelect.value;
+    const game = gamesList.find(item => item.id === id);
+    if (!id || id === 'offline' || game?.phase !== 'active') {
+      statusEl.textContent = '请选择进行中的在线对局';
+      return;
+    }
+
+    const scores = pinnedReplayStep ? {} : (liveAdjudicationScores() || {});
+    const standings = Object.entries(scores)
+      .filter(([owner]) => state?.players?.[owner]?.status !== 'eliminated')
+      .sort(([, a], [, b]) => (b.total ?? 0) - (a.total ?? 0))
+      .map(([owner, score], index) => `${index + 1}. ${playerName(owner)}：${score.total ?? 0}`)
+      .join('\n');
+    const confirmed = confirm(`确定强制裁决当前对局？\n\n${standings || '将按当前分数结算'}\n\n裁决后对局立即结束，无法继续行动。`);
+    if (!confirmed) return;
+
+    forceAdjudicateBtn.disabled = true;
+    forceAdjudicateBtn.textContent = '裁决中…';
+    try {
+      const headers = {};
+      const controlToken = localStorage.getItem('autoControlToken') || '';
+      if (controlToken) headers['x-control-token'] = controlToken;
+      const res = await fetch(`/api/games/${encodeURIComponent(id)}/force-adjudicate`, { method: 'POST', headers });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        statusEl.textContent = body.error || '强制裁决失败';
+        return;
+      }
+      await loadGameState(id);
+      await fetchGameList();
+      statusEl.textContent = '对局已按当前分数裁决';
+    } finally {
+      forceAdjudicateBtn.textContent = '强制裁决';
+      updateForceAdjudicateButton();
+    }
   }
   async function deleteCurrentGame() {
     const id = gameSelect.value;
@@ -2170,6 +2224,7 @@
       buildTimelineMarkers();
       if (!pinnedReplayStep && wasAtLatest) stepForward();
       else updateControls();
+      if (ev.type === 'game_over') forceAdjudicateBtn.disabled = true;
       setLive('online', '实时连接中');
       statusEl.textContent = '实时连接中';
     };
@@ -2413,6 +2468,7 @@
     try { await fetchGameList(); } finally { refreshBtn.classList.remove('busy'); }
   });
   deleteGameBtn.addEventListener('click', deleteCurrentGame);
+  forceAdjudicateBtn.addEventListener('click', forceAdjudicateCurrentGame);
   btnStart.addEventListener('click', goToStart);
   btnPrev.addEventListener('click', () => { pausePlayback(); stepBackward(); });
   btnPlay.addEventListener('click', () => playing ? pausePlayback() : startPlayback());

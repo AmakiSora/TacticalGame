@@ -75,6 +75,7 @@ const gamePickerButton = document.getElementById('game-picker-button');
 const gamePickerLabel = document.getElementById('game-picker-label');
 const gamePickerMenu = document.getElementById('game-picker-menu');
 const refreshBtn = document.getElementById('refresh-list');
+const forceAdjudicateBtn = document.getElementById('force-adjudicate');
 const deleteGameBtn = document.getElementById('delete-game');
 const statusEl = document.getElementById('status');
 const resourcesEl = document.getElementById('resources');
@@ -756,6 +757,8 @@ function formatEventShort(ev) {
     case 'round_end': return `第 ${p.roundNumber || '?'} 轮结束`;
     case 'turn_skipped': return `跳过 ${playerName(p.playerId)}`;
     case 'game_over':
+      if (p.reason === 'forced_adjudication_draw') return '强制裁决平局';
+      if (p.reason === 'forced_adjudication_score') return `强制裁决 胜者:${playerName(p.winner)}`;
       if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
       if (p.reason === 'turn_limit_score') return `${maxTurnsLabel()}裁决 胜者:${playerName(p.winner)}`;
       if (p.reason === 'last_player_standing') return `最后存活 胜者:${playerName(p.winner)}`;
@@ -936,6 +939,8 @@ function syncMobileChrome() {
 }
 
 function resultText(result) {
+  if (result.reason === 'forced_adjudication_draw') return '强制裁决平局';
+  if (result.reason === 'forced_adjudication_score') return `强制裁决胜者: ${playerName(result.winner)}`;
   if (result.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
   if (result.reason === 'turn_limit_score') return `${maxTurnsLabel()}裁决胜者: ${playerName(result.winner)}`;
   return `胜者: ${playerName(result.winner)}`;
@@ -1051,7 +1056,14 @@ function syncGamePickerLabel() {
     option.classList.toggle('active', option.dataset.gameId === gameSelect.value);
     option.setAttribute('aria-selected', String(option.dataset.gameId === gameSelect.value));
   });
+  updateForceAdjudicateButton();
   renderDrawerGameList();
+}
+
+function updateForceAdjudicateButton() {
+  if (!forceAdjudicateBtn) return;
+  const selected = gamesList.find(game => game.id === gameSelect.value);
+  forceAdjudicateBtn.disabled = selected?.phase !== 'active';
 }
 
 function renderGamePickerMenu() {
@@ -1137,7 +1149,46 @@ function resetLoadedGame(message = '请选择在线对局') {
   selDetailEl.textContent = '点击或悬停棋盘查看单位、总部或据点信息';
   cellInfoEl.textContent = '';
   updateControls();
+  updateForceAdjudicateButton();
   statusEl.textContent = message;
+}
+
+async function forceAdjudicateCurrentGame() {
+  const id = gameSelect.value;
+  const game = gamesList.find(item => item.id === id);
+  if (!id || id === 'offline' || game?.phase !== 'active') {
+    statusEl.textContent = '请选择进行中的在线对局';
+    return;
+  }
+
+  const scores = pinnedReplayStep ? {} : (liveAdjudicationScores() || {});
+  const standings = Object.entries(scores)
+    .filter(([owner]) => state?.players?.[owner]?.status !== 'eliminated')
+    .sort(([, a], [, b]) => (b.total ?? 0) - (a.total ?? 0))
+    .map(([owner, score], index) => `${index + 1}. ${playerName(owner)}：${score.total ?? 0}`)
+    .join('\n');
+  const confirmed = confirm(`确定强制裁决当前对局？\n\n${standings || '将按当前分数结算'}\n\n裁决后对局立即结束，无法继续行动。`);
+  if (!confirmed) return;
+
+  forceAdjudicateBtn.disabled = true;
+  forceAdjudicateBtn.textContent = '裁决中…';
+  try {
+    const headers = {};
+    const controlToken = localStorage.getItem('autoControlToken') || '';
+    if (controlToken) headers['x-control-token'] = controlToken;
+    const res = await fetch(`/api/games/${encodeURIComponent(id)}/force-adjudicate`, { method: 'POST', headers });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      statusEl.textContent = body.error || '强制裁决失败';
+      return;
+    }
+    await loadGameState(id);
+    await fetchGameList();
+    statusEl.textContent = '对局已按当前分数裁决';
+  } finally {
+    forceAdjudicateBtn.textContent = '强制裁决';
+    updateForceAdjudicateButton();
+  }
 }
 
 async function deleteCurrentGame() {
@@ -1188,6 +1239,7 @@ function subscribeSse(id) {
     buildTimelineMarkers();
     if (!pinnedReplayStep && wasAtLatest) stepForward();
     else updateControls();
+    if (ev.type === 'game_over') forceAdjudicateBtn.disabled = true;
     statusEl.textContent = '实时连接中';
   };
   liveSse.onerror = () => { statusEl.textContent = 'SSE 断开，自动重连中'; };
@@ -1556,6 +1608,7 @@ gamePickerButton?.addEventListener('keydown', e => {
 gamePickerMenu?.addEventListener('click', e => e.stopPropagation());
 gamePickerMenu?.addEventListener('keydown', e => e.stopPropagation());
 refreshBtn.addEventListener('click', fetchGameList);
+forceAdjudicateBtn?.addEventListener('click', forceAdjudicateCurrentGame);
 deleteGameBtn.addEventListener('click', deleteCurrentGame);
 btnStart.addEventListener('click', goToStart);
 btnPrev.addEventListener('click', () => { pausePlayback(); stepBackward(); });

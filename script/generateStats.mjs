@@ -555,7 +555,7 @@ function emptyModelBucket(model) {
 }
 
 export function isDrawMatch(match) {
-  return match.reason === 'turn_limit_draw' || Boolean(match.reviewFlags?.deadlock);
+  return match.reason === 'turn_limit_draw' || match.reason === 'forced_adjudication_draw' || Boolean(match.reviewFlags?.deadlock);
 }
 
 export function isRankedMatch(match) {

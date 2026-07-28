@@ -1137,6 +1137,8 @@ function formatEventShort(ev) {
     case 'reset_actions': return `${playerName(p.owner)} 单位已重置`;
     case 'turn_end': return `轮到 ${playerName(p.nextOwner)}`;
     case 'game_over':
+      if (p.reason === 'forced_adjudication_draw') return '强制裁决平局';
+      if (p.reason === 'forced_adjudication_score') return `${playerName(p.winner)} 强制裁决获胜`;
       if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
       if (p.reason === 'turn_limit_score') return `${playerName(p.winner)} ${maxTurnsLabel()}裁决获胜`;
       return `${playerName(p.winner)} 获胜`;

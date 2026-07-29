@@ -15,10 +15,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = dirname(SCRIPT_DIR);
 
-const KNOWN_AGENTS = new Set(['PI', 'CX', 'CC', 'QW', 'OMP', 'WB', 'ZC', 'SCRIPT', 'QD', 'QW']);
+export const KNOWN_AGENTS = new Set(['PI', 'CX', 'CC', 'QW', 'OMP', 'WB', 'ZC', 'SCRIPT', 'QD', 'QW']);
 
 /** Canonical model keys (lowercase). */
-const MODEL_ALIASES = new Map([
+export const MODEL_ALIASES = new Map([
   ['dsv4f', 'deepseekv4flash'],
   ['dsv4', 'deepseekv4flash'],
   ['deepseekv4f', 'deepseekv4flash'],
@@ -49,11 +49,11 @@ const MODEL_ALIASES = new Map([
   ['deepseekv4flash', 'deepseekv4flash'],
 ]);
 
-const REPLAY_JSON_RE = /^(tg_\d+)_(\d{8})\.json$/i;
-const REVIEW_MD_RE =
+export const REPLAY_JSON_RE = /^(tg_\d+)_(\d{8})\.json$/i;
+export const REVIEW_MD_RE =
   /^(tg_\d+)(?:-\d+)?_(win|lose|draw|terminated|deadlock|rank(\d+))_([A-Za-z0-9]+)@(.+)\.md$/i;
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const opts = {
     records: join(PROJECT_DIR, 'records'),
     out: join(PROJECT_DIR, 'public', 'data', 'stats.json'),
@@ -71,12 +71,18 @@ function parseArgs(argv) {
   return opts;
 }
 
-function lower(s) {
+export function lower(s) {
   return String(s || '').trim().toLowerCase();
 }
 
-function canonicalizeModel(raw) {
-  let key = lower(raw).replace(/\s+/g, '');
+export function canonicalizeModel(raw) {
+  let modelName = String(raw || '').trim();
+  const agentSuffix = modelName.match(/^(.*?)[-_]([A-Za-z]{1,8})$/);
+  if (agentSuffix && KNOWN_AGENTS.has(canonicalizeAgent(agentSuffix[2]))) {
+    modelName = agentSuffix[1];
+  }
+
+  let key = lower(modelName).replace(/\s+/g, '');
   if (!key) return 'unknown';
   // Self-play seat tags only: ModelA / ModelB (not models that naturally end in b like v35b)
   if (/^(mimo2\.5pro|deepseekv4flash|step3\.7flash|longcat2\.0)[ab]$/i.test(key)) {
@@ -89,7 +95,7 @@ function canonicalizeModel(raw) {
   return key;
 }
 
-function canonicalizeAgent(raw) {
+export function canonicalizeAgent(raw) {
   const a = String(raw || '').trim().toUpperCase();
   if (!a) return 'UNKNOWN';
   if (a === 'SCRIPT') return 'SCRIPT';
@@ -103,7 +109,7 @@ function canonicalizeAgent(raw) {
  *   "MiMo2.5pro", "sensenova6.7fl", "dsv4f-Script"
  *   "MiMo2.5proA" / "MiMo2.5proB"
  */
-function parseDisplayName(displayName) {
+export function parseDisplayName(displayName) {
   const raw = String(displayName || '').trim() || 'unknown';
   // Pattern: model-AGENT (agent is short uppercase-ish token at end)
   const dash = raw.match(/^(.*?)[-_]([A-Za-z]{1,8})$/);
@@ -120,7 +126,7 @@ function parseDisplayName(displayName) {
   return { displayName: raw, model: canonicalizeModel(raw), agent: 'UNKNOWN' };
 }
 
-function parseReviewFileName(fileName) {
+export function parseReviewFileName(fileName) {
   const m = fileName.match(REVIEW_MD_RE);
   if (!m) return null;
   const rankNum = m[3] ? Number(m[3]) : null;
@@ -136,7 +142,7 @@ function parseReviewFileName(fileName) {
   };
 }
 
-function scoreOf(raw) {
+export function scoreOf(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const headquartersDamage =
     num(raw.headquartersDamage) ?? num(raw.enemyHqDamage) ?? 0;
@@ -150,11 +156,11 @@ function scoreOf(raw) {
   };
 }
 
-function num(v) {
+export function num(v) {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
-function emptyEventStats() {
+export function emptyEventStats() {
   return {
     moves: 0,
     attacks: 0,
@@ -169,7 +175,7 @@ function emptyEventStats() {
   };
 }
 
-function tallyEvent(stats, type, payload) {
+export function tallyEvent(stats, type, payload) {
   switch (type) {
     case 'move':
       stats.moves += 1;
@@ -207,7 +213,7 @@ function tallyEvent(stats, type, payload) {
   }
 }
 
-function loadReplay(filePath) {
+export function loadReplay(filePath) {
   const text = readFileSync(filePath, 'utf8');
   const data = JSON.parse(text);
   // legacy: pure event array
@@ -226,7 +232,7 @@ function loadReplay(filePath) {
   return data;
 }
 
-function extractMatch(filePath, version, fileName, reviewsByRecord) {
+export function extractMatch(filePath, version, fileName, reviewsByRecord) {
   const m = fileName.match(REPLAY_JSON_RE);
   if (!m) return null;
   const recordId = m[1].toLowerCase();
@@ -458,16 +464,6 @@ function extractMatch(filePath, version, fileName, reviewsByRecord) {
       if (owner && perSeatEvents[owner]) tallyEvent(perSeatEvents[owner], type, payload);
       else if (type !== 'attack') {
         /* global only already counted */
-      }
-      if (type === 'attack') {
-        // still try count under attacker owner
-        const atkOwner = unitOwner.get(payload.attackerId);
-        if (atkOwner && perSeatEvents[atkOwner] && !payload.owner) {
-          // already not counted per-seat above if owner missing — count now
-          if (!payload.owner && !unitOwner.get(payload.unitId)) {
-            tallyEvent(perSeatEvents[atkOwner], type, payload);
-          }
-        }
       }
     } else if (type === 'control_point_captured' && payload.owner && perSeatEvents[payload.owner]) {
       tallyEvent(perSeatEvents[payload.owner], type, payload);
@@ -812,7 +808,7 @@ function round4(n) {
   return Math.round(n * 10000) / 10000;
 }
 
-function collectReviews(versionDir) {
+export function collectReviews(versionDir) {
   const byRecord = new Map();
   let files;
   try {

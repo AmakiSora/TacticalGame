@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TacticalGame — 娱乐数据</title>
+  <link rel="stylesheet" href="/entertainment.css" />
+  <link rel="stylesheet" href="/mobile-icons.css" />
+  <script src="/version.js" defer></script>
+  <script src="/entertainment.js" defer></script>
+</head>
+<body class="stats-shell">
+  <header>
+    <div class="brand-block">
+      <h1>娱乐数据 <span class="version-badge"></span></h1>
+      <div class="page-subtitle">动作总量 · 行为画像 · 极限记录 · 时间线</div>
+    </div>
+    <nav class="page-nav" aria-label="站点导航">
+      <a href="/play.html">玩家</a>
+      <a href="/spectator.html">观战</a>
+      <a href="/spectator2.html">全息观战</a>
+      <a href="/control.html">控制台</a>
+      <a href="/map-editor.html">地图编辑</a>
+      <a href="/stats.html">统计</a>
+      <a href="/entertainment.html" class="active">娱乐数据</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="meta-bar panel">
+      <div class="meta-item">
+        <span>数据生成时间</span>
+        <strong id="generated-at">—</strong>
+      </div>
+      <div class="meta-item">
+        <span>回放局数</span>
+        <strong id="source-count">—</strong>
+      </div>
+      <div class="meta-item">
+        <span>日期范围</span>
+        <strong id="date-range">—</strong>
+      </div>
+      <div class="meta-item status-item">
+        <span>状态</span>
+        <strong id="load-status" class="status-pill">加载中…</strong>
+      </div>
+      <div class="meta-actions">
+        <button id="btn-reload" type="button">重新加载</button>
+      </div>
+    </section>
+
+    <section id="kpi-grid" class="kpi-grid" aria-label="总览指标"></section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>趣味事实</h2>
+          <span>从回放数据自动提炼</span>
+        </div>
+      </div>
+      <div id="fun-facts" class="fun-facts"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>模型行为画像</h2>
+          <span>每局平均动作数 · 标签按相对优势生成</span>
+        </div>
+      </div>
+      <div id="model-profiles" class="profile-list"></div>
+    </section>
+
+    <section class="two-col">
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>单位部署</h2>
+          <span>占比与按模型分布</span>
+        </div>
+        <div id="unit-bars" class="bar-list"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>极限记录</h2>
+          <span>各项之最 · 点击对局编号跳转统计页</span>
+        </div>
+        <div id="extremes-list" class="extremes-list"></div>
+      </section>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>时间线</h2>
+          <span>按天聚合的对局频次与平均整轮</span>
+        </div>
+      </div>
+      <div id="timeline" class="timeline"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>Schema 演进</h2>
+          <span>各回放格式版本的出现顺序与局数</span>
+        </div>
+      </div>
+      <div id="schema-timeline" class="schema-list"></div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    数据文件 <code>/data/fun-stats.json</code> · 重新生成：
+    <code>npm run fun-stats</code> 或 <code>node script/generateFunStats.mjs</code>
+  </footer>
+</body>
+</html>

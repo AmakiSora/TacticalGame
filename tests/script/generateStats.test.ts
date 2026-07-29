@@ -1,5 +1,15 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { aggregate, isDrawMatch, isRankedMatch } from '../../script/generateStats.mjs';
+import {
+  aggregate,
+  canonicalizeModel,
+  extractMatch,
+  isDrawMatch,
+  isRankedMatch,
+  parseReviewFileName,
+} from '../../script/generateStats.mjs';
 
 function participant(playerId: string, model: string, rank: number | null, isWinner = false) {
   return {
@@ -33,6 +43,49 @@ function match(overrides: Record<string, unknown>) {
 }
 
 describe('stats aggregation', () => {
+  it('normalizes an agent suffix repeated in a review model name', () => {
+    expect(canonicalizeModel('doubaoseed2.1pro-PI')).toBe('doubaoseed2.1pro');
+    expect(parseReviewFileName('tg_0061_rank03_PI@doubaoseed2.1pro-PI.md')).toMatchObject({
+      agent: 'PI',
+      model: 'doubaoseed2.1pro',
+      rank: 3,
+    });
+  });
+
+  it('attributes an ownerless attack to its attacker exactly once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-stats-'));
+    const fileName = 'tg_9999_20260730.json';
+    const filePath = join(dir, fileName);
+    writeFileSync(filePath, JSON.stringify({
+      playerNames: { player_a: 'ModelA-PI', player_b: 'ModelB-WB' },
+      events: [
+        {
+          type: 'game_start',
+          payload: {
+            units: [{ id: 'unit-a', owner: 'player_a' }],
+          },
+        },
+        {
+          type: 'attack',
+          payload: { attackerId: 'unit-a', targetId: 'unit-b', damage: 10 },
+        },
+        {
+          type: 'game_over',
+          payload: { winner: 'player_a', reason: 'headquarters_destroyed' },
+        },
+      ],
+    }), 'utf8');
+
+    try {
+      const result = extractMatch(filePath, 'V3', fileName, new Map());
+      expect(result?.eventStats.attacks).toBe(1);
+      expect(result?.participants.find(p => p.playerId === 'player_a')?.events.attacks).toBe(1);
+      expect(result?.participants.find(p => p.playerId === 'player_b')?.events.attacks).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('keeps incomplete matches out of competitive rankings', () => {
     const completed = match({
       participants: [

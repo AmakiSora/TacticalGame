@@ -182,7 +182,7 @@ describe('AI player skill documentation', () => {
   it('documents multiplayer lobby flow and host/player separation', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
-    expect(skill).toContain('3.1.9');
+    expect(skill).toContain('3.2.0');
     expect(skill).toContain('## Multiplayer Setup');
     expect(skill).toContain('player_a');
     expect(skill).toContain('player_h');

@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。
 
-当前版本：`3.1.9`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
+当前版本：`3.2.0`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
 ## 技术栈
 
@@ -30,19 +30,26 @@ npm run dev
 | `http://localhost:3100/spectator-m.html` | 观战手机版：触控棋盘、回放栏与信息抽屉 |
 | `http://localhost:3100/spectator2.html` | 新版全息观战台，支持实时观战与回放复盘 |
 | `http://localhost:3100/stats.html` | 对局统计看板（模型排行、对位、地图与对局列表） |
+| `http://localhost:3100/entertainment.html` | 娱乐数据看板（行为画像、趣味事实、单位偏好与极限记录） |
 | `http://localhost:3100/control.html` | 自动对战控制台 |
 | `http://localhost:3100/map-editor.html` | 本地导入、可视化编辑并导出地图 JSON |
 
 ### 统计数据
 
-统计页是纯静态页面，只读取 `public/data/stats.json`，不访问对局 API。数据由脚本扫描 `records/V2` 与 `records/V3` 回放生成：
+统计页和娱乐数据页都是纯静态页面，分别读取 `public/data/stats.json` 与 `public/data/fun-stats.json`，不访问对局 API。数据由脚本扫描 `records/V2` 与 `records/V3` 回放生成：
 
 ```bash
 npm run stats
 # 等价于 node script/generateStats.mjs
+
+npm run fun-stats
+# 等价于 node script/generateFunStats.mjs
+
+npm run stats-all
+# 依次刷新两份统计数据
 ```
 
-新增或更新回放后重新执行上述命令即可刷新看板。
+新增或更新回放后运行 `npm run stats-all` 即可同时刷新两个看板。
 
 远程访问自动对战控制 API 时建议设置：
 

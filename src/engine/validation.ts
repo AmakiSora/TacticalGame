@@ -1,7 +1,7 @@
 // src/engine/validation.ts
 import type { GameState, Position, Unit, Headquarters, TerrainType } from '../types.js';
 import type { Result } from './result.js';
-import { hexDistance, hexKey, hexNeighbors, isValidHex } from './hex.js';
+import { hexDistance, hexKey, hexNeighbors } from './hex.js';
 
 export type Occupant =
   | { kind: 'unit'; entity: Unit }
@@ -16,7 +16,7 @@ export function getTerrain(game: GameState, q: number, r: number): TerrainType {
 }
 
 export function isInBounds(game: GameState, q: number, r: number): boolean {
-  return isValidHex({ q, r }, game.map.radius);
+  return game.cells.some(cell => cell.q === q && cell.r === r);
 }
 
 export function isPassable(game: GameState, q: number, r: number): boolean {

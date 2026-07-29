@@ -3,7 +3,8 @@
   const HEX_SIZE = 34;
   const PAD = 48;
   const TERRAIN_COLORS = { plain: '#111923', water: '#183a55', blocker: '#393f46' };
-  const OWNER_COLORS = { player_a: '#66ccff', player_b: '#ff9966' };
+  const SLOT_COLORS = ['#66ccff', '#ff9966', '#8ee28e', '#d6a3ff', '#ffe17a', '#ff7f9f', '#70e0d0', '#c7d0dc'];
+  const OWNER_COLORS = { player_a: SLOT_COLORS[0], player_b: SLOT_COLORS[1] };
   const UNIT_TYPES = ['infantry', 'scout', 'heavy', 'ranger', 'support'];
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
   const CONTROL_POINT_KINDS = ['supply', 'forward_base', 'repair'];
@@ -51,6 +52,36 @@
       }
     }
     return cells;
+  }
+
+  function playableCells(config) {
+    return Array.isArray(config.playableCells) ? config.playableCells : allCells(config.radius);
+  }
+
+  function isPlayableCell(config, pos) {
+    return playableCells(config).some(cell => cell.q === pos.q && cell.r === pos.r);
+  }
+
+  function materializePlayableCells(config) {
+    if (!Array.isArray(config.playableCells)) config.playableCells = allCells(config.radius);
+    return config.playableCells;
+  }
+
+  function arePlayableCellsConnected(cells) {
+    if (!Array.isArray(cells) || cells.length === 0) return false;
+    const remaining = new Set(cells.map(hexKey));
+    const queue = [{ ...cells[0] }];
+    remaining.delete(hexKey(cells[0]));
+    const directions = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+    for (let index = 0; index < queue.length; index++) {
+      for (const [dq, dr] of directions) {
+        const next = { q: queue[index].q + dq, r: queue[index].r + dr };
+        const key = hexKey(next);
+        if (!remaining.delete(key)) continue;
+        queue.push(next);
+      }
+    }
+    return remaining.size === 0;
   }
 
   function defaultUnits() {
@@ -138,6 +169,9 @@
       grid: 'hex',
       orientation: 'pointy',
       radius: Number.isInteger(cfg.radius) && cfg.radius > 0 ? cfg.radius : defaults.radius,
+      ...(Array.isArray(cfg.playableCells)
+        ? { playableCells: cfg.playableCells.map(cell => ({ q: cell.q, r: cell.r })) }
+        : {}),
       terrainCells: Array.isArray(cfg.terrainCells) ? cfg.terrainCells.map(c => ({ q: c.q, r: c.r, terrain: c.terrain || 'plain' })) : [],
       controlPoints: Array.isArray(cfg.controlPoints)
         ? cfg.controlPoints.map((p, i) => ({ id: p.id || `cp_${i + 1}`, name: p.name || `据点 ${i + 1}`, ...(p.kind ? { kind: p.kind } : {}), q: p.q, r: p.r }))
@@ -155,7 +189,42 @@
         defense: numberOrDefault(cfg.headquartersSpec?.defense, defaults.headquartersSpec.defense),
       },
       balance: deepClone(defaults.balance),
+      spawnMode: Array.isArray(cfg.spawnSlots),
+      spawnSlots: [],
+      layouts: {},
     };
+
+    if (normalized.spawnMode) {
+      normalized.spawnSlots = cfg.spawnSlots.map((slot, index) => ({
+        id: typeof slot.id === 'string' && slot.id ? slot.id : `slot_${index + 1}`,
+        headquarters: { q: slot.headquarters?.q, r: slot.headquarters?.r },
+        startingUnits: Array.isArray(slot.startingUnits)
+          ? slot.startingUnits.map(unit => ({ type: unit.type, q: unit.q, r: unit.r }))
+          : [],
+      }));
+      normalized.layouts = cfg.layouts && typeof cfg.layouts === 'object' ? deepClone(cfg.layouts) : {};
+      const first = normalized.spawnSlots[0];
+      const second = normalized.spawnSlots[1] || first;
+      if (first) {
+        normalized.headquarters = {
+          player_a: { ...first.headquarters },
+          player_b: { ...second.headquarters },
+        };
+        normalized.startingUnits = [
+          ...first.startingUnits.map(unit => ({ ...unit, owner: 'player_a' })),
+          ...second.startingUnits.map(unit => ({ ...unit, owner: 'player_b' })),
+        ];
+      }
+    } else {
+      normalized.spawnSlots = ['player_a', 'player_b'].map(player => ({
+        id: `slot_${player.slice(-1)}`,
+        headquarters: { ...normalized.headquarters[player] },
+        startingUnits: normalized.startingUnits
+          .filter(unit => unit.owner === player)
+          .map(({ owner: _owner, ...unit }) => ({ ...unit })),
+      }));
+      normalized.layouts = { 2: normalized.spawnSlots.map(slot => slot.id) };
+    }
 
     for (const type of UNIT_TYPES) normalized.units[type] = normalizeUnitSpec(type, cfg.units?.[type]);
     const sourceBalance = cfg.balance && typeof cfg.balance === 'object' ? cfg.balance : {};
@@ -219,12 +288,15 @@
       units[type] = normalizeUnitSpec(type, src);
     }
 
-    return {
+    const serialized = {
       name: String(config.name || ''),
       description: String(config.description || ''),
       grid: 'hex',
       orientation: 'pointy',
       radius: Number(config.radius),
+      ...(Array.isArray(config.playableCells)
+        ? { playableCells: sortPositions(config.playableCells.map(cell => ({ q: Number(cell.q), r: Number(cell.r) }))) }
+        : {}),
       terrainCells: sortPositions((config.terrainCells || [])
         .filter(cell => cell.terrain === 'water' || cell.terrain === 'blocker')
         .map(cell => ({ q: Number(cell.q), r: Number(cell.r), terrain: cell.terrain }))),
@@ -235,16 +307,6 @@
         q: Number(point.q),
         r: Number(point.r),
       })),
-      headquarters: {
-        player_a: { q: Number(config.headquarters?.player_a?.q), r: Number(config.headquarters?.player_a?.r) },
-        player_b: { q: Number(config.headquarters?.player_b?.q), r: Number(config.headquarters?.player_b?.r) },
-      },
-      startingUnits: (config.startingUnits || []).map(unit => ({
-        owner: unit.owner,
-        type: unit.type,
-        q: Number(unit.q),
-        r: Number(unit.r),
-      })),
       units,
       headquartersSpec: {
         hp: Number(config.headquartersSpec?.hp ?? 0),
@@ -252,12 +314,52 @@
       },
       balance,
     };
+    if (config.spawnMode) {
+      serialized.spawnSlots = (config.spawnSlots || []).map((slot, index) => ({
+        id: String(slot.id || `slot_${index + 1}`),
+        headquarters: { q: Number(slot.headquarters?.q), r: Number(slot.headquarters?.r) },
+        startingUnits: (slot.startingUnits || []).map(unit => ({
+          type: unit.type,
+          q: Number(unit.q),
+          r: Number(unit.r),
+        })),
+      }));
+      serialized.layouts = Object.fromEntries(Object.entries(config.layouts || {})
+        .filter(([, slots]) => Array.isArray(slots))
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([count, slots]) => [count, [...slots]]));
+    } else {
+      serialized.headquarters = {
+        player_a: { q: Number(config.headquarters?.player_a?.q), r: Number(config.headquarters?.player_a?.r) },
+        player_b: { q: Number(config.headquarters?.player_b?.q), r: Number(config.headquarters?.player_b?.r) },
+      };
+      serialized.startingUnits = (config.startingUnits || []).map(unit => ({
+        owner: unit.owner,
+        type: unit.type,
+        q: Number(unit.q),
+        r: Number(unit.r),
+      }));
+    }
+    return serialized;
   }
 
   function validateMapConfig(config, id = 'map') {
     const errors = [];
-    const c = config && typeof config === 'object' ? config : {};
+    const c = config && typeof config === 'object' ? deepClone(config) : {};
+    if (Array.isArray(c.spawnSlots)) {
+      const first = c.spawnSlots[0];
+      const second = c.spawnSlots[1] || first;
+      c.headquarters = c.headquarters || {
+        player_a: first?.headquarters,
+        player_b: second?.headquarters,
+      };
+      c.startingUnits = c.startingUnits || [
+        ...(first?.startingUnits || []).map(unit => ({ ...unit, owner: 'player_a' })),
+        ...(second?.startingUnits || []).map(unit => ({ ...unit, owner: 'player_b' })),
+      ];
+    }
     const mapName = `Map "${id}"`;
+    let playableKeys = null;
     function record(value, ctx) {
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
         errors.push(`${ctx} must be an object`);
@@ -278,6 +380,7 @@
       const r = num(obj, 'r', ctx, -Infinity);
       if (!Number.isInteger(q) || !Number.isInteger(r)) errors.push(`${ctx} q/r must be integers`);
       else if (!isValidHex({ q, r }, radius)) errors.push(`${ctx} (${q},${r}) is outside radius ${radius}`);
+      else if (playableKeys && !playableKeys.has(`${q},${r}`)) errors.push(`${ctx} (${q},${r}) is outside playableCells`);
       return { q, r };
     }
     function claim(posValue, ctx) {
@@ -292,6 +395,25 @@
     if (c.orientation !== 'pointy') errors.push(`${mapName} orientation must be "pointy"`);
     const radius = num(c, 'radius', mapName, 1);
     if (!Number.isInteger(radius)) errors.push(`${mapName} radius must be an integer`);
+
+    const sourcePlayableCells = 'playableCells' in c ? c.playableCells : allCells(radius);
+    if (!Array.isArray(sourcePlayableCells) || sourcePlayableCells.length === 0) {
+      errors.push(`${mapName}.playableCells must be a non-empty array`);
+      playableKeys = new Set();
+    } else {
+      playableKeys = new Set();
+      sourcePlayableCells.forEach((cellValue, index) => {
+        const cell = record(cellValue, `playableCells[${index}]`);
+        const q = num(cell, 'q', `playableCells[${index}]`, -Infinity);
+        const r = num(cell, 'r', `playableCells[${index}]`, -Infinity);
+        if (!Number.isInteger(q) || !Number.isInteger(r)) errors.push(`playableCells[${index}] q/r must be integers`);
+        else if (!isValidHex({ q, r }, radius)) errors.push(`playableCells[${index}] (${q},${r}) is outside radius ${radius}`);
+        const key = `${q},${r}`;
+        if (playableKeys.has(key)) errors.push(`playableCells[${index}] duplicates ${key}`);
+        playableKeys.add(key);
+      });
+      if (!arePlayableCellsConnected(sourcePlayableCells)) errors.push(`${mapName}.playableCells must form one connected area`);
+    }
 
     const units = record(c.units, `${mapName}.units`);
     for (const type of UNIT_TYPES) {
@@ -382,6 +504,55 @@
       if (!UNIT_TYPES.includes(String(unit.type))) errors.push(`startingUnits[${i}].type invalid`);
       claim(pos(unit, `startingUnits[${i}]`, radius), `startingUnits[${i}]`);
     });
+
+    if (Array.isArray(c.spawnSlots)) {
+      if (c.spawnSlots.length < 2 || c.spawnSlots.length > 8) errors.push(`${mapName}.spawnSlots must contain 2-8 slots`);
+      const ids = new Set();
+      c.spawnSlots.forEach((slotValue, slotIndex) => {
+        const slot = record(slotValue, `spawnSlots[${slotIndex}]`);
+        str(slot, 'id', `spawnSlots[${slotIndex}]`);
+        if (ids.has(slot.id)) errors.push(`spawnSlots[${slotIndex}].id must be unique`);
+        ids.add(slot.id);
+        pos(record(slot.headquarters, `spawnSlots[${slotIndex}].headquarters`), `spawnSlots[${slotIndex}].headquarters`, radius);
+        if (!Array.isArray(slot.startingUnits)) errors.push(`spawnSlots[${slotIndex}].startingUnits must be an array`);
+        else slot.startingUnits.forEach((unitValue, unitIndex) => {
+          const unit = record(unitValue, `spawnSlots[${slotIndex}].startingUnits[${unitIndex}]`);
+          if (!UNIT_TYPES.includes(String(unit.type))) errors.push(`spawnSlots[${slotIndex}].startingUnits[${unitIndex}].type invalid`);
+          pos(unit, `spawnSlots[${slotIndex}].startingUnits[${unitIndex}]`, radius);
+        });
+      });
+      const layouts = record(c.layouts, `${mapName}.layouts`);
+      const impassable = new Set((c.terrainCells || [])
+        .filter(cell => cell.terrain === 'water' || cell.terrain === 'blocker')
+        .map(hexKey));
+      const controlPositions = new Set((c.controlPoints || []).map(hexKey));
+      for (const [countText, slotIds] of Object.entries(layouts)) {
+        const count = Number(countText);
+        if (!Number.isInteger(count) || count < 2 || count > 8 || !Array.isArray(slotIds) || slotIds.length !== count) {
+          errors.push(`${mapName}.layouts.${countText} must contain exactly ${countText} slots`);
+          continue;
+        }
+        if (new Set(slotIds).size !== slotIds.length || slotIds.some(slotId => typeof slotId !== 'string' || !ids.has(slotId))) {
+          errors.push(`${mapName}.layouts.${countText} contains invalid slots`);
+          continue;
+        }
+        const occupiedInLayout = new Set(controlPositions);
+        for (const slotId of slotIds) {
+          const slotIndex = c.spawnSlots.findIndex(slot => slot.id === slotId);
+          const slot = c.spawnSlots[slotIndex];
+          const objects = [
+            { ...slot.headquarters, ctx: `spawnSlots[${slotIndex}].headquarters` },
+            ...(slot.startingUnits || []).map((unit, unitIndex) => ({ ...unit, ctx: `spawnSlots[${slotIndex}].startingUnits[${unitIndex}]` })),
+          ];
+          for (const object of objects) {
+            const key = hexKey(object);
+            if (impassable.has(key)) errors.push(`${object.ctx} is on impassable terrain at ${key}`);
+            if (occupiedInLayout.has(key)) errors.push(`${object.ctx} overlaps another fixed map object at ${key}`);
+            occupiedInLayout.add(key);
+          }
+        }
+      }
+    }
 
     return errors;
   }
@@ -509,6 +680,12 @@
     if (error.includes('grid must be "hex"')) return '地图网格必须是 hex。';
     if (error.includes('orientation must be "pointy"')) return '地图方向必须是 pointy。';
     if (error.includes('radius must be an integer')) return '地图半径必须是整数。';
+    if (error.includes('playableCells must be a non-empty array')) return '地图必须至少包含 1 个可用格子。';
+    if (error.includes('playableCells must form one connected area')) return '所有可用格子必须六向连通。';
+    if (error.includes('outside playableCells')) return error.replace('is outside playableCells', '不在可用地图边界内');
+    if (error.includes('.spawnSlots must contain 2-8 slots')) return '多人地图必须配置 2–8 个出生槽。';
+    if (error.includes('.layouts.') && error.includes('must contain exactly')) return '人数布局选择的出生槽数量不正确。';
+    if (error.includes('.layouts.') && error.includes('contains invalid slots')) return '人数布局包含重复或不存在的出生槽。';
     if (error.includes('.canCapture must be boolean')) {
       const unit = error.match(/^units\.(\w+)/)?.[1];
       return `${humanUnit(unit)}规格的可占点必须是布尔值。`;
@@ -527,20 +704,41 @@
     (copy.controlPoints || []).forEach(item => collect(item, 'controlPoints'));
     (copy.startingUnits || []).forEach(item => collect(item, 'startingUnits'));
     for (const player of ['player_a', 'player_b']) collect(copy.headquarters[player], `headquarters.${player}`);
+    if (Array.isArray(copy.playableCells)) copy.playableCells.forEach(item => collect(item, 'playableCells'));
+    if (copy.spawnMode) {
+      (copy.spawnSlots || []).forEach((slot, slotIndex) => {
+        collect(slot.headquarters, `spawnSlots.${slotIndex}.headquarters`);
+        (slot.startingUnits || []).forEach(item => collect(item, `spawnSlots.${slotIndex}.startingUnits`));
+      });
+    }
     if (outside.length && !confirmRemoval) return { config: copy, removed: outside.length, requiresConfirmation: true };
     copy.radius = nextRadius;
     copy.terrainCells = (copy.terrainCells || []).filter(item => isValidHex(item, nextRadius));
     copy.controlPoints = (copy.controlPoints || []).filter(item => isValidHex(item, nextRadius));
     copy.startingUnits = (copy.startingUnits || []).filter(item => isValidHex(item, nextRadius));
+    if (Array.isArray(copy.playableCells)) copy.playableCells = copy.playableCells.filter(item => isValidHex(item, nextRadius));
     for (const player of ['player_a', 'player_b']) {
       if (!isValidHex(copy.headquarters[player], nextRadius)) copy.headquarters[player] = { q: player === 'player_a' ? -nextRadius : nextRadius, r: 0 };
+    }
+    if (copy.spawnMode) {
+      const candidates = playableCells(copy);
+      const occupied = new Set((copy.controlPoints || []).map(hexKey));
+      (copy.spawnSlots || []).forEach(slot => {
+        slot.startingUnits = (slot.startingUnits || []).filter(item => isValidHex(item, nextRadius) && isPlayableCell(copy, item));
+        if (!isValidHex(slot.headquarters, nextRadius) || !isPlayableCell(copy, slot.headquarters)) {
+          const replacement = candidates.find(cell => !occupied.has(hexKey(cell)));
+          if (replacement) slot.headquarters = { ...replacement };
+        }
+        occupied.add(hexKey(slot.headquarters));
+        slot.startingUnits.forEach(unit => occupied.add(hexKey(unit)));
+      });
     }
     return { config: copy, removed: outside.length, requiresConfirmation: false };
   }
 
   function createCellsFromConfig(config) {
     const terrain = new Map((config.terrainCells || []).map(cell => [hexKey(cell), cell.terrain]));
-    return allCells(config.radius).map(cell => ({ ...cell, terrain: terrain.get(hexKey(cell)) || 'plain' }));
+    return playableCells(config).map(cell => ({ ...cell, terrain: terrain.get(hexKey(cell)) || 'plain' }));
   }
 
   const core = {
@@ -551,6 +749,8 @@
     resizeMapRadius,
     formatValidationError,
     isValidHex,
+    isPlayableCell,
+    arePlayableCellsConnected,
     createCellsFromConfig,
   };
 
@@ -581,6 +781,7 @@
     balanceFields: $('balance-fields'),
     unitSpecFields: $('unit-spec-fields'),
     controlTypeFields: $('control-type-fields'),
+    spawnLayoutFields: $('spawn-layout-fields'),
   };
   const ctx = els.canvas.getContext('2d');
   let config = createDefaultMapConfig();
@@ -589,6 +790,37 @@
   let selected = null;
   let zoom = 1;
   let layout = { minX: 0, minY: 0, width: 840, height: 840 };
+
+  function activateSpawnMode() {
+    if (config.spawnMode) return;
+    config.spawnMode = true;
+    config.spawnSlots = ['player_a', 'player_b'].map(player => ({
+      id: `slot_${player.slice(-1)}`,
+      headquarters: { ...config.headquarters[player] },
+      startingUnits: (config.startingUnits || [])
+        .filter(unit => unit.owner === player)
+        .map(({ owner: _owner, ...unit }) => ({ ...unit })),
+    }));
+    config.layouts = { 2: config.spawnSlots.map(slot => slot.id) };
+  }
+
+  function slotColor(index) {
+    return SLOT_COLORS[index % SLOT_COLORS.length];
+  }
+
+  function selectedSlotIndex() {
+    if (!config.spawnMode) return -1;
+    return config.spawnSlots.findIndex(slot => slot.id === els.toolOwner.value);
+  }
+
+  function syncToolOwnerOptions() {
+    const previous = els.toolOwner.value;
+    const options = config.spawnMode
+      ? config.spawnSlots.map(slot => ({ value: slot.id, label: slot.id }))
+      : ['player_a', 'player_b'].map(player => ({ value: player, label: player }));
+    els.toolOwner.innerHTML = options.map(option => `<option value="${esc(option.value)}">${esc(option.label)}</option>`).join('');
+    if (options.some(option => option.value === previous)) els.toolOwner.value = previous;
+  }
 
   function setStatus(message) {
     els.status.textContent = message;
@@ -686,18 +918,30 @@
   }
 
   function terrainAt(pos) {
+    if (!isPlayableCell(config, pos)) return '地图外';
     return (config.terrainCells || []).find(cell => cell.q === pos.q && cell.r === pos.r)?.terrain || 'plain';
   }
 
   function setTerrain(pos, terrain) {
-    if (!isValidHex(pos, config.radius)) return false;
+    if (!isPlayableCell(config, pos)) return false;
     config.terrainCells = (config.terrainCells || []).filter(cell => !(cell.q === pos.q && cell.r === pos.r));
     if (terrain !== 'plain') config.terrainCells.push({ q: pos.q, r: pos.r, terrain });
     return true;
   }
 
   function objectAt(pos) {
+    if (config.spawnMode) {
+      for (let slotIndex = 0; slotIndex < config.spawnSlots.length; slotIndex++) {
+        const slot = config.spawnSlots[slotIndex];
+        if (slot.headquarters.q === pos.q && slot.headquarters.r === pos.r) {
+          return { type: 'spawnHeadquarters', slotIndex, object: slot.headquarters };
+        }
+        const unitIndex = slot.startingUnits.findIndex(unit => unit.q === pos.q && unit.r === pos.r);
+        if (unitIndex >= 0) return { type: 'spawnUnit', slotIndex, unitIndex, object: slot.startingUnits[unitIndex] };
+      }
+    }
     for (const player of ['player_a', 'player_b']) {
+      if (config.spawnMode) break;
       const hq = config.headquarters[player];
       if (hq.q === pos.q && hq.r === pos.r) return { type: 'headquarters', player, object: hq };
     }
@@ -712,11 +956,17 @@
     const hit = objectAt(pos);
     if (!hit) return false;
     if (!ignore) return true;
-    return !(hit.type === ignore.type && hit.index === ignore.index && hit.player === ignore.player);
+    return !(
+      hit.type === ignore.type
+      && hit.index === ignore.index
+      && hit.player === ignore.player
+      && hit.slotIndex === ignore.slotIndex
+      && hit.unitIndex === ignore.unitIndex
+    );
   }
 
   function canPlace(pos, ignore) {
-    return isValidHex(pos, config.radius) && !hasFixedObjectAt(pos, ignore);
+    return isPlayableCell(config, pos) && !hasFixedObjectAt(pos, ignore);
   }
 
   function nextControlPointId() {
@@ -734,15 +984,32 @@
 
   function placeAt(pos) {
     if (!isValidHex(pos, config.radius)) return;
-    if (tool === 'plain' || tool === 'water' || tool === 'blocker') {
+    if (tool === 'add-cell') {
+      const existed = isPlayableCell(config, pos);
+      const cells = materializePlayableCells(config);
+      if (!existed) cells.push({ q: pos.q, r: pos.r });
+      selected = { type: 'cell', object: { q: pos.q, r: pos.r } };
+    } else if (tool === 'remove-cell') {
+      removePlayableCell(pos);
+    } else if (tool === 'plain' || tool === 'water' || tool === 'blocker') {
+      if (!isPlayableCell(config, pos)) return setStatus('该位置不属于地图，请先添加地块');
       setTerrain(pos, tool);
       selected = { type: 'cell', object: { q: pos.q, r: pos.r } };
     } else if (tool === 'hq') {
-      const player = els.toolOwner.value;
-      const ignore = { type: 'headquarters', player };
-      if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部');
-      config.headquarters[player] = { q: pos.q, r: pos.r };
-      selected = { type: 'headquarters', player, object: config.headquarters[player] };
+      if (config.spawnMode) {
+        const slotIndex = selectedSlotIndex();
+        if (slotIndex < 0) return setStatus('请先选择出生槽');
+        const ignore = { type: 'spawnHeadquarters', slotIndex };
+        if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部');
+        config.spawnSlots[slotIndex].headquarters = { q: pos.q, r: pos.r };
+        selected = { type: 'spawnHeadquarters', slotIndex, object: config.spawnSlots[slotIndex].headquarters };
+      } else {
+        const player = els.toolOwner.value;
+        const ignore = { type: 'headquarters', player };
+        if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部');
+        config.headquarters[player] = { q: pos.q, r: pos.r };
+        selected = { type: 'headquarters', player, object: config.headquarters[player] };
+      }
     } else if (tool === 'control') {
       if (!canPlace(pos)) return setStatus('该格已有固定对象，不能放置据点');
       const kind = els.toolControlKind.value;
@@ -751,15 +1018,33 @@
       selected = { type: 'controlPoint', index: config.controlPoints.length - 1, object: point };
     } else if (tool === 'unit') {
       if (!canPlace(pos)) return setStatus('该格已有固定对象，不能放置初始单位');
-      const unit = { owner: els.toolOwner.value, type: els.toolUnitType.value, q: pos.q, r: pos.r };
-      config.startingUnits.push(unit);
-      selected = { type: 'startingUnit', index: config.startingUnits.length - 1, object: unit };
+      if (config.spawnMode) {
+        const slotIndex = selectedSlotIndex();
+        if (slotIndex < 0) return setStatus('请先选择出生槽');
+        const unit = { type: els.toolUnitType.value, q: pos.q, r: pos.r };
+        config.spawnSlots[slotIndex].startingUnits.push(unit);
+        selected = { type: 'spawnUnit', slotIndex, unitIndex: config.spawnSlots[slotIndex].startingUnits.length - 1, object: unit };
+      } else {
+        const unit = { owner: els.toolOwner.value, type: els.toolUnitType.value, q: pos.q, r: pos.r };
+        config.startingUnits.push(unit);
+        selected = { type: 'startingUnit', index: config.startingUnits.length - 1, object: unit };
+      }
     } else if (tool === 'delete') {
       deleteAt(pos);
     } else {
       selectObject(objectAt(pos), pos);
     }
     syncAll();
+  }
+
+  function removePlayableCell(pos) {
+    if (!isPlayableCell(config, pos)) return setStatus('该位置已经在地图外');
+    if (objectAt(pos)) return setStatus('该格存在总部、据点或单位，不能移除地块');
+    if (terrainAt(pos) !== 'plain') return setStatus('请先将该格地形恢复为平地，再移除地块');
+    const next = playableCells(config).filter(cell => cell.q !== pos.q || cell.r !== pos.r);
+    if (!arePlayableCellsConnected(next)) return setStatus('移除后会使地图断开，操作已取消');
+    config.playableCells = next;
+    selected = null;
   }
 
   function deleteAt(pos) {
@@ -769,9 +1054,10 @@
       selected = { type: 'cell', object: { q: pos.q, r: pos.r } };
       return;
     }
-    if (hit.type === 'headquarters') return setStatus('双方总部必须存在，可用总部工具移动位置');
+    if (hit.type === 'headquarters' || hit.type === 'spawnHeadquarters') return setStatus('总部必须存在，可用总部工具移动位置');
     if (hit.type === 'controlPoint') config.controlPoints.splice(hit.index, 1);
     if (hit.type === 'startingUnit') config.startingUnits.splice(hit.index, 1);
+    if (hit.type === 'spawnUnit') config.spawnSlots[hit.slotIndex].startingUnits.splice(hit.unitIndex, 1);
     selected = null;
   }
 
@@ -782,9 +1068,12 @@
     ctx.fillRect(0, 0, els.canvas.width, els.canvas.height);
     for (const cell of allCells(config.radius)) {
       pathHex(cell.q, cell.r, 1);
-      ctx.fillStyle = TERRAIN_COLORS[terrainAt(cell)] || TERRAIN_COLORS.plain;
-      ctx.fill();
-      ctx.strokeStyle = '#20313d';
+      const playable = isPlayableCell(config, cell);
+      if (playable) {
+        ctx.fillStyle = TERRAIN_COLORS[terrainAt(cell)] || TERRAIN_COLORS.plain;
+        ctx.fill();
+      }
+      ctx.strokeStyle = playable ? '#20313d' : 'rgba(74,96,112,.22)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -794,8 +1083,15 @@
       ctx.fill();
     }
     for (const point of config.controlPoints) drawControlPoint(point);
-    for (const player of ['player_a', 'player_b']) drawHeadquarters(player, config.headquarters[player]);
-    for (const unit of config.startingUnits) drawUnit(unit);
+    if (config.spawnMode) {
+      config.spawnSlots.forEach((slot, slotIndex) => {
+        drawHeadquarters(slot.id, slot.headquarters, slotIndex);
+        slot.startingUnits.forEach(unit => drawUnit({ ...unit, owner: slot.id, slotIndex }));
+      });
+    } else {
+      for (const player of ['player_a', 'player_b']) drawHeadquarters(player, config.headquarters[player]);
+      for (const unit of config.startingUnits) drawUnit(unit);
+    }
   }
 
   function drawUnitGlyph(type, x, y) {
@@ -891,10 +1187,10 @@
     ctx.restore();
   }
 
-  function drawHeadquarters(player, hq) {
+  function drawHeadquarters(player, hq, slotIndex = null) {
     const p = hexToPixel(hq.q, hq.r);
     pathHex(hq.q, hq.r, 5);
-    ctx.fillStyle = OWNER_COLORS[player];
+    ctx.fillStyle = OWNER_COLORS[player] || slotColor(slotIndex || 0);
     ctx.globalAlpha = 0.78;
     ctx.fill();
     ctx.globalAlpha = 1;
@@ -922,7 +1218,7 @@
 
   function drawUnit(unit) {
     const p = hexToPixel(unit.q, unit.r);
-    ctx.fillStyle = OWNER_COLORS[unit.owner] || '#d8e0e8';
+    ctx.fillStyle = OWNER_COLORS[unit.owner] || (Number.isInteger(unit.slotIndex) ? slotColor(unit.slotIndex) : '#d8e0e8');
     ctx.beginPath();
     ctx.arc(p.x, p.y, HEX_SIZE * 0.42, 0, Math.PI * 2);
     ctx.fill();
@@ -1039,6 +1335,106 @@
     });
   }
 
+  function renderSpawnLayouts() {
+    if (!config.spawnMode) {
+      els.spawnLayoutFields.innerHTML = `<p class="outside-cell-hint">当前使用旧式双人出生配置。转换后可编辑 2–8 人出生槽和布局。</p>
+        <button id="enable-spawn-mode" type="button">转换为多人出生布局</button>`;
+      $('enable-spawn-mode').addEventListener('click', () => {
+        activateSpawnMode();
+        syncAll();
+      });
+      return;
+    }
+
+    const slotOptions = selectedId => config.spawnSlots.map(slot =>
+      `<option value="${esc(slot.id)}"${slot.id === selectedId ? ' selected' : ''}>${esc(slot.id)}</option>`).join('');
+    const slotRows = config.spawnSlots.map((slot, index) => `<div class="spawn-slot-row" data-slot-index="${index}">
+      <span class="spawn-color" style="background:${slotColor(index)}"></span>
+      <input class="spawn-slot-id" value="${esc(slot.id)}" aria-label="出生槽 ID" />
+      <button class="spawn-select" type="button">选择</button>
+      <button class="spawn-delete danger" type="button">删除</button>
+    </div>`).join('');
+    const layoutRows = Array.from({ length: 7 }, (_, offset) => offset + 2).map(count => {
+      const selectedSlots = Array.isArray(config.layouts?.[count]) ? config.layouts[count] : null;
+      const selects = selectedSlots
+        ? Array.from({ length: count }, (_, index) => `<select class="layout-slot" data-position="${index}">${slotOptions(selectedSlots[index])}</select>`).join('')
+        : '';
+      return `<div class="layout-row" data-count="${count}">
+        <label><input class="layout-enabled" type="checkbox"${selectedSlots ? ' checked' : ''} /> ${count} 人</label>
+        ${selects}
+      </div>`;
+    }).join('');
+    els.spawnLayoutFields.innerHTML = `<div class="spawn-toolbar"><button id="spawn-add" type="button">新增出生槽</button><span class="outside-cell-hint">总部工具和单位工具作用于当前选择槽</span></div>${slotRows}${layoutRows}`;
+
+    $('spawn-add').addEventListener('click', () => {
+      if (config.spawnSlots.length >= 8) return setStatus('出生槽最多 8 个');
+      const preferred = selected?.type === 'cell' ? selected.object : null;
+      const position = preferred && canPlace(preferred) ? preferred : playableCells(config).find(cell => canPlace(cell));
+      if (!position) return setStatus('没有可用于新总部的空格');
+      let number = config.spawnSlots.length + 1;
+      const ids = new Set(config.spawnSlots.map(slot => slot.id));
+      while (ids.has(`slot_${number}`)) number += 1;
+      const slot = { id: `slot_${number}`, headquarters: { ...position }, startingUnits: [] };
+      config.spawnSlots.push(slot);
+      selected = { type: 'spawnHeadquarters', slotIndex: config.spawnSlots.length - 1, object: slot.headquarters };
+      syncAll();
+      els.toolOwner.value = slot.id;
+    });
+
+    els.spawnLayoutFields.querySelectorAll('.spawn-slot-row').forEach(row => {
+      const index = Number(row.dataset.slotIndex);
+      row.querySelector('.spawn-slot-id').addEventListener('change', event => {
+        const nextId = event.target.value.trim();
+        const previousId = config.spawnSlots[index].id;
+        if (!nextId || config.spawnSlots.some((slot, slotIndex) => slotIndex !== index && slot.id === nextId)) {
+          setStatus('出生槽 ID 必须非空且唯一');
+          return syncAll();
+        }
+        config.spawnSlots[index].id = nextId;
+        for (const slots of Object.values(config.layouts || {})) {
+          if (!Array.isArray(slots)) continue;
+          for (let position = 0; position < slots.length; position++) if (slots[position] === previousId) slots[position] = nextId;
+        }
+        syncAll();
+      });
+      row.querySelector('.spawn-select').addEventListener('click', () => {
+        els.toolOwner.value = config.spawnSlots[index].id;
+        selected = { type: 'spawnHeadquarters', slotIndex: index, object: config.spawnSlots[index].headquarters };
+        renderSelection();
+        drawBoard();
+      });
+      row.querySelector('.spawn-delete').addEventListener('click', () => {
+        if (config.spawnSlots.length <= 2) return setStatus('至少保留 2 个出生槽');
+        const removed = config.spawnSlots[index].id;
+        if (!confirm(`删除出生槽 ${removed} 及其初始单位，并关闭引用它的人数布局，是否继续？`)) return;
+        config.spawnSlots.splice(index, 1);
+        for (const [count, slots] of Object.entries(config.layouts || {})) {
+          if (Array.isArray(slots) && slots.includes(removed)) delete config.layouts[count];
+        }
+        selected = null;
+        syncAll();
+      });
+    });
+
+    els.spawnLayoutFields.querySelectorAll('.layout-row').forEach(row => {
+      const count = Number(row.dataset.count);
+      row.querySelector('.layout-enabled').addEventListener('change', event => {
+        if (!event.target.checked) delete config.layouts[count];
+        else if (config.spawnSlots.length < count) {
+          setStatus(`${count} 人布局至少需要 ${count} 个出生槽`);
+          delete config.layouts[count];
+        } else config.layouts[count] = config.spawnSlots.slice(0, count).map(slot => slot.id);
+        syncAll();
+      });
+      row.querySelectorAll('.layout-slot').forEach(select => {
+        select.addEventListener('change', event => {
+          config.layouts[count][Number(event.target.dataset.position)] = event.target.value;
+          syncAll();
+        });
+      });
+    });
+  }
+
   function setSelectionIcon(cls, color) {
     els.selectionIcon.className = `token-icon ${cls}`;
     els.selectionIcon.style.color = color || '';
@@ -1062,6 +1458,10 @@
       const pos = selected.object;
       els.selectionTitleText.textContent = `格子 ${pos.q},${pos.r}`;
       hideSelectionIcon();
+      if (!isPlayableCell(config, pos)) {
+        els.selectionFields.innerHTML = '<p class="outside-cell-hint">该位置在地图边界外，可使用“添加地块”工具恢复。</p>';
+        return;
+      }
       els.selectionFields.innerHTML = `<div class="field-grid compact">
         <label>地形 <select id="sel-terrain"><option value="plain">平地</option><option value="water">水域</option><option value="blocker">阻挡</option></select></label>
       </div>`;
@@ -1071,16 +1471,28 @@
     }
     const obj = selected.type === 'headquarters'
       ? config.headquarters[selected.player]
-      : selected.type === 'controlPoint'
-        ? config.controlPoints[selected.index]
-        : config.startingUnits[selected.index];
+      : selected.type === 'spawnHeadquarters'
+        ? config.spawnSlots[selected.slotIndex].headquarters
+        : selected.type === 'controlPoint'
+          ? config.controlPoints[selected.index]
+          : selected.type === 'spawnUnit'
+            ? config.spawnSlots[selected.slotIndex].startingUnits[selected.unitIndex]
+            : config.startingUnits[selected.index];
     selected.object = obj;
     if (selected.type === 'headquarters') {
       els.selectionTitleText.textContent = `总部 ${selected.player}`;
       setSelectionIcon('headquarters', OWNER_COLORS[selected.player]);
+    } else if (selected.type === 'spawnHeadquarters') {
+      const slot = config.spawnSlots[selected.slotIndex];
+      els.selectionTitleText.textContent = `总部 ${slot.id}`;
+      setSelectionIcon('headquarters', slotColor(selected.slotIndex));
     } else if (selected.type === 'controlPoint') {
       els.selectionTitleText.textContent = `据点 ${obj.id}`;
       setSelectionIcon(obj.kind || 'supply', '#d6b34a');
+    } else if (selected.type === 'spawnUnit') {
+      const slot = config.spawnSlots[selected.slotIndex];
+      els.selectionTitleText.textContent = `${slot.id} ${UNIT_NAMES[obj.type]}`;
+      setSelectionIcon(obj.type, slotColor(selected.slotIndex));
     } else {
       els.selectionTitleText.textContent = `${obj.owner} ${UNIT_NAMES[obj.type]}`;
       setSelectionIcon(obj.type, OWNER_COLORS[obj.owner]);
@@ -1095,8 +1507,11 @@
       : selected.type === 'startingUnit'
         ? `<div class="field-grid compact"><label>玩家 <select id="sel-owner"><option value="player_a">player_a</option><option value="player_b">player_b</option></select></label>
           <label>单位 <select id="sel-type">${UNIT_TYPES.map(type => `<option value="${type}">${esc(UNIT_NAMES[type])}</option>`).join('')}</select></label></div>`
+        : selected.type === 'spawnUnit'
+          ? `<div class="field-grid compact"><label>出生槽 <input value="${esc(config.spawnSlots[selected.slotIndex].id)}" disabled /></label>
+            <label>单位 <select id="sel-type">${UNIT_TYPES.map(type => `<option value="${type}">${esc(UNIT_NAMES[type])}</option>`).join('')}</select></label></div>`
         : '';
-    const canDelete = selected.type !== 'headquarters';
+    const canDelete = selected.type !== 'headquarters' && selected.type !== 'spawnHeadquarters';
     els.selectionFields.innerHTML = `${detail}${base}<div class="selection-actions"><button id="sel-apply" type="button">应用</button>${canDelete ? '<button id="sel-delete" class="danger" type="button">删除</button>' : ''}</div>`;
     if ($('sel-kind')) $('sel-kind').value = obj.kind || '';
     if ($('sel-owner')) $('sel-owner').value = obj.owner;
@@ -1109,9 +1524,13 @@
     if (!selected) return;
     const obj = selected.type === 'headquarters'
       ? config.headquarters[selected.player]
-      : selected.type === 'controlPoint'
-        ? config.controlPoints[selected.index]
-        : config.startingUnits[selected.index];
+      : selected.type === 'spawnHeadquarters'
+        ? config.spawnSlots[selected.slotIndex].headquarters
+        : selected.type === 'controlPoint'
+          ? config.controlPoints[selected.index]
+          : selected.type === 'spawnUnit'
+            ? config.spawnSlots[selected.slotIndex].startingUnits[selected.unitIndex]
+            : config.startingUnits[selected.index];
     const next = { q: Number($('sel-q').value), r: Number($('sel-r').value) };
     if (!canPlace(next, selected)) return setStatus('目标格越界或已有固定对象');
     obj.q = next.q;
@@ -1127,6 +1546,7 @@
       obj.owner = $('sel-owner').value;
       obj.type = $('sel-type').value;
     }
+    if (selected.type === 'spawnUnit') obj.type = $('sel-type').value;
     syncAll();
   }
 
@@ -1141,10 +1561,12 @@
   }
 
   function syncAll() {
+    syncToolOwnerOptions();
     renderGlobalFields();
     renderBalanceFields();
     renderUnitSpecs();
     renderControlTypes();
+    renderSpawnLayouts();
     renderSelection();
     renderValidation();
     drawBoard();
@@ -1206,7 +1628,7 @@
   els.mapRadius.addEventListener('change', () => {
     const next = Number(els.mapRadius.value);
     const preview = resizeMapRadius(config, next, false);
-    if (preview.requiresConfirmation && !confirm(`半径缩小会移除 ${preview.removed} 个半径外对象或地形，是否继续？`)) {
+    if (preview.requiresConfirmation && !confirm(`半径缩小会移除 ${preview.removed} 个半径外格子、对象或地形，是否继续？`)) {
       els.mapRadius.value = config.radius;
       return;
     }

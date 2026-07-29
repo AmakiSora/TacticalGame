@@ -295,16 +295,6 @@ function restoreSessionIntoMemory() {
   if (els.gameId) els.gameId.value = gameId;
 }
 
-function previewCells(radius) {
-  const cells = [];
-  for (let q = -radius; q <= radius; q++) {
-    for (let r = -radius; r <= radius; r++) {
-      if (Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r)) <= radius) cells.push({ q, r });
-    }
-  }
-  return cells;
-}
-
 function previewHexToRaw(q, r, size) {
   return { x: size * SQRT3 * (q + r / 2), y: size * 1.5 * r };
 }
@@ -318,14 +308,13 @@ function previewHexCornersRaw(q, r, size) {
 }
 
 function renderMapPreview(preview) {
-  if (!preview || !Number.isFinite(preview.radius)) {
+  if (!preview || !Array.isArray(preview.cells) || preview.cells.length === 0) {
     return '<div class="map-preview empty">暂无预览</div>';
   }
 
   const size = 7;
   const pad = 8;
-  const cells = previewCells(preview.radius);
-  const terrain = new Map((preview.terrainCells || []).map(cell => [hexKey(cell), cell.terrain]));
+  const cells = preview.cells;
   const allCorners = cells.flatMap(cell => previewHexCornersRaw(cell.q, cell.r, size));
   const minX = Math.min(...allCorners.map(p => p.x));
   const minY = Math.min(...allCorners.map(p => p.y));
@@ -341,17 +330,22 @@ function renderMapPreview(preview) {
     .map(p => `${(p.x - minX + pad).toFixed(1)},${(p.y - minY + pad).toFixed(1)}`)
     .join(' ');
   const hexes = cells.map(cell => {
-    const terrainClass = terrain.get(hexKey(cell)) || 'plain';
+    const terrainClass = cell.terrain || 'plain';
     return `<polygon class="preview-hex ${terrainClass}" points="${polygon(cell)}"></polygon>`;
   }).join('');
   const controlPoints = (preview.controlPoints || []).map(cp => {
     const p = point(cp);
     return `<circle class="preview-marker cp" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"><title>${esc(cp.name)}</title></circle>`;
   }).join('');
-  const headquarters = Object.entries(preview.headquarters || {}).map(([owner, pos]) => {
-    const p = point(pos);
-    const cls = owner === 'player_a' ? 'hq-a' : 'hq-b';
-    return `<rect class="preview-marker hq ${cls}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"></rect>`;
+  const spawnHeadquarters = (preview.spawnSlots || []).map((slot, index) => ({
+    id: slot.id,
+    index,
+    ...slot.headquarters,
+  }));
+  const legacyHeadquarters = Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, ...pos }));
+  const headquarters = (spawnHeadquarters.length ? spawnHeadquarters : legacyHeadquarters).map(slot => {
+    const p = point(slot);
+    return `<rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"><title>${esc(slot.id)}</title></rect>`;
   }).join('');
 
   return `<div class="map-preview" aria-hidden="true">

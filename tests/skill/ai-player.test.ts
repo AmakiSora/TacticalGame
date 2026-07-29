@@ -99,6 +99,13 @@ describe('AI player setup', () => {
     expect(source).not.toContain('/host/skip-turn');
   });
 
+  it('does not derive the playable boundary from map radius', async () => {
+    const source = await readFile('skill/ai-player.mjs', 'utf8');
+
+    expect(source).not.toContain('isValidHex');
+    expect(source).not.toContain('game.map.radius');
+  });
+
   it('auto-starts a full lobby when the host seat holds a host token', async () => {
     const app = await startTestServer();
     await app.listen({ port: 0, host: '127.0.0.1' });
@@ -187,6 +194,9 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('POST /api/games/:id/leave');
     expect(skill).toContain('last_player_standing');
     expect(skill).toContain('multiplayer-ring');
+    expect(skill).toContain('four-corners');
+    expect(skill).toContain('GET /api/maps');
+    expect(skill).toContain('preview.supportedPlayerCounts');
     expect(skill).toContain('Never hardcode a single rival as `player_b`');
     expect(skill).toContain('live `adjudication` snapshot');
     expect(skill).toContain('Trust these server totals instead of recomputing them');
@@ -223,9 +233,32 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('demolish');
     expect(skill).toContain('action point');
   });
+
+  it('uses game cells as the authoritative map boundary', async () => {
+    const skill = await readFile('skill/SKILL.md', 'utf8');
+
+    expect(skill).toContain('`game.cells` is the authoritative playable boundary');
+    expect(skill).toContain('Never infer whether a coordinate is playable from `map.radius`');
+    expect(skill).toContain('Coordinates inside the radius but absent from `game.cells` are outside the map');
+  });
 });
 
 describe('AI player strategy', () => {
+  it('rejects a radius-contained coordinate that is absent from game cells', async () => {
+    const game = {
+      map: { radius: 9, terrainCells: [] },
+      cells: [{ q: 0, r: 0, terrain: 'plain' }],
+    };
+    const coordinate = { q: 9, r: 0 };
+    const s = -coordinate.q - coordinate.r;
+    expect(Math.max(Math.abs(coordinate.q), Math.abs(coordinate.r), Math.abs(s))).toBeLessThanOrEqual(game.map.radius);
+
+    const ai = await import('../../skill/ai-player.mjs');
+
+    expect(ai.isPassable(game, coordinate)).toBe(false);
+    expect(ai.isPassable(game, { q: 0, r: 0 })).toBe(true);
+  });
+
   it('deploys strategically before ordinary movement when supplies and actions remain', async () => {
     const app = await startTestServer();
     try {

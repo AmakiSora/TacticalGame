@@ -22,5 +22,12 @@ echo "  node skill/ai-player.mjs --url ${BASE_URL} --side a --map multiplayer-ri
 echo "  node skill/ai-player.mjs --url ${BASE_URL} --side b --game <gameId> --name AI-B"
 echo "  node skill/ai-player.mjs --url ${BASE_URL} --side c --game <gameId> --name AI-C"
 echo
+echo "For the four-player irregular map four-corners:"
+echo "  BASE_URL=${BASE_URL} MAP_ID=four-corners MAX_PLAYERS=4 ./skill/example-game.sh"
+echo "  node skill/ai-player.mjs --url ${BASE_URL} --side a --map four-corners --max-players 4 --name AI-A"
+echo "  node skill/ai-player.mjs --url ${BASE_URL} --side b --game <gameId> --name AI-B"
+echo "  node skill/ai-player.mjs --url ${BASE_URL} --side c --game <gameId> --name AI-C"
+echo "  node skill/ai-player.mjs --url ${BASE_URL} --side d --game <gameId> --name AI-D"
+echo
 echo "Reconnect an existing seat with a known token:"
 echo "  node skill/ai-player.mjs --url ${BASE_URL} --side player_c --game <gameId> --token <playerToken>"

@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -45,6 +45,10 @@ function validMap() {
       },
     },
   };
+}
+
+function fourCornersMap() {
+  return JSON.parse(readFileSync('maps/four-corners.json', 'utf8')) as Record<string, any>;
 }
 
 function controlPointTypes() {
@@ -190,12 +194,70 @@ describe('map config loader', () => {
     const map = listMaps().find(item => item.id === 'default')!;
 
     expect(map.preview.radius).toBe(8);
+    expect(map.preview.cells).toHaveLength(217);
     expect(map.preview.maxTurns).toBe(15);
     expect(map.preview.terrainCells).toContainEqual({ q: -1, r: -2, terrain: 'water' });
     expect(map.preview.controlPoints).toContainEqual(expect.objectContaining({ name: '中央阵地', q: 0, r: 0 }));
     expect(map.preview.headquarters.player_a).toEqual({ q: -8, r: 0 });
     expect(map.preview.headquarters.player_b).toEqual({ q: 8, r: 0 });
     resetConfig();
+  });
+
+  it('loads legacy radius maps and irregular maps into the same authoritative cell model', () => {
+    resetConfig();
+    loadMaps();
+
+    const legacy = getMapConfig('default');
+    const irregular = getMapConfig('four-corners');
+    const preview = listMaps().find(item => item.id === 'four-corners')!.preview;
+
+    expect(legacy.playableCells).toHaveLength(217);
+    expect(irregular.playableCells).toHaveLength(163);
+    expect(preview.cells).toHaveLength(163);
+    expect(preview.supportedPlayerCounts).toEqual([4]);
+    expect(irregular.playableCells.some(cell => cell.q === 9 && cell.r === 0)).toBe(false);
+    resetConfig();
+  });
+
+  it('keeps four-corners geometry, terrain, points and spawn slots mirrored on both axes', () => {
+    resetConfig();
+    loadMaps();
+    const map = getMapConfig('four-corners');
+    const cellKeys = new Set(map.playableCells.map(cell => `${cell.q},${cell.r}`));
+    const reflectX = (pos: { q: number; r: number }) => ({ q: pos.q + pos.r, r: -pos.r });
+    const reflectY = (pos: { q: number; r: number }) => ({ q: -pos.q - pos.r, r: pos.r });
+
+    for (const cell of map.playableCells) {
+      expect(cellKeys.has(`${reflectX(cell).q},${reflectX(cell).r}`)).toBe(true);
+      expect(cellKeys.has(`${reflectY(cell).q},${reflectY(cell).r}`)).toBe(true);
+    }
+    expect(map.spawnSlots.map(slot => hexDistance(slot.headquarters, { q: 0, r: 0 }))).toEqual([9, 9, 9, 9]);
+    expect(map.spawnSlots.map((slot, index) => hexDistance(slot.headquarters, map.spawnSlots[(index + 1) % 4].headquarters)))
+      .toEqual([12, 12, 12, 12]);
+    expect(map.spawnSlots.every(slot => slot.startingUnits.map(unit => unit.type).join(',') === 'infantry,scout')).toBe(true);
+    expect(map.controlPoints.filter(point => point.kind === 'supply')).toHaveLength(4);
+    expect(map.controlPoints.filter(point => point.kind === 'forward_base')).toHaveLength(4);
+    expect(map.controlPoints.filter(point => point.kind === 'repair')).toHaveLength(1);
+    resetConfig();
+  });
+
+  it.each([
+    ['duplicate', (map: Record<string, any>) => map.playableCells.push({ ...map.playableCells[0] }), 'duplicates'],
+    ['disconnected', (map: Record<string, any>) => map.playableCells.push({ q: 0, r: 9 }), 'must form one connected area'],
+    ['object outside', (map: Record<string, any>) => map.terrainCells.push({ q: 9, r: 0, terrain: 'water' }), 'is outside playableCells'],
+  ])('rejects invalid irregular geometry: %s', (_name, mutate, message) => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = fourCornersMap();
+    mutate(map);
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+    expect(() => loadMaps(dir)).toThrow(message);
+    resetConfig();
+  });
+
+  it('keeps engine boundary checks independent from radius geometry', () => {
+    const validationSource = readFileSync('src/engine/validation.ts', 'utf8');
+    expect(validationSource).not.toContain('isValidHex');
+    expect(validationSource).toContain('game.cells.some');
   });
 
   it('keeps dual-lanes lane roles mirrored around the center axis', () => {

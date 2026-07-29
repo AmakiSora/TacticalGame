@@ -215,9 +215,8 @@ function neighbors(pos) {
   return HEX_DIRECTIONS.map(d => ({ q: pos.q + d.q, r: pos.r + d.r }));
 }
 
-function isValidHex(pos, radius) {
-  const s = -pos.q - pos.r;
-  return Math.max(Math.abs(pos.q), Math.abs(pos.r), Math.abs(s)) <= radius;
+function isPlayableCell(game, pos) {
+  return game.cells.some(c => c.q === pos.q && c.r === pos.r);
 }
 
 function terrainAt(game, pos) {
@@ -235,8 +234,8 @@ function occupantAt(game, pos) {
   return null;
 }
 
-function isPassable(game, pos) {
-  return isValidHex(pos, game.map.radius) && terrainAt(game, pos) === 'plain';
+export function isPassable(game, pos) {
+  return isPlayableCell(game, pos) && terrainAt(game, pos) === 'plain';
 }
 
 function isEmptyPlain(game, pos) {

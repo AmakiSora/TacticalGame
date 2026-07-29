@@ -2,8 +2,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ControlPointKind, PlayerId, TerrainType, UnitType } from '../types.js';
+import type { ControlPointKind, MapCell, PlayerId, Position, TerrainType, UnitType } from '../types.js';
 import { isValidHex } from '../engine/hex.js';
+import { arePlayableCellsConnected, createMapCells, createRadiusPlayableCells } from './geometry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -75,6 +76,7 @@ export interface MapConfig {
   grid: 'hex';
   orientation: 'pointy';
   radius: number;
+  playableCells: Position[];
   terrainCells: TerrainCellConfig[];
   controlPoints: ControlPointConfig[];
   headquarters: Record<'player_a' | 'player_b', { q: number; r: number }>;
@@ -105,10 +107,24 @@ export interface MapConfig {
   };
 }
 
+// 地图文件允许省略可用格和新旧出生格式；加载后统一收敛为上面的 MapConfig。
+export type MapFileConfig = Omit<
+  MapConfig,
+  'playableCells' | 'supportedPlayerCounts' | 'headquarters' | 'startingUnits' | 'spawnSlots' | 'layouts'
+> & {
+  playableCells?: Position[];
+  supportedPlayerCounts?: number[];
+  headquarters?: Record<'player_a' | 'player_b', { q: number; r: number }>;
+  startingUnits?: StartingUnitConfig[];
+  spawnSlots?: SpawnSlotConfig[];
+  layouts?: Record<string, string[]>;
+};
+
 export interface MapPreview {
   radius: number;
   maxTurns: number;
   actionsPerTurn: number;
+  cells: MapCell[];
   terrainCells: TerrainCellConfig[];
   controlPoints: ControlPointConfig[];
   headquarters: Record<'player_a' | 'player_b', { q: number; r: number }>;
@@ -129,12 +145,18 @@ const maps = new Map<string, MapConfig>();
 
 function normalizeMapConfig(config: unknown): unknown {
   const c = asRecord(config, 'Map');
+  const playableCells = 'playableCells' in c
+    ? c.playableCells
+    : typeof c.radius === 'number' && Number.isInteger(c.radius) && c.radius > 0
+      ? createRadiusPlayableCells(c.radius)
+      : [];
   if (Array.isArray(c.spawnSlots)) {
     const slots = c.spawnSlots as SpawnSlotConfig[];
     const first = slots[0];
     const second = slots[1] ?? slots[0];
     return {
       ...c,
+      playableCells,
       headquarters: c.headquarters ?? {
         player_a: first?.headquarters,
         player_b: second?.headquarters,
@@ -159,6 +181,7 @@ function normalizeMapConfig(config: unknown): unknown {
   }));
   return {
     ...c,
+    playableCells,
     spawnSlots,
     layouts: { 2: spawnSlots.map(slot => slot.id) },
     supportedPlayerCounts: [2],
@@ -204,6 +227,28 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   if (c.orientation !== 'pointy') throw new Error(`Map "${id}" orientation must be "pointy"`);
   const radius = assertNumber(c, 'radius', `Map "${id}"`, 1);
   if (!Number.isInteger(radius)) throw new Error(`Map "${id}" radius must be an integer`);
+
+  if (!Array.isArray(c.playableCells) || c.playableCells.length === 0) {
+    throw new Error(`Map "${id}".playableCells must be a non-empty array`);
+  }
+  const playableKeys = new Set<string>();
+  for (let i = 0; i < c.playableCells.length; i++) {
+    const cell = asRecord(c.playableCells[i], `playableCells[${i}]`);
+    const pos = assertPosition(cell, `playableCells[${i}]`, radius);
+    const key = `${pos.q},${pos.r}`;
+    if (playableKeys.has(key)) throw new Error(`playableCells[${i}] duplicates ${key}`);
+    playableKeys.add(key);
+  }
+  if (!arePlayableCellsConnected(c.playableCells as Position[])) {
+    throw new Error(`Map "${id}".playableCells must form one connected area`);
+  }
+  function assertPlayablePosition(obj: Record<string, unknown>, ctx: string): { q: number; r: number } {
+    const pos = assertPosition(obj, ctx, radius);
+    if (!playableKeys.has(`${pos.q},${pos.r}`)) {
+      throw new Error(`${ctx} (${pos.q},${pos.r}) is outside playableCells`);
+    }
+    return pos;
+  }
 
   const units = asRecord(c.units, `Map "${id}".units`) as Record<UnitType, UnitSpec>;
   for (const type of ['infantry', 'scout', 'heavy', 'ranger', 'support'] as UnitType[]) {
@@ -260,7 +305,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
 
   const hq = asRecord(c.headquarters, `Map "${id}".headquarters`);
   for (const player of ['player_a', 'player_b'] as PlayerId[]) {
-    assertPosition(asRecord(hq[player], `headquarters.${player}`), `headquarters.${player}`, radius);
+    assertPlayablePosition(asRecord(hq[player], `headquarters.${player}`), `headquarters.${player}`);
   }
 
   const occupied = new Set<string>();
@@ -275,7 +320,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   if (!Array.isArray(c.terrainCells)) throw new Error(`Map "${id}".terrainCells must be an array`);
   for (let i = 0; i < c.terrainCells.length; i++) {
     const cell = asRecord(c.terrainCells[i], `terrainCells[${i}]`);
-    assertPosition(cell, `terrainCells[${i}]`, radius);
+    assertPlayablePosition(cell, `terrainCells[${i}]`);
     if (cell.terrain !== 'water' && cell.terrain !== 'blocker' && cell.terrain !== 'plain') {
       throw new Error(`terrainCells[${i}].terrain must be plain, water, or blocker`);
     }
@@ -295,7 +340,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
       }
       typedControlPoints += 1;
     }
-    const pos = assertPosition(cp, `controlPoints[${i}]`, radius);
+    const pos = assertPlayablePosition(cp, `controlPoints[${i}]`);
     claim(pos, `controlPoints[${i}]`);
   }
   if (typedControlPoints > 0) {
@@ -314,7 +359,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     if (!['infantry', 'scout', 'heavy', 'ranger', 'support'].includes(String(unit.type))) {
       throw new Error(`startingUnits[${i}].type invalid`);
     }
-    const pos = assertPosition(unit, `startingUnits[${i}]`, radius);
+    const pos = assertPlayablePosition(unit, `startingUnits[${i}]`);
     claim(pos, `startingUnits[${i}]`);
   }
 
@@ -327,18 +372,23 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     const slotId = assertString(slot, 'id', `spawnSlots[${i}]`);
     if (spawnIds.has(slotId)) throw new Error(`spawnSlots[${i}].id must be unique`);
     spawnIds.add(slotId);
-    assertPosition(asRecord(slot.headquarters, `spawnSlots[${i}].headquarters`), `spawnSlots[${i}].headquarters`, radius);
+    assertPlayablePosition(asRecord(slot.headquarters, `spawnSlots[${i}].headquarters`), `spawnSlots[${i}].headquarters`);
     if (!Array.isArray(slot.startingUnits)) throw new Error(`spawnSlots[${i}].startingUnits must be an array`);
     for (let j = 0; j < slot.startingUnits.length; j++) {
       const unit = asRecord(slot.startingUnits[j], `spawnSlots[${i}].startingUnits[${j}]`);
       if (!['infantry', 'scout', 'heavy', 'ranger', 'support'].includes(String(unit.type))) {
         throw new Error(`spawnSlots[${i}].startingUnits[${j}].type invalid`);
       }
-      assertPosition(unit, `spawnSlots[${i}].startingUnits[${j}]`, radius);
+      assertPlayablePosition(unit, `spawnSlots[${i}].startingUnits[${j}]`);
     }
   }
   const layouts = asRecord(c.layouts, `Map "${id}".layouts`);
   const supportedCounts: number[] = [];
+  const impassable = new Set((c.terrainCells as TerrainCellConfig[])
+    .filter(cell => cell.terrain === 'water' || cell.terrain === 'blocker')
+    .map(cell => `${cell.q},${cell.r}`));
+  const controlPointPositions = new Set((c.controlPoints as ControlPointConfig[])
+    .map(point => `${point.q},${point.r}`));
   for (const [countText, value] of Object.entries(layouts)) {
     const count = Number(countText);
     if (!Number.isInteger(count) || count < 2 || count > 8 || !Array.isArray(value) || value.length !== count) {
@@ -347,6 +397,24 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     const unique = new Set(value);
     if (unique.size !== value.length || value.some(slotId => typeof slotId !== 'string' || !spawnIds.has(slotId))) {
       throw new Error(`Map "${id}".layouts.${countText} contains invalid slots`);
+    }
+    const layoutOccupied = new Set(controlPointPositions);
+    for (const slotId of value as string[]) {
+      const slotIndex = (c.spawnSlots as SpawnSlotConfig[]).findIndex(slot => slot.id === slotId);
+      const slot = (c.spawnSlots as SpawnSlotConfig[])[slotIndex];
+      const objects = [
+        { ...slot.headquarters, ctx: `spawnSlots[${slotIndex}].headquarters` },
+        ...slot.startingUnits.map((unit, unitIndex) => ({
+          ...unit,
+          ctx: `spawnSlots[${slotIndex}].startingUnits[${unitIndex}]`,
+        })),
+      ];
+      for (const object of objects) {
+        const key = `${object.q},${object.r}`;
+        if (impassable.has(key)) throw new Error(`${object.ctx} is on impassable terrain at ${key}`);
+        if (layoutOccupied.has(key)) throw new Error(`${object.ctx} overlaps another fixed map object at ${key}`);
+        layoutOccupied.add(key);
+      }
     }
     supportedCounts.push(count);
   }
@@ -391,6 +459,7 @@ export function listMaps(): MapListItem[] {
       radius: cfg.radius,
       maxTurns: cfg.balance.maxTurns,
       actionsPerTurn: cfg.balance.actionsPerTurn,
+      cells: createMapCells(cfg.playableCells, cfg.terrainCells),
       terrainCells: cfg.terrainCells.map(cell => ({ ...cell })),
       controlPoints: cfg.controlPoints.map(point => ({ ...point })),
       headquarters: {

@@ -67,7 +67,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 ## 核心规则
 
 - 地图为尖顶六边形，坐标为 `{ q, r }`。
-- 当前内置地图包含旧双人地图和 `multiplayer-ring` 多人环形地图；地图会声明支持的玩家人数。有效格满足 `max(abs(q), abs(r), abs(-q-r)) <= radius`。
+- 当前内置地图包含旧双人地图、`multiplayer-ring` 多人环形地图和仅支持 4 人的异形地图 `four-corners`；每张地图会声明支持的玩家人数。旧地图默认使用 `radius` 内的完整六边形，异形地图通过 `playableCells` 显式声明实际存在的格子。
 - 地形：`plain` 可通行/部署，`water` 和 `blocker` 不可通行/部署。
 - 每方开局有总部；默认图和沙漠图提供 2 个步兵、1 个侦察兵、80 补给，`dual-lanes` 不提供免费单位而是给 208 补给让玩家自行部署。
 - **每回合最多消耗 5 个行动点**（`config.balance.actionsPerTurn`）。首次操作一个单位（部署/移动/攻击/治疗）消耗 1 点并「激活」该单位；同一单位在本回合内的后续动作免费。行动点用尽后，只能继续操作已激活的单位。这是为防止资源碾压方操作过多单位而设的硬上限。
@@ -204,7 +204,9 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 }
 ```
 
-未列在 `terrainCells` 的有效格默认为 `plain`。
+异形地图可另外声明 `"playableCells": [{ "q": 0, "r": 0 }, { "q": 1, "r": 0 }]`。该字段可选；省略时，加载器按 `max(abs(q), abs(r), abs(-q-r)) <= radius` 展开完整六边形。声明时可组成任意连通的凹形、凸形或带孔洞边界，但每个坐标仍须位于 `radius` 包络内。加载后所有地图都会得到完整权威格子列表，移动、部署、爆破、寻路和绘图都以该列表为准。`GET /api/maps` 的 `preview.cells` 也始终返回已经解析并带地形的预览格子。
+
+未列在 `terrainCells` 的可用格默认为 `plain`。地图编辑器支持添加和移除地块，并可维护 2–8 个出生槽及对应人数布局；移除包含对象的格子会被阻止，避免隐式丢失配置。
 
 据点可选 `kind`：`supply`、`forward_base`、`repair`。如果地图没有任何据点写 `kind`，引擎使用旧规则：统一 `balance.controlPointIncome`、无部署折扣、无据点维修。如果任意据点写了 `kind`，则该地图所有据点都必须写 `kind`，并且 `balance.controlPointTypes` 必须完整配置三种类型的 `income`、`deployDiscount`、`repairAmount`。裁决分始终按据点数量计算，不按据点类型加权。
 

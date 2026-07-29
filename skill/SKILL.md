@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-This skill teaches manual operation of the Hex V2 multiplayer game (app version `3.1.6`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
+This skill teaches manual operation of the Hex multiplayer game (app version `3.1.6`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
 
 Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exist for tests or automated demos, but this skill is for agent reasoning and direct game operation.
 
@@ -44,13 +44,14 @@ Seats are `player_a` … `player_h` (2-8 players). The server assigns seats in j
 
 Typical flow:
 
-1. Host creates a lobby: `POST /api/games` with `{ "mapId", "maxPlayers", "participate", "playerName" }`.
-2. Other agents join: `POST /api/games/:id/join` with `{ "name" }`.
-3. Optional: inspect lobby without secrets via `GET /api/games/:id/lobby`.
-4. Host starts when at least 2 players are present and the map supports that count: `POST /api/games/:id/start` with `X-Host-Token`.
-5. Play until elimination leaves one survivor, or adjudication at the map max round.
+1. Read `GET /api/maps` and choose a map whose `preview.supportedPlayerCounts` includes the intended lobby size.
+2. Host creates a lobby: `POST /api/games` with `{ "mapId", "maxPlayers", "participate", "playerName" }`.
+3. Other agents join: `POST /api/games/:id/join` with `{ "name" }`.
+4. Optional: inspect lobby without secrets via `GET /api/games/:id/lobby`.
+5. Host starts when at least 2 players are present and the map supports that count: `POST /api/games/:id/start` with `X-Host-Token`.
+6. Play until elimination leaves one survivor, or adjudication at the map max round.
 
-Map support is not universal: most maps are 2-player only. Use `multiplayer-ring` for 2/3/6-player games (symmetric ring spawns), or any map whose `supportedPlayerCounts` includes the chosen size. Creating with an unsupported `maxPlayers` returns `unsupported_player_count`.
+Map support is not universal: most maps are 2-player only. `multiplayer-ring` supports 2/3/6 players (symmetric ring spawns), while `four-corners` supports exactly 4 players. Prefer `GET /api/maps` and each map's `preview.supportedPlayerCounts` over hardcoded compatibility rules. Creating with an unsupported `maxPlayers` returns `unsupported_player_count`.
 
 ## API
 
@@ -58,6 +59,7 @@ Player action requests require `X-Player-Token: <token>`. Host management reques
 
 | Purpose | Method and path | Auth | Body |
 |---|---|---|---|
+| List maps | `GET /api/maps` | none | none |
 | Create lobby | `POST /api/games` | none | `{ "mapId": "default", "maxPlayers": 2, "participate": true, "playerName": "Agent A" }` |
 | Lobby summary | `GET /api/games/:id/lobby` | none | none |
 | Join lobby | `POST /api/games/:id/join` | none | `{ "name": "Agent B" }` |
@@ -85,6 +87,8 @@ If `POST /join` returns `game_already_full` or `game_already_started`, report th
 
 - Coordinates are pointy-top axial hex `{ q, r }`.
 - Hex distance is `max(abs(dq), abs(dr), abs(ds))`, where `s = -q-r`.
+- `game.cells` is the authoritative playable boundary. Never infer whether a coordinate is playable from `map.radius`; radius is only compatibility and display metadata.
+- Before moving, deploying, or demolishing, confirm that the target coordinate exists in `game.cells`. Coordinates inside the radius but absent from `game.cells` are outside the map.
 - Movement uses pathfinding and cannot pass through water, blockers, units, or headquarters.
 - Attack and healing only check hex distance; there is no line-of-sight blocking.
 - Only heavy units can demolish terrain. A heavy can turn an adjacent blocker into plain terrain if the target hex is in bounds, unoccupied, and exactly distance 1.
@@ -141,7 +145,7 @@ Use this order unless the user asks for a different style:
 8. Near adjudication, read `adjudication.scores` / `leaders` / `margin` and prioritize headquarters damage, captured points, valuable unit survival, and spending excess supplies. Only living rivals remain valid targets, but headquarters damage already dealt to eliminated rivals still counts toward the cumulative score.
 9. When no useful legal action remains, call `/end-turn`.
 
-Before every action, confirm the unit has the required movement/action availability, the target is in range, the destination is valid, and action points allow the activation.
+Before every action, confirm the unit has the required movement/action availability, the target is in range, the destination exists in `game.cells`, the destination is otherwise valid, and action points allow the activation.
 
 ## Multiplayer Threat Notes
 

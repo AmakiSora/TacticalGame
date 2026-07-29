@@ -28,6 +28,8 @@
         <button class="tool-button" type="button" data-tool="plain">平地</button>
         <button class="tool-button" type="button" data-tool="water">水域</button>
         <button class="tool-button" type="button" data-tool="blocker">阻挡</button>
+        <button class="tool-button" type="button" data-tool="add-cell">添加地块</button>
+        <button class="tool-button danger" type="button" data-tool="remove-cell">移除地块</button>
         <button class="tool-button" type="button" data-tool="hq">总部</button>
         <button class="tool-button" type="button" data-tool="control">据点</button>
         <button class="tool-button" type="button" data-tool="unit">初始单位</button>
@@ -51,7 +53,7 @@
           <span id="tool-hint">选择格子或对象</span>
         </div>
         <div class="field-grid compact">
-          <label>玩家
+          <label>玩家 / 出生槽
             <select id="tool-owner">
               <option value="player_a">player_a</option>
               <option value="player_b">player_b</option>
@@ -97,6 +99,14 @@
           <span id="selection-title"><span id="selection-icon" class="token-icon hidden"></span><span id="selection-title-text">未选择</span></span>
         </div>
         <div id="selection-fields" class="selection-fields empty">点击棋盘上的格子或对象进行编辑</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>出生布局</h2>
+          <span>2–8 人出生槽</span>
+        </div>
+        <div id="spawn-layout-fields" class="spawn-layout-fields"></div>
       </section>
 
       <section class="panel">

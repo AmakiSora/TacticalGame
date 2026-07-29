@@ -9,7 +9,7 @@ import type {
 import { PLAYER_IDS } from '../types.js';
 import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
-import { isValidHex } from '../engine/hex.js';
+import { createMapCells } from '../config/geometry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -78,15 +78,7 @@ function createHQ(owner: PlayerId, config: MapConfig, slot: SpawnSlotConfig): He
 }
 
 function createCells(config: MapConfig): MapCell[] {
-  const terrain = new Map(config.terrainCells.map(c => [`${c.q},${c.r}`, c.terrain]));
-  const cells: MapCell[] = [];
-  for (let q = -config.radius; q <= config.radius; q++) {
-    for (let r = -config.radius; r <= config.radius; r++) {
-      if (!isValidHex({ q, r }, config.radius)) continue;
-      cells.push({ q, r, terrain: terrain.get(`${q},${r}`) ?? 'plain' });
-    }
-  }
-  return cells;
+  return createMapCells(config.playableCells, config.terrainCells);
 }
 
 export function createLobby(id: string, mapId = 'default', options: CreateLobbyOptions): GameState {

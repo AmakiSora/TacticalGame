@@ -245,6 +245,44 @@ textarea {
   font-size: 13px;
 }
 
+.spawn-layout-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.spawn-toolbar,
+.spawn-slot-row,
+.layout-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spawn-slot-row,
+.layout-row {
+  border: 1px solid #20313d;
+  border-radius: 6px;
+  background: var(--panel-2);
+  padding: 8px;
+}
+
+.spawn-slot-row select,
+.layout-row select {
+  min-width: 0;
+}
+
+.spawn-color {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border-radius: 50%;
+}
+
+.outside-cell-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .validation-panel ul {
   margin: 0;
   padding-left: 18px;

@@ -59,6 +59,51 @@ describe('multiplayer lobby API', () => {
     if (app) await app.close();
   });
 
+  it('publishes authoritative irregular preview cells and only allows four-corners at four players', async () => {
+    app = await startTestServer();
+    const mapsRes = await app.inject({ method: 'GET', url: '/api/maps' });
+    const map = mapsRes.json().maps.find((item: any) => item.id === 'four-corners');
+    expect(map.preview.cells).toHaveLength(163);
+    expect(map.preview.supportedPlayerCounts).toEqual([4]);
+
+    const invalid = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      payload: { mapId: 'four-corners', maxPlayers: 3, participate: true },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json().code).toBe('unsupported_player_count');
+  });
+
+  it('creates and starts a four-player game on four-corners', async () => {
+    app = await startTestServer();
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      payload: { mapId: 'four-corners', maxPlayers: 4, participate: true, playerName: 'A' },
+    });
+    expect(createRes.statusCode).toBe(200);
+    const created = createRes.json() as { gameId: string; hostToken: string };
+    for (const name of ['B', 'C', 'D']) {
+      const joined = await app.inject({
+        method: 'POST',
+        url: `/api/games/${created.gameId}/join`,
+        payload: { name },
+      });
+      expect(joined.statusCode).toBe(200);
+    }
+    const startRes = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/start`,
+      headers: { 'X-Host-Token': created.hostToken },
+    });
+    expect(startRes.statusCode).toBe(200);
+    const game = globalStore.get(created.gameId)!;
+    expect(game.cells).toHaveLength(163);
+    expect(Object.keys(game.headquarters)).toHaveLength(4);
+    expect(game.units).toHaveLength(8);
+  });
+
   it('creates, fills and starts a 3-player lobby', async () => {
     app = await startTestServer();
     const lobby = await createThreePlayerLobby(app);

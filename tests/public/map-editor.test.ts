@@ -106,7 +106,38 @@ describe('map editor page', () => {
 
     expect(serialized.controlPoints.every((point: any) => !('kind' in point))).toBe(true);
     expect(serialized.balance.controlPointTypes).toBeUndefined();
+    expect(serialized.spawnSlots).toBeUndefined();
+    expect(serialized.layouts).toBeUndefined();
     expect(core.validateMapConfig(serialized, 'default')).toEqual([]);
+  });
+
+  it('round-trips irregular cells and complete multiplayer spawn layouts', () => {
+    const core = loadCore();
+    const irregular = JSON.parse(read('maps/four-corners.json'));
+
+    const normalized = core.normalizeImportedMap(irregular);
+    const serialized = core.serializeMapConfig(normalized);
+
+    expect(serialized.playableCells).toHaveLength(163);
+    expect(core.createCellsFromConfig(normalized)).toHaveLength(163);
+    expect(serialized.spawnSlots).toHaveLength(4);
+    expect(serialized.layouts).toEqual({ 4: ['slot_nw', 'slot_ne', 'slot_se', 'slot_sw'] });
+    expect(serialized).not.toHaveProperty('headquarters');
+    expect(serialized).not.toHaveProperty('startingUnits');
+    expect(core.validateMapConfig(serialized, 'four-corners')).toEqual([]);
+  });
+
+  it('exposes irregular-boundary and 2-8 player layout editing controls', () => {
+    const html = read('public/map-editor.html');
+    const source = read('public/map-editor.js');
+
+    expect(html).toContain('data-tool="add-cell"');
+    expect(html).toContain('data-tool="remove-cell"');
+    expect(html).toContain('id="spawn-layout-fields"');
+    expect(source).toContain('function materializePlayableCells');
+    expect(source).toContain('function removePlayableCell');
+    expect(source).toContain('function renderSpawnLayouts');
+    expect(source).toContain("Array.from({ length: 7 }, (_, offset) => offset + 2)");
   });
 
   it('preserves typed control point configuration during import and export', () => {
@@ -127,6 +158,9 @@ describe('map editor page', () => {
     const multiplayer = JSON.parse(read('maps/multiplayer-ring.json'));
 
     const serialized = core.serializeMapConfig(core.normalizeImportedMap(multiplayer));
+    expect(serialized.spawnSlots).toHaveLength(6);
+    expect(serialized.layouts).toEqual(multiplayer.layouts);
+    expect(core.validateMapConfig(serialized, 'multiplayer-ring')).toEqual([]);
     expect(serialized.balance.comebackSupply).toEqual({
       startRound: 3,
       scoreGapPercent: 40,

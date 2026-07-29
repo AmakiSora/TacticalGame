@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/events/bus.js';
 import { attackTarget } from '../../src/engine/combat.js';
+import { demolishTerrain } from '../../src/engine/demolition.js';
+import { deployUnit } from '../../src/engine/deployment.js';
 import { endTurn, eliminatePlayer, startGame } from '../../src/engine/engine.js';
+import { moveUnit } from '../../src/engine/units.js';
+import { findReachableCells, isInBounds } from '../../src/engine/validation.js';
 import { addLobbyPlayer, createLobby } from '../../src/state/store.js';
 import type { GameState, PlayerId } from '../../src/types.js';
 
@@ -20,7 +24,47 @@ function createThreePlayerGame(): { game: GameState; bus: EventBus } {
   return { game, bus };
 }
 
+function createFourCornerGame(): { game: GameState; bus: EventBus } {
+  const bus = new EventBus();
+  const game = createLobby('mp-4-irregular', 'four-corners', {
+    maxPlayers: 4,
+    participate: true,
+    playerName: 'A',
+  });
+  expect(addLobbyPlayer(game, 'B')).not.toBeNull();
+  expect(addLobbyPlayer(game, 'C')).not.toBeNull();
+  expect(addLobbyPlayer(game, 'D')).not.toBeNull();
+  expect(startGame(game, bus, () => 0).ok).toBe(true);
+  return { game, bus };
+}
+
 describe('multiplayer free-for-all engine', () => {
+  it('starts four-corners with four symmetric spawns and authoritative irregular cells', () => {
+    const { game } = createFourCornerGame();
+    expect(game.cells).toHaveLength(163);
+    expect(Object.keys(game.headquarters)).toHaveLength(4);
+    expect(game.units).toHaveLength(8);
+    expect(new Set(Object.values(game.players).map(player => player?.spawnSlotId)).size).toBe(4);
+    expect(isInBounds(game, 9, 0)).toBe(false);
+    expect(isInBounds(game, 9, -6)).toBe(true);
+  });
+
+  it('rejects movement, deployment and demolition into a radius-valid missing cell', () => {
+    const { game, bus } = createFourCornerGame();
+    const northWestHq = Object.values(game.headquarters).find(hq => hq.q === -3 && hq.r === -6)!;
+    const scout = game.units.find(unit => unit.owner === northWestHq.owner && unit.q === -3 && unit.r === -5)!;
+    const missing = { q: -4, r: -5 };
+
+    expect(findReachableCells(game, scout)).not.toContainEqual(missing);
+    expect(moveUnit(game, bus, scout.owner, scout.id, missing.q, missing.r)).toMatchObject({ ok: false, code: 'invalid_move' });
+    expect(deployUnit(game, bus, northWestHq.owner, 'infantry', northWestHq.id, missing.q, missing.r))
+      .toMatchObject({ ok: false, code: 'invalid_terrain' });
+    scout.type = 'heavy';
+    expect(demolishTerrain(game, bus, scout.owner, scout.id, missing.q, missing.r))
+      .toMatchObject({ ok: false, code: 'invalid_demolish' });
+    expect(game.turn.actionsUsed).toBe(0);
+  });
+
   it('starts a 3-player lobby on multiplayer-ring with three active seats', () => {
     const { game } = createThreePlayerGame();
     expect(game.phase).toBe('active');

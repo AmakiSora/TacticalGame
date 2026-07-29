@@ -1,41 +1,42 @@
 {
-  "generatedAt": "2026-07-28T01:02:19.722Z",
+  "generatedAt": "2026-07-29T14:37:03.282Z",
   "source": {
     "versions": [
       "V2",
       "V3"
     ],
-    "replayCount": 57,
+    "replayCount": 60,
     "parseErrors": 0
   },
   "warnings": [],
   "overview": {
-    "matchCount": 57,
-    "completedCount": 54,
+    "matchCount": 60,
+    "completedCount": 57,
     "incompleteCount": 3,
     "parseErrorCount": 0,
     "playerCountDist": {
-      "2": 52,
+      "2": 55,
       "3": 4,
       "6": 1
     },
     "reasonDist": {
       "headquarters_destroyed": 16,
       "incomplete": 3,
-      "turn_limit_score": 25,
-      "last_player_standing": 13
+      "turn_limit_score": 26,
+      "last_player_standing": 13,
+      "forced_adjudication_score": 2
     },
     "mapDist": {
       "default": 24,
       "dual-lanes": 4,
-      "breach": 7,
+      "breach": 9,
       "multiplayer-ring": 5,
       "forge": 6,
-      "danger-close": 11
+      "danger-close": 12
     },
     "versionDist": {
       "V2": 30,
-      "V3": 27
+      "V3": 30
     },
     "schemaDist": {
       "2.0.0": 14,
@@ -56,12 +57,14 @@
       "3.1.3": 8,
       "3.1.4": 2,
       "3.1.5": 11,
-      "unknown": 1
+      "unknown": 1,
+      "3.1.6": 1,
+      "3.1.8": 2
     },
-    "totalEvents": 15025,
-    "avgRounds": 6.19,
+    "totalEvents": 15575,
+    "avgRounds": 6.48,
     "dateMin": "20260614",
-    "dateMax": "20260728"
+    "dateMax": "20260729"
   },
   "modelLeaderboard": [
     {
@@ -137,26 +140,27 @@
     {
       "rank": 2,
       "model": "gpt5.6sol",
-      "games": 2,
-      "wins": 2,
+      "games": 3,
+      "wins": 3,
       "losses": 0,
       "draws": 0,
-      "top3": 2,
+      "top3": 3,
       "winRate": 1,
       "top3Rate": 1,
       "avgRank": 1,
-      "avgScore": 2211,
-      "avgHqDamage": 77,
-      "rating": 0.3424,
+      "avgScore": 2236.7,
+      "avgHqDamage": 51.3,
+      "rating": 0.4385,
       "agents": {
-        "CX": 2
+        "CX": 3
       },
       "maps": {
         "danger-close": 1,
-        "forge": 1
+        "forge": 1,
+        "breach": 1
       },
       "versions": {
-        "V3": 2
+        "V3": 3
       },
       "vs": {
         "grok4.5": {
@@ -166,42 +170,86 @@
         "glm5.2": {
           "games": 1,
           "wins": 1
+        },
+        "deepseekv4flash": {
+          "games": 1,
+          "wins": 1
         }
       },
       "recent": [
         "tg_0036",
-        "tg_0049"
+        "tg_0049",
+        "tg_0058"
       ]
     },
     {
       "rank": 3,
-      "model": "deepseekv4flash",
-      "games": 16,
-      "wins": 9,
-      "losses": 7,
+      "model": "kimik3",
+      "games": 2,
+      "wins": 2,
+      "losses": 0,
       "draws": 0,
-      "top3": 16,
-      "winRate": 0.5625,
+      "top3": 2,
+      "winRate": 1,
       "top3Rate": 1,
-      "avgRank": 1.5,
-      "avgScore": 1497.4,
-      "avgHqDamage": 11.4,
-      "rating": 0.3318,
+      "avgRank": 1,
+      "avgScore": 2096.5,
+      "avgHqDamage": 60,
+      "rating": 0.3424,
+      "agents": {
+        "WB": 2
+      },
+      "maps": {
+        "danger-close": 1,
+        "breach": 1
+      },
+      "versions": {
+        "V3": 2
+      },
+      "vs": {
+        "Qwen3.8MaxPreview": {
+          "games": 1,
+          "wins": 1
+        },
+        "grok4.5": {
+          "games": 1,
+          "wins": 1
+        }
+      },
+      "recent": [
+        "tg_0040",
+        "tg_0059"
+      ]
+    },
+    {
+      "rank": 4,
+      "model": "deepseekv4flash",
+      "games": 17,
+      "wins": 9,
+      "losses": 8,
+      "draws": 0,
+      "top3": 17,
+      "winRate": 0.5294,
+      "top3Rate": 1,
+      "avgRank": 1.53,
+      "avgScore": 1482.2,
+      "avgHqDamage": 9.5,
+      "rating": 0.3096,
       "agents": {
         "PI": 8,
         "SCRIPT": 5,
-        "OMP": 3
+        "OMP": 4
       },
       "maps": {
         "default": 11,
         "dual-lanes": 1,
-        "breach": 1,
+        "breach": 2,
         "multiplayer-ring": 1,
         "forge": 2
       },
       "versions": {
         "V2": 13,
-        "V3": 3
+        "V3": 4
       },
       "vs": {
         "mimo2.5pro": {
@@ -247,108 +295,21 @@
         "glm5.1": {
           "games": 1,
           "wins": 1
+        },
+        "gpt5.6sol": {
+          "games": 1,
+          "wins": 0
         }
       },
       "recent": [
-        "tg_0012",
         "tg_0017",
         "tg_0018",
         "tg_0026",
         "tg_0029",
         "tg_0034",
         "tg_0035",
-        "tg_0051"
-      ]
-    },
-    {
-      "rank": 4,
-      "model": "longcat2.0",
-      "games": 11,
-      "wins": 6,
-      "losses": 5,
-      "draws": 0,
-      "top3": 10,
-      "winRate": 0.5455,
-      "top3Rate": 0.9091,
-      "avgRank": 1.82,
-      "avgScore": 1550.9,
-      "avgHqDamage": 35.8,
-      "rating": 0.2801,
-      "agents": {
-        "PI": 6,
-        "OMP": 5
-      },
-      "maps": {
-        "default": 1,
-        "dual-lanes": 1,
-        "breach": 3,
-        "multiplayer-ring": 2,
-        "danger-close": 3,
-        "forge": 1
-      },
-      "versions": {
-        "V2": 3,
-        "V3": 8
-      },
-      "vs": {
-        "qwen3.6v35b": {
-          "games": 1,
-          "wins": 1
-        },
-        "agnes2.0flash": {
-          "games": 2,
-          "wins": 2
-        },
-        "hy3": {
-          "games": 2,
-          "wins": 0
-        },
-        "step3.7flash": {
-          "games": 2,
-          "wins": 2
-        },
-        "deepseekv4flash": {
-          "games": 1,
-          "wins": 0
-        },
-        "mimo2.5pro": {
-          "games": 1,
-          "wins": 0
-        },
-        "doubaoseed2.1pro": {
-          "games": 1,
-          "wins": 0
-        },
-        "Qwen3.8MaxPreview": {
-          "games": 1,
-          "wins": 0
-        },
-        "minimaxm3": {
-          "games": 2,
-          "wins": 1
-        },
-        "glm5.1": {
-          "games": 1,
-          "wins": 1
-        },
-        "grok4.5": {
-          "games": 1,
-          "wins": 0
-        },
-        "glm5.2": {
-          "games": 1,
-          "wins": 0
-        }
-      },
-      "recent": [
-        "tg_0033",
-        "tg_0034",
-        "tg_0037",
-        "tg_0048",
-        "tg_0052",
-        "tg_0053",
-        "tg_0055",
-        "tg_0057"
+        "tg_0051",
+        "tg_0058"
       ]
     },
     {
@@ -434,6 +395,101 @@
     },
     {
       "rank": 6,
+      "model": "longcat2.0",
+      "games": 12,
+      "wins": 6,
+      "losses": 6,
+      "draws": 0,
+      "top3": 11,
+      "winRate": 0.5,
+      "top3Rate": 0.9167,
+      "avgRank": 1.83,
+      "avgScore": 1426.7,
+      "avgHqDamage": 32.5,
+      "rating": 0.2538,
+      "agents": {
+        "PI": 6,
+        "OMP": 6
+      },
+      "maps": {
+        "default": 1,
+        "dual-lanes": 1,
+        "breach": 3,
+        "multiplayer-ring": 2,
+        "danger-close": 4,
+        "forge": 1
+      },
+      "versions": {
+        "V2": 3,
+        "V3": 9
+      },
+      "vs": {
+        "qwen3.6v35b": {
+          "games": 1,
+          "wins": 1
+        },
+        "agnes2.0flash": {
+          "games": 2,
+          "wins": 2
+        },
+        "hy3": {
+          "games": 2,
+          "wins": 0
+        },
+        "step3.7flash": {
+          "games": 2,
+          "wins": 2
+        },
+        "deepseekv4flash": {
+          "games": 1,
+          "wins": 0
+        },
+        "mimo2.5pro": {
+          "games": 1,
+          "wins": 0
+        },
+        "doubaoseed2.1pro": {
+          "games": 1,
+          "wins": 0
+        },
+        "Qwen3.8MaxPreview": {
+          "games": 1,
+          "wins": 0
+        },
+        "minimaxm3": {
+          "games": 2,
+          "wins": 1
+        },
+        "glm5.1": {
+          "games": 1,
+          "wins": 1
+        },
+        "grok4.5": {
+          "games": 1,
+          "wins": 0
+        },
+        "glm5.2": {
+          "games": 1,
+          "wins": 0
+        },
+        "ring2.6": {
+          "games": 1,
+          "wins": 0
+        }
+      },
+      "recent": [
+        "tg_0034",
+        "tg_0037",
+        "tg_0048",
+        "tg_0052",
+        "tg_0053",
+        "tg_0055",
+        "tg_0057",
+        "tg_0060"
+      ]
+    },
+    {
+      "rank": 7,
       "model": "gpt5.5",
       "games": 3,
       "wins": 2,
@@ -473,7 +529,7 @@
       ]
     },
     {
-      "rank": 7,
+      "rank": 8,
       "model": "doubaoseed2.1pro",
       "games": 3,
       "wins": 2,
@@ -531,7 +587,7 @@
       ]
     },
     {
-      "rank": 8,
+      "rank": 9,
       "model": "fable5",
       "games": 1,
       "wins": 1,
@@ -564,8 +620,8 @@
       ]
     },
     {
-      "rank": 9,
-      "model": "kimik3",
+      "rank": 10,
+      "model": "ring2.6",
       "games": 1,
       "wins": 1,
       "losses": 0,
@@ -574,11 +630,11 @@
       "winRate": 1,
       "top3Rate": 1,
       "avgRank": 1,
-      "avgScore": 2608,
-      "avgHqDamage": 120,
+      "avgScore": 1940,
+      "avgHqDamage": 91,
       "rating": 0.2065,
       "agents": {
-        "WB": 1
+        "OMP": 1
       },
       "maps": {
         "danger-close": 1
@@ -587,17 +643,17 @@
         "V3": 1
       },
       "vs": {
-        "Qwen3.8MaxPreview": {
+        "longcat2.0": {
           "games": 1,
           "wins": 1
         }
       },
       "recent": [
-        "tg_0040"
+        "tg_0060"
       ]
     },
     {
-      "rank": 10,
+      "rank": 11,
       "model": "deepseekv4pro",
       "games": 4,
       "wins": 2,
@@ -651,61 +707,6 @@
         "tg_0035",
         "tg_0046",
         "tg_0054"
-      ]
-    },
-    {
-      "rank": 11,
-      "model": "grok4.5",
-      "games": 4,
-      "wins": 2,
-      "losses": 2,
-      "draws": 0,
-      "top3": 4,
-      "winRate": 0.5,
-      "top3Rate": 1,
-      "avgRank": 1.5,
-      "avgScore": 1740.3,
-      "avgHqDamage": 56.8,
-      "rating": 0.15,
-      "agents": {
-        "OMP": 2,
-        "PI": 2
-      },
-      "maps": {
-        "danger-close": 2,
-        "multiplayer-ring": 1,
-        "breach": 1
-      },
-      "versions": {
-        "V3": 4
-      },
-      "vs": {
-        "gpt5.6sol": {
-          "games": 1,
-          "wins": 0
-        },
-        "glm5.2": {
-          "games": 1,
-          "wins": 1
-        },
-        "Qwen3.8MaxPreview": {
-          "games": 1,
-          "wins": 1
-        },
-        "deepseekv4pro": {
-          "games": 1,
-          "wins": 0
-        },
-        "longcat2.0": {
-          "games": 1,
-          "wins": 1
-        }
-      },
-      "recent": [
-        "tg_0036",
-        "tg_0038",
-        "tg_0046",
-        "tg_0055"
       ]
     },
     {
@@ -776,6 +777,66 @@
     },
     {
       "rank": 13,
+      "model": "grok4.5",
+      "games": 5,
+      "wins": 2,
+      "losses": 3,
+      "draws": 0,
+      "top3": 5,
+      "winRate": 0.4,
+      "top3Rate": 1,
+      "avgRank": 1.6,
+      "avgScore": 1557.6,
+      "avgHqDamage": 45.4,
+      "rating": 0.1176,
+      "agents": {
+        "OMP": 3,
+        "PI": 2
+      },
+      "maps": {
+        "danger-close": 2,
+        "multiplayer-ring": 1,
+        "breach": 2
+      },
+      "versions": {
+        "V3": 5
+      },
+      "vs": {
+        "gpt5.6sol": {
+          "games": 1,
+          "wins": 0
+        },
+        "glm5.2": {
+          "games": 1,
+          "wins": 1
+        },
+        "Qwen3.8MaxPreview": {
+          "games": 1,
+          "wins": 1
+        },
+        "deepseekv4pro": {
+          "games": 1,
+          "wins": 0
+        },
+        "longcat2.0": {
+          "games": 1,
+          "wins": 1
+        },
+        "kimik3": {
+          "games": 1,
+          "wins": 0
+        }
+      },
+      "recent": [
+        "tg_0036",
+        "tg_0038",
+        "tg_0046",
+        "tg_0055",
+        "tg_0059"
+      ]
+    },
+    {
+      "rank": 14,
       "model": "qwen3.7max",
       "games": 2,
       "wins": 1,
@@ -816,7 +877,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 15,
       "model": "mimo2.5pro",
       "games": 12,
       "wins": 3,
@@ -892,7 +953,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 16,
       "model": "qwen3.6v35b",
       "games": 3,
       "wins": 1,
@@ -935,7 +996,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 17,
       "model": "sensenova6.7fl",
       "games": 3,
       "wins": 1,
@@ -981,7 +1042,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "model": "glm5.1",
       "games": 4,
       "wins": 1,
@@ -1034,7 +1095,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "model": "agnes2.0flash",
       "games": 4,
       "wins": 1,
@@ -1082,7 +1143,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "model": "Qwen3.8MaxPreview",
       "games": 6,
       "wins": 1,
@@ -1160,7 +1221,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "model": "step3.7flash",
       "games": 9,
       "wins": 1,
@@ -1230,7 +1291,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 22,
       "model": "glm4.7",
       "games": 1,
       "wins": 0,
@@ -1289,32 +1350,43 @@
     },
     {
       "agent": "OMP",
-      "games": 29,
-      "wins": 12,
-      "winRate": 0.4138,
+      "games": 33,
+      "wins": 13,
+      "winRate": 0.3939,
       "models": {
         "mimo2.5pro": 3,
         "minimaxm3": 4,
         "glm5.1": 3,
         "agnes2.0flash": 3,
-        "longcat2.0": 5,
-        "deepseekv4flash": 3,
+        "longcat2.0": 6,
+        "deepseekv4flash": 4,
         "step3.7flash": 4,
         "sensenova6.7fl": 1,
-        "grok4.5": 2,
-        "doubaoseed2.1pro": 1
+        "grok4.5": 3,
+        "doubaoseed2.1pro": 1,
+        "ring2.6": 1
       }
     },
     {
       "agent": "WB",
-      "games": 16,
-      "wins": 10,
-      "winRate": 0.625,
+      "games": 17,
+      "wins": 11,
+      "winRate": 0.6471,
       "models": {
         "deepseekv4pro": 2,
         "hy3": 9,
         "glm5.2": 4,
-        "kimik3": 1
+        "kimik3": 2
+      }
+    },
+    {
+      "agent": "CX",
+      "games": 6,
+      "wins": 5,
+      "winRate": 0.8333,
+      "models": {
+        "gpt5.5": 3,
+        "gpt5.6sol": 3
       }
     },
     {
@@ -1325,16 +1397,6 @@
       "models": {
         "deepseekv4flash": 5,
         "glm5.2": 3
-      }
-    },
-    {
-      "agent": "CX",
-      "games": 5,
-      "wins": 4,
-      "winRate": 0.8,
-      "models": {
-        "gpt5.5": 3,
-        "gpt5.6sol": 2
       }
     },
     {
@@ -1392,27 +1454,29 @@
     },
     {
       "mapId": "danger-close",
-      "games": 11,
+      "games": 12,
       "reasons": {
-        "last_player_standing": 11
+        "last_player_standing": 11,
+        "forced_adjudication_score": 1
       },
       "playerCounts": {
-        "2": 11
+        "2": 12
       },
-      "avgRounds": 13.27
+      "avgRounds": 13.33
     },
     {
       "mapId": "breach",
-      "games": 7,
+      "games": 9,
       "reasons": {
-        "turn_limit_score": 3,
+        "turn_limit_score": 4,
         "headquarters_destroyed": 3,
-        "last_player_standing": 1
+        "last_player_standing": 1,
+        "forced_adjudication_score": 1
       },
       "playerCounts": {
-        "2": 7
+        "2": 9
       },
-      "avgRounds": 5.71
+      "avgRounds": 6.89
     },
     {
       "mapId": "forge",
@@ -1451,6 +1515,135 @@
     }
   ],
   "matches": [
+    {
+      "recordId": "tg_0060",
+      "version": "V3",
+      "date": "20260729",
+      "fileName": "tg_0060_20260729.json",
+      "gameId": "1eb1b00f-d615-4837-ac8d-ba7e539c3b66",
+      "mapId": "danger-close",
+      "schemaVersion": "3.1.8",
+      "playerCount": 2,
+      "winner": "player_b",
+      "reason": "forced_adjudication_score",
+      "completed": true,
+      "eventCount": 135,
+      "rounds": 14,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "LongCat2.0-OMP",
+          "model": "longcat2.0",
+          "agent": "OMP",
+          "rank": 2,
+          "isWinner": false,
+          "status": "active",
+          "scoreTotal": 185,
+          "headquartersDamage": 0
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "Ring2.6-OMP",
+          "model": "ring2.6",
+          "agent": "OMP",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 1940,
+          "headquartersDamage": 91
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
+    {
+      "recordId": "tg_0059",
+      "version": "V3",
+      "date": "20260729",
+      "fileName": "tg_0059_20260729.json",
+      "gameId": "82255f50-5cd4-4013-88bb-724e544109f9",
+      "mapId": "breach",
+      "schemaVersion": "3.1.8",
+      "playerCount": 2,
+      "winner": "player_b",
+      "reason": "forced_adjudication_score",
+      "completed": true,
+      "eventCount": 124,
+      "rounds": 7,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "Grok4.5-OMP",
+          "model": "grok4.5",
+          "agent": "OMP",
+          "rank": 2,
+          "isWinner": false,
+          "status": "active",
+          "scoreTotal": 827,
+          "headquartersDamage": 0
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "KimiK3-WB",
+          "model": "kimik3",
+          "agent": "WB",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 1585,
+          "headquartersDamage": 0
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
+    {
+      "recordId": "tg_0058",
+      "version": "V3",
+      "date": "20260729",
+      "fileName": "tg_0058_20260729.json",
+      "gameId": "cac0298b-4875-485e-ab5a-afeb6c4fb042",
+      "mapId": "breach",
+      "schemaVersion": "3.1.6",
+      "playerCount": 2,
+      "winner": "player_a",
+      "reason": "turn_limit_score",
+      "completed": true,
+      "eventCount": 291,
+      "rounds": 15,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "GPT5.6sol-CX",
+          "model": "gpt5.6sol",
+          "agent": "CX",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 2288,
+          "headquartersDamage": 0
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "deepseekv4flash-OMP",
+          "model": "deepseekv4flash",
+          "agent": "OMP",
+          "rank": 2,
+          "isWinner": false,
+          "status": "active",
+          "scoreTotal": 1406,
+          "headquartersDamage": 0
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
     {
       "recordId": "tg_0057",
       "version": "V3",

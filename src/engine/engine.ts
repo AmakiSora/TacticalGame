@@ -10,6 +10,7 @@ import { appendEvent } from './events.js';
 import { hexDistance } from './hex.js';
 import { controlPointIncome, controlPointTypeSpec } from './controlPoints.js';
 import { addLobbyPlayer, initializeLobbyGame } from '../state/store.js';
+import { artilleryStateForRound, isArtilleryDanger } from './artillery.js';
 
 export function joinedPlayerIds(game: GameState): PlayerId[] {
   return PLAYER_IDS.filter(id => game.players[id]);
@@ -32,6 +33,7 @@ function syncLegacyTurnAliases(game: GameState): void {
 function mapPayload(game: GameState) {
   return {
     id: game.mapId, name: game.config.name, description: game.config.description,
+    mode: game.config.mode,
     grid: game.map.grid, orientation: game.map.orientation, radius: game.map.radius,
     terrainCells: game.map.terrainCells.map(c => ({ ...c })),
     cells: game.cells.map(c => ({ ...c })),
@@ -41,6 +43,7 @@ function mapPayload(game: GameState) {
 function fullReplayPayload(game: GameState) {
   return {
     mapId: game.mapId,
+    mode: game.config.mode,
     map: mapPayload(game),
     players: structuredClone(game.players),
     turnOrder: [...game.turn.turnOrder],
@@ -48,12 +51,15 @@ function fullReplayPayload(game: GameState) {
     headquarters: structuredClone(game.headquarters),
     units: game.units.map(u => ({ ...u })),
     resources: structuredClone(game.resources),
+    artillery: structuredClone(game.artillery),
     firstPlayer: game.turn.currentPlayerId,
     playerNames: { ...game.playerNames },
     config: {
+      mode: game.config.mode,
       units: structuredClone(game.config.units),
       headquartersSpec: { ...game.config.headquartersSpec },
       balance: structuredClone(game.config.balance),
+      annihilation: structuredClone(game.config.annihilation),
     },
   };
 }
@@ -139,6 +145,7 @@ function repairFromControlPoints(game: GameState, bus: EventBus, owner: PlayerId
     if (repairAmount <= 0) continue;
     for (const unit of game.units) {
       if (unit.owner !== owner || !unit.alive || unit.hp >= unit.maxHp || repaired.has(unit.id)) continue;
+      if (isArtilleryDanger(game, unit)) continue;
       if (hexDistance(point, unit) > 1) continue;
       const amount = Math.min(repairAmount, unit.maxHp - unit.hp);
       if (amount <= 0) continue;
@@ -295,6 +302,106 @@ function grantComebackSupplies(game: GameState, bus: EventBus): void {
   }
 }
 
+function markPlayerEliminated(
+  game: GameState,
+  bus: EventBus,
+  playerId: PlayerId,
+  reason: EliminationReason,
+  eliminatedBy: PlayerId | null,
+): void {
+  const player = game.players[playerId]!;
+  player.status = 'eliminated';
+  player.eliminatedAt = Date.now();
+  player.eliminatedBy = eliminatedBy;
+  if (eliminatedBy && game.players[eliminatedBy]) game.players[eliminatedBy]!.stats.playersEliminated += 1;
+
+  const removedUnitIds = game.units.filter(unit => unit.owner === playerId).map(unit => unit.id);
+  game.units = game.units.filter(unit => unit.owner !== playerId);
+  const neutralizedPointIds: string[] = [];
+  for (const point of game.controlPoints) {
+    if (point.owner !== playerId) continue;
+    point.owner = null;
+    neutralizedPointIds.push(point.id);
+    appendEvent(game, bus, 'control_point_neutralized', { pointId: point.id, previousOwner: playerId });
+  }
+  const hq = game.headquarters[playerId];
+  if (hq) { hq.alive = false; hq.hp = 0; }
+  appendEvent(game, bus, 'player_eliminated', {
+    playerId, reason, eliminatedBy, removedUnitIds, neutralizedPointIds,
+  });
+}
+
+function resolveAnnihilationWipes(game: GameState, bus: EventBus): boolean {
+  if (game.config.mode !== 'annihilation') return false;
+  const activeBefore = activePlayerIds(game);
+  const wiped = activeBefore.filter(owner => !game.units.some(unit => unit.owner === owner && unit.alive));
+  if (wiped.length === 0) return false;
+
+  for (const owner of wiped) markPlayerEliminated(game, bus, owner, 'artillery_destroyed', null);
+  const activeAfter = activePlayerIds(game);
+  if (activeAfter.length <= 1) {
+    endGame(
+      game,
+      bus,
+      activeAfter[0] ?? null,
+      activeAfter.length === 1 ? 'last_player_standing' : 'mutual_annihilation',
+    );
+    return true;
+  }
+  return false;
+}
+
+function updateArtilleryForRound(game: GameState, bus: EventBus): boolean {
+  if (game.config.mode !== 'annihilation') return false;
+  const previousSafeRadius = game.artillery?.safeRadius ?? game.map.radius;
+  game.artillery = artilleryStateForRound(game, game.turn.roundNumber);
+  if (!game.artillery) return false;
+
+  if (game.artillery.safeRadius < previousSafeRadius) {
+    appendEvent(game, bus, 'artillery_shrunk', {
+      roundNumber: game.turn.roundNumber,
+      safeRadius: game.artillery.safeRadius,
+      dangerCells: game.artillery.dangerCells,
+      warningCells: game.artillery.warningCells,
+      nextShrinkRound: game.artillery.nextShrinkRound,
+    });
+  } else if (game.artillery.warningCells.length > 0) {
+    appendEvent(game, bus, 'artillery_warning', {
+      roundNumber: game.turn.roundNumber,
+      safeRadius: game.artillery.safeRadius,
+      warningCells: game.artillery.warningCells,
+      nextShrinkRound: game.artillery.nextShrinkRound,
+    });
+  }
+
+  const damage = game.config.annihilation!.artillery.damage;
+  for (const unit of game.units.filter(candidate => candidate.alive && isArtilleryDanger(game, candidate))) {
+    const actualDamage = Math.min(unit.hp, damage);
+    unit.hp = Math.max(0, unit.hp - damage);
+    appendEvent(game, bus, 'artillery_damage', {
+      unitId: unit.id,
+      owner: unit.owner,
+      damage: actualDamage,
+      unitHp: unit.hp,
+      q: unit.q,
+      r: unit.r,
+      roundNumber: game.turn.roundNumber,
+    });
+    if (unit.hp === 0) {
+      unit.alive = false;
+      appendEvent(game, bus, 'unit_death', {
+        unitId: unit.id,
+        owner: unit.owner,
+        type: unit.type,
+        q: unit.q,
+        r: unit.r,
+        cause: 'artillery',
+      });
+    }
+  }
+  return resolveAnnihilationWipes(game, bus);
+}
+
 function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): void {
   const active = activePlayerIds(game);
   if (active.length <= 1) {
@@ -314,6 +421,7 @@ function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): v
     game.turn.roundNumber += 1;
     game.turn.turnNumber = game.turn.roundNumber;
     game.turn.actedThisRound = [];
+    if (updateArtilleryForRound(game, bus)) return;
     next = nextActiveInOrder(game, previousOwner);
   }
   if (!next) return;
@@ -343,25 +451,7 @@ export function eliminatePlayer(
   if (activePlayerIds(game).length <= 1) {
     return { ok: false, code: 'invalid_move', message: 'cannot eliminate the last active player' };
   }
-  player.status = 'eliminated';
-  player.eliminatedAt = Date.now();
-  player.eliminatedBy = eliminatedBy;
-  if (eliminatedBy && game.players[eliminatedBy]) game.players[eliminatedBy]!.stats.playersEliminated += 1;
-
-  const removedUnitIds = game.units.filter(unit => unit.owner === playerId).map(unit => unit.id);
-  game.units = game.units.filter(unit => unit.owner !== playerId);
-  const neutralizedPointIds: string[] = [];
-  for (const point of game.controlPoints) {
-    if (point.owner !== playerId) continue;
-    point.owner = null;
-    neutralizedPointIds.push(point.id);
-    appendEvent(game, bus, 'control_point_neutralized', { pointId: point.id, previousOwner: playerId });
-  }
-  const hq = game.headquarters[playerId];
-  if (hq) { hq.alive = false; hq.hp = 0; }
-  appendEvent(game, bus, 'player_eliminated', {
-    playerId, reason, eliminatedBy, removedUnitIds, neutralizedPointIds,
-  });
+  markPlayerEliminated(game, bus, playerId, reason, eliminatedBy);
 
   const active = activePlayerIds(game);
   if (active.length === 1) {

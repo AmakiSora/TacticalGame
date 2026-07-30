@@ -14,15 +14,17 @@ export function isPlayerId(value: unknown): value is PlayerId {
 }
 
 export type UnitType = 'infantry' | 'scout' | 'heavy' | 'ranger' | 'support';
+export type GameMode = 'standard' | 'annihilation';
 export type GamePhase = 'lobby' | 'active' | 'game_over';
 export type PlayerStatus = 'lobby' | 'active' | 'eliminated';
 export type GameOverReason =
   | 'last_player_standing'
   | 'turn_limit_score'
   | 'turn_limit_draw'
+  | 'mutual_annihilation'
   | 'forced_adjudication_score'
   | 'forced_adjudication_draw';
-export type EliminationReason = 'headquarters_destroyed' | 'host_eliminated';
+export type EliminationReason = 'headquarters_destroyed' | 'army_destroyed' | 'artillery_destroyed' | 'host_eliminated';
 export type TerrainType = 'plain' | 'water' | 'blocker';
 export type ControlPointKind = 'supply' | 'forward_base' | 'repair';
 
@@ -98,6 +100,13 @@ export interface MapCell extends Position {
   terrain: TerrainType;
 }
 
+export interface ArtilleryState {
+  safeRadius: number;
+  dangerCells: Position[];
+  warningCells: Position[];
+  nextShrinkRound: number | null;
+}
+
 export interface HexMapState {
   grid: 'hex';
   orientation: 'pointy';
@@ -132,6 +141,9 @@ export type EventType =
   | 'control_point_repair'
   | 'income'
   | 'comeback_supply'
+  | 'artillery_warning'
+  | 'artillery_shrunk'
+  | 'artillery_damage'
   | 'reset_actions'
   | 'turn_skipped'
   | 'turn_end'
@@ -211,6 +223,7 @@ export interface GameState {
   events: GameEvent[];
   winner: PlayerId | null;
   result: GameResult | null;
+  artillery: ArtilleryState | null;
 }
 
 export interface ApiError {

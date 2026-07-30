@@ -73,6 +73,8 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 ## 核心规则
 
+- 地图可声明 `mode: "annihilation"` 进入「歼灭模式」。该模式不生成总部，每名玩家开局拥有一个出生据点和地图配置的初始部队；最后一个单位死亡时立即淘汰，仅剩一名玩家时获胜。
+- 歼灭模式的炮火会先预告、再按配置轮次向地图中心收缩。危险区单位在每个整轮开始时同时受到无视防御的炮火伤害，危险区内禁止部署、治疗和据点维修；炮火同时消灭所有剩余玩家时判定同归于尽。
 - 地图为尖顶六边形，坐标为 `{ q, r }`。
 - 当前内置地图包含旧双人地图、`multiplayer-ring` 多人环形地图和仅支持 4 人的异形地图 `four-corners`；每张地图会声明支持的玩家人数。旧地图默认使用 `radius` 内的完整六边形，异形地图通过 `playableCells` 显式声明实际存在的格子。
 - 地形：`plain` 可通行/部署，`water` 和 `blocker` 不可通行/部署。
@@ -148,7 +150,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 事件类型：
 
-`player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
+`player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
 
 `game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。
 
@@ -214,6 +216,8 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 异形地图可另外声明 `"playableCells": [{ "q": 0, "r": 0 }, { "q": 1, "r": 0 }]`。该字段可选；省略时，加载器按 `max(abs(q), abs(r), abs(-q-r)) <= radius` 展开完整六边形。声明时可组成任意连通的凹形、凸形或带孔洞边界，但每个坐标仍须位于 `radius` 包络内。加载后所有地图都会得到完整权威格子列表，移动、部署、爆破、寻路和绘图都以该列表为准。`GET /api/maps` 的 `preview.cells` 也始终返回已经解析并带地形的预览格子。
 
+歼灭地图另外声明 `mode: "annihilation"`、`annihilation.artillery`，并让每个 `spawnSlots[]` 通过 `controlPointId` 关联一个唯一出生据点。炮火参数包含首次生效轮次 `startRound`、收缩间隔 `intervalRounds`、每轮伤害 `damage` 和最终安全半径 `minimumSafeRadius`。当前内置 `annihilation` 地图在第 4 轮预告，第 5 轮首次生效，此后每两轮收缩一层。
+
 未列在 `terrainCells` 的可用格默认为 `plain`。地图编辑器支持添加和移除地块，并可维护 2–8 个出生槽及对应人数布局；移除包含对象的格子会被阻止，避免隐式丢失配置。
 
 据点可选 `kind`：`supply`、`forward_base`、`repair`。如果地图没有任何据点写 `kind`，引擎使用旧规则：统一 `balance.controlPointIncome`、无部署折扣、无据点维修。如果任意据点写了 `kind`，则该地图所有据点都必须写 `kind`，并且 `balance.controlPointTypes` 必须完整配置三种类型的 `income`、`deployDiscount`、`repairAmount`。裁决分始终按据点数量计算，不按据点类型加权。
@@ -241,7 +245,7 @@ AI 默认会持续轮询并自动处理后续己方回合，直到游戏结束�
 | `--max-turns <n>` | 最多处理多少个己方回合，默认 `80` |
 | `--once` | 只处理当前或下一个己方回合 |
 
-AI 策略优先级：击毁总部、击杀低血单位、治疗友军、战略部署、抢占据点/推进总部。第 8 回合后或拥有 3 个据点时优先转入总部压力；第 12 回合后按裁决分优化行动。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。
+AI 在标准模式中的策略优先级：击毁总部、击杀低血单位、治疗友军、战略部署、抢占据点/推进总部。第 8 回合后或拥有 3 个据点时优先转入总部压力；第 12 回合后按裁决分优化行动。歼灭模式改为优先脱离炮火预警/危险区并向最近敌军推进，不再寻找总部或以占点裁决为主目标。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。
 
 ### 自动对战控制台
 

@@ -267,6 +267,18 @@ function livingUnits(game, owner) {
   return game.units.filter(u => u.owner === owner && u.alive);
 }
 
+function artilleryRisk(game, pos) {
+  if (game.artillery?.dangerCells?.some(cell => cell.q === pos.q && cell.r === pos.r)) return 2;
+  if (game.artillery?.warningCells?.some(cell => cell.q === pos.q && cell.r === pos.r)) return 1;
+  return 0;
+}
+
+function nearestEnemyUnit(game, owner, from) {
+  return game.units
+    .filter(unit => unit.alive && unit.owner !== owner && enemyPlayerIds(game, owner).includes(unit.owner))
+    .sort((a, b) => hexDistance(from, a) - hexDistance(from, b) || targetScore({ kind: 'unit', entity: b }) - targetScore({ kind: 'unit', entity: a }))[0] || null;
+}
+
 function actionsPerTurn(game) {
   return game.config?.balance?.actionsPerTurn ?? Infinity;
 }
@@ -344,8 +356,9 @@ async function tryAttack(game, args, seat, unit) {
 
 async function tryHeal(game, args, seat, unit) {
   if (unit.type !== 'support' || unit.hasActed) return false;
+  if (artilleryRisk(game, unit) === 2) return false;
   const candidates = livingUnits(game, seat.owner)
-    .filter(u => u.id !== unit.id && u.hp < u.maxHp && hexDistance(unit, u) <= unit.attackRange)
+    .filter(u => u.id !== unit.id && u.hp < u.maxHp && hexDistance(unit, u) <= unit.attackRange && artilleryRisk(game, u) < 2)
     .sort((a, b) => ((b.maxHp - b.hp) / b.maxHp) - ((a.maxHp - a.hp) / a.maxHp));
   if (candidates.length === 0) return false;
   await request(args.url, 'POST', `/api/games/${seat.gameId}/heal`, {
@@ -357,6 +370,9 @@ async function tryHeal(game, args, seat, unit) {
 }
 
 export function movementGoal(game, owner, unit) {
+  if (game.config?.mode === 'annihilation') {
+    return nearestEnemyUnit(game, owner, unit) || { q: 0, r: 0 };
+  }
   const ownedPoints = game.controlPoints.filter(p => p.owner === owner).length;
   const endgamePush = game.turn.turnNumber >= 8 || ownedPoints >= 3;
   const adjudicationMode = game.turn.turnNumber >= 15;
@@ -392,10 +408,11 @@ async function tryMove(game, args, seat, unit) {
   if (reachable.length === 0) return false;
   const goal = movementGoal(game, seat.owner, unit);
   const currentDistance = hexDistance(unit, goal);
+  const currentRisk = artilleryRisk(game, unit);
   const best = reachable
-    .map(pos => ({ pos, distance: hexDistance(pos, goal) }))
-    .filter(item => item.distance < currentDistance || unit.canCapture)
-    .sort((a, b) => a.distance - b.distance)[0];
+    .map(pos => ({ pos, distance: hexDistance(pos, goal), risk: artilleryRisk(game, pos) }))
+    .filter(item => item.risk < currentRisk || item.distance < currentDistance || unit.canCapture)
+    .sort((a, b) => a.risk - b.risk || a.distance - b.distance)[0];
   if (!best) return false;
   await request(args.url, 'POST', `/api/games/${seat.gameId}/move`, {
     unitId: unit.id,
@@ -410,7 +427,7 @@ function deployOrigins(game, owner) {
   return [
     game.headquarters[owner],
     ...game.controlPoints.filter(p => p.owner === owner),
-  ].filter(origin => origin && origin.alive !== false);
+  ].filter(origin => origin && origin.alive !== false && artilleryRisk(game, origin) < 2);
 }
 
 function deployChoice(game, owner, origins = deployOrigins(game, owner)) {
@@ -444,13 +461,13 @@ async function tryDeploy(game, args, seat) {
   const unitType = deployChoice(game, seat.owner, origins);
   if (!unitType) return false;
 
-  const enemyHq = nearestEnemyHeadquarters(game, seat.owner, origins[0]) || origins[0];
+  const enemyHq = nearestEnemyHeadquarters(game, seat.owner, origins[0]) || nearestEnemyUnit(game, seat.owner, origins[0]) || { q: 0, r: 0 };
   const candidateMoves = [];
   for (const origin of origins) {
     const cost = effectiveDeployCost(game, unitType, origin);
     if (game.resources[seat.owner].supplies < cost) continue;
     for (const pos of neighbors(origin)) {
-      if (isEmptyPlain(game, pos)) {
+      if (isEmptyPlain(game, pos) && artilleryRisk(game, pos) < 2) {
         candidateMoves.push({ origin, pos, distance: hexDistance(pos, enemyHq), cost });
       }
     }

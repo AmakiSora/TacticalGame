@@ -280,6 +280,7 @@ function createEmptyState() {
     },
     winner: null,
     result: null,
+    artillery: null,
     eventLog: [],
   };
 }
@@ -325,6 +326,7 @@ function applyEvent(s, ev) {
       s.headquarters = new Map(Object.values(p.headquarters || {}).map(h => [h.id, { ...h }]));
       s.units = new Map((p.units || []).map(u => [u.id, { ...u }]));
       s.resources = JSON.parse(JSON.stringify(p.resources || s.resources));
+      s.artillery = p.artillery ? JSON.parse(JSON.stringify(p.artillery)) : null;
       computeLayout(s.cells);
       break;
     case 'deploy':
@@ -399,6 +401,17 @@ function applyEvent(s, ev) {
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies += p.amount;
       break;
+    case 'artillery_warning':
+      s.artillery = { ...(s.artillery || {}), safeRadius: p.safeRadius, warningCells: p.warningCells || [], nextShrinkRound: p.nextShrinkRound };
+      break;
+    case 'artillery_shrunk':
+      s.artillery = { safeRadius: p.safeRadius, dangerCells: p.dangerCells || [], warningCells: p.warningCells || [], nextShrinkRound: p.nextShrinkRound };
+      break;
+    case 'artillery_damage': {
+      const unit = s.units.get(p.unitId);
+      if (unit) unit.hp = p.unitHp;
+      break;
+    }
     case 'reset_actions':
       for (const u of s.units.values()) {
         if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
@@ -661,6 +674,23 @@ function drawBoard(now = performance.now()) {
     ctx.stroke();
   }
 
+  for (const cell of state.artillery?.warningCells || []) {
+    pathHex(cell.q, cell.r, 2);
+    ctx.fillStyle = 'rgba(244, 177, 66, .22)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 205, 105, .72)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  for (const cell of state.artillery?.dangerCells || []) {
+    pathHex(cell.q, cell.r, 2);
+    ctx.fillStyle = 'rgba(205, 55, 45, .34)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 95, 75, .68)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
   if (hoverCell) {
     pathHex(hoverCell.q, hoverCell.r, 2);
     ctx.fillStyle = 'rgba(255,255,255,.08)';
@@ -783,10 +813,14 @@ function formatEventShort(ev) {
     case 'control_point_repair': return `${p.pointName || '维修站'} 修复 ${String(p.unitId).slice(0, 6)} +${p.amount}`;
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
     case 'comeback_supply': return `${playerName(p.owner)} 追赶补给 +${p.amount}（落后${p.scoreGapPercent}%）`;
+    case 'artillery_warning': return `炮火预警：第 ${p.nextShrinkRound} 轮收缩`;
+    case 'artillery_shrunk': return `炮火收缩：安全半径 ${p.safeRadius}`;
+    case 'artillery_damage': return `${playerName(p.owner)} 单位遭炮击 -${p.damage}`;
     case 'turn_end': return `回合结束 -> ${playerName(p.nextPlayerId || p.nextOwner)} (${p.turnNumber || p.roundNumber})`;
     case 'round_end': return `第 ${p.roundNumber || '?'} 轮结束`;
     case 'turn_skipped': return `跳过 ${playerName(p.playerId)}`;
     case 'game_over':
+      if (p.reason === 'mutual_annihilation') return '双方同归于尽';
       if (p.reason === 'forced_adjudication_draw') return '强制裁决平局';
       if (p.reason === 'forced_adjudication_score') return `强制裁决 胜者:${playerName(p.winner)}`;
       if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;
@@ -853,6 +887,7 @@ function liveAdjudicationRankings() {
 
 function scoreBreakdown(score) {
   const hqDamage = score.headquartersDamage ?? score.enemyHqDamage ?? 0;
+  if (gameConfig?.mode === 'annihilation') return `存活兵力 ${score.armyValue} · 补给 ${score.supplies}`;
   return `HQ伤害 ${hqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
 }
 

@@ -85,6 +85,8 @@ If `POST /join` returns `game_already_full` or `game_already_started`, report th
 
 ## Rules To Remember
 
+- Check `game.config.mode` before choosing a strategy. In `annihilation` mode there are no headquarters; a player is eliminated as soon as their final living unit dies, and the last surviving player wins.
+- In annihilation mode, inspect `game.artillery.dangerCells`, `warningCells`, and `nextShrinkRound` before every action. Danger-zone units take configured damage at each round boundary, and deployment, healing, and control-point repair are disabled there. Move exposed units inward while closing on the nearest enemy army.
 - Coordinates are pointy-top axial hex `{ q, r }`.
 - Hex distance is `max(abs(dq), abs(dr), abs(ds))`, where `s = -q-r`.
 - `game.cells` is the authoritative playable boundary. Never infer whether a coordinate is playable from `map.radius`; radius is only compatibility and display metadata.
@@ -131,6 +133,8 @@ Each player has `config.balance.actionsPerTurn` action points per turn. Always r
 Do not use V1 concepts: `x/y`, Manhattan distance, buildings, miners, production queues, walls, `/build`, `/produce`, or `/sell`.
 
 ## Decision Heuristic
+
+For `annihilation` mode, replace the standard headquarters heuristic with: take any safe legal kill, leave danger and warning cells, advance toward the nearest living enemy, focus fire until units die, and deploy only from safe owned points into safe cells. Never wait for adjudication while an attack or inward advance is available.
 
 Use this order unless the user asks for a different style:
 

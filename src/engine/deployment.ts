@@ -7,6 +7,7 @@ import { isDeployable, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
 import { createUnitFromConfig } from '../state/store.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
+import { isArtilleryDanger } from './artillery.js';
 
 function deployOrigin(game: GameState, owner: PlayerId, fromId: string): Position | null {
   const hq = game.headquarters[owner];
@@ -28,6 +29,9 @@ export function deployUnit(
   if (!spec) return { ok: false, code: 'invalid_deploy', message: 'unknown unit type' };
   const origin = deployOrigin(game, owner, fromId);
   if (!origin) return { ok: false, code: 'invalid_deploy', message: 'invalid deploy origin' };
+  if (isArtilleryDanger(game, origin) || isArtilleryDanger(game, { q, r })) {
+    return { ok: false, code: 'invalid_deploy', message: 'cannot deploy inside the artillery zone' };
+  }
 
   // Deploy always consumes one action point (the new unit is freshly activated).
   // Checked early so an exhausted player cannot probe deploy targets.

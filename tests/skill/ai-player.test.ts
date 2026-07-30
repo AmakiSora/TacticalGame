@@ -339,4 +339,34 @@ describe('AI player strategy', () => {
       await app.close();
     }
   });
+
+  it('targets the nearest enemy army when annihilation mode has no headquarters', async () => {
+    const app = await startTestServer();
+    try {
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/games',
+        payload: { mapId: 'annihilation', maxPlayers: 2, playerName: 'A' },
+      });
+      const created = createRes.json() as { gameId: string; hostToken: string };
+      await app.inject({ method: 'POST', url: `/api/games/${created.gameId}/join`, payload: { name: 'B' } });
+      await app.inject({
+        method: 'POST',
+        url: `/api/games/${created.gameId}/start`,
+        headers: { 'X-Host-Token': created.hostToken },
+      });
+      const game = globalStore.get(created.gameId)! as any;
+      const owner = game.turn.currentPlayerId;
+      const unit = game.units.find((candidate: any) => candidate.owner === owner);
+      const ai = await import('../../skill/ai-player.mjs');
+
+      const goal = ai.movementGoal(game, owner, unit);
+
+      expect(game.headquarters).toEqual({});
+      expect(goal.owner).not.toBe(owner);
+      expect(goal.alive).toBe(true);
+    } finally {
+      await app.close();
+    }
+  });
 });

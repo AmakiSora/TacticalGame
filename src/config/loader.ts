@@ -2,7 +2,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ControlPointKind, MapCell, PlayerId, Position, TerrainType, UnitType } from '../types.js';
+import type { ControlPointKind, GameMode, MapCell, PlayerId, Position, TerrainType, UnitType } from '../types.js';
 import { isValidHex } from '../engine/hex.js';
 import { arePlayableCellsConnected, createMapCells, createRadiusPlayableCells } from './geometry.js';
 
@@ -67,10 +67,23 @@ export interface SpawnUnitConfig {
 export interface SpawnSlotConfig {
   id: string;
   headquarters: { q: number; r: number };
+  controlPointId?: string;
   startingUnits: SpawnUnitConfig[];
 }
 
+export interface ArtilleryConfig {
+  startRound: number;
+  intervalRounds: number;
+  damage: number;
+  minimumSafeRadius: number;
+}
+
+export interface AnnihilationConfig {
+  artillery: ArtilleryConfig;
+}
+
 export interface MapConfig {
+  mode: GameMode;
   name: string;
   description: string;
   grid: 'hex';
@@ -86,6 +99,7 @@ export interface MapConfig {
   supportedPlayerCounts: number[];
   units: Record<UnitType, UnitSpec>;
   headquartersSpec: HeadquartersSpec;
+  annihilation?: AnnihilationConfig;
   balance: {
     startingSupplies: number;
     baseIncome: number;
@@ -110,8 +124,9 @@ export interface MapConfig {
 // 地图文件允许省略可用格和新旧出生格式；加载后统一收敛为上面的 MapConfig。
 export type MapFileConfig = Omit<
   MapConfig,
-  'playableCells' | 'supportedPlayerCounts' | 'headquarters' | 'startingUnits' | 'spawnSlots' | 'layouts'
+  'mode' | 'playableCells' | 'supportedPlayerCounts' | 'headquarters' | 'startingUnits' | 'spawnSlots' | 'layouts'
 > & {
+  mode?: GameMode;
   playableCells?: Position[];
   supportedPlayerCounts?: number[];
   headquarters?: Record<'player_a' | 'player_b', { q: number; r: number }>;
@@ -121,6 +136,7 @@ export type MapFileConfig = Omit<
 };
 
 export interface MapPreview {
+  mode: GameMode;
   radius: number;
   maxTurns: number;
   actionsPerTurn: number;
@@ -130,6 +146,7 @@ export interface MapPreview {
   headquarters: Record<'player_a' | 'player_b', { q: number; r: number }>;
   spawnSlots: SpawnSlotConfig[];
   supportedPlayerCounts: number[];
+  artillery?: ArtilleryConfig;
 }
 
 export interface MapListItem {
@@ -145,6 +162,7 @@ const maps = new Map<string, MapConfig>();
 
 function normalizeMapConfig(config: unknown): unknown {
   const c = asRecord(config, 'Map');
+  const mode = c.mode ?? 'standard';
   const playableCells = 'playableCells' in c
     ? c.playableCells
     : typeof c.radius === 'number' && Number.isInteger(c.radius) && c.radius > 0
@@ -156,6 +174,7 @@ function normalizeMapConfig(config: unknown): unknown {
     const second = slots[1] ?? slots[0];
     return {
       ...c,
+      mode,
       playableCells,
       headquarters: c.headquarters ?? {
         player_a: first?.headquarters,
@@ -181,6 +200,7 @@ function normalizeMapConfig(config: unknown): unknown {
   }));
   return {
     ...c,
+    mode,
     playableCells,
     spawnSlots,
     layouts: { 2: spawnSlots.map(slot => slot.id) },
@@ -221,6 +241,9 @@ function assertPosition(obj: Record<string, unknown>, ctx: string, radius: numbe
 
 function validateMap(id: string, config: unknown): asserts config is MapConfig {
   const c = asRecord(config, `Map "${id}"`);
+  if (c.mode !== 'standard' && c.mode !== 'annihilation') {
+    throw new Error(`Map "${id}".mode must be standard or annihilation`);
+  }
   const name = assertString(c, 'name', `Map "${id}"`);
   const description = assertString(c, 'description', `Map "${id}"`);
   if (c.grid !== 'hex') throw new Error(`Map "${id}" grid must be "hex"`);
@@ -303,6 +326,20 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
   }
 
+  if (c.mode === 'annihilation') {
+    const annihilation = asRecord(c.annihilation, `Map "${id}".annihilation`);
+    const artillery = asRecord(annihilation.artillery, `Map "${id}".annihilation.artillery`);
+    for (const key of ['startRound', 'intervalRounds', 'damage', 'minimumSafeRadius']) {
+      const value = assertNumber(artillery, key, `Map "${id}".annihilation.artillery`, 1);
+      if (!Number.isInteger(value)) throw new Error(`Map "${id}".annihilation.artillery.${key} must be an integer`);
+    }
+    if ((artillery.minimumSafeRadius as number) >= radius) {
+      throw new Error(`Map "${id}".annihilation.artillery.minimumSafeRadius must be smaller than radius`);
+    }
+  } else if ('annihilation' in c) {
+    throw new Error(`Map "${id}".annihilation is only valid in annihilation mode`);
+  }
+
   const hq = asRecord(c.headquarters, `Map "${id}".headquarters`);
   for (const player of ['player_a', 'player_b'] as PlayerId[]) {
     assertPlayablePosition(asRecord(hq[player], `headquarters.${player}`), `headquarters.${player}`);
@@ -367,11 +404,22 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     throw new Error(`Map "${id}".spawnSlots must contain 2-8 slots`);
   }
   const spawnIds = new Set<string>();
+  const spawnControlPointIds = new Set<string>();
   for (let i = 0; i < c.spawnSlots.length; i++) {
     const slot = asRecord(c.spawnSlots[i], `spawnSlots[${i}]`);
     const slotId = assertString(slot, 'id', `spawnSlots[${i}]`);
     if (spawnIds.has(slotId)) throw new Error(`spawnSlots[${i}].id must be unique`);
     spawnIds.add(slotId);
+    if (c.mode === 'annihilation') {
+      const controlPointId = assertString(slot, 'controlPointId', `spawnSlots[${i}]`);
+      if (!(c.controlPoints as ControlPointConfig[]).some(point => point.id === controlPointId)) {
+        throw new Error(`spawnSlots[${i}].controlPointId must reference a control point`);
+      }
+      if (spawnControlPointIds.has(controlPointId)) {
+        throw new Error(`spawnSlots[${i}].controlPointId must be unique`);
+      }
+      spawnControlPointIds.add(controlPointId);
+    }
     assertPlayablePosition(asRecord(slot.headquarters, `spawnSlots[${i}].headquarters`), `spawnSlots[${i}].headquarters`);
     if (!Array.isArray(slot.startingUnits)) throw new Error(`spawnSlots[${i}].startingUnits must be an array`);
     for (let j = 0; j < slot.startingUnits.length; j++) {
@@ -456,6 +504,7 @@ export function listMaps(): MapListItem[] {
     name: cfg.name,
     description: cfg.description,
     preview: {
+      mode: cfg.mode,
       radius: cfg.radius,
       maxTurns: cfg.balance.maxTurns,
       actionsPerTurn: cfg.balance.actionsPerTurn,
@@ -472,6 +521,7 @@ export function listMaps(): MapListItem[] {
         startingUnits: slot.startingUnits.map(unit => ({ ...unit })),
       })),
       supportedPlayerCounts: [...cfg.supportedPlayerCounts],
+      artillery: cfg.annihilation?.artillery ? { ...cfg.annihilation.artillery } : undefined,
     },
   }));
 }

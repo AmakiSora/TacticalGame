@@ -127,6 +127,22 @@ describe('map editor page', () => {
     expect(core.validateMapConfig(serialized, 'four-corners')).toEqual([]);
   });
 
+  it('preserves annihilation mode, artillery settings, and spawn point ownership links', () => {
+    const core = loadCore();
+    const annihilation = JSON.parse(read('maps/annihilation.json'));
+
+    const serialized = core.serializeMapConfig(core.normalizeImportedMap(annihilation));
+
+    expect(serialized.mode).toBe('annihilation');
+    expect(serialized.annihilation.artillery).toEqual({
+      startRound: 5,
+      intervalRounds: 2,
+      damage: 24,
+      minimumSafeRadius: 2,
+    });
+    expect(serialized.spawnSlots.map((slot: any) => slot.controlPointId)).toEqual(['cp_west', 'cp_east']);
+  });
+
   it('exposes irregular-boundary and 2-8 player layout editing controls', () => {
     const html = read('public/map-editor.html');
     const source = read('public/map-editor.js');

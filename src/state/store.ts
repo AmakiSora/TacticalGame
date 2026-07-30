@@ -10,6 +10,7 @@ import { PLAYER_IDS } from '../types.js';
 import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
 import { createMapCells } from '../config/geometry.js';
+import { artilleryStateForRound } from '../engine/artillery.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -99,7 +100,9 @@ export function createLobby(id: string, mapId = 'default', options: CreateLobbyO
       phase: 'lobby', actionsUsed: 0, turnNumber: 1, currentOwner: null,
     },
     events: [], winner: null, result: null,
+    artillery: null,
   };
+  game.artillery = artilleryStateForRound(game, 1);
   if (options.participate !== false) addLobbyPlayer(game, options.playerName);
   return game;
 }
@@ -152,7 +155,12 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
     player.status = 'active';
     player.spawnSlotId = slot.id;
     player.turnOrder = index;
-    game.headquarters[owner] = createHQ(owner, game.config, slot);
+    if (game.config.mode === 'standard') {
+      game.headquarters[owner] = createHQ(owner, game.config, slot);
+    } else {
+      const point = game.controlPoints.find(candidate => candidate.id === slot.controlPointId);
+      if (point) point.owner = owner;
+    }
     game.resources[owner] = { supplies: game.config.balance.startingSupplies };
     game.units.push(...slot.startingUnits.map(unit =>
       createUnitFromConfig(game.config, owner, unit.type, unit.q, unit.r)));
@@ -172,6 +180,7 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
     turnNumber: 1,
     currentOwner: turnOrder[0],
   };
+  game.artillery = artilleryStateForRound(game, 1);
 }
 
 // 旧的引擎测试仍通过该构造器创建一局双人战场。
@@ -186,7 +195,12 @@ export function createInitialGame(id: string, mapId = 'default'): GameState {
     player.spawnSlotId = slots[index].id;
     player.turnOrder = index;
     const slot = slots[index];
-    game.headquarters[owner] = createHQ(owner, config, slot);
+    if (config.mode === 'standard') {
+      game.headquarters[owner] = createHQ(owner, config, slot);
+    } else {
+      const point = game.controlPoints.find(candidate => candidate.id === slot.controlPointId);
+      if (point) point.owner = owner;
+    }
     game.resources[owner] = { supplies: config.balance.startingSupplies };
     game.units.push(...slot.startingUnits.map(unit => createUnitFromConfig(config, owner, unit.type, unit.q, unit.r)));
   }
@@ -195,6 +209,7 @@ export function createInitialGame(id: string, mapId = 'default'): GameState {
   game.turn.turnOrder = ['player_a', 'player_b'];
   game.turn.currentPlayerId = 'player_a';
   game.turn.currentOwner = 'player_a';
+  game.artillery = artilleryStateForRound(game, 1);
   return game;
 }
 

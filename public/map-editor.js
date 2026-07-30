@@ -125,6 +125,7 @@
 
   function createDefaultMapConfig() {
     return {
+      mode: 'standard',
       name: '新地图',
       description: '半径8的尖顶六边形战场',
       grid: 'hex',
@@ -164,6 +165,7 @@
     const defaults = createDefaultMapConfig();
     const cfg = deepClone(data);
     const normalized = {
+      mode: cfg.mode === 'annihilation' ? 'annihilation' : 'standard',
       name: typeof cfg.name === 'string' && cfg.name ? cfg.name : defaults.name,
       description: typeof cfg.description === 'string' ? cfg.description : defaults.description,
       grid: 'hex',
@@ -192,12 +194,14 @@
       spawnMode: Array.isArray(cfg.spawnSlots),
       spawnSlots: [],
       layouts: {},
+      ...(cfg.annihilation && typeof cfg.annihilation === 'object' ? { annihilation: deepClone(cfg.annihilation) } : {}),
     };
 
     if (normalized.spawnMode) {
       normalized.spawnSlots = cfg.spawnSlots.map((slot, index) => ({
         id: typeof slot.id === 'string' && slot.id ? slot.id : `slot_${index + 1}`,
         headquarters: { q: slot.headquarters?.q, r: slot.headquarters?.r },
+        ...(typeof slot.controlPointId === 'string' ? { controlPointId: slot.controlPointId } : {}),
         startingUnits: Array.isArray(slot.startingUnits)
           ? slot.startingUnits.map(unit => ({ type: unit.type, q: unit.q, r: unit.r }))
           : [],
@@ -289,6 +293,7 @@
     }
 
     const serialized = {
+      ...(config.mode === 'annihilation' ? { mode: 'annihilation' } : {}),
       name: String(config.name || ''),
       description: String(config.description || ''),
       grid: 'hex',
@@ -313,11 +318,13 @@
         defense: Number(config.headquartersSpec?.defense ?? 0),
       },
       balance,
+      ...(config.mode === 'annihilation' && config.annihilation ? { annihilation: deepClone(config.annihilation) } : {}),
     };
     if (config.spawnMode) {
       serialized.spawnSlots = (config.spawnSlots || []).map((slot, index) => ({
         id: String(slot.id || `slot_${index + 1}`),
         headquarters: { q: Number(slot.headquarters?.q), r: Number(slot.headquarters?.r) },
+        ...(typeof slot.controlPointId === 'string' ? { controlPointId: slot.controlPointId } : {}),
         startingUnits: (slot.startingUnits || []).map(unit => ({
           type: unit.type,
           q: Number(unit.q),

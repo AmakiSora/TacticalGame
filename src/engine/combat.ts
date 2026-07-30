@@ -6,6 +6,7 @@ import { hexDistance } from './hex.js';
 import { consumeAction, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
 import { eliminatePlayer } from './engine.js';
+import { isArtilleryDanger } from './artillery.js';
 
 type Target =
   | { kind: 'unit'; entity: Unit }
@@ -94,6 +95,12 @@ export function attackTarget(
         q: target.entity.q,
         r: target.entity.r,
       });
+      if (
+        game.config.mode === 'annihilation' &&
+        !game.units.some(unit => unit.owner === target.entity.owner && unit.alive)
+      ) {
+        eliminatePlayer(game, bus, target.entity.owner, 'army_destroyed', owner);
+      }
     }
   }
 
@@ -114,6 +121,9 @@ export function healTarget(
 
   const target = game.units.find(u => u.id === targetId && u.owner === owner && u.alive);
   if (!target) return { ok: false, code: 'invalid_heal', message: 'target is not a friendly unit' };
+  if (isArtilleryDanger(game, support) || isArtilleryDanger(game, target)) {
+    return { ok: false, code: 'invalid_heal', message: 'cannot heal inside the artillery zone' };
+  }
   const distance = hexDistance(support, target);
   if (distance > support.attackRange) return { ok: false, code: 'invalid_heal', message: 'target out of range' };
 

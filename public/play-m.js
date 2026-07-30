@@ -383,12 +383,12 @@ function renderMapPreview(preview) {
     const p = point(cp);
     return `<circle class="preview-marker cp" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"><title>${esc(cp.name)}</title></circle>`;
   }).join('');
-  const spawnHeadquarters = (preview.spawnSlots || []).map((slot, index) => ({
+  const spawnHeadquarters = (preview.mode === 'annihilation' ? [] : (preview.spawnSlots || [])).map((slot, index) => ({
     id: slot.id,
     index,
     ...slot.headquarters,
   }));
-  const legacyHeadquarters = Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, ...pos }));
+  const legacyHeadquarters = preview.mode === 'annihilation' ? [] : Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, ...pos }));
   const headquarters = (spawnHeadquarters.length ? spawnHeadquarters : legacyHeadquarters).map(slot => {
     const p = point(slot);
     return `<rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"><title>${esc(slot.id)}</title></rect>`;
@@ -445,6 +445,7 @@ function renderMapPicker(maps) {
 		    const maxTurns = map.preview?.maxTurns ?? '-';
 		    const actionsPerTurn = map.preview?.actionsPerTurn ?? '-';
 	    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
+	    const modeLabel = map.preview?.mode === 'annihilation' ? '歼灭' : '标准';
     return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}" aria-label="${esc(map.name)} (${esc(map.id)})">
       ${renderMapPreview(map.preview)}
       <span class="map-card-copy">
@@ -455,6 +456,7 @@ function renderMapPicker(maps) {
           <span class="meta-tag" data-label="玩家数">⚑${esc(counts)}</span>
           <span class="meta-tag" data-label="每回合行动点">♟${esc(actionsPerTurn)}</span>
           <span class="meta-tag" data-label="最大回合数">⏱${esc(maxTurns)}</span>
+          <span class="meta-tag" data-label="游戏模式">${esc(modeLabel)}</span>
         </span>
       </span>
       <span class="map-card-tooltip" role="tooltip">
@@ -494,6 +496,7 @@ function createEmptyState() {
     winner: null,
     result: null,
     adjudication: null,
+    artillery: null,
     eventLog: [],
   };
 }
@@ -514,6 +517,7 @@ function applyEvent(s, ev) {
       s.headquarters = new Map(Object.values(p.headquarters || {}).map(h => [h.id, { ...h }]));
       s.units = new Map((p.units || []).map(u => [u.id, { ...u }]));
       s.resources = JSON.parse(JSON.stringify(p.resources || s.resources));
+      s.artillery = p.artillery ? JSON.parse(JSON.stringify(p.artillery)) : null;
       computeLayout(s.cells);
       break;
     case 'deploy':
@@ -537,6 +541,17 @@ function applyEvent(s, ev) {
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies += p.amount;
       break;
+    case 'artillery_warning':
+      s.artillery = { ...(s.artillery || {}), safeRadius: p.safeRadius, warningCells: p.warningCells || [], nextShrinkRound: p.nextShrinkRound };
+      break;
+    case 'artillery_shrunk':
+      s.artillery = { safeRadius: p.safeRadius, dangerCells: p.dangerCells || [], warningCells: p.warningCells || [], nextShrinkRound: p.nextShrinkRound };
+      break;
+    case 'artillery_damage': {
+      const unit = s.units.get(p.unitId);
+      if (unit) unit.hp = p.unitHp;
+      break;
+    }
     case 'reset_actions':
       for (const u of s.units.values()) if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
@@ -636,6 +651,7 @@ async function refreshAdjudication() {
 
 function cellAt(q, r) { return state.cells.find(c => c.q === q && c.r === r); }
 function isPlain(q, r) { return cellAt(q, r)?.terrain === 'plain'; }
+function isArtilleryDangerCell(q, r) { return Boolean(state.artillery?.dangerCells?.some(cell => cell.q === q && cell.r === r)); }
 function entityAt(q, r, owner) {
   for (const u of state.units.values()) if (u.alive && u.q === q && u.r === r && (!owner || u.owner === owner)) return u;
   for (const h of state.headquarters.values()) if (h.alive && h.q === q && h.r === r && (!owner || h.owner === owner)) return h;
@@ -676,7 +692,8 @@ function reachable(unit) {
   return result;
 }
 function deployCells(origin) {
-  return hexNeighbors(origin).filter(p => isPlain(p.q, p.r) && !occupied(p.q, p.r));
+  if (isArtilleryDangerCell(origin.q, origin.r)) return [];
+  return hexNeighbors(origin).filter(p => isPlain(p.q, p.r) && !occupied(p.q, p.r) && !isArtilleryDangerCell(p.q, p.r));
 }
 function attackRangeCells(unit) {
   return state.cells
@@ -945,6 +962,12 @@ function drawBoard(now = performance.now()) {
   for (const c of state.cells) {
     pathHex(c.q, c.r, 1); ctx.fillStyle = TERRAIN[c.terrain] || TERRAIN.plain; ctx.fill(); ctx.strokeStyle = '#20313d'; ctx.lineWidth = 1; ctx.stroke();
   }
+  for (const cell of state.artillery?.warningCells || []) {
+    pathHex(cell.q, cell.r, 2); ctx.fillStyle = 'rgba(244, 177, 66, .22)'; ctx.fill(); ctx.strokeStyle = 'rgba(255, 205, 105, .72)'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  for (const cell of state.artillery?.dangerCells || []) {
+    pathHex(cell.q, cell.r, 2); ctx.fillStyle = 'rgba(205, 55, 45, .34)'; ctx.fill(); ctx.strokeStyle = 'rgba(255, 95, 75, .68)'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
   for (const h of rangeHighlights) {
     pathHex(h.q, h.r, 3);
     ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'attack' ? 'rgba(255,80,80,.28)' : h.type === 'attack-radius' ? 'rgba(255,80,80,.08)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : h.type === 'demolish' ? 'rgba(255,170,70,.28)' : 'rgba(80,220,180,.20)';
@@ -1035,6 +1058,7 @@ function liveAdjudicationRankings() {
 }
 
 function scoreBreakdown(score) {
+  if (gameConfig?.mode === 'annihilation') return `存活兵力 ${score.armyValue} · 补给 ${score.supplies}`;
   return `HQ伤害 ${score.headquartersDamage ?? score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
 }
 
@@ -1162,9 +1186,13 @@ function formatEventShort(ev) {
     case 'control_point_repair': return `${p.pointName || '维修站'} 修复单位 +${p.amount}`;
     case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
     case 'comeback_supply': return `${playerName(p.owner)} 追赶补给 +${p.amount}（落后${p.scoreGapPercent}%）`;
+    case 'artillery_warning': return `炮火预警：第 ${p.nextShrinkRound} 轮收缩`;
+    case 'artillery_shrunk': return `炮火收缩：安全半径 ${p.safeRadius}`;
+    case 'artillery_damage': return `${playerName(p.owner)} 单位遭炮击 -${p.damage}`;
     case 'reset_actions': return `${playerName(p.owner)} 单位已重置`;
     case 'turn_end': return `轮到 ${playerName(p.nextOwner)}`;
     case 'game_over':
+      if (p.reason === 'mutual_annihilation') return '双方同归于尽';
       if (p.reason === 'forced_adjudication_draw') return '强制裁决平局';
       if (p.reason === 'forced_adjudication_score') return `${playerName(p.winner)} 强制裁决获胜`;
       if (p.reason === 'turn_limit_draw') return `${maxTurnsLabel()}裁决平局`;

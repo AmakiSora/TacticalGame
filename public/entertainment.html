@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>TacticalGame — 娱乐数据</title>
+  <title>TacticalGame - 娱乐数据</title>
   <link rel="stylesheet" href="/entertainment.css" />
   <link rel="stylesheet" href="/mobile-icons.css" />
   <script src="/version.js" defer></script>
   <script src="/entertainment.js" defer></script>
 </head>
-<body class="stats-shell">
+<body class="entertainment-shell">
   <header>
     <div class="brand-block">
       <h1>娱乐数据 <span class="version-badge"></span></h1>
-      <div class="page-subtitle">动作总量 · 行为画像 · 极限记录 · 时间线</div>
+      <div class="page-subtitle">从对局记录里，找值得聊的事</div>
     </div>
     <nav class="page-nav" aria-label="站点导航">
       <a href="/play.html">玩家</a>
@@ -27,91 +27,119 @@
   </header>
 
   <main>
-    <section class="meta-bar panel">
-      <div class="meta-item">
-        <span>数据生成时间</span>
-        <strong id="generated-at">—</strong>
+    <section class="report-lead" aria-labelledby="report-title">
+      <div class="lead-copy">
+        <div class="report-kicker"><span class="live-dot" aria-hidden="true"></span> 战场观察 / 最新汇总</div>
+        <h2 id="report-title">正在整理战报...</h2>
+        <p id="report-summary" class="report-summary">正在从回放中提取关键趋势。</p>
+        <div class="report-meta" aria-label="数据范围">
+          <span><b id="source-count">-</b> 局回放</span>
+          <span id="date-range">-</span>
+          <span id="generated-at">-</span>
+        </div>
       </div>
-      <div class="meta-item">
-        <span>回放局数</span>
-        <strong id="source-count">—</strong>
-      </div>
-      <div class="meta-item">
-        <span>日期范围</span>
-        <strong id="date-range">—</strong>
-      </div>
-      <div class="meta-item status-item">
-        <span>状态</span>
-        <strong id="load-status" class="status-pill">加载中…</strong>
-      </div>
-      <div class="meta-actions">
-        <button id="btn-reload" type="button">重新加载</button>
+      <div class="lead-actions">
+        <a class="text-link" href="/stats.html">查看完整统计 <span aria-hidden="true">→</span></a>
+        <button id="btn-reload" class="icon-button" type="button" title="重新加载数据" aria-label="重新加载数据">
+          <span class="ui-icon icon-reset" aria-hidden="true"></span>
+        </button>
+        <span id="load-status" class="load-status" role="status">加载中</span>
       </div>
     </section>
 
-    <section id="kpi-grid" class="kpi-grid" aria-label="总览指标"></section>
-
-    <section class="panel">
-      <div class="panel-heading">
-        <div class="panel-heading-copy">
-          <h2>趣味事实</h2>
-          <span>从回放数据自动提炼</span>
+    <section class="pulse-section" aria-labelledby="pulse-title">
+      <div class="section-heading">
+        <div>
+          <span class="section-index">01</span>
+          <h2 id="pulse-title">战场脉搏</h2>
         </div>
+        <p>只保留能说明对局节奏的数字</p>
       </div>
-      <div id="fun-facts" class="fun-facts"></div>
+      <div id="pulse-grid" class="pulse-grid"></div>
+      <div class="action-mix-wrap">
+        <div class="mix-title">
+          <span>动作构成</span>
+          <strong id="action-mix-total">-</strong>
+        </div>
+        <div id="action-mix" class="action-mix" aria-label="动作构成占比"></div>
+        <div id="action-legend" class="action-legend"></div>
+      </div>
     </section>
 
-    <section class="panel">
-      <div class="panel-heading">
-        <div class="panel-heading-copy">
-          <h2>模型行为画像</h2>
-          <span>每局平均动作数 · 标签按相对优势生成</span>
+    <section class="stories-section" aria-labelledby="stories-title">
+      <div class="section-heading">
+        <div>
+          <span class="section-index">02</span>
+          <h2 id="stories-title">本期名场面</h2>
         </div>
+        <p>不是最高就最好，但这些局值得被记住</p>
       </div>
-      <div id="model-profiles" class="profile-list"></div>
+      <div id="story-grid" class="story-grid"></div>
     </section>
 
-    <section class="two-col">
-      <section class="panel">
-        <div class="panel-heading">
-          <h2>单位部署</h2>
-          <span>占比与按模型分布</span>
+    <section class="field-grid">
+      <section class="insights-section" aria-labelledby="insights-title">
+        <div class="section-heading compact-heading">
+          <div>
+            <span class="section-index">03</span>
+            <h2 id="insights-title">四条观察</h2>
+          </div>
         </div>
-        <div id="unit-bars" class="bar-list"></div>
+        <ol id="insight-list" class="insight-list"></ol>
       </section>
-      <section class="panel">
-        <div class="panel-heading">
-          <h2>极限记录</h2>
-          <span>各项之最 · 点击对局编号跳转统计页</span>
+
+      <section class="arsenal-section" aria-labelledby="arsenal-title">
+        <div class="section-heading compact-heading">
+          <div>
+            <span class="section-index">04</span>
+            <h2 id="arsenal-title">兵种选择</h2>
+          </div>
+          <p>部署占比</p>
         </div>
-        <div id="extremes-list" class="extremes-list"></div>
+        <div id="unit-bars" class="unit-bars"></div>
       </section>
     </section>
 
-    <section class="panel">
-      <div class="panel-heading">
-        <div class="panel-heading-copy">
-          <h2>时间线</h2>
-          <span>按天聚合的对局频次与平均整轮</span>
+    <section class="model-lab" aria-labelledby="lab-title">
+      <div class="section-heading lab-heading">
+        <div>
+          <span class="section-index">05</span>
+          <h2 id="lab-title">战术档案</h2>
+        </div>
+        <div class="model-picker">
+          <label for="model-select">选择模型</label>
+          <select id="model-select"></select>
         </div>
       </div>
-      <div id="timeline" class="timeline"></div>
+      <div class="lab-layout">
+        <div id="model-identity" class="model-identity"></div>
+        <div>
+          <div class="benchmark-key">
+            <span><i class="key-model"></i>该模型</span>
+            <span><i class="key-average"></i>全场均值</span>
+          </div>
+          <div id="model-benchmarks" class="benchmark-list"></div>
+        </div>
+      </div>
     </section>
 
-    <section class="panel">
-      <div class="panel-heading">
-        <div class="panel-heading-copy">
-          <h2>Schema 演进</h2>
-          <span>各回放格式版本的出现顺序与局数</span>
+    <section class="records-section" aria-labelledby="records-title">
+      <div class="section-heading records-heading">
+        <div>
+          <span class="section-index">06</span>
+          <h2 id="records-title">纪录柜</h2>
+        </div>
+        <div class="record-tabs" role="group" aria-label="纪录分类">
+          <button type="button" class="record-tab active" data-record-view="battle" aria-pressed="true">对局</button>
+          <button type="button" class="record-tab" data-record-view="action" aria-pressed="false">单项</button>
         </div>
       </div>
-      <div id="schema-timeline" class="schema-list"></div>
+      <div id="records-list" class="records-list"></div>
     </section>
   </main>
 
   <footer class="page-footer">
-    数据文件 <code>/data/fun-stats.json</code> · 重新生成：
-    <code>npm run fun-stats</code> 或 <code>node script/generateFunStats.mjs</code>
+    数据来自 <code>/data/fun-stats.json</code>，由 records 回放自动生成。
   </footer>
 </body>
 </html>

@@ -121,6 +121,20 @@ describe('shared board animation layer', () => {
     }
   });
 
+  it('serves the shared dependency before desktop player code', async () => {
+    const app = await buildServer();
+    try {
+      const page = await app.inject({ method: 'GET', url: '/play.html' });
+      expect(page.statusCode).toBe(200);
+      const sharedIndex = page.body.indexOf('/board-animation.js');
+      const playerIndex = page.body.indexOf('/play.js');
+      expect(sharedIndex).toBeGreaterThan(-1);
+      expect(sharedIndex).toBeLessThan(playerIndex);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('interpolates movement and hit points instead of snapping to the next state', () => {
     const loaded = loadAnimation();
     expect(loaded).not.toBeNull();

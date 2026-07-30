@@ -69,6 +69,7 @@ const boardViewport = document.getElementById('board-viewport');
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
+const boardAnimation = window.BoardAnimation.create({ hexToPixel, ownerColor });
 const gameSelect = document.getElementById('game-select');
 const gamePicker = document.querySelector('.game-picker');
 const gamePickerButton = document.getElementById('game-picker-button');
@@ -460,6 +461,8 @@ function rebuildToStep(step) {
   state = createEmptyState();
   for (let i = 0; i <= step && i < allEvents.length; i++) applyEvent(state, allEvents[i]);
   currentStep = step;
+  boardAnimation.reset();
+  boardAnimation.syncState(state, { animate: false });
   drawBoard();
   renderSidebar();
   renderDetail();
@@ -567,30 +570,49 @@ function drawControlPointGlyph(kind, x, y) {
   ctx.restore();
 }
 
-function drawUnitMarker(u) {
-  if (!u.alive) return;
-  const p = hexToPixel(u.q, u.r);
+function drawUnitMarker(u, view = null) {
+  if (!u.alive && !view) return;
+  const p = view || hexToPixel(u.q, u.r);
+  const alpha = view?.alpha ?? 1;
+  const scale = view?.scale ?? 1;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(p.x, p.y);
+  ctx.scale(scale, scale);
+  ctx.translate(-p.x, -p.y);
   ctx.fillStyle = ownerColor(u.owner);
   ctx.beginPath();
   ctx.arc(p.x, p.y, HEX_SIZE * 0.42, 0, Math.PI * 2);
   ctx.fill();
   drawUnitGlyph(u.type, p.x, p.y);
-  drawHpBar(p.x, p.y - 21, 34, u.hp, u.maxHp);
   if (u.hasMoved || u.hasActed) {
     ctx.fillStyle = 'rgba(0,0,0,.35)';
     ctx.beginPath();
     ctx.arc(p.x + 12, p.y + 12, 5, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  drawHpBar(p.x, p.y - 21, 34, u.hp, u.maxHp);
+  ctx.restore();
 }
 
-function drawHeadquartersMarker(hq) {
-  const p = hexToPixel(hq.q, hq.r);
+function drawHeadquartersMarker(hq, view = null) {
+  if (!hq.alive && !view) return;
+  const p = view || hexToPixel(hq.q, hq.r);
+  const alpha = view?.alpha ?? 1;
+  const scale = view?.scale ?? 1;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(p.x, p.y);
+  ctx.scale(scale, scale);
+  ctx.translate(-p.x, -p.y);
   pathHex(hq.q, hq.r, 5);
   ctx.fillStyle = hq.alive ? ownerColor(hq.owner) : '#555';
-  ctx.globalAlpha = hq.alive ? 0.78 : 0.3;
+  ctx.globalAlpha = alpha * (hq.alive ? 0.78 : 0.3);
   ctx.fill();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alpha;
   ctx.save();
   ctx.fillStyle = '#071016';
   ctx.beginPath();
@@ -602,7 +624,11 @@ function drawHeadquartersMarker(hq) {
   ctx.closePath();
   ctx.fill();
   ctx.restore();
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = alpha;
   drawHpBar(p.x, p.y - 25, 42, hq.hp, hq.maxHp);
+  ctx.restore();
 }
 
 function drawControlPointMarker(cp) {
@@ -620,7 +646,7 @@ function drawControlPointMarker(cp) {
   }
 }
 
-function drawBoard() {
+function drawBoard(now = performance.now()) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#0a0e14';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -645,13 +671,17 @@ function drawBoard() {
     drawControlPointMarker(cp);
   }
 
-  for (const hq of state.headquarters.values()) {
-    drawHeadquartersMarker(hq);
-  }
+  boardAnimation.forEachHeadquarters((hq, view) => drawHeadquartersMarker(hq, view));
+  boardAnimation.forEachUnit((u, view) => drawUnitMarker(u, view));
+  boardAnimation.drawEffects(ctx, now);
+}
 
-  for (const u of state.units.values()) {
-    drawUnitMarker(u);
+function renderLoop(now) {
+  if (boardAnimation.isActive()) {
+    boardAnimation.update(now);
+    drawBoard(now);
   }
+  requestAnimationFrame(renderLoop);
 }
 
 function unitLabel(type) {
@@ -984,8 +1014,11 @@ function updateControls() {
 
 function stepForward() {
   if (currentStep >= allEvents.length - 1) { pausePlayback(); return; }
-  applyEvent(state, allEvents[currentStep + 1]);
+  const event = allEvents[currentStep + 1];
+  applyEvent(state, event);
   currentStep++;
+  boardAnimation.recordEvent(event, state);
+  boardAnimation.syncState(state, { animate: event.type !== 'game_start' });
   drawBoard(); renderSidebar(); renderDetail(); updateControls();
 }
 function stepBackward() { if (currentStep > 0) rebuildToStep(currentStep - 1); }
@@ -1139,6 +1172,8 @@ function resetLoadedGame(message = '请选择在线对局') {
   currentStep = -1;
   hoverCell = null;
   state = createEmptyState();
+  boardAnimation.reset();
+  boardAnimation.syncState(state, { animate: false });
   buildTimelineMarkers();
   drawBoard();
   resourcesEl.innerHTML = '';
@@ -1225,7 +1260,12 @@ async function loadGameState(id) {
   allEvents = events;
   buildTimelineMarkers();
   if (allEvents.length > 0) rebuildToStep(allEvents.length - 1);
-  else { state = createEmptyState(); drawBoard(); renderSidebar(); renderDetail(); updateControls(); }
+  else {
+    state = createEmptyState();
+    boardAnimation.reset();
+    boardAnimation.syncState(state, { animate: false });
+    drawBoard(); renderSidebar(); renderDetail(); updateControls();
+  }
 }
 
 function subscribeSse(id) {
@@ -1537,6 +1577,8 @@ function loadImportedReplay(replay) {
   else {
     state = createEmptyState();
     currentStep = -1;
+    boardAnimation.reset();
+    boardAnimation.syncState(state, { animate: false });
     drawBoard();
     renderSidebar();
     renderDetail();
@@ -1787,3 +1829,4 @@ document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
 });
 document.getElementById('btn-zoom-reset')?.addEventListener('click', () => fitBoardToViewport());
 window.addEventListener('resize', () => fitBoardToViewport());
+requestAnimationFrame(renderLoop);

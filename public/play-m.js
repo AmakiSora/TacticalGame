@@ -48,6 +48,10 @@ const els = {
   btnSaveSession: $('btn-save-session'), btnEnterSession: $('btn-enter-session'), btnClearSession: $('btn-clear-session'),
 };
 const ctx = els.canvas.getContext('2d');
+const boardAnimation = window.BoardAnimation.create({
+  hexToPixel,
+  ownerColor: owner => OWNER_COLOR[owner] || '#9aa7b2',
+});
 
 let gameConfig = null;
 let playerNames = defaultPlayerNames();
@@ -597,6 +601,8 @@ async function loadFullState() {
   playerNames = defaultPlayerNames();
   state = createEmptyState();
   for (const ev of data.events) applyEvent(state, ev);
+  boardAnimation.reset();
+  boardAnimation.syncState(state, { animate: false });
   await refreshAdjudication();
   return true;
 }
@@ -779,30 +785,49 @@ function drawControlPointGlyph(kind, x, y) {
   ctx.restore();
 }
 
-function drawUnitMarker(u) {
-  if (!u.alive) return;
-  const p = hexToPixel(u.q, u.r);
+function drawUnitMarker(u, view = null) {
+  if (!u.alive && !view) return;
+  const p = view || hexToPixel(u.q, u.r);
+  const alpha = view?.alpha ?? 1;
+  const scale = view?.scale ?? 1;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(p.x, p.y);
+  ctx.scale(scale, scale);
+  ctx.translate(-p.x, -p.y);
   ctx.fillStyle = OWNER_COLOR[u.owner] || '#9aa7b2';
   ctx.beginPath();
   ctx.arc(p.x, p.y, HEX_SIZE * .42, 0, Math.PI * 2);
   ctx.fill();
   drawUnitGlyph(u.type, p.x, p.y);
-  drawHpBar(p.x, p.y - 21, 34, u.hp, u.maxHp);
   if (u.hasMoved || u.hasActed) {
     ctx.fillStyle = "rgba(0,0,0,.35)";
     ctx.beginPath();
     ctx.arc(p.x + 12, p.y + 12, 5, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  drawHpBar(p.x, p.y - 21, 34, u.hp, u.maxHp);
+  ctx.restore();
 }
 
-function drawHeadquartersMarker(hq) {
-  const p = hexToPixel(hq.q, hq.r);
+function drawHeadquartersMarker(hq, view = null) {
+  if (!hq.alive && !view) return;
+  const p = view || hexToPixel(hq.q, hq.r);
+  const alpha = view?.alpha ?? 1;
+  const scale = view?.scale ?? 1;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(p.x, p.y);
+  ctx.scale(scale, scale);
+  ctx.translate(-p.x, -p.y);
   pathHex(hq.q, hq.r, 5);
   ctx.fillStyle = hq.alive ? (OWNER_COLOR[hq.owner] || '#9aa7b2') : "#555";
-  ctx.globalAlpha = hq.alive ? .78 : .3;
+  ctx.globalAlpha = alpha * (hq.alive ? .78 : .3);
   ctx.fill();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alpha;
   ctx.save();
   ctx.fillStyle = "#071016";
   ctx.beginPath();
@@ -814,7 +839,11 @@ function drawHeadquartersMarker(hq) {
   ctx.closePath();
   ctx.fill();
   ctx.restore();
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = alpha;
   drawHpBar(p.x, p.y - 25, 42, hq.hp, hq.maxHp);
+  ctx.restore();
 }
 
 function drawControlPointMarker(cp) {
@@ -909,7 +938,7 @@ function renderControlPointCard(cp) {
     <div class="sel-coord">坐标 (${cp.q}, ${cp.r})</div>
   </div>`;
 }
-function drawBoard() {
+function drawBoard(now = performance.now()) {
   if (!state || state.cells.length === 0) return;
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
   ctx.fillStyle = '#0a0e14'; ctx.fillRect(0, 0, els.canvas.width, els.canvas.height);
@@ -925,12 +954,17 @@ function drawBoard() {
   for (const cp of state.controlPoints.values()) {
     drawControlPointMarker(cp);
   }
-  for (const hq of state.headquarters.values()) {
-    drawHeadquartersMarker(hq);
+  boardAnimation.forEachHeadquarters((hq, view) => drawHeadquartersMarker(hq, view));
+  boardAnimation.forEachUnit((u, view) => drawUnitMarker(u, view));
+  boardAnimation.drawEffects(ctx, now);
+}
+
+function renderLoop(now) {
+  if (boardAnimation.isActive()) {
+    boardAnimation.update(now);
+    drawBoard(now);
   }
-  for (const u of state.units.values()) {
-    drawUnitMarker(u);
-  }
+  requestAnimationFrame(renderLoop);
 }
 
 function actionsPerTurn() { return gameConfig?.balance?.actionsPerTurn ?? 0; }
@@ -1464,7 +1498,10 @@ function subscribeSse() {
   const lastSeq = state?.eventLog.at(-1)?.seq ?? 0;
   sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}`);
   sse.onmessage = async e => {
-    applyEvent(state, JSON.parse(e.data));
+    const event = JSON.parse(e.data);
+    applyEvent(state, event);
+    boardAnimation.recordEvent(event, state);
+    boardAnimation.syncState(state, { animate: event.type !== 'game_start' });
     await refreshAdjudication();
     drawBoard();
     renderSidebar();
@@ -1890,3 +1927,4 @@ window.addEventListener('resize', () => {
 
 loadMapList();
 startAvailableGamesRefresh();
+requestAnimationFrame(renderLoop);

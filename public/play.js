@@ -918,8 +918,10 @@ function drawBoard(now = performance.now()) {
 }
 
 function renderLoop(now) {
-  boardAnimation.update(now);
-  drawBoard(now);
+  if (boardAnimation.isActive()) {
+    boardAnimation.update(now);
+    drawBoard(now);
+  }
   requestAnimationFrame(renderLoop);
 }
 

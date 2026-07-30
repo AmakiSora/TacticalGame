@@ -192,6 +192,21 @@
       effects = effects.filter(effect => now - effect.start < effect.duration);
     }
 
+    function viewMapIsActive(views) {
+      for (const view of views.values()) {
+        if (Math.abs(view.tx - view.x) >= 0.4) return true;
+        if (Math.abs(view.ty - view.y) >= 0.4) return true;
+        if (Math.abs(view.targetAlpha - view.alpha) >= 0.01) return true;
+        if (Math.abs(view.targetScale - view.scale) >= 0.01) return true;
+        if (Math.abs(view.targetHp - view.hp) >= 0.5) return true;
+      }
+      return false;
+    }
+
+    function isActive() {
+      return effects.length > 0 || viewMapIsActive(unitViews) || viewMapIsActive(headquartersViews);
+    }
+
     function drawEffect(context, effect, progress) {
       if (progress < 0 || progress >= 1) return;
       const fade = 1 - progress;
@@ -272,6 +287,7 @@
       forEachUnit,
       forEachHeadquarters,
       drawEffects,
+      isActive,
     };
   }
 

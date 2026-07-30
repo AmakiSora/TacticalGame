@@ -34,6 +34,7 @@ type BoardAnimationController = {
   forEachUnit(callback: (entity: Entity, view: AnimationView) => void): void;
   forEachHeadquarters(callback: (entity: Entity, view: AnimationView) => void): void;
   drawEffects(context: RecordingContext, now: number): void;
+  isActive(): boolean;
 };
 
 type BoardAnimationApi = {
@@ -135,6 +136,25 @@ describe('shared board animation layer', () => {
     }
   });
 
+  it('serves the shared dependency before both mobile board clients', async () => {
+    const app = await buildServer();
+    try {
+      for (const [pageUrl, clientPath] of [
+        ['/spectator-m.html', '/spectator-m.js'],
+        ['/play-m.html', '/play-m.js'],
+      ]) {
+        const page = await app.inject({ method: 'GET', url: pageUrl });
+        expect(page.statusCode).toBe(200);
+        const sharedIndex = page.body.indexOf('/board-animation.js');
+        const clientIndex = page.body.indexOf(clientPath);
+        expect(sharedIndex).toBeGreaterThan(-1);
+        expect(sharedIndex).toBeLessThan(clientIndex);
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
   it('interpolates movement and hit points instead of snapping to the next state', () => {
     const loaded = loadAnimation();
     expect(loaded).not.toBeNull();
@@ -156,6 +176,27 @@ describe('shared board animation layer', () => {
     expect(rendered!.x).toBeLessThan(40);
     expect(rendered!.hp).toBeGreaterThan(40);
     expect(rendered!.hp).toBeLessThan(100);
+  });
+
+  it('reports activity only while a view or effect still needs animation frames', () => {
+    const loaded = loadAnimation();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+    const animation = createController(loaded);
+    const state = createState();
+    animation.syncState(state, { animate: false });
+    expect(animation.isActive()).toBe(false);
+
+    state.units.get('unit-1')!.q = 2;
+    animation.syncState(state, { animate: true });
+    expect(animation.isActive()).toBe(true);
+    for (let frame = 0; frame < 80; frame++) animation.update(frame * 16);
+    expect(animation.isActive()).toBe(false);
+
+    animation.recordEvent({ type: 'move', payload: { toQ: 2, toR: 0 } }, state);
+    expect(animation.isActive()).toBe(true);
+    animation.update(1000);
+    expect(animation.isActive()).toBe(false);
   });
 
   it('draws attack, healing, capture, deployment, movement, and destruction feedback', () => {

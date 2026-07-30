@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createContext, Script } from 'node:vm';
 import { describe, expect, it } from 'vitest';
+import { buildServer } from '../../src/server.js';
 
 type Entity = {
   id: string;
@@ -104,6 +105,22 @@ function createController(loaded: NonNullable<ReturnType<typeof loadAnimation>>)
 }
 
 describe('shared board animation layer', () => {
+  it('serves the shared dependency before desktop spectator code', async () => {
+    const app = await buildServer();
+    try {
+      const page = await app.inject({ method: 'GET', url: '/spectator.html' });
+      const shared = await app.inject({ method: 'GET', url: '/board-animation.js' });
+      expect(page.statusCode).toBe(200);
+      expect(shared.statusCode).toBe(200);
+      const sharedIndex = page.body.indexOf('/board-animation.js');
+      const appIndex = page.body.indexOf('/app.js');
+      expect(sharedIndex).toBeGreaterThan(-1);
+      expect(sharedIndex).toBeLessThan(appIndex);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('interpolates movement and hit points instead of snapping to the next state', () => {
     const loaded = loadAnimation();
     expect(loaded).not.toBeNull();

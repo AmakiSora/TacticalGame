@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const appJs = () => readFileSync('public/app.js', 'utf-8');
 const versionJs = () => readFileSync('public/version.js', 'utf-8');
+const expectedAppVersion = '3.2.1';
 
 describe('spectator import/export', () => {
   it('exports replay metadata with events and final result', () => {
@@ -44,5 +45,19 @@ describe('spectator import/export', () => {
     const source = versionJs();
 
     expect(source).toMatch(/window\.APP_VERSION = '\d+\.\d+\.\d+';/);
+  });
+
+  it('keeps every current application version source synchronized', () => {
+    const packageJson = JSON.parse(readFileSync('package.json', 'utf-8'));
+    const packageLock = JSON.parse(readFileSync('package-lock.json', 'utf-8'));
+    const readme = readFileSync('README.md', 'utf-8');
+    const skill = readFileSync('skill/SKILL.md', 'utf-8');
+
+    expect(packageJson.version).toBe(expectedAppVersion);
+    expect(packageLock.version).toBe(expectedAppVersion);
+    expect(packageLock.packages[''].version).toBe(expectedAppVersion);
+    expect(versionJs()).toContain(`window.APP_VERSION = '${expectedAppVersion}';`);
+    expect(readme).toContain(`当前版本：\`${expectedAppVersion}\``);
+    expect(skill).toContain(`app version \`${expectedAppVersion}\``);
   });
 });

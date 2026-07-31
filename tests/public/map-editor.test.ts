@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 
 type EditorCore = {
   createDefaultMapConfig: () => any;
+  configureMapMode: (config: any, mode: 'standard' | 'annihilation', annihilationDraft?: any) => any;
   normalizeImportedMap: (data: any) => any;
   serializeMapConfig: (config: any) => any;
   validateMapConfig: (config: any, id?: string) => string[];
   formatValidationError: (error: string) => string;
   resizeMapRadius: (config: any, radius: number, confirmRemoval: boolean) => { config: any; removed: number; requiresConfirmation: boolean };
+  updateSpawnControlPointReferences: (config: any, previousId: string, nextId?: string) => any;
 };
 
 function read(path: string): string {
@@ -29,6 +31,7 @@ describe('map editor page', () => {
     const html = read('public/map-editor.html');
 
     expect(html).toContain('<link rel="stylesheet" href="/map-editor.css" />');
+    expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1" />');
     expect(html).toContain('id="map-canvas"');
     expect(html).toContain('id="btn-import"');
     expect(html).toContain('id="btn-export"');
@@ -38,7 +41,11 @@ describe('map editor page', () => {
     expect(html).toContain('id="btn-zoom-in"');
     expect(html).toContain('id="btn-zoom-reset"');
     expect(html).toContain('id="validation-panel"');
-    expect(html).toContain('<script src="/map-editor.js?v=3.2.4"></script>');
+    expect(html).toContain('id="map-mode"');
+    expect(html).toContain('data-mode="standard"');
+    expect(html).toContain('data-mode="annihilation"');
+    expect(html).toContain('id="annihilation-panel"');
+    expect(html).toContain('<script src="/map-editor.js?v=3.2.5"></script>');
   });
 
   it('supports toolbar zoom buttons without hijacking wheel scroll', () => {
@@ -157,6 +164,89 @@ describe('map editor page', () => {
     });
   });
 
+  it('uses a three-zone workspace with tabbed inspector navigation', () => {
+    const html = read('public/map-editor.html');
+    const source = read('public/map-editor.js');
+
+    expect(html).toContain('class="tool-rail"');
+    expect(html).toContain('class="board-panel"');
+    expect(html).toContain('class="inspector"');
+    expect(html.match(/data-inspector-tab=/g)).toHaveLength(5);
+    expect(html.match(/data-inspector-pane=/g)).toHaveLength(5);
+    expect(source).toContain('function activateInspectorTab(tabId)');
+    expect(source).toContain("activateInspectorTab('selection')");
+    expect(source).toContain("activateInspectorTab('rules')");
+  });
+
+  it('creates a complete annihilation configuration and restores standard defaults when switching back', () => {
+    const core = loadCore();
+    const annihilation = core.configureMapMode(core.createDefaultMapConfig(), 'annihilation');
+    annihilation.controlPoints = [
+      { id: 'cp_a', name: 'A 出生点', kind: 'forward_base', q: -4, r: 0 },
+      { id: 'cp_b', name: 'B 出生点', kind: 'forward_base', q: 4, r: 0 },
+    ];
+    annihilation.spawnSlots[0].controlPointId = 'cp_a';
+    annihilation.spawnSlots[1].controlPointId = 'cp_b';
+
+    const serialized = core.serializeMapConfig(annihilation);
+    expect(serialized.mode).toBe('annihilation');
+    expect(serialized.annihilation.artillery).toEqual({
+      startRound: 5,
+      intervalRounds: 2,
+      damage: 25,
+      minimumSafeRadius: 2,
+    });
+    expect(serialized.balance.adjudicationWeights.effectiveActions).toBe(10);
+    expect(serialized.spawnSlots.map((slot: any) => slot.controlPointId)).toEqual(['cp_a', 'cp_b']);
+    expect(core.validateMapConfig(serialized, 'new-annihilation')).toEqual([]);
+
+    const standard = core.configureMapMode(annihilation, 'standard');
+    expect(standard.mode).toBe('standard');
+    expect(standard.annihilation).toBeUndefined();
+    expect(standard.balance.adjudicationWeights.effectiveActions).toBe(2);
+  });
+
+  it('validates annihilation artillery and unique spawn point ownership links', () => {
+    const core = loadCore();
+    const config = core.configureMapMode(core.createDefaultMapConfig(), 'annihilation');
+    config.controlPoints = [
+      { id: 'cp_a', name: 'A', q: -4, r: 0 },
+      { id: 'cp_b', name: 'B', q: 4, r: 0 },
+    ];
+    config.spawnSlots[0].controlPointId = 'cp_a';
+    config.spawnSlots[1].controlPointId = 'cp_a';
+    config.annihilation.artillery.damage = 0;
+    config.annihilation.artillery.intervalRounds = 1.5;
+    config.annihilation.artillery.minimumSafeRadius = config.radius;
+
+    const errors = core.validateMapConfig(core.serializeMapConfig(config), 'broken-annihilation');
+    expect(errors).toContain('Map "broken-annihilation".annihilation.artillery.damage must be a number >= 1');
+    expect(errors).toContain('Map "broken-annihilation".annihilation.artillery.intervalRounds must be an integer');
+    expect(errors).toContain('Map "broken-annihilation".annihilation.artillery.minimumSafeRadius must be smaller than radius');
+    expect(errors).toContain('spawnSlots[1].controlPointId must be unique');
+
+    config.spawnSlots[1].controlPointId = 'missing';
+    expect(core.validateMapConfig(core.serializeMapConfig(config), 'broken-annihilation'))
+      .toContain('spawnSlots[1].controlPointId must reference a control point');
+  });
+
+  it('keeps annihilation radius and spawn point references consistent during edits', () => {
+    const core = loadCore();
+    const config = core.configureMapMode(core.createDefaultMapConfig(), 'annihilation');
+    config.spawnSlots[0].controlPointId = 'old_cp';
+    config.spawnSlots[1].controlPointId = 'other_cp';
+
+    core.updateSpawnControlPointReferences(config, 'old_cp', 'new_cp');
+    expect(config.spawnSlots[0].controlPointId).toBe('new_cp');
+    core.updateSpawnControlPointReferences(config, 'new_cp');
+    expect(config.spawnSlots[0].controlPointId).toBeUndefined();
+
+    config.annihilation.artillery.minimumSafeRadius = 2;
+    const resized = core.resizeMapRadius(config, 1, true).config;
+    expect(resized.radius).toBe(2);
+    expect(resized.annihilation.artillery.minimumSafeRadius).toBe(1);
+  });
+
   it('exposes irregular-boundary and 2-8 player layout editing controls', () => {
     const html = read('public/map-editor.html');
     const source = read('public/map-editor.js');
@@ -252,7 +342,6 @@ describe('map editor page', () => {
   it('formats validation errors in Chinese for display', () => {
     const core = loadCore();
 
-    expect(core.formatValidationError('Map "editor".controlPoints must be a non-empty array')).toBe('地图必须至少有 1 个据点。');
     expect(core.formatValidationError('startingUnits[0] (10,0) is outside radius 8')).toBe('初始单位 1 的坐标 (10,0) 超出地图半径 8。');
     expect(core.formatValidationError('controlPoints[0] overlaps another fixed map object at 0,0')).toBe('据点 1 与另一个固定对象重叠，位置为 0,0。');
     expect(core.formatValidationError('Map "editor".controlPoints must all define kind when any control point is typed')).toBe('如果任意据点设置了类型，所有据点都必须设置类型。');

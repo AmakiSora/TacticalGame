@@ -371,11 +371,8 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
   }
 
-  if (!Array.isArray(c.controlPoints) || c.controlPoints.length === 0) {
-    throw new Error(`Map "${id}".controlPoints must be a non-empty array`);
-  }
   let typedControlPoints = 0;
-  for (let i = 0; i < c.controlPoints.length; i++) {
+  for (let i = 0; i < (c.controlPoints as ControlPointConfig[]).length; i++) {
     const cp = asRecord(c.controlPoints[i], `controlPoints[${i}]`);
     assertString(cp, 'id', `controlPoints[${i}]`);
     assertString(cp, 'name', `controlPoints[${i}]`);
@@ -418,7 +415,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     const slotId = assertString(slot, 'id', `spawnSlots[${i}]`);
     if (spawnIds.has(slotId)) throw new Error(`spawnSlots[${i}].id must be unique`);
     spawnIds.add(slotId);
-    if (c.mode === 'annihilation') {
+    if (c.mode === 'annihilation' && Array.isArray(c.controlPoints) && c.controlPoints.length > 0) {
       const controlPointId = assertString(slot, 'controlPointId', `spawnSlots[${i}]`);
       if (!(c.controlPoints as ControlPointConfig[]).some(point => point.id === controlPointId)) {
         throw new Error(`spawnSlots[${i}].controlPointId must reference a control point`);

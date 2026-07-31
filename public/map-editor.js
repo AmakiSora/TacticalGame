@@ -2,8 +2,9 @@
   const SQRT3 = Math.sqrt(3);
   const HEX_SIZE = 34;
   const PAD = 48;
+  // 与观战/玩家棋盘（app.js）一致的地形与阵营配色
   const TERRAIN_COLORS = { plain: '#111923', water: '#183a55', blocker: '#393f46' };
-  const SLOT_COLORS = ['#66ccff', '#ff9966', '#8ee28e', '#d6a3ff', '#ffe17a', '#ff7f9f', '#70e0d0', '#c7d0dc'];
+  const SLOT_COLORS = ['#66ccff', '#ff9966', '#9fdf6f', '#d98cff', '#ffd166', '#72e0d1', '#f27a9a', '#a7b7ff'];
   const OWNER_COLORS = { player_a: SLOT_COLORS[0], player_b: SLOT_COLORS[1] };
   const UNIT_TYPES = ['infantry', 'scout', 'heavy', 'ranger', 'support'];
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
@@ -125,6 +126,17 @@
     };
   }
 
+  function defaultAnnihilation(radius = 8) {
+    return {
+      artillery: {
+        startRound: 5,
+        intervalRounds: 2,
+        damage: 25,
+        minimumSafeRadius: Math.min(2, Math.max(1, radius - 1)),
+      },
+    };
+  }
+
   function createDefaultMapConfig() {
     return {
       mode: 'standard',
@@ -150,6 +162,64 @@
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
   }
 
+  function normalizeAnnihilation(input, radius) {
+    const defaults = defaultAnnihilation(radius);
+    const artillery = input && typeof input === 'object' && input.artillery && typeof input.artillery === 'object'
+      ? input.artillery
+      : {};
+    return {
+      artillery: {
+        startRound: numberOrDefault(artillery.startRound, defaults.artillery.startRound),
+        intervalRounds: numberOrDefault(artillery.intervalRounds, defaults.artillery.intervalRounds),
+        damage: numberOrDefault(artillery.damage, defaults.artillery.damage),
+        minimumSafeRadius: numberOrDefault(artillery.minimumSafeRadius, defaults.artillery.minimumSafeRadius),
+      },
+    };
+  }
+
+  function enableSpawnMode(target) {
+    if (target.spawnMode && Array.isArray(target.spawnSlots)) return target;
+    target.spawnMode = true;
+    target.spawnSlots = ['player_a', 'player_b'].map(player => ({
+      id: `slot_${player.slice(-1)}`,
+      headquarters: { ...target.headquarters[player] },
+      startingUnits: (target.startingUnits || [])
+        .filter(unit => unit.owner === player)
+        .map(({ owner: _owner, ...unit }) => ({ ...unit })),
+    }));
+    target.layouts = { 2: target.spawnSlots.map(slot => slot.id) };
+    return target;
+  }
+
+  function configureMapMode(input, mode, annihilationDraft = null) {
+    if (mode !== 'standard' && mode !== 'annihilation') throw new Error('玩法模式必须是 standard 或 annihilation');
+    const configured = deepClone(input);
+    const previousMode = configured.mode === 'annihilation' ? 'annihilation' : 'standard';
+    const previousDefaultWeight = previousMode === 'annihilation' ? 10 : 2;
+    const nextDefaultWeight = mode === 'annihilation' ? 10 : 2;
+    if (configured.balance?.adjudicationWeights?.effectiveActions === previousDefaultWeight) {
+      configured.balance.adjudicationWeights.effectiveActions = nextDefaultWeight;
+    }
+    configured.mode = mode;
+    if (mode === 'annihilation') {
+      configured.radius = Math.max(2, configured.radius);
+      configured.annihilation = normalizeAnnihilation(annihilationDraft || configured.annihilation, configured.radius);
+      enableSpawnMode(configured);
+    } else {
+      delete configured.annihilation;
+    }
+    return configured;
+  }
+
+  function updateSpawnControlPointReferences(target, previousId, nextId = null) {
+    for (const slot of target.spawnSlots || []) {
+      if (slot.controlPointId !== previousId) continue;
+      if (nextId) slot.controlPointId = nextId;
+      else delete slot.controlPointId;
+    }
+    return target;
+  }
+
   function normalizeUnitSpec(type, input) {
     const fallback = defaultUnits()[type];
     const src = input && typeof input === 'object' ? input : {};
@@ -166,13 +236,15 @@
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('地图 JSON 必须是对象');
     const defaults = createDefaultMapConfig();
     const cfg = deepClone(data);
+    const mode = cfg.mode === 'annihilation' ? 'annihilation' : 'standard';
+    const radius = Number.isInteger(cfg.radius) && cfg.radius > 0 ? cfg.radius : defaults.radius;
     const normalized = {
-      mode: cfg.mode === 'annihilation' ? 'annihilation' : 'standard',
+      mode,
       name: typeof cfg.name === 'string' && cfg.name ? cfg.name : defaults.name,
       description: typeof cfg.description === 'string' ? cfg.description : defaults.description,
       grid: 'hex',
       orientation: 'pointy',
-      radius: Number.isInteger(cfg.radius) && cfg.radius > 0 ? cfg.radius : defaults.radius,
+      radius,
       ...(Array.isArray(cfg.playableCells)
         ? { playableCells: cfg.playableCells.map(cell => ({ q: cell.q, r: cell.r })) }
         : {}),
@@ -196,13 +268,15 @@
       spawnMode: Array.isArray(cfg.spawnSlots),
       spawnSlots: [],
       layouts: {},
-      ...(cfg.annihilation && typeof cfg.annihilation === 'object' ? { annihilation: deepClone(cfg.annihilation) } : {}),
+      ...(mode === 'annihilation' ? { annihilation: normalizeAnnihilation(cfg.annihilation, radius) } : {}),
     };
 
     if (normalized.spawnMode) {
       normalized.spawnSlots = cfg.spawnSlots.map((slot, index) => ({
         id: typeof slot.id === 'string' && slot.id ? slot.id : `slot_${index + 1}`,
-        headquarters: { q: slot.headquarters?.q, r: slot.headquarters?.r },
+        headquarters: slot.headquarters && typeof slot.headquarters.q === 'number' && typeof slot.headquarters.r === 'number'
+          ? { q: slot.headquarters.q, r: slot.headquarters.r }
+          : null,
         ...(typeof slot.controlPointId === 'string' ? { controlPointId: slot.controlPointId } : {}),
         startingUnits: Array.isArray(slot.startingUnits)
           ? slot.startingUnits.map(unit => ({ type: unit.type, q: unit.q, r: unit.r }))
@@ -212,9 +286,11 @@
       const first = normalized.spawnSlots[0];
       const second = normalized.spawnSlots[1] || first;
       if (first) {
+        const hqA = first.headquarters || { q: -radius, r: 0 };
+        const hqB = second.headquarters || { q: radius, r: 0 };
         normalized.headquarters = {
-          player_a: { ...first.headquarters },
-          player_b: { ...second.headquarters },
+          player_a: { ...hqA },
+          player_b: { ...hqB },
         };
         normalized.startingUnits = [
           ...first.startingUnits.map(unit => ({ ...unit, owner: 'player_a' })),
@@ -404,12 +480,28 @@
       occupied.add(key);
     }
 
+    const mode = c.mode === undefined ? 'standard' : c.mode;
+    if (mode !== 'standard' && mode !== 'annihilation') errors.push(`${mapName}.mode must be standard or annihilation`);
     str(c, 'name', mapName);
     str(c, 'description', mapName);
     if (c.grid !== 'hex') errors.push(`${mapName} grid must be "hex"`);
     if (c.orientation !== 'pointy') errors.push(`${mapName} orientation must be "pointy"`);
     const radius = num(c, 'radius', mapName, 1);
     if (!Number.isInteger(radius)) errors.push(`${mapName} radius must be an integer`);
+
+    if (mode === 'annihilation') {
+      const annihilation = record(c.annihilation, `${mapName}.annihilation`);
+      const artillery = record(annihilation.artillery, `${mapName}.annihilation.artillery`);
+      for (const key of ['startRound', 'intervalRounds', 'damage', 'minimumSafeRadius']) {
+        const value = num(artillery, key, `${mapName}.annihilation.artillery`, 1);
+        if (!Number.isInteger(value)) errors.push(`${mapName}.annihilation.artillery.${key} must be an integer`);
+      }
+      if (artillery.minimumSafeRadius >= radius) {
+        errors.push(`${mapName}.annihilation.artillery.minimumSafeRadius must be smaller than radius`);
+      }
+    } else if ('annihilation' in c) {
+      errors.push(`${mapName}.annihilation is only valid in annihilation mode`);
+    }
 
     const sourcePlayableCells = 'playableCells' in c ? c.playableCells : allCells(radius);
     if (!Array.isArray(sourcePlayableCells) || sourcePlayableCells.length === 0) {
@@ -493,9 +585,8 @@
       if (!['plain', 'water', 'blocker'].includes(cell.terrain)) errors.push(`terrainCells[${i}].terrain must be plain, water, or blocker`);
     });
 
-    if (!Array.isArray(c.controlPoints) || c.controlPoints.length === 0) errors.push(`${mapName}.controlPoints must be a non-empty array`);
-    let typed = 0;
     if (Array.isArray(c.controlPoints)) {
+      let typed = 0;
       c.controlPoints.forEach((pointValue, i) => {
         const point = record(pointValue, `controlPoints[${i}]`);
         str(point, 'id', `controlPoints[${i}]`);
@@ -520,14 +611,33 @@
       claim(pos(unit, `startingUnits[${i}]`, radius), `startingUnits[${i}]`);
     });
 
+    if (mode === 'annihilation' && !Array.isArray(c.spawnSlots)) {
+      errors.push(`${mapName}.spawnSlots must contain 2-8 slots`);
+    }
     if (Array.isArray(c.spawnSlots)) {
       if (c.spawnSlots.length < 2 || c.spawnSlots.length > 8) errors.push(`${mapName}.spawnSlots must contain 2-8 slots`);
       const ids = new Set();
+      const spawnControlPointIds = new Set();
       c.spawnSlots.forEach((slotValue, slotIndex) => {
         const slot = record(slotValue, `spawnSlots[${slotIndex}]`);
         str(slot, 'id', `spawnSlots[${slotIndex}]`);
         if (ids.has(slot.id)) errors.push(`spawnSlots[${slotIndex}].id must be unique`);
         ids.add(slot.id);
+        if (mode === 'annihilation') {
+          if (Array.isArray(c.controlPoints) && c.controlPoints.length > 0) {
+            str(slot, 'controlPointId', `spawnSlots[${slotIndex}]`);
+            if (
+              typeof slot.controlPointId === 'string' && slot.controlPointId.length > 0
+              && !c.controlPoints.some(point => point?.id === slot.controlPointId)
+            ) {
+              errors.push(`spawnSlots[${slotIndex}].controlPointId must reference a control point`);
+            }
+            if (typeof slot.controlPointId === 'string' && slot.controlPointId.length > 0 && spawnControlPointIds.has(slot.controlPointId)) {
+              errors.push(`spawnSlots[${slotIndex}].controlPointId must be unique`);
+            }
+            if (typeof slot.controlPointId === 'string' && slot.controlPointId.length > 0) spawnControlPointIds.add(slot.controlPointId);
+          }
+        }
         pos(record(slot.headquarters, `spawnSlots[${slotIndex}].headquarters`), `spawnSlots[${slotIndex}].headquarters`, radius);
         if (!Array.isArray(slot.startingUnits)) errors.push(`spawnSlots[${slotIndex}].startingUnits must be an array`);
         else slot.startingUnits.forEach((unitValue, unitIndex) => {
@@ -624,6 +734,10 @@
       startRound: '开始轮次',
       scoreGapPercent: '分差百分比',
       amountPerRound: '每轮补给量',
+      intervalRounds: '收缩间隔',
+      damage: '炮火伤害',
+      minimumSafeRadius: '最小安全半径',
+      controlPointId: '绑定据点',
     };
     return names[key] || key;
   }
@@ -650,6 +764,10 @@
     if (text === 'balance.adjudicationWeights') return '裁决权重';
     if (text === 'balance.controlPointTypes') return '据点类型配置';
     if (text === 'balance.comebackSupply') return '追赶补给配置';
+    if (text === 'annihilation') return '歼灭模式配置';
+    if (text === 'annihilation.artillery') return '炮火配置';
+    match = text.match(/^spawnSlots\[(\d+)\]$/);
+    if (match) return `出生槽 ${Number(match[1]) + 1}`;
     return text;
   }
 
@@ -678,8 +796,6 @@
     if (match) return '地形格列表必须是数组。';
     match = error.match(/^terrainCells\[(\d+)\]\.terrain must be plain, water, or blocker$/);
     if (match) return `地形格 ${Number(match[1]) + 1} 的地形必须是平地、水域或阻挡。`;
-    match = error.match(/^(.+)\.controlPoints must be a non-empty array$/);
-    if (match) return '地图必须至少有 1 个据点。';
     match = error.match(/^controlPoints\[(\d+)\]\.kind must be supply, forward_base, or repair$/);
     if (match) return `据点 ${Number(match[1]) + 1} 的类型必须是补给站、前线基地或维修站。`;
     match = error.match(/^(.+)\.balance\.controlPointTypes is required when control points use kind$/);
@@ -695,6 +811,11 @@
     if (error.includes('grid must be "hex"')) return '地图网格必须是 hex。';
     if (error.includes('orientation must be "pointy"')) return '地图方向必须是 pointy。';
     if (error.includes('radius must be an integer')) return '地图半径必须是整数。';
+    if (error.includes('.mode must be standard or annihilation')) return '玩法模式必须是普通模式或歼灭模式。';
+    if (error.includes('.annihilation is only valid in annihilation mode')) return '只有歼灭模式可以配置炮火收缩。';
+    if (error.includes('.minimumSafeRadius must be smaller than radius')) return '炮火最小安全半径必须小于地图半径。';
+    if (error.includes('.controlPointId must reference a control point')) return `出生槽 ${itemNumber(error)} 绑定了不存在的据点。`;
+    if (error.includes('.controlPointId must be unique')) return `出生槽 ${itemNumber(error)} 绑定的据点已被其他出生槽使用。`;
     if (error.includes('playableCells must be a non-empty array')) return '地图必须至少包含 1 个可用格子。';
     if (error.includes('playableCells must form one connected area')) return '所有可用格子必须六向连通。';
     if (error.includes('outside playableCells')) return error.replace('is outside playableCells', '不在可用地图边界内');
@@ -709,7 +830,8 @@
   }
 
   function resizeMapRadius(config, radius, confirmRemoval) {
-    const nextRadius = Math.max(1, Math.floor(Number(radius) || 1));
+    const minimumRadius = config.mode === 'annihilation' ? 2 : 1;
+    const nextRadius = Math.max(minimumRadius, Math.floor(Number(radius) || minimumRadius));
     const copy = deepClone(config);
     const outside = [];
     const collect = (item, group) => {
@@ -748,6 +870,9 @@
         slot.startingUnits.forEach(unit => occupied.add(hexKey(unit)));
       });
     }
+    if (copy.mode === 'annihilation' && copy.annihilation?.artillery) {
+      copy.annihilation.artillery.minimumSafeRadius = Math.min(copy.annihilation.artillery.minimumSafeRadius, nextRadius - 1);
+    }
     return { config: copy, removed: outside.length, requiresConfirmation: false };
   }
 
@@ -758,6 +883,9 @@
 
   const core = {
     createDefaultMapConfig,
+    configureMapMode,
+    defaultAnnihilation,
+    updateSpawnControlPointReferences,
     normalizeImportedMap,
     serializeMapConfig,
     validateMapConfig,
@@ -776,7 +904,6 @@
   const $ = id => document.getElementById(id);
   const els = {
     canvas: $('map-canvas'),
-    status: $('status-text'),
     badge: $('validation-badge'),
     validationCount: $('validation-count'),
     validationList: $('validation-list'),
@@ -785,6 +912,9 @@
     mapName: $('map-name'),
     mapDescription: $('map-description'),
     mapRadius: $('map-radius'),
+    mapMode: $('map-mode'),
+    annihilationPanel: $('annihilation-panel'),
+    artilleryFields: $('artillery-fields'),
     toolOwner: $('tool-owner'),
     toolUnitType: $('tool-unit-type'),
     toolControlKind: $('tool-control-kind'),
@@ -798,6 +928,20 @@
     controlTypeFields: $('control-type-fields'),
     spawnLayoutFields: $('spawn-layout-fields'),
   };
+
+  function activateInspectorTab(tabId) {
+    document.querySelectorAll('[data-inspector-tab]').forEach(tab => {
+      const active = tab.dataset.inspectorTab === tabId;
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-selected', String(active));
+    });
+    document.querySelectorAll('[data-inspector-pane]').forEach(pane => {
+      const active = pane.dataset.inspectorPane === tabId;
+      pane.classList.toggle('active', active);
+      pane.hidden = !active;
+    });
+  }
+
   const ctx = els.canvas.getContext('2d');
   let config = createDefaultMapConfig();
   let tool = 'select';
@@ -805,18 +949,10 @@
   let selected = null;
   let zoom = 1;
   let layout = { minX: 0, minY: 0, width: 840, height: 840 };
+  let annihilationDraft = null;
 
   function activateSpawnMode() {
-    if (config.spawnMode) return;
-    config.spawnMode = true;
-    config.spawnSlots = ['player_a', 'player_b'].map(player => ({
-      id: `slot_${player.slice(-1)}`,
-      headquarters: { ...config.headquarters[player] },
-      startingUnits: (config.startingUnits || [])
-        .filter(unit => unit.owner === player)
-        .map(({ owner: _owner, ...unit }) => ({ ...unit })),
-    }));
-    config.layouts = { 2: config.spawnSlots.map(slot => slot.id) };
+    enableSpawnMode(config);
   }
 
   function slotColor(index) {
@@ -837,8 +973,17 @@
     if (options.some(option => option.value === previous)) els.toolOwner.value = previous;
   }
 
-  function setStatus(message) {
-    els.status.textContent = message;
+  function toast(msg, type = 'info') {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.className = '', 2400);
+  }
+
+  function setStatus(message, type = 'info') {
+    toast(message, type);
   }
 
   function applyZoom() {
@@ -993,6 +1138,7 @@
 
   function selectObject(hit, pos) {
     selected = hit ? { ...hit } : { type: 'cell', object: { q: pos.q, r: pos.r } };
+    activateInspectorTab('selection');
     renderSelection();
     drawBoard();
   }
@@ -1002,40 +1148,46 @@
     if (tool === 'add-cell') {
       const existed = isPlayableCell(config, pos);
       const cells = materializePlayableCells(config);
-      if (!existed) cells.push({ q: pos.q, r: pos.r });
+      if (!existed) {
+        cells.push({ q: pos.q, r: pos.r });
+        if (!arePlayableCellsConnected(cells)) {
+          cells.pop();
+          return setStatus('添加该地块后地图不连通，操作已取消', 'err');
+        }
+      }
       selected = { type: 'cell', object: { q: pos.q, r: pos.r } };
     } else if (tool === 'remove-cell') {
       removePlayableCell(pos);
     } else if (tool === 'plain' || tool === 'water' || tool === 'blocker') {
-      if (!isPlayableCell(config, pos)) return setStatus('该位置不属于地图，请先添加地块');
+      if (!isPlayableCell(config, pos)) return setStatus('该位置不属于地图，请先添加地块', 'err');
       setTerrain(pos, tool);
       selected = { type: 'cell', object: { q: pos.q, r: pos.r } };
     } else if (tool === 'hq') {
       if (config.spawnMode) {
         const slotIndex = selectedSlotIndex();
-        if (slotIndex < 0) return setStatus('请先选择出生槽');
+        if (slotIndex < 0) return setStatus('请先选择出生槽', 'err');
         const ignore = { type: 'spawnHeadquarters', slotIndex };
-        if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部');
+        if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部', 'err');
         config.spawnSlots[slotIndex].headquarters = { q: pos.q, r: pos.r };
         selected = { type: 'spawnHeadquarters', slotIndex, object: config.spawnSlots[slotIndex].headquarters };
       } else {
         const player = els.toolOwner.value;
         const ignore = { type: 'headquarters', player };
-        if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部');
+        if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部', 'err');
         config.headquarters[player] = { q: pos.q, r: pos.r };
         selected = { type: 'headquarters', player, object: config.headquarters[player] };
       }
     } else if (tool === 'control') {
-      if (!canPlace(pos)) return setStatus('该格已有固定对象，不能放置据点');
+      if (!canPlace(pos)) return setStatus('该格已有固定对象，不能放置据点', 'err');
       const kind = els.toolControlKind.value;
       const point = { id: nextControlPointId(), name: `据点 ${config.controlPoints.length + 1}`, ...(kind ? { kind } : {}), q: pos.q, r: pos.r };
       config.controlPoints.push(point);
       selected = { type: 'controlPoint', index: config.controlPoints.length - 1, object: point };
     } else if (tool === 'unit') {
-      if (!canPlace(pos)) return setStatus('该格已有固定对象，不能放置初始单位');
+      if (!canPlace(pos)) return setStatus('该格已有固定对象，不能放置初始单位', 'err');
       if (config.spawnMode) {
         const slotIndex = selectedSlotIndex();
-        if (slotIndex < 0) return setStatus('请先选择出生槽');
+        if (slotIndex < 0) return setStatus('请先选择出生槽', 'err');
         const unit = { type: els.toolUnitType.value, q: pos.q, r: pos.r };
         config.spawnSlots[slotIndex].startingUnits.push(unit);
         selected = { type: 'spawnUnit', slotIndex, unitIndex: config.spawnSlots[slotIndex].startingUnits.length - 1, object: unit };
@@ -1049,15 +1201,16 @@
     } else {
       selectObject(objectAt(pos), pos);
     }
+    if (['hq', 'control', 'unit'].includes(tool) && selected) activateInspectorTab('selection');
     syncAll();
   }
 
   function removePlayableCell(pos) {
-    if (!isPlayableCell(config, pos)) return setStatus('该位置已经在地图外');
-    if (objectAt(pos)) return setStatus('该格存在总部、据点或单位，不能移除地块');
-    if (terrainAt(pos) !== 'plain') return setStatus('请先将该格地形恢复为平地，再移除地块');
+    if (!isPlayableCell(config, pos)) return setStatus('该位置已经在地图外', 'err');
+    if (objectAt(pos)) return setStatus('该格存在总部、据点或单位，不能移除地块', 'err');
+    if (terrainAt(pos) !== 'plain') return setStatus('请先将该格地形恢复为平地，再移除地块', 'err');
     const next = playableCells(config).filter(cell => cell.q !== pos.q || cell.r !== pos.r);
-    if (!arePlayableCellsConnected(next)) return setStatus('移除后会使地图断开，操作已取消');
+    if (!arePlayableCellsConnected(next)) return setStatus('移除后会使地图断开，操作已取消', 'err');
     config.playableCells = next;
     selected = null;
   }
@@ -1069,8 +1222,12 @@
       selected = { type: 'cell', object: { q: pos.q, r: pos.r } };
       return;
     }
-    if (hit.type === 'headquarters' || hit.type === 'spawnHeadquarters') return setStatus('总部必须存在，可用总部工具移动位置');
-    if (hit.type === 'controlPoint') config.controlPoints.splice(hit.index, 1);
+    if (hit.type === 'headquarters' || hit.type === 'spawnHeadquarters') return setStatus('总部必须存在，可用总部工具移动位置', 'err');
+    if (hit.type === 'controlPoint') {
+      const removedId = config.controlPoints[hit.index].id;
+      config.controlPoints.splice(hit.index, 1);
+      updateSpawnControlPointReferences(config, removedId);
+    }
     if (hit.type === 'startingUnit') config.startingUnits.splice(hit.index, 1);
     if (hit.type === 'spawnUnit') config.spawnSlots[hit.slotIndex].startingUnits.splice(hit.unitIndex, 1);
     selected = null;
@@ -1088,13 +1245,13 @@
         ctx.fillStyle = TERRAIN_COLORS[terrainAt(cell)] || TERRAIN_COLORS.plain;
         ctx.fill();
       }
-      ctx.strokeStyle = playable ? '#20313d' : 'rgba(74,96,112,.22)';
+      ctx.strokeStyle = playable ? '#20313d' : 'rgba(62,84,99,.3)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
     if (hoverCell) {
       pathHex(hoverCell.q, hoverCell.r, 2);
-      ctx.fillStyle = 'rgba(255,255,255,.08)';
+      ctx.fillStyle = 'rgba(102,204,255,.13)';
       ctx.fill();
     }
     for (const point of config.controlPoints) drawControlPoint(point);
@@ -1253,6 +1410,35 @@
     els.mapName.value = config.name;
     els.mapDescription.value = config.description;
     els.mapRadius.value = config.radius;
+    els.mapRadius.min = config.mode === 'annihilation' ? '2' : '1';
+    els.mapMode.querySelectorAll('[data-mode]').forEach(button => {
+      const active = button.dataset.mode === config.mode;
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  function renderAnnihilationFields() {
+    const active = config.mode === 'annihilation';
+    els.annihilationPanel.hidden = !active;
+    if (!active) {
+      els.artilleryFields.innerHTML = '';
+      return;
+    }
+    if (!config.annihilation) config.annihilation = defaultAnnihilation(config.radius);
+    const artillery = config.annihilation.artillery;
+    els.artilleryFields.innerHTML = [
+      fieldHtml('artillery:startRound', '开始轮次', artillery.startRound, 1),
+      fieldHtml('artillery:intervalRounds', '收缩间隔', artillery.intervalRounds, 1),
+      fieldHtml('artillery:damage', '炮火伤害', artillery.damage, 1),
+      fieldHtml('artillery:minimumSafeRadius', '最小安全半径', artillery.minimumSafeRadius, 1, Math.max(1, config.radius - 1)),
+    ].join('');
+    els.artilleryFields.querySelectorAll('input[data-bind]').forEach(input => {
+      input.addEventListener('change', () => {
+        const [, key] = input.dataset.bind.split(':');
+        config.annihilation.artillery[key] = clampBoundNumber(input.value, input.min, input.max);
+        syncAll();
+      });
+    });
   }
 
   // 关闭追赶补给时暂存参数，重新启用时恢复，避免用户只是临时关掉开关就丢配置。
@@ -1363,11 +1549,21 @@
 
     const slotOptions = selectedId => config.spawnSlots.map(slot =>
       `<option value="${esc(slot.id)}"${slot.id === selectedId ? ' selected' : ''}>${esc(slot.id)}</option>`).join('');
+    const controlPointOptions = (slotIndex, selectedId) => {
+      const options = config.controlPoints.map(point => {
+        const usedByAnother = config.spawnSlots.some((slot, index) => index !== slotIndex && slot.controlPointId === point.id);
+        return `<option value="${esc(point.id)}"${point.id === selectedId ? ' selected' : ''}${usedByAnother ? ' disabled' : ''}>${esc(point.name)} (${esc(point.id)})</option>`;
+      }).join('');
+      return `<option value="">请选择据点</option>${options}`;
+    };
     const slotRows = config.spawnSlots.map((slot, index) => `<div class="spawn-slot-row" data-slot-index="${index}">
       <span class="spawn-color" style="background:${slotColor(index)}"></span>
       <input class="spawn-slot-id" value="${esc(slot.id)}" aria-label="出生槽 ID" />
       <button class="spawn-select" type="button">选择</button>
       <button class="spawn-delete danger" type="button">删除</button>
+      ${config.mode === 'annihilation' ? `<label class="spawn-control-point-field">绑定出生据点
+        <select class="spawn-control-point">${controlPointOptions(index, slot.controlPointId)}</select>
+      </label>` : ''}
     </div>`).join('');
     const layoutRows = Array.from({ length: 7 }, (_, offset) => offset + 2).map(count => {
       const selectedSlots = Array.isArray(config.layouts?.[count]) ? config.layouts[count] : null;
@@ -1382,14 +1578,21 @@
     els.spawnLayoutFields.innerHTML = `<div class="spawn-toolbar"><button id="spawn-add" type="button">新增出生槽</button><span class="outside-cell-hint">总部工具和单位工具作用于当前选择槽</span></div>${slotRows}${layoutRows}`;
 
     $('spawn-add').addEventListener('click', () => {
-      if (config.spawnSlots.length >= 8) return setStatus('出生槽最多 8 个');
+      if (config.spawnSlots.length >= 8) return setStatus('出生槽最多 8 个', 'err');
       const preferred = selected?.type === 'cell' ? selected.object : null;
       const position = preferred && canPlace(preferred) ? preferred : playableCells(config).find(cell => canPlace(cell));
-      if (!position) return setStatus('没有可用于新总部的空格');
+      if (!position) return setStatus('没有可用于新总部的空格', 'err');
       let number = config.spawnSlots.length + 1;
       const ids = new Set(config.spawnSlots.map(slot => slot.id));
       while (ids.has(`slot_${number}`)) number += 1;
-      const slot = { id: `slot_${number}`, headquarters: { ...position }, startingUnits: [] };
+      const usedControlPoints = new Set(config.spawnSlots.map(slot => slot.controlPointId).filter(Boolean));
+      const availableControlPoint = config.controlPoints.find(point => !usedControlPoints.has(point.id));
+      const slot = {
+        id: `slot_${number}`,
+        headquarters: { ...position },
+        ...(config.mode === 'annihilation' && availableControlPoint ? { controlPointId: availableControlPoint.id } : {}),
+        startingUnits: [],
+      };
       config.spawnSlots.push(slot);
       selected = { type: 'spawnHeadquarters', slotIndex: config.spawnSlots.length - 1, object: slot.headquarters };
       syncAll();
@@ -1402,7 +1605,7 @@
         const nextId = event.target.value.trim();
         const previousId = config.spawnSlots[index].id;
         if (!nextId || config.spawnSlots.some((slot, slotIndex) => slotIndex !== index && slot.id === nextId)) {
-          setStatus('出生槽 ID 必须非空且唯一');
+          setStatus('出生槽 ID 必须非空且唯一', 'err');
           return syncAll();
         }
         config.spawnSlots[index].id = nextId;
@@ -1412,14 +1615,21 @@
         }
         syncAll();
       });
+      row.querySelector('.spawn-control-point')?.addEventListener('change', event => {
+        const controlPointId = event.target.value;
+        if (controlPointId) config.spawnSlots[index].controlPointId = controlPointId;
+        else delete config.spawnSlots[index].controlPointId;
+        syncAll();
+      });
       row.querySelector('.spawn-select').addEventListener('click', () => {
         els.toolOwner.value = config.spawnSlots[index].id;
         selected = { type: 'spawnHeadquarters', slotIndex: index, object: config.spawnSlots[index].headquarters };
+        activateInspectorTab('selection');
         renderSelection();
         drawBoard();
       });
       row.querySelector('.spawn-delete').addEventListener('click', () => {
-        if (config.spawnSlots.length <= 2) return setStatus('至少保留 2 个出生槽');
+        if (config.spawnSlots.length <= 2) return setStatus('至少保留 2 个出生槽', 'err');
         const removed = config.spawnSlots[index].id;
         if (!confirm(`删除出生槽 ${removed} 及其初始单位，并关闭引用它的人数布局，是否继续？`)) return;
         config.spawnSlots.splice(index, 1);
@@ -1436,7 +1646,7 @@
       row.querySelector('.layout-enabled').addEventListener('change', event => {
         if (!event.target.checked) delete config.layouts[count];
         else if (config.spawnSlots.length < count) {
-          setStatus(`${count} 人布局至少需要 ${count} 个出生槽`);
+          setStatus(`${count} 人布局至少需要 ${count} 个出生槽`, 'err');
           delete config.layouts[count];
         } else config.layouts[count] = config.spawnSlots.slice(0, count).map(slot => slot.id);
         syncAll();
@@ -1547,15 +1757,19 @@
             ? config.spawnSlots[selected.slotIndex].startingUnits[selected.unitIndex]
             : config.startingUnits[selected.index];
     const next = { q: Number($('sel-q').value), r: Number($('sel-r').value) };
-    if (!canPlace(next, selected)) return setStatus('目标格越界或已有固定对象');
+    if (!canPlace(next, selected)) return setStatus('目标格越界或已有固定对象', 'err');
     obj.q = next.q;
     obj.r = next.r;
     if (selected.type === 'controlPoint') {
+      const previousId = obj.id;
       obj.id = $('sel-id').value.trim() || obj.id;
       obj.name = $('sel-name').value.trim() || obj.name;
       const kind = $('sel-kind').value;
       if (kind) obj.kind = kind;
       else delete obj.kind;
+      if (obj.id !== previousId) {
+        updateSpawnControlPointReferences(config, previousId, obj.id);
+      }
     }
     if (selected.type === 'startingUnit') {
       obj.owner = $('sel-owner').value;
@@ -1578,6 +1792,7 @@
   function syncAll() {
     syncToolOwnerOptions();
     renderGlobalFields();
+    renderAnnihilationFields();
     renderBalanceFields();
     renderUnitSpecs();
     renderControlTypes();
@@ -1591,21 +1806,21 @@
     const serialized = serializeMapConfig(config);
     const errors = validateMapConfig(serialized, 'export');
     if (errors.length) {
-      setStatus('导出失败：请先修复校验问题');
+      setStatus('导出失败：请先修复校验问题', 'err');
       renderValidation();
       return;
     }
     downloadFile(`${serialized.name || 'map'}.json`, `${JSON.stringify(serialized, null, 2)}\n`, 'application/json');
-    setStatus('地图 JSON 已导出');
+    setStatus('地图 JSON 已导出', 'ok');
   }
 
   function copyJson() {
     const serialized = serializeMapConfig(config);
     const errors = validateMapConfig(serialized, 'copy');
-    if (errors.length) return setStatus('复制失败：请先修复校验问题');
+    if (errors.length) return setStatus('复制失败：请先修复校验问题', 'err');
     const text = `${JSON.stringify(serialized, null, 2)}\n`;
-    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => setStatus('地图 JSON 已复制'));
-    else setStatus('当前浏览器不支持剪贴板复制');
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => setStatus('地图 JSON 已复制', 'ok'));
+    else setStatus('当前浏览器不支持剪贴板复制', 'err');
   }
 
   function importJsonFile(file) {
@@ -1614,16 +1829,18 @@
       try {
         config = normalizeImportedMap(JSON.parse(reader.result));
         comebackSupplyDraft = null;
+        annihilationDraft = null;
         selected = null;
+        activateInspectorTab('map');
         syncAll();
-        setStatus(`已导入 ${file.name}`);
+        setStatus(`已导入 ${file.name}`, 'ok');
       } catch (err) {
-        setStatus(`导入失败：${err.message}`);
+        setStatus(`导入失败：${err.message}`, 'err');
       } finally {
         els.importFile.value = '';
       }
     };
-    reader.onerror = () => setStatus('读取文件失败');
+    reader.onerror = () => setStatus('读取文件失败', 'err');
     reader.readAsText(file);
   }
 
@@ -1631,8 +1848,11 @@
     button.addEventListener('click', () => {
       tool = button.dataset.tool;
       document.querySelectorAll('.tool-button').forEach(btn => btn.classList.toggle('active', btn === button));
-      els.toolHint.textContent = button.textContent;
+      els.toolHint.textContent = button.querySelector('span:last-child')?.textContent?.trim() || button.textContent.trim();
     });
+  });
+  document.querySelectorAll('[data-inspector-tab]').forEach(tab => {
+    tab.addEventListener('click', () => activateInspectorTab(tab.dataset.inspectorTab));
   });
   document.getElementById('btn-zoom-in').addEventListener('click', () => setZoom(zoom + 0.1));
   document.getElementById('btn-zoom-out').addEventListener('click', () => setZoom(zoom - 0.1));
@@ -1640,6 +1860,18 @@
 
   els.mapName.addEventListener('input', () => { config.name = els.mapName.value; renderValidation(); });
   els.mapDescription.addEventListener('input', () => { config.description = els.mapDescription.value; renderValidation(); });
+  els.mapMode.querySelectorAll('[data-mode]').forEach(button => {
+    button.addEventListener('click', () => {
+      const nextMode = button.dataset.mode;
+      if (nextMode === config.mode) return;
+      if (config.mode === 'annihilation') annihilationDraft = deepClone(config.annihilation);
+      config = configureMapMode(config, nextMode, annihilationDraft);
+      selected = null;
+      syncAll();
+      if (nextMode === 'annihilation') activateInspectorTab('rules');
+      setStatus(nextMode === 'annihilation' ? '已切换为歼灭模式，请配置出生据点与炮火参数' : '已切换为普通模式', 'ok');
+    });
+  });
   els.mapRadius.addEventListener('change', () => {
     const next = Number(els.mapRadius.value);
     const preview = resizeMapRadius(config, next, false);
@@ -1655,7 +1887,9 @@
     if (!confirm('新建会清空当前编辑内容，是否继续？')) return;
     config = createDefaultMapConfig();
     comebackSupplyDraft = null;
+    annihilationDraft = null;
     selected = null;
+    activateInspectorTab('map');
     syncAll();
     setStatus('已新建地图');
   });

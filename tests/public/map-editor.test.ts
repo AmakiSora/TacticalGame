@@ -129,7 +129,7 @@ describe('map editor page', () => {
 
   it('preserves annihilation mode, artillery settings, and spawn point ownership links', () => {
     const core = loadCore();
-    const annihilation = JSON.parse(read('maps/annihilation.json'));
+    const annihilation = JSON.parse(read('maps/artillery-zone.json'));
 
     const serialized = core.serializeMapConfig(core.normalizeImportedMap(annihilation));
 
@@ -137,10 +137,24 @@ describe('map editor page', () => {
     expect(serialized.annihilation.artillery).toEqual({
       startRound: 5,
       intervalRounds: 2,
-      damage: 24,
+      damage: 25,
       minimumSafeRadius: 2,
     });
-    expect(serialized.spawnSlots.map((slot: any) => slot.controlPointId)).toEqual(['cp_west', 'cp_east']);
+    expect(serialized.balance.maxTurns).toBe(12);
+    expect(serialized.controlPoints.filter((point: any) => point.kind === 'supply')).toHaveLength(6);
+    expect(serialized.spawnSlots.map((slot: any) => slot.controlPointId)).toEqual([
+      'cp_east',
+      'cp_northeast',
+      'cp_northwest',
+      'cp_west',
+      'cp_southwest',
+      'cp_southeast',
+    ]);
+    expect(serialized.layouts).toEqual({
+      2: ['slot_east', 'slot_west'],
+      3: ['slot_east', 'slot_northwest', 'slot_southwest'],
+      6: ['slot_east', 'slot_northeast', 'slot_northwest', 'slot_west', 'slot_southwest', 'slot_southeast'],
+    });
   });
 
   it('exposes irregular-boundary and 2-8 player layout editing controls', () => {

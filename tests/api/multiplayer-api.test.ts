@@ -75,6 +75,54 @@ describe('multiplayer lobby API', () => {
     expect(invalid.json().code).toBe('unsupported_player_count');
   });
 
+  it.each([2, 3, 6])('creates and starts a %i-player artillery-zone game', async playerCount => {
+    app = await startTestServer();
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      payload: { mapId: 'artillery-zone', maxPlayers: playerCount, participate: true, playerName: 'A' },
+    });
+    expect(createRes.statusCode).toBe(200);
+    const created = createRes.json() as { gameId: string; hostToken: string };
+
+    for (let index = 1; index < playerCount; index++) {
+      const joined = await app.inject({
+        method: 'POST',
+        url: `/api/games/${created.gameId}/join`,
+        payload: { name: String.fromCharCode(65 + index) },
+      });
+      expect(joined.statusCode).toBe(200);
+    }
+
+    const startRes = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/start`,
+      headers: { 'X-Host-Token': created.hostToken },
+    });
+    expect(startRes.statusCode).toBe(200);
+    const game = globalStore.get(created.gameId)!;
+    expect(game.turn.turnOrder).toHaveLength(playerCount);
+    expect(game.units).toHaveLength(playerCount * 3);
+    expect(game.controlPoints.filter(point => point.owner !== null)).toHaveLength(playerCount);
+  });
+
+  it('rejects unsupported player counts for artillery-zone', async () => {
+    app = await startTestServer();
+    const mapsRes = await app.inject({ method: 'GET', url: '/api/maps' });
+    const map = mapsRes.json().maps.find((item: any) => item.id === 'artillery-zone');
+    expect(map.preview.supportedPlayerCounts).toEqual([2, 3, 6]);
+
+    for (const playerCount of [4, 5]) {
+      const invalid = await app.inject({
+        method: 'POST',
+        url: '/api/games',
+        payload: { mapId: 'artillery-zone', maxPlayers: playerCount, participate: true },
+      });
+      expect(invalid.statusCode).toBe(400);
+      expect(invalid.json().code).toBe('unsupported_player_count');
+    }
+  });
+
   it('creates and starts a four-player game on four-corners', async () => {
     app = await startTestServer();
     const createRes = await app.inject({

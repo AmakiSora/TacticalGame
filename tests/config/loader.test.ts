@@ -203,6 +203,77 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('keeps annihilation mode separate from map identity', () => {
+    resetConfig();
+    loadMaps();
+
+    const map = listMaps().find(item => item.id === 'artillery-zone')!;
+
+    expect(map.name).toBe('炮火禁区');
+    expect(map.preview.mode).toBe('annihilation');
+    expect(map.preview.supportedPlayerCounts).toEqual([2, 3, 6]);
+    expect(listMaps().some(item => item.id === 'annihilation')).toBe(false);
+    resetConfig();
+  });
+
+  it('keeps artillery-zone terrain, spawn points and armies rotationally symmetric', () => {
+    resetConfig();
+    loadMaps();
+    const map = getMapConfig('artillery-zone');
+    const rotate = (pos: { q: number; r: number }) => ({ q: -pos.r, r: pos.q + pos.r });
+    const terrain = new Map(map.terrainCells.map(cell => [`${cell.q},${cell.r}`, cell.terrain]));
+    const points = new Set(map.controlPoints.map(point => `${point.q},${point.r}`));
+    const headquarters = new Set(map.spawnSlots.map(slot => `${slot.headquarters.q},${slot.headquarters.r}`));
+    const armies = new Set(map.spawnSlots.flatMap(slot =>
+      slot.startingUnits.map(unit => `${unit.type}:${unit.q},${unit.r}`)));
+
+    for (const cell of map.terrainCells) {
+      const rotated = rotate(cell);
+      expect(terrain.get(`${rotated.q},${rotated.r}`)).toBe(cell.terrain);
+    }
+    for (const point of map.controlPoints) {
+      const rotated = rotate(point);
+      expect(points.has(`${rotated.q},${rotated.r}`)).toBe(true);
+    }
+    for (const slot of map.spawnSlots) {
+      const rotated = rotate(slot.headquarters);
+      expect(headquarters.has(`${rotated.q},${rotated.r}`)).toBe(true);
+      expect(slot.startingUnits.map(unit => unit.type)).toEqual(['infantry', 'infantry', 'heavy']);
+      const direction = slot.id.slice('slot_'.length);
+      const matchingSupply = map.controlPoints.find(point => point.id === `supply_${direction}`)!;
+      const infantry = slot.startingUnits.filter(unit => unit.type === 'infantry');
+      expect(infantry.some(unit =>
+        hexDistance(unit, matchingSupply) <= map.units.infantry.moveRange)).toBe(true);
+      for (const unit of slot.startingUnits) {
+        const rotatedUnit = rotate(unit);
+        expect(armies.has(`${unit.type}:${rotatedUnit.q},${rotatedUnit.r}`)).toBe(true);
+      }
+    }
+    expect(map.controlPoints.filter(point => point.kind === 'forward_base')).toHaveLength(6);
+    expect(map.controlPoints.filter(point => point.kind === 'supply')).toHaveLength(6);
+    expect(map.controlPoints.filter(point => point.kind === 'forward_base')
+      .every(point => hexDistance(point, { q: 0, r: 0 }) === 4)).toBe(true);
+    expect(map.controlPoints.filter(point => point.kind === 'supply')
+      .every(point => hexDistance(point, { q: 0, r: 0 }) === 3)).toBe(true);
+    expect(map.balance).toMatchObject({
+      baseIncome: 8,
+      actionsPerTurn: 4,
+      maxTurns: 12,
+      controlPointTypes: {
+        forward_base: { income: 4 },
+        supply: { income: 8 },
+      },
+    });
+    const middlePhaseIncome = 4 * (8 + 4 + 8);
+    expect(Math.floor(middlePhaseIncome / map.units.scout.cost)).toBe(2);
+    expect(map.layouts).toEqual({
+      2: ['slot_east', 'slot_west'],
+      3: ['slot_east', 'slot_northwest', 'slot_southwest'],
+      6: ['slot_east', 'slot_northeast', 'slot_northwest', 'slot_west', 'slot_southwest', 'slot_southeast'],
+    });
+    resetConfig();
+  });
+
   it('loads legacy radius maps and irregular maps into the same authoritative cell model', () => {
     resetConfig();
     loadMaps();

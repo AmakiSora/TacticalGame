@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。
 
-当前版本：`3.2.1`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
+当前版本：`3.2.3`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
 ## 技术栈
 
@@ -216,7 +216,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 异形地图可另外声明 `"playableCells": [{ "q": 0, "r": 0 }, { "q": 1, "r": 0 }]`。该字段可选；省略时，加载器按 `max(abs(q), abs(r), abs(-q-r)) <= radius` 展开完整六边形。声明时可组成任意连通的凹形、凸形或带孔洞边界，但每个坐标仍须位于 `radius` 包络内。加载后所有地图都会得到完整权威格子列表，移动、部署、爆破、寻路和绘图都以该列表为准。`GET /api/maps` 的 `preview.cells` 也始终返回已经解析并带地形的预览格子。
 
-歼灭地图另外声明 `mode: "annihilation"`、`annihilation.artillery`，并让每个 `spawnSlots[]` 通过 `controlPointId` 关联一个唯一出生据点。炮火参数包含首次生效轮次 `startRound`、收缩间隔 `intervalRounds`、每轮伤害 `damage` 和最终安全半径 `minimumSafeRadius`。当前内置 `annihilation` 地图在第 4 轮预告，第 5 轮首次生效，此后每两轮收缩一层。
+歼灭模式地图另外声明 `mode: "annihilation"`、`annihilation.artillery`，并让每个 `spawnSlots[]` 通过 `controlPointId` 关联一个唯一出生据点。炮火参数包含首次生效轮次 `startRound`、收缩间隔 `intervalRounds`、每轮伤害 `damage` 和最终安全半径 `minimumSafeRadius`。当前内置歼灭模式地图“炮火禁区”（`artillery-zone`）支持 2、3、6 人，采用六向旋转对称出生布局，共 12 轮：第 1–4 轮争夺内圈补给点，第 5–8 轮利用额外收入扩军，第 9–12 轮外圈与内圈据点依次被炮火覆盖。炮火在第 4 轮预告、第 5 轮首次收缩，此后每两轮收缩一层。
 
 未列在 `terrainCells` 的可用格默认为 `plain`。地图编辑器支持添加和移除地块，并可维护 2–8 个出生槽及对应人数布局；移除包含对象的格子会被阻止，避免隐式丢失配置。
 

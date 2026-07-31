@@ -182,7 +182,7 @@ describe('AI player skill documentation', () => {
   it('documents multiplayer lobby flow and host/player separation', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
-    expect(skill).toContain('3.2.1');
+    expect(skill).toContain('3.2.3');
     expect(skill).toContain('## Multiplayer Setup');
     expect(skill).toContain('player_a');
     expect(skill).toContain('player_h');
@@ -340,13 +340,13 @@ describe('AI player strategy', () => {
     }
   });
 
-  it('targets the nearest enemy army when annihilation mode has no headquarters', async () => {
+  it('captures supplies early and targets the nearest enemy army afterward in annihilation mode', async () => {
     const app = await startTestServer();
     try {
       const createRes = await app.inject({
         method: 'POST',
         url: '/api/games',
-        payload: { mapId: 'annihilation', maxPlayers: 2, playerName: 'A' },
+        payload: { mapId: 'artillery-zone', maxPlayers: 2, playerName: 'A' },
       });
       const created = createRes.json() as { gameId: string; hostToken: string };
       await app.inject({ method: 'POST', url: `/api/games/${created.gameId}/join`, payload: { name: 'B' } });
@@ -357,14 +357,19 @@ describe('AI player strategy', () => {
       });
       const game = globalStore.get(created.gameId)! as any;
       const owner = game.turn.currentPlayerId;
-      const unit = game.units.find((candidate: any) => candidate.owner === owner);
+      const unit = game.units.find((candidate: any) => candidate.owner === owner && candidate.type === 'infantry');
       const ai = await import('../../skill/ai-player.mjs');
 
-      const goal = ai.movementGoal(game, owner, unit);
-
       expect(game.headquarters).toEqual({});
-      expect(goal.owner).not.toBe(owner);
-      expect(goal.alive).toBe(true);
+      const earlyGoal = ai.movementGoal(game, owner, unit);
+      expect(earlyGoal.kind).toBe('supply');
+      expect(earlyGoal.owner).toBeNull();
+
+      game.turn.roundNumber = 5;
+      game.turn.turnNumber = 5;
+      const middleGoal = ai.movementGoal(game, owner, unit);
+      expect(middleGoal.owner).not.toBe(owner);
+      expect(middleGoal.alive).toBe(true);
     } finally {
       await app.close();
     }

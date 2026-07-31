@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-This skill teaches manual operation of the Hex multiplayer game (app version `3.2.1`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
+This skill teaches manual operation of the Hex multiplayer game (app version `3.2.3`). Think through each turn from the current state, choose legal actions, call the matching REST endpoint, then refresh state before deciding again.
 
 Do not run `node skill/ai-player.mjs` to delegate the turn. That script may exist for tests or automated demos, but this skill is for agent reasoning and direct game operation.
 
@@ -51,7 +51,7 @@ Typical flow:
 5. Host starts when at least 2 players are present and the map supports that count: `POST /api/games/:id/start` with `X-Host-Token`.
 6. Play until elimination leaves one survivor, or adjudication at the map max round.
 
-Map support is not universal: most maps are 2-player only. `multiplayer-ring` supports 2/3/6 players (symmetric ring spawns), while `four-corners` supports exactly 4 players. Prefer `GET /api/maps` and each map's `preview.supportedPlayerCounts` over hardcoded compatibility rules. Creating with an unsupported `maxPlayers` returns `unsupported_player_count`.
+Map support is not universal: most maps are 2-player only. `multiplayer-ring` and the annihilation-mode `artillery-zone` support 2/3/6 players with symmetric spawns, while `four-corners` supports exactly 4 players. Prefer `GET /api/maps` and each map's `preview.supportedPlayerCounts` over hardcoded compatibility rules. Creating with an unsupported `maxPlayers` returns `unsupported_player_count`.
 
 ## API
 
@@ -86,7 +86,7 @@ If `POST /join` returns `game_already_full` or `game_already_started`, report th
 ## Rules To Remember
 
 - Check `game.config.mode` before choosing a strategy. In `annihilation` mode there are no headquarters; a player is eliminated as soon as their final living unit dies, and the last surviving player wins.
-- In annihilation mode, inspect `game.artillery.dangerCells`, `warningCells`, and `nextShrinkRound` before every action. Danger-zone units take configured damage at each round boundary, and deployment, healing, and control-point repair are disabled there. Move exposed units inward while closing on the nearest enemy army.
+- In annihilation mode, inspect `game.artillery.dangerCells`, `warningCells`, and `nextShrinkRound` before every action. Danger-zone units take configured damage at each round boundary, and deployment, healing, and control-point repair are disabled there. During the first four rounds, send capture-capable units toward safe neutral `supply` points; from round 5 onward, move exposed units inward while closing on the nearest enemy army.
 - Coordinates are pointy-top axial hex `{ q, r }`.
 - Hex distance is `max(abs(dq), abs(dr), abs(ds))`, where `s = -q-r`.
 - `game.cells` is the authoritative playable boundary. Never infer whether a coordinate is playable from `map.radius`; radius is only compatibility and display metadata.
@@ -134,7 +134,7 @@ Do not use V1 concepts: `x/y`, Manhattan distance, buildings, miners, production
 
 ## Decision Heuristic
 
-For `annihilation` mode, replace the standard headquarters heuristic with: take any safe legal kill, leave danger and warning cells, advance toward the nearest living enemy, focus fire until units die, and deploy only from safe owned points into safe cells. Never wait for adjudication while an attack or inward advance is available.
+For `annihilation` mode, replace the standard headquarters heuristic with: take any safe legal kill, contest safe neutral `supply` points during rounds 1–4, leave danger and warning cells, advance toward the nearest living enemy from round 5 onward, focus fire until units die, and deploy only from safe owned points into safe cells. Never wait for adjudication while an attack or inward advance is available.
 
 Use this order unless the user asks for a different style:
 

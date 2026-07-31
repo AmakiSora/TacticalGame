@@ -12,6 +12,9 @@ import { controlPointIncome, controlPointTypeSpec } from './controlPoints.js';
 import { addLobbyPlayer, initializeLobbyGame } from '../state/store.js';
 import { artilleryStateForRound, isArtilleryDanger } from './artillery.js';
 
+const ANNIHILATION_ACTION_SCORE_PER_POINT = 10;
+const STANDARD_ACTION_SCORE_PER_POINT = 2;
+
 export function joinedPlayerIds(game: GameState): PlayerId[] {
   return PLAYER_IDS.filter(id => game.players[id]);
 }
@@ -165,6 +168,11 @@ function armyValue(game: GameState, owner: PlayerId): number {
     .reduce((sum, unit) => sum + Math.round(unit.cost * (unit.hp / unit.maxHp)), 0);
 }
 
+function actionScorePerPoint(game: GameState): number {
+  return game.config.balance.adjudicationWeights.actionPoints
+    ?? (game.config.mode === 'annihilation' ? ANNIHILATION_ACTION_SCORE_PER_POINT : STANDARD_ACTION_SCORE_PER_POINT);
+}
+
 function scorePlayer(game: GameState, owner: PlayerId): AdjudicationScore {
   const weights = game.config.balance.adjudicationWeights;
   const headquartersDamage = game.players[owner]?.stats.headquartersDamage ?? 0;
@@ -172,20 +180,26 @@ function scorePlayer(game: GameState, owner: PlayerId): AdjudicationScore {
   const controlPoints = game.controlPoints.filter(point => point.owner === owner).length;
   const army = armyValue(game, owner);
   const supplies = game.resources[owner]?.supplies ?? 0;
+  const actionScore = (game.players[owner]?.stats.actionPointsUsed ?? 0) * actionScorePerPoint(game);
   return {
-    headquartersDamage, ownHqHp, controlPoints, armyValue: army, supplies,
+    headquartersDamage, ownHqHp, controlPoints, armyValue: army, supplies, actionScore,
     total:
       headquartersDamage * weights.enemyHqDamage +
       ownHqHp * weights.ownHqHp +
       controlPoints * weights.controlPoint +
       army * weights.armyValue +
-      supplies * weights.supplies,
+      supplies * weights.supplies + actionScore,
   };
 }
 
 export function buildAdjudicationScores(game: GameState): PlayerRecord<AdjudicationScore> {
   const scores: PlayerRecord<AdjudicationScore> = {};
-  for (const id of joinedPlayerIds(game)) scores[id] = scorePlayer(game, id);
+  for (const id of joinedPlayerIds(game)) {
+    const player = game.players[id];
+    scores[id] = player?.status === 'eliminated' && player.adjudicationScore
+      ? { ...player.adjudicationScore }
+      : scorePlayer(game, id);
+  }
   return scores;
 }
 
@@ -213,7 +227,7 @@ export function buildAdjudicationSnapshot(game: GameState): AdjudicationSnapshot
   const margin = sortedTotals.length >= 2 ? sortedTotals[0] - sortedTotals[1] : (sortedTotals[0] ?? 0);
   return {
     maxTurns: game.config.balance.maxTurns,
-    weights: { ...game.config.balance.adjudicationWeights },
+    weights: { ...game.config.balance.adjudicationWeights, actionPoints: actionScorePerPoint(game) },
     scores,
     rankings,
     leaders,
@@ -308,8 +322,11 @@ function markPlayerEliminated(
   playerId: PlayerId,
   reason: EliminationReason,
   eliminatedBy: PlayerId | null,
+  capturedScore?: AdjudicationScore,
 ): void {
   const player = game.players[playerId]!;
+  const eliminationScore = capturedScore || scorePlayer(game, playerId);
+  if (eliminationScore) player.adjudicationScore = { ...eliminationScore };
   player.status = 'eliminated';
   player.eliminatedAt = Date.now();
   player.eliminatedBy = eliminatedBy;
@@ -328,6 +345,7 @@ function markPlayerEliminated(
   if (hq) { hq.alive = false; hq.hp = 0; }
   appendEvent(game, bus, 'player_eliminated', {
     playerId, reason, eliminatedBy, removedUnitIds, neutralizedPointIds,
+    score: eliminationScore,
   });
 }
 
@@ -337,7 +355,8 @@ function resolveAnnihilationWipes(game: GameState, bus: EventBus): boolean {
   const wiped = activeBefore.filter(owner => !game.units.some(unit => unit.owner === owner && unit.alive));
   if (wiped.length === 0) return false;
 
-  for (const owner of wiped) markPlayerEliminated(game, bus, owner, 'artillery_destroyed', null);
+  const scores = new Map(wiped.map(owner => [owner, scorePlayer(game, owner)] as const));
+  for (const owner of wiped) markPlayerEliminated(game, bus, owner, 'artillery_destroyed', null, scores.get(owner));
   const activeAfter = activePlayerIds(game);
   if (activeAfter.length <= 1) {
     endGame(

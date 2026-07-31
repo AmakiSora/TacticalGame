@@ -41,6 +41,7 @@ export interface PlayerStats {
   headquartersDamage: number;
   unitsDestroyed: number;
   playersEliminated: number;
+  actionPointsUsed: number;
 }
 
 export interface PlayerState {
@@ -53,6 +54,8 @@ export interface PlayerState {
   eliminatedAt: number | null;
   eliminatedBy: PlayerId | null;
   stats: PlayerStats;
+  /** Final score captured before this player's army is removed. */
+  adjudicationScore?: AdjudicationScore;
 }
 
 export interface Unit {
@@ -166,6 +169,7 @@ export interface AdjudicationScore {
   controlPoints: number;
   armyValue: number;
   supplies: number;
+  actionScore: number;
   total: number;
 }
 
@@ -189,6 +193,8 @@ export interface AdjudicationWeights {
   controlPoint: number;
   armyValue: number;
   supplies: number;
+  /** Optional per-action-point score; defaults to 10 in annihilation and 2 in standard mode. */
+  actionPoints?: number;
 }
 
 /** Live adjudication snapshot attached to GET /api/games/:id responses. */

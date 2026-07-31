@@ -275,6 +275,14 @@ function cloneMapPayload(map = {}) {
   };
 }
 
+function recordActionPoint(s, owner, payload) {
+  if (!owner || typeof payload.actionsUsed !== 'number' || payload.actionsUsed <= (s.turn.actionsUsed ?? 0)) return;
+  const player = s.players?.[owner];
+  if (!player) return;
+  if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0 };
+  player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - (s.turn.actionsUsed ?? 0);
+}
+
 function applyEvent(s, ev) {
   if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
   s.eventLog.push(ev);
@@ -301,6 +309,7 @@ function applyEvent(s, ev) {
       computeLayout(s.cells);
       break;
     case 'deploy':
+      recordActionPoint(s, p.owner, p);
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies -= p.cost || 0;
       s.units.set(p.unitId, {
@@ -314,6 +323,7 @@ function applyEvent(s, ev) {
       break;
     case 'move': {
       const u = s.units.get(p.unitId);
+      recordActionPoint(s, p.owner || u?.owner, p);
       if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; u.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -321,6 +331,7 @@ function applyEvent(s, ev) {
     case 'attack': {
       const target = s.units.get(p.targetId) || s.headquarters.get(p.targetId);
       const a = s.units.get(p.attackerId);
+      recordActionPoint(s, p.owner || a?.owner, p);
       const previousHp = target ? target.hp : null;
       if (target) target.hp = p.targetHp;
       if (a) { a.hasActed = true; a.actionSpent = true; }
@@ -328,7 +339,7 @@ function applyEvent(s, ev) {
       if (target && previousHp != null && (p.targetKind === 'headquarters' || s.headquarters.has(p.targetId)) && a) {
         const player = s.players[a.owner];
         if (player) {
-          if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0 };
+          if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0 };
           const actualDamage = Math.max(0, previousHp - (Number(p.targetHp) || 0));
           player.stats.headquartersDamage += actualDamage;
         }
@@ -340,6 +351,7 @@ function applyEvent(s, ev) {
       const target = s.units.get(p.targetId);
       if (target) target.hp = p.targetHp;
       const support = s.units.get(p.supportId);
+      recordActionPoint(s, p.owner || support?.owner, p);
       if (support) { support.hasActed = true; support.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -402,7 +414,10 @@ function applyEvent(s, ev) {
     case 'turn_skipped':
       break;
     case 'player_eliminated':
-      if (s.players[p.playerId]) s.players[p.playerId].status = 'eliminated';
+      if (s.players[p.playerId]) {
+        s.players[p.playerId].status = 'eliminated';
+        if (p.score && typeof p.score === 'object') s.players[p.playerId].adjudicationScore = p.score;
+      }
       for (const id of p.removedUnitIds || []) s.units.delete(id);
       for (const hq of s.headquarters.values()) {
         if (hq.owner === p.playerId) {
@@ -431,6 +446,7 @@ function applyEvent(s, ev) {
     case 'demolish': {
       setCellTerrain(s, p.q, p.r, p.toTerrain || 'plain');
       const u = s.units.get(p.unitId);
+      recordActionPoint(s, p.owner || u?.owner, p);
       if (u) { u.hasActed = true; u.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -806,8 +822,12 @@ function formatEventShort(ev) {
 function playerScore(owner) {
   const weights = gameConfig?.balance?.adjudicationWeights;
   if (!weights || !state) return null;
+  const preserved = state.players?.[owner]?.status === 'eliminated'
+    ? state.players[owner].adjudicationScore
+    : null;
+  if (preserved) return { ...preserved };
   const ownHq = [...state.headquarters.values()].find(h => h.owner === owner);
-  if (!ownHq) return null;
+  if (!ownHq && gameConfig?.mode !== 'annihilation') return null;
   // Prefer per-player cumulative HQ damage from attack events (server-compatible).
   // Fall back to total enemy HQ damage only when stats are unavailable (legacy replays).
   const tracked = state.players?.[owner]?.stats?.headquartersDamage;
@@ -816,12 +836,15 @@ function playerScore(owner) {
     : [...state.headquarters.values()]
       .filter(h => h.owner !== owner)
       .reduce((sum, hq) => sum + Math.max(0, (hq.maxHp || 0) - (hq.hp || 0)), 0);
-  const ownHqHp = Math.max(0, ownHq.hp || 0);
+  const ownHqHp = ownHq ? Math.max(0, ownHq.hp || 0) : 0;
   const controlPoints = [...state.controlPoints.values()].filter(p => p.owner === owner).length;
   const armyValue = [...state.units.values()]
     .filter(u => u.owner === owner && u.alive)
     .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
   const supplies = state.resources?.[owner]?.supplies || 0;
+  const actionScorePerPoint = gameConfig?.balance?.adjudicationWeights?.actionPoints
+    ?? (gameConfig?.mode === 'annihilation' ? 10 : 2);
+  const actionScore = (state.players?.[owner]?.stats?.actionPointsUsed ?? 0) * actionScorePerPoint;
   return {
     headquartersDamage,
     enemyHqDamage: headquartersDamage,
@@ -829,12 +852,13 @@ function playerScore(owner) {
     controlPoints,
     armyValue,
     supplies,
+    actionScore,
     total:
       headquartersDamage * weights.enemyHqDamage +
       ownHqHp * weights.ownHqHp +
       controlPoints * weights.controlPoint +
       armyValue * weights.armyValue +
-      supplies * weights.supplies,
+      supplies * weights.supplies + actionScore,
   };
 }
 
@@ -858,8 +882,8 @@ function liveAdjudicationRankings() {
 
 function scoreBreakdown(score) {
   const hqDamage = score.headquartersDamage ?? score.enemyHqDamage ?? 0;
-  if (gameConfig?.mode === 'annihilation') return `存活兵力 ${score.armyValue} · 补给 ${score.supplies}`;
-  return `HQ伤害 ${hqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies}`;
+  if (gameConfig?.mode === 'annihilation') return `存活兵力 ${score.armyValue} · 行动分 ${score.actionScore ?? 0}`;
+  return `HQ伤害 ${hqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies} · 行动分 ${score.actionScore ?? 0}`;
 }
 
 function renderScorePanel() {

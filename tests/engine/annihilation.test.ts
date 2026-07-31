@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/events/bus.js';
 import { attackTarget } from '../../src/engine/combat.js';
 import { deployUnit } from '../../src/engine/deployment.js';
-import { endTurn, startGame } from '../../src/engine/engine.js';
+import { buildAdjudicationScores, eliminatePlayer, endTurn, startGame } from '../../src/engine/engine.js';
 import { isArtilleryDanger } from '../../src/engine/artillery.js';
-import { findReachableCells } from '../../src/engine/validation.js';
+import { moveUnit } from '../../src/engine/units.js';
+import { consumeAction, findReachableCells } from '../../src/engine/validation.js';
 import { addLobbyPlayer, createLobby } from '../../src/state/store.js';
 
 function createAnnihilationGame(playerCount = 2) {
@@ -92,6 +93,44 @@ describe('annihilation mode', () => {
     expect(game.winner).toBe(attackerOwner);
     expect(game.result?.reason).toBe('last_player_standing');
     expect(game.events.find(event => event.type === 'player_eliminated')?.payload.reason).toBe('army_destroyed');
+  });
+
+  it('preserves a player score when annihilation removes their army', () => {
+    const { game, bus } = createAnnihilationGame(3);
+    const victim = 'player_b';
+    const before = buildAdjudicationScores(game)[victim];
+
+    expect(eliminatePlayer(game, bus, victim, 'host_eliminated', null)).toMatchObject({ ok: true });
+    expect(game.players[victim]?.adjudicationScore).toEqual(before);
+    expect(buildAdjudicationScores(game)[victim]).toEqual(before);
+    expect(game.events.find(event => event.type === 'player_eliminated')?.payload).toMatchObject({ score: before });
+  });
+
+  it('adds ten score for every action point actually spent', () => {
+    const { game, bus } = createAnnihilationGame();
+    const owner = game.turn.currentPlayerId!;
+    const unit = game.units.find(candidate => candidate.owner === owner)!;
+    const destination = findReachableCells(game, unit)[0]!;
+    const before = buildAdjudicationScores(game)[owner]!;
+
+    expect(moveUnit(game, bus, owner, unit.id, destination.q, destination.r)).toMatchObject({ ok: true });
+
+    const after = buildAdjudicationScores(game)[owner]!;
+    expect(game.players[owner]?.stats.actionPointsUsed).toBe(1);
+    expect(after.actionScore).toBe(10);
+    expect(after.total - before.total).toBe(10);
+  });
+
+  it('does not score a free follow-up action twice for the same unit', () => {
+    const { game } = createAnnihilationGame();
+    const owner = game.turn.currentPlayerId!;
+    const unit = game.units.find(candidate => candidate.owner === owner)!;
+
+    expect(consumeAction(game, unit)).toMatchObject({ ok: true });
+    expect(consumeAction(game, unit)).toMatchObject({ ok: true });
+
+    expect(game.players[owner]?.stats.actionPointsUsed).toBe(1);
+    expect(buildAdjudicationScores(game)[owner]?.actionScore).toBe(10);
   });
 
   it('raises turn income from 12 to 20 after capturing an inner supply point', () => {

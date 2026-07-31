@@ -3,7 +3,7 @@ import { EventBus } from '../../src/events/bus.js';
 import { attackTarget } from '../../src/engine/combat.js';
 import { demolishTerrain } from '../../src/engine/demolition.js';
 import { deployUnit } from '../../src/engine/deployment.js';
-import { endTurn, eliminatePlayer, startGame } from '../../src/engine/engine.js';
+import { buildAdjudicationScores, endTurn, eliminatePlayer, startGame } from '../../src/engine/engine.js';
 import { moveUnit } from '../../src/engine/units.js';
 import { findReachableCells, isInBounds } from '../../src/engine/validation.js';
 import { addLobbyPlayer, createLobby } from '../../src/state/store.js';
@@ -86,6 +86,7 @@ describe('multiplayer free-for-all engine', () => {
     // Give victim a control point so neutralization is observable.
     const point = game.controlPoints[0];
     point.owner = victim;
+    const scoreBeforeElimination = buildAdjudicationScores(game)[victim];
 
     const result = eliminatePlayer(game, bus, victim, 'host_eliminated', attacker);
     expect(result.ok).toBe(true);
@@ -95,7 +96,25 @@ describe('multiplayer free-for-all engine', () => {
     expect(point.owner).toBeNull();
     expect(game.events.some(e => e.type === 'player_eliminated')).toBe(true);
     expect(game.events.some(e => e.type === 'control_point_neutralized')).toBe(true);
+    expect(game.players[victim]?.adjudicationScore).toEqual(scoreBeforeElimination);
+    expect(buildAdjudicationScores(game)[victim]).toEqual(scoreBeforeElimination);
+    expect(game.events.find(e => e.type === 'player_eliminated')?.payload.score).toEqual(scoreBeforeElimination);
     expect(game.winner).toBeNull();
+  });
+
+  it('adds the lower standard-mode action score for an action point spent', () => {
+    const { game, bus } = createThreePlayerGame();
+    const owner = game.turn.currentPlayerId!;
+    const unit = game.units.find(candidate => candidate.owner === owner)!;
+    const destination = findReachableCells(game, unit)[0]!;
+    const before = buildAdjudicationScores(game)[owner]!;
+
+    expect(moveUnit(game, bus, owner, unit.id, destination.q, destination.r)).toMatchObject({ ok: true });
+
+    const after = buildAdjudicationScores(game)[owner]!;
+    expect(game.players[owner]?.stats.actionPointsUsed).toBe(1);
+    expect(after.actionScore).toBe(2);
+    expect(after.total - before.total).toBe(2);
   });
 
   it('ends the match only when the second-to-last player is eliminated', () => {

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type {
   GameState, Headquarters, MapCell, PlayerId, PlayerState, Unit, UnitType,
 } from '../types.js';
-import { PLAYER_IDS } from '../types.js';
+import { isPlayerId, PLAYER_IDS } from '../types.js';
 import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
 import { createMapCells } from '../config/geometry.js';
@@ -52,7 +52,7 @@ export function createPlayer(id: PlayerId, name?: string): PlayerState {
     turnOrder: null,
     eliminatedAt: null,
     eliminatedBy: null,
-    stats: { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0 },
+    stats: { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0 },
   };
 }
 
@@ -213,6 +213,52 @@ export function createInitialGame(id: string, mapId = 'default'): GameState {
   return game;
 }
 
+function restoreActionPointStats(game: GameState): void {
+  const totals = new Map<PlayerId, number>();
+  const unitOwners = new Map<string, PlayerId>();
+  let actionsUsed = 0;
+
+  for (const event of game.events || []) {
+    const payload = event.payload || {};
+    if (event.type === 'game_start') {
+      actionsUsed = 0;
+      const units = Array.isArray(payload.units) ? payload.units : [];
+      for (const unit of units) {
+        if (!unit || typeof unit !== 'object') continue;
+        const row = unit as Record<string, unknown>;
+        if (typeof row.id === 'string' && isPlayerId(row.owner)) unitOwners.set(row.id, row.owner);
+      }
+      continue;
+    }
+    if (event.type === 'turn_end' || event.type === 'reset_actions') {
+      actionsUsed = typeof payload.actionsUsed === 'number' ? payload.actionsUsed : 0;
+      continue;
+    }
+
+    let owner = isPlayerId(payload.owner) ? payload.owner : null;
+    if (event.type === 'deploy' && typeof payload.unitId === 'string' && owner) {
+      unitOwners.set(payload.unitId, owner);
+    }
+    if (!owner) {
+      const unitId = event.type === 'attack' ? payload.attackerId
+        : event.type === 'heal' ? payload.supportId
+          : payload.unitId;
+      if (typeof unitId === 'string') owner = unitOwners.get(unitId) ?? null;
+    }
+    if (!['deploy', 'move', 'attack', 'heal', 'demolish'].includes(event.type)) continue;
+    if (!owner || typeof payload.actionsUsed !== 'number') continue;
+    if (payload.actionsUsed > actionsUsed) {
+      totals.set(owner, (totals.get(owner) ?? 0) + payload.actionsUsed - actionsUsed);
+    }
+    actionsUsed = payload.actionsUsed;
+  }
+
+  for (const id of PLAYER_IDS) {
+    const stats = game.players[id]?.stats;
+    if (stats) stats.actionPointsUsed = totals.get(id) ?? 0;
+  }
+}
+
 export class GameStore {
   private games: Map<string, GameState> = new Map();
   private persistenceFileOverride: string | null | undefined;
@@ -241,7 +287,11 @@ export class GameStore {
         return;
       }
       this.games.clear();
-      for (const game of parsed.games) if (game && typeof game.id === 'string') this.games.set(game.id, game);
+      for (const game of parsed.games) {
+        if (!game || typeof game.id !== 'string') continue;
+        restoreActionPointStats(game);
+        this.games.set(game.id, game);
+      }
       console.log(`[game:persist] loaded ${this.games.size} games from ${file}`);
     } catch (err) {
       this.games.clear();

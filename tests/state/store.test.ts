@@ -48,6 +48,31 @@ describe('GameStore persistence', () => {
     expect(persisted.games).toEqual([]);
   });
 
+  it('restores cumulative action points for legacy persisted games', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    const game = createInitialGame('legacy-actions');
+    delete (game.players.player_a!.stats as Partial<typeof game.players.player_a.stats>).actionPointsUsed;
+    delete (game.players.player_b!.stats as Partial<typeof game.players.player_b.stats>).actionPointsUsed;
+    game.events = [
+      { seq: 1, type: 'game_start', timestamp: 1, payload: { units: [
+        { id: 'unit-a', owner: 'player_a' }, { id: 'unit-b', owner: 'player_b' },
+      ] } },
+      { seq: 2, type: 'move', timestamp: 2, payload: { unitId: 'unit-a', owner: 'player_a', actionsUsed: 1 } },
+      { seq: 3, type: 'attack', timestamp: 3, payload: { attackerId: 'unit-a', actionsUsed: 1 } },
+      { seq: 4, type: 'deploy', timestamp: 4, payload: { unitId: 'unit-c', owner: 'player_a', actionsUsed: 2 } },
+      { seq: 5, type: 'turn_end', timestamp: 5, payload: {} },
+      { seq: 6, type: 'move', timestamp: 6, payload: { unitId: 'unit-b', owner: 'player_b', actionsUsed: 1 } },
+    ];
+    store.save(game);
+
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    expect(restored.get('legacy-actions')!.players.player_a!.stats.actionPointsUsed).toBe(2);
+    expect(restored.get('legacy-actions')!.players.player_b!.stats.actionPointsUsed).toBe(1);
+  });
+
   it('keeps the store empty when the persistence file is invalid', () => {
     const file = tempFile();
     writeFileSync(file, '{ bad json');

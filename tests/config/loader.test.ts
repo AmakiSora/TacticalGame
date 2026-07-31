@@ -124,6 +124,16 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('validates the optional action point adjudication weight', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as unknown as BrokenMap;
+    (map.balance.adjudicationWeights as Record<string, unknown>).actionPoints = 'invalid';
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('adjudicationWeights.actionPoints must be a number >= 0');
+    resetConfig();
+  });
+
   it('requires full control point type config when any control point is typed', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as unknown as BrokenMap;

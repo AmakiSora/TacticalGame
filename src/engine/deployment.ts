@@ -55,6 +55,8 @@ export function deployUnit(
   }
 
   game.turn.actionsUsed += 1;
+  const stats = game.players[owner]?.stats;
+  if (stats) stats.actionPointsUsed = (stats.actionPointsUsed ?? 0) + 1;
 
   resources.supplies -= actualCost;
   const unit = createUnitFromConfig(game.config, owner, unitType, q, r);

@@ -75,6 +75,8 @@ export function consumeAction(game: GameState, unit: Unit): Result {
     return { ok: false, code: 'action_limit_reached', message: `only ${limit} actions allowed per turn` };
   }
   game.turn.actionsUsed += 1;
+  const stats = game.players[unit.owner]?.stats;
+  if (stats) stats.actionPointsUsed = (stats.actionPointsUsed ?? 0) + 1;
   unit.actionSpent = true;
   return { ok: true };
 }

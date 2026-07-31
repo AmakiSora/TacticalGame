@@ -106,11 +106,11 @@ describe('hex V2 rules', () => {
     game.units = [];
     const scores = buildAdjudicationScores(game);
     expect(scores.player_b.controlPoints).toBe(3);
-    expect(scores.player_b.total).toBe(180 * 2 + 3 * 90 + game.players.player_b!.stats.actionPointsUsed * 2);
+    expect(scores.player_b.total).toBe(180 * 2 + 3 * 90 + game.players.player_b!.stats.actionMerit * 2);
     const snapshot = buildAdjudicationSnapshot(game);
     expect(snapshot.scores).toEqual(scores);
     expect(snapshot.maxTurns).toBe(game.config.balance.maxTurns);
-    expect(snapshot.weights).toEqual({ ...game.config.balance.adjudicationWeights, actionPoints: 2 });
+    expect(snapshot.weights).toEqual({ ...game.config.balance.adjudicationWeights, effectiveActions: 2 });
     expect(snapshot.leaders).toEqual(['player_b']);
     expect(snapshot.margin).toBe(scores.player_b.total - scores.player_a.total);
   });

@@ -7,6 +7,7 @@ import { consumeAction, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
 import { eliminatePlayer } from './engine.js';
 import { isArtilleryDanger } from './artillery.js';
+import { addActionMerit, effectActionMerit } from './actionScore.js';
 
 type Target =
   | { kind: 'unit'; entity: Unit }
@@ -68,11 +69,14 @@ export function attackTarget(
   if (target.kind === 'headquarters' && game.players[owner]) {
     game.players[owner]!.stats.headquartersDamage += actualDamage;
   }
+  addActionMerit(game, owner, effectActionMerit(actualDamage));
   attacker.hasActed = true;
   appendEvent(game, bus, 'attack', {
+    owner,
     attackerId,
     targetId,
     damage,
+    actualDamage,
     targetHp: target.entity.hp,
     targetKind: target.kind,
     actionsUsed: game.turn.actionsUsed,
@@ -133,9 +137,10 @@ export function healTarget(
   const amount = rollHeal(game, support);
   const healed = Math.min(target.maxHp - target.hp, amount);
   target.hp += healed;
+  addActionMerit(game, owner, effectActionMerit(healed));
   support.hasActed = true;
   appendEvent(game, bus, 'heal', {
-    supportId, targetId, amount: healed, targetHp: target.hp,
+    owner, supportId, targetId, amount: healed, targetHp: target.hp,
     actionsUsed: game.turn.actionsUsed, actionsRemaining: actionsRemaining(game),
   });
   return { ok: true };

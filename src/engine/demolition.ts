@@ -4,6 +4,7 @@ import type { Result } from './result.js';
 import { appendEvent } from './events.js';
 import { hexDistance } from './hex.js';
 import { actionsRemaining, consumeAction, getCellOccupant, getTerrain, isInBounds } from './validation.js';
+import { ACTION_MERIT, addActionMerit } from './actionScore.js';
 
 function setTerrain(game: GameState, q: number, r: number, terrain: 'plain'): void {
   const cell = game.cells.find(c => c.q === q && c.r === r);
@@ -39,6 +40,7 @@ export function demolishTerrain(
 
   setTerrain(game, q, r, 'plain');
   unit.hasActed = true;
+  addActionMerit(game, owner, ACTION_MERIT.demolish);
   appendEvent(game, bus, 'demolish', {
     unitId,
     owner,

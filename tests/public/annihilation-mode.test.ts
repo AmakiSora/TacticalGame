@@ -40,7 +40,10 @@ describe('annihilation mode UI', () => {
       const source = read(file);
       expect(source).toContain("if (!ownHq && gameConfig?.mode !== 'annihilation') return null;");
       expect(source).toContain('const ownHqHp = ownHq ? Math.max(0, ownHq.hp || 0) : 0;');
-      expect(source).toContain("?? (gameConfig?.mode === 'annihilation' ? 10 : 2);");
+      expect(source).toContain("gameConfig?.balance?.adjudicationWeights?.effectiveActions");
+      expect(source).toContain("gameConfig?.mode === 'annihilation' ? 10 : 2");
+      expect(source).toContain("stats?.actionMerit ?? 0");
+      expect(source).toContain('function recordActionMerit');
       expect(source).toContain("const preserved = state.players?.[owner]?.status === 'eliminated'");
       expect(source).toContain('行动分 ${score.actionScore ?? 0}');
     }

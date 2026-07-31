@@ -11,6 +11,7 @@ import { hexDistance } from './hex.js';
 import { controlPointIncome, controlPointTypeSpec } from './controlPoints.js';
 import { addLobbyPlayer, initializeLobbyGame } from '../state/store.js';
 import { artilleryStateForRound, isArtilleryDanger } from './artillery.js';
+import { ACTION_MERIT, addActionMerit } from './actionScore.js';
 
 const ANNIHILATION_ACTION_SCORE_PER_POINT = 10;
 const STANDARD_ACTION_SCORE_PER_POINT = 2;
@@ -106,6 +107,7 @@ function captureControlPoints(game: GameState, bus: EventBus, owner: PlayerId): 
     if (!capturer || point.owner === owner) continue;
     const previousOwner = point.owner;
     point.owner = owner;
+    addActionMerit(game, owner, ACTION_MERIT.capture);
     appendEvent(game, bus, 'control_point_captured', {
       pointId: point.id, name: point.name, owner, previousOwner,
       unitId: capturer.id, q: point.q, r: point.r,
@@ -169,7 +171,8 @@ function armyValue(game: GameState, owner: PlayerId): number {
 }
 
 function actionScorePerPoint(game: GameState): number {
-  return game.config.balance.adjudicationWeights.actionPoints
+  return game.config.balance.adjudicationWeights.effectiveActions
+    ?? game.config.balance.adjudicationWeights.actionPoints
     ?? (game.config.mode === 'annihilation' ? ANNIHILATION_ACTION_SCORE_PER_POINT : STANDARD_ACTION_SCORE_PER_POINT);
 }
 
@@ -180,7 +183,7 @@ function scorePlayer(game: GameState, owner: PlayerId): AdjudicationScore {
   const controlPoints = game.controlPoints.filter(point => point.owner === owner).length;
   const army = armyValue(game, owner);
   const supplies = game.resources[owner]?.supplies ?? 0;
-  const actionScore = (game.players[owner]?.stats.actionPointsUsed ?? 0) * actionScorePerPoint(game);
+  const actionScore = (game.players[owner]?.stats.actionMerit ?? 0) * actionScorePerPoint(game);
   return {
     headquartersDamage, ownHqHp, controlPoints, armyValue: army, supplies, actionScore,
     total:
@@ -227,7 +230,7 @@ export function buildAdjudicationSnapshot(game: GameState): AdjudicationSnapshot
   const margin = sortedTotals.length >= 2 ? sortedTotals[0] - sortedTotals[1] : (sortedTotals[0] ?? 0);
   return {
     maxTurns: game.config.balance.maxTurns,
-    weights: { ...game.config.balance.adjudicationWeights, actionPoints: actionScorePerPoint(game) },
+    weights: { ...game.config.balance.adjudicationWeights, effectiveActions: actionScorePerPoint(game) },
     scores,
     rankings,
     leaders,

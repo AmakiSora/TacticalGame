@@ -124,13 +124,13 @@ describe('map config loader', () => {
     resetConfig();
   });
 
-  it('validates the optional action point adjudication weight', () => {
+  it('validates the optional effective action adjudication weight', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as unknown as BrokenMap;
-    (map.balance.adjudicationWeights as Record<string, unknown>).actionPoints = 'invalid';
+    (map.balance.adjudicationWeights as Record<string, unknown>).effectiveActions = 'invalid';
     writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
 
-    expect(() => loadMaps(dir)).toThrow('adjudicationWeights.actionPoints must be a number >= 0');
+    expect(() => loadMaps(dir)).toThrow('adjudicationWeights.effectiveActions must be a number >= 0');
     resetConfig();
   });
 

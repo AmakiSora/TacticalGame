@@ -25,7 +25,7 @@
     ['controlPoint', '据点数量'],
     ['armyValue', '兵力价值'],
     ['supplies', '金币'],
-    ['actionPoints', '行动点'],
+    ['effectiveActions', '有效行动'],
   ];
 
   function deepClone(value) {
@@ -119,7 +119,7 @@
         controlPoint: 120,
         armyValue: 2,
         supplies: 1,
-        actionPoints: 2,
+        effectiveActions: 2,
       },
       controlPointTypes: defaultControlPointTypes(),
     };
@@ -237,10 +237,13 @@
     for (const [key] of BALANCE_KEYS) normalized.balance[key] = numberOrDefault(sourceBalance[key], defaults.balance[key]);
     normalized.balance.adjudicationWeights = {};
     for (const [key] of WEIGHT_KEYS) {
-      const fallback = key === 'actionPoints' && normalized.mode === 'annihilation'
+      const fallback = key === 'effectiveActions' && normalized.mode === 'annihilation'
         ? 10
         : defaults.balance.adjudicationWeights[key];
-      normalized.balance.adjudicationWeights[key] = numberOrDefault(sourceBalance.adjudicationWeights?.[key], fallback);
+      const sourceValue = key === 'effectiveActions'
+        ? sourceBalance.adjudicationWeights?.effectiveActions ?? sourceBalance.adjudicationWeights?.actionPoints
+        : sourceBalance.adjudicationWeights?.[key];
+      normalized.balance.adjudicationWeights[key] = numberOrDefault(sourceValue, fallback);
     }
     if (sourceBalance.controlPointTypes && typeof sourceBalance.controlPointTypes === 'object') {
       normalized.balance.controlPointTypes = {};

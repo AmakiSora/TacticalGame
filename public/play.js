@@ -462,8 +462,17 @@ function recordActionPoint(s, owner, payload) {
   if (!owner || typeof payload.actionsUsed !== 'number' || payload.actionsUsed <= (s.turn.actionsUsed ?? 0)) return;
   const player = s.players?.[owner];
   if (!player) return;
-  if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0 };
+  if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
   player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - (s.turn.actionsUsed ?? 0);
+}
+function recordActionMerit(s, owner, type, payload) {
+  const fixed = type === 'deploy' || type === 'demolish' ? 1 : type === 'control_point_captured' ? 2 : 0;
+  const amount = type === 'attack' ? payload.actualDamage ?? payload.damage : type === 'heal' ? payload.amount : 0;
+  const merit = fixed || (typeof amount === 'number' && amount > 0 ? Math.ceil(amount / 20) : 0);
+  const player = owner ? s.players?.[owner] : null;
+  if (!player || merit <= 0) return;
+  if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
+  player.stats.actionMerit = (player.stats.actionMerit ?? 0) + merit;
 }
 function applyEvent(s, ev) {
   if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
@@ -487,17 +496,18 @@ function applyEvent(s, ev) {
       break;
     case 'deploy':
       recordActionPoint(s, p.owner, p);
+      recordActionMerit(s, p.owner, ev.type, p);
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies -= p.cost || 0;
       s.units.set(p.unitId, { id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r, hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense, moveRange: p.moveRange, attackRange: p.attackRange, alive: true, hasMoved: true, hasActed: false, actionSpent: true, canCapture: !!p.canCapture, healPower: p.healPower, cost: p.unitCost ?? p.cost });
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'move': { const u = s.units.get(p.unitId); recordActionPoint(s, p.owner || u?.owner, p); if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
-    case 'attack': { const t = s.units.get(p.targetId) || s.headquarters.get(p.targetId); if (t) t.hp = p.targetHp; const a = s.units.get(p.attackerId); recordActionPoint(s, p.owner || a?.owner, p); if (a) { a.hasActed = true; a.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
-    case 'heal': { const t = s.units.get(p.targetId); if (t) t.hp = p.targetHp; const u = s.units.get(p.supportId); recordActionPoint(s, p.owner || u?.owner, p); if (u) { u.hasActed = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
+    case 'attack': { const t = s.units.get(p.targetId) || s.headquarters.get(p.targetId); if (t) t.hp = p.targetHp; const a = s.units.get(p.attackerId); recordActionPoint(s, p.owner || a?.owner, p); recordActionMerit(s, p.owner || a?.owner, ev.type, p); if (a) { a.hasActed = true; a.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
+    case 'heal': { const t = s.units.get(p.targetId); if (t) t.hp = p.targetHp; const u = s.units.get(p.supportId); recordActionPoint(s, p.owner || u?.owner, p); recordActionMerit(s, p.owner || u?.owner, ev.type, p); if (u) { u.hasActed = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
     case 'unit_death': { const u = s.units.get(p.unitId); if (u) u.alive = false; break; }
     case 'headquarters_destroyed': { const h = s.headquarters.get(p.headquartersId); if (h) h.alive = false; break; }
-    case 'control_point_captured': { const cp = s.controlPoints.get(p.pointId); if (cp) cp.owner = p.owner; break; }
+    case 'control_point_captured': { recordActionMerit(s, p.owner, ev.type, p); const cp = s.controlPoints.get(p.pointId); if (cp) cp.owner = p.owner; break; }
     case 'control_point_repair': { const u = s.units.get(p.unitId); if (u) u.hp = p.unitHp; break; }
     case 'income':
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
@@ -562,6 +572,7 @@ function applyEvent(s, ev) {
       setCellTerrain(s, p.q, p.r, p.toTerrain || 'plain');
       const u = s.units.get(p.unitId);
       recordActionPoint(s, p.owner || u?.owner, p);
+      recordActionMerit(s, p.owner || u?.owner, ev.type, p);
       if (u) { u.hasActed = true; u.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -995,9 +1006,10 @@ function playerScore(owner) {
     .filter(u => u.owner === owner && u.alive)
     .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
   const supplies = state.resources?.[owner]?.supplies || 0;
-  const actionScorePerPoint = gameConfig?.balance?.adjudicationWeights?.actionPoints
+  const actionScorePerPoint = gameConfig?.balance?.adjudicationWeights?.effectiveActions
+    ?? gameConfig?.balance?.adjudicationWeights?.actionPoints
     ?? (gameConfig?.mode === 'annihilation' ? 10 : 2);
-  const actionScore = (state.players?.[owner]?.stats?.actionPointsUsed ?? 0) * actionScorePerPoint;
+  const actionScore = (state.players?.[owner]?.stats?.actionMerit ?? 0) * actionScorePerPoint;
   return {
     headquartersDamage,
     enemyHqDamage: headquartersDamage,

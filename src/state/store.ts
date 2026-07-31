@@ -11,6 +11,7 @@ import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
 import { createMapCells } from '../config/geometry.js';
 import { artilleryStateForRound } from '../engine/artillery.js';
+import { actionMeritForEvent } from '../engine/actionScore.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -52,7 +53,7 @@ export function createPlayer(id: PlayerId, name?: string): PlayerState {
     turnOrder: null,
     eliminatedAt: null,
     eliminatedBy: null,
-    stats: { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0 },
+    stats: { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 },
   };
 }
 
@@ -213,8 +214,9 @@ export function createInitialGame(id: string, mapId = 'default'): GameState {
   return game;
 }
 
-function restoreActionPointStats(game: GameState): void {
-  const totals = new Map<PlayerId, number>();
+function restoreActionStats(game: GameState): void {
+  const actionPointTotals = new Map<PlayerId, number>();
+  const actionMeritTotals = new Map<PlayerId, number>();
   const unitOwners = new Map<string, PlayerId>();
   let actionsUsed = 0;
 
@@ -245,17 +247,24 @@ function restoreActionPointStats(game: GameState): void {
           : payload.unitId;
       if (typeof unitId === 'string') owner = unitOwners.get(unitId) ?? null;
     }
+    if (owner) {
+      const merit = actionMeritForEvent(event.type, payload);
+      if (merit > 0) actionMeritTotals.set(owner, (actionMeritTotals.get(owner) ?? 0) + merit);
+    }
     if (!['deploy', 'move', 'attack', 'heal', 'demolish'].includes(event.type)) continue;
     if (!owner || typeof payload.actionsUsed !== 'number') continue;
     if (payload.actionsUsed > actionsUsed) {
-      totals.set(owner, (totals.get(owner) ?? 0) + payload.actionsUsed - actionsUsed);
+      actionPointTotals.set(owner, (actionPointTotals.get(owner) ?? 0) + payload.actionsUsed - actionsUsed);
     }
     actionsUsed = payload.actionsUsed;
   }
 
   for (const id of PLAYER_IDS) {
     const stats = game.players[id]?.stats;
-    if (stats) stats.actionPointsUsed = totals.get(id) ?? 0;
+    if (stats) {
+      stats.actionPointsUsed = actionPointTotals.get(id) ?? 0;
+      stats.actionMerit = actionMeritTotals.get(id) ?? 0;
+    }
   }
 }
 
@@ -289,7 +298,7 @@ export class GameStore {
       this.games.clear();
       for (const game of parsed.games) {
         if (!game || typeof game.id !== 'string') continue;
-        restoreActionPointStats(game);
+        restoreActionStats(game);
         this.games.set(game.id, game);
       }
       console.log(`[game:persist] loaded ${this.games.size} games from ${file}`);

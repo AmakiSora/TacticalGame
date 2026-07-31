@@ -42,6 +42,7 @@ export interface PlayerStats {
   unitsDestroyed: number;
   playersEliminated: number;
   actionPointsUsed: number;
+  actionMerit: number;
 }
 
 export interface PlayerState {
@@ -193,7 +194,9 @@ export interface AdjudicationWeights {
   controlPoint: number;
   armyValue: number;
   supplies: number;
-  /** Optional per-action-point score; defaults to 10 in annihilation and 2 in standard mode. */
+  /** Optional per-effective-action merit score; defaults to 10 in annihilation and 2 in standard mode. */
+  effectiveActions?: number;
+  /** Backward-compatible alias for maps created before effective-action scoring. */
   actionPoints?: number;
 }
 

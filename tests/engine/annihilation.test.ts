@@ -5,7 +5,7 @@ import { deployUnit } from '../../src/engine/deployment.js';
 import { buildAdjudicationScores, eliminatePlayer, endTurn, startGame } from '../../src/engine/engine.js';
 import { isArtilleryDanger } from '../../src/engine/artillery.js';
 import { moveUnit } from '../../src/engine/units.js';
-import { consumeAction, findReachableCells } from '../../src/engine/validation.js';
+import { findReachableCells } from '../../src/engine/validation.js';
 import { addLobbyPlayer, createLobby } from '../../src/state/store.js';
 
 function createAnnihilationGame(playerCount = 2) {
@@ -106,7 +106,7 @@ describe('annihilation mode', () => {
     expect(game.events.find(event => event.type === 'player_eliminated')?.payload).toMatchObject({ score: before });
   });
 
-  it('adds ten score for every action point actually spent', () => {
+  it('does not award action score for movement alone', () => {
     const { game, bus } = createAnnihilationGame();
     const owner = game.turn.currentPlayerId!;
     const unit = game.units.find(candidate => candidate.owner === owner)!;
@@ -117,20 +117,29 @@ describe('annihilation mode', () => {
 
     const after = buildAdjudicationScores(game)[owner]!;
     expect(game.players[owner]?.stats.actionPointsUsed).toBe(1);
-    expect(after.actionScore).toBe(10);
-    expect(after.total - before.total).toBe(10);
+    expect(game.players[owner]?.stats.actionMerit).toBe(0);
+    expect(after.actionScore).toBe(0);
+    expect(after.total - before.total).toBe(0);
   });
 
-  it('does not score a free follow-up action twice for the same unit', () => {
-    const { game } = createAnnihilationGame();
+  it('scores actual combat damage in twenty-HP contribution buckets', () => {
+    const { game, bus } = createAnnihilationGame();
     const owner = game.turn.currentPlayerId!;
-    const unit = game.units.find(candidate => candidate.owner === owner)!;
+    const enemy = game.turn.turnOrder.find(candidate => candidate !== owner)!;
+    const attacker = game.units.find(candidate => candidate.owner === owner)!;
+    const target = game.units.find(candidate => candidate.owner === enemy)!;
+    attacker.attackRange = 20;
+    attacker.attack = 40;
+    target.defense = 0;
+    target.hp = 100;
 
-    expect(consumeAction(game, unit)).toMatchObject({ ok: true });
-    expect(consumeAction(game, unit)).toMatchObject({ ok: true });
+    expect(attackTarget(game, bus, owner, attacker.id, target.id)).toMatchObject({ ok: true });
 
+    const actualDamage = game.events.findLast(event => event.type === 'attack')!.payload.actualDamage as number;
+    const expectedMerit = Math.ceil(actualDamage / 20);
     expect(game.players[owner]?.stats.actionPointsUsed).toBe(1);
-    expect(buildAdjudicationScores(game)[owner]?.actionScore).toBe(10);
+    expect(game.players[owner]?.stats.actionMerit).toBe(expectedMerit);
+    expect(buildAdjudicationScores(game)[owner]?.actionScore).toBe(expectedMerit * 10);
   });
 
   it('raises turn income from 12 to 20 after capturing an inner supply point', () => {

@@ -115,6 +115,7 @@ export interface MapConfig {
       controlPoint: number;
       armyValue: number;
       supplies: number;
+      effectiveActions?: number;
       actionPoints?: number;
     };
     controlPointTypes?: Record<ControlPointKind, ControlPointTypeSpec>;
@@ -305,6 +306,9 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   }
   if ('actionPoints' in weights) {
     assertNumber(weights, 'actionPoints', `Map "${id}".balance.adjudicationWeights`, 0);
+  }
+  if ('effectiveActions' in weights) {
+    assertNumber(weights, 'effectiveActions', `Map "${id}".balance.adjudicationWeights`, 0);
   }
   const controlPointTypes = 'controlPointTypes' in balance
     ? asRecord(balance.controlPointTypes, `Map "${id}".balance.controlPointTypes`)

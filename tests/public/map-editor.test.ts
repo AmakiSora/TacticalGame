@@ -38,7 +38,7 @@ describe('map editor page', () => {
     expect(html).toContain('id="btn-zoom-in"');
     expect(html).toContain('id="btn-zoom-reset"');
     expect(html).toContain('id="validation-panel"');
-    expect(html).toContain('<script src="/map-editor.js?v=3.2.3"></script>');
+    expect(html).toContain('<script src="/map-editor.js?v=3.2.4"></script>');
   });
 
   it('supports toolbar zoom buttons without hijacking wheel scroll', () => {

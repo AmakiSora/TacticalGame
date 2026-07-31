@@ -308,8 +308,18 @@ function recordActionPoint(s, owner, payload) {
   if (!owner || typeof payload.actionsUsed !== 'number' || payload.actionsUsed <= (s.turn.actionsUsed ?? 0)) return;
   const player = s.players?.[owner];
   if (!player) return;
-  if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0 };
+  if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
   player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - (s.turn.actionsUsed ?? 0);
+}
+
+function recordActionMerit(s, owner, type, payload) {
+  const fixed = type === 'deploy' || type === 'demolish' ? 1 : type === 'control_point_captured' ? 2 : 0;
+  const amount = type === 'attack' ? payload.actualDamage ?? payload.damage : type === 'heal' ? payload.amount : 0;
+  const merit = fixed || (typeof amount === 'number' && amount > 0 ? Math.ceil(amount / 20) : 0);
+  const player = owner ? s.players?.[owner] : null;
+  if (!player || merit <= 0) return;
+  if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
+  player.stats.actionMerit = (player.stats.actionMerit ?? 0) + merit;
 }
 
 function applyEvent(s, ev) {
@@ -339,6 +349,7 @@ function applyEvent(s, ev) {
       break;
     case 'deploy':
       recordActionPoint(s, p.owner, p);
+      recordActionMerit(s, p.owner, ev.type, p);
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies -= p.cost || 0;
       s.units.set(p.unitId, {
@@ -361,6 +372,7 @@ function applyEvent(s, ev) {
       const target = s.units.get(p.targetId) || s.headquarters.get(p.targetId);
       const a = s.units.get(p.attackerId);
       recordActionPoint(s, p.owner || a?.owner, p);
+      recordActionMerit(s, p.owner || a?.owner, ev.type, p);
       const previousHp = target ? target.hp : null;
       if (target) target.hp = p.targetHp;
       if (a) { a.hasActed = true; a.actionSpent = true; }
@@ -368,7 +380,7 @@ function applyEvent(s, ev) {
       if (target && previousHp != null && (p.targetKind === 'headquarters' || s.headquarters.has(p.targetId)) && a) {
         const player = s.players[a.owner];
         if (player) {
-          if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0 };
+          if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
           const actualDamage = Math.max(0, previousHp - (Number(p.targetHp) || 0));
           player.stats.headquartersDamage += actualDamage;
         }
@@ -381,6 +393,7 @@ function applyEvent(s, ev) {
       if (target) target.hp = p.targetHp;
       const support = s.units.get(p.supportId);
       recordActionPoint(s, p.owner || support?.owner, p);
+      recordActionMerit(s, p.owner || support?.owner, ev.type, p);
       if (support) { support.hasActed = true; support.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -396,6 +409,7 @@ function applyEvent(s, ev) {
       break;
     }
     case 'control_point_captured': {
+      recordActionMerit(s, p.owner, ev.type, p);
       const cp = s.controlPoints.get(p.pointId);
       if (cp) cp.owner = p.owner;
       break;
@@ -476,6 +490,7 @@ function applyEvent(s, ev) {
       setCellTerrain(s, p.q, p.r, p.toTerrain || 'plain');
       const u = s.units.get(p.unitId);
       recordActionPoint(s, p.owner || u?.owner, p);
+      recordActionMerit(s, p.owner || u?.owner, ev.type, p);
       if (u) { u.hasActed = true; u.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -871,9 +886,10 @@ function playerScore(owner) {
     .filter(u => u.owner === owner && u.alive)
     .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
   const supplies = state.resources?.[owner]?.supplies || 0;
-  const actionScorePerPoint = gameConfig?.balance?.adjudicationWeights?.actionPoints
+  const actionScorePerPoint = gameConfig?.balance?.adjudicationWeights?.effectiveActions
+    ?? gameConfig?.balance?.adjudicationWeights?.actionPoints
     ?? (gameConfig?.mode === 'annihilation' ? 10 : 2);
-  const actionScore = (state.players?.[owner]?.stats?.actionPointsUsed ?? 0) * actionScorePerPoint;
+  const actionScore = (state.players?.[owner]?.stats?.actionMerit ?? 0) * actionScorePerPoint;
   return {
     headquartersDamage,
     enemyHqDamage: headquartersDamage,

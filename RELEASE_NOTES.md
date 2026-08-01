@@ -2,6 +2,18 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.2.7
+
+- 重构 Hex API Game Skill 为「短主文档 + 按模式分册」：`SKILL.md` 只保留远程服务器、API、公共规则与强制 mode 路由；标准总部战写入 `standard.md`，歼灭战写入 `annihilation.md`。
+- 对局进入 `active` 后必须先读 `game.config.mode`，再用 `read` 加载对应模式文件，且仅以当前模式文件为检查清单与决策序权威，避免两套规则在同一上下文里互相覆盖。
+- 修正歼灭模式 skill 串台：此前开头已写明无总部 / 全灭出局，后半仍沿用「打 HQ、从总部部署、按 HQ 伤害抢分」的标准决策，导致 `artillery-zone` 上出现空转找 HQ、错误 `fromId`、终局乱抢据点分等问题。
+- `annihilation.md` 明确硬禁与运行时事实：不创建 HQ、`fromId` 只能是已占领据点、炮火危险区禁止部署/治疗/据点维修；`artillery-zone` 裁决权重下实质分为 `armyValue + actionScore`，终局优先保军力与有效行动而非虚构 HQ/据点分。
+- `standard.md` 保留总部战完整路径：从 HQ 或据点部署、优先打击敌方总部、临近裁决按 HQ 伤害与据点等权重抢分。
+- 补全 Skill 裁决分说明：总分六项为 HQ 伤、己方 HQ、据点、军队、补给与 **`actionScore`**；写明 `actionScore = actionMerit × effectiveActions`（歼灭默认 10、标准默认 2）、merit 来源（部署/拆墙/占点/伤害与治疗折算）以及纯移动不计分，避免终局囤补给或空移动。
+- 歼灭 Skill / 示例 AI 的炮火节奏改为读配置与运行时状态：`config.annihilation.artillery`（`startRound` / `intervalRounds` / `damage` / `minimumSafeRadius`）与 `game.artillery`（`safeRadius` / `dangerCells` / `warningCells` / `nextShrinkRound`）；阶段用 `round < startRound` 推导，不再写死「前 4 回合 / 第 5 回合」。明确 danger 在回合边界结算伤害、warning 仅预告下一圈、危险区禁止部署/治疗/据点维修。
+- Skill 强制每次先读 `game.config.units` 与单位实例字段再算射程/移速/造价/`canCapture`，并写明常见能力坑：仅 infantry/scout 占点、ranger 远距输出、仅 support 可治疗友军、仅 heavy 可拆除邻格 blocker；禁止沿用跨地图记忆数值。
+- 修复统计脚本在 Vitest 下的加载问题：去掉 `generateStats.mjs` / `generateFunStats.mjs` 文件头 shebang，避免作为模块导入时被误解析。
+
 ## 3.2.6
 
 - 移除自动控制体系：删除服务端 `AutoControlController`、`/api/control/*` 路由、自动对战控制台 `control.html`，以及 `script/autoRunPi` 调度脚本与相关测试。

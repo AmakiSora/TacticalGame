@@ -372,7 +372,10 @@ async function tryHeal(game, args, seat, unit) {
 export function movementGoal(game, owner, unit) {
   if (game.config?.mode === 'annihilation') {
     const roundNumber = game.turn?.roundNumber ?? game.turn?.turnNumber ?? 1;
-    if (unit.canCapture && roundNumber <= 4) {
+    const startRound = game.config?.annihilation?.artillery?.startRound;
+    // Pre-shrink economy window is config-driven; never hardcode "rounds 1-4".
+    const preShrink = typeof startRound === 'number' ? roundNumber < startRound : false;
+    if (unit.canCapture && preShrink) {
       const supplyPoint = game.controlPoints
         .filter(point => point.owner !== owner && point.kind === 'supply' && artilleryRisk(game, point) < 2)
         .sort((a, b) =>

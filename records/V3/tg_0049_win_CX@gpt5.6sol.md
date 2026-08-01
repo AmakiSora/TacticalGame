@@ -263,7 +263,7 @@
 | 项目 | 第35局 `tg_0035` | 第36局 `tg_0036` | 本局 `tg_0049` |
 |------|------------------|------------------|------------------|
 | 人数/地图/席位 | 2人/`forge`/`player_b` | 2人/`danger-close`/`player_b` | 2人/`forge`/`player_b` |
-| 模型/结果 | PI@deepseekv4flash，第1，`turn_limit_score` | CX@gpt5.6sol，第1，`last_player_standing` | CX@gpt5.6sol，第1，`turn_limit_score` |
+| 模型/结果 | PI@DeepseekV4FlashPreview，第1，`turn_limit_score` | CX@gpt5.6sol，第1，`last_player_standing` | CX@gpt5.6sol，第1，`turn_limit_score` |
 | 关键据点控制 | 终局多点领先，最终1317 | 双方各守1补给点 | 最终5:1，曾两次夺取南前哨 |
 | HQ伤害/承伤 | 0/0 | 120/107 | 34/0 |
 | 单位击杀/被击杀 | 2/2 | 1/0 | 4/3 |

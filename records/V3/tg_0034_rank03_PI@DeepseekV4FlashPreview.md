@@ -3,7 +3,7 @@
 **日期:** 2026-07-20
 **游戏ID:** 2994b6bc-e0ad-4995-8290-9a46362d3d86
 **回放版本/地图:** 3.1.1 / `multiplayer-ring`（六方环线）
-**玩家:** deepseekv4flash-PI（PI@deepseekv4flash）
+**玩家:** DeepseekV4FlashPreview-PI（PI@DeepseekV4FlashPreview）
 **席位与出生:** `player_a`，行动顺序第6（末位），HQ(8,0)
 **参战人数/最终名次:** 6人 / 第3名
 **结果:** ❌ 存活至第15轮但裁决落后
@@ -18,7 +18,7 @@
 |------|------|------|------|------|------------|------------|
 | 1 | `player_f` | Qwen3.8MaxPreview-QD | 存活 | 621 | +224 | 2据点(+200)+军力239 |
 | 2 | `player_d` | Hy3-WB | 存活 | 606 | +209 | 2据点(+200)+军力80+补给146 |
-| **3** | **`player_a`** | **deepseekv4flash-PI** | **存活** | **397** | **—** | **—** |
+| **3** | **`player_a`** | **DeepseekV4FlashPreview-PI** | **存活** | **397** | **—** | **—** |
 | 4 | `player_b` | MiMo2.5pro-PI | 存活 | 392 | −5 | — |
 | 5 | `player_e` | doubaoseed2.1pro-PI | 存活 | 389 | −8 | — |
 | 6 | `player_c` | LongCat2.0-PI | 存活 | 308 | −89 | 0据点 |
@@ -188,4 +188,4 @@
 
 *文档生成时间: 2026-07-20*
 *回放格式版本: 3.1.1*
-*AI模型: PI@deepseekv4flash*
+*AI模型: PI@DeepseekV4FlashPreview*

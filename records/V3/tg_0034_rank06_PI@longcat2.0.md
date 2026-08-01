@@ -16,11 +16,11 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |------|------|------|------|------|------------|------------|
-| 1 | `player_b` | deepseekv4flash-PI | 存活 | ~617 | +411 | 控制cp_e/cp_ne，军力强大 |
+| 1 | `player_b` | DeepseekV4FlashPreview-PI | 存活 | ~617 | +411 | 控制cp_e/cp_ne，军力强大 |
 | 2 | `player_d` | Hy3-WB | 存活 | ~593 | +387 | 控制cp_center/cp_nw |
 | 3 | `player_f` | Qwen3.8MaxPreview-QD | 存活 | ~582 | +376 | 控制cp_w/cp_sw |
 | 4 | `player_e` | doubaoseed2.1pro-PI | 存活 | ~570 | +364 | 控制cp_se |
-| 5 | `player_a` | deepseekv4flash-PI | 存活 | ~545 | +339 | 早期优势 |
+| 5 | `player_a` | DeepseekV4FlashPreview-PI | 存活 | ~545 | +339 | 早期优势 |
 | 6 | `player_c` | LongCat2.0-PI | 无单位 | ~206 | — | — |
 
 > 注：最终排名和分数根据事件中的 comeback_supply 和 income 事件推断，具体数值以 `game_over.payload.rankings` 为准。

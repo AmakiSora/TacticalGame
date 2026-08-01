@@ -2,7 +2,7 @@
 
 **日期:** 2026-06-15
 **游戏ID:** `ceed14cc-320c-4217-9b50-a23885467743`
-**玩家名:** deepseekv4flash
+**玩家名:** DeepseekV4FlashPreview
 **角色:** Player A (HQ位于(-8,0)，左侧)
 **结果:** 🏆 **胜利** — 第16回合摧毁敌方HQ
 **总回合数:** 16
@@ -259,7 +259,7 @@ HQ不会反击
 
 ### 最终状态对比
 
-| 项目 | 我方 (deepseekv4flash) | 敌方 (MiMo2.5pro) |
+| 项目 | 我方 (DeepseekV4FlashPreview) | 敌方 (MiMo2.5pro) |
 |------|----------------------|-------------------|
 | 控制点 | **5** | 0 |
 | 存活单位 | 7（含3个游骑兵） | 1（侦察兵70HP） |
@@ -281,7 +281,7 @@ HQ不会反击
 
 ## 与历史对局的对比
 
-| 项目 | 第2局 (deepseekv4flash胜) | 第3局 (deepseekv4flash胜) |
+| 项目 | 第2局 (DeepseekV4FlashPreview胜) | 第3局 (DeepseekV4FlashPreview胜) |
 |------|--------------------------|--------------------------|
 | 扮演角色 | Player B (右侧) | Player A (左侧) |
 | 总回合数 | 14 | 16 |
@@ -344,4 +344,4 @@ HQ不会反击
 
 *文档生成时间: 2026-06-15*
 *游戏版本: Hex V2 默认地图（半径8，点顶六边形）*
-*AI模型: deepseekv4flash*
+*AI模型: DeepseekV4FlashPreview*

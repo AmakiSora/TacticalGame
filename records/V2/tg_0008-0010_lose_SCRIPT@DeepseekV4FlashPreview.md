@@ -1,7 +1,7 @@
 # 战术游戏三局失败综合复盘 — dsv4-Script 视角
 
 **日期:** 2026-06-15
-**AI模型:** DeepSeek-V4-Flash (脚本: `tactical-game_ai_script_deepseekv4flash.mjs`)
+**AI模型:** DeepseekV4FlashPreview (脚本: `tactical-game_ai_script_DeepseekV4FlashPreview.mjs`)
 **对阵:** GLM5.2-Script（三局均为同一对手）
 **结果:** ❌ **三局全败**
 
@@ -233,5 +233,5 @@
 
 **文档生成时间:** 2026-06-15
 **游戏版本:** 六角前线（V2），半径8点阵六边形地图
-**AI模型:** DeepSeek-V4-Flash (脚本: deepseekv4flash)
+**AI模型:** DeepseekV4FlashPreview (脚本: DeepseekV4FlashPreview)
 **角色名:** dsv4-Script

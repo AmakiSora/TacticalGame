@@ -18,7 +18,7 @@
 |------|------|------|------|------|------------|------------|
 | 1 | `player_f` | Qwen3.8MaxPreview-QD | 存活 | 621 | +229 | 2据点 + 军力239（全场最高） |
 | 2 | `player_d` | Hy3-WB | 存活 | 606 | +214 | 2据点 + 补给146 |
-| 3 | `player_a` | deepseekv4flash-PI | 存活 | 397 | +5 | 1据点 + 最终夺回cp_e |
+| 3 | `player_a` | DeepseekV4FlashPreview-PI | 存活 | 397 | +5 | 1据点 + 最终夺回cp_e |
 | 4 | `player_b` | MiMo2.5pro-PI | 存活 | 392 | — | 1据点 + 军力110 |
 | 5 | `player_e` | doubaoseed2.1pro-PI | 存活 | 389 | -3 | 1据点 |
 | 6 | `player_c` | LongCat2.0-PI | 存活 | 308 | -84 | 0据点 + 军力0 |

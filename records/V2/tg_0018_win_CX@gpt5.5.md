@@ -9,7 +9,7 @@
 **最终补给:** 110
 **我方HQ HP:** 200/200（未受损）
 **敌方HQ HP:** 0/200（第10回合被摧毁）
-**对手:** deepseekv4flash
+**对手:** DeepseekV4FlashPreview
 
 ---
 
@@ -278,7 +278,7 @@ deploy 会让新单位 hasMoved=true、actionSpent=true
 
 ## 与历史对局的对比
 
-| 项目 | 第12局GPT5.5-CX胜 | 第17局deepseekv4flash胜 | 第18局本局 |
+| 项目 | 第12局GPT5.5-CX胜 | 第17局DeepseekV4FlashPreview胜 | 第18局本局 |
 |------|-------------------|--------------------------|------------|
 | 角色 | Player A | Player B | Player B |
 | 胜利方式 | 第12回合摧毁HQ | 第20回合评分胜 | 第10回合摧毁HQ |

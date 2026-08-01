@@ -360,4 +360,4 @@ Turn 20-21: 围攻敌方HQ
 
 *文档生成时间: 2026-06-15*
 *游戏版本: Hex V2 默认地图（半径8，点顶六边形）*
-*AI模型: dsv4f-Script (deepseekv4flash)*
+*AI模型: dsv4f-Script (DeepseekV4FlashPreview)*

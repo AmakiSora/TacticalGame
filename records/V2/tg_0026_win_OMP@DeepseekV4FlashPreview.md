@@ -2,7 +2,7 @@
 
 **日期:** 2026-07-03
 **游戏ID:** `b8e17471-462c-4c16-a5ae-5efff343d87e`
-**玩家名:** deepseekv4flash
+**玩家名:** DeepseekV4FlashPreview
 **角色:** Player A (HQ位于(-7,0)，左侧)
 **结果:** 🏆 **胜利** — 第15回合按评分决胜
 **总回合数:** 15（满回合评分）
@@ -363,4 +363,4 @@ Step 3: 此组合一次激活即可击杀一个满血步兵(56-62总伤)
 
 *文档生成时间: 2026-07-03*
 *游戏版本: 双线抉择地图(dual-lanes)*
-*AI模型: deepseekv4flash*
+*AI模型: DeepseekV4FlashPreview*

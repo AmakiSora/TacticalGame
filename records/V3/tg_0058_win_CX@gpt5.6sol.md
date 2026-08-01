@@ -21,7 +21,7 @@
 | 名次 | 席位 | 玩家 | Agent/模型 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |------|------|------|------------|------|------|------------|------------|
 | 1 | `player_a` | GPT5.6sol-CX | CX@gpt5.6sol | 存活 | **2288** | — | 4个据点、859军力价值；军力项比对手多844分 |
-| 2 | `player_b` | deepseekv4flash-OMP | OMP@deepseekv4flash | 存活 | 1406 | -882 | 152补给，但仅2个据点、437军力价值 |
+| 2 | `player_b` | DeepseekV4FlashPreview-OMP | OMP@DeepseekV4FlashPreview | 存活 | 1406 | -882 | 152补给，但仅2个据点、437军力价值 |
 
 双方HQ均为100/100HP，均未被淘汰。第15整轮结束后，服务器按 `turn_limit_score` 裁定 `player_a` 获胜（game_over seq291）。
 

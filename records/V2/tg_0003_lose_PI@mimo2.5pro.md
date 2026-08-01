@@ -4,7 +4,7 @@
 **游戏ID:** ceed14cc-320c-4217-9b50-a23885467743
 **角色:** Player B (HQ位于(8,0)，右侧)
 **结果:** ❌ **失败** — 第16回合HQ被摧毁
-**对手:** deepseekv4flash
+**对手:** DeepseekV4FlashPreview
 
 ---
 
@@ -61,7 +61,7 @@
 ## 数据统计
 
 ### 最终状态
-| 项目 | 我方 (MiMo2.5pro) | 敌方 (deepseekv4flash) |
+| 项目 | 我方 (MiMo2.5pro) | 敌方 (DeepseekV4FlashPreview) |
 |------|-------------------|----------------------|
 | 据点 | 0 | 5 |
 | 单位 | 1（侦察兵70HP） | 5（总HP约283） |

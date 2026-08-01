@@ -325,7 +325,7 @@ dist = (|dq| + |dq+dr| + |dr|) / 2
 | 项目 | 第2局 | 第3局 | 第4局 | 第5局 | **第6局** |
 |------|-------|-------|-------|-------|----------|
 | 角色 | Player B | Player A | Player B | Player A | **Player A** |
-| 模型 | deepseekv4flash | deepseekv4flash | deepseekv4flash | dsv4f-Script | **GLM5.2-ZC** |
+| 模型 | DeepseekV4FlashPreview | DeepseekV4FlashPreview | DeepseekV4FlashPreview | dsv4f-Script | **GLM5.2-ZC** |
 | 结果 | 🏆胜 | 🏆胜 | 🏆胜 | 🏆胜 | **🏆胜** |
 | 总回合数 | 14 | 16 | 18 | 21 | **17** |
 | 控制点 | 5全占 | 5全占 | 5全占 | 4控制 | **3控制** |
@@ -359,7 +359,7 @@ dist = (|dq| + |dq+dr| + |dr|) / 2
 - **早攻HQ** — 兵临城下立即开攻，不拖延，第14回合即总攻
 
 ### 与之前对局的不同
-第6局是GLM5.2-ZC的首场V2对局，相比前5局deepseekv4flash系列的纯游骑兵海：
+第6局是GLM5.2-ZC的首场V2对局，相比前5局DeepseekV4FlashPreview系列的纯游骑兵海：
 1. **重装终结者战术** — 首次引入双heavy作为攻城核心，验证了重甲单位的终结能力
 2. **最少据点取胜** — 仅3据点（历史最少），证明经济优势不依赖数量堆砌
 3. **攻城更激进** — 第14回合首次攻HQ（比第5局第20回合早6回合）

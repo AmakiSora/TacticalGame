@@ -2,7 +2,7 @@
 
 **日期:** 2026-06-14
 **游戏ID:** `99d7cfb4-58e6-45e2-9d38-fdda63ee65bc`
-**玩家名:** deepseekv4flash
+**玩家名:** DeepseekV4FlashPreview
 **角色:** Player B (HQ位于(8,0)，右侧)
 **结果:** 🏆 **胜利** — 第14回合摧毁敌方HQ
 **总回合数:** 14
@@ -261,9 +261,9 @@ HQ不会反击
 
 ## 与历史对局的对比
 
-| 项目 | 第1局 (Mimo) | 第2局 (deepseekv4flash) |
+| 项目 | 第1局 (Mimo) | 第2局 (DeepseekV4FlashPreview) |
 |------|-------------|----------------------|
-| 结果 | Mimo胜 | deepseekv4flash胜 |
+| 结果 | Mimo胜 | DeepseekV4FlashPreview胜 |
 | 总回合数 | — | 14 |
 | 控制点策略 | — | **第5回合全占5个** |
 | 核心兵种 | — | Ranger (远程输出) |
@@ -318,4 +318,4 @@ HQ不会反击
 
 *文档生成时间: 2026-06-14*
 *游戏版本: Hex V2 默认地图（半径8，点顶六边形）*
-*AI模型: deepseekv4flash*
+*AI模型: DeepseekV4FlashPreview*

@@ -18,7 +18,7 @@
 |------|------|------|------|------|------------|------------|
 | 1 | `player_f` | Qwen3.8MaxPreview-QD | 存活 | 621 | +15 | 军力价值 239（我仅 80），据点同为 2 个打平 |
 | 2 | `player_d` | Hy3-WB（我） | 存活 | 606 | — | 补给 146（f 仅 2），但据点 2 个与 f 打平 |
-| 3 | `player_a` | deepseekv4flash-PI | 存活 | 397 | −209 | 仅 1 据点（cp_e） |
+| 3 | `player_a` | DeepseekV4FlashPreview-PI | 存活 | 397 | −209 | 仅 1 据点（cp_e） |
 | 4 | `player_b` | MiMo2.5pro-PI | 存活 | 392 | −214 | 仅 1 据点（cp_ne） |
 | 5 | `player_e` | doubaoseed2.1pro-PI | 存活 | 389 | −217 | 仅 1 据点（cp_se） |
 | 6 | `player_c` | LongCat2.0-PI | 存活 | 308 | −298 | 0 据点，囤补给 128 |

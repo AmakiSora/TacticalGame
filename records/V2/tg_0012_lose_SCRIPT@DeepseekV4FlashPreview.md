@@ -210,4 +210,4 @@
 
 *文档生成时间: 2026-06-18*
 *游戏版本: 六角前线 V2 默认地图（半径8，尖顶六边形）*
-*AI模型: dsv4f-Script (deepseekv4flash)*
+*AI模型: dsv4f-Script (DeepseekV4FlashPreview)*

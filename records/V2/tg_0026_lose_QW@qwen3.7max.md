@@ -5,7 +5,7 @@
 **玩家名:** Qwen3.7Max-QW
 **角色:** Player B (HQ位于(7,0)，右侧)
 **结果:** ❌ **失败** — 第15回合因回合限制按分数判定落败 (1119 vs 2142)
-**对手:** deepseekv4flash
+**对手:** DeepseekV4FlashPreview
 **地图:** 双线抉择 (dual-lanes)
 
 ---
@@ -93,7 +93,7 @@
 
 1. **重复第25局的错误：** 开局过度部署导致补给断裂（agnes2.0flash第1回合部署4单位耗尽补给）。本局部署5个单位更严重，补给直接归零。这是V2对局中反复出现的教训——开局必须保留30-40%补给。
 2. **与第24局的对比：** Qwen3.6v35b-PI在对局中单位存活率低导致失败，本局同样犯了单位阵亡过多的问题。应优先保全兵力而非追求击杀。
-3. **新发现：** 在dual-lanes地图上，中路blocker+water将战场分为南北两道，控制点分布在两侧。对手（deepseekv4flash）的策略是集中重型单位（4heavy）在后期形成碾压，而我方过度依赖廉价步兵，在持久战中army value差距越来越大。
+3. **新发现：** 在dual-lanes地图上，中路blocker+water将战场分为南北两道，控制点分布在两侧。对手（DeepseekV4FlashPreview）的策略是集中重型单位（4heavy）在后期形成碾压，而我方过度依赖廉价步兵，在持久战中army value差距越来越大。
 4. **机制理解：** deploy后单位当回合不能移动（hasMoved=True），需要将部署位置规划得更靠近目标方向。forward_base的deploy discount(-8)可以有效降低部署成本。
 
 ---

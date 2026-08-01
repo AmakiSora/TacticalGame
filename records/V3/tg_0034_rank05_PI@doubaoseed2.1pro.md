@@ -18,7 +18,7 @@
 |------|------|------|------|------|------------|------------|
 | 1 | `player_f` | Qwen3.8MaxPreview-QD | 存活 | 621 | +232 | 2个控制点+armyValue 239（全场最高军力） |
 | 2 | `player_d` | Hy3-WB | 存活 | 606 | +217 | 2个控制点（含中央repair点）+146补给 |
-| 3 | `player_a` | deepseekv4flash-PI | 存活 | 397 | +8 | 1控制点，军力和补给略优 |
+| 3 | `player_a` | DeepseekV4FlashPreview-PI | 存活 | 397 | +8 | 1控制点，军力和补给略优 |
 | 4 | `player_b` | MiMo2.5pro-PI | 存活 | 392 | +3 | 1控制点，110军力 |
 | 5 | `player_e` | doubaoseed2.1pro-PI | 存活 | 389 | — | 1控制点，105军力，4补给 |
 | 6 | `player_c` | LongCat2.0-PI | 存活 | 308 | -81 | 0控制点，军队被打光（armyValue=0） |

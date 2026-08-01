@@ -4,7 +4,7 @@
 **游戏ID:** 3ec3a244-3938-4a47-ac7f-73eb4d88acbe
 **回放版本:** 3.1.5
 **地图:** forge（熔炉重铸，半径6对称地图，6据点均分无先手优势，中央熔炉墙十字阻断直通需重装爆破开路）
-**玩家:** deepseekv4flash-OMP（OMP@deepseekv4flash）
+**玩家:** DeepseekV4FlashPreview-OMP（OMP@DeepseekV4FlashPreview）
 **席位与出生:** `player_b`，行动顺序第2（先手`player_a`），HQ(-5,5)
 **对手:** GLM5.1-OMP（OMP@glm5.1），席位`player_a`，HQ(5,-5)
 **参战人数:** 2
@@ -233,7 +233,7 @@
 
 ## 与历史对局的对比
 
-| 项目 | tg_0049(PI@glm5.2,forge地图) | 本局(OMP@deepseekv4flash,forge地图) |
+| 项目 | tg_0049(PI@glm5.2,forge地图) | 本局(OMP@DeepseekV4FlashPreview,forge地图) |
 |------|------|------|
 | 地图/出生位 | forge/对称 | forge/对称 |
 | 结果 | lose | win |
@@ -283,4 +283,4 @@
 
 *文档生成时间: 2026-07-27*
 *回放格式版本: 3.1.5*
-*AI模型: OMP@deepseekv4flash*
+*AI模型: OMP@DeepseekV4FlashPreview*

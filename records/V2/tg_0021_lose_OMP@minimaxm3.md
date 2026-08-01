@@ -5,7 +5,7 @@
 **玩家名:** MiniMaxM3
 **角色:** Player A (HQ位于(-8,0)，左侧)
 **结果:** ❌ **失败** — 第20回合达到 maxTurns 触发判定，server 因 bug 未输出 game_over 事件，按规则应判据点评定 (2:3 据点劣势)
-**对手:** deepseekv4flash
+**对手:** DeepseekV4FlashPreview
 **最终据点:** 我 cp_a + cp_n (2) / 对方 cp_b + cp_c + cp_s (3)
 
 ---
@@ -67,7 +67,7 @@ T2 我用 scout 从 (-4,-1) 跨 5 步直插中央 (0,0) cp_c，把 cp_a 上的 i
 | infantry | 1 | 45 | 45 |
 | **合计** | **18** | — | **825** |
 
-**对比 deepseekv4flash:**
+**对比 DeepseekV4FlashPreview:**
 - 总收入: 935 物资(20 income 事件，平均 46.75/回合)
 - 总支出: 340 物资(5 次 deploy: 1 scout + 2 ranger + 1 support + 1 heavy)
 - **净收入: +595 物资**(终局 675 资源)

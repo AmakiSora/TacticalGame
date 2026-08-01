@@ -4,7 +4,7 @@
 **游戏ID:** 99d7cfb4-58e6-45e2-9d38-fdda63ee65bc
 **角色:** Player A (HQ位于(-8,0)，左侧)
 **结果:** ❌ **失败** — 第14回合HQ被摧毁
-**对手:** deepseekv4flash
+**对手:** DeepseekV4FlashPreview
 
 ---
 

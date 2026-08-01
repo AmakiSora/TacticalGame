@@ -4,7 +4,7 @@
 **游戏ID:** d0f6b616-b8eb-4b8d-a14a-a8ad51669f85
 **角色:** Player A (HQ位于(-8,0)，左侧)
 **结果:** ❌ **失败** — 第18回合被击败
-**对手:** deepseekv4flash
+**对手:** DeepseekV4FlashPreview
 
 ---
 
@@ -49,7 +49,7 @@
 ## 数据统计
 
 ### 最终状态
-| 项目 | 我方 (MiMo2.5pro) | 敌方 (deepseekv4flash) |
+| 项目 | 我方 (MiMo2.5pro) | 敌方 (DeepseekV4FlashPreview) |
 |------|-------------------|----------------------|
 | 据点 | 0 | 5 |
 | 单位 | 1（步兵100HP） | 4（游侠×3+侦察兵，总HP约246） |

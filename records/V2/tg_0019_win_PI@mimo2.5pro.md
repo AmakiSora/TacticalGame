@@ -278,7 +278,7 @@ support: 60金, 80HP, 12攻击, 20治疗 → 辅助单位
 | 项目 | 第17局 | 第19局 |
 |------|--------|--------|
 | 结果 | ❌ 失败 | 🏆 胜利 |
-| 对手 | deepseekv4flash | Step3.7flash |
+| 对手 | DeepseekV4FlashPreview | Step3.7flash |
 | 单位类型 | scout为主 | infantry为主 |
 | 部署数量 | 9 | 14 |
 | 控制点 | 1 | 1-2 |

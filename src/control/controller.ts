@@ -118,7 +118,7 @@ function defaultPlayer(side: PlayerId): PlayerCommandConfig {
   const suffix = side.replace('player_', '');
   return {
     provider: side === 'player_a' ? 'new-api' : 'deepseek',
-    model: side === 'player_a' ? 'step-3.7-flash' : 'deepseekv4flash',
+    model: side === 'player_a' ? 'step-3.7-flash' : 'DeepseekV4FlashPreview',
     name: `tactical-game-${side.replace('_', '-')}`,
     session: `.pi/session/player-${suffix}.jsonl`,
     skill: DEFAULT_SKILL,

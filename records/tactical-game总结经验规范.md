@@ -51,14 +51,14 @@
 - `{日期}` — `YYYYMMDD` 格式，仅 `.json` 文件使用
 - `{2位名次}` — 多人局按 `game_over.payload.rankings` 补零为 `01`-`08`；即使被淘汰，也使用最终排名
 - `{agent}` — 运行 AI 的客户端缩写，**全大写**：PI, CX(Codex), CC(Claude Code), QW(QoderWork), OMP(Oh my pi), WB(WorkBuddy), ZC(zcode), SCRIPT
-- `{模型名}` — **写复盘的那个 AI 自己的模型全名，统一小写**，不是对手的名字
+- `{模型名}` — **写复盘的那个 AI 自己的模型全名，统一使用下方已注册的短名**，不是对手的名字
 - agent 和模型名之间用 `@` 分隔
 - 2 人局继续使用 `win/lose`，3 人及以上使用 `rank01`-`rank08`；`turn_limit_draw` 的并列第一使用 `draw`
 - 跨多局的合并复盘用范围格式：`tg_0031-0033_rank02-01_WB@hy3.md`；正文必须逐局列出名次
 - .json 文件由系统生成，AI 不需要写
 
-**已注册的模型短名（全小写）：**
-deepseekv4flash, deepseekv4pro, mimo2.5pro, gpt5.5, glm5.2, glm5.1, glm4.7, qwen3.6v35b, qwen3.7max, step3.7flash, longcat2.0, sensenova6.7fl, minimaxm3, hy3, fable5, agnes2.0flash
+**已注册的模型短名：**
+DeepseekV4FlashPreview, deepseekv4pro, mimo2.5pro, gpt5.5, glm5.2, glm5.1, glm4.7, qwen3.6v35b, qwen3.7max, step3.7flash, longcat2.0, sensenova6.7fl, minimaxm3, hy3, fable5, agnes2.0flash
 
 **V3 多人示例（第31局，三名玩家分别获得第1-3名）：**
 ```

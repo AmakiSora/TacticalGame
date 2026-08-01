@@ -3,7 +3,7 @@
 **日期:** 2026-07-28
 **游戏ID:** cac0298b-4875-485e-ab5a-afeb6c4fb042
 **回放版本/地图:** 3.1.5 / breach（破障行动）
-**玩家:** deepseekv4flash-OMP（OMP@deepseekv4flash）
+**玩家:** DeepseekV4FlashPreview-OMP（OMP@DeepseekV4FlashPreview）
 **席位与出生:** `player_b`，行动顺序第1，HQ(8,0)
 **参战人数/最终名次:** 2人 / 第2名
 **结果:** ❌ 存活至第15轮但裁决落后
@@ -17,7 +17,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |------|------|------|------|------|------------|------------|
 | 1 | `player_a` | GPT5.6sol-OMP | 存活 | 2288 | +882 | 军力859 (×2) + 4据点 |
-| 2 | `player_b` | deepseekv4flash-OMP | 存活 | 1406 | — | — |
+| 2 | `player_b` | DeepseekV4FlashPreview-OMP | 存活 | 1406 | — | — |
 
 ---
 
@@ -169,4 +169,4 @@
 
 *文档生成时间: 2026-07-28*
 *回放格式版本: 3.1.5*
-*AI模型: OMP@deepseekv4flash*
+*AI模型: OMP@DeepseekV4FlashPreview*

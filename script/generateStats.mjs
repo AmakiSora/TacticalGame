@@ -19,9 +19,11 @@ export const KNOWN_AGENTS = new Set(['PI', 'CX', 'CC', 'QW', 'OMP', 'WB', 'ZC', 
 
 /** Canonical model keys (lowercase). */
 export const MODEL_ALIASES = new Map([
-  ['dsv4f', 'deepseekv4flash'],
-  ['dsv4', 'deepseekv4flash'],
-  ['deepseekv4f', 'deepseekv4flash'],
+  ['dsv4f', 'DeepseekV4FlashPreview'],
+  ['dsv4', 'DeepseekV4FlashPreview'],
+  ['deepseekv4f', 'DeepseekV4FlashPreview'],
+  ['deepseekv4flash', 'DeepseekV4FlashPreview'],
+  ['deepseekv4flashpreview', 'DeepseekV4FlashPreview'],
   ['step3.7f', 'step3.7flash'],
   ['step3.7flash', 'step3.7flash'],
   ['mimo2.5proa', 'mimo2.5pro'],
@@ -46,7 +48,6 @@ export const MODEL_ALIASES = new Map([
   ['fable5', 'fable5'],
   ['doubaoseed2.1pro', 'doubaoseed2.1pro'],
   ['deepseekv4pro', 'deepseekv4pro'],
-  ['deepseekv4flash', 'deepseekv4flash'],
 ]);
 
 export const REPLAY_JSON_RE = /^(tg_\d+)_(\d{8})\.json$/i;
@@ -85,7 +86,7 @@ export function canonicalizeModel(raw) {
   let key = lower(modelName).replace(/\s+/g, '');
   if (!key) return 'unknown';
   // Self-play seat tags only: ModelA / ModelB (not models that naturally end in b like v35b)
-  if (/^(mimo2\.5pro|deepseekv4flash|step3\.7flash|longcat2\.0)[ab]$/i.test(key)) {
+  if (/^(mimo2\.5pro|deepseekv4flash|deepseekv4flashpreview|step3\.7flash|longcat2\.0)[ab]$/i.test(key)) {
     key = key.slice(0, -1);
   }
   if (MODEL_ALIASES.has(key)) return MODEL_ALIASES.get(key);
@@ -105,7 +106,7 @@ export function canonicalizeAgent(raw) {
 /**
  * Parse free-form player display names into { model, agent, displayName }.
  * Patterns:
- *   "Hy3-WB", "deepseekv4flash-PI", "Qwen3.8MaxPreview-QD", "glm5.2-WB"
+ *   "Hy3-WB", "DeepseekV4FlashPreview-PI", "Qwen3.8MaxPreview-QD", "glm5.2-WB"
  *   "MiMo2.5pro", "sensenova6.7fl", "dsv4f-Script"
  *   "MiMo2.5proA" / "MiMo2.5proB"
  */

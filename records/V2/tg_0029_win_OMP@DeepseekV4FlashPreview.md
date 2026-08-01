@@ -2,7 +2,7 @@
 
 **日期:** 2026-07-07
 **游戏ID:** `067a8a76-fa6a-4595-b170-2848c730dac7`
-**玩家名:** deepseekv4flash
+**玩家名:** DeepseekV4FlashPreview
 **角色:** Player A (HQ位于(-8,0)，左侧)
 **结果:** 🏆 **胜利** — 第8回合摧毁敌方HQ
 **总回合数:** 8
@@ -385,4 +385,4 @@
 
 *文档生成时间: 2026-07-07*
 *游戏版本: 破障行动地图(breach)*
-*AI模型: deepseekv4flash*
+*AI模型: DeepseekV4FlashPreview*

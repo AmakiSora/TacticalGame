@@ -4,7 +4,7 @@
 **游戏ID:** d42383c9-11a8-44f4-b191-214e59dec481
 **回放版本:** 3.1.2
 **地图:** `forge`（熔炉重铸）
-**玩家:** deepseekv4flash-PI（PI@deepseekv4flash）
+**玩家:** DeepseekV4FlashPreview-PI（PI@DeepseekV4FlashPreview）
 **席位与出生:** `player_b`，行动顺序第1（先手），HQ(-5,5)
 **参战人数:** 2
 **结果:** 🏆 第1名 — `turn_limit_score`
@@ -20,7 +20,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |------|------|------|------|------|------------|------------|
-| **1** | **`player_b`** | **deepseekv4flash-PI** | **存活** | **1317** | **—** | **军力333（+666分）** |
+| **1** | **`player_b`** | **DeepseekV4FlashPreview-PI** | **存活** | **1317** | **—** | **军力333（+666分）** |
 | 2 | `player_a` | deepseekv4pro-PI | 存活 | 1138 | -179 | — |
 
 ---
@@ -302,4 +302,4 @@
 
 *文档生成时间: 2026-07-21*
 *回放格式版本: 3.1.0*
-*AI模型: PI@deepseekv4flash*
+*AI模型: PI@DeepseekV4FlashPreview*

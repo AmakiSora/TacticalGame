@@ -31,7 +31,6 @@ npm run dev
 | `http://localhost:3100/spectator2.html` | 新版全息观战台，支持实时观战与回放复盘 |
 | `http://localhost:3100/stats.html` | 对局统计看板（模型排行、对位、地图与对局列表） |
 | `http://localhost:3100/entertainment.html` | 娱乐数据看板（行为画像、趣味事实、单位偏好与极限记录） |
-| `http://localhost:3100/control.html` | 自动对战控制台 |
 | `http://localhost:3100/map-editor.html` | 本地导入、可视化编辑并导出地图 JSON |
 
 ### 统计数据
@@ -51,13 +50,13 @@ npm run stats-all
 
 新增或更新回放后运行 `npm run stats-all` 即可同时刷新两个看板。
 
-远程访问自动对战控制 API 时建议设置：
+远程使用删除对局、强制裁决、管理员改名等管理接口时建议设置：
 
 ```bash
 AUTO_CONTROL_TOKEN=<your-token> npm run dev
 ```
 
-未设置 `AUTO_CONTROL_TOKEN` 时，控制 API 只允许本机访问。
+未设置 `AUTO_CONTROL_TOKEN` 时，这些管理接口只允许本机访问。
 
 ## 对局持久化
 
@@ -130,7 +129,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 | `POST` | `/api/games/:id/force-adjudicate` | control token | `{ ok: true, result }` |
 | `DELETE` | `/api/games/:id` | control token | `{ ok: true }` |
 
-强制裁决仅适用于进行中的对局，按请求时存活玩家的裁决总分决定胜者；最高分并列则平局。删除和强制裁决接口复用自动控制权限：设置 `AUTO_CONTROL_TOKEN` 后需要 `X-Control-Token: <token>` 或 `?token=<token>`；未设置时仅允许本机请求。删除对局会同时删除内存状态和持久化文件中的记录。
+强制裁决仅适用于进行中的对局，按请求时存活玩家的裁决总分决定胜者；最高分并列则平局。删除、强制裁决和管理员改名接口使用控制权限：设置 `AUTO_CONTROL_TOKEN` 后需要 `X-Control-Token: <token>` 或 `?token=<token>`；未设置时仅允许本机请求。删除对局会同时删除内存状态和持久化文件中的记录。
 
 ### 操作
 
@@ -158,23 +157,6 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 `income` 事件保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。`deploy` 事件中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。`control_point_repair` 事件包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 
 `demolish` 事件包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。
-
-### 自动控制
-
-自动控制 API 用于浏览器控制台和外部调度器。设置 `AUTO_CONTROL_TOKEN` 后，请通过 `X-Control-Token: <token>` 请求头或 `?token=<token>` 访问。
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| `GET` | `/api/control/status` | 查看控制器状态、当前对局、最近日志和配置 |
-| `GET` | `/api/control/config` | 读取自动控制配置 |
-| `PUT` | `/api/control/config` | 保存自动控制配置 |
-| `POST` | `/api/control/start` | 启动自动控制；`bootstrap` 开启时由服务端创建并加入对局 |
-| `POST` | `/api/control/pause` | 暂停回合结束后的自动触发 |
-| `POST` | `/api/control/resume` | 恢复自动触发 |
-| `POST` | `/api/control/stop` | 停止自动控制并取消事件订阅 |
-| `POST` | `/api/control/manual` | 向指定玩家发送一次手动提示 |
-| `GET` | `/api/control/logs` | 拉取增量日志 |
-| `GET` | `/api/control/logs/stream` | 通过 SSE 推送状态和日志 |
 
 ## 地图格式
 
@@ -247,55 +229,6 @@ AI 默认会持续轮询并自动处理后续己方回合，直到游戏结束�
 | `--once` | 只处理当前或下一个己方回合 |
 
 AI 在标准模式中的策略优先级：击毁总部、击杀低血单位、治疗友军、战略部署、抢占据点/推进总部。第 8 回合后或拥有 3 个据点时优先转入总部压力；第 12 回合后按裁决分优化行动。歼灭模式改为优先脱离炮火预警/危险区并向最近敌军推进，不再寻找总部或以占点裁决为主目标。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。
-
-### 自动对战控制台
-
-`control.html` 用于管理双边 pi 自动对战。控制台可以配置双方 provider、model、name、session、skill、常规提示、bootstrap 提示和高级命令；支持保存配置、启动、暂停、恢复、停止、发送手动指令和查看日志。
-
-默认运行数据保存在 `runtime/auto-control/`：
-
-- `config.json`：控制台配置
-- `state.json`：控制器状态、最后事件序号和当前子进程
-- `logs.jsonl`：控制日志
-
-配置中可用占位符：
-
-| 占位符 | 含义 |
-|---|---|
-| `{gameId}` | 当前对局 ID |
-| `{token}` | 对应玩家 token |
-| `{side}` / `{owner}` | `player_a` 或 `player_b` |
-| `{name}` | 对应玩家名称 |
-
-### autoRunPi 脚本
-
-`script/autoRunPi.mjs` 是基于观战事件的命令行调度器，不需要玩家 token 即可轮询事件；它会在一方结束回合后调用另一方 pi，并把断点状态写入 `script/.autoRun-<gameId>.json`。
-
-连接已有对局：
-
-```bash
-node script/autoRunPi.mjs <gameId> --a-session .pi/session/player-a.jsonl --b-session .pi/session/player-b.jsonl
-```
-
-自动创建并加入对局：
-
-```bash
-node script/autoRunPi.mjs --bootstrap --a-session .pi/session/player-a.jsonl --b-session .pi/session/player-b.jsonl --a-start-prompt "创建一局 default 地图对局" --b-start-prompt "加入对局 {gameId}"
-```
-
-常用参数：
-
-| 参数 | 说明 |
-|---|---|
-| `--base-url <url>` | 服务地址，默认 `http://localhost:3100` |
-| `--provider <provider>` | 双方默认 pi provider，默认 `new-api` |
-| `--a-provider <provider>` / `--b-provider <provider>` | 分别设置双方 provider |
-| `--a-model <model>` / `--b-model <model>` | 分别设置双方模型，默认 `step-3.7-flash` |
-| `--a-name <name>` / `--b-name <name>` | 分别设置双方 pi 名称 |
-| `--skill <path>` | pi skill 路径，默认 `.pi/skills/skill` |
-| `--interval <sec>` | 事件轮询间隔，默认 `2` |
-| `--timeout <sec>` | 等待一方结束回合的超时重试秒数，默认 `10` |
-| `--fresh` | 忽略断点状态从头开始 |
 
 ## 回放与记录
 

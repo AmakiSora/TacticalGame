@@ -4,7 +4,7 @@ This release runs TacticalGame as one Node.js container exposed directly at `htt
 
 ## Security Notice
 
-This deployment has no password gateway and uses unencrypted HTTP. Anyone who can reach TCP port `3123` can access public game pages and APIs. `AUTO_CONTROL_TOKEN` protects control endpoints only; it does not protect game routes or encrypt `X-Player-Token`, `X-Host-Token`, or `X-Control-Token` headers.
+This deployment has no password gateway and uses unencrypted HTTP. Anyone who can reach TCP port `3123` can access public game pages and APIs. `AUTO_CONTROL_TOKEN` protects admin endpoints only (delete game, force adjudication, admin rename); it does not protect game routes or encrypt `X-Player-Token`, `X-Host-Token`, or `X-Control-Token` headers.
 
 Restrict TCP `3123` to trusted source IPs, a VPN, or a private network in the cloud firewall/security group. Do not expose this direct HTTP endpoint broadly on an untrusted network. Add TLS termination and an access policy before broader use.
 
@@ -109,6 +109,6 @@ After every deployment, verify directly through port `3123`:
 3. `/api/maps` returns configured maps.
 4. A game can be created, joined, started, and changed with `X-Player-Token`.
 5. Player and spectator pages receive new events while left open for more than 30 seconds.
-6. Control endpoints reject external requests without `X-Control-Token: $AUTO_CONTROL_TOKEN`.
+6. Admin endpoints (delete game, force adjudication, admin rename) reject external requests without `X-Control-Token: $AUTO_CONTROL_TOKEN`.
 
 When secure public access is needed, place a TLS-terminating reverse proxy, cloud load balancer, VPN, or firewall allowlist in front of this service. Keep the application as one replica until game state and SSE fan-out are backed by shared services.

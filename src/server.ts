@@ -7,7 +7,6 @@ import { gamesRoutes } from './api/games.js';
 import { actionsRoutes } from './api/actions.js';
 import { closeSseConnections, eventsRoutes } from './api/events.js';
 import { mapsRoutes } from './api/maps.js';
-import { controlRoutes } from './api/control.js';
 import { globalStore } from './state/store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -94,7 +93,6 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(gamesRoutes);
   await app.register(actionsRoutes);
   await app.register(eventsRoutes);
-  await app.register(controlRoutes);
   await app.register(fastifyStatic, { root: PUBLIC_DIR, prefix: '/' });
   ready = true;
   return app;

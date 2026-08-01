@@ -32,21 +32,6 @@ describe('multiplayer UI wiring', () => {
     expect(source).toContain('rankA - rankB');
   });
 
-  it('control page supports playerCount and dynamic multi-seat fields', () => {
-    const html = read('public/control.html');
-    const source = read('public/control.js');
-
-    expect(html).toContain('id="player-count"');
-    expect(html).toContain('id="player-fields"');
-    expect(source).toContain('playerCount');
-    expect(source).toContain('ensurePlayerFields');
-    expect(source).toContain("PLAYER_IDS = ['player_a'");
-    expect(source).toContain('playerConfigCache');
-    // Must not hard-wipe to only A/B on save.
-    expect(source).not.toContain("player_a: readPlayer('player_a')");
-    expect(source).not.toContain("player_b: readPlayer('player_b')");
-  });
-
   it('renders host lobby kick controls and calls the lobby-only endpoint', () => {
     const source = read('public/play.js');
     expect(source).toContain('data-kick-player');

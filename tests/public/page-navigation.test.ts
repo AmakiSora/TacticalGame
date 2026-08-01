@@ -28,7 +28,6 @@ describe('desktop page navigation', () => {
       '/play.html',
       '/spectator.html',
       '/spectator2.html',
-      '/control.html',
       '/map-editor.html',
       '/stats.html',
     ]) {

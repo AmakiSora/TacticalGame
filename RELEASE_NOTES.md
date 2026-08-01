@@ -2,6 +2,13 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.2.6
+
+- 移除自动控制体系：删除服务端 `AutoControlController`、`/api/control/*` 路由、自动对战控制台 `control.html`，以及 `script/autoRunPi` 调度脚本与相关测试。
+- 保留管理鉴权：删除对局、强制裁决、管理员改名仍由 `AUTO_CONTROL_TOKEN` / 本机访问保护；导航与文档同步去掉自动控制入口。
+- 修复 `src/config/loader.ts` 的 TypeScript `TS18046` 类型错误。
+- 此前所有 deepseekv4flash 以及 deepseekv4pro 统一加上后缀 Preview。
+
 ## 3.2.5
 
 - 地图编辑器完整支持歼灭地图：可新建或切换玩法模式、编辑炮火开始轮次/收缩间隔/伤害/最小安全半径，并为每个出生槽绑定唯一出生据点；模式切换、地图缩放、据点改名或删除时会同步维护相关配置，前端校验规则与服务端保持一致。

@@ -372,8 +372,9 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   }
 
   let typedControlPoints = 0;
-  for (let i = 0; i < (c.controlPoints as ControlPointConfig[]).length; i++) {
-    const cp = asRecord(c.controlPoints[i], `controlPoints[${i}]`);
+  const controlPoints = c.controlPoints as ControlPointConfig[];
+  for (let i = 0; i < controlPoints.length; i++) {
+    const cp = asRecord(controlPoints[i], `controlPoints[${i}]`);
     assertString(cp, 'id', `controlPoints[${i}]`);
     assertString(cp, 'name', `controlPoints[${i}]`);
     if ('kind' in cp) {
@@ -389,7 +390,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     if (!controlPointTypes) {
       throw new Error(`Map "${id}".balance.controlPointTypes is required when control points use kind`);
     }
-    if (typedControlPoints !== c.controlPoints.length) {
+    if (typedControlPoints !== controlPoints.length) {
       throw new Error(`Map "${id}".controlPoints must all define kind when any control point is typed`);
     }
   }

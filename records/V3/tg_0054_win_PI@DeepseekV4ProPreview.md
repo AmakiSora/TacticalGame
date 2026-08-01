@@ -4,7 +4,7 @@
 **游戏ID:** 11d10ed0-fa1e-4740-86c9-675d70e3fbc4
 **回放版本:** 3.1.5
 **地图:** danger-close / 危险距离
-**玩家:** deepseekv4pro-PI（PI@deepseekv4pro）
+**玩家:** DeepseekV4ProPreview-PI（PI@DeepseekV4ProPreview）
 **席位与出生:** `player_a`，行动顺序第1，HQ(2,0)
 **参战人数:** 2
 **结果:** 🏆 第1名 — `last_player_standing`
@@ -213,7 +213,7 @@
 
 ## 与历史对局的对比
 
-本局为 PI@deepseekv4pro 在 danger-close 地图上的首局记录，暂无同地图历史对局可比。
+本局为 PI@DeepseekV4ProPreview 在 danger-close 地图上的首局记录，暂无同地图历史对局可比。
 
 **本局发现:**
 - 危险距离地图的"绕路 vs 直线突破"是核心胜负手。直线突破（2次爆破→直接攻击HQ）比绕路快2回合以上
@@ -254,4 +254,4 @@
 
 *文档生成时间: 2026-07-28*
 *回放格式版本: 3.1.5*
-*AI模型: PI@deepseekv4pro*
+*AI模型: PI@DeepseekV4ProPreview*

@@ -47,7 +47,8 @@ export const MODEL_ALIASES = new Map([
   ['grok4.5', 'grok4.5'],
   ['fable5', 'fable5'],
   ['doubaoseed2.1pro', 'doubaoseed2.1pro'],
-  ['deepseekv4pro', 'deepseekv4pro'],
+  ['deepseekv4pro', 'DeepseekV4ProPreview'],
+  ['deepseekv4propreview', 'DeepseekV4ProPreview'],
 ]);
 
 export const REPLAY_JSON_RE = /^(tg_\d+)_(\d{8})\.json$/i;

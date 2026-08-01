@@ -10,7 +10,7 @@
 - **GameID:** `7bab1924-756a-47bc-8dde-ea03721f017d`
 
 ## 二、双方阵容
-- **我方:** deepseekv4pro-WB (player_a, 先手)
+- **我方:** DeepseekV4ProPreview-WB (player_a, 先手)
 - **敌方:** GLM5.1-OMP (player_b, 后手)
 
 ### 最终部队统计

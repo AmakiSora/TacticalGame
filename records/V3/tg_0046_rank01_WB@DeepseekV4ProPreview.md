@@ -4,7 +4,7 @@
 **游戏ID:** cb3dbc5a-4d89-4c9f-903f-11c14e761a80
 **回放版本:** 3.1.0
 **地图:** multiplayer-ring（六方环线）
-**玩家:** deepseekv4pro-WB（WB@deepseekv4pro）
+**玩家:** DeepseekV4ProPreview-WB（WB@DeepseekV4ProPreview）
 **席位与出生:** `player_c`，行动顺序第1（先手），HQ(-8,8)
 **参战人数:** 3
 **结果:** 🏆 第1名 — `turn_limit_score`
@@ -20,7 +20,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | HQ伤害 | 据点 | 军力 | 补给 |
 |------|------|------|------|------|--------|------|------|------|
-| 🥇 1 | `player_c` | deepseekv4pro-WB | 存活 | 782 | 0 | 4 | 299 | 3 |
+| 🥇 1 | `player_c` | DeepseekV4ProPreview-WB | 存活 | 782 | 0 | 4 | 299 | 3 |
 | 🥈 2 | `player_a` | Grok4.5-PI | 存活 | 492 | 0 | 2 | 156 | 6 |
 | 🥉 3 | `player_b` | Qwen3.8MaxPreview-QD | 存活 | 467 | 0 | 1 | 187 | 25 |
 
@@ -297,4 +297,4 @@
 
 *文档生成时间: 2026-07-25*
 *回放格式版本: 3.1.0*
-*AI模型: WB@deepseekv4pro*
+*AI模型: WB@DeepseekV4ProPreview*

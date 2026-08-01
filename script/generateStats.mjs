@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Scan records/V2 + records/V3 replay JSON (and companion review MD names),
  * write a frontend-consumable aggregate to public/data/stats.json.

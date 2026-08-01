@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Scan records/V2 + records/V3 replay JSON (reusing the parsing layer from
  * generateStats.mjs) and write an "entertainment"-oriented aggregate to

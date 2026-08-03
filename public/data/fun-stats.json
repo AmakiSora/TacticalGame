@@ -1,33 +1,40 @@
 {
-  "generatedAt": "2026-08-03T18:21:36.144Z",
+  "generatedAt": "2026-08-03T20:49:21.530Z",
   "source": {
     "versions": [
       "V2",
       "V3"
     ],
-    "replayCount": 70,
+    "replayCount": 71,
     "parseErrors": 0
   },
   "warnings": [],
   "overview": {
-    "matchCount": 70,
-    "completedCount": 67,
+    "matchCount": 71,
+    "completedCount": 68,
     "totalActions": {
-      "moves": 4658,
-      "attacks": 3109,
-      "deploys": 1012,
+      "moves": 4737,
+      "attacks": 3155,
+      "deploys": 1026,
       "heals": 126,
-      "demolishes": 112,
-      "captures": 504,
-      "unitDeaths": 464,
-      "rounds": 492
+      "demolishes": 119,
+      "captures": 514,
+      "unitDeaths": 470,
+      "rounds": 504,
+      "income": 64326,
+      "deployCost": 50985,
+      "comebackSupply": 792
     },
-    "totalEvents": 17339,
-    "avgRounds": 7.03,
-    "avgDurationSec": 9205.8,
-    "totalDurationSec": 625991.824,
+    "totalEvents": 17606,
+    "avgRounds": 7.1,
+    "avgDurationSec": 9138.8,
+    "totalDurationSec": 630575.75,
     "dateMin": "20260614",
-    "dateMax": "20260803"
+    "dateMax": "20260804",
+    "avgActionsPerRound": 8.3,
+    "avgIncomePerMatch": 906,
+    "avgDeployCostPerMatch": 718.1,
+    "spendRate": 0.7926
   },
   "modelProfiles": [
     {
@@ -58,6 +65,35 @@
       "styleTags": [
         "治疗型",
         "扩张型"
+      ]
+    },
+    {
+      "model": "longcat2.0",
+      "games": 14,
+      "moves": 393,
+      "attacks": 239,
+      "deploys": 89,
+      "heals": 10,
+      "captures": 35,
+      "demolishes": 18,
+      "unitDeathsLost": 26,
+      "perGame": {
+        "attacks": 17.07,
+        "heals": 0.71,
+        "deploys": 6.36,
+        "captures": 2.5,
+        "moves": 28.07,
+        "demolishes": 1.29
+      },
+      "deploysByType": {
+        "ranger": 4,
+        "scout": 23,
+        "infantry": 49,
+        "heavy": 10,
+        "support": 3
+      },
+      "styleTags": [
+        "拆迁型"
       ]
     },
     {
@@ -116,35 +152,6 @@
       },
       "styleTags": [
         "扩张型"
-      ]
-    },
-    {
-      "model": "longcat2.0",
-      "games": 13,
-      "moves": 350,
-      "attacks": 224,
-      "deploys": 82,
-      "heals": 10,
-      "captures": 31,
-      "demolishes": 13,
-      "unitDeathsLost": 22,
-      "perGame": {
-        "attacks": 17.23,
-        "heals": 0.77,
-        "deploys": 6.31,
-        "captures": 2.38,
-        "moves": 26.92,
-        "demolishes": 1
-      },
-      "deploysByType": {
-        "ranger": 4,
-        "scout": 22,
-        "infantry": 43,
-        "heavy": 10,
-        "support": 3
-      },
-      "styleTags": [
-        "拆迁型"
       ]
     },
     {
@@ -410,6 +417,33 @@
       ]
     },
     {
+      "model": "dsv4flash0731",
+      "games": 4,
+      "moves": 68,
+      "attacks": 49,
+      "deploys": 15,
+      "heals": 0,
+      "captures": 11,
+      "demolishes": 5,
+      "unitDeathsLost": 6,
+      "perGame": {
+        "attacks": 12.25,
+        "heals": 0,
+        "deploys": 3.75,
+        "captures": 2.75,
+        "moves": 17,
+        "demolishes": 1.25
+      },
+      "deploysByType": {
+        "heavy": 1,
+        "scout": 7,
+        "infantry": 7
+      },
+      "styleTags": [
+        "拆迁型"
+      ]
+    },
+    {
       "model": "glm5.1",
       "games": 4,
       "moves": 110,
@@ -496,33 +530,6 @@
       "styleTags": [
         "机动型",
         "爆兵型"
-      ]
-    },
-    {
-      "model": "dsv4flash0731",
-      "games": 3,
-      "moves": 32,
-      "attacks": 18,
-      "deploys": 8,
-      "heals": 0,
-      "captures": 5,
-      "demolishes": 3,
-      "unitDeathsLost": 4,
-      "perGame": {
-        "attacks": 6,
-        "heals": 0,
-        "deploys": 2.67,
-        "captures": 1.67,
-        "moves": 10.67,
-        "demolishes": 1
-      },
-      "deploysByType": {
-        "heavy": 1,
-        "scout": 4,
-        "infantry": 3
-      },
-      "styleTags": [
-        "拆迁型"
       ]
     },
     {
@@ -747,12 +754,12 @@
   "unitStats": [
     {
       "unitType": "infantry",
-      "deploys": 372,
-      "share": 0.3676,
+      "deploys": 382,
+      "share": 0.3723,
       "byModel": {
+        "longcat2.0": 49,
         "mimo2.5pro": 47,
         "DeepseekV4FlashPreview": 43,
-        "longcat2.0": 43,
         "minimaxm3": 35,
         "hy3": 32,
         "step3.7flash": 30,
@@ -764,6 +771,7 @@
         "grok4.5": 9,
         "Qwen3.8MaxPreview": 8,
         "glm4.7": 7,
+        "dsv4flash0731": 7,
         "qwen3.6v35b": 6,
         "gpt5.6sol": 6,
         "gpt5.5": 5,
@@ -771,20 +779,19 @@
         "agnes2.0flash": 4,
         "glm5.1": 3,
         "kimik3": 3,
-        "dsv4flash0731": 3,
         "gemini3.5flash": 2
       }
     },
     {
       "unitType": "scout",
-      "deploys": 323,
-      "share": 0.3192,
+      "deploys": 327,
+      "share": 0.3187,
       "byModel": {
         "hy3": 37,
         "DeepseekV4FlashPreview": 28,
         "minimaxm3": 28,
         "mimo2.5pro": 26,
-        "longcat2.0": 22,
+        "longcat2.0": 23,
         "qwen3.6v35b": 21,
         "glm5.2": 18,
         "step3.7flash": 18,
@@ -796,8 +803,8 @@
         "doubaoseed2.1pro": 12,
         "qwen3.7max": 10,
         "grok4.5": 7,
+        "dsv4flash0731": 7,
         "glm5.1": 5,
-        "dsv4flash0731": 4,
         "DeepseekV4ProPreview": 3,
         "fable5": 3,
         "gpt5.6sol": 3,
@@ -808,7 +815,7 @@
     {
       "unitType": "ranger",
       "deploys": 135,
-      "share": 0.1334,
+      "share": 0.1316,
       "byModel": {
         "DeepseekV4FlashPreview": 44,
         "glm5.2": 19,
@@ -834,7 +841,7 @@
     {
       "unitType": "heavy",
       "deploys": 111,
-      "share": 0.1097,
+      "share": 0.1082,
       "byModel": {
         "DeepseekV4FlashPreview": 12,
         "mimo2.5pro": 11,
@@ -862,7 +869,7 @@
     {
       "unitType": "support",
       "deploys": 71,
-      "share": 0.0702,
+      "share": 0.0692,
       "byModel": {
         "DeepseekV4FlashPreview": 19,
         "glm5.2": 12,
@@ -881,6 +888,583 @@
         "qwen3.7max": 1,
         "gemini3.5flash": 1
       }
+    }
+  ],
+  "economy": [
+    {
+      "model": "DeepseekV4FlashPreview",
+      "games": 19,
+      "income": 10599,
+      "deployCost": 8219,
+      "comebackSupply": 100,
+      "avgIncome": 557.8,
+      "avgDeployCost": 432.6,
+      "spendRate": 0.7755
+    },
+    {
+      "model": "mimo2.5pro",
+      "games": 12,
+      "income": 6094,
+      "deployCost": 4814,
+      "comebackSupply": 0,
+      "avgIncome": 507.8,
+      "avgDeployCost": 401.2,
+      "spendRate": 0.79
+    },
+    {
+      "model": "glm5.2",
+      "games": 13,
+      "income": 6621,
+      "deployCost": 4484,
+      "comebackSupply": 72,
+      "avgIncome": 509.3,
+      "avgDeployCost": 344.9,
+      "spendRate": 0.6772
+    },
+    {
+      "model": "longcat2.0",
+      "games": 14,
+      "income": 4867,
+      "deployCost": 4047,
+      "comebackSupply": 124,
+      "avgIncome": 347.6,
+      "avgDeployCost": 289.1,
+      "spendRate": 0.8315
+    },
+    {
+      "model": "minimaxm3",
+      "games": 10,
+      "income": 3700,
+      "deployCost": 3365,
+      "comebackSupply": 0,
+      "avgIncome": 370,
+      "avgDeployCost": 336.5,
+      "spendRate": 0.9095
+    },
+    {
+      "model": "hy3",
+      "games": 13,
+      "income": 4380,
+      "deployCost": 3218,
+      "comebackSupply": 36,
+      "avgIncome": 336.9,
+      "avgDeployCost": 247.5,
+      "spendRate": 0.7347
+    },
+    {
+      "model": "step3.7flash",
+      "games": 11,
+      "income": 5588,
+      "deployCost": 3205,
+      "comebackSupply": 132,
+      "avgIncome": 508,
+      "avgDeployCost": 291.4,
+      "spendRate": 0.5736
+    },
+    {
+      "model": "gpt5.5",
+      "games": 4,
+      "income": 2868,
+      "deployCost": 2519,
+      "comebackSupply": 0,
+      "avgIncome": 717,
+      "avgDeployCost": 629.8,
+      "spendRate": 0.8783
+    },
+    {
+      "model": "doubaoseed2.1pro",
+      "games": 5,
+      "income": 1559,
+      "deployCost": 1884,
+      "comebackSupply": 0,
+      "avgIncome": 311.8,
+      "avgDeployCost": 376.8,
+      "spendRate": 1.2085
+    },
+    {
+      "model": "glm5.1",
+      "games": 4,
+      "income": 2048,
+      "deployCost": 1685,
+      "comebackSupply": 12,
+      "avgIncome": 512,
+      "avgDeployCost": 421.3,
+      "spendRate": 0.8228
+    },
+    {
+      "model": "Qwen3.8MaxPreview",
+      "games": 7,
+      "income": 1432,
+      "deployCost": 1646,
+      "comebackSupply": 60,
+      "avgIncome": 204.6,
+      "avgDeployCost": 235.1,
+      "spendRate": 1.1494
+    },
+    {
+      "model": "sensenova6.7fl",
+      "games": 3,
+      "income": 1845,
+      "deployCost": 1576,
+      "comebackSupply": 0,
+      "avgIncome": 615,
+      "avgDeployCost": 525.3,
+      "spendRate": 0.8542
+    },
+    {
+      "model": "qwen3.6v35b",
+      "games": 4,
+      "income": 1973,
+      "deployCost": 1518,
+      "comebackSupply": 0,
+      "avgIncome": 493.3,
+      "avgDeployCost": 379.5,
+      "spendRate": 0.7694
+    },
+    {
+      "model": "qwen3.7max",
+      "games": 5,
+      "income": 1758,
+      "deployCost": 1319,
+      "comebackSupply": 0,
+      "avgIncome": 351.6,
+      "avgDeployCost": 263.8,
+      "spendRate": 0.7503
+    },
+    {
+      "model": "DeepseekV4ProPreview",
+      "games": 5,
+      "income": 1799,
+      "deployCost": 1255,
+      "comebackSupply": 0,
+      "avgIncome": 359.8,
+      "avgDeployCost": 251,
+      "spendRate": 0.6976
+    },
+    {
+      "model": "gpt5.6sol",
+      "games": 3,
+      "income": 1160,
+      "deployCost": 1198,
+      "comebackSupply": 0,
+      "avgIncome": 386.7,
+      "avgDeployCost": 399.3,
+      "spendRate": 1.0328
+    },
+    {
+      "model": "agnes2.0flash",
+      "games": 4,
+      "income": 902,
+      "deployCost": 1132,
+      "comebackSupply": 160,
+      "avgIncome": 225.5,
+      "avgDeployCost": 283,
+      "spendRate": 1.255
+    },
+    {
+      "model": "grok4.5",
+      "games": 5,
+      "income": 1286,
+      "deployCost": 1099,
+      "comebackSupply": 0,
+      "avgIncome": 257.2,
+      "avgDeployCost": 219.8,
+      "spendRate": 0.8546
+    },
+    {
+      "model": "glm4.7",
+      "games": 1,
+      "income": 1385,
+      "deployCost": 835,
+      "comebackSupply": 0,
+      "avgIncome": 1385,
+      "avgDeployCost": 835,
+      "spendRate": 0.6029
+    },
+    {
+      "model": "fable5",
+      "games": 1,
+      "income": 642,
+      "deployCost": 685,
+      "comebackSupply": 0,
+      "avgIncome": 642,
+      "avgDeployCost": 685,
+      "spendRate": 1.067
+    },
+    {
+      "model": "dsv4flash0731",
+      "games": 4,
+      "income": 1028,
+      "deployCost": 530,
+      "comebackSupply": 72,
+      "avgIncome": 257,
+      "avgDeployCost": 132.5,
+      "spendRate": 0.5156
+    },
+    {
+      "model": "kimik3",
+      "games": 2,
+      "income": 368,
+      "deployCost": 385,
+      "comebackSupply": 0,
+      "avgIncome": 184,
+      "avgDeployCost": 192.5,
+      "spendRate": 1.0462
+    },
+    {
+      "model": "gemini3.5flash",
+      "games": 1,
+      "income": 256,
+      "deployCost": 317,
+      "comebackSupply": 24,
+      "avgIncome": 256,
+      "avgDeployCost": 317,
+      "spendRate": 1.2383
+    },
+    {
+      "model": "gptoss120b",
+      "games": 1,
+      "income": 84,
+      "deployCost": 50,
+      "comebackSupply": 0,
+      "avgIncome": 84,
+      "avgDeployCost": 50,
+      "spendRate": 0.5952
+    },
+    {
+      "model": "ring2.6",
+      "games": 1,
+      "income": 84,
+      "deployCost": 0,
+      "comebackSupply": 0,
+      "avgIncome": 84,
+      "avgDeployCost": 0,
+      "spendRate": 0
+    }
+  ],
+  "eliminations": {
+    "killerBoard": [
+      {
+        "model": "minimaxm3",
+        "kills": 4,
+        "deaths": 0,
+        "net": 4
+      },
+      {
+        "model": "longcat2.0",
+        "kills": 3,
+        "deaths": 1,
+        "net": 2
+      },
+      {
+        "model": "qwen3.7max",
+        "kills": 2,
+        "deaths": 1,
+        "net": 1
+      },
+      {
+        "model": "hy3",
+        "kills": 2,
+        "deaths": 2,
+        "net": 0
+      },
+      {
+        "model": "DeepseekV4ProPreview",
+        "kills": 1,
+        "deaths": 0,
+        "net": 1
+      },
+      {
+        "model": "doubaoseed2.1pro",
+        "kills": 1,
+        "deaths": 0,
+        "net": 1
+      },
+      {
+        "model": "gpt5.6sol",
+        "kills": 1,
+        "deaths": 0,
+        "net": 1
+      },
+      {
+        "model": "kimik3",
+        "kills": 1,
+        "deaths": 0,
+        "net": 1
+      },
+      {
+        "model": "agnes2.0flash",
+        "kills": 1,
+        "deaths": 1,
+        "net": 0
+      },
+      {
+        "model": "dsv4flash0731",
+        "kills": 1,
+        "deaths": 1,
+        "net": 0
+      },
+      {
+        "model": "glm5.2",
+        "kills": 1,
+        "deaths": 1,
+        "net": 0
+      },
+      {
+        "model": "grok4.5",
+        "kills": 1,
+        "deaths": 1,
+        "net": 0
+      }
+    ],
+    "rivalries": []
+  },
+  "mapStage": [
+    {
+      "mapId": "default",
+      "games": 24,
+      "avgRounds": null,
+      "roundsSampled": 0,
+      "capturesPerGame": 9.58,
+      "avgDurationSec": 5893.9,
+      "winnerModels": [
+        {
+          "model": "DeepseekV4FlashPreview",
+          "wins": 5
+        },
+        {
+          "model": "glm5.2",
+          "wins": 5
+        },
+        {
+          "model": "mimo2.5pro",
+          "wins": 4
+        },
+        {
+          "model": "gpt5.5",
+          "wins": 2
+        },
+        {
+          "model": "qwen3.6v35b",
+          "wins": 1
+        },
+        {
+          "model": "longcat2.0",
+          "wins": 1
+        },
+        {
+          "model": "step3.7flash",
+          "wins": 1
+        },
+        {
+          "model": "glm5.1",
+          "wins": 1
+        },
+        {
+          "model": "sensenova6.7fl",
+          "wins": 1
+        }
+      ]
+    },
+    {
+      "mapId": "danger-close",
+      "games": 16,
+      "avgRounds": 12.94,
+      "roundsSampled": 16,
+      "capturesPerGame": 1.75,
+      "avgDurationSec": 4250.2,
+      "winnerModels": [
+        {
+          "model": "minimaxm3",
+          "wins": 3
+        },
+        {
+          "model": "longcat2.0",
+          "wins": 2
+        },
+        {
+          "model": "gpt5.6sol",
+          "wins": 1
+        },
+        {
+          "model": "grok4.5",
+          "wins": 1
+        },
+        {
+          "model": "agnes2.0flash",
+          "wins": 1
+        },
+        {
+          "model": "kimik3",
+          "wins": 1
+        },
+        {
+          "model": "glm5.2",
+          "wins": 1
+        },
+        {
+          "model": "doubaoseed2.1pro",
+          "wins": 1
+        },
+        {
+          "model": "DeepseekV4ProPreview",
+          "wins": 1
+        },
+        {
+          "model": "ring2.6",
+          "wins": 1
+        },
+        {
+          "model": "qwen3.7max",
+          "wins": 1
+        },
+        {
+          "model": "hy3",
+          "wins": 1
+        },
+        {
+          "model": "dsv4flash0731",
+          "wins": 1
+        }
+      ]
+    },
+    {
+      "mapId": "breach",
+      "games": 11,
+      "avgRounds": 11.86,
+      "roundsSampled": 7,
+      "capturesPerGame": 7.27,
+      "avgDurationSec": 8796.9,
+      "winnerModels": [
+        {
+          "model": "hy3",
+          "wins": 3
+        },
+        {
+          "model": "longcat2.0",
+          "wins": 2
+        },
+        {
+          "model": "fable5",
+          "wins": 1
+        },
+        {
+          "model": "DeepseekV4FlashPreview",
+          "wins": 1
+        },
+        {
+          "model": "minimaxm3",
+          "wins": 1
+        },
+        {
+          "model": "grok4.5",
+          "wins": 1
+        },
+        {
+          "model": "gpt5.6sol",
+          "wins": 1
+        },
+        {
+          "model": "kimik3",
+          "wins": 1
+        }
+      ]
+    },
+    {
+      "mapId": "forge",
+      "games": 8,
+      "avgRounds": 9.88,
+      "roundsSampled": 8,
+      "capturesPerGame": 7.75,
+      "avgDurationSec": 4334.5,
+      "winnerModels": [
+        {
+          "model": "glm5.2",
+          "wins": 3
+        },
+        {
+          "model": "DeepseekV4FlashPreview",
+          "wins": 2
+        },
+        {
+          "model": "gpt5.6sol",
+          "wins": 1
+        },
+        {
+          "model": "qwen3.7max",
+          "wins": 1
+        },
+        {
+          "model": "DeepseekV4ProPreview",
+          "wins": 1
+        }
+      ]
+    },
+    {
+      "mapId": "dual-lanes",
+      "games": 6,
+      "avgRounds": 15,
+      "roundsSampled": 3,
+      "capturesPerGame": 5.67,
+      "avgDurationSec": 18694.5,
+      "winnerModels": [
+        {
+          "model": "DeepseekV4FlashPreview",
+          "wins": 2
+        },
+        {
+          "model": "doubaoseed2.1pro",
+          "wins": 2
+        },
+        {
+          "model": "longcat2.0",
+          "wins": 1
+        },
+        {
+          "model": "hy3",
+          "wins": 1
+        }
+      ]
+    },
+    {
+      "mapId": "multiplayer-ring",
+      "games": 5,
+      "avgRounds": 15.6,
+      "roundsSampled": 5,
+      "capturesPerGame": 13.2,
+      "avgDurationSec": 37811.1,
+      "winnerModels": [
+        {
+          "model": "hy3",
+          "wins": 2
+        },
+        {
+          "model": "longcat2.0",
+          "wins": 1
+        },
+        {
+          "model": "Qwen3.8MaxPreview",
+          "wins": 1
+        },
+        {
+          "model": "DeepseekV4ProPreview",
+          "wins": 1
+        }
+      ]
+    },
+    {
+      "mapId": "four-corners",
+      "games": 1,
+      "avgRounds": 12,
+      "roundsSampled": 1,
+      "capturesPerGame": 14,
+      "avgDurationSec": 11399,
+      "winnerModels": [
+        {
+          "model": "longcat2.0",
+          "wins": 1
+        }
+      ]
     }
   ],
   "extremes": {
@@ -1300,25 +1884,104 @@
         }
       ],
       "durationSec": 27.9
+    },
+    "mostActionsPerRound": {
+      "recordId": "tg_0034",
+      "date": "20260720",
+      "mapId": "multiplayer-ring",
+      "playerCount": 6,
+      "winner": "Qwen3.8MaxPreview-QD",
+      "reason": "turn_limit_score",
+      "participants": [
+        {
+          "displayName": "DeepseekV4FlashPreview-PI",
+          "model": "DeepseekV4FlashPreview",
+          "rank": 3,
+          "isWinner": false
+        },
+        {
+          "displayName": "MiMo2.5pro-PI",
+          "model": "mimo2.5pro",
+          "rank": 4,
+          "isWinner": false
+        },
+        {
+          "displayName": "LongCat2.0-PI",
+          "model": "longcat2.0",
+          "rank": 6,
+          "isWinner": false
+        },
+        {
+          "displayName": "Hy3-WB",
+          "model": "hy3",
+          "rank": 2,
+          "isWinner": false
+        },
+        {
+          "displayName": "doubaoseed2.1pro-PI",
+          "model": "doubaoseed2.1pro",
+          "rank": 5,
+          "isWinner": false
+        },
+        {
+          "displayName": "Qwen3.8MaxPreview-QD",
+          "model": "Qwen3.8MaxPreview",
+          "rank": 1,
+          "isWinner": true
+        }
+      ],
+      "value": 26.07,
+      "kind": "actionsPerRound"
+    },
+    "biggestSpender": {
+      "recordId": "tg_0002",
+      "date": "20260614",
+      "mapId": "default",
+      "playerCount": 2,
+      "winner": "DeepseekV4FlashPreview",
+      "reason": "headquarters_destroyed",
+      "participants": [
+        {
+          "displayName": "MiMo2.5pro",
+          "model": "mimo2.5pro",
+          "rank": 2,
+          "isWinner": false
+        },
+        {
+          "displayName": "DeepseekV4FlashPreview",
+          "model": "DeepseekV4FlashPreview",
+          "rank": 1,
+          "isWinner": true
+        }
+      ],
+      "value": 1230,
+      "kind": "deployCost",
+      "model": "DeepseekV4FlashPreview"
     }
   },
   "funFacts": [
-    "在 70 局对局中，共打出 9,521 次操作：4,658 次移动、3,109 次攻击、1,012 次部署、504 次占领、126 次治疗。",
-    "战场上有 464 个单位阵亡，平均每局阵亡 6.6 个。",
-    "最受欢迎的单位是「infantry」，共部署 372 次，占全部部署的 37%。",
+    "在 71 局对局中，共打出 9,677 次操作：4,737 次移动、3,155 次攻击、1,026 次部署、514 次占领、126 次治疗。",
+    "战场上有 470 个单位阵亡，平均每局阵亡 6.6 个。",
+    "最受欢迎的单位是「infantry」，共部署 382 次，占全部部署的 37%。",
     "最暴躁的模型是「DeepseekV4FlashPreview」，累计发起 644 次攻击。",
     "最勤快的模型是「DeepseekV4FlashPreview」，累计移动 918 次。",
     "最漫长的一局是 tg_0039，鏖战 24 整轮。",
     "最速决的是 tg_0059，仅 7 整轮便分出胜负。",
     "最血腥的一局是 tg_0034，阵亡 25 个单位。",
     "单场最强拆迁：agnes2.0flash 在 tg_0025 中造成 161 点 HQ 伤害。",
-    "平均每局耗时约 153分26秒。"
+    "最舍得花钱的模型是「DeepseekV4FlashPreview」，累计在部署上花掉 8,219 补给（共 19 场）。",
+    "最无情的终结者是「minimaxm3」，亲手送走 4 名对手，自己也被淘汰 0 次。",
+    "最常登场的战场是「default」，出现 24 次。",
+    "节奏最密的一局是 tg_0034，平均每轮 26.07 次有效操作。",
+    "平均每局耗时约 152分19秒。"
   ],
   "timeline": [
     {
       "date": "2026-06-14",
       "matches": 2,
       "totalActions": 360,
+      "cumulativeMatches": 2,
+      "cumulativeActions": 360,
       "avgRounds": 0,
       "avgDurationSec": 1959.4
     },
@@ -1326,6 +1989,8 @@
       "date": "2026-06-15",
       "matches": 8,
       "totalActions": 1771,
+      "cumulativeMatches": 10,
+      "cumulativeActions": 2131,
       "avgRounds": 0,
       "avgDurationSec": 1014.6
     },
@@ -1333,6 +1998,8 @@
       "date": "2026-06-16",
       "matches": 1,
       "totalActions": 278,
+      "cumulativeMatches": 11,
+      "cumulativeActions": 2409,
       "avgRounds": 0,
       "avgDurationSec": 13195.2
     },
@@ -1340,6 +2007,8 @@
       "date": "2026-06-18",
       "matches": 2,
       "totalActions": 374,
+      "cumulativeMatches": 13,
+      "cumulativeActions": 2783,
       "avgRounds": 0,
       "avgDurationSec": 3774.3
     },
@@ -1347,6 +2016,8 @@
       "date": "2026-06-19",
       "matches": 2,
       "totalActions": 363,
+      "cumulativeMatches": 15,
+      "cumulativeActions": 3146,
       "avgRounds": 0,
       "avgDurationSec": 10704.6
     },
@@ -1354,6 +2025,8 @@
       "date": "2026-06-21",
       "matches": 4,
       "totalActions": 712,
+      "cumulativeMatches": 19,
+      "cumulativeActions": 3858,
       "avgRounds": 0,
       "avgDurationSec": 5669.5
     },
@@ -1361,6 +2034,8 @@
       "date": "2026-06-22",
       "matches": 1,
       "totalActions": 114,
+      "cumulativeMatches": 20,
+      "cumulativeActions": 3972,
       "avgRounds": 0,
       "avgDurationSec": 3070.6
     },
@@ -1368,6 +2043,8 @@
       "date": "2026-06-23",
       "matches": 1,
       "totalActions": 221,
+      "cumulativeMatches": 21,
+      "cumulativeActions": 4193,
       "avgRounds": 0,
       "avgDurationSec": 19873
     },
@@ -1375,6 +2052,8 @@
       "date": "2026-06-24",
       "matches": 1,
       "totalActions": 179,
+      "cumulativeMatches": 22,
+      "cumulativeActions": 4372,
       "avgRounds": 0,
       "avgDurationSec": 9584.2
     },
@@ -1382,6 +2061,8 @@
       "date": "2026-06-25",
       "matches": 1,
       "totalActions": 195,
+      "cumulativeMatches": 23,
+      "cumulativeActions": 4567,
       "avgRounds": 0,
       "avgDurationSec": 12036.2
     },
@@ -1389,6 +2070,8 @@
       "date": "2026-06-27",
       "matches": 1,
       "totalActions": 141,
+      "cumulativeMatches": 24,
+      "cumulativeActions": 4708,
       "avgRounds": 0,
       "avgDurationSec": 20022.7
     },
@@ -1396,6 +2079,8 @@
       "date": "2026-07-01",
       "matches": 1,
       "totalActions": 152,
+      "cumulativeMatches": 25,
+      "cumulativeActions": 4860,
       "avgRounds": 0,
       "avgDurationSec": 43078.5
     },
@@ -1403,6 +2088,8 @@
       "date": "2026-07-04",
       "matches": 1,
       "totalActions": 173,
+      "cumulativeMatches": 26,
+      "cumulativeActions": 5033,
       "avgRounds": 0,
       "avgDurationSec": 26388.3
     },
@@ -1410,6 +2097,8 @@
       "date": "2026-07-05",
       "matches": 1,
       "totalActions": 195,
+      "cumulativeMatches": 27,
+      "cumulativeActions": 5228,
       "avgRounds": 0,
       "avgDurationSec": 20861.2
     },
@@ -1417,6 +2106,8 @@
       "date": "2026-07-07",
       "matches": 2,
       "totalActions": 194,
+      "cumulativeMatches": 29,
+      "cumulativeActions": 5422,
       "avgRounds": 0,
       "avgDurationSec": 4874.9
     },
@@ -1424,6 +2115,8 @@
       "date": "2026-07-08",
       "matches": 1,
       "totalActions": 74,
+      "cumulativeMatches": 30,
+      "cumulativeActions": 5496,
       "avgRounds": 0,
       "avgDurationSec": 4138.3
     },
@@ -1431,6 +2124,8 @@
       "date": "2026-07-14",
       "matches": 1,
       "totalActions": 245,
+      "cumulativeMatches": 31,
+      "cumulativeActions": 5741,
       "avgRounds": 18,
       "avgDurationSec": 81093
     },
@@ -1438,6 +2133,8 @@
       "date": "2026-07-15",
       "matches": 1,
       "totalActions": 201,
+      "cumulativeMatches": 32,
+      "cumulativeActions": 5942,
       "avgRounds": 15,
       "avgDurationSec": 26158.3
     },
@@ -1445,6 +2142,8 @@
       "date": "2026-07-18",
       "matches": 1,
       "totalActions": 205,
+      "cumulativeMatches": 33,
+      "cumulativeActions": 6147,
       "avgRounds": 15,
       "avgDurationSec": 44210
     },
@@ -1452,6 +2151,8 @@
       "date": "2026-07-20",
       "matches": 1,
       "totalActions": 391,
+      "cumulativeMatches": 34,
+      "cumulativeActions": 6538,
       "avgRounds": 15,
       "avgDurationSec": 31628.1
     },
@@ -1459,6 +2160,8 @@
       "date": "2026-07-21",
       "matches": 3,
       "totalActions": 162,
+      "cumulativeMatches": 37,
+      "cumulativeActions": 6700,
       "avgRounds": 10.67,
       "avgDurationSec": 3261.4
     },
@@ -1466,6 +2169,8 @@
       "date": "2026-07-22",
       "matches": 2,
       "totalActions": 82,
+      "cumulativeMatches": 39,
+      "cumulativeActions": 6782,
       "avgRounds": 17,
       "avgDurationSec": 4306.4
     },
@@ -1473,6 +2178,8 @@
       "date": "2026-07-23",
       "matches": 3,
       "totalActions": 90,
+      "cumulativeMatches": 42,
+      "cumulativeActions": 6872,
       "avgRounds": 11.67,
       "avgDurationSec": 2892.5
     },
@@ -1480,6 +2187,8 @@
       "date": "2026-07-24",
       "matches": 3,
       "totalActions": 275,
+      "cumulativeMatches": 45,
+      "cumulativeActions": 7147,
       "avgRounds": 12,
       "avgDurationSec": 4564.3
     },
@@ -1487,6 +2196,8 @@
       "date": "2026-07-25",
       "matches": 2,
       "totalActions": 301,
+      "cumulativeMatches": 47,
+      "cumulativeActions": 7448,
       "avgRounds": 12.5,
       "avgDurationSec": 4555
     },
@@ -1494,6 +2205,8 @@
       "date": "2026-07-26",
       "matches": 1,
       "totalActions": 164,
+      "cumulativeMatches": 48,
+      "cumulativeActions": 7612,
       "avgRounds": 15,
       "avgDurationSec": 4342.6
     },
@@ -1501,6 +2214,8 @@
       "date": "2026-07-27",
       "matches": 5,
       "totalActions": 436,
+      "cumulativeMatches": 53,
+      "cumulativeActions": 8048,
       "avgRounds": 14,
       "avgDurationSec": 7967.7
     },
@@ -1508,6 +2223,8 @@
       "date": "2026-07-28",
       "matches": 4,
       "totalActions": 364,
+      "cumulativeMatches": 57,
+      "cumulativeActions": 8412,
       "avgRounds": 10.75,
       "avgDurationSec": 3829.7
     },
@@ -1515,6 +2232,8 @@
       "date": "2026-07-29",
       "matches": 3,
       "totalActions": 279,
+      "cumulativeMatches": 60,
+      "cumulativeActions": 8691,
       "avgRounds": 12,
       "avgDurationSec": 20667.8
     },
@@ -1522,6 +2241,8 @@
       "date": "2026-07-30",
       "matches": 1,
       "totalActions": 257,
+      "cumulativeMatches": 61,
+      "cumulativeActions": 8948,
       "avgRounds": 12,
       "avgDurationSec": 11399
     },
@@ -1529,6 +2250,8 @@
       "date": "2026-07-31",
       "matches": 3,
       "totalActions": 281,
+      "cumulativeMatches": 64,
+      "cumulativeActions": 9229,
       "avgRounds": 11.33,
       "avgDurationSec": 5134.2
     },
@@ -1536,6 +2259,8 @@
       "date": "2026-08-01",
       "matches": 1,
       "totalActions": 29,
+      "cumulativeMatches": 65,
+      "cumulativeActions": 9258,
       "avgRounds": 13,
       "avgDurationSec": 3499.8
     },
@@ -1543,6 +2268,8 @@
       "date": "2026-08-02",
       "matches": 1,
       "totalActions": 36,
+      "cumulativeMatches": 66,
+      "cumulativeActions": 9294,
       "avgRounds": 14,
       "avgDurationSec": 5484.8
     },
@@ -1550,8 +2277,272 @@
       "date": "2026-08-03",
       "matches": 4,
       "totalActions": 227,
+      "cumulativeMatches": 70,
+      "cumulativeActions": 9521,
       "avgRounds": 7.5,
       "avgDurationSec": 3577.9
+    },
+    {
+      "date": "2026-08-04",
+      "matches": 1,
+      "totalActions": 156,
+      "cumulativeMatches": 71,
+      "cumulativeActions": 9677,
+      "avgRounds": 12,
+      "avgDurationSec": 4583.9
+    }
+  ],
+  "monthlyTrend": [
+    {
+      "month": "2026.06",
+      "matches": 24,
+      "totalActions": 4708,
+      "avgRounds": null,
+      "avgDurationSec": 5893.9,
+      "activeModels": 12
+    },
+    {
+      "month": "2026.07",
+      "matches": 40,
+      "totalActions": 4521,
+      "avgRounds": 12.79,
+      "avgDurationSec": 11918.5,
+      "activeModels": 20
+    },
+    {
+      "month": "2026.08",
+      "matches": 7,
+      "totalActions": 448,
+      "avgRounds": 11.5,
+      "avgDurationSec": 4050.4,
+      "activeModels": 10
+    }
+  ],
+  "modelDebut": [
+    {
+      "model": "DeepseekV4FlashPreview",
+      "debutDate": "2026-06-14",
+      "latestDate": "2026-08-03",
+      "games": 19,
+      "wins": 10,
+      "debutRecordId": "tg_0002",
+      "latestRecordId": "tg_0069"
+    },
+    {
+      "model": "mimo2.5pro",
+      "debutDate": "2026-06-14",
+      "latestDate": "2026-07-23",
+      "games": 12,
+      "wins": 4,
+      "debutRecordId": "tg_0001",
+      "latestRecordId": "tg_0042"
+    },
+    {
+      "model": "glm5.2",
+      "debutDate": "2026-06-15",
+      "latestDate": "2026-08-03",
+      "games": 13,
+      "wins": 9,
+      "debutRecordId": "tg_0006",
+      "latestRecordId": "tg_0070"
+    },
+    {
+      "model": "minimaxm3",
+      "debutDate": "2026-06-15",
+      "latestDate": "2026-08-01",
+      "games": 10,
+      "wins": 4,
+      "debutRecordId": "tg_0006",
+      "latestRecordId": "tg_0065"
+    },
+    {
+      "model": "glm4.7",
+      "debutDate": "2026-06-16",
+      "latestDate": "2026-06-16",
+      "games": 1,
+      "wins": 0,
+      "debutRecordId": "tg_0011",
+      "latestRecordId": "tg_0011"
+    },
+    {
+      "model": "gpt5.5",
+      "debutDate": "2026-06-18",
+      "latestDate": "2026-07-05",
+      "games": 4,
+      "wins": 2,
+      "debutRecordId": "tg_0012",
+      "latestRecordId": "tg_0027"
+    },
+    {
+      "model": "qwen3.6v35b",
+      "debutDate": "2026-06-19",
+      "latestDate": "2026-06-27",
+      "games": 4,
+      "wins": 1,
+      "debutRecordId": "tg_0014",
+      "latestRecordId": "tg_0024"
+    },
+    {
+      "model": "step3.7flash",
+      "debutDate": "2026-06-19",
+      "latestDate": "2026-08-01",
+      "games": 11,
+      "wins": 1,
+      "debutRecordId": "tg_0014",
+      "latestRecordId": "tg_0065"
+    },
+    {
+      "model": "longcat2.0",
+      "debutDate": "2026-06-21",
+      "latestDate": "2026-08-04",
+      "games": 14,
+      "wins": 8,
+      "debutRecordId": "tg_0016",
+      "latestRecordId": "tg_0071"
+    },
+    {
+      "model": "sensenova6.7fl",
+      "debutDate": "2026-06-22",
+      "latestDate": "2026-07-14",
+      "games": 3,
+      "wins": 1,
+      "debutRecordId": "tg_0020",
+      "latestRecordId": "tg_0031"
+    },
+    {
+      "model": "DeepseekV4ProPreview",
+      "debutDate": "2026-06-25",
+      "latestDate": "2026-08-03",
+      "games": 5,
+      "wins": 3,
+      "debutRecordId": "tg_0023",
+      "latestRecordId": "tg_0067"
+    },
+    {
+      "model": "glm5.1",
+      "debutDate": "2026-06-25",
+      "latestDate": "2026-07-27",
+      "games": 4,
+      "wins": 1,
+      "debutRecordId": "tg_0023",
+      "latestRecordId": "tg_0050"
+    },
+    {
+      "model": "agnes2.0flash",
+      "debutDate": "2026-07-01",
+      "latestDate": "2026-07-24",
+      "games": 4,
+      "wins": 1,
+      "debutRecordId": "tg_0025",
+      "latestRecordId": "tg_0044"
+    },
+    {
+      "model": "qwen3.7max",
+      "debutDate": "2026-07-04",
+      "latestDate": "2026-07-31",
+      "games": 5,
+      "wins": 2,
+      "debutRecordId": "tg_0026",
+      "latestRecordId": "tg_0062"
+    },
+    {
+      "model": "fable5",
+      "debutDate": "2026-07-05",
+      "latestDate": "2026-07-05",
+      "games": 1,
+      "wins": 1,
+      "debutRecordId": "tg_0027",
+      "latestRecordId": "tg_0027"
+    },
+    {
+      "model": "hy3",
+      "debutDate": "2026-07-07",
+      "latestDate": "2026-08-03",
+      "games": 13,
+      "wins": 7,
+      "debutRecordId": "tg_0028",
+      "latestRecordId": "tg_0068"
+    },
+    {
+      "model": "doubaoseed2.1pro",
+      "debutDate": "2026-07-20",
+      "latestDate": "2026-07-31",
+      "games": 5,
+      "wins": 3,
+      "debutRecordId": "tg_0034",
+      "latestRecordId": "tg_0064"
+    },
+    {
+      "model": "Qwen3.8MaxPreview",
+      "debutDate": "2026-07-20",
+      "latestDate": "2026-07-31",
+      "games": 7,
+      "wins": 1,
+      "debutRecordId": "tg_0034",
+      "latestRecordId": "tg_0062"
+    },
+    {
+      "model": "gpt5.6sol",
+      "debutDate": "2026-07-21",
+      "latestDate": "2026-07-29",
+      "games": 3,
+      "wins": 3,
+      "debutRecordId": "tg_0036",
+      "latestRecordId": "tg_0058"
+    },
+    {
+      "model": "grok4.5",
+      "debutDate": "2026-07-21",
+      "latestDate": "2026-07-29",
+      "games": 5,
+      "wins": 2,
+      "debutRecordId": "tg_0036",
+      "latestRecordId": "tg_0059"
+    },
+    {
+      "model": "kimik3",
+      "debutDate": "2026-07-23",
+      "latestDate": "2026-07-29",
+      "games": 2,
+      "wins": 2,
+      "debutRecordId": "tg_0040",
+      "latestRecordId": "tg_0059"
+    },
+    {
+      "model": "ring2.6",
+      "debutDate": "2026-07-29",
+      "latestDate": "2026-07-29",
+      "games": 1,
+      "wins": 1,
+      "debutRecordId": "tg_0060",
+      "latestRecordId": "tg_0060"
+    },
+    {
+      "model": "gptoss120b",
+      "debutDate": "2026-08-02",
+      "latestDate": "2026-08-02",
+      "games": 1,
+      "wins": 0,
+      "debutRecordId": "tg_0066",
+      "latestRecordId": "tg_0066"
+    },
+    {
+      "model": "dsv4flash0731",
+      "debutDate": "2026-08-03",
+      "latestDate": "2026-08-04",
+      "games": 4,
+      "wins": 1,
+      "debutRecordId": "tg_0068",
+      "latestRecordId": "tg_0071"
+    },
+    {
+      "model": "gemini3.5flash",
+      "debutDate": "2026-08-03",
+      "latestDate": "2026-08-03",
+      "games": 1,
+      "wins": 0,
+      "debutRecordId": "tg_0067",
+      "latestRecordId": "tg_0067"
     }
   ],
   "schemaTimeline": [
@@ -1673,7 +2664,7 @@
     {
       "schemaVersion": "3.2.7",
       "firstDate": "2026-08-03",
-      "games": 3
+      "games": 4
     }
   ]
 }

@@ -108,6 +108,9 @@ function emptyActionTotals() {
     captures: 0,
     unitDeaths: 0,
     rounds: 0,
+    income: 0,
+    deployCost: 0,
+    comebackSupply: 0,
   };
 }
 
@@ -122,6 +125,9 @@ function actionTotalsFromMatch(m) {
     captures: es.captures || 0,
     unitDeaths: es.unitDeaths || 0,
     rounds: es.rounds || 0,
+    income: es.income || 0,
+    deployCost: es.deployCost || 0,
+    comebackSupply: es.comebackSupply || 0,
   };
 }
 
@@ -150,12 +156,20 @@ export function buildOverview(matches) {
   let roundsSum = 0;
   let durSum = 0;
   let durCount = 0;
+  let roundActionsSum = 0;
+  let roundCountSum = 0;
   for (const m of matches) {
     if (m.error) continue;
     overview.matchCount += 1;
     if (m.completed) overview.completedCount += 1;
     overview.totalEvents += m.eventCount || 0;
     roundsSum += m.eventStats?.rounds || 0;
+    const rounds = m.eventStats?.rounds || 0;
+    if (rounds > 0) {
+      const at = actionTotalsFromMatch(m);
+      roundActionsSum += at.moves + at.attacks + at.deploys + at.heals + at.demolishes + at.captures;
+      roundCountSum += rounds;
+    }
     const at = actionTotalsFromMatch(m);
     for (const k of Object.keys(overview.totalActions)) {
       overview.totalActions[k] += at[k];
@@ -172,7 +186,11 @@ export function buildOverview(matches) {
     }
   }
   overview.avgRounds = overview.matchCount > 0 ? round2(roundsSum / overview.matchCount) : 0;
+  overview.avgActionsPerRound = roundCountSum > 0 ? round2(roundActionsSum / roundCountSum) : 0;
   overview.avgDurationSec = durCount > 0 ? round1(durSum / durCount) : null;
+  overview.avgIncomePerMatch = overview.matchCount > 0 ? round1(overview.totalActions.income / overview.matchCount) : 0;
+  overview.avgDeployCostPerMatch = overview.matchCount > 0 ? round1(overview.totalActions.deployCost / overview.matchCount) : 0;
+  overview.spendRate = overview.totalActions.income > 0 ? round4(overview.totalActions.deployCost / overview.totalActions.income) : 0;
   return overview;
 }
 
@@ -311,6 +329,136 @@ function buildUnitStats(matches) {
 
 function round4(n) { return Math.round(n * 10000) / 10000; }
 
+/**
+ * Per-model economy ledger: income received vs supplies spent on deploys,
+ * plus the spend rate (deploy cost / income).
+ */
+export function buildEconomy(matches) {
+  const perModel = new Map();
+  for (const m of matches) {
+    if (m.error || !m.participants) continue;
+    for (const p of m.participants) {
+      const ev = p.events || {};
+      const b = perModel.get(p.model) || { model: p.model, games: 0, income: 0, deployCost: 0, comebackSupply: 0 };
+      b.games += 1;
+      b.income += ev.income || 0;
+      b.deployCost += ev.deployCost || 0;
+      b.comebackSupply += ev.comebackSupply || 0;
+      perModel.set(p.model, b);
+    }
+  }
+  return [...perModel.values()]
+    .map((b) => ({
+      model: b.model,
+      games: b.games,
+      income: b.income,
+      deployCost: b.deployCost,
+      comebackSupply: b.comebackSupply,
+      avgIncome: round1(b.income / b.games),
+      avgDeployCost: round1(b.deployCost / b.games),
+      spendRate: b.income > 0 ? round4(b.deployCost / b.income) : 0,
+    }))
+    .sort((a, b) => b.deployCost - a.deployCost || b.income - a.income || a.model.localeCompare(b.model));
+}
+
+/**
+ * Elimination ledger: per-model kills (as eliminatedBy), deaths, mutual
+ * rivalry pairs where both sides have eliminated the other at least once.
+ */
+export function buildEliminations(matches) {
+  const perModel = new Map();
+  const pairs = new Map();
+  const bucket = (model) => ({ model, kills: 0, deaths: 0, eliminated: {}, killedBy: {} });
+
+  for (const m of matches) {
+    if (m.error || !Array.isArray(m.eliminations)) continue;
+    const modelById = new Map((m.participants || []).map((p) => [p.playerId, p.model]));
+    for (const el of m.eliminations) {
+      const killed = modelById.get(el.playerId);
+      const killer = el.eliminatedBy ? modelById.get(el.eliminatedBy) : null;
+      if (killed) {
+        const b = perModel.get(killed) || bucket(killed);
+        b.deaths += 1;
+        if (killer && killer !== killed) b.killedBy[killer] = (b.killedBy[killer] || 0) + 1;
+        perModel.set(killed, b);
+      }
+      if (killer) {
+        const b = perModel.get(killer) || bucket(killer);
+        b.kills += 1;
+        if (killed && killer !== killed) b.eliminated[killed] = (b.eliminated[killed] || 0) + 1;
+        perModel.set(killer, b);
+      }
+      if (killer && killed && killer !== killed) {
+        const [a, b] = [killer, killed].sort();
+        const key = `${a}|${b}`;
+        const pair = pairs.get(key) || { a, b, aKillsB: 0, bKillsA: 0 };
+        if (killer === a) pair.aKillsB += 1;
+        else pair.bKillsA += 1;
+        pairs.set(key, pair);
+      }
+    }
+  }
+
+  const killerBoard = [...perModel.values()]
+    .map((b) => ({ model: b.model, kills: b.kills, deaths: b.deaths, net: b.kills - b.deaths }))
+    .filter((b) => b.kills > 0)
+    .sort((a, b) => b.kills - a.kills || b.net - a.net || a.model.localeCompare(b.model));
+
+  const rivalries = [...pairs.values()]
+    .filter((p) => p.aKillsB > 0 && p.bKillsA > 0)
+    .map((p) => ({ a: p.a, b: p.b, aKillsB: p.aKillsB, bKillsA: p.bKillsA, total: p.aKillsB + p.bKillsA }))
+    .sort((x, y) => y.total - x.total || y.aKillsB - x.aKillsB);
+
+  return { killerBoard, rivalries };
+}
+
+/** Per-map stage summary: games, pace, capture intensity and dominant winners. */
+export function buildMapStage(matches) {
+  const byMap = new Map();
+  for (const m of matches) {
+    if (m.error) continue;
+    const b = byMap.get(m.mapId) || { mapId: m.mapId, games: 0, roundsSum: 0, roundsCount: 0, captures: 0, durSum: 0, durCount: 0, wins: {} };
+    b.games += 1;
+    const rounds = m.eventStats?.rounds || 0;
+    if (rounds > 0) {
+      b.roundsSum += rounds;
+      b.roundsCount += 1;
+    }
+    b.captures += m.eventStats?.captures || 0;
+    const dur = durationSec(m);
+    if (dur != null && dur > 0) {
+      b.durSum += dur;
+      b.durCount += 1;
+    }
+    const winnerP = (m.participants || []).find((p) => p.isWinner);
+    if (winnerP) b.wins[winnerP.model] = (b.wins[winnerP.model] || 0) + 1;
+    byMap.set(m.mapId, b);
+  }
+  return [...byMap.values()]
+    .map((b) => ({
+      mapId: b.mapId,
+      games: b.games,
+      avgRounds: b.roundsCount > 0 ? round2(b.roundsSum / b.roundsCount) : null,
+      roundsSampled: b.roundsCount,
+      capturesPerGame: round2(b.captures / b.games),
+      avgDurationSec: b.durCount > 0 ? round1(b.durSum / b.durCount) : null,
+      winnerModels: Object.entries(b.wins)
+        .sort((a, c) => c[1] - a[1])
+        .map(([model, wins]) => ({ model, wins })),
+    }))
+    .sort((a, b) => b.games - a.games || a.mapId.localeCompare(b.mapId));
+}
+
+/** Total effective actions divided by whole rounds of a match. */
+function actionsPerRound(m) {
+  const es = m.eventStats || {};
+  const rounds = es.rounds || 0;
+  if (rounds <= 0) return null;
+  const at = actionTotalsFromMatch(m);
+  const actions = at.moves + at.attacks + at.deploys + at.heals + at.demolishes + at.captures;
+  return actions / rounds;
+}
+
 function participantSummary(m) {
   return (m.participants || []).map((p) => ({
     displayName: p.displayName,
@@ -402,6 +550,26 @@ export function buildExtremes(matches) {
   const shortDur = findMin(matches, durationSec, { positiveOnly: true });
   if (shortDur) out.shortestDuration = extremeMatch(shortDur.match, { durationSec: round1(shortDur.value) });
 
+  const busiest = findMax(matches, actionsPerRound);
+  if (busiest) out.mostActionsPerRound = extremeMatch(busiest.match, { value: round2(busiest.value), kind: 'actionsPerRound' });
+
+  // single-player biggest deploy spender
+  let bestSpend = null;
+  let bestSpendVal = -Infinity;
+  for (const m of matches) {
+    if (m.error || !m.completed || !m.participants) continue;
+    for (const p of m.participants) {
+      const cost = p.events?.deployCost || 0;
+      if (cost > bestSpendVal) {
+        bestSpendVal = cost;
+        bestSpend = { match: m, model: p.model };
+      }
+    }
+  }
+  if (bestSpend) {
+    out.biggestSpender = { ...extremeMatch(bestSpend.match, { value: bestSpendVal, kind: 'deployCost' }), model: bestSpend.model };
+  }
+
   return out;
 }
 
@@ -419,7 +587,7 @@ function extremeMatch(m, extra) {
   };
 }
 
-function buildTimeline(matches) {
+export function buildTimeline(matches) {
   const byDay = new Map();
   for (const m of matches) {
     if (m.error || !m.date) continue;
@@ -436,15 +604,93 @@ function buildTimeline(matches) {
       b.durCount += 1;
     }
   }
+  let cumulativeMatches = 0;
+  let cumulativeActions = 0;
   return [...byDay.values()]
     .sort((a, b) => a.date.localeCompare(b.date))
+    .map((b) => {
+      cumulativeMatches += b.matches;
+      cumulativeActions += b.totalActions;
+      return {
+        date: b.date,
+        matches: b.matches,
+        totalActions: b.totalActions,
+        cumulativeMatches,
+        cumulativeActions,
+        avgRounds: b.matches > 0 ? round2(b.roundsSum / b.matches) : 0,
+        avgDurationSec: b.durCount > 0 ? round1(b.durSum / b.durCount) : null,
+      };
+    });
+}
+
+/** Per-calendar-month trend: pace, action volume and model pool breadth. */
+export function buildMonthlyTrend(matches) {
+  const byMonth = new Map();
+  for (const m of matches) {
+    if (m.error || !m.date) continue;
+    const month = String(m.date).slice(0, 6); // YYYYMM
+    if (!byMonth.has(month)) {
+      byMonth.set(month, { month, matches: 0, totalActions: 0, roundsSum: 0, roundsCount: 0, durSum: 0, durCount: 0, models: new Set() });
+    }
+    const b = byMonth.get(month);
+    b.matches += 1;
+    const at = actionTotalsFromMatch(m);
+    b.totalActions += at.moves + at.attacks + at.deploys + at.heals + at.demolishes + at.captures;
+    const rounds = m.eventStats?.rounds || 0;
+    if (rounds > 0) {
+      b.roundsSum += rounds;
+      b.roundsCount += 1;
+    }
+    const dur = durationSec(m);
+    if (dur != null && dur > 0) {
+      b.durSum += dur;
+      b.durCount += 1;
+    }
+    for (const p of m.participants || []) b.models.add(p.model);
+  }
+  return [...byMonth.values()]
+    .sort((a, b) => a.month.localeCompare(b.month))
     .map((b) => ({
-      date: b.date,
+      month: `${b.month.slice(0, 4)}.${b.month.slice(4)}`,
       matches: b.matches,
       totalActions: b.totalActions,
-      avgRounds: b.matches > 0 ? round2(b.roundsSum / b.matches) : 0,
+      avgRounds: b.roundsCount > 0 ? round2(b.roundsSum / b.roundsCount) : null,
       avgDurationSec: b.durCount > 0 ? round1(b.durSum / b.durCount) : null,
+      activeModels: b.models.size,
     }));
+}
+
+/** Per-model debut/latest activity window for a gantt-style lineup. */
+export function buildModelDebut(matches) {
+  const perModel = new Map();
+  for (const m of matches) {
+    if (m.error || !m.participants || !m.date) continue;
+    for (const p of m.participants) {
+      const b = perModel.get(p.model) || {
+        model: p.model,
+        debutDate: m.date,
+        latestDate: m.date,
+        games: 0,
+        wins: 0,
+        debutRecordId: m.recordId,
+        latestRecordId: m.recordId,
+      };
+      b.games += 1;
+      if (p.isWinner || p.rank === 1) b.wins += 1;
+      if (m.date < b.debutDate) {
+        b.debutDate = m.date;
+        b.debutRecordId = m.recordId;
+      }
+      if (m.date > b.latestDate) {
+        b.latestDate = m.date;
+        b.latestRecordId = m.recordId;
+      }
+      perModel.set(p.model, b);
+    }
+  }
+  return [...perModel.values()]
+    .map((b) => ({ model: b.model, debutDate: fmtDate(b.debutDate), latestDate: fmtDate(b.latestDate), games: b.games, wins: b.wins, debutRecordId: b.debutRecordId, latestRecordId: b.latestRecordId }))
+    .sort((a, b) => a.debutDate.localeCompare(b.debutDate) || a.model.localeCompare(b.model));
 }
 
 function buildSchemaTimeline(matches) {
@@ -462,7 +708,7 @@ function buildSchemaTimeline(matches) {
     .map((s) => ({ ...s, firstDate: fmtDate(s.firstDate) }));
 }
 
-function buildFunFacts(overview, modelProfiles, unitStats, extremes) {
+function buildFunFacts(overview, modelProfiles, unitStats, extremes, economy, eliminations, mapStage) {
   const facts = [];
   const ta = overview.totalActions;
   const totalActions = ta.moves + ta.attacks + ta.deploys + ta.heals + ta.demolishes + ta.captures;
@@ -492,6 +738,29 @@ function buildFunFacts(overview, modelProfiles, unitStats, extremes) {
   if (extremes.highestHqDamage && extremes.highestHqDamage.value > 0) {
     facts.push(`单场最强拆迁：${extremes.highestHqDamage.model} 在 ${extremes.highestHqDamage.recordId} 中造成 ${extremes.highestHqDamage.value} 点 HQ 伤害。`);
   }
+  if (economy.length > 0) {
+    const spender = economy[0];
+    facts.push(`最舍得花钱的模型是「${spender.model}」，累计在部署上花掉 ${spender.deployCost.toLocaleString()} 补给（共 ${spender.games} 场）。`);
+  }
+  const killer = eliminations.killerBoard?.[0];
+  if (killer) {
+    facts.push(`最无情的终结者是「${killer.model}」，亲手送走 ${killer.kills} 名对手，自己也被淘汰 ${killer.deaths} 次。`);
+  }
+  const rivalry = eliminations.rivalries?.[0];
+  if (rivalry) {
+    facts.push(`「${rivalry.a}」与「${rivalry.b}」互相淘汰 ${rivalry.total} 次（${rivalry.aKillsB} : ${rivalry.bKillsA}），是战场上最深的梁子。`);
+  }
+  if (mapStage.length > 0) {
+    const top = mapStage[0];
+    if (top.avgRounds != null) {
+      facts.push(`最常登场的战场是「${top.mapId}」，出现 ${top.games} 次，平均每局鏖战 ${top.avgRounds} 整轮。`);
+    } else {
+      facts.push(`最常登场的战场是「${top.mapId}」，出现 ${top.games} 次。`);
+    }
+  }
+  if (extremes.mostActionsPerRound) {
+    facts.push(`节奏最密的一局是 ${extremes.mostActionsPerRound.recordId}，平均每轮 ${extremes.mostActionsPerRound.value} 次有效操作。`);
+  }
   if (overview.avgDurationSec != null) {
     facts.push(`平均每局耗时约 ${fmtDuration(overview.avgDurationSec)}。`);
   }
@@ -506,10 +775,15 @@ function main() {
   const overview = buildOverview(matches);
   const modelProfiles = buildModelProfiles(matches);
   const unitStats = buildUnitStats(matches);
+  const economy = buildEconomy(matches);
+  const eliminations = buildEliminations(matches);
+  const mapStage = buildMapStage(matches);
   const extremes = buildExtremes(matches);
   const timeline = buildTimeline(matches);
+  const monthlyTrend = buildMonthlyTrend(matches);
+  const modelDebut = buildModelDebut(matches);
   const schemaTimeline = buildSchemaTimeline(matches);
-  const funFacts = buildFunFacts(overview, modelProfiles, unitStats, extremes);
+  const funFacts = buildFunFacts(overview, modelProfiles, unitStats, extremes, economy, eliminations, mapStage);
 
   const payload = {
     generatedAt: new Date().toISOString(),
@@ -522,9 +796,14 @@ function main() {
     overview,
     modelProfiles,
     unitStats,
+    economy,
+    eliminations,
+    mapStage,
     extremes,
     funFacts,
     timeline,
+    monthlyTrend,
+    modelDebut,
     schemaTimeline,
   };
 

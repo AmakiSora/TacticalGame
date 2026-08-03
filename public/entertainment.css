@@ -135,7 +135,7 @@ main {
 .section-heading h2 { font-size: 20px; font-weight: 720; letter-spacing: 0; }
 .section-heading p { color: var(--muted); font-size: 12px; }
 
-.pulse-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.pulse-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .pulse-item { min-width: 0; padding: 24px 20px 22px 0; }
 .pulse-item + .pulse-item { padding-left: 20px; border-left: 1px solid var(--line); }
 .pulse-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 700; }
@@ -157,7 +157,7 @@ main {
 .legend-item i { width: 8px; height: 8px; border-radius: 2px; }
 .legend-item b { color: var(--soft); font-weight: 700; }
 
-.story-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--line); }
+.story-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--line); }
 .story-card { position: relative; min-height: 250px; padding: 26px; background: var(--surface); }
 .story-card.featured { background: #19221f; }
 .story-label { display: block; color: var(--mint); font-size: 10px; font-weight: 800; }
@@ -168,6 +168,67 @@ main {
 .story-id { position: absolute; right: 20px; bottom: 18px; color: #68777c; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 11px; }
 
 .field-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 64px; padding: 48px 0; border-bottom: 1px solid var(--line-strong); }
+
+.economy-section, .map-stage-section { padding: 48px 0; border-bottom: 1px solid var(--line-strong); }
+.trend-section { padding: 48px 0; border-bottom: 1px solid var(--line-strong); }
+.trend-block { padding: 22px 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.trend-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 24px; margin-top: 24px; }
+.trend-block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.trend-label { color: var(--soft); font-size: 13px; font-weight: 750; }
+.trend-sub { color: var(--muted); font-size: 10px; }
+.growth-chart svg { display: block; width: 100%; height: auto; }
+.growth-summary { margin-top: 10px; color: var(--muted); font-size: 11px; }
+.debut-list { display: flex; flex-direction: column; gap: 10px; }
+.debut-row { display: grid; grid-template-columns: minmax(110px, 1.2fr) minmax(0, 2fr) 92px; gap: 14px; align-items: center; font-size: 11px; }
+.debut-name { min-width: 0; color: var(--soft); overflow-wrap: anywhere; }
+.debut-new { margin-left: 4px; color: var(--amber); font-size: 9px; font-style: normal; font-weight: 700; }
+.debut-track { position: relative; height: 10px; overflow: hidden; border-radius: 5px; background: #232c30; }
+.debut-span { position: absolute; top: 0; bottom: 0; border-radius: 5px; background: var(--blue); opacity: .85; }
+.debut-row:nth-child(even) .debut-span { background: var(--mint); }
+.debut-games { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.monthly-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.month-card { padding: 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2); }
+.month-name { display: block; color: var(--text); font-size: 17px; font-weight: 760; }
+.month-matches { display: block; margin-top: 6px; color: var(--amber); font-size: 12px; font-weight: 700; }
+.month-meta { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.version-head { margin-top: 22px; }
+.version-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.version-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); color: var(--soft); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 10px; }
+.version-chip small { color: var(--muted); font-size: 9px; }
+.economy-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.economy-card { min-width: 0; padding: 22px 20px 20px 0; }
+.economy-card + .economy-card { padding-left: 20px; border-left: 1px solid var(--line); }
+.economy-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.economy-value { display: block; color: var(--amber); font-size: 27px; font-weight: 760; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.economy-note { display: block; margin-top: 8px; color: #728187; font-size: 11px; }
+.economy-lab { display: grid; grid-template-columns: 1.2fr .8fr; gap: 48px; margin-top: 30px; }
+.economy-side-label { display: block; margin-bottom: 12px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.spender-list, .rivalry-list { list-style: none; }
+.spender-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 1fr 96px; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.spender-rank { color: #65747a; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 10px; }
+.spender-model { min-width: 0; color: var(--soft); font-size: 12px; overflow-wrap: anywhere; }
+.spender-bar { height: 6px; overflow: hidden; border-radius: 2px; background: #252d31; }
+.spender-bar i { display: block; height: 100%; border-radius: 2px; background: var(--mint); }
+.spender-value { color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.spender-value small { display: block; color: var(--muted); font-size: 9px; }
+.rivalry-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.rivalry-models { min-width: 0; color: var(--soft); overflow-wrap: anywhere; }
+.rivalry-models b { color: var(--muted); font-weight: 400; }
+.rivalry-score { color: var(--coral); font-weight: 750; font-variant-numeric: tabular-nums; }
+.rivalry-total { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.rivalry-empty { padding: 10px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.map-stage { border-top: 1px solid var(--line); }
+.map-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) 62px 110px 84px; gap: 16px; align-items: center; padding: 14px 4px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.map-name { min-width: 0; color: var(--soft); font-weight: 700; text-transform: capitalize; overflow-wrap: anywhere; }
+.map-track { height: 8px; overflow: hidden; border-radius: 2px; background: #252d31; }
+.map-fill { height: 100%; border-radius: 2px; background: var(--blue); }
+.map-row:nth-child(2) .map-fill { background: var(--mint); }
+.map-row:nth-child(3) .map-fill { background: var(--amber); }
+.map-row:nth-child(4) .map-fill { background: var(--coral); }
+.map-row:nth-child(5) .map-fill { background: var(--violet); }
+.map-games { color: var(--text); font-variant-numeric: tabular-nums; }
+.map-pace, .map-captures { color: var(--muted); text-align: right; }
+.empty-block { padding: 24px 0; color: var(--muted); font-size: 12px; }
 .compact-heading { margin-bottom: 20px; }
 .insight-list { list-style: none; counter-reset: insights; }
 .insight-list li { display: grid; grid-template-columns: 36px 1fr; gap: 8px; padding: 16px 0; border-top: 1px solid var(--line); color: var(--soft); font-size: 13px; line-height: 1.65; }
@@ -231,7 +292,6 @@ main {
 .record-match b { color: var(--text); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
 .record-detail { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .record-value { color: var(--amber); font-weight: 750; text-align: right; }
-.empty-block { padding: 24px 0; color: var(--muted); font-size: 12px; }
 
 .page-footer { width: min(1240px, calc(100% - 40px)); margin: 0 auto; padding: 0 0 30px; color: #65747a; font-size: 11px; }
 .page-footer code { color: #89989e; }
@@ -245,9 +305,17 @@ main {
   .pulse-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pulse-item:nth-child(3) { padding-left: 0; border-top: 1px solid var(--line); border-left: 0; }
   .pulse-item:nth-child(4) { border-top: 1px solid var(--line); }
+  .pulse-item:nth-child(5) { padding-left: 0; border-top: 1px solid var(--line); border-left: 0; }
   .story-grid { grid-template-columns: 1fr; }
   .story-card { min-height: 210px; }
   .field-grid { grid-template-columns: 1fr; gap: 44px; }
+  .economy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .economy-card:nth-child(3) { padding-left: 0; border-top: 1px solid var(--line); border-left: 0; }
+  .economy-card:nth-child(4) { border-top: 1px solid var(--line); }
+  .economy-lab { grid-template-columns: 1fr; gap: 30px; }
+  .trend-grid { grid-template-columns: 1fr; }
+  .map-row { grid-template-columns: 120px minmax(0, 1fr) 62px 100px; }
+  .map-captures { display: none; }
   .lab-layout { grid-template-columns: 1fr; gap: 32px; }
   .model-identity { padding-right: 0; padding-bottom: 28px; border-right: 0; border-bottom: 1px solid var(--line); }
 }
@@ -263,7 +331,11 @@ main {
   .report-lead h2 { font-size: 31px; }
   .report-summary { font-size: 13px; }
   .report-meta { gap: 7px 18px; }
-  .pulse-section, .stories-section, .model-lab, .records-section, .field-grid { padding: 34px 0; }
+  .pulse-section, .stories-section, .model-lab, .records-section, .field-grid, .economy-section, .map-stage-section { padding: 34px 0; }
+  .trend-section { padding: 34px 0; }
+  .trend-block { padding: 16px 14px; }
+  .monthly-grid { grid-template-columns: 1fr; }
+  .debut-row { grid-template-columns: 88px minmax(0, 1fr) 62px; gap: 8px; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 8px; margin-bottom: 18px; }
   .section-heading > div:first-child { align-items: baseline; }
   .section-heading p { padding-left: 31px; }

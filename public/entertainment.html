@@ -65,10 +65,69 @@
       </div>
     </section>
 
-    <section class="stories-section" aria-labelledby="stories-title">
+    <section class="economy-section" aria-labelledby="economy-title">
       <div class="section-heading">
         <div>
           <span class="section-index">02</span>
+          <h2 id="economy-title">战场经济</h2>
+        </div>
+        <p>补给从哪里来，又花到哪里去</p>
+      </div>
+      <div id="economy-grid" class="economy-grid"></div>
+      <div class="economy-lab">
+        <div class="economy-side">
+          <span class="economy-side-label">花钱最狠的模型</span>
+          <ol id="spender-list" class="spender-list"></ol>
+        </div>
+        <div class="economy-side">
+          <span class="economy-side-label">相爱相杀</span>
+          <ul id="rivalry-list" class="rivalry-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="trend-section" aria-labelledby="trend-title">
+      <div class="section-heading">
+        <div>
+          <span class="section-index">03</span>
+          <h2 id="trend-title">趋势观察</h2>
+        </div>
+        <p>看时间如何推动战场</p>
+      </div>
+      <div class="trend-block">
+        <div class="trend-block-head">
+          <span class="trend-label">对局增长</span>
+          <span class="trend-sub">每日对局数（柱）· 累计曲线（线）</span>
+        </div>
+        <div id="growth-chart" class="growth-chart"></div>
+      </div>
+      <div class="trend-grid">
+        <div class="trend-block">
+          <div class="trend-block-head">
+            <span class="trend-label">模型登场</span>
+            <span class="trend-sub">谁在何时进入战场，活跃至今？</span>
+          </div>
+          <div id="debut-list" class="debut-list"></div>
+        </div>
+        <div class="trend-block">
+          <div class="trend-block-head">
+            <span class="trend-label">月度节奏</span>
+            <span class="trend-sub">按月汇总</span>
+          </div>
+          <div id="monthly-grid" class="monthly-grid"></div>
+          <div class="trend-block-head version-head">
+            <span class="trend-label">版本演进</span>
+            <span class="trend-sub">回放格式换代</span>
+          </div>
+          <div id="version-list" class="version-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stories-section" aria-labelledby="stories-title">
+      <div class="section-heading">
+        <div>
+          <span class="section-index">04</span>
           <h2 id="stories-title">本期名场面</h2>
         </div>
         <p>不是最高就最好，但这些局值得被记住</p>
@@ -80,7 +139,7 @@
       <section class="insights-section" aria-labelledby="insights-title">
         <div class="section-heading compact-heading">
           <div>
-            <span class="section-index">03</span>
+            <span class="section-index">05</span>
             <h2 id="insights-title">四条观察</h2>
           </div>
         </div>
@@ -90,7 +149,7 @@
       <section class="arsenal-section" aria-labelledby="arsenal-title">
         <div class="section-heading compact-heading">
           <div>
-            <span class="section-index">04</span>
+            <span class="section-index">06</span>
             <h2 id="arsenal-title">兵种选择</h2>
           </div>
           <p>部署占比</p>
@@ -102,7 +161,7 @@
     <section class="model-lab" aria-labelledby="lab-title">
       <div class="section-heading lab-heading">
         <div>
-          <span class="section-index">05</span>
+          <span class="section-index">07</span>
           <h2 id="lab-title">战术档案</h2>
         </div>
         <div class="model-picker">
@@ -122,10 +181,21 @@
       </div>
     </section>
 
+    <section class="map-stage-section" aria-labelledby="map-stage-title">
+      <div class="section-heading">
+        <div>
+          <span class="section-index">08</span>
+          <h2 id="map-stage-title">地图舞台</h2>
+        </div>
+        <p>每张地图的登场次数与节奏</p>
+      </div>
+      <div id="map-stage" class="map-stage"></div>
+    </section>
+
     <section class="records-section" aria-labelledby="records-title">
       <div class="section-heading records-heading">
         <div>
-          <span class="section-index">06</span>
+          <span class="section-index">09</span>
           <h2 id="records-title">纪录柜</h2>
         </div>
         <div class="record-tabs" role="group" aria-label="纪录分类">

@@ -172,6 +172,9 @@ export function emptyEventStats() {
     unitDeaths: 0,
     rounds: 0,
     turns: 0,
+    income: 0,
+    deployCost: 0,
+    comebackSupply: 0,
     deploysByType: {},
   };
 }
@@ -189,6 +192,13 @@ export function tallyEvent(stats, type, payload) {
       if (payload?.unitType) {
         stats.deploysByType[payload.unitType] = (stats.deploysByType[payload.unitType] || 0) + 1;
       }
+      stats.deployCost += num(payload?.cost) ?? 0;
+      break;
+    case 'income':
+      stats.income += num(payload?.amount) ?? 0;
+      break;
+    case 'comeback_supply':
+      stats.comebackSupply += num(payload?.amount) ?? 0;
       break;
     case 'heal':
       stats.heals += 1;
@@ -465,6 +475,10 @@ export function extractMatch(filePath, version, fileName, reviewsByRecord) {
       if (owner && perSeatEvents[owner]) tallyEvent(perSeatEvents[owner], type, payload);
       else if (type !== 'attack') {
         /* global only already counted */
+      }
+    } else if (type === 'income' || type === 'comeback_supply') {
+      if (payload.owner && perSeatEvents[payload.owner]) {
+        tallyEvent(perSeatEvents[payload.owner], type, payload);
       }
     } else if (type === 'control_point_captured' && payload.owner && perSeatEvents[payload.owner]) {
       tallyEvent(perSeatEvents[payload.owner], type, payload);

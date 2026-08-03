@@ -165,11 +165,11 @@ describe('AI player skill documentation', () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
     expect(skill).toContain('## Manual Turn Loop');
-    expect(skill).toContain('Do not run `node skill/ai-player.mjs` to delegate the turn');
-    expect(skill).toContain('Read the current game state before choosing each action');
-    expect(skill).toContain('Explain the chosen legal action briefly, then call the matching REST endpoint');
-    expect(skill).toContain('Refresh state after every successful action and reason again');
-    expect(skill).toContain('End the turn only after available useful legal actions are exhausted');
+    expect(skill).toContain('Do **not** run `node skill/ai-player.mjs`');
+    expect(skill).toContain('run that mode\'s checklist, pick one legal action');
+    expect(skill).toContain('Brief rationale, then the matching endpoint');
+    expect(skill).toContain('Refresh state after every success and reason again');
+    expect(skill).toContain('no useful legal action remains');
   });
 
   it('is written for general agents instead of a Codex-specific client', async () => {
@@ -180,9 +180,13 @@ describe('AI player skill documentation', () => {
   });
 
   it('documents multiplayer lobby flow and host/player separation', async () => {
-    const skill = await readFile('skill/SKILL.md', 'utf8');
+    const [skill, pkg] = await Promise.all([
+      readFile('skill/SKILL.md', 'utf8'),
+      readFile('package.json', 'utf8'),
+    ]);
+    const version = JSON.parse(pkg).version as string;
 
-    expect(skill).toContain('3.2.6');
+    expect(skill).toContain(`app version \`${version}\``);
     expect(skill).toContain('## Multiplayer Setup');
     expect(skill).toContain('player_a');
     expect(skill).toContain('player_h');
@@ -197,16 +201,15 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('four-corners');
     expect(skill).toContain('GET /api/maps');
     expect(skill).toContain('preview.supportedPlayerCounts');
-    expect(skill).toContain('Never hardcode a single rival as `player_b`');
-    expect(skill).toContain('live `adjudication` snapshot');
-    expect(skill).toContain('Trust these server totals instead of recomputing them');
+    expect(skill).toContain('never hardcode `player_b`');
+    expect(skill).toContain('Trust live `adjudication`');
     expect(skill).not.toContain('Score only against living rivals');
   });
 
   it('explains typed control point strategy', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
-    expect(skill).toContain('Typed control points');
+    expect(skill).toContain('controlPointTypes');
     expect(skill).toContain('supply');
     expect(skill).toContain('forward_base');
     expect(skill).toContain('repair');
@@ -215,12 +218,11 @@ describe('AI player skill documentation', () => {
   it('documents percentage-based comeback supplies and their tactical use', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
-    expect(skill).toContain('config.balance.comebackSupply');
-    expect(skill).toContain('(leaderScore - playerScore) / leaderScore * 100 >= scoreGapPercent');
-    expect(skill).toContain('one shared pre-grant snapshot');
-    expect(skill).toContain('final round goes directly to adjudication without a grant');
-    expect(skill).toContain('comeback_supply');
-    expect(skill).toContain('do not assume the grant repeats');
+    expect(skill).toContain('comebackSupply');
+    expect(skill).toContain('startRound');
+    expect(skill).toContain('amountPerRound');
+    expect(skill).toContain('shared leader snapshot');
+    expect(skill).toContain('after non-final rounds');
   });
 
   it('documents heavy terrain demolition controls and constraints', async () => {
@@ -228,18 +230,18 @@ describe('AI player skill documentation', () => {
 
     expect(skill).toContain('POST /api/games/:id/demolish');
     expect(skill).toContain('{ "unitId": "...", "q": 0, "r": 0 }');
-    expect(skill).toContain('Only heavy units can demolish terrain');
-    expect(skill).toContain('adjacent blocker');
+    expect(skill).toContain('**Only** `type === "heavy"`');
+    expect(skill).toContain('**blocker**');
     expect(skill).toContain('demolish');
-    expect(skill).toContain('action point');
+    expect(skill).toContain('costs 1 AP');
   });
 
   it('uses game cells as the authoritative map boundary', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
-    expect(skill).toContain('`game.cells` is the authoritative playable boundary');
-    expect(skill).toContain('Never infer whether a coordinate is playable from `map.radius`');
-    expect(skill).toContain('Coordinates inside the radius but absent from `game.cells` are outside the map');
+    expect(skill).toContain('`game.cells` is the playable set');
+    expect(skill).toContain('Do not treat `map.radius` as a walkable disk');
+    expect(skill).toContain('Move/deploy/demolish targets must exist in `game.cells`');
   });
 });
 

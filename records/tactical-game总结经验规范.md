@@ -58,7 +58,7 @@
 - .json 文件由系统生成，AI 不需要写
 
 **已注册的模型短名：**
-DeepseekV4FlashPreview, DeepseekV4ProPreview, mimo2.5pro, gpt5.5, glm5.2, glm5.1, glm4.7, qwen3.6v35b, qwen3.7max, step3.7flash, longcat2.0, sensenova6.7fl, minimaxm3, hy3, fable5, agnes2.0flash
+DeepseekV4FlashPreview, DeepseekV4ProPreview, Dsv4Flash0731, mimo2.5pro, gpt5.5, glm5.2, glm5.1, glm4.7, qwen3.6v35b, qwen3.7max, step3.7flash, longcat2.0, sensenova6.7fl, minimaxm3, hy3, fable5, agnes2.0flash
 
 **V3 多人示例（第31局，三名玩家分别获得第1-3名）：**
 ```

@@ -23,6 +23,8 @@ export const MODEL_ALIASES = new Map([
   ['deepseekv4f', 'DeepseekV4FlashPreview'],
   ['deepseekv4flash', 'DeepseekV4FlashPreview'],
   ['deepseekv4flashpreview', 'DeepseekV4FlashPreview'],
+  ['Dsv4Flash0731', 'Dsv4Flash0731'],
+  ['deepseekv4flash0731', 'Dsv4Flash0731'],
   ['step3.7f', 'step3.7flash'],
   ['step3.7flash', 'step3.7flash'],
   ['mimo2.5proa', 'mimo2.5pro'],

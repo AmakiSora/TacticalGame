@@ -1,40 +1,40 @@
 {
-  "generatedAt": "2026-08-03T20:49:21.530Z",
+  "generatedAt": "2026-08-03T23:50:03.808Z",
   "source": {
     "versions": [
       "V2",
       "V3"
     ],
-    "replayCount": 71,
+    "replayCount": 72,
     "parseErrors": 0
   },
   "warnings": [],
   "overview": {
-    "matchCount": 71,
-    "completedCount": 68,
+    "matchCount": 72,
+    "completedCount": 69,
     "totalActions": {
-      "moves": 4737,
-      "attacks": 3155,
-      "deploys": 1026,
+      "moves": 4798,
+      "attacks": 3232,
+      "deploys": 1060,
       "heals": 126,
       "demolishes": 119,
-      "captures": 514,
-      "unitDeaths": 470,
-      "rounds": 504,
-      "income": 64326,
-      "deployCost": 50985,
+      "captures": 526,
+      "unitDeaths": 484,
+      "rounds": 519,
+      "income": 65304,
+      "deployCost": 52353,
       "comebackSupply": 792
     },
-    "totalEvents": 17606,
-    "avgRounds": 7.1,
-    "avgDurationSec": 9138.8,
-    "totalDurationSec": 630575.75,
+    "totalEvents": 17933,
+    "avgRounds": 7.21,
+    "avgDurationSec": 9087.7,
+    "totalDurationSec": 636135.844,
     "dateMin": "20260614",
     "dateMax": "20260804",
-    "avgActionsPerRound": 8.3,
-    "avgIncomePerMatch": 906,
-    "avgDeployCostPerMatch": 718.1,
-    "spendRate": 0.7926
+    "avgActionsPerRound": 8.41,
+    "avgIncomePerMatch": 907,
+    "avgDeployCostPerMatch": 727.1,
+    "spendRate": 0.8017
   },
   "modelProfiles": [
     {
@@ -122,8 +122,8 @@
         "infantry": 20
       },
       "styleTags": [
-        "扩张型",
-        "治疗型"
+        "治疗型",
+        "扩张型"
       ]
     },
     {
@@ -271,6 +271,36 @@
       "styleTags": []
     },
     {
+      "model": "grok4.5",
+      "games": 6,
+      "moves": 120,
+      "attacks": 130,
+      "deploys": 39,
+      "heals": 5,
+      "captures": 19,
+      "demolishes": 13,
+      "unitDeathsLost": 14,
+      "perGame": {
+        "attacks": 21.67,
+        "heals": 0.83,
+        "deploys": 6.5,
+        "captures": 3.17,
+        "moves": 20,
+        "demolishes": 2.17
+      },
+      "deploysByType": {
+        "heavy": 3,
+        "infantry": 19,
+        "scout": 11,
+        "support": 2,
+        "ranger": 4
+      },
+      "styleTags": [
+        "拆迁型",
+        "攻击型"
+      ]
+    },
+    {
       "model": "DeepseekV4ProPreview",
       "games": 5,
       "moves": 149,
@@ -330,33 +360,30 @@
       ]
     },
     {
-      "model": "grok4.5",
+      "model": "dsv4flash0731",
       "games": 5,
-      "moves": 92,
-      "attacks": 87,
-      "deploys": 23,
-      "heals": 5,
-      "captures": 12,
-      "demolishes": 13,
-      "unitDeathsLost": 9,
+      "moves": 101,
+      "attacks": 83,
+      "deploys": 33,
+      "heals": 0,
+      "captures": 16,
+      "demolishes": 5,
+      "unitDeathsLost": 15,
       "perGame": {
-        "attacks": 17.4,
-        "heals": 1,
-        "deploys": 4.6,
-        "captures": 2.4,
-        "moves": 18.4,
-        "demolishes": 2.6
+        "attacks": 16.6,
+        "heals": 0,
+        "deploys": 6.6,
+        "captures": 3.2,
+        "moves": 20.2,
+        "demolishes": 1
       },
       "deploysByType": {
-        "heavy": 3,
-        "infantry": 9,
-        "scout": 7,
-        "support": 2,
-        "ranger": 2
+        "heavy": 1,
+        "scout": 15,
+        "infantry": 17
       },
       "styleTags": [
-        "拆迁型",
-        "治疗型"
+        "拆迁型"
       ]
     },
     {
@@ -411,33 +438,6 @@
         "scout": 14,
         "ranger": 1,
         "heavy": 6
-      },
-      "styleTags": [
-        "拆迁型"
-      ]
-    },
-    {
-      "model": "dsv4flash0731",
-      "games": 4,
-      "moves": 68,
-      "attacks": 49,
-      "deploys": 15,
-      "heals": 0,
-      "captures": 11,
-      "demolishes": 5,
-      "unitDeathsLost": 6,
-      "perGame": {
-        "attacks": 12.25,
-        "heals": 0,
-        "deploys": 3.75,
-        "captures": 2.75,
-        "moves": 17,
-        "demolishes": 1.25
-      },
-      "deploysByType": {
-        "heavy": 1,
-        "scout": 7,
-        "infantry": 7
       },
       "styleTags": [
         "拆迁型"
@@ -754,8 +754,8 @@
   "unitStats": [
     {
       "unitType": "infantry",
-      "deploys": 382,
-      "share": 0.3723,
+      "deploys": 402,
+      "share": 0.3792,
       "byModel": {
         "longcat2.0": 49,
         "mimo2.5pro": 47,
@@ -765,13 +765,13 @@
         "step3.7flash": 30,
         "glm5.2": 20,
         "sensenova6.7fl": 20,
+        "grok4.5": 19,
         "doubaoseed2.1pro": 18,
+        "dsv4flash0731": 17,
         "DeepseekV4ProPreview": 14,
         "qwen3.7max": 9,
-        "grok4.5": 9,
         "Qwen3.8MaxPreview": 8,
         "glm4.7": 7,
-        "dsv4flash0731": 7,
         "qwen3.6v35b": 6,
         "gpt5.6sol": 6,
         "gpt5.5": 5,
@@ -784,8 +784,8 @@
     },
     {
       "unitType": "scout",
-      "deploys": 327,
-      "share": 0.3187,
+      "deploys": 339,
+      "share": 0.3198,
       "byModel": {
         "hy3": 37,
         "DeepseekV4FlashPreview": 28,
@@ -797,13 +797,13 @@
         "step3.7flash": 18,
         "sensenova6.7fl": 17,
         "Qwen3.8MaxPreview": 17,
+        "dsv4flash0731": 15,
         "agnes2.0flash": 14,
         "glm4.7": 13,
         "gpt5.5": 13,
         "doubaoseed2.1pro": 12,
+        "grok4.5": 11,
         "qwen3.7max": 10,
-        "grok4.5": 7,
-        "dsv4flash0731": 7,
         "glm5.1": 5,
         "DeepseekV4ProPreview": 3,
         "fable5": 3,
@@ -814,8 +814,8 @@
     },
     {
       "unitType": "ranger",
-      "deploys": 135,
-      "share": 0.1316,
+      "deploys": 137,
+      "share": 0.1292,
       "byModel": {
         "DeepseekV4FlashPreview": 44,
         "glm5.2": 19,
@@ -828,11 +828,11 @@
         "step3.7flash": 4,
         "qwen3.7max": 4,
         "doubaoseed2.1pro": 4,
+        "grok4.5": 4,
         "DeepseekV4ProPreview": 3,
         "fable5": 3,
         "hy3": 3,
         "gpt5.6sol": 3,
-        "grok4.5": 2,
         "agnes2.0flash": 1,
         "kimik3": 1,
         "gemini3.5flash": 1
@@ -841,7 +841,7 @@
     {
       "unitType": "heavy",
       "deploys": 111,
-      "share": 0.1082,
+      "share": 0.1047,
       "byModel": {
         "DeepseekV4FlashPreview": 12,
         "mimo2.5pro": 11,
@@ -869,7 +869,7 @@
     {
       "unitType": "support",
       "deploys": 71,
-      "share": 0.0692,
+      "share": 0.067,
       "byModel": {
         "DeepseekV4FlashPreview": 19,
         "glm5.2": 12,
@@ -982,6 +982,16 @@
       "spendRate": 1.2085
     },
     {
+      "model": "grok4.5",
+      "games": 6,
+      "income": 1806,
+      "deployCost": 1801,
+      "comebackSupply": 0,
+      "avgIncome": 301,
+      "avgDeployCost": 300.2,
+      "spendRate": 0.9972
+    },
+    {
       "model": "glm5.1",
       "games": 4,
       "income": 2048,
@@ -1052,6 +1062,16 @@
       "spendRate": 1.0328
     },
     {
+      "model": "dsv4flash0731",
+      "games": 5,
+      "income": 1486,
+      "deployCost": 1196,
+      "comebackSupply": 72,
+      "avgIncome": 297.2,
+      "avgDeployCost": 239.2,
+      "spendRate": 0.8048
+    },
+    {
       "model": "agnes2.0flash",
       "games": 4,
       "income": 902,
@@ -1060,16 +1080,6 @@
       "avgIncome": 225.5,
       "avgDeployCost": 283,
       "spendRate": 1.255
-    },
-    {
-      "model": "grok4.5",
-      "games": 5,
-      "income": 1286,
-      "deployCost": 1099,
-      "comebackSupply": 0,
-      "avgIncome": 257.2,
-      "avgDeployCost": 219.8,
-      "spendRate": 0.8546
     },
     {
       "model": "glm4.7",
@@ -1090,16 +1100,6 @@
       "avgIncome": 642,
       "avgDeployCost": 685,
       "spendRate": 1.067
-    },
-    {
-      "model": "dsv4flash0731",
-      "games": 4,
-      "income": 1028,
-      "deployCost": 530,
-      "comebackSupply": 72,
-      "avgIncome": 257,
-      "avgDeployCost": 132.5,
-      "spendRate": 0.5156
     },
     {
       "model": "kimik3",
@@ -1402,11 +1402,11 @@
     },
     {
       "mapId": "dual-lanes",
-      "games": 6,
+      "games": 7,
       "avgRounds": 15,
-      "roundsSampled": 3,
-      "capturesPerGame": 5.67,
-      "avgDurationSec": 18694.5,
+      "roundsSampled": 4,
+      "capturesPerGame": 6.57,
+      "avgDurationSec": 16505.4,
       "winnerModels": [
         {
           "model": "DeepseekV4FlashPreview",
@@ -1422,6 +1422,10 @@
         },
         {
           "model": "hy3",
+          "wins": 1
+        },
+        {
+          "model": "grok4.5",
           "wins": 1
         }
       ]
@@ -1960,9 +1964,9 @@
     }
   },
   "funFacts": [
-    "在 71 局对局中，共打出 9,677 次操作：4,737 次移动、3,155 次攻击、1,026 次部署、514 次占领、126 次治疗。",
-    "战场上有 470 个单位阵亡，平均每局阵亡 6.6 个。",
-    "最受欢迎的单位是「infantry」，共部署 382 次，占全部部署的 37%。",
+    "在 72 局对局中，共打出 9,861 次操作：4,798 次移动、3,232 次攻击、1,060 次部署、526 次占领、126 次治疗。",
+    "战场上有 484 个单位阵亡，平均每局阵亡 6.7 个。",
+    "最受欢迎的单位是「infantry」，共部署 402 次，占全部部署的 38%。",
     "最暴躁的模型是「DeepseekV4FlashPreview」，累计发起 644 次攻击。",
     "最勤快的模型是「DeepseekV4FlashPreview」，累计移动 918 次。",
     "最漫长的一局是 tg_0039，鏖战 24 整轮。",
@@ -1973,7 +1977,7 @@
     "最无情的终结者是「minimaxm3」，亲手送走 4 名对手，自己也被淘汰 0 次。",
     "最常登场的战场是「default」，出现 24 次。",
     "节奏最密的一局是 tg_0034，平均每轮 26.07 次有效操作。",
-    "平均每局耗时约 152分19秒。"
+    "平均每局耗时约 151分28秒。"
   ],
   "timeline": [
     {
@@ -2284,12 +2288,12 @@
     },
     {
       "date": "2026-08-04",
-      "matches": 1,
-      "totalActions": 156,
-      "cumulativeMatches": 71,
-      "cumulativeActions": 9677,
-      "avgRounds": 12,
-      "avgDurationSec": 4583.9
+      "matches": 2,
+      "totalActions": 340,
+      "cumulativeMatches": 72,
+      "cumulativeActions": 9861,
+      "avgRounds": 13.5,
+      "avgDurationSec": 5072
     }
   ],
   "monthlyTrend": [
@@ -2311,11 +2315,11 @@
     },
     {
       "month": "2026.08",
-      "matches": 7,
-      "totalActions": 448,
-      "avgRounds": 11.5,
-      "avgDurationSec": 4050.4,
-      "activeModels": 10
+      "matches": 8,
+      "totalActions": 632,
+      "avgRounds": 12,
+      "avgDurationSec": 4266.1,
+      "activeModels": 11
     }
   ],
   "modelDebut": [
@@ -2493,11 +2497,11 @@
     {
       "model": "grok4.5",
       "debutDate": "2026-07-21",
-      "latestDate": "2026-07-29",
-      "games": 5,
-      "wins": 2,
+      "latestDate": "2026-08-04",
+      "games": 6,
+      "wins": 3,
       "debutRecordId": "tg_0036",
-      "latestRecordId": "tg_0059"
+      "latestRecordId": "tg_0072"
     },
     {
       "model": "kimik3",
@@ -2530,7 +2534,7 @@
       "model": "dsv4flash0731",
       "debutDate": "2026-08-03",
       "latestDate": "2026-08-04",
-      "games": 4,
+      "games": 5,
       "wins": 1,
       "debutRecordId": "tg_0068",
       "latestRecordId": "tg_0071"
@@ -2664,7 +2668,7 @@
     {
       "schemaVersion": "3.2.7",
       "firstDate": "2026-08-03",
-      "games": 4
+      "games": 5
     }
   ]
 }

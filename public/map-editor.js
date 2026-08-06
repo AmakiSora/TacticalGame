@@ -768,6 +768,8 @@
     if (text === 'annihilation.artillery') return '炮火配置';
     match = text.match(/^spawnSlots\[(\d+)\]$/);
     if (match) return `出生槽 ${Number(match[1]) + 1}`;
+    match = text.match(/^spawnSlots\[(\d+)\]\.headquarters$/);
+    if (match) return `出生槽 ${Number(match[1]) + 1} ${config.mode === 'annihilation' ? '出生点' : '总部'}`;
     return text;
   }
 
@@ -899,6 +901,9 @@
 
   global.MapEditorCore = core;
 
+  // 校验文案需要按玩法模式区分出生槽锚点称呼（歼灭=出生点）；在 DOM 初始化前声明，供无 DOM 环境安全读取
+  let config = createDefaultMapConfig();
+
   if (typeof document === 'undefined') return;
 
   const $ = id => document.getElementById(id);
@@ -943,7 +948,6 @@
   }
 
   const ctx = els.canvas.getContext('2d');
-  let config = createDefaultMapConfig();
   let tool = 'select';
   let hoverCell = null;
   let selected = null;
@@ -957,6 +961,11 @@
 
   function slotColor(index) {
     return SLOT_COLORS[index % SLOT_COLORS.length];
+  }
+
+  // 歼灭模式下出生槽的 headquarters 只是出生锚点，不是总部；文案与图标按模式区分
+  function hqTerm() {
+    return config.mode === 'annihilation' ? '出生点' : '总部';
   }
 
   function selectedSlotIndex() {
@@ -1167,13 +1176,13 @@
         const slotIndex = selectedSlotIndex();
         if (slotIndex < 0) return setStatus('请先选择出生槽', 'err');
         const ignore = { type: 'spawnHeadquarters', slotIndex };
-        if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部', 'err');
+        if (!canPlace(pos, ignore)) return setStatus(`该格已有固定对象，不能放置${hqTerm()}`, 'err');
         config.spawnSlots[slotIndex].headquarters = { q: pos.q, r: pos.r };
         selected = { type: 'spawnHeadquarters', slotIndex, object: config.spawnSlots[slotIndex].headquarters };
       } else {
         const player = els.toolOwner.value;
         const ignore = { type: 'headquarters', player };
-        if (!canPlace(pos, ignore)) return setStatus('该格已有固定对象，不能放置总部', 'err');
+        if (!canPlace(pos, ignore)) return setStatus(`该格已有固定对象，不能放置${hqTerm()}`, 'err');
         config.headquarters[player] = { q: pos.q, r: pos.r };
         selected = { type: 'headquarters', player, object: config.headquarters[player] };
       }
@@ -1222,7 +1231,7 @@
       selected = { type: 'cell', object: { q: pos.q, r: pos.r } };
       return;
     }
-    if (hit.type === 'headquarters' || hit.type === 'spawnHeadquarters') return setStatus('总部必须存在，可用总部工具移动位置', 'err');
+    if (hit.type === 'headquarters' || hit.type === 'spawnHeadquarters') return setStatus(`${hqTerm()}必须存在，可用${hqTerm()}工具移动位置`, 'err');
     if (hit.type === 'controlPoint') {
       const removedId = config.controlPoints[hit.index].id;
       config.controlPoints.splice(hit.index, 1);
@@ -1257,7 +1266,8 @@
     for (const point of config.controlPoints) drawControlPoint(point);
     if (config.spawnMode) {
       config.spawnSlots.forEach((slot, slotIndex) => {
-        drawHeadquarters(slot.id, slot.headquarters, slotIndex);
+        if (config.mode === 'annihilation') drawSpawnAnchor(slot.id, slot.headquarters, slotIndex);
+        else drawHeadquarters(slot.id, slot.headquarters, slotIndex);
         slot.startingUnits.forEach(unit => drawUnit({ ...unit, owner: slot.id, slotIndex }));
       });
     } else {
@@ -1359,13 +1369,19 @@
     ctx.restore();
   }
 
-  function drawHeadquarters(player, hq, slotIndex = null) {
+  // 出生锚点底色：槽位色半透明六边形，总部与出生点共用
+  function drawAnchorBase(hq, color) {
     const p = hexToPixel(hq.q, hq.r);
     pathHex(hq.q, hq.r, 5);
-    ctx.fillStyle = OWNER_COLORS[player] || slotColor(slotIndex || 0);
+    ctx.fillStyle = color;
     ctx.globalAlpha = 0.78;
     ctx.fill();
     ctx.globalAlpha = 1;
+    return p;
+  }
+
+  function drawHeadquarters(player, hq, slotIndex = null) {
+    const p = drawAnchorBase(hq, OWNER_COLORS[player] || slotColor(slotIndex || 0));
     ctx.save();
     ctx.fillStyle = '#071016';
     ctx.beginPath();
@@ -1374,6 +1390,23 @@
     ctx.moveTo(p.x, p.y - 8);
     ctx.lineTo(p.x - 7, p.y - 2);
     ctx.lineTo(p.x + 7, p.y - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 歼灭模式出生锚点：旗标造型（整体居中于格心），与总部房屋图标区分
+  function drawSpawnAnchor(player, hq, slotIndex = null) {
+    const p = drawAnchorBase(hq, OWNER_COLORS[player] || slotColor(slotIndex || 0));
+    ctx.save();
+    ctx.fillStyle = '#071016';
+    // 旗杆：p.x-4..p.x-2，与旗面共同占据 p.x-4..p.x+4，格心居中
+    ctx.fillRect(p.x - 4, p.y - 9, 2, 11);
+    // 旗面
+    ctx.beginPath();
+    ctx.moveTo(p.x - 2, p.y - 9);
+    ctx.lineTo(p.x + 4, p.y - 5);
+    ctx.lineTo(p.x - 2, p.y - 1);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
@@ -1415,6 +1448,20 @@
       const active = button.dataset.mode === config.mode;
       button.setAttribute('aria-pressed', String(active));
     });
+  }
+
+  // 总部/出生点工具按钮随玩法模式切换文案与图标
+  function renderHQToolLabel() {
+    const labelEl = $('hq-tool-label');
+    if (!labelEl) return;
+    const button = labelEl.closest('.tool-button');
+    const iconEl = $('hq-tool-icon');
+    const label = hqTerm();
+    labelEl.textContent = label;
+    button.title = `放置${label}`;
+    if (iconEl) iconEl.className = `token-icon ${config.mode === 'annihilation' ? 'spawn-point' : 'headquarters'}`;
+    // 当前激活工具是总部/出生点时同步提示条
+    if (tool === 'hq') els.toolHint.textContent = label;
   }
 
   function renderAnnihilationFields() {
@@ -1462,8 +1509,13 @@
     els.balanceFields.innerHTML = [
       ...BALANCE_KEYS.map(([key, label, min]) => fieldHtml(`balance:${key}`, label, config.balance[key], min)),
       ...WEIGHT_KEYS.map(([key, label]) => fieldHtml(`weight:${key}`, `裁决 ${label}`, config.balance.adjudicationWeights[key], 0)),
-      fieldHtml('hq:hp', '总部 HP', config.headquartersSpec.hp, 1),
-      fieldHtml('hq:defense', '总部防御', config.headquartersSpec.defense, 0),
+      // 歼灭模式没有总部，总部规格仅作占位，隐藏避免误导
+      ...(config.mode === 'annihilation'
+        ? []
+        : [
+          fieldHtml('hq:hp', '总部 HP', config.headquartersSpec.hp, 1),
+          fieldHtml('hq:defense', '总部防御', config.headquartersSpec.defense, 0),
+        ]),
       `<label class="toggle-field">启用追赶补给 <input id="comeback-enabled" type="checkbox"${comeback ? ' checked' : ''} /></label>`,
       fieldHtml('comeback:startRound', '追赶开始轮次', draft.startRound ?? 3, 1, null, !comeback),
       fieldHtml('comeback:scoreGapPercent', '追赶分差百分比', draft.scoreGapPercent ?? 40, 1, 100, !comeback),
@@ -1575,13 +1627,13 @@
         ${selects}
       </div>`;
     }).join('');
-    els.spawnLayoutFields.innerHTML = `<div class="spawn-toolbar"><button id="spawn-add" type="button">新增出生槽</button><span class="outside-cell-hint">总部工具和单位工具作用于当前选择槽</span></div>${slotRows}${layoutRows}`;
+    els.spawnLayoutFields.innerHTML = `<div class="spawn-toolbar"><button id="spawn-add" type="button">新增出生槽</button><span class="outside-cell-hint">${hqTerm()}工具和单位工具作用于当前选择槽</span></div>${slotRows}${layoutRows}`;
 
     $('spawn-add').addEventListener('click', () => {
       if (config.spawnSlots.length >= 8) return setStatus('出生槽最多 8 个', 'err');
       const preferred = selected?.type === 'cell' ? selected.object : null;
       const position = preferred && canPlace(preferred) ? preferred : playableCells(config).find(cell => canPlace(cell));
-      if (!position) return setStatus('没有可用于新总部的空格', 'err');
+      if (!position) return setStatus(`没有可用于新${hqTerm()}的空格`, 'err');
       let number = config.spawnSlots.length + 1;
       const ids = new Set(config.spawnSlots.map(slot => slot.id));
       while (ids.has(`slot_${number}`)) number += 1;
@@ -1709,8 +1761,8 @@
       setSelectionIcon('headquarters', OWNER_COLORS[selected.player]);
     } else if (selected.type === 'spawnHeadquarters') {
       const slot = config.spawnSlots[selected.slotIndex];
-      els.selectionTitleText.textContent = `总部 ${slot.id}`;
-      setSelectionIcon('headquarters', slotColor(selected.slotIndex));
+      els.selectionTitleText.textContent = `${hqTerm()} ${slot.id}`;
+      setSelectionIcon(config.mode === 'annihilation' ? 'spawn-point' : 'headquarters', slotColor(selected.slotIndex));
     } else if (selected.type === 'controlPoint') {
       els.selectionTitleText.textContent = `据点 ${obj.id}`;
       setSelectionIcon(obj.kind || 'supply', '#d6b34a');
@@ -1791,6 +1843,7 @@
 
   function syncAll() {
     syncToolOwnerOptions();
+    renderHQToolLabel();
     renderGlobalFields();
     renderAnnihilationFields();
     renderBalanceFields();

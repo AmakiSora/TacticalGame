@@ -45,7 +45,7 @@ describe('map editor page', () => {
     expect(html).toContain('data-mode="standard"');
     expect(html).toContain('data-mode="annihilation"');
     expect(html).toContain('id="annihilation-panel"');
-    expect(html).toContain('<script src="/map-editor.js?v=3.2.6"></script>');
+    expect(html).toContain('<script src="/map-editor.js?v=3.2.7"></script>');
   });
 
   it('supports toolbar zoom buttons without hijacking wheel scroll', () => {
@@ -99,6 +99,7 @@ describe('map editor page', () => {
     expect(css).toContain('.token-icon.ranger');
     expect(css).toContain('.token-icon.support');
     expect(css).toContain('.token-icon.headquarters');
+    expect(css).toContain('.token-icon.spawn-point');
     expect(css).toContain('.token-icon.supply');
     expect(css).toContain('.token-icon.forward_base');
     expect(css).toContain('.token-icon.repair');
@@ -346,6 +347,29 @@ describe('map editor page', () => {
     expect(core.formatValidationError('controlPoints[0] overlaps another fixed map object at 0,0')).toBe('据点 1 与另一个固定对象重叠，位置为 0,0。');
     expect(core.formatValidationError('Map "editor".controlPoints must all define kind when any control point is typed')).toBe('如果任意据点设置了类型，所有据点都必须设置类型。');
     expect(core.formatValidationError('Map "editor".balance.startingSupplies must be a number >= 0')).toBe('平衡设置的初始金币必须是大于等于 0 的数字。');
+  });
+
+  it('labels spawn slot anchors as spawn points in annihilation mode', () => {
+    const core = loadCore();
+    const source = read('public/map-editor.js');
+    const html = read('public/map-editor.html');
+
+    // 标准模式默认配置下，出生槽锚点仍称总部
+    expect(core.formatValidationError('spawnSlots[0].headquarters (6,-6) is outside radius 5')).toBe('出生槽 1 总部 的坐标 (6,-6) 超出地图半径 5。');
+
+    // 歼灭模式：画布绘制与选中面板按模式分流为出生点
+    expect(source).toContain("if (config.mode === 'annihilation') drawSpawnAnchor(slot.id, slot.headquarters, slotIndex);");
+    expect(source).toContain('else drawHeadquarters(slot.id, slot.headquarters, slotIndex);');
+    expect(source).toContain('function drawSpawnAnchor');
+    expect(source).toContain('function hqTerm()');
+    expect(source).toContain("config.mode === 'annihilation' ? '出生点' : '总部'");
+    expect(source).toContain("setSelectionIcon(config.mode === 'annihilation' ? 'spawn-point' : 'headquarters'");
+
+    // 工具按钮带动态标签挂载点，规则页歼灭模式隐藏总部规格
+    expect(html).toContain('id="hq-tool-label"');
+    expect(html).toContain('id="hq-tool-icon"');
+    expect(source).toContain("...(config.mode === 'annihilation'");
+    expect(source).toContain("fieldHtml('hq:hp'");
   });
 
   it('requires confirmation before radius shrink removes outside objects', () => {

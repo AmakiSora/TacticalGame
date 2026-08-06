@@ -5,121 +5,145 @@
   "grid": "hex",
   "orientation": "pointy",
   "radius": 6,
-  "terrainCells": [
-    { "q": -2, "r": -2, "terrain": "water" },
-    { "q": 2, "r": -4, "terrain": "water" },
-    { "q": 4, "r": -2, "terrain": "water" },
-    { "q": 2, "r": 2, "terrain": "water" },
-    { "q": -2, "r": 4, "terrain": "water" },
-    { "q": -4, "r": 2, "terrain": "water" },
-    { "q": 1, "r": -3, "terrain": "blocker" },
-    { "q": 3, "r": -2, "terrain": "blocker" },
-    { "q": 2, "r": 1, "terrain": "blocker" },
-    { "q": -1, "r": 3, "terrain": "blocker" },
-    { "q": -3, "r": 2, "terrain": "blocker" },
-    { "q": -2, "r": -1, "terrain": "blocker" }
-  ],
+  "terrainCells": [],
   "controlPoints": [
-    { "id": "cp_east", "name": "东部集结点", "kind": "forward_base", "q": 4, "r": 0 },
-    { "id": "cp_northeast", "name": "东北集结点", "kind": "forward_base", "q": 4, "r": -4 },
-    { "id": "cp_northwest", "name": "西北集结点", "kind": "forward_base", "q": 0, "r": -4 },
-    { "id": "cp_west", "name": "西部集结点", "kind": "forward_base", "q": -4, "r": 0 },
-    { "id": "cp_southwest", "name": "西南集结点", "kind": "forward_base", "q": -4, "r": 4 },
-    { "id": "cp_southeast", "name": "东南集结点", "kind": "forward_base", "q": 0, "r": 4 },
-    { "id": "supply_east", "name": "东部补给点", "kind": "supply", "q": 3, "r": 0 },
-    { "id": "supply_northeast", "name": "东北补给点", "kind": "supply", "q": 3, "r": -3 },
-    { "id": "supply_northwest", "name": "西北补给点", "kind": "supply", "q": 0, "r": -3 },
-    { "id": "supply_west", "name": "西部补给点", "kind": "supply", "q": -3, "r": 0 },
-    { "id": "supply_southwest", "name": "西南补给点", "kind": "supply", "q": -3, "r": 3 },
-    { "id": "supply_southeast", "name": "东南补给点", "kind": "supply", "q": 0, "r": 3 }
-  ],
-  "headquarters": {
-    "player_a": { "q": -6, "r": 0 },
-    "player_b": { "q": 6, "r": 0 }
-  },
-  "startingUnits": [
-    { "owner": "player_a", "type": "infantry", "q": -5, "r": 0 },
-    { "owner": "player_a", "type": "infantry", "q": -5, "r": 1 },
-    { "owner": "player_a", "type": "heavy", "q": -4, "r": -1 },
-    { "owner": "player_b", "type": "infantry", "q": 5, "r": 0 },
-    { "owner": "player_b", "type": "infantry", "q": 5, "r": -1 },
-    { "owner": "player_b", "type": "heavy", "q": 4, "r": 1 }
-  ],
-  "spawnSlots": [
     {
-      "id": "slot_east",
-      "headquarters": { "q": 6, "r": 0 },
-      "controlPointId": "cp_east",
-      "startingUnits": [
-        { "type": "infantry", "q": 5, "r": 0 },
-        { "type": "infantry", "q": 5, "r": -1 },
-        { "type": "heavy", "q": 4, "r": 1 }
-      ]
+      "id": "cp_east",
+      "name": "东部集结点",
+      "kind": "forward_base",
+      "q": 4,
+      "r": 0
     },
     {
-      "id": "slot_northeast",
-      "headquarters": { "q": 6, "r": -6 },
-      "controlPointId": "cp_northeast",
-      "startingUnits": [
-        { "type": "infantry", "q": 5, "r": -5 },
-        { "type": "infantry", "q": 4, "r": -5 },
-        { "type": "heavy", "q": 5, "r": -4 }
-      ]
+      "id": "cp_northeast",
+      "name": "东北集结点",
+      "kind": "forward_base",
+      "q": 4,
+      "r": -4
     },
     {
-      "id": "slot_northwest",
-      "headquarters": { "q": 0, "r": -6 },
-      "controlPointId": "cp_northwest",
-      "startingUnits": [
-        { "type": "infantry", "q": 0, "r": -5 },
-        { "type": "infantry", "q": -1, "r": -4 },
-        { "type": "heavy", "q": 1, "r": -5 }
-      ]
+      "id": "cp_northwest",
+      "name": "西北集结点",
+      "kind": "forward_base",
+      "q": 0,
+      "r": -4
     },
     {
-      "id": "slot_west",
-      "headquarters": { "q": -6, "r": 0 },
-      "controlPointId": "cp_west",
-      "startingUnits": [
-        { "type": "infantry", "q": -5, "r": 0 },
-        { "type": "infantry", "q": -5, "r": 1 },
-        { "type": "heavy", "q": -4, "r": -1 }
-      ]
+      "id": "cp_west",
+      "name": "西部集结点",
+      "kind": "forward_base",
+      "q": -4,
+      "r": 0
     },
     {
-      "id": "slot_southwest",
-      "headquarters": { "q": -6, "r": 6 },
-      "controlPointId": "cp_southwest",
-      "startingUnits": [
-        { "type": "infantry", "q": -5, "r": 5 },
-        { "type": "infantry", "q": -4, "r": 5 },
-        { "type": "heavy", "q": -5, "r": 4 }
-      ]
+      "id": "cp_southwest",
+      "name": "西南集结点",
+      "kind": "forward_base",
+      "q": -4,
+      "r": 4
     },
     {
-      "id": "slot_southeast",
-      "headquarters": { "q": 0, "r": 6 },
-      "controlPointId": "cp_southeast",
-      "startingUnits": [
-        { "type": "infantry", "q": 0, "r": 5 },
-        { "type": "infantry", "q": 1, "r": 4 },
-        { "type": "heavy", "q": -1, "r": 5 }
-      ]
+      "id": "cp_southeast",
+      "name": "东南集结点",
+      "kind": "forward_base",
+      "q": 0,
+      "r": 4
+    },
+    {
+      "id": "supply_east",
+      "name": "东部补给点",
+      "kind": "supply",
+      "q": 3,
+      "r": 0
+    },
+    {
+      "id": "supply_northeast",
+      "name": "东北补给点",
+      "kind": "supply",
+      "q": 3,
+      "r": -3
+    },
+    {
+      "id": "supply_northwest",
+      "name": "西北补给点",
+      "kind": "supply",
+      "q": 0,
+      "r": -3
+    },
+    {
+      "id": "supply_west",
+      "name": "西部补给点",
+      "kind": "supply",
+      "q": -3,
+      "r": 0
+    },
+    {
+      "id": "supply_southwest",
+      "name": "西南补给点",
+      "kind": "supply",
+      "q": -3,
+      "r": 3
+    },
+    {
+      "id": "supply_southeast",
+      "name": "东南补给点",
+      "kind": "supply",
+      "q": 0,
+      "r": 3
     }
   ],
-  "layouts": {
-    "2": ["slot_east", "slot_west"],
-    "3": ["slot_east", "slot_northwest", "slot_southwest"],
-    "6": ["slot_east", "slot_northeast", "slot_northwest", "slot_west", "slot_southwest", "slot_southeast"]
-  },
   "units": {
-    "infantry": { "hp": 100, "attack": 30, "defense": 8, "moveRange": 3, "attackRange": 1, "cost": 45, "canCapture": true },
-    "scout": { "hp": 65, "attack": 16, "defense": 4, "moveRange": 5, "attackRange": 1, "cost": 38, "canCapture": true },
-    "heavy": { "hp": 150, "attack": 40, "defense": 13, "moveRange": 3, "attackRange": 1, "cost": 92, "canCapture": false },
-    "ranger": { "hp": 72, "attack": 44, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 78, "canCapture": false },
-    "support": { "hp": 82, "attack": 10, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 60, "canCapture": false, "healPower": 22 }
+    "infantry": {
+      "hp": 100,
+      "attack": 30,
+      "defense": 8,
+      "moveRange": 3,
+      "attackRange": 1,
+      "cost": 45,
+      "canCapture": true
+    },
+    "scout": {
+      "hp": 65,
+      "attack": 16,
+      "defense": 4,
+      "moveRange": 5,
+      "attackRange": 1,
+      "cost": 38,
+      "canCapture": true
+    },
+    "heavy": {
+      "hp": 150,
+      "attack": 38,
+      "defense": 13,
+      "moveRange": 2,
+      "attackRange": 1,
+      "cost": 92,
+      "canCapture": false
+    },
+    "ranger": {
+      "hp": 72,
+      "attack": 44,
+      "defense": 3,
+      "moveRange": 3,
+      "attackRange": 3,
+      "cost": 72,
+      "canCapture": false
+    },
+    "support": {
+      "hp": 82,
+      "attack": 10,
+      "defense": 5,
+      "moveRange": 3,
+      "attackRange": 1,
+      "cost": 60,
+      "canCapture": false,
+      "healPower": 22
+    }
   },
-  "headquartersSpec": { "hp": 1, "defense": 0 },
+  "headquartersSpec": {
+    "hp": 1,
+    "defense": 0
+  },
   "balance": {
     "startingSupplies": 45,
     "baseIncome": 8,
@@ -134,12 +158,25 @@
       "ownHqHp": 0,
       "controlPoint": 0,
       "armyValue": 2,
-      "supplies": 0
+      "supplies": 0,
+      "effectiveActions": 10
     },
     "controlPointTypes": {
-      "supply": { "income": 8, "deployDiscount": 0, "repairAmount": 0 },
-      "forward_base": { "income": 4, "deployDiscount": 0, "repairAmount": 0 },
-      "repair": { "income": 0, "deployDiscount": 0, "repairAmount": 0 }
+      "supply": {
+        "income": 8,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "forward_base": {
+        "income": 4,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "repair": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      }
     }
   },
   "annihilation": {
@@ -149,5 +186,176 @@
       "damage": 25,
       "minimumSafeRadius": 2
     }
+  },
+  "spawnSlots": [
+    {
+      "id": "slot_east",
+      "headquarters": {
+        "q": 6,
+        "r": 0
+      },
+      "controlPointId": "cp_east",
+      "startingUnits": [
+        {
+          "type": "infantry",
+          "q": 5,
+          "r": 0
+        },
+        {
+          "type": "infantry",
+          "q": 5,
+          "r": -1
+        },
+        {
+          "type": "heavy",
+          "q": 4,
+          "r": 1
+        }
+      ]
+    },
+    {
+      "id": "slot_northeast",
+      "headquarters": {
+        "q": 6,
+        "r": -6
+      },
+      "controlPointId": "cp_northeast",
+      "startingUnits": [
+        {
+          "type": "infantry",
+          "q": 5,
+          "r": -5
+        },
+        {
+          "type": "infantry",
+          "q": 4,
+          "r": -5
+        },
+        {
+          "type": "heavy",
+          "q": 5,
+          "r": -4
+        }
+      ]
+    },
+    {
+      "id": "slot_northwest",
+      "headquarters": {
+        "q": 0,
+        "r": -6
+      },
+      "controlPointId": "cp_northwest",
+      "startingUnits": [
+        {
+          "type": "infantry",
+          "q": 0,
+          "r": -5
+        },
+        {
+          "type": "infantry",
+          "q": -1,
+          "r": -4
+        },
+        {
+          "type": "heavy",
+          "q": 1,
+          "r": -5
+        }
+      ]
+    },
+    {
+      "id": "slot_west",
+      "headquarters": {
+        "q": -6,
+        "r": 0
+      },
+      "controlPointId": "cp_west",
+      "startingUnits": [
+        {
+          "type": "infantry",
+          "q": -5,
+          "r": 0
+        },
+        {
+          "type": "infantry",
+          "q": -5,
+          "r": 1
+        },
+        {
+          "type": "heavy",
+          "q": -4,
+          "r": -1
+        }
+      ]
+    },
+    {
+      "id": "slot_southwest",
+      "headquarters": {
+        "q": -6,
+        "r": 6
+      },
+      "controlPointId": "cp_southwest",
+      "startingUnits": [
+        {
+          "type": "infantry",
+          "q": -5,
+          "r": 5
+        },
+        {
+          "type": "infantry",
+          "q": -4,
+          "r": 5
+        },
+        {
+          "type": "heavy",
+          "q": -5,
+          "r": 4
+        }
+      ]
+    },
+    {
+      "id": "slot_southeast",
+      "headquarters": {
+        "q": 0,
+        "r": 6
+      },
+      "controlPointId": "cp_southeast",
+      "startingUnits": [
+        {
+          "type": "infantry",
+          "q": 0,
+          "r": 5
+        },
+        {
+          "type": "infantry",
+          "q": 1,
+          "r": 4
+        },
+        {
+          "type": "heavy",
+          "q": -1,
+          "r": 5
+        }
+      ]
+    }
+  ],
+  "layouts": {
+    "2": [
+      "slot_east",
+      "slot_west"
+    ],
+    "3": [
+      "slot_east",
+      "slot_northwest",
+      "slot_southwest"
+    ],
+    "6": [
+      "slot_east",
+      "slot_northeast",
+      "slot_northwest",
+      "slot_west",
+      "slot_southwest",
+      "slot_southeast"
+    ]
   }
 }

@@ -778,6 +778,32 @@ textarea {
   clip-path: polygon(0% 30%, 50% 0%, 100% 30%, 100% 100%, 0% 100%);
 }
 
+/* 出生点（歼灭模式出生锚点）——旗标造型，区别于总部房屋图标；旗杆+旗面整体居中于 14px 图标盒 */
+.token-icon.spawn-point {
+  position: relative;
+}
+
+.token-icon.spawn-point::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: currentColor; /* 旗杆 */
+}
+
+.token-icon.spawn-point::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 40%, 0 80%); /* 旗面 */
+}
+
 .token-icon.supply {
   width: 12px;
   height: 12px;

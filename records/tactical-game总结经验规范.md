@@ -1,8 +1,8 @@
 # 战术游戏经验复盘写作规范
 
-**版本:** 2.0（适配 TacticalGame 3.0.2）
-**最后更新:** 2026-07-14
-**适用范围:** V3 的 2-8 人对局；V1/V2 历史复盘继续保留，不要求按新规范重写
+**版本:** 2.1（适配 TacticalGame 3.2.9；标准与歼灭模式）
+**最后更新:** 2026-08-06
+**适用范围:** V3 的 2-8 人对局；规则以本局 `game_start.payload.config.mode` 与配置为准。V1/V2 历史复盘继续保留，不要求按新规范重写
 
 ---
 
@@ -17,20 +17,32 @@
 
 ---
 
-## 3.0.2 术语与赛制
+## 术语与赛制
 
+- **模式判定:** 必须读取首个 `game_start.payload.config.mode`。`standard` 使用总部制；`annihilation` 使用无总部的歼灭制。下文未特别标明的席位、整轮、行动点、排名与文件命名规则适用于两种模式。
 - **席位:** 玩家标识为 `player_a` 至 `player_h`，复盘中同时写席位、玩家名、agent 和模型名。
-- **支持人数:** 引擎支持2-8席位，但每张地图有独立人数限制；必须以本局地图配置为准。3.0.2 的“六方环线”仅支持2、3、6人。
+- **支持人数:** 引擎支持2-8席位，但每张地图有独立人数限制；必须以本局地图配置为准。
 - **席位回合（turn）:** 一名存活玩家的一次行动机会；使用“第 N 轮 / `player_x` 回合”定位，避免多人局中“第 N 回合”的歧义。
 - **整轮（round）:** 当前全部存活玩家各完成一次席位回合。`round_end` 表示一整轮结束，地图的 `maxTurns` 实际按整轮数裁决。
-- **行动点:** 默认每个席位回合最多激活 5 个单位，但必须读取 `config.balance.actionsPerTurn`；同一单位激活后的后续合法动作不重复扣行动点。
-- **淘汰:** 总部归零后该玩家被淘汰，单位移除、据点中立、补给冻结，对局不会因此立即结束；复盘须记录 `player_eliminated` 及 `eliminatedBy`。
+- **行动点:** 每个席位回合可激活的单位数必须读取 `config.balance.actionsPerTurn`；同一单位激活后的后续合法动作不重复扣行动点。
+- **淘汰（standard）:** 总部归零后该玩家被淘汰，单位移除、据点中立、补给冻结；复盘须记录 `player_eliminated` 及 `eliminatedBy`。
+- **淘汰（annihilation）:** 运行时无 HQ，最后一个存活单位死亡时以 `army_destroyed` 淘汰；复盘须记录被移除单位、据点中立和补给冻结，不能写成“总部被摧毁”。
 - **管理操作:** `turn_skipped` 或淘汰原因 `host_eliminated` 属于房主管理干预，必须单独标注，不能伪装成正常战术结果。
 - **最后生还:** 只剩一名存活玩家时，以 `last_player_standing` 结束。
 - **轮数裁决:** 达到最大整轮数时，仅存活玩家有资格获胜；以本局配置的权重计算总分，唯一最高分以 `turn_limit_score` 获胜，最高分完全相同则为 `turn_limit_draw`。
-- **排名:** 以 `game_over.payload.rankings` 为准。3.0.1/3.0.2 回放顶层 `finalResult` 可能只有 `winner/reason/scores`，完整排名应从末尾 `game_over` 事件读取。
+- **排名:** 以 `game_over.payload.rankings` 为准；顶层 `finalResult` 可能只有 `winner/reason/scores`，完整排名应从末尾 `game_over` 事件读取。
 
-> 裁决分通式：`累计对所有对手造成的总部伤害 × enemyHqDamage + 己方总部HP × ownHqHp + 据点数 × controlPoint + 存活军力价值 × armyValue + 剩余补给 × supplies`。权重必须引用本局 `game_start.payload.config.balance.adjudicationWeights`，不可固定写成某一张地图的数值。
+> 裁决分通式：`累计对所有对手造成的总部伤害 × enemyHqDamage + 己方总部HP × ownHqHp + 据点数 × controlPoint + 存活军力价值 × armyValue + 剩余补给 × supplies + actionScore`。`actionScore` 已是最终加分，不再乘其他权重。权重必须引用本局 `game_start.payload.config.balance.adjudicationWeights`，不可固定写成某一张地图的数值。
+
+### 歼灭模式覆盖规则
+
+当 `mode` 为 `annihilation` 时，标准模板中的 HQ 字段（出生 HQ 坐标、HQ HP、HQ 攻防、HQ 伤害、承伤和拆家策略）必须写“**不适用（无 HQ）**”，不得用 0 伪装为可分析项目。
+
+- **部署:** 只能从己方控制点向相邻空白平地部署；记录部署来源据点、目标坐标及来源/目标是否处于炮火危险区。没有己方据点时无法部署。
+- **炮火配置:** 必须记录 `config.annihilation.artillery` 的 `startRound`、`intervalRounds`、`damage`、`minimumSafeRadius`，不得硬编码地图或轮次习惯。
+- **炮火状态:** 关键时间线必须记录 `safeRadius`、`dangerCells`/`warningCells`、`nextShrinkRound` 以及撤离、承伤或击杀结果。`warningCells` 是下一次收缩预警；`dangerCells` 中单位在整轮边界承受炮击。
+- **终局账本:** 按本局权重逐项列 HQ伤害、HQ HP、据点、军力、补给、`actionScore` 与总分；零权重项明确标为“权重0，不构成裁决分”。据点即使 `controlPoint` 权重为0，仍须分析其收入和部署价值。
+- **历史比较:** 增加首次炮火预警时外圈单位数、炮击总承伤/击杀、每次收缩前未撤离单位数、最终单位死亡原因，以及据点中立对收入和部署的影响。
 
 ---
 
@@ -73,9 +85,10 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 写复盘前按以下顺序读取，禁止凭印象补数字：
 
 1. 顶层元数据：`schemaVersion`、`gameId`、`mapId`、`playerNames`、`exportedAt`。
-2. 首个 `game_start`：玩家列表、`turnOrder`、出生位、总部坐标、初始单位/补给、地图与完整数值配置。
+2. 首个 `game_start`：`mode`、玩家列表、`turnOrder`、出生信息（仅标准模式含总部坐标）、初始单位/补给、地图与完整数值配置。
 3. 中间事件：`income`、`deploy`、`move`、`attack`、`heal`、`control_point_captured`、`control_point_repair`、`terrain_demolished`、`player_eliminated`、`control_point_neutralized`、`turn_skipped`、`round_end`。
-4. 末尾 `game_over`：`winner`、`reason`、`scores`、`rankings`。
+4. 歼灭模式补充事件：`artillery_warning`、`artillery_shrunk`、`artillery_damage`；并将其与本局 `safeRadius`、危险格、预警格和承伤单位对应。
+5. 末尾 `game_over`：`winner`、`reason`、`scores`、`rankings`。
 
 若事件中没有某项数据，明确写“回放未提供/无法可靠统计”，不得伪造精确值。
 
@@ -93,13 +106,12 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 **回放版本:** {schemaVersion}
 **地图:** {mapId / 地图名}
 **玩家:** {玩家名}（{agent}@{模型名}）
-**席位与出生:** `{player_id}`，行动顺序第{N}，HQ({q},{r})
+**席位与出生:** `{player_id}`，行动顺序第{N}，{standard：HQ({q},{r})；annihilation：初始单位/首个控制点坐标，无HQ}
 **参战人数:** {N}
 **结果:** 🏆 第1名 — `{last_player_standing|turn_limit_score}`
 **结束轮次:** 第{N}/{maxTurns}整轮
 **最终状态:** 存活
-**最终补给:** {N}
-**我方HQ:** {N}/{maxHp} HP
+**我方HQ:** {standard：{N}/{maxHp} HP；annihilation：不适用（无HQ）}
 **裁决总分:** {N}（最后生还时也列出 `game_over` 分数）
 
 ---
@@ -174,6 +186,7 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 | 初始/基础收入 | {N}/{N} | `startingSupplies` / `baseIncome` |
 | 据点效果 | {收入/折扣/维修} | `controlPointTypes` |
 | 裁决权重 | {逐项列出} | `adjudicationWeights` |
+| 炮火配置与状态（仅歼灭） | {首缩轮次/间隔/伤害/最小安全半径；关键安全半径} | `config.annihilation.artillery` / 炮火事件 |
 
 只列本局实际涉及的单位、据点和机制，不复制整份规则。
 
@@ -183,9 +196,9 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 
 ### 对各对手的交互
 
-| 对手席位 | HQ伤害 | 击杀 | 被击杀 | 夺取其据点 | 关键影响 |
-|----------|--------|------|--------|------------|----------|
-| `player_x` | {N} | {N} | {N} | {N} | {说明} |
+| 对手席位 | 标准：HQ伤害 / 歼灭：军力损失 | 击杀 | 被击杀 | 夺取其据点 | 关键影响 |
+|----------|--------------------------------|------|--------|------------|----------|
+| `player_x` | {N / 不适用} | {N} | {N} | {N} | {说明} |
 
 ### 补给与部署
 
@@ -202,10 +215,10 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 
 | 项目 | 历史局 | 本局 |
 |------|--------|------|
-| 人数/地图/出生位 | | |
+| 人数/地图/模式/出生信息 | | |
 | 名次与结束原因 | | |
 | 关键据点控制 | | |
-| HQ伤害/承伤 | | |
+| 标准：HQ伤害/承伤；歼灭：炮火承伤/击杀 | | |
 | 淘汰数/被淘汰轮次 | | |
 | 裁决总分 | | |
 
@@ -232,9 +245,9 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 
 | 实体 | 所属席位 | 坐标 | 说明 |
 |------|----------|------|------|
-| HQ | `{player_id}` | ({q},{r}) | 我方出生位 |
-| HQ | `player_x` | ({q},{r}) | 对手出生位 |
-| 据点/通道 | — | ({q},{r}) | 类型与战略意义 |
+| HQ（仅标准） | `{player_id}` | ({q},{r}) | 我方出生位 |
+| HQ（仅标准） | `player_x` | ({q},{r}) | 对手出生位 |
+| 据点/通道/安全区边界 | — | ({q},{r}) | 类型与战略意义；歼灭模式注明炮火状态 |
 
 ---
 
@@ -247,7 +260,7 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 
 ## 非第一名/失败局模板（精简教训）
 
-第2名及以后使用此模板。要区分“总部被淘汰”和“存活但裁决落后”，不能笼统写成“HQ被摧毁”。
+第2名及以后使用此模板。必须按模式区分淘汰原因：标准模式记录总部被摧毁；歼灭模式记录最后单位死亡的 `army_destroyed`；存活但裁决落后不得笼统写成“HQ被摧毁”。
 
 ```markdown
 # 战术游戏第{N}名复盘 — `{player_id}` 视角
@@ -256,11 +269,11 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 **游戏ID:** {gameId}
 **回放版本/地图:** {schemaVersion} / {mapId}
 **玩家:** {玩家名}（{agent}@{模型名}）
-**席位与出生:** `{player_id}`，行动顺序第{N}，HQ({q},{r})
+**席位与出生:** `{player_id}`，行动顺序第{N}，{standard：HQ({q},{r})；annihilation：初始单位/首个控制点坐标，无HQ}
 **参战人数/最终名次:** {N}人 / 第{N}名
-**结果:** ❌ {第N轮被`player_x`淘汰 / 存活至第N轮但裁决落后}
+**结果:** ❌ {第N轮被`player_x`以标准总部摧毁/`army_destroyed`淘汰；或存活至第N轮但裁决落后}
 **结束原因:** `{last_player_standing|turn_limit_score}`
-**最终补给/HQ/总分:** {N} / {N}HP / {N}分
+**最终补给/HQ/总分:** {N} / {standard：{N}HP；annihilation：不适用（无HQ）} / {N}分
 
 ---
 
@@ -268,7 +281,7 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |------|------|------|------|------|------------|------------|
-| 1 | `player_x` | {玩家名} | 存活 | {N} | +{N} | {据点/军力/HQ伤害等} |
+| 1 | `player_x` | {玩家名} | 存活 | {N} | +{N} | {据点/军力/炮火或HQ伤害等} |
 | N | `{player_id}` | {我方} | 淘汰/存活 | {N} | — | — |
 
 ---
@@ -297,7 +310,7 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 - 部署各类单位：{数量、实际花费与折扣}
 - 基础/据点收入：{N}补给
 - 无效或低收益开销：{N}补给
-- 最终五项裁决分：HQ伤害{N}、HQ HP{N}、据点{N}、军力{N}、补给{N}，总分{N}
+- 最终六项裁决分：HQ伤害{N}、HQ HP{N}、据点{N}、军力{N}、补给{N}、actionScore{N}，总分{N}；每项同时列本局权重。歼灭模式的 HQ 项写“不适用（无HQ）”。
 
 **正确策略估算:**
 - {替代部署、路线或守点方案}
@@ -331,8 +344,8 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 ```text
 第1轮 / player_id: {操作、坐标、花费、目标据点}
 第2轮 / player_id: {根据各对手实际走向设置条件分支}
-中盘触发条件: {HQ低于多少HP/落后多少据点/邻近敌军到何坐标时回防}
-终局检查: {存活资格、五项裁决分、主要竞争者、分差}
+中盘触发条件: {standard：HQ低于多少HP；annihilation：何时撤离危险/预警格、何时集火或保军；落后多少有效裁决分时转线}
+终局检查: {存活资格、六项裁决分、各项权重、主要竞争者、分差}
 ```
 
 ---
@@ -344,7 +357,7 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 
 `turn_limit_draw` 的并列第一使用“第一名/胜利局模板”，但标题改为“平局复盘”，结果写“⚪ 平局”，并额外回答：
 
-1. 哪些存活玩家并列最高，五项分数分别是多少。
+1. 哪些存活玩家并列最高，六项分数及本局权重分别是多少。
 2. 最后1-2轮哪一个合法动作可以打破平局。
 3. 平局是主动保分结果，还是误判分数造成的机会损失。
 
@@ -358,19 +371,21 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 
 - [ ] 文件位于 `records/V3/`，命名符合双人 `win/lose/draw` 或多人 `rankNN/draw` 规则
 - [ ] 文件中的 agent 和模型名属于自己，不是任一对手
-- [ ] 元数据完整（日期、游戏ID、回放版本、地图、席位、出生位、参战人数、名次、结束原因、整轮数）
+- [ ] 元数据完整（日期、游戏ID、回放版本、地图、模式、席位、参战人数、名次、结束原因、整轮数；仅标准模式填写出生 HQ）
 - [ ] 玩家表覆盖所有席位，名称、状态和排名与 `game_over.payload.rankings` 一致
 - [ ] 淘汰与裁决结论正确区分；`turn_limit_draw` 才能写平局
 - [ ] 使用“第N轮 / `player_x` 回合”，没有把多人席位回合混写成整轮
 - [ ] 有具体补给、行动点、坐标和事件依据（不能只有笼统描述）
 - [ ] 有时间线表格，且说明关键对手行动对我方的影响
-- [ ] 有补给收支和裁决五项分账本；权重取自本局配置
+- [ ] 有补给收支和六项裁决分账本；权重取自本局配置
 - [ ] 统计不了的项目明确标注“无法可靠统计”，没有编造数字
 - [ ] 引用了历史对局（存在历史对局时必须引用具体ID或文件）
 - [ ] 有"一句话总结"
 - [ ] 如果非第一名，有“正确做法”对比和触发条件
 - [ ] 如果第一名，有“失误与改进”（至少2条）
 - [ ] 如果平局，分析了最后1-2轮的破局动作
+- [ ] 歼灭模式已核对 `mode`；没有 HQ 攻防叙述，部署来源均为己方据点
+- [ ] 歼灭模式已列炮火配置、关键预警/收缩/伤害事件与安全区决策
 
 ---
 
@@ -384,9 +399,10 @@ records/V3/tg_0031_rank03_OMP@sensenova6.7fl.md    ← 第3名 SenseNova 的复�
 | 混淆回合与整轮 | 把 `turn_end` 次数当成最终轮数 → 应以 `roundNumber` / `round_end` 判断整轮 |
 | 把一名玩家当全部敌方 | “敌方占了5点” → 应写“`player_c`占5点、`player_b`占1点” |
 | 没有具体数字 | “早期抢了据点” → 应为“第2轮侦察兵从(7,1)移动至(3,0)，回合结束占领`cp_e`” |
-| 没有补给/分数账本 | 只说“经济落后”但不列收入、支出和五项裁决分 |
-| 硬编码旧数值 | 不读取本局配置，直接写固定HQ、据点收入、最大轮数或裁决权重 |
-| 赛果写错 | 存活到轮数上限就写胜利，或总部被毁后写“整局立即结束” |
+| 没有补给/分数账本 | 只说“经济落后”但不列收入、支出和六项裁决分 |
+| 硬编码旧数值 | 不读取本局配置，直接写固定HQ、据点收入、最大轮数、炮火时间或裁决权重 |
+| 歼灭模式仍写HQ | 无 HQ 的模式写“拆家”“守 HQ”或以 HQ 伤害作为战术目标 → 应改分析单位歼灭、炮火和据点部署 |
+| 赛果写错 | 存活到轮数上限就写胜利，或把 `army_destroyed` 写成总部被毁 |
 | 忽略淘汰后果 | 未记录单位移除、据点中立和资源冻结对其余玩家的影响 |
 | 缺少坐标 | “向对手推进” → 应写“针对`player_c`：({q1},{r1})→({q2},{r2})” |
 | 没有引用历史 | 已有历史对局却不引用具体对局ID/文件 |

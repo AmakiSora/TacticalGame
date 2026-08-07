@@ -1,21 +1,21 @@
 {
-  "generatedAt": "2026-08-05T08:09:00.074Z",
+  "generatedAt": "2026-08-07T03:51:17.967Z",
   "source": {
     "versions": [
       "V2",
       "V3"
     ],
-    "replayCount": 74,
+    "replayCount": 76,
     "parseErrors": 0
   },
   "warnings": [],
   "overview": {
-    "matchCount": 74,
-    "completedCount": 71,
+    "matchCount": 76,
+    "completedCount": 73,
     "incompleteCount": 3,
     "parseErrorCount": 0,
     "playerCountDist": {
-      "2": 67,
+      "2": 69,
       "3": 4,
       "4": 1,
       "6": 2
@@ -23,8 +23,8 @@
     "reasonDist": {
       "headquarters_destroyed": 16,
       "incomplete": 3,
-      "turn_limit_score": 33,
-      "last_player_standing": 19,
+      "turn_limit_score": 34,
+      "last_player_standing": 20,
       "forced_adjudication_score": 3
     },
     "mapDist": {
@@ -34,11 +34,16 @@
       "multiplayer-ring": 6,
       "forge": 8,
       "danger-close": 16,
-      "four-corners": 1
+      "four-corners": 1,
+      "artillery-zone": 2
+    },
+    "modeDist": {
+      "standard": 74,
+      "annihilation": 2
     },
     "versionDist": {
       "V2": 30,
-      "V3": 44
+      "V3": 46
     },
     "schemaDist": {
       "2.0.0": 14,
@@ -64,12 +69,13 @@
       "3.1.8": 2,
       "3.1.9": 1,
       "3.2.1": 6,
-      "3.2.7": 7
+      "3.2.7": 7,
+      "3.2.9": 2
     },
-    "totalEvents": 18882,
-    "avgRounds": 7.41,
+    "totalEvents": 19352,
+    "avgRounds": 7.51,
     "dateMin": "20260614",
-    "dateMax": "20260805"
+    "dateMax": "20260807"
   },
   "modelLeaderboard": [
     {
@@ -125,34 +131,80 @@
     },
     {
       "rank": 2,
-      "model": "glm5.2",
-      "games": 12,
-      "wins": 9,
-      "losses": 3,
+      "model": "kimik3",
+      "games": 3,
+      "wins": 3,
+      "losses": 0,
       "draws": 0,
-      "top3": 12,
-      "winRate": 0.75,
+      "top3": 3,
+      "winRate": 1,
       "top3Rate": 1,
-      "avgRank": 1.25,
-      "avgScore": 1312.1,
-      "avgHqDamage": 20.4,
-      "rating": 0.4677,
+      "avgRank": 1,
+      "avgScore": 1734.3,
+      "avgHqDamage": 40,
+      "rating": 0.4385,
+      "agents": {
+        "WB": 3
+      },
+      "maps": {
+        "danger-close": 1,
+        "breach": 1,
+        "artillery-zone": 1
+      },
+      "versions": {
+        "V3": 3
+      },
+      "vs": {
+        "Qwen3.8MaxPreview": {
+          "games": 1,
+          "wins": 1
+        },
+        "grok4.5": {
+          "games": 1,
+          "wins": 1
+        },
+        "glm5.2": {
+          "games": 1,
+          "wins": 1
+        }
+      },
+      "recent": [
+        "tg_0040",
+        "tg_0059",
+        "tg_0076"
+      ]
+    },
+    {
+      "rank": 3,
+      "model": "glm5.2",
+      "games": 13,
+      "wins": 9,
+      "losses": 4,
+      "draws": 0,
+      "top3": 13,
+      "winRate": 0.6923,
+      "top3Rate": 1,
+      "avgRank": 1.31,
+      "avgScore": 1253.9,
+      "avgHqDamage": 17.9,
+      "rating": 0.4237,
       "agents": {
         "ZC": 2,
         "SCRIPT": 3,
         "WB": 4,
         "PI": 2,
-        "OMP": 1
+        "OMP": 2
       },
       "maps": {
         "default": 5,
         "danger-close": 2,
         "forge": 4,
-        "four-corners": 1
+        "four-corners": 1,
+        "artillery-zone": 1
       },
       "versions": {
         "V2": 5,
-        "V3": 7
+        "V3": 8
       },
       "vs": {
         "minimaxm3": {
@@ -190,56 +242,21 @@
         "dsv4flash0731": {
           "games": 1,
           "wins": 1
+        },
+        "kimik3": {
+          "games": 1,
+          "wins": 0
         }
       },
       "recent": [
-        "tg_0010",
         "tg_0038",
         "tg_0041",
         "tg_0043",
         "tg_0049",
         "tg_0057",
         "tg_0061",
-        "tg_0070"
-      ]
-    },
-    {
-      "rank": 3,
-      "model": "kimik3",
-      "games": 2,
-      "wins": 2,
-      "losses": 0,
-      "draws": 0,
-      "top3": 2,
-      "winRate": 1,
-      "top3Rate": 1,
-      "avgRank": 1,
-      "avgScore": 2096.5,
-      "avgHqDamage": 60,
-      "rating": 0.3424,
-      "agents": {
-        "WB": 2
-      },
-      "maps": {
-        "danger-close": 1,
-        "breach": 1
-      },
-      "versions": {
-        "V3": 2
-      },
-      "vs": {
-        "Qwen3.8MaxPreview": {
-          "games": 1,
-          "wins": 1
-        },
-        "grok4.5": {
-          "games": 1,
-          "wins": 1
-        }
-      },
-      "recent": [
-        "tg_0040",
-        "tg_0059"
+        "tg_0070",
+        "tg_0076"
       ]
     },
     {
@@ -858,31 +875,32 @@
     {
       "rank": 13,
       "model": "minimaxm3",
-      "games": 10,
+      "games": 11,
       "wins": 4,
-      "losses": 5,
+      "losses": 6,
       "draws": 1,
-      "top3": 9,
-      "winRate": 0.4,
-      "top3Rate": 0.9,
+      "top3": 10,
+      "winRate": 0.3636,
+      "top3Rate": 0.9091,
       "avgRank": 2,
-      "avgScore": 1818.1,
-      "avgHqDamage": 62.5,
-      "rating": 0.1682,
+      "avgScore": 1642.8,
+      "avgHqDamage": 55.6,
+      "rating": 0.1517,
       "agents": {
         "CC": 2,
-        "OMP": 5,
+        "OMP": 6,
         "PI": 3
       },
       "maps": {
         "default": 3,
         "multiplayer-ring": 2,
         "danger-close": 3,
-        "breach": 2
+        "breach": 2,
+        "artillery-zone": 1
       },
       "versions": {
         "V2": 3,
-        "V3": 7
+        "V3": 8
       },
       "vs": {
         "glm5.2": {
@@ -914,7 +932,7 @@
           "wins": 1
         },
         "dsv4flash0731": {
-          "games": 1,
+          "games": 2,
           "wins": 0
         },
         "gpt5.6luna": {
@@ -927,14 +945,14 @@
         }
       },
       "recent": [
-        "tg_0022",
         "tg_0032",
         "tg_0037",
         "tg_0044",
         "tg_0047",
         "tg_0048",
         "tg_0065",
-        "tg_0074"
+        "tg_0074",
+        "tg_0075"
       ]
     },
     {
@@ -1074,6 +1092,89 @@
     },
     {
       "rank": 16,
+      "model": "dsv4flash0731",
+      "games": 8,
+      "wins": 2,
+      "losses": 6,
+      "draws": 0,
+      "top3": 8,
+      "winRate": 0.25,
+      "top3Rate": 1,
+      "avgRank": 1.75,
+      "avgScore": 1459,
+      "avgHqDamage": 16.4,
+      "rating": 0.0715,
+      "agents": {
+        "OMP": 5,
+        "PI": 2,
+        "CC": 1
+      },
+      "maps": {
+        "danger-close": 1,
+        "dual-lanes": 3,
+        "forge": 1,
+        "breach": 1,
+        "multiplayer-ring": 1,
+        "artillery-zone": 1
+      },
+      "versions": {
+        "V3": 8
+      },
+      "vs": {
+        "hy3": {
+          "games": 2,
+          "wins": 1
+        },
+        "DeepseekV4FlashPreview": {
+          "games": 1,
+          "wins": 0
+        },
+        "glm5.2": {
+          "games": 1,
+          "wins": 0
+        },
+        "longcat2.0": {
+          "games": 1,
+          "wins": 0
+        },
+        "grok4.5": {
+          "games": 1,
+          "wins": 0
+        },
+        "gpt5.6sol": {
+          "games": 1,
+          "wins": 0
+        },
+        "minimaxm3": {
+          "games": 2,
+          "wins": 2
+        },
+        "step3.7flash": {
+          "games": 1,
+          "wins": 1
+        },
+        "gpt5.6luna": {
+          "games": 1,
+          "wins": 1
+        },
+        "doubaoseed2.1pro": {
+          "games": 1,
+          "wins": 1
+        }
+      },
+      "recent": [
+        "tg_0068",
+        "tg_0069",
+        "tg_0070",
+        "tg_0071",
+        "tg_0072",
+        "tg_0073",
+        "tg_0074",
+        "tg_0075"
+      ]
+    },
+    {
+      "rank": 17,
       "model": "qwen3.6v35b",
       "games": 3,
       "wins": 1,
@@ -1116,7 +1217,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "model": "sensenova6.7fl",
       "games": 3,
       "wins": 1,
@@ -1162,7 +1263,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "model": "glm5.1",
       "games": 4,
       "wins": 1,
@@ -1215,7 +1316,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "model": "agnes2.0flash",
       "games": 4,
       "wins": 1,
@@ -1263,7 +1364,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "model": "Qwen3.8MaxPreview",
       "games": 7,
       "wins": 1,
@@ -1343,87 +1444,6 @@
         "tg_0046",
         "tg_0047",
         "tg_0062"
-      ]
-    },
-    {
-      "rank": 21,
-      "model": "dsv4flash0731",
-      "games": 7,
-      "wins": 1,
-      "losses": 6,
-      "draws": 0,
-      "top3": 7,
-      "winRate": 0.1429,
-      "top3Rate": 1,
-      "avgRank": 1.86,
-      "avgScore": 1467.1,
-      "avgHqDamage": 18.7,
-      "rating": 0.0257,
-      "agents": {
-        "OMP": 4,
-        "PI": 2,
-        "CC": 1
-      },
-      "maps": {
-        "danger-close": 1,
-        "dual-lanes": 3,
-        "forge": 1,
-        "breach": 1,
-        "multiplayer-ring": 1
-      },
-      "versions": {
-        "V3": 7
-      },
-      "vs": {
-        "hy3": {
-          "games": 2,
-          "wins": 1
-        },
-        "DeepseekV4FlashPreview": {
-          "games": 1,
-          "wins": 0
-        },
-        "glm5.2": {
-          "games": 1,
-          "wins": 0
-        },
-        "longcat2.0": {
-          "games": 1,
-          "wins": 0
-        },
-        "grok4.5": {
-          "games": 1,
-          "wins": 0
-        },
-        "gpt5.6sol": {
-          "games": 1,
-          "wins": 0
-        },
-        "minimaxm3": {
-          "games": 1,
-          "wins": 1
-        },
-        "step3.7flash": {
-          "games": 1,
-          "wins": 1
-        },
-        "gpt5.6luna": {
-          "games": 1,
-          "wins": 1
-        },
-        "doubaoseed2.1pro": {
-          "games": 1,
-          "wins": 1
-        }
-      },
-      "recent": [
-        "tg_0068",
-        "tg_0069",
-        "tg_0070",
-        "tg_0071",
-        "tg_0072",
-        "tg_0073",
-        "tg_0074"
       ]
     },
     {
@@ -1690,12 +1710,12 @@
     },
     {
       "agent": "OMP",
-      "games": 47,
-      "wins": 18,
-      "winRate": 0.383,
+      "games": 50,
+      "wins": 19,
+      "winRate": 0.38,
       "models": {
         "mimo2.5pro": 3,
-        "minimaxm3": 5,
+        "minimaxm3": 6,
         "glm5.1": 3,
         "agnes2.0flash": 3,
         "longcat2.0": 6,
@@ -1706,21 +1726,21 @@
         "doubaoseed2.1pro": 3,
         "ring2.6": 1,
         "qwen3.7max": 3,
-        "dsv4flash0731": 4,
-        "glm5.2": 1,
+        "dsv4flash0731": 5,
+        "glm5.2": 2,
         "gpt5.6luna": 1
       }
     },
     {
       "agent": "WB",
-      "games": 23,
-      "wins": 15,
-      "winRate": 0.6522,
+      "games": 24,
+      "wins": 16,
+      "winRate": 0.6667,
       "models": {
         "DeepseekV4ProPreview": 3,
         "hy3": 14,
         "glm5.2": 4,
-        "kimik3": 2
+        "kimik3": 3
       }
     },
     {
@@ -1860,6 +1880,18 @@
       "avgRounds": 15.5
     },
     {
+      "mapId": "artillery-zone",
+      "games": 2,
+      "reasons": {
+        "last_player_standing": 1,
+        "turn_limit_score": 1
+      },
+      "playerCounts": {
+        "2": 2
+      },
+      "avgRounds": 11.5
+    },
+    {
       "mapId": "four-corners",
       "games": 1,
       "reasons": {
@@ -1873,12 +1905,105 @@
   ],
   "matches": [
     {
+      "recordId": "tg_0076",
+      "version": "V3",
+      "date": "20260807",
+      "fileName": "tg_0076_20260807.json",
+      "gameId": "122faef3-68aa-4721-affa-6316fb41fb04",
+      "mapId": "artillery-zone",
+      "mode": "annihilation",
+      "schemaVersion": "3.2.9",
+      "playerCount": 2,
+      "winner": "player_a",
+      "reason": "turn_limit_score",
+      "completed": true,
+      "eventCount": 250,
+      "rounds": 12,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "KimiK3-WB",
+          "model": "kimik3",
+          "agent": "WB",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 1010,
+          "headquartersDamage": 0,
+          "artilleryDamage": 225
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "GLM5.2-OMP",
+          "model": "glm5.2",
+          "agent": "OMP",
+          "rank": 2,
+          "isWinner": false,
+          "status": "active",
+          "scoreTotal": 846,
+          "headquartersDamage": 0,
+          "artilleryDamage": 50
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
+    {
+      "recordId": "tg_0075",
+      "version": "V3",
+      "date": "20260806",
+      "fileName": "tg_0075_20260806.json",
+      "gameId": "06ecd993-200e-43ac-9ab4-906acb3ff017",
+      "mapId": "artillery-zone",
+      "mode": "annihilation",
+      "schemaVersion": "3.2.9",
+      "playerCount": 2,
+      "winner": "player_a",
+      "reason": "last_player_standing",
+      "completed": true,
+      "eventCount": 220,
+      "rounds": 11,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "Dsv4Flash0731-OMP",
+          "model": "dsv4flash0731",
+          "agent": "OMP",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 1402,
+          "headquartersDamage": 0,
+          "artilleryDamage": 175
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "MiniMaxM3-OMP",
+          "model": "minimaxm3",
+          "agent": "OMP",
+          "rank": 2,
+          "isWinner": false,
+          "status": "eliminated",
+          "scoreTotal": 240,
+          "headquartersDamage": 0,
+          "artilleryDamage": 100
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
+    {
       "recordId": "tg_0074",
       "version": "V3",
       "date": "20260805",
       "fileName": "tg_0074_20260805.json",
       "gameId": "60a24325-295e-4572-9188-6c3aa805f366",
       "mapId": "multiplayer-ring",
+      "mode": "standard",
       "schemaVersion": "3.2.7",
       "playerCount": 6,
       "winner": "player_b",
@@ -1896,7 +2021,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 564,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -1907,7 +2033,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 595,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_c",
@@ -1918,7 +2045,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 373,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_d",
@@ -1929,7 +2057,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 474,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_e",
@@ -1940,7 +2069,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 493,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_f",
@@ -1951,7 +2081,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 529,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -1966,6 +2097,7 @@
       "fileName": "tg_0073_20260804.json",
       "gameId": "08d8a51a-36b0-418a-988b-14a0ca1c194d",
       "mapId": "dual-lanes",
+      "mode": "standard",
       "schemaVersion": "3.2.7",
       "playerCount": 2,
       "winner": "player_a",
@@ -1983,7 +2115,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2686,
-          "headquartersDamage": 67
+          "headquartersDamage": 67,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -1994,7 +2127,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 929,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2009,6 +2143,7 @@
       "fileName": "tg_0072_20260804.json",
       "gameId": "78ddc7ca-ac61-4228-98c1-ce0c34553473",
       "mapId": "dual-lanes",
+      "mode": "standard",
       "schemaVersion": "3.2.7",
       "playerCount": 2,
       "winner": "player_a",
@@ -2026,7 +2161,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1904,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2037,7 +2173,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1392,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2052,6 +2189,7 @@
       "fileName": "tg_0071_20260804.json",
       "gameId": "0e6c52ab-f3ae-4361-bb2b-48b38b3e3a55",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "3.2.7",
       "playerCount": 2,
       "winner": "player_a",
@@ -2069,7 +2207,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1560,
-          "headquartersDamage": 100
+          "headquartersDamage": 100,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2080,7 +2219,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 1708,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2095,6 +2235,7 @@
       "fileName": "tg_0070_20260803.json",
       "gameId": "34b06ac0-06f3-4e68-8dfa-c246b30b9152",
       "mapId": "forge",
+      "mode": "standard",
       "schemaVersion": "3.2.7",
       "playerCount": 2,
       "winner": "player_b",
@@ -2112,7 +2253,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1267,
-          "headquartersDamage": 11
+          "headquartersDamage": 11,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2123,7 +2265,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1494,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2138,6 +2281,7 @@
       "fileName": "tg_0069_20260803.json",
       "gameId": "e6dd75c8-837e-40bd-80c4-db02f0e23246",
       "mapId": "dual-lanes",
+      "mode": "standard",
       "schemaVersion": "3.2.7",
       "playerCount": 2,
       "winner": "player_a",
@@ -2155,7 +2299,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 1755,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2166,7 +2311,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1730,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2181,6 +2327,7 @@
       "fileName": "tg_0068_20260803.json",
       "gameId": "3a64f9ef-4743-4236-86f7-c4ee91e1035b",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.2.7",
       "playerCount": 2,
       "winner": "player_b",
@@ -2198,7 +2345,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 566,
-          "headquartersDamage": 20
+          "headquartersDamage": 20,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2209,7 +2357,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2680,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2224,6 +2373,7 @@
       "fileName": "tg_0067_20260803.json",
       "gameId": "a803c2a9-5f2e-437b-9924-05f2c8bb0630",
       "mapId": "forge",
+      "mode": "standard",
       "schemaVersion": "3.2.1",
       "playerCount": 2,
       "winner": "player_b",
@@ -2241,7 +2391,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 876,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2252,7 +2403,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1505,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2267,6 +2419,7 @@
       "fileName": "tg_0066_20260802.json",
       "gameId": "4b8a1c3b-28ad-460a-9a06-d3052fd2aeb0",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.2.1",
       "playerCount": 2,
       "winner": "player_b",
@@ -2284,7 +2437,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2295,7 +2449,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2626,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2310,6 +2465,7 @@
       "fileName": "tg_0065_20260801.json",
       "gameId": "24f963da-7c46-4893-8041-2e5018e32091",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.2.1",
       "playerCount": 2,
       "winner": "player_b",
@@ -2327,7 +2483,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2338,7 +2495,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2676,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2353,6 +2511,7 @@
       "fileName": "tg_0064_20260731.json",
       "gameId": "f9450efc-3560-4d96-b697-3b6942839a25",
       "mapId": "dual-lanes",
+      "mode": "standard",
       "schemaVersion": "3.2.1",
       "playerCount": 2,
       "winner": "player_b",
@@ -2370,7 +2529,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 620,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2381,7 +2541,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2023,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2396,6 +2557,7 @@
       "fileName": "tg_0063_20260731.json",
       "gameId": "e85ef5e2-aa2d-422a-8092-d963937df3a8",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "3.2.1",
       "playerCount": 2,
       "winner": "player_b",
@@ -2413,7 +2575,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 164,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2424,7 +2587,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2089,
-          "headquartersDamage": 100
+          "headquartersDamage": 100,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2439,6 +2603,7 @@
       "fileName": "tg_0062_20260731.json",
       "gameId": "9d4a1b2a-7a2c-4420-9a37-d10163fec0f7",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.2.1",
       "playerCount": 2,
       "winner": "player_b",
@@ -2456,7 +2621,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2467,7 +2633,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2643,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2482,6 +2649,7 @@
       "fileName": "tg_0061_20260730.json",
       "gameId": "b02d971b-2192-4186-9c1e-23d55c9c0d1c",
       "mapId": "four-corners",
+      "mode": "standard",
       "schemaVersion": "3.1.9",
       "playerCount": 4,
       "winner": "player_c",
@@ -2499,7 +2667,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 927,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2510,7 +2679,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 876,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_c",
@@ -2521,7 +2691,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1082,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_d",
@@ -2532,7 +2703,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 910,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2547,6 +2719,7 @@
       "fileName": "tg_0060_20260729.json",
       "gameId": "1eb1b00f-d615-4837-ac8d-ba7e539c3b66",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.8",
       "playerCount": 2,
       "winner": "player_b",
@@ -2564,7 +2737,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 185,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2575,7 +2749,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1940,
-          "headquartersDamage": 91
+          "headquartersDamage": 91,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2590,6 +2765,7 @@
       "fileName": "tg_0059_20260729.json",
       "gameId": "82255f50-5cd4-4013-88bb-724e544109f9",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "3.1.8",
       "playerCount": 2,
       "winner": "player_b",
@@ -2607,7 +2783,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 827,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2618,7 +2795,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1585,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2633,6 +2811,7 @@
       "fileName": "tg_0058_20260729.json",
       "gameId": "cac0298b-4875-485e-ab5a-afeb6c4fb042",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "3.1.6",
       "playerCount": 2,
       "winner": "player_a",
@@ -2650,7 +2829,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2288,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2661,7 +2841,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1406,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2676,6 +2857,7 @@
       "fileName": "tg_0057_20260728.json",
       "gameId": "b6ac1cc5-8c2c-4c0b-b00d-36b115033dc8",
       "mapId": "forge",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_a",
@@ -2693,7 +2875,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1445,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2704,7 +2887,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1413,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2719,6 +2903,7 @@
       "fileName": "tg_0056_20260728.json",
       "gameId": "31decc44-27c0-41ed-96d1-47600d5b6e07",
       "mapId": "forge",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_a",
@@ -2736,7 +2921,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2258,
-          "headquartersDamage": 100
+          "headquartersDamage": 100,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2747,7 +2933,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 302,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2762,6 +2949,7 @@
       "fileName": "tg_0055_20260728.json",
       "gameId": "05a75e2d-d0e4-49fb-b74f-b5a7ffcf0cb0",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_a",
@@ -2779,7 +2967,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1676,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2790,7 +2979,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1174,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2805,6 +2995,7 @@
       "fileName": "tg_0054_20260728.json",
       "gameId": "11d10ed0-fa1e-4740-86c9-675d70e3fbc4",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_a",
@@ -2822,7 +3013,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2642,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2833,7 +3025,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 680,
-          "headquartersDamage": 34
+          "headquartersDamage": 34,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2848,6 +3041,7 @@
       "fileName": "tg_0053_20260727.json",
       "gameId": "4d580f9f-ebbd-491f-99a7-b5efa1e467ba",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_a",
@@ -2865,7 +3059,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2632,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2876,7 +3071,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2891,6 +3087,7 @@
       "fileName": "tg_0052_20260727.json",
       "gameId": "28c25c57-a66d-40fa-833c-d43019ffc353",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_b",
@@ -2908,7 +3105,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2919,7 +3117,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2666,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2934,6 +3133,7 @@
       "fileName": "tg_0051_20260727.json",
       "gameId": null,
       "mapId": "forge",
+      "mode": "standard",
       "schemaVersion": "unknown",
       "playerCount": 2,
       "winner": "player_b",
@@ -2951,7 +3151,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 751,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -2962,7 +3163,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1132,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -2977,6 +3179,7 @@
       "fileName": "tg_0050_20260727.json",
       "gameId": "1a108c73-1cbf-41af-b26c-b287b26b9f03",
       "mapId": "dual-lanes",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_a",
@@ -2994,7 +3197,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1606,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3005,7 +3209,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1198,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3020,6 +3225,7 @@
       "fileName": "tg_0049_20260727.json",
       "gameId": "07692929-72ea-4eee-bacb-a95addd25665",
       "mapId": "forge",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_b",
@@ -3037,7 +3243,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 921,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3048,7 +3255,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1853,
-          "headquartersDamage": 34
+          "headquartersDamage": 34,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3063,6 +3271,7 @@
       "fileName": "tg_0048_20260726.json",
       "gameId": "6c4f4281-7694-4cfd-be53-ef8c54588591",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_a",
@@ -3080,7 +3289,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1843,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3091,7 +3301,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1819,
-          "headquartersDamage": 40
+          "headquartersDamage": 40,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3106,6 +3317,7 @@
       "fileName": "tg_0047_20260725.json",
       "gameId": "fffe14f5-766b-42af-b496-6bfda55b87db",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 2,
       "winner": "player_b",
@@ -3123,7 +3335,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 82,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3134,7 +3347,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1919,
-          "headquartersDamage": 100
+          "headquartersDamage": 100,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3149,6 +3363,7 @@
       "fileName": "tg_0046_20260725.json",
       "gameId": "cb3dbc5a-4d89-4c9f-903f-11c14e761a80",
       "mapId": "multiplayer-ring",
+      "mode": "standard",
       "schemaVersion": "3.1.5",
       "playerCount": 3,
       "winner": "player_c",
@@ -3166,7 +3381,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 492,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3177,7 +3393,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 467,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_c",
@@ -3188,7 +3405,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 782,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3203,6 +3421,7 @@
       "fileName": "tg_0045_20260724.json",
       "gameId": "09feb3a1-4ea9-427b-8bdf-202e1e2ea923",
       "mapId": "dual-lanes",
+      "mode": "standard",
       "schemaVersion": "3.1.4",
       "playerCount": 2,
       "winner": "player_b",
@@ -3220,7 +3439,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1213,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3231,7 +3451,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1591,
-          "headquartersDamage": 76
+          "headquartersDamage": 76,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3246,6 +3467,7 @@
       "fileName": "tg_0044_20260724.json",
       "gameId": "1202b478-e79a-4e10-b9fc-1e47748bef10",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.4",
       "playerCount": 2,
       "winner": "player_a",
@@ -3263,7 +3485,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2676,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3274,7 +3497,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3289,6 +3513,7 @@
       "fileName": "tg_0043_20260724.json",
       "gameId": "435cebe6-73d5-44fe-ae59-36869338eef7",
       "mapId": "forge",
+      "mode": "standard",
       "schemaVersion": "3.1.3",
       "playerCount": 2,
       "winner": "player_b",
@@ -3306,7 +3531,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1217,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3317,7 +3543,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1298,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3332,6 +3559,7 @@
       "fileName": "tg_0042_20260723.json",
       "gameId": "2b5dd5c0-9443-4cc5-b8af-92cd46b9e7ef",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.3",
       "playerCount": 2,
       "winner": "player_b",
@@ -3349,7 +3577,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3360,7 +3589,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2526,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3375,6 +3605,7 @@
       "fileName": "tg_0041_20260723.json",
       "gameId": "834716f7-5dca-43dc-8f9a-f92d94b00c6a",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.3",
       "playerCount": 2,
       "winner": "player_b",
@@ -3392,7 +3623,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3403,7 +3635,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2640,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3418,6 +3651,7 @@
       "fileName": "tg_0040_20260723.json",
       "gameId": "553381d3-2df3-4f21-a9ea-42c1d3d8ee35",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.3",
       "playerCount": 2,
       "winner": "player_a",
@@ -3435,7 +3669,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2608,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3446,7 +3681,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3461,6 +3697,7 @@
       "fileName": "tg_0039_20260722.json",
       "gameId": "90582da3-e6ba-4a35-b7f5-23c9ff9ad343",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.3",
       "playerCount": 2,
       "winner": "player_b",
@@ -3478,7 +3715,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 0,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3489,7 +3727,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2864,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3504,6 +3743,7 @@
       "fileName": "tg_0038_20260722.json",
       "gameId": "eb43c562-2fe2-4be0-9646-cea86723f89c",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.3",
       "playerCount": 2,
       "winner": "player_b",
@@ -3521,7 +3761,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 460,
-          "headquartersDamage": 23
+          "headquartersDamage": 23,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3532,7 +3773,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2653,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3547,6 +3789,7 @@
       "fileName": "tg_0037_20260721.json",
       "gameId": "9916d1c8-b410-4393-964a-5534c650936c",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.3",
       "playerCount": 2,
       "winner": "player_b",
@@ -3564,7 +3807,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 580,
-          "headquartersDamage": 29
+          "headquartersDamage": 29,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3575,7 +3819,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2697,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3590,6 +3835,7 @@
       "fileName": "tg_0036_20260721.json",
       "gameId": "bbb4c11a-2a8c-45ed-a264-8ee64dd57f89",
       "mapId": "danger-close",
+      "mode": "standard",
       "schemaVersion": "3.1.3",
       "playerCount": 2,
       "winner": "player_b",
@@ -3607,7 +3853,8 @@
           "isWinner": false,
           "status": "eliminated",
           "scoreTotal": 2140,
-          "headquartersDamage": 107
+          "headquartersDamage": 107,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3618,7 +3865,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2569,
-          "headquartersDamage": 120
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3633,6 +3881,7 @@
       "fileName": "tg_0035_20260721.json",
       "gameId": "d42383c9-11a8-44f4-b191-214e59dec481",
       "mapId": "forge",
+      "mode": "standard",
       "schemaVersion": "3.1.2",
       "playerCount": 2,
       "winner": "player_b",
@@ -3650,7 +3899,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1138,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3661,7 +3911,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 1317,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3676,6 +3927,7 @@
       "fileName": "tg_0034_20260720.json",
       "gameId": "2994b6bc-e0ad-4995-8290-9a46362d3d86",
       "mapId": "multiplayer-ring",
+      "mode": "standard",
       "schemaVersion": "3.1.1",
       "playerCount": 6,
       "winner": "player_f",
@@ -3693,7 +3945,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 397,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3704,7 +3957,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 392,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_c",
@@ -3715,7 +3969,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 308,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_d",
@@ -3726,7 +3981,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 606,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_e",
@@ -3737,7 +3993,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 389,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_f",
@@ -3748,7 +4005,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 621,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3763,6 +4021,7 @@
       "fileName": "tg_0033_20260718.json",
       "gameId": "7161c050-3d16-4862-908e-5598314c44ec",
       "mapId": "multiplayer-ring",
+      "mode": "standard",
       "schemaVersion": "3.1.0",
       "playerCount": 3,
       "winner": "player_a",
@@ -3780,7 +4039,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 835,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3791,7 +4051,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 506,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_c",
@@ -3802,7 +4063,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 822,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3817,6 +4079,7 @@
       "fileName": "tg_0032_20260715.json",
       "gameId": "13df0e82-998f-4585-8668-f2c867cee6ba",
       "mapId": "multiplayer-ring",
+      "mode": "standard",
       "schemaVersion": "3.0.2",
       "playerCount": 3,
       "winner": "player_c",
@@ -3834,7 +4097,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 212,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3845,7 +4109,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 755,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_c",
@@ -3856,7 +4121,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 843,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3871,6 +4137,7 @@
       "fileName": "tg_0031_20260714.json",
       "gameId": "c700eb87-c6c7-4983-953f-f430505055d9",
       "mapId": "multiplayer-ring",
+      "mode": "standard",
       "schemaVersion": "3.0.1",
       "playerCount": 3,
       "winner": "player_c",
@@ -3888,7 +4155,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1404,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3899,7 +4167,8 @@
           "isWinner": false,
           "status": "active",
           "scoreTotal": 1254,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_c",
@@ -3910,7 +4179,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": 2256,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3925,6 +4195,7 @@
       "fileName": "tg_0030_20260708.json",
       "gameId": "2f1f2d80-ad60-4a9f-bba3-a11d38f2b470",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "2.4.2",
       "playerCount": 2,
       "winner": "player_a",
@@ -3942,7 +4213,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3953,7 +4225,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -3968,6 +4241,7 @@
       "fileName": "tg_0029_20260707.json",
       "gameId": "067a8a76-fa6a-4595-b170-2848c730dac7",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "2.4.1",
       "playerCount": 2,
       "winner": "player_a",
@@ -3985,7 +4259,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -3996,7 +4271,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4011,6 +4287,7 @@
       "fileName": "tg_0028_20260707.json",
       "gameId": "07fe6027-552c-495f-b989-5ed67c476c8b",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "2.4.1",
       "playerCount": 2,
       "winner": "player_a",
@@ -4028,7 +4305,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4039,7 +4317,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4054,6 +4333,7 @@
       "fileName": "tg_0027_20260705.json",
       "gameId": "c63ce4f6-190e-42af-b66b-686a08b892f6",
       "mapId": "breach",
+      "mode": "standard",
       "schemaVersion": "2.4.0",
       "playerCount": 2,
       "winner": "player_b",
@@ -4071,7 +4351,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1136,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4082,7 +4363,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 1949,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4097,6 +4379,7 @@
       "fileName": "tg_0026_20260704.json",
       "gameId": "b8e17471-462c-4c16-a5ae-5efff343d87e",
       "mapId": "dual-lanes",
+      "mode": "standard",
       "schemaVersion": "2.3.1",
       "playerCount": 2,
       "winner": "player_a",
@@ -4114,7 +4397,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 2142,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4125,7 +4409,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1119,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4140,6 +4425,7 @@
       "fileName": "tg_0025_20260701.json",
       "gameId": "b798d746-e51d-4bec-9474-92ec28c9c1c8",
       "mapId": "dual-lanes",
+      "mode": "standard",
       "schemaVersion": "2.3.0",
       "playerCount": 2,
       "winner": "player_b",
@@ -4157,7 +4443,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1421,
-          "headquartersDamage": 161
+          "headquartersDamage": 161,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4168,7 +4455,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 1794,
-          "headquartersDamage": 66
+          "headquartersDamage": 66,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4183,6 +4471,7 @@
       "fileName": "tg_0024_20260627.json",
       "gameId": "f0c9f0e0-fed8-4b65-aebb-41e0ba8a2100",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.2.1",
       "playerCount": 2,
       "winner": "player_a",
@@ -4200,7 +4489,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 2284,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4211,7 +4501,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1210,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4226,6 +4517,7 @@
       "fileName": "tg_0023_20260625.json",
       "gameId": "7bab1924-756a-47bc-8dde-ea03721f017d",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.4",
       "playerCount": 2,
       "winner": "player_b",
@@ -4243,7 +4535,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1219,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4254,7 +4547,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 2569,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4269,6 +4563,7 @@
       "fileName": "tg_0022_20260624.json",
       "gameId": "4e0982dc-f38e-49bd-97ce-cc28d7d60a79",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.4",
       "playerCount": 2,
       "winner": "player_a",
@@ -4286,7 +4581,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 1642,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4297,7 +4593,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1630,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4312,6 +4609,7 @@
       "fileName": "tg_0021_20260623.json",
       "gameId": "d9ffa938-3ea0-4203-b82c-479c7c99e107",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.4",
       "playerCount": 2,
       "winner": null,
@@ -4329,7 +4627,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4340,7 +4639,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4355,6 +4655,7 @@
       "fileName": "tg_0020_20260622.json",
       "gameId": "6e1cee28-e468-4478-913a-d1064ec3f1ee",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.4",
       "playerCount": 2,
       "winner": "player_b",
@@ -4372,7 +4673,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1715,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4383,7 +4685,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 1833,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4398,6 +4701,7 @@
       "fileName": "tg_0019_20260621.json",
       "gameId": "112abfa9-5637-46d2-860e-b4b0ff1819fe",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.4",
       "playerCount": 2,
       "winner": "player_b",
@@ -4415,7 +4719,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1685,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4426,7 +4731,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 1731,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4441,6 +4747,7 @@
       "fileName": "tg_0018_20260621.json",
       "gameId": "ba146bde-3358-485b-bbb4-bb1027abf335",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.4",
       "playerCount": 2,
       "winner": "player_b",
@@ -4458,7 +4765,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4469,7 +4777,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4484,6 +4793,7 @@
       "fileName": "tg_0017_20260621.json",
       "gameId": "8e842a74-41a5-4063-8775-eb5275c122ed",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.3",
       "playerCount": 2,
       "winner": "player_b",
@@ -4501,7 +4811,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 767,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4512,7 +4823,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 2499,
-          "headquartersDamage": 57
+          "headquartersDamage": 57,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4527,6 +4839,7 @@
       "fileName": "tg_0016_20260621.json",
       "gameId": "42a6bd57-4862-47ad-a251-a33888117521",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.3",
       "playerCount": 2,
       "winner": "player_a",
@@ -4544,7 +4857,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 2264,
-          "headquartersDamage": 23
+          "headquartersDamage": 23,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4555,7 +4869,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1112,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4570,6 +4885,7 @@
       "fileName": "tg_0015_20260619.json",
       "gameId": "ebb2e82a-3fdc-4f74-8505-69acf488d384",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.1.0",
       "playerCount": 2,
       "winner": "player_a",
@@ -4587,7 +4903,8 @@
           "isWinner": true,
           "status": null,
           "scoreTotal": 2253,
-          "headquartersDamage": 139
+          "headquartersDamage": 139,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4598,7 +4915,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": 1162,
-          "headquartersDamage": 0
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4613,6 +4931,7 @@
       "fileName": "tg_0014_20260619.json",
       "gameId": "a79e7d7a-aa30-413b-bbf8-783cffc60b76",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": null,
@@ -4630,7 +4949,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4641,7 +4961,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4656,6 +4977,7 @@
       "fileName": "tg_0013_20260618.json",
       "gameId": "03bf0be9-8ab9-42fd-a558-77834c8df7a9",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": null,
@@ -4673,7 +4995,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4684,7 +5007,8 @@
           "isWinner": false,
           "status": null,
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4699,6 +5023,7 @@
       "fileName": "tg_0012_20260618.json",
       "gameId": "e02c9680-522c-4523-8966-96c2d8a3ca2c",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_a",
@@ -4716,7 +5041,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4727,7 +5053,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4742,6 +5069,7 @@
       "fileName": "tg_0011_20260616.json",
       "gameId": "9fbf3bc1-b0e8-4504-a24d-11e08cb5b0da",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_b",
@@ -4759,7 +5087,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4770,7 +5099,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4785,6 +5115,7 @@
       "fileName": "tg_0010_20260615.json",
       "gameId": "5a7e1c78-8a16-4c12-a055-b133b3942918",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_a",
@@ -4802,7 +5133,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4813,7 +5145,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4828,6 +5161,7 @@
       "fileName": "tg_0009_20260615.json",
       "gameId": "8d3e6f3a-740e-4f6e-8bee-745940498be6",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_b",
@@ -4845,7 +5179,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4856,7 +5191,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4871,6 +5207,7 @@
       "fileName": "tg_0008_20260615.json",
       "gameId": "e5bac326-7460-4d0a-9121-bfe725e95699",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_a",
@@ -4888,7 +5225,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4899,7 +5237,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4914,6 +5253,7 @@
       "fileName": "tg_0007_20260615.json",
       "gameId": "bca5b803-61b9-4777-b4b3-6d4e24ded03d",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_b",
@@ -4931,7 +5271,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4942,7 +5283,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -4957,6 +5299,7 @@
       "fileName": "tg_0006_20260615.json",
       "gameId": "053a4378-9d85-4345-a96e-94bad4ff74e4",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_a",
@@ -4974,7 +5317,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -4985,7 +5329,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -5000,6 +5345,7 @@
       "fileName": "tg_0005_20260615.json",
       "gameId": null,
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_a",
@@ -5017,7 +5363,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -5028,7 +5375,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -5043,6 +5391,7 @@
       "fileName": "tg_0004_20260615.json",
       "gameId": null,
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_b",
@@ -5060,7 +5409,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -5071,7 +5421,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -5086,6 +5437,7 @@
       "fileName": "tg_0003_20260615.json",
       "gameId": "ceed14cc-320c-4217-9b50-a23885467743",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_a",
@@ -5103,7 +5455,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -5114,7 +5467,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -5129,6 +5483,7 @@
       "fileName": "tg_0002_20260614.json",
       "gameId": "99d7cfb4-58e6-45e2-9d38-fdda63ee65bc",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_b",
@@ -5146,7 +5501,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -5157,7 +5513,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {
@@ -5172,6 +5529,7 @@
       "fileName": "tg_0001_20260614.json",
       "gameId": "00d0614a-1832-4a26-acbe-3cce11edd351",
       "mapId": "default",
+      "mode": "standard",
       "schemaVersion": "2.0.0",
       "playerCount": 2,
       "winner": "player_a",
@@ -5189,7 +5547,8 @@
           "isWinner": true,
           "status": "active",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         },
         {
           "playerId": "player_b",
@@ -5200,7 +5559,8 @@
           "isWinner": false,
           "status": "unknown",
           "scoreTotal": null,
-          "headquartersDamage": null
+          "headquartersDamage": null,
+          "artilleryDamage": 0
         }
       ],
       "reviewFlags": {

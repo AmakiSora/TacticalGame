@@ -6,6 +6,10 @@
   <title>TacticalGame — 统计看板</title>
   <link rel="stylesheet" href="/stats.css" />
   <link rel="stylesheet" href="/mobile-icons.css" />
+  <style>
+    .mode-anni { background: #c0392b; color: #fff; }
+    .mode-std { background: #2980b9; color: #fff; }
+  </style>
   <script src="/version.js" defer></script>
   <script src="/stats.js" defer></script>
 </head>
@@ -73,6 +77,12 @@
         <label>
           <span>人数</span>
           <select id="filter-players">
+            <option value="">全部</option>
+          </select>
+        </label>
+        <label>
+          <span>模式</span>
+          <select id="filter-mode">
             <option value="">全部</option>
           </select>
         </label>
@@ -194,6 +204,7 @@
             <option value="date">日期</option>
             <option value="recordId">对局编号</option>
             <option value="mapId">地图</option>
+            <option value="mode">模式</option>
             <option value="playerCount">人数</option>
             <option value="rounds">整轮</option>
             <option value="reason">结束原因</option>
@@ -209,6 +220,7 @@
               <th data-msort="date">日期</th>
               <th data-msort="version">版本</th>
               <th data-msort="mapId">地图</th>
+              <th data-msort="mode">模式</th>
               <th data-msort="playerCount" class="num">人数</th>
               <th>参赛模型</th>
               <th>胜者</th>

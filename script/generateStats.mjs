@@ -178,6 +178,8 @@ export function emptyEventStats() {
     deployCost: 0,
     comebackSupply: 0,
     deploysByType: {},
+    artilleryDamage: 0,
+    artilleryHits: 0,
   };
 }
 
@@ -220,6 +222,10 @@ export function tallyEvent(stats, type, payload) {
       break;
     case 'turn_end':
       stats.turns += 1;
+      break;
+    case 'artillery_damage':
+      stats.artilleryHits += 1;
+      stats.artilleryDamage += num(payload?.damage) ?? 0;
       break;
     default:
       break;
@@ -276,6 +282,8 @@ export function extractMatch(filePath, version, fileName, reviewsByRecord) {
     gs.mapId ||
     gs.map?.id ||
     null;
+
+  const mode = gs.mode || gs.map?.mode || 'standard';
 
   const playerNames = {
     ...(gs.playerNames || {}),
@@ -486,6 +494,8 @@ export function extractMatch(filePath, version, fileName, reviewsByRecord) {
       tallyEvent(perSeatEvents[payload.owner], type, payload);
     } else if (type === 'unit_death' && payload.owner && perSeatEvents[payload.owner]) {
       tallyEvent(perSeatEvents[payload.owner], type, payload);
+    } else if (type === 'artillery_damage' && payload.owner && perSeatEvents[payload.owner]) {
+      tallyEvent(perSeatEvents[payload.owner], type, payload);
     }
 
     if (type === 'headquarters_destroyed') hqKills += 1;
@@ -521,6 +531,7 @@ export function extractMatch(filePath, version, fileName, reviewsByRecord) {
     filePath: filePath.replace(/\\/g, '/'),
     gameId,
     mapId: mapId || 'unknown',
+    mode,
     schemaVersion,
     exportedAt,
     playerCount,
@@ -584,6 +595,7 @@ export function aggregate(matches) {
     playerCountDist: {},
     reasonDist: {},
     mapDist: {},
+    modeDist: {},
     versionDist: {},
     schemaDist: {},
     totalEvents: 0,
@@ -612,6 +624,7 @@ export function aggregate(matches) {
       (overview.playerCountDist[match.playerCount] || 0) + 1;
     overview.reasonDist[match.reason] = (overview.reasonDist[match.reason] || 0) + 1;
     overview.mapDist[match.mapId] = (overview.mapDist[match.mapId] || 0) + 1;
+    overview.modeDist[match.mode] = (overview.modeDist[match.mode] || 0) + 1;
     overview.versionDist[match.version] = (overview.versionDist[match.version] || 0) + 1;
     overview.schemaDist[match.schemaVersion] =
       (overview.schemaDist[match.schemaVersion] || 0) + 1;
@@ -773,6 +786,7 @@ export function aggregate(matches) {
       fileName: m.fileName,
       gameId: m.gameId,
       mapId: m.mapId,
+      mode: m.mode,
       schemaVersion: m.schemaVersion,
       playerCount: m.playerCount,
       winner: m.winner,
@@ -790,6 +804,7 @@ export function aggregate(matches) {
         status: p.status,
         scoreTotal: p.score?.total ?? null,
         headquartersDamage: p.score?.headquartersDamage ?? null,
+        artilleryDamage: p.events?.artilleryDamage ?? null,
       })),
       reviewFlags: m.reviewFlags,
     }));

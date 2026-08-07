@@ -12,6 +12,7 @@
     filterVersion: document.getElementById('filter-version'),
     filterMap: document.getElementById('filter-map'),
     filterPlayers: document.getElementById('filter-players'),
+    filterMode: document.getElementById('filter-mode'),
     filterModel: document.getElementById('filter-model'),
     filterSearch: document.getElementById('filter-search'),
     btnReset: document.getElementById('btn-reset-filters'),
@@ -44,8 +45,17 @@
     forced_adjudication_score: '强制裁决',
     forced_adjudication_draw: '强制裁决平局',
     headquarters_destroyed: '摧毁总部',
+    mutual_annihilation: '同归于尽',
+    army_destroyed: '全军覆没',
+    artillery_destroyed: '炮火歼灭',
+    host_eliminated: '主机淘汰',
     incomplete: '未完赛',
     unknown: '未知',
+  };
+
+  const MODE_LABELS = {
+    standard: '标准',
+    annihilation: '歼灭',
   };
 
   function pct(n) {
@@ -94,6 +104,7 @@
       version: el.filterVersion.value,
       map: el.filterMap.value,
       players: el.filterPlayers.value,
+      mode: el.filterMode.value,
       model: el.filterModel.value,
       search: el.filterSearch.value.trim().toLowerCase(),
     };
@@ -103,6 +114,7 @@
     if (f.version && m.version !== f.version) return false;
     if (f.map && m.mapId !== f.map) return false;
     if (f.players && String(m.playerCount) !== f.players) return false;
+    if (f.mode && m.mode !== f.mode) return false;
     if (f.model) {
       const hit = (m.participants || []).some(p => p.model === f.model);
       if (!hit) return false;
@@ -129,6 +141,7 @@
     const agents = new Map();
     const mapDist = {};
     const reasonDist = {};
+    const modeDist = {};
     let completed = 0;
     let roundsSum = 0;
 
@@ -146,6 +159,8 @@
         scoreCount: 0,
         hqDamageSum: 0,
         hqDamageCount: 0,
+        artilleryDamageSum: 0,
+        artilleryDamageCount: 0,
         agents: {},
         vs: {},
         recent: [],
@@ -155,6 +170,7 @@
     for (const m of matches) {
       mapDist[m.mapId] = (mapDist[m.mapId] || 0) + 1;
       reasonDist[m.reason] = (reasonDist[m.reason] || 0) + 1;
+      modeDist[m.mode] = (modeDist[m.mode] || 0) + 1;
       if (m.completed) completed += 1;
       roundsSum += m.rounds || 0;
 
@@ -187,6 +203,10 @@
           b.hqDamageSum += p.headquartersDamage;
           b.hqDamageCount += 1;
         }
+        if (p.artilleryDamage != null) {
+          b.artilleryDamageSum += p.artilleryDamage;
+          b.artilleryDamageCount += 1;
+        }
 
         if (!agents.has(p.agent)) {
           agents.set(p.agent, { agent: p.agent, games: 0, wins: 0, models: {} });
@@ -216,6 +236,7 @@
         const avgRank = b.rankCount > 0 ? b.rankSum / b.rankCount : null;
         const avgScore = b.scoreCount > 0 ? b.scoreSum / b.scoreCount : null;
         const avgHqDamage = b.hqDamageCount > 0 ? b.hqDamageSum / b.hqDamageCount : null;
+        const avgArtilleryDamage = b.artilleryDamageCount > 0 ? b.artilleryDamageSum / b.artilleryDamageCount : null;
         return {
           model: b.model,
           games: b.games,
@@ -228,6 +249,7 @@
           avgRank,
           avgScore,
           avgHqDamage,
+          avgArtilleryDamage,
           rating: wilsonLower(b.wins, b.games),
           agents: b.agents,
           vs: b.vs,
@@ -254,6 +276,7 @@
         incompleteCount: matches.length - completed,
         mapDist,
         reasonDist,
+        modeDist,
         avgRounds: matches.length ? roundsSum / matches.length : 0,
         modelCount: modelLeaderboard.length,
       },
@@ -288,7 +311,7 @@
 
   function renderKpis(overview, sourceOverview) {
     const cards = [
-      { label: '筛选局数', value: overview.matchCount, sub: `全量 ${sourceOverview?.matchCount ?? '—'}` },
+      { label: '筛选局数', value: overview.matchCount, sub: `标准 ${overview.modeDist?.standard ?? 0} · 歼灭 ${overview.modeDist?.annihilation ?? 0}` },
       { label: '完赛', value: overview.completedCount, sub: `未完赛 ${overview.incompleteCount}` },
       { label: '模型数', value: overview.modelCount, sub: '当前筛选' },
       { label: '平均整轮', value: fmtNum(overview.avgRounds, 2), sub: 'round_end 计数' },
@@ -464,6 +487,7 @@
           <td data-label="日期">${fmtDate(m.date)}</td>
           <td data-label="版本">${escapeHtml(m.version)}</td>
           <td data-label="地图">${escapeHtml(m.mapId)}</td>
+          <td data-label="模式"><span class="tag ${m.mode === 'annihilation' ? 'mode-anni' : 'mode-std'}">${escapeHtml(MODE_LABELS[m.mode] || m.mode || '—')}</span></td>
           <td class="num" data-label="人数">${m.playerCount}</td>
           <td data-label="参赛模型"><div class="participant-chips">${chips}</div></td>
           <td class="win" data-label="胜者">${escapeHtml(winnerLabel)}</td>
@@ -498,6 +522,8 @@
 
     keep(el.filterMap, maps);
     keep(el.filterPlayers, players);
+    const modes = [...new Set(allMatches.map(m => m.mode).filter(Boolean))].sort();
+    keep(el.filterMode, modes);
     keep(el.filterModel, models);
   }
 
@@ -575,6 +601,7 @@
     el.filterVersion.value = '';
     el.filterMap.value = '';
     el.filterPlayers.value = '';
+    el.filterMode.value = '';
     el.filterModel.value = '';
     el.filterSearch.value = '';
     selectedModel = null;
@@ -584,6 +611,7 @@
     el.filterVersion,
     el.filterMap,
     el.filterPlayers,
+    el.filterMode,
     el.filterModel,
     el.filterSearch,
   ]) {
@@ -628,7 +656,7 @@
     if (matchSort.key === key) matchSort.dir = matchSort.dir === 'asc' ? 'desc' : 'asc';
     else {
       matchSort.key = key;
-      matchSort.dir = key === 'recordId' || key === 'mapId' || key === 'reason' ? 'asc' : 'desc';
+      matchSort.dir = key === 'recordId' || key === 'mapId' || key === 'mode' || key === 'reason' ? 'asc' : 'desc';
     }
     applyAndRender();
   });
@@ -637,7 +665,7 @@
     const key = el.matchSortMobile.value;
     matchSort = {
       key,
-      dir: key === 'recordId' || key === 'mapId' || key === 'reason' ? 'asc' : 'desc',
+      dir: key === 'recordId' || key === 'mapId' || key === 'mode' || key === 'reason' ? 'asc' : 'desc',
     };
     applyAndRender();
   });

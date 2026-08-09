@@ -1,70 +1,70 @@
 {
-  "generatedAt": "2026-08-07T09:41:23.479Z",
+  "generatedAt": "2026-08-09T02:18:20.405Z",
   "source": {
     "versions": [
       "V2",
       "V3"
     ],
-    "replayCount": 77,
+    "replayCount": 78,
     "parseErrors": 0
   },
   "warnings": [],
   "overview": {
-    "matchCount": 77,
-    "completedCount": 74,
+    "matchCount": 78,
+    "completedCount": 75,
     "totalActions": {
-      "moves": 5191,
-      "attacks": 3527,
-      "deploys": 1155,
-      "heals": 131,
+      "moves": 5243,
+      "attacks": 3573,
+      "deploys": 1164,
+      "heals": 133,
       "demolishes": 119,
-      "captures": 584,
-      "unitDeaths": 545,
-      "rounds": 583,
-      "income": 69958,
-      "deployCost": 56782,
+      "captures": 593,
+      "unitDeaths": 555,
+      "rounds": 595,
+      "income": 70790,
+      "deployCost": 57350,
       "comebackSupply": 932
     },
-    "totalEvents": 19615,
-    "avgRounds": 7.57,
-    "avgDurationSec": 9792.6,
-    "totalDurationSec": 734446.353,
+    "totalEvents": 19844,
+    "avgRounds": 7.63,
+    "avgDurationSec": 9698.4,
+    "totalDurationSec": 737076.408,
     "dateMin": "20260614",
-    "dateMax": "20260807",
-    "avgActionsPerRound": 8.94,
-    "avgIncomePerMatch": 908.5,
-    "avgDeployCostPerMatch": 737.4,
-    "spendRate": 0.8117
+    "dateMax": "20260809",
+    "avgActionsPerRound": 8.96,
+    "avgIncomePerMatch": 907.6,
+    "avgDeployCostPerMatch": 735.3,
+    "spendRate": 0.8101
   },
   "modelProfiles": [
     {
       "model": "DeepseekV4FlashPreview",
-      "games": 19,
-      "moves": 918,
-      "attacks": 644,
-      "deploys": 146,
-      "heals": 32,
-      "captures": 107,
+      "games": 20,
+      "moves": 941,
+      "attacks": 663,
+      "deploys": 150,
+      "heals": 34,
+      "captures": 109,
       "demolishes": 15,
-      "unitDeathsLost": 77,
+      "unitDeathsLost": 83,
       "perGame": {
-        "attacks": 33.89,
-        "heals": 1.68,
-        "deploys": 7.68,
-        "captures": 5.63,
-        "moves": 48.32,
-        "demolishes": 0.79
+        "attacks": 33.15,
+        "heals": 1.7,
+        "deploys": 7.5,
+        "captures": 5.45,
+        "moves": 47.05,
+        "demolishes": 0.75
       },
       "deploysByType": {
-        "ranger": 44,
-        "support": 19,
+        "ranger": 46,
+        "support": 20,
         "scout": 28,
         "heavy": 12,
-        "infantry": 43
+        "infantry": 44
       },
       "styleTags": [
         "治疗型",
-        "扩张型"
+        "攻击型"
       ]
     },
     {
@@ -207,7 +207,8 @@
         "support": 3
       },
       "styleTags": [
-        "治疗型"
+        "治疗型",
+        "机动型"
       ]
     },
     {
@@ -242,27 +243,27 @@
     },
     {
       "model": "dsv4flash0731",
-      "games": 8,
-      "moves": 179,
-      "attacks": 164,
-      "deploys": 58,
+      "games": 9,
+      "moves": 208,
+      "attacks": 191,
+      "deploys": 63,
       "heals": 0,
-      "captures": 32,
+      "captures": 39,
       "demolishes": 5,
-      "unitDeathsLost": 30,
+      "unitDeathsLost": 34,
       "perGame": {
-        "attacks": 20.5,
+        "attacks": 21.22,
         "heals": 0,
-        "deploys": 7.25,
-        "captures": 4,
-        "moves": 22.38,
-        "demolishes": 0.63
+        "deploys": 7,
+        "captures": 4.33,
+        "moves": 23.11,
+        "demolishes": 0.56
       },
       "deploysByType": {
-        "heavy": 3,
-        "scout": 28,
-        "infantry": 23,
-        "ranger": 4
+        "heavy": 4,
+        "scout": 29,
+        "infantry": 24,
+        "ranger": 6
       },
       "styleTags": [
         "扩张型",
@@ -781,16 +782,16 @@
   "unitStats": [
     {
       "unitType": "infantry",
-      "deploys": 441,
-      "share": 0.3818,
+      "deploys": 443,
+      "share": 0.3806,
       "byModel": {
         "longcat2.0": 49,
         "mimo2.5pro": 47,
-        "DeepseekV4FlashPreview": 43,
+        "DeepseekV4FlashPreview": 44,
         "minimaxm3": 42,
         "hy3": 38,
         "step3.7flash": 34,
-        "dsv4flash0731": 23,
+        "dsv4flash0731": 24,
         "glm5.2": 21,
         "sensenova6.7fl": 20,
         "grok4.5": 19,
@@ -812,13 +813,13 @@
     },
     {
       "unitType": "scout",
-      "deploys": 375,
-      "share": 0.3247,
+      "deploys": 376,
+      "share": 0.323,
       "byModel": {
         "minimaxm3": 38,
         "hy3": 37,
+        "dsv4flash0731": 29,
         "DeepseekV4FlashPreview": 28,
-        "dsv4flash0731": 28,
         "mimo2.5pro": 26,
         "longcat2.0": 23,
         "glm5.2": 22,
@@ -843,15 +844,16 @@
     },
     {
       "unitType": "ranger",
-      "deploys": 153,
-      "share": 0.1325,
+      "deploys": 157,
+      "share": 0.1349,
       "byModel": {
-        "DeepseekV4FlashPreview": 44,
+        "DeepseekV4FlashPreview": 46,
         "glm5.2": 20,
         "gpt5.5": 14,
         "glm5.1": 9,
         "gpt5.6sol": 9,
         "minimaxm3": 7,
+        "dsv4flash0731": 6,
         "mimo2.5pro": 5,
         "Qwen3.8MaxPreview": 5,
         "doubaoseed2.1pro": 5,
@@ -859,7 +861,6 @@
         "step3.7flash": 4,
         "qwen3.7max": 4,
         "grok4.5": 4,
-        "dsv4flash0731": 4,
         "DeepseekV4ProPreview": 3,
         "fable5": 3,
         "hy3": 3,
@@ -871,8 +872,8 @@
     },
     {
       "unitType": "heavy",
-      "deploys": 113,
-      "share": 0.0978,
+      "deploys": 114,
+      "share": 0.0979,
       "byModel": {
         "DeepseekV4FlashPreview": 12,
         "mimo2.5pro": 11,
@@ -887,9 +888,9 @@
         "doubaoseed2.1pro": 5,
         "Qwen3.8MaxPreview": 4,
         "hy3": 4,
+        "dsv4flash0731": 4,
         "qwen3.7max": 3,
         "grok4.5": 3,
-        "dsv4flash0731": 3,
         "qwen3.6v35b": 2,
         "DeepseekV4ProPreview": 2,
         "kimik3": 2,
@@ -899,10 +900,10 @@
     },
     {
       "unitType": "support",
-      "deploys": 73,
-      "share": 0.0632,
+      "deploys": 74,
+      "share": 0.0636,
       "byModel": {
-        "DeepseekV4FlashPreview": 19,
+        "DeepseekV4FlashPreview": 20,
         "glm5.2": 13,
         "mimo2.5pro": 9,
         "gpt5.5": 5,
@@ -925,13 +926,13 @@
   "economy": [
     {
       "model": "DeepseekV4FlashPreview",
-      "games": 19,
-      "income": 10599,
-      "deployCost": 8219,
+      "games": 20,
+      "income": 10911,
+      "deployCost": 8468,
       "comebackSupply": 100,
-      "avgIncome": 557.8,
-      "avgDeployCost": 432.6,
-      "spendRate": 0.7755
+      "avgIncome": 545.6,
+      "avgDeployCost": 423.4,
+      "spendRate": 0.7761
     },
     {
       "model": "mimo2.5pro",
@@ -994,6 +995,16 @@
       "spendRate": 0.754
     },
     {
+      "model": "dsv4flash0731",
+      "games": 9,
+      "income": 2980,
+      "deployCost": 2669,
+      "comebackSupply": 72,
+      "avgIncome": 331.1,
+      "avgDeployCost": 296.6,
+      "spendRate": 0.8956
+    },
+    {
       "model": "gpt5.5",
       "games": 4,
       "income": 2868,
@@ -1002,16 +1013,6 @@
       "avgIncome": 717,
       "avgDeployCost": 629.8,
       "spendRate": 0.8783
-    },
-    {
-      "model": "dsv4flash0731",
-      "games": 8,
-      "income": 2460,
-      "deployCost": 2350,
-      "comebackSupply": 72,
-      "avgIncome": 307.5,
-      "avgDeployCost": 293.8,
-      "spendRate": 0.9553
     },
     {
       "model": "doubaoseed2.1pro",
@@ -1504,15 +1505,15 @@
     },
     {
       "mapId": "artillery-zone",
-      "games": 3,
-      "avgRounds": 11.67,
-      "roundsSampled": 3,
-      "capturesPerGame": 8.67,
-      "avgDurationSec": 4258.3,
+      "games": 4,
+      "avgRounds": 11.75,
+      "roundsSampled": 4,
+      "capturesPerGame": 8.75,
+      "avgDurationSec": 3851.2,
       "winnerModels": [
         {
           "model": "dsv4flash0731",
-          "wins": 1
+          "wins": 2
         },
         {
           "model": "kimik3",
@@ -2032,20 +2033,20 @@
     }
   },
   "funFacts": [
-    "在 77 局对局中，共打出 10,707 次操作：5,191 次移动、3,527 次攻击、1,155 次部署、584 次占领、131 次治疗。",
-    "战场上有 545 个单位阵亡，平均每局阵亡 7.1 个。",
-    "最受欢迎的单位是「infantry」，共部署 441 次，占全部部署的 38%。",
-    "最暴躁的模型是「DeepseekV4FlashPreview」，累计发起 644 次攻击。",
-    "最勤快的模型是「DeepseekV4FlashPreview」，累计移动 918 次。",
+    "在 78 局对局中，共打出 10,825 次操作：5,243 次移动、3,573 次攻击、1,164 次部署、593 次占领、133 次治疗。",
+    "战场上有 555 个单位阵亡，平均每局阵亡 7.1 个。",
+    "最受欢迎的单位是「infantry」，共部署 443 次，占全部部署的 38%。",
+    "最暴躁的模型是「DeepseekV4FlashPreview」，累计发起 663 次攻击。",
+    "最勤快的模型是「DeepseekV4FlashPreview」，累计移动 941 次。",
     "最漫长的一局是 tg_0039，鏖战 24 整轮。",
     "最速决的是 tg_0059，仅 7 整轮便分出胜负。",
     "最血腥的一局是 tg_0034，阵亡 25 个单位。",
     "单场最强拆迁：agnes2.0flash 在 tg_0025 中造成 161 点 HQ 伤害。",
-    "最舍得花钱的模型是「DeepseekV4FlashPreview」，累计在部署上花掉 8,219 补给（共 19 场）。",
+    "最舍得花钱的模型是「DeepseekV4FlashPreview」，累计在部署上花掉 8,468 补给（共 20 场）。",
     "最无情的终结者是「minimaxm3」，亲手送走 4 名对手，自己也被淘汰 1 次。",
     "最常登场的战场是「default」，出现 24 次。",
     "节奏最密的一局是 tg_0034，平均每轮 26.07 次有效操作。",
-    "平均每局耗时约 163分13秒。"
+    "平均每局耗时约 161分38秒。"
   ],
   "timeline": [
     {
@@ -2389,6 +2390,15 @@
       "cumulativeActions": 10707,
       "avgRounds": 12,
       "avgDurationSec": 4397.5
+    },
+    {
+      "date": "2026-08-09",
+      "matches": 1,
+      "totalActions": 118,
+      "cumulativeMatches": 78,
+      "cumulativeActions": 10825,
+      "avgRounds": 12,
+      "avgDurationSec": 2630.1
     }
   ],
   "monthlyTrend": [
@@ -2410,10 +2420,10 @@
     },
     {
       "month": "2026.08",
-      "matches": 13,
-      "totalActions": 1478,
-      "avgRounds": 12.33,
-      "avgDurationSec": 10681.1,
+      "matches": 14,
+      "totalActions": 1596,
+      "avgRounds": 12.31,
+      "avgDurationSec": 10061.8,
       "activeModels": 15
     }
   ],
@@ -2421,11 +2431,11 @@
     {
       "model": "DeepseekV4FlashPreview",
       "debutDate": "2026-06-14",
-      "latestDate": "2026-08-03",
-      "games": 19,
+      "latestDate": "2026-08-09",
+      "games": 20,
       "wins": 10,
       "debutRecordId": "tg_0002",
-      "latestRecordId": "tg_0069"
+      "latestRecordId": "tg_0078"
     },
     {
       "model": "mimo2.5pro",
@@ -2628,11 +2638,11 @@
     {
       "model": "dsv4flash0731",
       "debutDate": "2026-08-03",
-      "latestDate": "2026-08-06",
-      "games": 8,
-      "wins": 2,
+      "latestDate": "2026-08-09",
+      "games": 9,
+      "wins": 3,
       "debutRecordId": "tg_0068",
-      "latestRecordId": "tg_0075"
+      "latestRecordId": "tg_0078"
     },
     {
       "model": "gemini3.5flash",
@@ -2777,7 +2787,7 @@
     {
       "schemaVersion": "3.2.9",
       "firstDate": "2026-08-06",
-      "games": 3
+      "games": 4
     }
   ]
 }

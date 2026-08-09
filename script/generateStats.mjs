@@ -36,7 +36,7 @@ export const MODEL_ALIASES = new Map([
   ['agnes2.0flash', 'agnes2.0flash'],
   ['qwen3.6v35b', 'qwen3.6v35b'],
   ['qwen3.7max', 'qwen3.7max'],
-  ['qwen3.8max', 'Qwen3.8MaxPreview'],
+  ['qwen3.8max', 'Qwen3.8Max'],
   ['qwen3.8maxpreview', 'Qwen3.8MaxPreview'],
   ['glm5.2', 'glm5.2'],
   ['glm5.1', 'glm5.1'],

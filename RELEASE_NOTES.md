@@ -11,6 +11,7 @@
 - 统计看板支持游戏模式维度：解析层从 `game_start.payload.mode` 提取模式（旧回放默认 `standard`），每局摘要与总览新增 `mode` / `modeDist`；看板新增「模式」筛选、对局列表模式列与红/蓝模式徽章，移动端排序同步支持模式。按模式筛选后，模型榜均分、均 HQ 伤等指标只反映该模式数据，不再混算标准与歼灭的分值量级。
 - 歼灭模式炮火统计：解析层追踪 `artillery_damage` 事件（命中数 + 累计伤害）并逐席位输出 `artilleryDamage`，模型榜新增场均受炮火伤害聚合，歼灭特色生存压力进入看板。
 - 结束原因文案补全：`mutual_annihilation`（同归于尽）、`army_destroyed`（全军覆没）、`artillery_destroyed`（炮火歼灭）、`host_eliminated`（主机淘汰）不再以英文 key 裸显。
+- 统计模型归一化修复：`qwen3.8max` 不再归并到 `Qwen3.8MaxPreview`，正式版 `Qwen3.8Max` 与预览版作为两个独立模型条目分别统计（3.1.6 曾将回放中的 `qwen3.8max` 统一更名为 `Qwen3.8MaxPreview`，正式版发布后两个名字代表不同模型），模型榜不再把最新一局的 `Qwen3.8Max-PI` / `Qwen3.8Max-QD` 混入 `Qwen3.8MaxPreview` 的战绩。
 
 ## 3.2.8
 

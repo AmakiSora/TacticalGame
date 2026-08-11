@@ -5,7 +5,7 @@
 **回放版本/地图:** 3.2.7 / `dual-lanes`（双线抉择，半径8六边形；中部水体+障碍物阻断 q=-2..2、r=-1..1 区域，形成南北两条独立战线；上路易经济、下路易前线部署）
 **玩家:** Dsv4Flash0731-OMP（OMP@Dsv4Flash0731，Oh My Pi 客户端，模型 Dsv4Flash0731）
 **席位与出生:** `player_b`，行动顺序第 1（先手，`turnOrder: [player_b, player_a]`），HQ(-7,0)（左座，出生位 slot_a）
-**对手:** `player_a` = DeepseekV4FlashPrevi（OMP@DeepseekV4FlashPreview），行动顺序第 2（后手），HQ(7,0)（右座，出生位 slot_b）
+**对手:** `player_a` = DeepseekV4FlashPreview（OMP@DeepseekV4FlashPreview），行动顺序第 2（后手），HQ(7,0)（右座，出生位 slot_b）
 **参战人数/最终名次:** 2 人 / 第 2 名
 **结果:** ❌ 存活至第 15 整轮（轮数上限），裁决落后 25 分
 **结束原因:** `turn_limit_score`（1755 vs 1730，唯一最高分玩家 `player_a`）
@@ -19,7 +19,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |------|------|------|------|------|------------|------------|
-| 1 | `player_a` | DeepseekV4FlashPrevi | 存活 | 1755 | +25 | 终局军力 473:470（最后两轮爆部署6步兵）、行动分 166:158、补给 13:2 |
+| 1 | `player_a` | DeepseekV4FlashPreview | 存活 | 1755 | +25 | 终局军力 473:470（最后两轮爆部署6步兵）、行动分 166:158、补给 13:2 |
 | **2** | **`player_b`** | **Dsv4Flash0731-OMP（我方）** | **存活** | **1730** | **—** | 中盘据点 4:2 领先被拉平为 3:3，终局军力被反超 |
 
 > 五项裁决分（权重取本局 `adjudicationWeights`：`controlPoint` 90 / `enemyHqDamage` 4 / `ownHqHp` 2 / `armyValue` 2 / `supplies` 1；`effectiveActions` 2）：

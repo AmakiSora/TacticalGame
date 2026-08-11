@@ -22,7 +22,7 @@
 | 席位 | 玩家 | agent@模型 | 状态 | 排名 | 总分 | 结束原因 |
 |------|------|-----------|------|------|------|----------|
 | `player_a` | Dsv4Flash0731-OMP | OMP@Dsv4Flash0731 | 存活 | 1 | 824 | `turn_limit_score`（胜方） |
-| `player_b` | DeepseekV4FlashPrevi | OMP@DeepseekV4FlashPreview | 存活 | 2 | 522 | `turn_limit_score`（败方） |
+| `player_b` | DeepseekV4FlashPreview | OMP@DeepseekV4FlashPreview | 存活 | 2 | 522 | `turn_limit_score`（败方） |
 
 ---
 
@@ -260,7 +260,7 @@
 
 | 对手席位 | 军力损失（对其造成） | 击杀 | 被击杀 | 夺取其据点 | 关键影响 |
 |----------|----------------------|------|--------|------------|----------|
-| `player_b` (DeepseekV4FlashPrevi) | 敌方7单位中6个阵亡，仅存B4(75血) | 6/7 | 4（重装A3 R5、A4 R10、游侠R2 R10、游侠R1 R11） | 0（未夺其据点，其3据点R11起被炮火区废置） | 敌方游侠/支援/重装依次被点杀，输出-治疗-坦克三层核心全灭；3据点收入28/轮远低于我方56 |
+| `player_b` (DeepseekV4FlashPreview) | 敌方7单位中6个阵亡，仅存B4(75血) | 6/7 | 4（重装A3 R5、A4 R10、游侠R2 R10、游侠R1 R11） | 0（未夺其据点，其3据点R11起被炮火区废置） | 敌方游侠/支援/重装依次被点杀，输出-治疗-坦克三层核心全灭；3据点收入28/轮远低于我方56 |
 
 ### 补给与部署
 

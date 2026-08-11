@@ -11,92 +11,26 @@
  *   node script/generateFunStats.mjs --out public/data/fun-stats.json
  *   node script/generateFunStats.mjs --records records
  */
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
-  extractMatch,
-  collectReviews,
-  REPLAY_JSON_RE,
+  collectMatches,
+  parseArgs,
+  round1,
+  round2,
+  round4,
+  fmtDate,
+  fmtDuration,
+  durationSec,
 } from './generateStats.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = dirname(SCRIPT_DIR);
-export const MAX_DURATION_SEC = 86400 * 3;
 
-function parseArgs(argv) {
-  const opts = {
-    records: join(PROJECT_DIR, 'records'),
-    out: join(PROJECT_DIR, 'public', 'data', 'fun-stats.json'),
-    versions: ['V2', 'V3'],
-  };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--out') opts.out = resolve(argv[++i]);
-    else if (a === '--records') opts.records = resolve(argv[++i]);
-    else if (a === '--help' || a === '-h') {
-      console.log(`Usage: node script/generateFunStats.mjs [--records dir] [--out file]`);
-      process.exit(0);
-    }
-  }
-  return opts;
-}
-
-function round1(n) { return Math.round(n * 10) / 10; }
-function round2(n) { return Math.round(n * 100) / 100; }
-function fmtDate(yyyymmdd) {
-  const s = String(yyyymmdd || '');
-  if (s.length !== 8) return s;
-  return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-}
-function fmtDuration(sec) {
-  if (sec == null || !Number.isFinite(sec)) return '—';
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  if (m > 0) return `${m}分${s}秒`;
-  return `${s}秒`;
-}
-
-/**
- * Collect raw per-match records via the shared parser. Returns array of
- * match objects (same shape as generateStats extractMatch output), sorted by
- * date/recordId ascending.
- */
-function collectMatches(opts) {
-  const matches = [];
-  const warnings = [];
-  for (const version of opts.versions) {
-    const dir = join(opts.records, version);
-    let files;
-    try {
-      files = readdirSync(dir);
-    } catch (err) {
-      warnings.push(`skip ${version}: ${err.message}`);
-      continue;
-    }
-    const reviews = collectReviews(dir);
-    for (const f of files) {
-      if (!REPLAY_JSON_RE.test(f)) continue;
-      const full = join(dir, f);
-      try {
-        const st = statSync(full);
-        if (!st.isFile()) continue;
-      } catch {
-        continue;
-      }
-      const match = extractMatch(full, version, f, reviews);
-      if (match) matches.push(match);
-    }
-  }
-  matches.sort((a, b) => {
-    const da = a.date || '';
-    const db = b.date || '';
-    if (da !== db) return da.localeCompare(db);
-    return (a.recordId || '').localeCompare(b.recordId || '');
-  });
-  return { matches, warnings };
-}
+// 共享层常量/工具转发导出，保持旧调用方（测试）导入路径不变
+export { MAX_DURATION_SEC, durationSec } from './generateStats.mjs';
 
 function emptyActionTotals() {
   return {
@@ -192,16 +126,6 @@ export function buildOverview(matches) {
   overview.avgDeployCostPerMatch = overview.matchCount > 0 ? round1(overview.totalActions.deployCost / overview.matchCount) : 0;
   overview.spendRate = overview.totalActions.income > 0 ? round4(overview.totalActions.deployCost / overview.totalActions.income) : 0;
   return overview;
-}
-
-export function durationSec(m) {
-  const ts = m.timestamps;
-  if (!ts || typeof ts.start !== 'number' || typeof ts.end !== 'number') return null;
-  if (!Number.isFinite(ts.start) || !Number.isFinite(ts.end)) return null;
-  const ms = ts.end - ts.start;
-  if (!Number.isFinite(ms)) return null;
-  const sec = ms / 1000;
-  return sec >= 0 && sec < MAX_DURATION_SEC ? sec : null;
 }
 
 /**
@@ -326,8 +250,6 @@ function buildUnitStats(matches) {
     };
   });
 }
-
-function round4(n) { return Math.round(n * 10000) / 10000; }
 
 /**
  * Per-model economy ledger: income received vs supplies spent on deploys,
@@ -768,7 +690,10 @@ function buildFunFacts(overview, modelProfiles, unitStats, extremes, economy, el
 }
 
 function main() {
-  const opts = parseArgs(process.argv.slice(2));
+  const opts = parseArgs(process.argv.slice(2), {
+    out: join(PROJECT_DIR, 'public', 'data', 'fun-stats.json'),
+    usage: 'node script/generateFunStats.mjs [--records dir] [--out file]',
+  });
   const { matches, warnings } = collectMatches(opts);
 
   const valid = matches.filter((m) => !m.error);

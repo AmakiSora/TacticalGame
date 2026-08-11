@@ -43,10 +43,14 @@ export function generateToken(): string {
   return randomBytes(16).toString('hex');
 }
 
+/** 玩家名称最大长度，后端入口与前端输入框统一引用此常量。 */
+export const MAX_PLAYER_NAME_LEN = 30;
+
+
 export function createPlayer(id: PlayerId, name?: string): PlayerState {
   return {
     id,
-    name: name?.trim().slice(0, 20) || `玩家 ${id.slice(-1).toUpperCase()}`,
+    name: name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || `玩家 ${id.slice(-1).toUpperCase()}`,
     joinedAt: Date.now(),
     status: 'lobby',
     spawnSlotId: null,

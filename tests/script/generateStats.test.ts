@@ -52,6 +52,35 @@ describe('stats aggregation', () => {
     });
   });
 
+  it('keeps DeepseekV4Pro formal distinct from its preview', () => {
+    expect(canonicalizeModel('DeepseekV4Pro-OMP')).toBe('DeepseekV4Pro');
+    expect(canonicalizeModel('DeepseekV4Pro')).toBe('DeepseekV4Pro');
+    expect(canonicalizeModel('DeepseekV4ProPreview-PI')).toBe('DeepseekV4ProPreview');
+    expect(canonicalizeModel('DeepseekV4proPreview')).toBe('DeepseekV4ProPreview');
+    expect(parseReviewFileName('tg_0082_lose_OMP@DeepseekV4Pro.md')).toMatchObject({
+      agent: 'OMP',
+      model: 'DeepseekV4Pro',
+    });
+  });
+
+  it('canonicalizes newly added model names and the truncated display name', () => {
+    expect(canonicalizeModel('agnes2.5flash-OMP')).toBe('agnes2.5flash');
+    expect(canonicalizeModel('gemini3.5flash-PI')).toBe('gemini3.5flash');
+    expect(canonicalizeModel('gptoss120b-PI')).toBe('gptoss120b');
+    expect(canonicalizeModel('GPT5.6luna-OMP')).toBe('gpt5.6luna');
+    expect(canonicalizeModel('SenseNova6.8FLP-OMP')).toBe('sensenova6.8flp');
+    expect(canonicalizeModel('Ring2.6-OMP')).toBe('ring2.6');
+    expect(canonicalizeModel('DeepseekV4FlashPrevi')).toBe('DeepseekV4FlashPreview');
+  });
+
+  it('splits a known CP agent suffix off the model name', () => {
+    expect(canonicalizeModel('LongCat2.0-CP')).toBe('longcat2.0');
+    expect(parseReviewFileName('tg_0083_lose_CP@longcat2.0.md')).toMatchObject({
+      agent: 'CP',
+      model: 'longcat2.0',
+    });
+  });
+
   it('attributes an ownerless attack to its attacker exactly once', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-stats-'));
     const fileName = 'tg_9999_20260730.json';

@@ -1,7 +1,7 @@
 // src/api/games.ts
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { globalStore, createLobby, addLobbyPlayer, removeLobbyPlayer } from '../state/store.js';
+import { globalStore, createLobby, addLobbyPlayer, removeLobbyPlayer, MAX_PLAYER_NAME_LEN } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
@@ -135,7 +135,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string }; Body: { name?: string } }>('/api/games/:id/player', async (req, reply) => {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
-    const name = req.body?.name?.trim().slice(0, 20);
+    const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN);
     if (!name) return reply.code(400).send({ error: 'name is required', code: 'invalid_move' });
     ctx.game.players[ctx.player]!.name = name;
     ctx.game.playerNames[ctx.player] = name;
@@ -152,7 +152,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!isPlayerId(playerId) || !game.players[playerId]) {
       return reply.code(400).send({ error: 'valid playerId required', code: 'invalid_move' });
     }
-    const name = req.body?.name?.trim().slice(0, 20);
+    const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN);
     if (!name) return reply.code(400).send({ error: 'name is required', code: 'invalid_move' });
     game.players[playerId]!.name = name;
     game.playerNames[playerId] = name;

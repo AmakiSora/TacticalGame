@@ -2,6 +2,12 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.2.10
+
+- 放宽玩家名称长度上限：后端创建/加入大厅的名称截断由 20 提升到 30，并抽出 `MAX_PLAYER_NAME_LEN` 常量供 `src/state/store.ts`、`src/api/games.ts` 与桌面/移动端创建/加入表单统一引用，避免前后端阈值脱节。
+- 统计采集层共享化与模型规范化扩充：`script/generateStats.mjs` 
+- 将回放目录扫描、`collectMatches`、`durationSec`/`MAX_DURATION_SEC`、`round1`/`round2` 等抽取为导出 API，`script/generateFunStats.mjs` 改为复用同一采集层，删除两份重复的目录遍历与时长判定逻辑；
+
 ## 3.2.9
 
 - 地图编辑器区分歼灭模式出生锚点：歼灭地图中出生槽的 `headquarters` 字段仅为出生元数据（运行时 `game.headquarters` 恒为空），编辑器此前沿用总部图标与「总部」称呼，易误解为歼灭模式也有总部。现在歼灭模式下画布改绘旗标出生点图标，工具按钮、选中面板、状态提示与校验错误文案统一改为「出生点」，规则页隐藏无运行时作用的总部 HP/防御字段；普通模式保持总部原样，切换模式时文案与图标随动。

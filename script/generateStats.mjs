@@ -11,10 +11,10 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'n
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const PROJECT_DIR = dirname(SCRIPT_DIR);
+export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+export const PROJECT_DIR = dirname(SCRIPT_DIR);
 
-export const KNOWN_AGENTS = new Set(['PI', 'CX', 'CC', 'QW', 'OMP', 'WB', 'ZC', 'SCRIPT', 'QD', 'QW']);
+export const KNOWN_AGENTS = new Set(['PI', 'CX', 'CC', 'QW', 'OMP', 'WB', 'ZC', 'SCRIPT', 'QD', 'CP']);
 
 /** Canonical model keys (lowercase). */
 export const MODEL_ALIASES = new Map([
@@ -32,8 +32,10 @@ export const MODEL_ALIASES = new Map([
   ['mimo2.5pro', 'mimo2.5pro'],
   ['minimaxm3', 'minimaxm3'],
   ['sensenova6.7fl', 'sensenova6.7fl'],
+  ['sensenova6.8flp', 'sensenova6.8flp'],
   ['longcat2.0', 'longcat2.0'],
   ['agnes2.0flash', 'agnes2.0flash'],
+  ['agnes2.5flash', 'agnes2.5flash'],
   ['qwen3.6v35b', 'qwen3.6v35b'],
   ['qwen3.7max', 'qwen3.7max'],
   ['qwen3.8max', 'Qwen3.8Max'],
@@ -43,23 +45,29 @@ export const MODEL_ALIASES = new Map([
   ['glm4.7', 'glm4.7'],
   ['gpt5.5', 'gpt5.5'],
   ['gpt5.6sol', 'gpt5.6sol'],
+  ['gpt5.6luna', 'gpt5.6luna'],
   ['hy3', 'hy3'],
   ['kimik3', 'kimik3'],
   ['grok4.5', 'grok4.5'],
   ['fable5', 'fable5'],
   ['doubaoseed2.1pro', 'doubaoseed2.1pro'],
-  ['deepseekv4pro', 'DeepseekV4ProPreview'],
+  ['gemini3.5flash', 'gemini3.5flash'],
+  ['gptoss120b', 'gptoss120b'],
+  ['ring2.6', 'ring2.6'],
+  ['deepseekv4pro', 'DeepseekV4Pro'],
   ['deepseekv4propreview', 'DeepseekV4ProPreview'],
+  // 游戏端历史 20 字符截断名（DeepseekV4FlashPreview → DeepseekV4FlashPrevi），归一化回完整名
+  ['deepseekv4flashprevi', 'DeepseekV4FlashPreview'],
 ]);
 
 export const REPLAY_JSON_RE = /^(tg_\d+)_(\d{8})\.json$/i;
 export const REVIEW_MD_RE =
   /^(tg_\d+)(?:-\d+)?_(win|lose|draw|terminated|deadlock|rank(\d+))_([A-Za-z0-9]+)@(.+)\.md$/i;
 
-export function parseArgs(argv) {
+export function parseArgs(argv, { out = join(PROJECT_DIR, 'public', 'data', 'stats.json'), usage = 'node script/generateStats.mjs [--records dir] [--out file]' } = {}) {
   const opts = {
     records: join(PROJECT_DIR, 'records'),
-    out: join(PROJECT_DIR, 'public', 'data', 'stats.json'),
+    out,
     versions: ['V2', 'V3'],
   };
   for (let i = 0; i < argv.length; i++) {
@@ -67,7 +75,7 @@ export function parseArgs(argv) {
     if (a === '--out') opts.out = resolve(argv[++i]);
     else if (a === '--records') opts.records = resolve(argv[++i]);
     else if (a === '--help' || a === '-h') {
-      console.log(`Usage: node script/generateStats.mjs [--records dir] [--out file]`);
+      console.log(`Usage: ${usage}`);
       process.exit(0);
     }
   }
@@ -830,14 +838,44 @@ function wilsonLower(wins, n) {
   return (centre - margin) / denom;
 }
 
-function round1(n) {
+/** 娱乐统计的时长有效性上限（3 天），两个脚本共用同一判定。 */
+export const MAX_DURATION_SEC = 86400 * 3;
+
+export function round1(n) {
   return Math.round(n * 10) / 10;
 }
-function round2(n) {
+export function round2(n) {
   return Math.round(n * 100) / 100;
 }
-function round4(n) {
+export function round4(n) {
   return Math.round(n * 10000) / 10000;
+}
+
+/** YYYYMMDD → YYYY-MM-DD */
+export function fmtDate(yyyymmdd) {
+  const s = String(yyyymmdd || '');
+  if (s.length !== 8) return s;
+  return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+}
+
+/** 秒数 → 中文时长（X分Y秒 / Y秒），非法值显示 — */
+export function fmtDuration(sec) {
+  if (sec == null || !Number.isFinite(sec)) return '—';
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  if (m > 0) return `${m}分${s}秒`;
+  return `${s}秒`;
+}
+
+/** 对局真实时长（秒），缺失或超出 MAX_DURATION_SEC 视为无效。 */
+export function durationSec(m) {
+  const ts = m.timestamps;
+  if (!ts || typeof ts.start !== 'number' || typeof ts.end !== 'number') return null;
+  if (!Number.isFinite(ts.start) || !Number.isFinite(ts.end)) return null;
+  const ms = ts.end - ts.start;
+  if (!Number.isFinite(ms)) return null;
+  const sec = ms / 1000;
+  return sec >= 0 && sec < MAX_DURATION_SEC ? sec : null;
 }
 
 export function collectReviews(versionDir) {
@@ -858,11 +896,13 @@ export function collectReviews(versionDir) {
   return byRecord;
 }
 
-function main() {
-  const opts = parseArgs(process.argv.slice(2));
+/**
+ * 扫描 opts.versions 下的回放 JSON（含对应复盘 MD），返回按日期/recordId
+ * 升序排列的 match 数组与目录级警告。两个统计脚本共用同一采集层。
+ */
+export function collectMatches(opts) {
   const matches = [];
   const warnings = [];
-
   for (const version of opts.versions) {
     const dir = join(opts.records, version);
     let files;
@@ -886,13 +926,18 @@ function main() {
       if (match) matches.push(match);
     }
   }
-
   matches.sort((a, b) => {
     const da = a.date || '';
     const db = b.date || '';
     if (da !== db) return da.localeCompare(db);
     return (a.recordId || '').localeCompare(b.recordId || '');
   });
+  return { matches, warnings };
+}
+
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  const { matches, warnings } = collectMatches(opts);
 
   const agg = aggregate(matches);
 

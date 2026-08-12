@@ -1,40 +1,40 @@
 {
-  "generatedAt": "2026-08-11T09:03:54.769Z",
+  "generatedAt": "2026-08-12T00:47:27.713Z",
   "source": {
     "versions": [
       "V2",
       "V3"
     ],
-    "replayCount": 87,
+    "replayCount": 88,
     "parseErrors": 0
   },
   "warnings": [],
   "overview": {
-    "matchCount": 87,
-    "completedCount": 84,
+    "matchCount": 88,
+    "completedCount": 85,
     "totalActions": {
-      "moves": 5703,
-      "attacks": 3885,
-      "deploys": 1284,
-      "heals": 137,
+      "moves": 5756,
+      "attacks": 3945,
+      "deploys": 1296,
+      "heals": 140,
       "demolishes": 130,
-      "captures": 665,
-      "unitDeaths": 615,
-      "rounds": 711,
-      "income": 77646,
-      "deployCost": 62944,
+      "captures": 672,
+      "unitDeaths": 629,
+      "rounds": 723,
+      "income": 78454,
+      "deployCost": 63647,
       "comebackSupply": 932
     },
-    "totalEvents": 21889,
-    "avgRounds": 8.17,
-    "avgDurationSec": 9004.2,
-    "totalDurationSec": 774357.8920000002,
+    "totalEvents": 22133,
+    "avgRounds": 8.22,
+    "avgDurationSec": 9064.9,
+    "totalDurationSec": 788644.8750000002,
     "dateMin": "20260614",
-    "dateMax": "20260811",
-    "avgActionsPerRound": 8.87,
-    "avgIncomePerMatch": 892.5,
-    "avgDeployCostPerMatch": 723.5,
-    "spendRate": 0.8107
+    "dateMax": "20260812",
+    "avgActionsPerRound": 8.91,
+    "avgIncomePerMatch": 891.5,
+    "avgDeployCostPerMatch": 723.3,
+    "spendRate": 0.8113
   },
   "modelProfiles": [
     {
@@ -444,6 +444,36 @@
       ]
     },
     {
+      "model": "gpt5.6sol",
+      "games": 5,
+      "moves": 137,
+      "attacks": 124,
+      "deploys": 44,
+      "heals": 17,
+      "captures": 22,
+      "demolishes": 6,
+      "unitDeathsLost": 12,
+      "perGame": {
+        "attacks": 24.8,
+        "heals": 3.4,
+        "deploys": 8.8,
+        "captures": 4.4,
+        "moves": 27.4,
+        "demolishes": 1.2
+      },
+      "deploysByType": {
+        "heavy": 6,
+        "scout": 5,
+        "ranger": 11,
+        "support": 5,
+        "infantry": 17
+      },
+      "styleTags": [
+        "治疗型",
+        "拆迁型"
+      ]
+    },
+    {
       "model": "glm5.1",
       "games": 4,
       "moves": 110,
@@ -504,32 +534,31 @@
       ]
     },
     {
-      "model": "gpt5.6sol",
+      "model": "kimik3",
       "games": 4,
-      "moves": 106,
-      "attacks": 90,
-      "deploys": 38,
-      "heals": 14,
-      "captures": 18,
-      "demolishes": 6,
-      "unitDeathsLost": 6,
+      "moves": 76,
+      "attacks": 65,
+      "deploys": 20,
+      "heals": 1,
+      "captures": 11,
+      "demolishes": 3,
+      "unitDeathsLost": 14,
       "perGame": {
-        "attacks": 22.5,
-        "heals": 3.5,
-        "deploys": 9.5,
-        "captures": 4.5,
-        "moves": 26.5,
-        "demolishes": 1.5
+        "attacks": 16.25,
+        "heals": 0.25,
+        "deploys": 5,
+        "captures": 2.75,
+        "moves": 19,
+        "demolishes": 0.75
       },
       "deploysByType": {
-        "heavy": 6,
-        "scout": 5,
-        "ranger": 9,
-        "support": 4,
-        "infantry": 14
+        "heavy": 3,
+        "infantry": 9,
+        "scout": 2,
+        "ranger": 5,
+        "support": 1
       },
       "styleTags": [
-        "治疗型",
         "拆迁型"
       ]
     },
@@ -560,35 +589,6 @@
       "styleTags": [
         "机动型",
         "爆兵型"
-      ]
-    },
-    {
-      "model": "kimik3",
-      "games": 3,
-      "moves": 54,
-      "attacks": 39,
-      "deploys": 14,
-      "heals": 1,
-      "captures": 8,
-      "demolishes": 3,
-      "unitDeathsLost": 6,
-      "perGame": {
-        "attacks": 13,
-        "heals": 0.33,
-        "deploys": 4.67,
-        "captures": 2.67,
-        "moves": 18,
-        "demolishes": 1
-      },
-      "deploysByType": {
-        "heavy": 2,
-        "infantry": 7,
-        "scout": 1,
-        "ranger": 3,
-        "support": 1
-      },
-      "styleTags": [
-        "拆迁型"
       ]
     },
     {
@@ -912,8 +912,8 @@
   "unitStats": [
     {
       "unitType": "infantry",
-      "deploys": 493,
-      "share": 0.384,
+      "deploys": 498,
+      "share": 0.3843,
       "byModel": {
         "DeepseekV4FlashPreview": 55,
         "longcat2.0": 54,
@@ -926,13 +926,13 @@
         "sensenova6.7fl": 20,
         "grok4.5": 19,
         "doubaoseed2.1pro": 18,
+        "gpt5.6sol": 17,
         "DeepseekV4ProPreview": 14,
-        "gpt5.6sol": 14,
         "qwen3.7max": 10,
         "agnes2.0flash": 9,
+        "kimik3": 9,
         "Qwen3.8MaxPreview": 8,
         "glm4.7": 7,
-        "kimik3": 7,
         "qwen3.6v35b": 6,
         "gpt5.5": 5,
         "fable5": 5,
@@ -948,8 +948,8 @@
     },
     {
       "unitType": "scout",
-      "deploys": 424,
-      "share": 0.3302,
+      "deploys": 425,
+      "share": 0.3279,
       "byModel": {
         "dsv4flash0731": 47,
         "minimaxm3": 38,
@@ -975,28 +975,29 @@
         "DeepseekV4ProPreview": 3,
         "fable5": 3,
         "gemini3.5flash": 3,
+        "kimik3": 2,
         "agnes2.5flash": 2,
         "agnes2.5pro": 2,
-        "kimik3": 1,
         "gpt5.6luna": 1,
         "DeepseekV4Pro": 1
       }
     },
     {
       "unitType": "ranger",
-      "deploys": 171,
-      "share": 0.1332,
+      "deploys": 175,
+      "share": 0.135,
       "byModel": {
         "DeepseekV4FlashPreview": 46,
         "glm5.2": 23,
         "gpt5.5": 14,
         "dsv4flash0731": 12,
+        "gpt5.6sol": 11,
         "glm5.1": 9,
-        "gpt5.6sol": 9,
         "minimaxm3": 7,
         "mimo2.5pro": 5,
         "Qwen3.8MaxPreview": 5,
         "doubaoseed2.1pro": 5,
+        "kimik3": 5,
         "longcat2.0": 4,
         "step3.7flash": 4,
         "qwen3.7max": 4,
@@ -1004,7 +1005,6 @@
         "DeepseekV4ProPreview": 3,
         "fable5": 3,
         "hy3": 3,
-        "kimik3": 3,
         "Qwen3.8Max": 3,
         "DeepseekV4Pro": 2,
         "agnes2.0flash": 1,
@@ -1014,8 +1014,8 @@
     },
     {
       "unitType": "heavy",
-      "deploys": 121,
-      "share": 0.0942,
+      "deploys": 122,
+      "share": 0.0941,
       "byModel": {
         "DeepseekV4FlashPreview": 12,
         "glm5.2": 12,
@@ -1033,9 +1033,9 @@
         "hy3": 4,
         "qwen3.7max": 3,
         "grok4.5": 3,
+        "kimik3": 3,
         "qwen3.6v35b": 2,
         "DeepseekV4ProPreview": 2,
-        "kimik3": 2,
         "Qwen3.8Max": 2,
         "fable5": 1,
         "gptoss120b": 1
@@ -1043,15 +1043,15 @@
     },
     {
       "unitType": "support",
-      "deploys": 75,
-      "share": 0.0584,
+      "deploys": 76,
+      "share": 0.0586,
       "byModel": {
         "DeepseekV4FlashPreview": 20,
         "glm5.2": 13,
         "mimo2.5pro": 9,
         "gpt5.5": 5,
+        "gpt5.6sol": 5,
         "qwen3.6v35b": 4,
-        "gpt5.6sol": 4,
         "longcat2.0": 3,
         "step3.7flash": 3,
         "DeepseekV4ProPreview": 3,
@@ -1159,6 +1159,16 @@
       "spendRate": 0.8783
     },
     {
+      "model": "gpt5.6sol",
+      "games": 5,
+      "income": 2184,
+      "deployCost": 2353,
+      "comebackSupply": 0,
+      "avgIncome": 436.8,
+      "avgDeployCost": 470.6,
+      "spendRate": 1.0774
+    },
+    {
       "model": "doubaoseed2.1pro",
       "games": 6,
       "income": 1697,
@@ -1167,16 +1177,6 @@
       "avgIncome": 282.8,
       "avgDeployCost": 343.7,
       "spendRate": 1.2151
-    },
-    {
-      "model": "gpt5.6sol",
-      "games": 4,
-      "income": 1768,
-      "deployCost": 2014,
-      "comebackSupply": 0,
-      "avgIncome": 442,
-      "avgDeployCost": 503.5,
-      "spendRate": 1.1391
     },
     {
       "model": "grok4.5",
@@ -1259,6 +1259,16 @@
       "spendRate": 0.6976
     },
     {
+      "model": "kimik3",
+      "games": 4,
+      "income": 1204,
+      "deployCost": 1133,
+      "comebackSupply": 0,
+      "avgIncome": 301,
+      "avgDeployCost": 283.3,
+      "spendRate": 0.941
+    },
+    {
       "model": "glm4.7",
       "games": 1,
       "income": 1385,
@@ -1267,16 +1277,6 @@
       "avgIncome": 1385,
       "avgDeployCost": 835,
       "spendRate": 0.6029
-    },
-    {
-      "model": "kimik3",
-      "games": 3,
-      "income": 812,
-      "deployCost": 769,
-      "comebackSupply": 0,
-      "avgIncome": 270.7,
-      "avgDeployCost": 256.3,
-      "spendRate": 0.947
     },
     {
       "model": "fable5",
@@ -1623,11 +1623,11 @@
     },
     {
       "mapId": "artillery-zone",
-      "games": 10,
-      "avgRounds": 11.9,
-      "roundsSampled": 10,
-      "capturesPerGame": 8.4,
-      "avgDurationSec": 3941,
+      "games": 11,
+      "avgRounds": 11.91,
+      "roundsSampled": 11,
+      "capturesPerGame": 8.27,
+      "avgDurationSec": 4881.6,
       "winnerModels": [
         {
           "model": "dsv4flash0731",
@@ -1651,6 +1651,10 @@
         },
         {
           "model": "sensenova6.8flp",
+          "wins": 1
+        },
+        {
+          "model": "gpt5.6sol",
           "wins": 1
         }
       ]
@@ -2253,9 +2257,9 @@
     }
   },
   "funFacts": [
-    "在 87 局对局中，共打出 11,804 次操作：5,703 次移动、3,885 次攻击、1,284 次部署、665 次占领、137 次治疗。",
-    "战场上有 615 个单位阵亡，平均每局阵亡 7.1 个。",
-    "最受欢迎的单位是「infantry」，共部署 493 次，占全部部署的 38%。",
+    "在 88 局对局中，共打出 11,939 次操作：5,756 次移动、3,945 次攻击、1,296 次部署、672 次占领、140 次治疗。",
+    "战场上有 629 个单位阵亡，平均每局阵亡 7.1 个。",
+    "最受欢迎的单位是「infantry」，共部署 498 次，占全部部署的 38%。",
     "最暴躁的模型是「DeepseekV4FlashPreview」，累计发起 701 次攻击。",
     "最勤快的模型是「DeepseekV4FlashPreview」，累计移动 973 次。",
     "最漫长的一局是 tg_0039，鏖战 24 整轮。",
@@ -2266,7 +2270,7 @@
     "最无情的终结者是「minimaxm3」，亲手送走 4 名对手，自己也被淘汰 1 次。",
     "最常登场的战场是「default」，出现 24 次。",
     "节奏最密的一局是 tg_0034，平均每轮 26.07 次有效操作。",
-    "平均每局耗时约 150分4秒。"
+    "平均每局耗时约 151分5秒。"
   ],
   "timeline": [
     {
@@ -2637,6 +2641,15 @@
       "cumulativeActions": 11804,
       "avgRounds": 10.75,
       "avgDurationSec": 3107.9
+    },
+    {
+      "date": "2026-08-12",
+      "matches": 1,
+      "totalActions": 135,
+      "cumulativeMatches": 88,
+      "cumulativeActions": 11939,
+      "avgRounds": 12,
+      "avgDurationSec": 14287
     }
   ],
   "monthlyTrend": [
@@ -2658,10 +2671,10 @@
     },
     {
       "month": "2026.08",
-      "matches": 23,
-      "totalActions": 2575,
+      "matches": 24,
+      "totalActions": 2710,
       "avgRounds": 12,
-      "avgDurationSec": 7308,
+      "avgDurationSec": 7598.8,
       "activeModels": 22
     }
   ],
@@ -2831,11 +2844,11 @@
     {
       "model": "gpt5.6sol",
       "debutDate": "2026-07-21",
-      "latestDate": "2026-08-04",
-      "games": 4,
-      "wins": 4,
+      "latestDate": "2026-08-12",
+      "games": 5,
+      "wins": 5,
       "debutRecordId": "tg_0036",
-      "latestRecordId": "tg_0073"
+      "latestRecordId": "tg_0088"
     },
     {
       "model": "grok4.5",
@@ -2849,11 +2862,11 @@
     {
       "model": "kimik3",
       "debutDate": "2026-07-23",
-      "latestDate": "2026-08-07",
-      "games": 3,
+      "latestDate": "2026-08-12",
+      "games": 4,
       "wins": 3,
       "debutRecordId": "tg_0040",
-      "latestRecordId": "tg_0076"
+      "latestRecordId": "tg_0088"
     },
     {
       "model": "ring2.6",
@@ -3071,6 +3084,11 @@
       "schemaVersion": "3.2.9",
       "firstDate": "2026-08-06",
       "games": 13
+    },
+    {
+      "schemaVersion": "3.2.10",
+      "firstDate": "2026-08-12",
+      "games": 1
     }
   ]
 }

@@ -104,17 +104,17 @@
       <div class="panel-heading">
         <div class="panel-heading-copy">
           <h2>模型排行榜</h2>
-          <span>按 Wilson 下限评分排序 · 小样本不会虚高</span>
+          <span>双人局与多人局独立评分 · 默认按双人评分排序</span>
         </div>
         <div class="mobile-sort" aria-label="模型排行榜排序">
           <label for="model-sort-mobile">排序</label>
           <select id="model-sort-mobile">
-            <option value="rating">评分</option>
-            <option value="games">场次</option>
-            <option value="wins">胜场</option>
-            <option value="winRate">胜率</option>
-            <option value="top3Rate">前三率</option>
-            <option value="avgRank">平均名次</option>
+            <option value="duelRating">双人评分</option>
+            <option value="multiRating">多人评分</option>
+            <option value="multiPlacement">多人名次分</option>
+            <option value="duelGames">双人场次</option>
+            <option value="multiGames">多人场次</option>
+            <option value="games">总场次</option>
             <option value="model">模型名称</option>
           </select>
           <button id="model-sort-direction" class="icon-only" type="button" title="切换排序方向" aria-label="当前降序，切换排序方向"><span class="ui-icon icon-arrow-down" aria-hidden="true"></span></button>
@@ -126,23 +126,22 @@
             <tr>
               <th data-sort="rank">#</th>
               <th data-sort="model">模型</th>
-              <th data-sort="games" class="num">场次</th>
-              <th data-sort="wins" class="num">胜</th>
-              <th data-sort="losses" class="num">负</th>
-              <th data-sort="draws" class="num">平/僵</th>
-              <th data-sort="winRate" class="num">胜率</th>
-              <th data-sort="top3Rate" class="num">前三率</th>
-              <th data-sort="avgRank" class="num">均名次</th>
+              <th data-sort="games" class="num">总场次</th>
+              <th data-sort="duelGames" class="num">双人场次</th>
+              <th class="num">双人胜-负-平</th>
+              <th data-sort="duelWinRate" class="num">双人胜率</th>
+              <th data-sort="duelRating" class="num">双人评分</th>
+              <th data-sort="multiGames" class="num">多人场次</th>
+              <th data-sort="multiPlacement" class="num">多人名次分</th>
+              <th data-sort="multiRating" class="num">多人评分</th>
               <th data-sort="avgScore" class="num">均分</th>
-              <th data-sort="avgHqDamage" class="num">均HQ伤</th>
-              <th data-sort="rating" class="num">评分</th>
               <th>常用 Agent</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <p class="hint">点击模型行可查看对位矩阵与近期对局。评分 = Wilson 95% 下限，兼顾胜率与样本数。</p>
+      <p class="hint">双人评分：胜 1、平 0.5、负 0。多人名次分：第一名 1、末名 0，中间名次线性折算。两者分别计算 Wilson 95% 下限，不混合排序。</p>
     </section>
 
     <section class="two-col">

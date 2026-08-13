@@ -35,7 +35,7 @@
   /** @type {any[]} */
   let filteredMatches = [];
   let selectedModel = null;
-  let modelSort = { key: 'rating', dir: 'desc' };
+  let modelSort = { key: 'duelRating', dir: 'desc' };
   let matchSort = { key: 'date', dir: 'desc' };
 
   const REASON_LABELS = {
@@ -80,14 +80,14 @@
     if (kind) el.loadStatus.classList.add(kind);
   }
 
-  function wilsonLower(wins, n) {
-    if (n <= 0) return 0;
+  function wilsonLower(successes, trials) {
+    if (trials <= 0) return 0;
     const z = 1.96;
-    const p = wins / n;
+    const p = successes / trials;
     const z2 = z * z;
-    const denom = 1 + z2 / n;
-    const centre = p + z2 / (2 * n);
-    const margin = z * Math.sqrt((p * (1 - p) + z2 / (4 * n)) / n);
+    const denom = 1 + z2 / trials;
+    const centre = p + z2 / (2 * trials);
+    const margin = z * Math.sqrt((p * (1 - p) + z2 / (4 * trials)) / trials);
     return (centre - margin) / denom;
   }
 
@@ -155,6 +155,12 @@
         top3: 0,
         rankSum: 0,
         rankCount: 0,
+        duelGames: 0,
+        duelWins: 0,
+        duelLosses: 0,
+        duelDraws: 0,
+        multiGames: 0,
+        multiPlacementSum: 0,
         scoreSum: 0,
         scoreCount: 0,
         hqDamageSum: 0,
@@ -189,6 +195,23 @@
         if (isDraw) b.draws += 1;
         else if (p.isWinner || p.rank === 1) b.wins += 1;
         else if (p.rank != null || m.completed) b.losses += 1;
+
+        if (parts.length === 2) {
+          b.duelGames += 1;
+          if (isDraw) b.duelDraws += 1;
+          else if (p.isWinner || p.rank === 1) b.duelWins += 1;
+          else b.duelLosses += 1;
+        } else if (parts.length >= 3) {
+          const score = isDraw
+            ? 0.5
+            : Number.isInteger(p.rank) && p.rank >= 1 && p.rank <= parts.length
+              ? (parts.length - p.rank) / (parts.length - 1)
+              : null;
+          if (score != null) {
+            b.multiGames += 1;
+            b.multiPlacementSum += score;
+          }
+        }
 
         if (p.rank != null && p.rank <= 3) b.top3 += 1;
         if (p.rank != null) {
@@ -250,13 +273,29 @@
           avgScore,
           avgHqDamage,
           avgArtilleryDamage,
-          rating: wilsonLower(b.wins, b.games),
+          duelGames: b.duelGames,
+          duelWins: b.duelWins,
+          duelLosses: b.duelLosses,
+          duelDraws: b.duelDraws,
+          duelWinRate: b.duelGames > 0 ? b.duelWins / b.duelGames : null,
+          duelRating: b.duelGames > 0
+            ? wilsonLower(b.duelWins + b.duelDraws * 0.5, b.duelGames)
+            : null,
+          multiGames: b.multiGames,
+          multiPlacement: b.multiGames > 0 ? b.multiPlacementSum / b.multiGames : null,
+          multiRating: b.multiGames > 0 ? wilsonLower(b.multiPlacementSum, b.multiGames) : null,
           agents: b.agents,
           vs: b.vs,
           recent: b.recent,
         };
       })
-      .sort((a, b) => b.rating - a.rating || b.wins - a.wins || b.games - a.games)
+      .sort((a, b) => {
+        if (a.duelRating == null && b.duelRating != null) return 1;
+        if (b.duelRating == null && a.duelRating != null) return -1;
+        return (b.duelRating ?? 0) - (a.duelRating ?? 0)
+          || b.duelWins - a.duelWins
+          || b.duelGames - a.duelGames;
+      })
       .map((row, i) => ({ rank: i + 1, ...row }));
 
     const agentLeaderboard = [...agents.values()]
@@ -359,26 +398,28 @@
 
   function renderModelTable(rows) {
     const sorted = sortRows(rows, modelSort).map((row, i) =>
-      modelSort.key === 'rating' && modelSort.dir === 'desc' ? row : { ...row, rank: i + 1 },
+      modelSort.key === 'duelRating' && modelSort.dir === 'desc' ? row : { ...row, rank: i + 1 },
     );
-    // keep original rank from rating sort when default; otherwise show position in current sort
+    // 默认保留双人评分排名，切换排序时显示当前顺序。
     const body = el.modelTable.querySelector('tbody');
     body.innerHTML = sorted
       .map(r => {
         const selected = selectedModel === r.model ? 'selected' : '';
+        const duelRecord = r.duelGames
+          ? `${r.duelWins}-${r.duelLosses}-${r.duelDraws}`
+          : '—';
         return `<tr data-model="${escapeAttr(r.model)}" class="${selected}">
           <td class="num" data-label="排名">${r.rank}</td>
           <td class="model-name" data-label="模型">${escapeHtml(r.model)}</td>
-          <td class="num" data-label="场次">${r.games}</td>
-          <td class="num win" data-label="胜">${r.wins}</td>
-          <td class="num loss" data-label="负">${r.losses}</td>
-          <td class="num" data-label="平 / 僵">${r.draws}</td>
-          <td class="num" data-label="胜率"><span class="pill-rate">${pct(r.winRate)}</span></td>
-          <td class="num" data-label="前三率">${pct(r.top3Rate)}</td>
-          <td class="num" data-label="平均名次">${r.avgRank == null ? '—' : fmtNum(r.avgRank, 2)}</td>
+          <td class="num" data-label="总场次">${r.games}</td>
+          <td class="num" data-label="双人场次">${r.duelGames}</td>
+          <td class="num" data-label="双人胜-负-平">${duelRecord}</td>
+          <td class="num" data-label="双人胜率">${r.duelWinRate == null ? '—' : `<span class="pill-rate">${pct(r.duelWinRate)}</span>`}</td>
+          <td class="num" data-label="双人评分">${r.duelRating == null ? '—' : fmtNum(r.duelRating, 3)}</td>
+          <td class="num" data-label="多人场次">${r.multiGames}</td>
+          <td class="num" data-label="多人名次分">${r.multiPlacement == null ? '—' : pct(r.multiPlacement)}</td>
+          <td class="num" data-label="多人评分">${r.multiRating == null ? '—' : fmtNum(r.multiRating, 3)}</td>
           <td class="num" data-label="平均分">${r.avgScore == null ? '—' : fmtNum(r.avgScore, 0)}</td>
-          <td class="num" data-label="平均 HQ 伤害">${r.avgHqDamage == null ? '—' : fmtNum(r.avgHqDamage, 0)}</td>
-          <td class="num" data-label="评分">${fmtNum(r.rating, 3)}</td>
           <td class="muted" data-label="常用 Agent">${escapeHtml(topAgents(r.agents))}</td>
         </tr>`;
       })
@@ -641,7 +682,7 @@
 
   el.modelSortMobile?.addEventListener('change', () => {
     const key = el.modelSortMobile.value;
-    modelSort = { key, dir: key === 'model' || key === 'avgRank' ? 'asc' : 'desc' };
+    modelSort = { key, dir: key === 'model' ? 'asc' : 'desc' };
     applyAndRender();
   });
   el.modelSortDirection?.addEventListener('click', () => {

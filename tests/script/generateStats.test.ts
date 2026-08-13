@@ -9,6 +9,8 @@ import {
   isDrawMatch,
   isRankedMatch,
   parseReviewFileName,
+  placementScore,
+  wilsonLower,
 } from '../../script/generateStats.mjs';
 
 function participant(playerId: string, model: string, rank: number | null, isWinner = false) {
@@ -168,5 +170,48 @@ describe('stats aggregation', () => {
       games: 2,
       wins: 0,
     });
+  });
+
+  it('counts a duel draw as half a success without mixing it into multiplayer rating', () => {
+    const draw = match({
+      reason: 'turn_limit_draw',
+      participants: [
+        participant('player_a', 'model-a', 1),
+        participant('player_b', 'model-b', 1),
+      ],
+    });
+
+    const row = aggregate([draw]).modelLeaderboard.find(item => item.model === 'model-a');
+
+    expect(row?.duelRating).toBeCloseTo(wilsonLower(0.5, 1), 4);
+    expect(row).toMatchObject({
+      duelGames: 1,
+      duelWins: 0,
+      duelLosses: 0,
+      duelDraws: 1,
+      multiGames: 0,
+      multiRating: null,
+    });
+  });
+
+  it('scores multiplayer placements independently across player counts', () => {
+    expect(placementScore(1, 3)).toBe(1);
+    expect(placementScore(2, 3)).toBe(0.5);
+    expect(placementScore(3, 3)).toBe(0);
+    expect(placementScore(2, 4)).toBeCloseTo(2 / 3);
+    expect(placementScore(4, 6)).toBe(0.4);
+
+    const multiplayer = match({
+      participants: [
+        participant('player_a', 'model-a', 1, true),
+        participant('player_b', 'model-b', 2),
+        participant('player_c', 'model-c', 3),
+      ],
+      winner: 'player_a',
+    });
+    const row = aggregate([multiplayer]).modelLeaderboard.find(item => item.model === 'model-b');
+
+    expect(row).toMatchObject({ duelGames: 0, duelRating: null, multiGames: 1, multiPlacement: 0.5 });
+    expect(row?.multiRating).toBeCloseTo(wilsonLower(0.5, 1), 4);
   });
 });

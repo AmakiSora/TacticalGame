@@ -8,6 +8,8 @@ describe('stats dashboard', () => {
     expect(source).toContain('title="${escapeAttr(name)}">${escapeHtml(label)}');
     expect(source).toContain('if (!isRankedMatch(m)) continue;');
     expect(source).toContain('if (!isDraw && (p.isWinner || p.rank === 1)) ag.wins += 1;');
+    expect(source).toContain("let modelSort = { key: 'duelRating', dir: 'desc' };");
+    expect(source).toContain('multiRating: b.multiGames > 0');
   });
 
   it('does not publish the generator machine path', () => {
@@ -27,6 +29,8 @@ describe('stats dashboard', () => {
     expect(html).toContain('id="match-sort-direction"');
     expect(source).toContain('data-label="模型"');
     expect(source).toContain('data-label="参赛模型"');
+    expect(source).toContain('data-label="双人评分"');
+    expect(source).toContain('data-label="多人评分"');
     expect(source).toContain('function syncMobileSortControls');
     expect(css).toContain('@media (max-width: 720px)');
     expect(css).toContain('content: attr(data-label)');

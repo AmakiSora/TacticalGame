@@ -574,6 +574,12 @@ function emptyModelBucket(model) {
     top3: 0,
     rankSum: 0,
     rankCount: 0,
+    duelGames: 0,
+    duelWins: 0,
+    duelLosses: 0,
+    duelDraws: 0,
+    multiGames: 0,
+    multiPlacementSum: 0,
     scoreSum: 0,
     scoreCount: 0,
     hqDamageSum: 0,
@@ -588,6 +594,12 @@ function emptyModelBucket(model) {
 
 export function isDrawMatch(match) {
   return match.reason === 'turn_limit_draw' || match.reason === 'forced_adjudication_draw' || Boolean(match.reviewFlags?.deadlock);
+}
+
+/** 多人局名次归一化：第一名为 1，末名为 0，中间名次线性分布。 */
+export function placementScore(rank, playerCount) {
+  if (!Number.isInteger(rank) || playerCount < 3 || rank < 1 || rank > playerCount) return null;
+  return (playerCount - rank) / (playerCount - 1);
 }
 
 export function isRankedMatch(match) {
@@ -680,6 +692,19 @@ export function aggregate(matches) {
       else if (p.isWinner || p.rank === 1) b.wins += 1;
       else if (p.rank != null || match.completed) b.losses += 1;
 
+      if (parts.length === 2) {
+        b.duelGames += 1;
+        if (isDraw) b.duelDraws += 1;
+        else if (p.isWinner || p.rank === 1) b.duelWins += 1;
+        else b.duelLosses += 1;
+      } else if (parts.length >= 3) {
+        const score = isDraw ? 0.5 : placementScore(p.rank, parts.length);
+        if (score != null) {
+          b.multiGames += 1;
+          b.multiPlacementSum += score;
+        }
+      }
+
       if (p.rank != null && p.rank <= 3) b.top3 += 1;
       if (p.rank != null) {
         b.rankSum += p.rank;
@@ -733,8 +758,8 @@ export function aggregate(matches) {
       const avgRank = b.rankCount > 0 ? b.rankSum / b.rankCount : null;
       const avgScore = b.scoreCount > 0 ? b.scoreSum / b.scoreCount : null;
       const avgHqDamage = b.hqDamageCount > 0 ? b.hqDamageSum / b.hqDamageCount : null;
-      // simple rating: winRate weighted by sample size (Wilson-ish light)
-      const rating = wilsonLower(b.wins, b.games);
+      const duelWinRate = b.duelGames > 0 ? b.duelWins / b.duelGames : null;
+      const multiPlacement = b.multiGames > 0 ? b.multiPlacementSum / b.multiGames : null;
       return {
         model: b.model,
         games: b.games,
@@ -747,7 +772,19 @@ export function aggregate(matches) {
         avgRank: avgRank == null ? null : round2(avgRank),
         avgScore: avgScore == null ? null : round1(avgScore),
         avgHqDamage: avgHqDamage == null ? null : round1(avgHqDamage),
-        rating: round4(rating),
+        duelGames: b.duelGames,
+        duelWins: b.duelWins,
+        duelLosses: b.duelLosses,
+        duelDraws: b.duelDraws,
+        duelWinRate: duelWinRate == null ? null : round4(duelWinRate),
+        duelRating: b.duelGames > 0
+          ? round4(wilsonLower(b.duelWins + b.duelDraws * 0.5, b.duelGames))
+          : null,
+        multiGames: b.multiGames,
+        multiPlacement: multiPlacement == null ? null : round4(multiPlacement),
+        multiRating: b.multiGames > 0
+          ? round4(wilsonLower(b.multiPlacementSum, b.multiGames))
+          : null,
         agents: b.agents,
         maps: b.maps,
         versions: b.versions,
@@ -756,10 +793,11 @@ export function aggregate(matches) {
       };
     })
     .sort((a, b) => {
-      // primary: rating, then wins, then games
-      if (b.rating !== a.rating) return b.rating - a.rating;
-      if (b.wins !== a.wins) return b.wins - a.wins;
-      return b.games - a.games;
+      if (a.duelRating == null && b.duelRating != null) return 1;
+      if (b.duelRating == null && a.duelRating != null) return -1;
+      if (b.duelRating !== a.duelRating) return (b.duelRating ?? 0) - (a.duelRating ?? 0);
+      if (b.duelWins !== a.duelWins) return b.duelWins - a.duelWins;
+      return b.duelGames - a.duelGames;
     })
     .map((row, i) => ({ rank: i + 1, ...row }));
 
@@ -827,14 +865,14 @@ export function aggregate(matches) {
 }
 
 /** Wilson score lower bound (z≈1.96) for ranking with small samples. */
-function wilsonLower(wins, n) {
-  if (n <= 0) return 0;
+export function wilsonLower(successes, trials) {
+  if (trials <= 0) return 0;
   const z = 1.96;
-  const p = wins / n;
+  const p = successes / trials;
   const z2 = z * z;
-  const denom = 1 + z2 / n;
-  const centre = p + z2 / (2 * n);
-  const margin = z * Math.sqrt((p * (1 - p) + z2 / (4 * n)) / n);
+  const denom = 1 + z2 / trials;
+  const centre = p + z2 / (2 * trials);
+  const margin = z * Math.sqrt((p * (1 - p) + z2 / (4 * trials)) / trials);
   return (centre - margin) / denom;
 }
 
@@ -970,11 +1008,11 @@ function main() {
     }
   }
 
-  // print top 10 models for quick sanity check
-  console.log('Top models:');
+  // print top 10 duel models for quick sanity check
+  console.log('Top duel models:');
   for (const row of payload.modelLeaderboard.slice(0, 10)) {
     console.log(
-      `  #${row.rank} ${row.model}  ${row.wins}W/${row.games}G  wr=${(row.winRate * 100).toFixed(1)}%  rating=${row.rating.toFixed(3)}  avgRank=${row.avgRank ?? '-'}`,
+      `  #${row.rank} ${row.model}  duel=${row.duelWins}W/${row.duelLosses}L/${row.duelDraws}D  games=${row.duelGames}  rating=${row.duelRating?.toFixed(3) ?? '-'}  multi=${row.multiRating?.toFixed(3) ?? '-'}`,
     );
   }
 }

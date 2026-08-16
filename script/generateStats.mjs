@@ -40,6 +40,7 @@ export const MODEL_ALIASES = new Map([
   ['qwen3.7max', 'qwen3.7max'],
   ['qwen3.8max', 'Qwen3.8Max'],
   ['qwen3.8maxpreview', 'Qwen3.8MaxPreview'],
+  ['glm5.3', 'glm5.3'],
   ['glm5.2', 'glm5.2'],
   ['glm5.1', 'glm5.1'],
   ['glm4.7', 'glm4.7'],
@@ -56,8 +57,7 @@ export const MODEL_ALIASES = new Map([
   ['ring2.6', 'ring2.6'],
   ['deepseekv4pro', 'DeepseekV4Pro'],
   ['deepseekv4propreview', 'DeepseekV4ProPreview'],
-  // 游戏端历史 20 字符截断名（DeepseekV4FlashPreview → DeepseekV4FlashPrevi），归一化回完整名
-  ['deepseekv4flashprevi', 'DeepseekV4FlashPreview'],
+  ['DeepseekV4FlashPreview', 'DeepseekV4FlashPreview'],
 ]);
 
 export const REPLAY_JSON_RE = /^(tg_\d+)_(\d{8})\.json$/i;

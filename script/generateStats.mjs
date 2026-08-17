@@ -100,9 +100,13 @@ export function canonicalizeModel(raw) {
     key = key.slice(0, -1);
   }
   if (MODEL_ALIASES.has(key)) return MODEL_ALIASES.get(key);
+  const stripped = key.replace(/[-_]/g, '');
   for (const [alias, canon] of MODEL_ALIASES) {
-    if (key.replace(/[-_]/g, '') === alias.replace(/[-_]/g, '')) return canon;
+    if (stripped === alias.replace(/[-_]/g, '')) return canon;
   }
+  // Truncated display names (e.g. UI caps names at 20 chars): resolve when exactly one alias starts with the key
+  const prefixMatches = [...MODEL_ALIASES.entries()].filter(([alias]) => alias.startsWith(stripped));
+  if (prefixMatches.length === 1) return prefixMatches[0][1];
   return key;
 }
 

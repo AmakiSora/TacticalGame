@@ -7,7 +7,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 Manual operation of the Hex multiplayer game (app version `3.2.12`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
-Do **not** run `node skill/ai-player.mjs` (or the copy under this skill directory) to delegate turns. That script is for tests/demos only.
+Do **not** run `node skill/ai-player.mjs` (or the copy under this skill directory) to delegate turns. That script is for tests/demos only. `skill/wait-turn.mjs` is the only script you should run during a game, and only for waiting between turns.
 
 ## Mode routing (mandatory)
 
@@ -36,18 +36,39 @@ Before any API call, read the cloud server address from the user prompt and buil
 
 Keep player/host tokens in headers only. Never put tokens in URLs or print them.
 
+## Polling decision (mandatory)
+
+Before playing, classify the user prompt **once** and follow it for the whole game. This decides whether you keep polling after every `/end-turn`:
+
+- **Full-game / continuous intent** — e.g. 打完整局、一直玩、自动对局、打完为止、全程参与、赢下这局、play the whole game、play until it ends、keep playing → after **every** `/end-turn` you **must** keep waiting until `game_over` or your elimination. Never stop mid-game to wait for human input.
+- **Single-turn intent** — e.g. 只打一回合、走一步看看、play one turn、this turn only → stop and report right after `/end-turn`.
+- **Ambiguous** — default to full-game behavior and keep polling; not polling is the known failure mode. You may state this assumption in your report.
+
+Use [`wait-turn.mjs`](wait-turn.mjs) for the wait; do not hand-roll GET loops:
+
+```bash
+node skill/wait-turn.mjs --url ${BASE_URL} --game <gameId> --player <yourSeat> --token <playerToken> [--interval-s 3] [--timeout-s 1800]
+```
+
+Run it as a **blocking/background wait** immediately after `/end-turn` (or whenever it is not your turn). The token stays in the header only. Interpret the exit code:
+
+- `0` `my_turn` → refresh state, resume the turn loop
+- `2` `game_over` → report the final result and stop
+- `3` `eliminated` → report elimination and stop
+- `4` `timeout` → tell the user nothing happened within the window; only under full-game intent, rerun the script
+
 ## Manual Turn Loop
 
 1. `GET ${BASE_URL}/api/games/:id`
 2. `winner` or `phase === "game_over"` → stop, report result
 3. `phase === "lobby"` → host starts with `X-Host-Token` when ready; joiners wait for `active`
 4. `players[you].status !== "active"` → stop, report elimination
-5. Not your turn → poll briefly; do not ask the human to announce the turn
+5. Not your turn → run `wait-turn.mjs` (see Polling decision); do not hand-roll GET loops, do not ask the human to announce the turn
 6. Your turn → confirm mode file is loaded, run that mode's checklist, pick one legal action
 7. Brief rationale, then the matching endpoint
 8. Refresh state after every success and reason again
 9. `/end-turn` only when no useful legal action remains
-10. Keep polling after end-turn only if the user asked you to keep playing
+10. After `/end-turn`: follow the Polling decision — full-game intent means immediately running `wait-turn.mjs` again; single-turn intent means stopping with a report
 
 Player actions need a player token (`POST /api/games` with `participate: true`, or `POST /join`). Host token is separate; `participate: false` hosts never get a player token.
 

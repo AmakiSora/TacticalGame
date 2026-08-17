@@ -1187,6 +1187,10 @@ function normalizeListedGame(game) {
   };
 }
 
+function sortGamesByLatest(games) {
+  return [...games].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+}
+
 function closeGamePicker() {
   if (!gamePicker || !gamePickerButton) return;
   gamePicker.classList.remove('open');
@@ -1232,11 +1236,11 @@ function renderGamePickerMenu() {
       for (const game of gamesList) {
         const option = document.createElement('button');
         option.type = 'button';
-        option.className = 'game-picker-option';
+        option.className = `game-picker-option phase-${game.phase || 'unknown'}`;
         option.dataset.gameId = game.id;
         option.setAttribute('role', 'option');
         option.innerHTML = `<span class="game-id">${esc(game.id.slice(0, 8))}</span>
-          <span class="phase-badge">${esc(phaseLabel(game.phase))}</span>
+          <span class="phase-badge phase-${esc(game.phase || 'unknown')}">${esc(phaseLabel(game.phase))}</span>
           <span class="game-meta-line">回合 ${esc(game.turnNumber)} · ${esc(game.mapId || 'default')}</span>`;
         option.addEventListener('click', () => selectGame(game.id));
         gamePickerMenu.append(option);
@@ -1266,8 +1270,8 @@ async function fetchGameList() {
     return gamesList;
   }
   const { games } = payload || {};
-  gamesList = (games || []).map(normalizeListedGame)
-    .filter(game => typeof game.id === 'string' && game.id.length > 0);
+  gamesList = sortGamesByLatest((games || []).map(normalizeListedGame)
+    .filter(game => typeof game.id === 'string' && game.id.length > 0));
   const prev = gameSelect.value;
   gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
   for (const g of gamesList) {

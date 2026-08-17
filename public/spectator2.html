@@ -266,8 +266,11 @@
     .game-picker-option .game-meta-line { grid-column: 1 / -1; color: var(--ink-faint); font-size: 11.5px; }
     .phase-badge {
       padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
-      background: rgba(255, 92, 168, .12); border: 1px solid rgba(255, 92, 168, .35); color: #ffb9d9;
+      background: rgba(148,163,184,.14); border: 1px solid rgba(148,163,184,.32); color: #cbd5e1;
     }
+    .phase-badge.phase-lobby { background: rgba(245,158,11,.15); border-color: rgba(245,158,11,.48); color: #fbbf24; }
+    .phase-badge.phase-active { background: rgba(34,197,94,.15); border-color: rgba(34,197,94,.48); color: #86efac; }
+    .phase-badge.phase-game_over { background: rgba(148,163,184,.16); border-color: rgba(148,163,184,.42); color: #cbd5e1; }
     .game-picker-empty { padding: 14px 12px; color: var(--ink-faint); font-size: 13px; text-align: center; }
 
     /* 图例 */
@@ -2148,11 +2151,11 @@
     for (const game of gamesList) {
       const option = document.createElement('button');
       option.type = 'button';
-      option.className = 'game-picker-option';
+      option.className = `game-picker-option phase-${game.phase || 'unknown'}`;
       option.dataset.gameId = game.id;
       option.setAttribute('role', 'option');
       option.innerHTML = `<span class="game-id">${esc(game.id.slice(0, 8))}</span>
-        <span class="phase-badge">${esc(game.phase)}</span>
+        <span class="phase-badge phase-${esc(game.phase || 'unknown')}">${esc(phaseLabel(game.phase))}</span>
         <span class="game-meta-line">回合 ${esc(game.turnNumber)} · ${esc(game.mapId || 'default')}</span>`;
       option.addEventListener('click', () => selectGame(game.id));
       gamePickerMenu.append(option);
@@ -2170,7 +2173,8 @@
   async function fetchGameList() {
     const res = await fetch('/api/games');
     const { games } = await res.json();
-    gamesList = (games || []).map(normalizeListedGame).filter(game => game.id);
+    gamesList = (games || []).map(normalizeListedGame).filter(game => game.id)
+      .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
     const prev = gameSelect.value;
     gameSelect.innerHTML = '<option value="">-- 选择对局 --</option>';
     for (const g of gamesList) {

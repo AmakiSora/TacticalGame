@@ -26,16 +26,22 @@ function lobbySummary(game: GameState) {
 
 export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/games', async () => ({
+    // Keep the newest lobbies/games at the top.  Use the first event when
+    // available (it is the authoritative server timestamp), and fall back to
+    // the earliest player's join time for an empty lobby.
     games: globalStore.list().map(id => {
       const game = globalStore.get(id)!;
+      const createdAt = game.events[0]?.timestamp
+        ?? Math.min(...Object.values(game.players).map(player => player.joinedAt));
       return {
         ...lobbySummary(game),
         roundNumber: game.turn.roundNumber,
         currentPlayerId: game.turn.currentPlayerId,
         winner: game.winner,
         playerNames: game.playerNames,
+        createdAt,
       };
-    }),
+    }).sort((a, b) => b.createdAt - a.createdAt),
   }));
 
   app.post<{ Body: { mapId?: string; maxPlayers?: number; participate?: boolean; playerName?: string } }>(

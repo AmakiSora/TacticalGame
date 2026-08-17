@@ -828,11 +828,53 @@ function renderControlPointCard(cp) {
   </div>`;
 }
 
+const EVENT_LABELS = {
+  player_joined: '玩家加入',
+  player_left: '玩家离开',
+  game_start: '对局开始',
+  move: '移动',
+  attack: '攻击',
+  heal: '治疗',
+  unit_death: '单位阵亡',
+  deploy: '部署单位',
+  demolish: '爆破地形',
+  control_point_captured: '占领据点',
+  control_point_neutralized: '据点中立',
+  control_point_repair: '据点维修',
+  income: '收入结算',
+  comeback_supply: '追赶补给',
+  artillery_warning: '炮火预警',
+  artillery_shrunk: '炮火收缩',
+  artillery_damage: '炮火轰击',
+  reset_actions: '结束回合',
+  turn_skipped: '跳过回合',
+  turn_end: '回合交接',
+  round_end: '轮次结束',
+  headquarters_destroyed: '指挥部被毁',
+  player_eliminated: '玩家淘汰',
+  game_over: '对局结束',
+  name_rename: '玩家改名',
+};
+
+const PHASE_LABELS = {
+  lobby: '等待中',
+  active: '进行中',
+  game_over: '已结束',
+};
+
+function eventLabel(type) {
+  return EVENT_LABELS[type] || type;
+}
+
+function phaseLabel(phase) {
+  return PHASE_LABELS[phase] || phase;
+}
+
 function formatEventShort(ev) {
   const p = ev.payload || {};
   switch (ev.type) {
     case 'game_start': return '对局开始';
-    case 'deploy': return `部署 ${p.unitType} @(${p.q},${p.r})`;
+    case 'deploy': return `部署 ${UNIT_NAMES[p.unitType] || p.unitType} @(${p.q},${p.r})`;
     case 'move': return `移动 ${String(p.unitId).slice(0, 6)} -> (${p.toQ},${p.toR})`;
     case 'attack': return `攻击 ${String(p.targetId).slice(0, 6)} 伤害:${p.damage}`;
     case 'heal': return `治疗 ${String(p.targetId).slice(0, 6)} +${p.amount}`;
@@ -849,7 +891,11 @@ function formatEventShort(ev) {
     case 'artillery_damage': return `${playerName(p.owner)} 单位遭炮击 -${p.damage}`;
     case 'turn_end': return `回合结束 -> ${playerName(p.nextPlayerId || p.nextOwner)} (${p.turnNumber || p.roundNumber})`;
     case 'round_end': return `第 ${p.roundNumber || '?'} 轮结束`;
-    case 'turn_skipped': return `跳过 ${playerName(p.playerId)}`;
+    case 'reset_actions': return `${playerName(p.owner)} 结束回合，动作点重置`;
+    case 'turn_skipped': return `${playerName(p.playerId)} 跳过回合`;
+    case 'player_joined': return `${p.name || playerName(p.playerId)} 加入对局`;
+    case 'player_left': return `${playerName(p.playerId)} 离开对局`;
+    case 'name_rename': return `${playerName(p.playerId)} 改名为 ${p.name}`;
     case 'game_over':
       if (p.reason === 'mutual_annihilation') return '双方同归于尽';
       if (p.reason === 'forced_adjudication_draw') return '强制裁决平局';
@@ -1037,7 +1083,7 @@ function syncMobileChrome() {
     // full payload stays in drawer; strip uses compact summary from renderDetail
     if (state && currentStep >= 0 && currentStep < allEvents.length) {
       const ev = allEvents[currentStep];
-      drawerDetail.innerHTML = `<span class="ev-type ${ev.type}">${esc(ev.type)}</span><span style="color:#888">#${ev.seq}</span><span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>`;
+      drawerDetail.innerHTML = `<span class="ev-type ${ev.type}">${esc(eventLabel(ev.type))}</span><span style="color:#888">#${ev.seq}</span><span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>`;
     }
   }
   renderDrawerGameList();
@@ -1063,13 +1109,13 @@ function renderDetail() {
     ? ` · ${resultText(state.result)}`
     : '';
   detailEl.innerHTML = `<div class="sel-summary-line">
-    <strong>${esc(ev.type)}</strong>
+    <strong>${esc(eventLabel(ev.type))}</strong>
     <span class="sel-summary-meta">#${ev.seq} · ${esc(formatEventShort(ev))}${esc(note)}</span>
     <span class="sel-summary-hint">详情 ▾</span>
   </div>`;
   const drawerDetail = document.getElementById('drawer-event-detail');
   if (drawerDetail) {
-    drawerDetail.innerHTML = `<span class="ev-type ${ev.type}">${esc(ev.type)}</span><span style="color:#888">#${ev.seq}</span><span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>`;
+    drawerDetail.innerHTML = `<span class="ev-type ${ev.type}">${esc(eventLabel(ev.type))}</span><span style="color:#888">#${ev.seq}</span><span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>`;
   }
 }
 
@@ -1128,7 +1174,7 @@ function buildTimelineMarkers() {
 }
 
 function gameOptionText(game) {
-  return `${game.id.slice(0, 8)} - ${game.phase} 回合${game.turnNumber}`;
+  return `${game.id.slice(0, 8)} - ${phaseLabel(game.phase)} 回合${game.turnNumber}`;
 }
 
 function normalizeListedGame(game) {
@@ -1190,7 +1236,7 @@ function renderGamePickerMenu() {
         option.dataset.gameId = game.id;
         option.setAttribute('role', 'option');
         option.innerHTML = `<span class="game-id">${esc(game.id.slice(0, 8))}</span>
-          <span class="phase-badge">${esc(game.phase)}</span>
+          <span class="phase-badge">${esc(phaseLabel(game.phase))}</span>
           <span class="game-meta-line">回合 ${esc(game.turnNumber)} · ${esc(game.mapId || 'default')}</span>`;
         option.addEventListener('click', () => selectGame(game.id));
         gamePickerMenu.append(option);
@@ -1227,7 +1273,7 @@ async function fetchGameList() {
   for (const g of gamesList) {
     const opt = document.createElement('option');
     opt.value = g.id;
-    opt.textContent = `${g.id.slice(0, 8)} - ${g.phase} 回合${g.turnNumber}`;
+    opt.textContent = `${g.id.slice(0, 8)} - ${phaseLabel(g.phase)} 回合${g.turnNumber}`;
     gameSelect.appendChild(opt);
   }
   if (prev && [...gameSelect.options].some(o => o.value === prev)) gameSelect.value = prev;
@@ -1308,7 +1354,7 @@ async function deleteCurrentGame() {
     return;
   }
   const game = gamesList.find(g => g.id === id);
-  const phase = game?.phase || '未知';
+  const phase = phaseLabel(game?.phase) || '未知';
   const turnNumber = game?.turnNumber ?? '未知';
   const ok = confirm(`确定删除对局 ${id}？\n阶段：${phase}\n回合：${turnNumber}\n\n该操作会删除内存与持久化文件中的对局，不能撤销。`);
   if (!ok) return;
@@ -1837,7 +1883,7 @@ function renderDrawerGameList() {
   }
   list.innerHTML = gamesList.map(g => {
     const id = g.id || g.gameId || '';
-    const phase = g.phase || g.status || '';
+    const phase = phaseLabel(g.phase || g.status) || '';
     const active = id === current ? ' active' : '';
     return `<button type="button" class="drawer-game-option${active}" data-id="${esc(id)}">
       <div class="game-id">${esc(id)}</div>

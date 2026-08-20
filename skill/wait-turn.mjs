@@ -21,7 +21,8 @@ function printHelp() {
   node skill/wait-turn.mjs --url <serverUrl> --game <gameId> --player <a-h|player_a-player_h> --token <playerToken>
 
 Blocks while polling GET /api/games/:id until the seat's turn returns, the game
-ends, or the seat is eliminated. Run it in the background after /end-turn.
+ends, or the seat is eliminated. Run it in the FOREGROUND (blocking) after
+/end-turn and wait for its exit code; never send it to the background.
 
 Options:
   --url <url>          API base URL; required unless TACTICAL_GAME_URL is set

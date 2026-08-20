@@ -50,7 +50,7 @@ Use [`wait-turn.mjs`](wait-turn.mjs) for the wait; do not hand-roll GET loops:
 node skill/wait-turn.mjs --url ${BASE_URL} --game <gameId> --player <yourSeat> --token <playerToken> [--interval-s 3] [--timeout-s 1800]
 ```
 
-Run it as a **blocking/background wait** immediately after `/end-turn` (or whenever it is not your turn). The token stays in the header only. Interpret the exit code:
+Run it in the **foreground as a blocking command** immediately after `/end-turn` (or whenever it is not your turn): wait for it to exit and read its exit code before doing anything else. **Never** send it to the background — no `&`, no `nohup`, no "run in background" mode, no detached shell. A backgrounded wait is a known failure mode: the agent loses track of the game and stops responding. If your harness imposes a foreground command timeout shorter than `--timeout-s`, lower `--timeout-s` to fit and rerun the script on exit code `4` instead of backgrounding it. The token stays in the header only. Interpret the exit code:
 
 - `0` `my_turn` → refresh state, resume the turn loop
 - `2` `game_over` → report the final result and stop
@@ -63,12 +63,12 @@ Run it as a **blocking/background wait** immediately after `/end-turn` (or whene
 2. `winner` or `phase === "game_over"` → stop, report result
 3. `phase === "lobby"` → host starts with `X-Host-Token` when ready; joiners wait for `active`
 4. `players[you].status !== "active"` → stop, report elimination
-5. Not your turn → run `wait-turn.mjs` (see Polling decision); do not hand-roll GET loops, do not ask the human to announce the turn
+5. Not your turn → run `wait-turn.mjs` in the foreground (see Polling decision); do not hand-roll GET loops, do not background the script, do not ask the human to announce the turn
 6. Your turn → confirm mode file is loaded, run that mode's checklist, pick one legal action
 7. Brief rationale, then the matching endpoint
 8. Refresh state after every success and reason again
 9. `/end-turn` only when no useful legal action remains
-10. After `/end-turn`: follow the Polling decision — full-game intent means immediately running `wait-turn.mjs` again; single-turn intent means stopping with a report
+10. After `/end-turn`: follow the Polling decision — full-game intent means immediately running `wait-turn.mjs` again (foreground, blocking); single-turn intent means stopping with a report
 
 Player actions need a player token (`POST /api/games` with `participate: true`, or `POST /join`). Host token is separate; `participate: false` hosts never get a player token.
 

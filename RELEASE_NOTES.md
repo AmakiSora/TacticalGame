@@ -2,6 +2,12 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.2.13
+
+- 统一版本号变更脚本：应用版本号分散硬编码在 `package.json`、`package-lock.json`（顶层与 `packages['']` 两处）、`public/version.js`、`README.md`、`skill/SKILL.md`、`.qoder/skills/play-hex-api-game/SKILL.md`（skill 的 IDE 拷贝）与 `tests/public/import-export.test.ts` 的版本断言共 7 个位置，发版时手工逐个改极易漏改——`3.2.13` 提升时就漏改了 `README.md`、`package-lock.json` 与测试断言，导致 CI 在 `tests/skill/ai-player.test.ts` 与 `tests/public/import-export.test.ts` 两处版本一致性断言上失败。新增 `script/bump-version.mjs` 统一管理：传版本号一键提升全部位置（同时把 `public/*.html` 中与旧版本一致的脚本缓存参数 `?v=` 提升，并在 `RELEASE_NOTES.md` 插入新版本占位小节）、无参以 `package.json` 为基准同步其余位置（修复漏改）、`--check` 只校验一致性并输出 `OK`/`DRIFT` 清单（不一致退出码 1）；`board-animation.js?v=3.2.6` 这类独立维护的缓存参数不受影响。
+- `package.json` 新增 `sync-version`、`check-version` 脚本，并挂 `version` 生命周期钩子使 `npm version <x>` 自动触发同步；CI（`.github/workflows/ci.yml`）在 `npm test` 之前新增 `npm run check-version` 步骤，版本漂移会在 1 秒内以清晰清单报出，而不是埋在测试失败日志里。以后所有版本变更一律经 `node script/bump-version.mjs <version>` 完成。
+- Hex API Game Skill 回合等待强制前台执行：多个 AI 使用该 skill 时习惯把 `skill/wait-turn.mjs` 放到后台运行，导致 agent 丢失对局跟踪、结束回合后不再响应。为此 `SKILL.md` 的「Polling decision」小节与脚本 `--help` 文案由原先的 "blocking/background wait" 改为强制**前台阻塞执行**——必须等待脚本退出并读取退出码后再继续；明确禁止 `&`、`nohup`、"后台运行" 模式、分离 shell 等一切后台方式，并将后台化标注为已知故障模式；若 harness 的前台命令超时短于 `--timeout-s`，要求调小 `--timeout-s` 适配并在退出码 `4`（timeout）时重跑脚本，而不是转后台。手动回合循环（Manual Turn Loop）第 5、10 步同步加上「前台执行、禁止后台」字样，覆盖 AI 最常读到的两处操作清单。
+
 ## 3.2.12
 
 - 观战对局选择体验优化：对局列表改为按创建时间倒序排列，最新对局始终显示在顶部，避免对局数量增加后需要滚动到底部；`/api/games` 返回服务端权威的 `createdAt` 并统一排序，桌面端、移动端与全息观战页面同步适配。

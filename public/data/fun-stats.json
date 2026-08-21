@@ -1,42 +1,72 @@
 {
-  "generatedAt": "2026-08-17T18:03:11.143Z",
+  "generatedAt": "2026-08-21T01:41:06.020Z",
   "source": {
     "versions": [
       "V2",
       "V3"
     ],
-    "replayCount": 108,
+    "replayCount": 117,
     "parseErrors": 0
   },
   "warnings": [],
   "overview": {
-    "matchCount": 108,
-    "completedCount": 105,
+    "matchCount": 117,
+    "completedCount": 114,
     "totalActions": {
-      "moves": 6718,
-      "attacks": 4800,
-      "deploys": 1553,
-      "heals": 156,
-      "demolishes": 150,
-      "captures": 803,
-      "unitDeaths": 796,
-      "rounds": 972,
-      "income": 94306,
-      "deployCost": 76435,
+      "moves": 7211,
+      "attacks": 5173,
+      "deploys": 1639,
+      "heals": 170,
+      "demolishes": 158,
+      "captures": 851,
+      "unitDeaths": 869,
+      "rounds": 1087,
+      "income": 101112,
+      "deployCost": 80753,
       "comebackSupply": 932
     },
-    "totalEvents": 26802,
-    "avgRounds": 9,
-    "avgDurationSec": 9049.1,
-    "totalDurationSec": 968249.0060000004,
+    "totalEvents": 29058,
+    "avgRounds": 9.29,
+    "avgDurationSec": 9322.1,
+    "totalDurationSec": 1081368.9390000005,
     "dateMin": "20260614",
-    "dateMax": "20260818",
+    "dateMax": "20260821",
     "avgActionsPerRound": 8.93,
-    "avgIncomePerMatch": 873.2,
-    "avgDeployCostPerMatch": 707.7,
-    "spendRate": 0.8105
+    "avgIncomePerMatch": 864.2,
+    "avgDeployCostPerMatch": 690.2,
+    "spendRate": 0.7986
   },
   "modelProfiles": [
+    {
+      "model": "glm5.2",
+      "games": 22,
+      "moves": 658,
+      "attacks": 551,
+      "deploys": 124,
+      "heals": 24,
+      "captures": 102,
+      "demolishes": 6,
+      "unitDeathsLost": 86,
+      "perGame": {
+        "attacks": 25.05,
+        "heals": 1.09,
+        "deploys": 5.64,
+        "captures": 4.64,
+        "moves": 29.91,
+        "demolishes": 0.27
+      },
+      "deploysByType": {
+        "ranger": 37,
+        "support": 15,
+        "heavy": 14,
+        "scout": 32,
+        "infantry": 26
+      },
+      "styleTags": [
+        "治疗型",
+        "扩张型"
+      ]
+    },
     {
       "model": "DeepseekV4FlashPreview",
       "games": 20,
@@ -68,55 +98,54 @@
       ]
     },
     {
-      "model": "glm5.2",
+      "model": "dsv4flash0731",
       "games": 20,
-      "moves": 607,
-      "attacks": 500,
-      "deploys": 117,
-      "heals": 22,
-      "captures": 98,
-      "demolishes": 6,
-      "unitDeathsLost": 80,
+      "moves": 488,
+      "attacks": 460,
+      "deploys": 135,
+      "heals": 0,
+      "captures": 94,
+      "demolishes": 9,
+      "unitDeathsLost": 78,
       "perGame": {
-        "attacks": 25,
-        "heals": 1.1,
-        "deploys": 5.85,
-        "captures": 4.9,
-        "moves": 30.35,
-        "demolishes": 0.3
+        "attacks": 23,
+        "heals": 0,
+        "deploys": 6.75,
+        "captures": 4.7,
+        "moves": 24.4,
+        "demolishes": 0.45
       },
       "deploysByType": {
-        "ranger": 34,
-        "support": 14,
-        "heavy": 14,
-        "scout": 31,
-        "infantry": 24
+        "heavy": 10,
+        "scout": 49,
+        "infantry": 55,
+        "ranger": 21
       },
       "styleTags": [
-        "治疗型",
-        "扩张型"
+        "扩张型",
+        "攻击型"
       ]
     },
     {
       "model": "hy3",
-      "games": 18,
-      "moves": 406,
-      "attacks": 270,
-      "deploys": 123,
+      "games": 19,
+      "moves": 432,
+      "attacks": 297,
+      "deploys": 126,
       "heals": 0,
-      "captures": 62,
+      "captures": 63,
       "demolishes": 6,
-      "unitDeathsLost": 44,
+      "unitDeathsLost": 47,
       "perGame": {
-        "attacks": 15,
+        "attacks": 15.63,
         "heals": 0,
-        "deploys": 6.83,
-        "captures": 3.44,
-        "moves": 22.56,
-        "demolishes": 0.33
+        "deploys": 6.63,
+        "captures": 3.32,
+        "moves": 22.74,
+        "demolishes": 0.32
       },
       "deploysByType": {
-        "infantry": 72,
+        "infantry": 75,
         "scout": 44,
         "ranger": 3,
         "heavy": 4
@@ -128,25 +157,25 @@
     },
     {
       "model": "longcat2.0",
-      "games": 18,
-      "moves": 468,
-      "attacks": 283,
-      "deploys": 101,
+      "games": 19,
+      "moves": 495,
+      "attacks": 302,
+      "deploys": 104,
       "heals": 10,
-      "captures": 43,
+      "captures": 47,
       "demolishes": 20,
-      "unitDeathsLost": 42,
+      "unitDeathsLost": 48,
       "perGame": {
-        "attacks": 15.72,
-        "heals": 0.56,
-        "deploys": 5.61,
-        "captures": 2.39,
-        "moves": 26,
-        "demolishes": 1.11
+        "attacks": 15.89,
+        "heals": 0.53,
+        "deploys": 5.47,
+        "captures": 2.47,
+        "moves": 26.05,
+        "demolishes": 1.05
       },
       "deploysByType": {
         "ranger": 5,
-        "scout": 25,
+        "scout": 28,
         "infantry": 57,
         "heavy": 11,
         "support": 3
@@ -156,62 +185,32 @@
       ]
     },
     {
-      "model": "dsv4flash0731",
-      "games": 17,
-      "moves": 410,
-      "attacks": 395,
-      "deploys": 120,
-      "heals": 0,
-      "captures": 83,
-      "demolishes": 9,
-      "unitDeathsLost": 61,
-      "perGame": {
-        "attacks": 23.24,
-        "heals": 0,
-        "deploys": 7.06,
-        "captures": 4.88,
-        "moves": 24.12,
-        "demolishes": 0.53
-      },
-      "deploysByType": {
-        "heavy": 9,
-        "scout": 47,
-        "infantry": 48,
-        "ranger": 16
-      },
-      "styleTags": [
-        "扩张型",
-        "攻击型"
-      ]
-    },
-    {
       "model": "step3.7flash",
-      "games": 16,
-      "moves": 470,
+      "games": 17,
+      "moves": 473,
       "attacks": 187,
-      "deploys": 88,
+      "deploys": 89,
       "heals": 12,
-      "captures": 43,
+      "captures": 44,
       "demolishes": 1,
       "unitDeathsLost": 43,
       "perGame": {
-        "attacks": 11.69,
-        "heals": 0.75,
-        "deploys": 5.5,
-        "captures": 2.69,
-        "moves": 29.38,
+        "attacks": 11,
+        "heals": 0.71,
+        "deploys": 5.24,
+        "captures": 2.59,
+        "moves": 27.82,
         "demolishes": 0.06
       },
       "deploysByType": {
         "scout": 22,
-        "infantry": 48,
+        "infantry": 49,
         "heavy": 11,
         "ranger": 4,
         "support": 3
       },
       "styleTags": [
-        "治疗型",
-        "机动型"
+        "治疗型"
       ]
     },
     {
@@ -302,6 +301,36 @@
       "styleTags": [
         "治疗型",
         "拆迁型"
+      ]
+    },
+    {
+      "model": "qwen3.8v27b",
+      "games": 8,
+      "moves": 159,
+      "attacks": 173,
+      "deploys": 41,
+      "heals": 7,
+      "captures": 19,
+      "demolishes": 2,
+      "unitDeathsLost": 21,
+      "perGame": {
+        "attacks": 21.63,
+        "heals": 0.88,
+        "deploys": 5.13,
+        "captures": 2.38,
+        "moves": 19.88,
+        "demolishes": 0.25
+      },
+      "deploysByType": {
+        "infantry": 25,
+        "ranger": 9,
+        "heavy": 1,
+        "scout": 5,
+        "support": 1
+      },
+      "styleTags": [
+        "治疗型",
+        "攻击型"
       ]
     },
     {
@@ -419,6 +448,36 @@
       ]
     },
     {
+      "model": "glm5.1",
+      "games": 6,
+      "moves": 161,
+      "attacks": 119,
+      "deploys": 41,
+      "heals": 8,
+      "captures": 14,
+      "demolishes": 4,
+      "unitDeathsLost": 16,
+      "perGame": {
+        "attacks": 19.83,
+        "heals": 1.33,
+        "deploys": 6.83,
+        "captures": 2.33,
+        "moves": 26.83,
+        "demolishes": 0.67
+      },
+      "deploysByType": {
+        "ranger": 10,
+        "scout": 9,
+        "support": 2,
+        "heavy": 7,
+        "infantry": 13
+      },
+      "styleTags": [
+        "治疗型",
+        "拆迁型"
+      ]
+    },
+    {
       "model": "gpt5.6sol",
       "games": 6,
       "moves": 174,
@@ -506,6 +565,34 @@
       "styleTags": []
     },
     {
+      "model": "sensenova6.8flp",
+      "games": 6,
+      "moves": 131,
+      "attacks": 56,
+      "deploys": 33,
+      "heals": 0,
+      "captures": 12,
+      "demolishes": 6,
+      "unitDeathsLost": 15,
+      "perGame": {
+        "attacks": 9.33,
+        "heals": 0,
+        "deploys": 5.5,
+        "captures": 2,
+        "moves": 21.83,
+        "demolishes": 1
+      },
+      "deploysByType": {
+        "scout": 20,
+        "infantry": 9,
+        "heavy": 2,
+        "ranger": 2
+      },
+      "styleTags": [
+        "拆迁型"
+      ]
+    },
+    {
       "model": "agnes2.0flash",
       "games": 5,
       "moves": 135,
@@ -564,36 +651,6 @@
       ]
     },
     {
-      "model": "glm5.1",
-      "games": 5,
-      "moves": 148,
-      "attacks": 110,
-      "deploys": 38,
-      "heals": 8,
-      "captures": 13,
-      "demolishes": 4,
-      "unitDeathsLost": 16,
-      "perGame": {
-        "attacks": 22,
-        "heals": 1.6,
-        "deploys": 7.6,
-        "captures": 2.6,
-        "moves": 29.6,
-        "demolishes": 0.8
-      },
-      "deploysByType": {
-        "ranger": 9,
-        "scout": 8,
-        "support": 2,
-        "heavy": 7,
-        "infantry": 12
-      },
-      "styleTags": [
-        "治疗型",
-        "拆迁型"
-      ]
-    },
-    {
       "model": "gpt5.5",
       "games": 4,
       "moves": 131,
@@ -621,6 +678,34 @@
       "styleTags": [
         "治疗型",
         "拆迁型"
+      ]
+    },
+    {
+      "model": "gpt5.6terra",
+      "games": 4,
+      "moves": 54,
+      "attacks": 69,
+      "deploys": 12,
+      "heals": 6,
+      "captures": 7,
+      "demolishes": 0,
+      "unitDeathsLost": 21,
+      "perGame": {
+        "attacks": 17.25,
+        "heals": 1.5,
+        "deploys": 3,
+        "captures": 1.75,
+        "moves": 13.5,
+        "demolishes": 0
+      },
+      "deploysByType": {
+        "infantry": 8,
+        "support": 1,
+        "ranger": 1,
+        "scout": 2
+      },
+      "styleTags": [
+        "治疗型"
       ]
     },
     {
@@ -653,57 +738,32 @@
       ]
     },
     {
-      "model": "sensenova6.8flp",
-      "games": 4,
-      "moves": 61,
-      "attacks": 49,
-      "deploys": 19,
-      "heals": 0,
-      "captures": 7,
-      "demolishes": 6,
-      "unitDeathsLost": 10,
-      "perGame": {
-        "attacks": 12.25,
-        "heals": 0,
-        "deploys": 4.75,
-        "captures": 1.75,
-        "moves": 15.25,
-        "demolishes": 1.5
-      },
-      "deploysByType": {
-        "scout": 12,
-        "infantry": 7
-      },
-      "styleTags": [
-        "拆迁型"
-      ]
-    },
-    {
-      "model": "qwen3.8v27b",
+      "model": "dots3noteprev",
       "games": 3,
-      "moves": 59,
-      "attacks": 64,
-      "deploys": 15,
-      "heals": 0,
-      "captures": 6,
-      "demolishes": 2,
-      "unitDeathsLost": 4,
+      "moves": 75,
+      "attacks": 47,
+      "deploys": 5,
+      "heals": 5,
+      "captures": 5,
+      "demolishes": 8,
+      "unitDeathsLost": 3,
       "perGame": {
-        "attacks": 21.33,
-        "heals": 0,
-        "deploys": 5,
-        "captures": 2,
-        "moves": 19.67,
-        "demolishes": 0.67
+        "attacks": 15.67,
+        "heals": 1.67,
+        "deploys": 1.67,
+        "captures": 1.67,
+        "moves": 25,
+        "demolishes": 2.67
       },
       "deploysByType": {
-        "infantry": 11,
-        "ranger": 3,
-        "heavy": 1
+        "heavy": 1,
+        "infantry": 2,
+        "scout": 1,
+        "support": 1
       },
       "styleTags": [
-        "攻击型",
-        "拆迁型"
+        "拆迁型",
+        "治疗型"
       ]
     },
     {
@@ -784,35 +844,6 @@
       "styleTags": []
     },
     {
-      "model": "gpt5.6terra",
-      "games": 2,
-      "moves": 31,
-      "attacks": 44,
-      "deploys": 7,
-      "heals": 6,
-      "captures": 5,
-      "demolishes": 0,
-      "unitDeathsLost": 10,
-      "perGame": {
-        "attacks": 22,
-        "heals": 3,
-        "deploys": 3.5,
-        "captures": 2.5,
-        "moves": 15.5,
-        "demolishes": 0
-      },
-      "deploysByType": {
-        "infantry": 3,
-        "support": 1,
-        "ranger": 1,
-        "scout": 2
-      },
-      "styleTags": [
-        "治疗型",
-        "攻击型"
-      ]
-    },
-    {
       "model": "agnes2.5pro",
       "games": 1,
       "moves": 7,
@@ -863,6 +894,30 @@
       "styleTags": [
         "治疗型"
       ]
+    },
+    {
+      "model": "dots3-note-prev",
+      "games": 1,
+      "moves": 27,
+      "attacks": 14,
+      "deploys": 4,
+      "heals": 0,
+      "captures": 1,
+      "demolishes": 0,
+      "unitDeathsLost": 5,
+      "perGame": {
+        "attacks": 14,
+        "heals": 0,
+        "deploys": 4,
+        "captures": 1,
+        "moves": 27,
+        "demolishes": 0
+      },
+      "deploysByType": {
+        "infantry": 3,
+        "scout": 1
+      },
+      "styleTags": []
     },
     {
       "model": "fable5",
@@ -1000,18 +1055,19 @@
   "unitStats": [
     {
       "unitType": "infantry",
-      "deploys": 650,
-      "share": 0.4185,
+      "deploys": 690,
+      "share": 0.421,
       "byModel": {
-        "hy3": 72,
+        "hy3": 75,
         "longcat2.0": 57,
         "DeepseekV4FlashPreview": 55,
-        "step3.7flash": 48,
-        "dsv4flash0731": 48,
+        "dsv4flash0731": 55,
+        "step3.7flash": 49,
         "mimo2.5pro": 47,
         "minimaxm3": 44,
         "glm5.3": 27,
-        "glm5.2": 24,
+        "glm5.2": 26,
+        "qwen3.8v27b": 25,
         "gpt5.6sol": 22,
         "Qwen3.8Max": 21,
         "sensenova6.7fl": 20,
@@ -1019,38 +1075,40 @@
         "grok4.5": 19,
         "kimik3": 16,
         "DeepseekV4ProPreview": 14,
-        "glm5.1": 12,
+        "glm5.1": 13,
         "qwen3.7max": 11,
-        "qwen3.8v27b": 11,
         "agnes2.0flash": 9,
+        "sensenova6.8flp": 9,
         "Qwen3.8MaxPreview": 8,
+        "gpt5.6terra": 8,
         "glm4.7": 7,
-        "sensenova6.8flp": 7,
         "qwen3.6v35b": 6,
         "gpt5.5": 5,
         "fable5": 5,
         "agnes2.5flash": 5,
         "gpt5.6luna": 3,
-        "gpt5.6terra": 3,
+        "dots3-note-prev": 3,
         "gemini3.5flash": 2,
+        "dots3noteprev": 2,
         "DeepseekV4Pro": 1,
         "agnes2.5pro": 1
       }
     },
     {
       "unitType": "scout",
-      "deploys": 468,
-      "share": 0.3014,
+      "deploys": 490,
+      "share": 0.299,
       "byModel": {
-        "dsv4flash0731": 47,
+        "dsv4flash0731": 49,
         "hy3": 44,
         "minimaxm3": 43,
         "DeepseekV4FlashPreview": 33,
-        "glm5.2": 31,
+        "glm5.2": 32,
+        "longcat2.0": 28,
         "mimo2.5pro": 26,
-        "longcat2.0": 25,
         "step3.7flash": 22,
         "qwen3.6v35b": 21,
+        "sensenova6.8flp": 20,
         "sensenova6.7fl": 17,
         "Qwen3.8MaxPreview": 17,
         "doubaoseed2.1pro": 15,
@@ -1058,12 +1116,12 @@
         "glm4.7": 13,
         "gpt5.5": 13,
         "Qwen3.8Max": 12,
-        "sensenova6.8flp": 12,
         "qwen3.7max": 11,
         "grok4.5": 11,
-        "glm5.1": 8,
+        "glm5.1": 9,
         "gpt5.6sol": 7,
         "glm5.3": 5,
+        "qwen3.8v27b": 5,
         "kimik3": 4,
         "DeepseekV4ProPreview": 3,
         "fable5": 3,
@@ -1072,22 +1130,25 @@
         "agnes2.5pro": 2,
         "gpt5.6terra": 2,
         "gpt5.6luna": 1,
-        "DeepseekV4Pro": 1
+        "DeepseekV4Pro": 1,
+        "dots3noteprev": 1,
+        "dots3-note-prev": 1
       }
     },
     {
       "unitType": "ranger",
-      "deploys": 216,
-      "share": 0.1391,
+      "deploys": 233,
+      "share": 0.1422,
       "byModel": {
         "DeepseekV4FlashPreview": 46,
-        "glm5.2": 34,
-        "dsv4flash0731": 16,
+        "glm5.2": 37,
+        "dsv4flash0731": 21,
         "gpt5.5": 14,
         "gpt5.6sol": 11,
         "glm5.3": 11,
         "minimaxm3": 10,
-        "glm5.1": 9,
+        "glm5.1": 10,
+        "qwen3.8v27b": 9,
         "doubaoseed2.1pro": 7,
         "Qwen3.8Max": 7,
         "kimik3": 6,
@@ -1100,8 +1161,8 @@
         "DeepseekV4ProPreview": 3,
         "fable5": 3,
         "hy3": 3,
-        "qwen3.8v27b": 3,
         "DeepseekV4Pro": 2,
+        "sensenova6.8flp": 2,
         "agnes2.0flash": 1,
         "gemini3.5flash": 1,
         "gpt5.6luna": 1,
@@ -1110,15 +1171,15 @@
     },
     {
       "unitType": "heavy",
-      "deploys": 136,
-      "share": 0.0876,
+      "deploys": 140,
+      "share": 0.0854,
       "byModel": {
         "glm5.2": 14,
         "DeepseekV4FlashPreview": 12,
         "mimo2.5pro": 11,
         "step3.7flash": 11,
         "longcat2.0": 11,
-        "dsv4flash0731": 9,
+        "dsv4flash0731": 10,
         "glm5.1": 7,
         "agnes2.0flash": 6,
         "gpt5.6sol": 6,
@@ -1134,18 +1195,20 @@
         "Qwen3.8Max": 3,
         "qwen3.6v35b": 2,
         "DeepseekV4ProPreview": 2,
+        "sensenova6.8flp": 2,
         "fable5": 1,
         "gptoss120b": 1,
-        "qwen3.8v27b": 1
+        "qwen3.8v27b": 1,
+        "dots3noteprev": 1
       }
     },
     {
       "unitType": "support",
-      "deploys": 83,
-      "share": 0.0534,
+      "deploys": 86,
+      "share": 0.0525,
       "byModel": {
         "DeepseekV4FlashPreview": 20,
-        "glm5.2": 14,
+        "glm5.2": 15,
         "mimo2.5pro": 9,
         "gpt5.5": 5,
         "gpt5.6sol": 5,
@@ -1164,7 +1227,9 @@
         "kimik3": 1,
         "DeepseekV4Pro": 1,
         "gpt5.6terra": 1,
-        "minimaxm3": 1
+        "minimaxm3": 1,
+        "dots3noteprev": 1,
+        "qwen3.8v27b": 1
       }
     }
   ],
@@ -1181,33 +1246,33 @@
     },
     {
       "model": "glm5.2",
-      "games": 20,
-      "income": 9091,
-      "deployCost": 6582,
+      "games": 22,
+      "income": 9635,
+      "deployCost": 6986,
       "comebackSupply": 72,
-      "avgIncome": 454.6,
-      "avgDeployCost": 329.1,
-      "spendRate": 0.724
+      "avgIncome": 438,
+      "avgDeployCost": 317.5,
+      "spendRate": 0.7251
     },
     {
       "model": "dsv4flash0731",
-      "games": 17,
-      "income": 6780,
-      "deployCost": 5511,
+      "games": 20,
+      "income": 7916,
+      "deployCost": 6354,
       "comebackSupply": 72,
-      "avgIncome": 398.8,
-      "avgDeployCost": 324.2,
-      "spendRate": 0.8128
+      "avgIncome": 395.8,
+      "avgDeployCost": 317.7,
+      "spendRate": 0.8027
     },
     {
       "model": "hy3",
-      "games": 18,
-      "income": 6676,
-      "deployCost": 5220,
+      "games": 19,
+      "income": 6908,
+      "deployCost": 5355,
       "comebackSupply": 36,
-      "avgIncome": 370.9,
-      "avgDeployCost": 290,
-      "spendRate": 0.7819
+      "avgIncome": 363.6,
+      "avgDeployCost": 281.8,
+      "spendRate": 0.7752
     },
     {
       "model": "mimo2.5pro",
@@ -1220,6 +1285,16 @@
       "spendRate": 0.79
     },
     {
+      "model": "longcat2.0",
+      "games": 19,
+      "income": 6249,
+      "deployCost": 4719,
+      "comebackSupply": 124,
+      "avgIncome": 328.9,
+      "avgDeployCost": 248.4,
+      "spendRate": 0.7552
+    },
+    {
       "model": "minimaxm3",
       "games": 15,
       "income": 5214,
@@ -1230,24 +1305,14 @@
       "spendRate": 0.8984
     },
     {
-      "model": "longcat2.0",
-      "games": 18,
-      "income": 5909,
-      "deployCost": 4605,
-      "comebackSupply": 124,
-      "avgIncome": 328.3,
-      "avgDeployCost": 255.8,
-      "spendRate": 0.7793
-    },
-    {
       "model": "step3.7flash",
-      "games": 16,
-      "income": 7104,
-      "deployCost": 4255,
+      "games": 17,
+      "income": 7228,
+      "deployCost": 4300,
       "comebackSupply": 132,
-      "avgIncome": 444,
-      "avgDeployCost": 265.9,
-      "spendRate": 0.599
+      "avgIncome": 425.2,
+      "avgDeployCost": 252.9,
+      "spendRate": 0.5949
     },
     {
       "model": "glm5.3",
@@ -1280,6 +1345,16 @@
       "spendRate": 0.8783
     },
     {
+      "model": "glm5.1",
+      "games": 6,
+      "income": 2858,
+      "deployCost": 2365,
+      "comebackSupply": 12,
+      "avgIncome": 476.3,
+      "avgDeployCost": 394.2,
+      "spendRate": 0.8275
+    },
+    {
       "model": "doubaoseed2.1pro",
       "games": 7,
       "income": 1933,
@@ -1290,16 +1365,6 @@
       "spendRate": 1.1878
     },
     {
-      "model": "glm5.1",
-      "games": 5,
-      "income": 2524,
-      "deployCost": 2204,
-      "comebackSupply": 12,
-      "avgIncome": 504.8,
-      "avgDeployCost": 440.8,
-      "spendRate": 0.8732
-    },
-    {
       "model": "Qwen3.8Max",
       "games": 7,
       "income": 2442,
@@ -1308,6 +1373,16 @@
       "avgIncome": 348.9,
       "avgDeployCost": 298.4,
       "spendRate": 0.8554
+    },
+    {
+      "model": "qwen3.8v27b",
+      "games": 8,
+      "income": 2622,
+      "deployCost": 2073,
+      "comebackSupply": 0,
+      "avgIncome": 327.8,
+      "avgDeployCost": 259.1,
+      "spendRate": 0.7906
     },
     {
       "model": "grok4.5",
@@ -1370,6 +1445,16 @@
       "spendRate": 0.6559
     },
     {
+      "model": "sensenova6.8flp",
+      "games": 6,
+      "income": 1932,
+      "deployCost": 1439,
+      "comebackSupply": 0,
+      "avgIncome": 322,
+      "avgDeployCost": 239.8,
+      "spendRate": 0.7448
+    },
+    {
       "model": "agnes2.0flash",
       "games": 5,
       "income": 1230,
@@ -1400,26 +1485,6 @@
       "spendRate": 0.6029
     },
     {
-      "model": "sensenova6.8flp",
-      "games": 4,
-      "income": 1030,
-      "deployCost": 771,
-      "comebackSupply": 0,
-      "avgIncome": 257.5,
-      "avgDeployCost": 192.8,
-      "spendRate": 0.7485
-    },
-    {
-      "model": "qwen3.8v27b",
-      "games": 3,
-      "income": 958,
-      "deployCost": 761,
-      "comebackSupply": 0,
-      "avgIncome": 319.3,
-      "avgDeployCost": 253.7,
-      "spendRate": 0.7944
-    },
-    {
       "model": "fable5",
       "games": 1,
       "income": 642,
@@ -1431,13 +1496,13 @@
     },
     {
       "model": "gpt5.6terra",
-      "games": 2,
-      "income": 608,
-      "deployCost": 343,
+      "games": 4,
+      "income": 1032,
+      "deployCost": 568,
       "comebackSupply": 0,
-      "avgIncome": 304,
-      "avgDeployCost": 171.5,
-      "spendRate": 0.5641
+      "avgIncome": 258,
+      "avgDeployCost": 142,
+      "spendRate": 0.5504
     },
     {
       "model": "gemini3.5flash",
@@ -1480,6 +1545,26 @@
       "spendRate": 0.7424
     },
     {
+      "model": "dots3noteprev",
+      "games": 3,
+      "income": 874,
+      "deployCost": 238,
+      "comebackSupply": 0,
+      "avgIncome": 291.3,
+      "avgDeployCost": 79.3,
+      "spendRate": 0.2723
+    },
+    {
+      "model": "dots3-note-prev",
+      "games": 1,
+      "income": 232,
+      "deployCost": 173,
+      "comebackSupply": 0,
+      "avgIncome": 232,
+      "avgDeployCost": 173,
+      "spendRate": 0.7457
+    },
+    {
       "model": "agnes2.5pro",
       "games": 1,
       "income": 146,
@@ -1514,9 +1599,15 @@
     "killerBoard": [
       {
         "model": "dsv4flash0731",
-        "kills": 5,
-        "deaths": 1,
+        "kills": 6,
+        "deaths": 2,
         "net": 4
+      },
+      {
+        "model": "glm5.2",
+        "kills": 4,
+        "deaths": 1,
+        "net": 3
       },
       {
         "model": "minimaxm3",
@@ -1525,27 +1616,21 @@
         "net": 3
       },
       {
-        "model": "glm5.2",
-        "kills": 3,
+        "model": "qwen3.8v27b",
+        "kills": 4,
         "deaths": 1,
-        "net": 2
+        "net": 3
       },
       {
-        "model": "longcat2.0",
+        "model": "hy3",
         "kills": 3,
         "deaths": 2,
         "net": 1
       },
       {
-        "model": "qwen3.8v27b",
-        "kills": 2,
-        "deaths": 0,
-        "net": 2
-      },
-      {
-        "model": "hy3",
-        "kills": 2,
-        "deaths": 2,
+        "model": "longcat2.0",
+        "kills": 3,
+        "deaths": 3,
         "net": 0
       },
       {
@@ -1556,6 +1641,12 @@
       },
       {
         "model": "DeepseekV4ProPreview",
+        "kills": 1,
+        "deaths": 0,
+        "net": 1
+      },
+      {
+        "model": "dots3noteprev",
         "kills": 1,
         "deaths": 0,
         "net": 1
@@ -1585,6 +1676,12 @@
         "net": 0
       },
       {
+        "model": "glm5.1",
+        "kills": 1,
+        "deaths": 1,
+        "net": 0
+      },
+      {
         "model": "grok4.5",
         "kills": 1,
         "deaths": 1,
@@ -1606,6 +1703,60 @@
     "rivalries": []
   },
   "mapStage": [
+    {
+      "mapId": "artillery-zone",
+      "games": 28,
+      "avgRounds": 11.64,
+      "roundsSampled": 28,
+      "capturesPerGame": 7.75,
+      "avgDurationSec": 8087.7,
+      "winnerModels": [
+        {
+          "model": "dsv4flash0731",
+          "wins": 8
+        },
+        {
+          "model": "qwen3.8v27b",
+          "wins": 4
+        },
+        {
+          "model": "kimik3",
+          "wins": 2
+        },
+        {
+          "model": "minimaxm3",
+          "wins": 2
+        },
+        {
+          "model": "Qwen3.8Max",
+          "wins": 2
+        },
+        {
+          "model": "gpt5.6sol",
+          "wins": 2
+        },
+        {
+          "model": "hy3",
+          "wins": 2
+        },
+        {
+          "model": "glm5.2",
+          "wins": 2
+        },
+        {
+          "model": "glm5.3",
+          "wins": 2
+        },
+        {
+          "model": "agnes2.0flash",
+          "wins": 1
+        },
+        {
+          "model": "sensenova6.8flp",
+          "wins": 1
+        }
+      ]
+    },
     {
       "mapId": "default",
       "games": 25,
@@ -1657,66 +1808,12 @@
       ]
     },
     {
-      "mapId": "artillery-zone",
-      "games": 22,
-      "avgRounds": 11.82,
-      "roundsSampled": 22,
-      "capturesPerGame": 8.14,
-      "avgDurationSec": 7344.5,
-      "winnerModels": [
-        {
-          "model": "dsv4flash0731",
-          "wins": 7
-        },
-        {
-          "model": "kimik3",
-          "wins": 2
-        },
-        {
-          "model": "minimaxm3",
-          "wins": 2
-        },
-        {
-          "model": "Qwen3.8Max",
-          "wins": 2
-        },
-        {
-          "model": "gpt5.6sol",
-          "wins": 2
-        },
-        {
-          "model": "glm5.3",
-          "wins": 2
-        },
-        {
-          "model": "agnes2.0flash",
-          "wins": 1
-        },
-        {
-          "model": "sensenova6.8flp",
-          "wins": 1
-        },
-        {
-          "model": "hy3",
-          "wins": 1
-        },
-        {
-          "model": "glm5.2",
-          "wins": 1
-        },
-        {
-          "model": "qwen3.8v27b",
-          "wins": 1
-        }
-      ]
-    },
-    {
       "mapId": "danger-close",
-      "games": 22,
-      "avgRounds": 12.41,
-      "roundsSampled": 22,
-      "capturesPerGame": 1.82,
-      "avgDurationSec": 5139.4,
+      "games": 24,
+      "avgRounds": 12.79,
+      "roundsSampled": 24,
+      "capturesPerGame": 1.83,
+      "avgDurationSec": 6057.4,
       "winnerModels": [
         {
           "model": "minimaxm3",
@@ -1777,16 +1874,24 @@
         {
           "model": "qwen3.8v27b",
           "wins": 1
+        },
+        {
+          "model": "glm5.1",
+          "wins": 1
+        },
+        {
+          "model": "dots3noteprev",
+          "wins": 1
         }
       ]
     },
     {
       "mapId": "breach",
-      "games": 14,
-      "avgRounds": 12.1,
-      "roundsSampled": 10,
-      "capturesPerGame": 7.21,
-      "avgDurationSec": 8017.7,
+      "games": 15,
+      "avgRounds": 12.36,
+      "roundsSampled": 11,
+      "capturesPerGame": 7.13,
+      "avgDurationSec": 8606.5,
       "winnerModels": [
         {
           "model": "hy3",
@@ -1830,6 +1935,10 @@
         },
         {
           "model": "glm5.2",
+          "wins": 1
+        },
+        {
+          "model": "dots3noteprev",
           "wins": 1
         }
       ]
@@ -2446,9 +2555,9 @@
     }
   },
   "funFacts": [
-    "在 108 局对局中，共打出 14,180 次操作：6,718 次移动、4,800 次攻击、1,553 次部署、803 次占领、156 次治疗。",
-    "战场上有 796 个单位阵亡，平均每局阵亡 7.4 个。",
-    "最受欢迎的单位是「infantry」，共部署 650 次，占全部部署的 42%。",
+    "在 117 局对局中，共打出 15,202 次操作：7,211 次移动、5,173 次攻击、1,639 次部署、851 次占领、170 次治疗。",
+    "战场上有 869 个单位阵亡，平均每局阵亡 7.4 个。",
+    "最受欢迎的单位是「infantry」，共部署 690 次，占全部部署的 42%。",
     "最暴躁的模型是「DeepseekV4FlashPreview」，累计发起 701 次攻击。",
     "最勤快的模型是「DeepseekV4FlashPreview」，累计移动 973 次。",
     "最漫长的一局是 tg_0039，鏖战 24 整轮。",
@@ -2456,10 +2565,10 @@
     "最血腥的一局是 tg_0089，阵亡 27 个单位。",
     "单场最强拆迁：agnes2.0flash 在 tg_0025 中造成 161 点 HQ 伤害。",
     "最舍得花钱的模型是「DeepseekV4FlashPreview」，累计在部署上花掉 9,105 补给（共 20 场）。",
-    "最无情的终结者是「dsv4flash0731」，亲手送走 5 名对手，自己也被淘汰 1 次。",
-    "最常登场的战场是「default」，出现 25 次，平均每局鏖战 15 整轮。",
+    "最无情的终结者是「dsv4flash0731」，亲手送走 6 名对手，自己也被淘汰 2 次。",
+    "最常登场的战场是「artillery-zone」，出现 28 次，平均每局鏖战 11.64 整轮。",
     "节奏最密的一局是 tg_0034，平均每轮 26.07 次有效操作。",
-    "平均每局耗时约 150分49秒。"
+    "平均每局耗时约 155分22秒。"
   ],
   "timeline": [
     {
@@ -2893,6 +3002,33 @@
       "cumulativeActions": 14180,
       "avgRounds": 15,
       "avgDurationSec": 4940.5
+    },
+    {
+      "date": "2026-08-19",
+      "matches": 2,
+      "totalActions": 180,
+      "cumulativeMatches": 110,
+      "cumulativeActions": 14360,
+      "avgRounds": 17,
+      "avgDurationSec": 23997.7
+    },
+    {
+      "date": "2026-08-20",
+      "matches": 6,
+      "totalActions": 561,
+      "cumulativeMatches": 116,
+      "cumulativeActions": 14921,
+      "avgRounds": 11.5,
+      "avgDurationSec": 5942.8
+    },
+    {
+      "date": "2026-08-21",
+      "matches": 1,
+      "totalActions": 281,
+      "cumulativeMatches": 117,
+      "cumulativeActions": 15202,
+      "avgRounds": 12,
+      "avgDurationSec": 29467.6
     }
   ],
   "monthlyTrend": [
@@ -2914,11 +3050,11 @@
     },
     {
       "month": "2026.08",
-      "matches": 44,
-      "totalActions": 4951,
-      "avgRounds": 12.2,
-      "avgDurationSec": 8226.7,
-      "activeModels": 26
+      "matches": 53,
+      "totalActions": 5973,
+      "avgRounds": 12.3,
+      "avgDurationSec": 8964.1,
+      "activeModels": 28
     }
   ],
   "modelDebut": [
@@ -2943,11 +3079,11 @@
     {
       "model": "glm5.2",
       "debutDate": "2026-06-15",
-      "latestDate": "2026-08-17",
-      "games": 20,
-      "wins": 13,
+      "latestDate": "2026-08-21",
+      "games": 22,
+      "wins": 14,
       "debutRecordId": "tg_0006",
-      "latestRecordId": "tg_0104"
+      "latestRecordId": "tg_0117"
     },
     {
       "model": "minimaxm3",
@@ -2988,20 +3124,20 @@
     {
       "model": "step3.7flash",
       "debutDate": "2026-06-19",
-      "latestDate": "2026-08-17",
-      "games": 16,
+      "latestDate": "2026-08-20",
+      "games": 17,
       "wins": 1,
       "debutRecordId": "tg_0014",
-      "latestRecordId": "tg_0106"
+      "latestRecordId": "tg_0113"
     },
     {
       "model": "longcat2.0",
       "debutDate": "2026-06-21",
-      "latestDate": "2026-08-17",
-      "games": 18,
+      "latestDate": "2026-08-20",
+      "games": 19,
       "wins": 9,
       "debutRecordId": "tg_0016",
-      "latestRecordId": "tg_0102"
+      "latestRecordId": "tg_0114"
     },
     {
       "model": "sensenova6.7fl",
@@ -3024,11 +3160,11 @@
     {
       "model": "glm5.1",
       "debutDate": "2026-06-25",
-      "latestDate": "2026-08-17",
-      "games": 5,
-      "wins": 1,
+      "latestDate": "2026-08-19",
+      "games": 6,
+      "wins": 2,
       "debutRecordId": "tg_0023",
-      "latestRecordId": "tg_0105"
+      "latestRecordId": "tg_0109"
     },
     {
       "model": "agnes2.0flash",
@@ -3060,11 +3196,11 @@
     {
       "model": "hy3",
       "debutDate": "2026-07-07",
-      "latestDate": "2026-08-18",
-      "games": 18,
-      "wins": 10,
+      "latestDate": "2026-08-21",
+      "games": 19,
+      "wins": 11,
       "debutRecordId": "tg_0028",
-      "latestRecordId": "tg_0108"
+      "latestRecordId": "tg_0117"
     },
     {
       "model": "doubaoseed2.1pro",
@@ -3132,11 +3268,11 @@
     {
       "model": "dsv4flash0731",
       "debutDate": "2026-08-03",
-      "latestDate": "2026-08-17",
-      "games": 17,
-      "wins": 10,
+      "latestDate": "2026-08-21",
+      "games": 20,
+      "wins": 11,
       "debutRecordId": "tg_0068",
-      "latestRecordId": "tg_0103"
+      "latestRecordId": "tg_0117"
     },
     {
       "model": "gemini3.5flash",
@@ -3195,20 +3331,20 @@
     {
       "model": "sensenova6.8flp",
       "debutDate": "2026-08-11",
-      "latestDate": "2026-08-17",
-      "games": 4,
+      "latestDate": "2026-08-20",
+      "games": 6,
       "wins": 1,
       "debutRecordId": "tg_0085",
-      "latestRecordId": "tg_0107"
+      "latestRecordId": "tg_0115"
     },
     {
       "model": "gpt5.6terra",
       "debutDate": "2026-08-13",
-      "latestDate": "2026-08-14",
-      "games": 2,
+      "latestDate": "2026-08-21",
+      "games": 4,
       "wins": 0,
       "debutRecordId": "tg_0090",
-      "latestRecordId": "tg_0094"
+      "latestRecordId": "tg_0117"
     },
     {
       "model": "glm5.3",
@@ -3222,11 +3358,29 @@
     {
       "model": "qwen3.8v27b",
       "debutDate": "2026-08-17",
-      "latestDate": "2026-08-18",
-      "games": 3,
-      "wins": 3,
+      "latestDate": "2026-08-21",
+      "games": 8,
+      "wins": 6,
       "debutRecordId": "tg_0106",
-      "latestRecordId": "tg_0108"
+      "latestRecordId": "tg_0117"
+    },
+    {
+      "model": "dots3noteprev",
+      "debutDate": "2026-08-20",
+      "latestDate": "2026-08-20",
+      "games": 3,
+      "wins": 2,
+      "debutRecordId": "tg_0113",
+      "latestRecordId": "tg_0113"
+    },
+    {
+      "model": "dots3-note-prev",
+      "debutDate": "2026-08-21",
+      "latestDate": "2026-08-21",
+      "games": 1,
+      "wins": 0,
+      "debutRecordId": "tg_0117",
+      "latestRecordId": "tg_0117"
     }
   ],
   "schemaTimeline": [
@@ -3368,7 +3522,7 @@
     {
       "schemaVersion": "3.2.12",
       "firstDate": "2026-08-18",
-      "games": 1
+      "games": 10
     }
   ]
 }

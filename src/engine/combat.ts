@@ -129,7 +129,8 @@ export function healTarget(
     return { ok: false, code: 'invalid_heal', message: 'cannot heal inside the artillery zone' };
   }
   const distance = hexDistance(support, target);
-  if (distance > support.attackRange) return { ok: false, code: 'invalid_heal', message: 'target out of range' };
+  const healRange = game.config.units[support.type]?.healRange ?? support.attackRange;
+  if (distance > healRange) return { ok: false, code: 'invalid_heal', message: 'target out of range' };
 
   const spent = consumeAction(game, support);
   if (!spent.ok) return spent;

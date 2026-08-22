@@ -232,6 +232,7 @@
     for (const key of ['hp', 'attack', 'defense', 'moveRange', 'attackRange', 'cost']) {
       spec[key] = numberOrDefault(src[key], fallback[key]);
     }
+    if ('healRange' in src) spec.healRange = numberOrDefault(src.healRange, fallback.healRange ?? fallback.attackRange);
     spec.canCapture = typeof src.canCapture === 'boolean' ? src.canCapture : fallback.canCapture;
     if (type === 'support' || 'healPower' in src) spec.healPower = numberOrDefault(src.healPower, fallback.healPower || 0);
     // 同时模式兵种改造字段：编辑器暂不提供编辑 UI，但导入/导出必须保留，避免往返丢失。
@@ -542,6 +543,7 @@
     for (const type of UNIT_TYPES) {
       const spec = record(units[type], `units.${type}`);
       for (const key of ['hp', 'attack', 'defense', 'moveRange', 'attackRange', 'cost']) num(spec, key, `units.${type}`, 0);
+      if ('healRange' in spec) num(spec, 'healRange', `units.${type}`, 0);
       if (typeof spec.canCapture !== 'boolean') errors.push(`units.${type}.canCapture must be boolean`);
       if ('healPower' in spec) num(spec, 'healPower', `units.${type}`, 0);
     }
@@ -1569,8 +1571,9 @@
   function renderUnitSpecs() {
     els.unitSpecFields.innerHTML = UNIT_TYPES.map(type => {
       const spec = config.units[type];
-      const fields = ['hp', 'attack', 'defense', 'moveRange', 'attackRange', 'cost', 'healPower']
-        .filter(key => key !== 'healPower' || type === 'support' || key in spec)
+      const fields = ['hp', 'attack', 'defense', 'moveRange', 'attackRange', 'healRange', 'cost', 'healPower']
+        .filter(key => (key !== 'healPower' || type === 'support' || key in spec)
+          && (key !== 'healRange' || key in spec))
         .map(key => fieldHtml(`unit:${type}:${key}`, key, spec[key] ?? 0, 0)).join('');
       return `<div class="spec-card"><h3>${esc(UNIT_NAMES[type])}</h3><div class="field-grid compact">${fields}
         <label>可占点 <select data-bind="unit:${esc(type)}:canCapture"><option value="true"${spec.canCapture ? ' selected' : ''}>是</option><option value="false"${!spec.canCapture ? ' selected' : ''}>否</option></select></label>

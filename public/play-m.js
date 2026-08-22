@@ -753,13 +753,16 @@ function unitShapeSpec(unit, kind) {
   if (shape.type === 'arc') return { type: 'arc', length: 3 };
   return { type: 'single', length: 1 };
 }
+function unitHealRange(unit) {
+  return gameConfig?.units?.[unit.type]?.healRange ?? unit.attackRange;
+}
 /** 客户端镜像服务端的形状瞄准推导：返回 { type, direction, cells } 或 null（不可瞄准）。 */
 function shapeAimFor(unit, kind, q, r) {
   const shape = unitShapeSpec(unit, kind);
   const dq = q - unit.q, dr = r - unit.r;
   if (shape.type === 'single') {
     const d = hexDistance(unit, { q, r });
-    if (d > unit.attackRange) return null;
+    if (d > (kind === 'healShape' ? unitHealRange(unit) : unit.attackRange)) return null;
     if (kind === 'attackShape' && d === 0) return null;
     return { type: 'single', direction: 0, cells: [{ q, r }] };
   }
@@ -1509,7 +1512,7 @@ function selectUnit(unit) {
           return aim.cells.some(c => [...state.units.values()].some(e => e.alive && e.owner === myPlayer && e.q === c.q && e.r === c.r));
         }).map(p => ({ ...p, type: 'heal' }));
       } else {
-        rangeHighlights = [...state.units.values()].filter(e => e.owner === myPlayer && e.alive && e.hp < e.maxHp && hexDistance(unit, e) <= unit.attackRange).map(e => ({ q: e.q, r: e.r, type: 'heal' }));
+        rangeHighlights = [...state.units.values()].filter(e => e.owner === myPlayer && e.alive && e.hp < e.maxHp && hexDistance(unit, e) <= unitHealRange(unit)).map(e => ({ q: e.q, r: e.r, type: 'heal' }));
       }
     }
     if (action === 'demolish') {

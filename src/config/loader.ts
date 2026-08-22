@@ -18,6 +18,8 @@ export interface UnitSpec {
   cost: number;
   canCapture: boolean;
   healPower?: number;
+  /** 治疗射程；未配置时兼容回退到 attackRange。 */
+  healRange?: number;
   /** 同时模式兵种改造：攻击覆盖形状（single 单格 / line 定向直线 / arc 定向相邻三格扇形）。 */
   attackShape?: ActionShapeSpec;
   /** 同时模式兵种改造：治疗覆盖形状，语义同 attackShape。 */
@@ -295,6 +297,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
     if (typeof spec.canCapture !== 'boolean') throw new Error(`units.${type}.canCapture must be boolean`);
     if ('healPower' in spec) assertNumber(spec, 'healPower', `units.${type}`, 0);
+    if ('healRange' in spec) assertNumber(spec, 'healRange', `units.${type}`, 0);
     if ('attackLock' in spec && typeof spec.attackLock !== 'boolean') {
       throw new Error(`units.${type}.attackLock must be boolean`);
     }
@@ -309,8 +312,14 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
         if (!Number.isInteger(length) || length > 6) {
           throw new Error(`units.${type}.${key}.length must be an integer from 1 to 6`);
         }
-        if (shape.type === 'line' && length > (spec.attackRange as number)) {
-          throw new Error(`units.${type}.${key}.length must not exceed attackRange`);
+        if (shape.type === 'line') {
+          const range = key === 'healShape'
+            ? ((spec.healRange as number | undefined) ?? (spec.attackRange as number))
+            : (spec.attackRange as number);
+          const rangeName = key === 'healShape' && 'healRange' in spec ? 'healRange' : 'attackRange';
+          if (length > range) {
+            throw new Error(`units.${type}.${key}.length must not exceed ${rangeName}`);
+          }
         }
       }
     };

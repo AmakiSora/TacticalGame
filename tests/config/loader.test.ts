@@ -98,6 +98,24 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('validates heal shape length against healRange instead of attackRange', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as Record<string, any>;
+    map.units.support.healShape = { type: 'line', length: 2 };
+    map.units.support.healRange = 2;
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).not.toThrow();
+    expect(getMapConfig('default').units.support.healRange).toBe(2);
+    resetConfig();
+
+    const invalidDir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    map.units.support.healRange = 1;
+    writeFileSync(join(invalidDir, 'default.json'), JSON.stringify(map));
+    expect(() => loadMaps(invalidDir)).toThrow('units.support.healShape.length must not exceed healRange');
+    resetConfig();
+  });
+
   it.each([
     [{ startRound: 3, scoreGapPercent: 40 }, 'amountPerRound must be a number >= 1'],
     [{ startRound: 0, scoreGapPercent: 40, amountPerRound: 20 }, 'startRound must be a number >= 1'],

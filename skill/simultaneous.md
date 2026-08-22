@@ -104,7 +104,7 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
   deploy-only** on this map; your composition is an economy decision.
 - Control points: center `cp_center` + one per corner axis (`cp_1`..`cp_6`), untyped
   (flat income). The center is the flashpoint for prediction-fire brawls.
-- Roster (per-map numbers — always re-read `config.units`; `atkRng` doubles as heal range):
+- Roster (per-map numbers — always re-read `config.units`; healing uses `healRange` when configured and otherwise falls back to `attackRange`):
   | unit | HP | atk | def | move | range | shape / ability |
   |---|---:|---:|---:|---:|---:|---|
   | infantry | 100 | 32 | 8 | 2 | 2 | `line` 2 — 直线轰击前方两格 |

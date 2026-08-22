@@ -77,6 +77,10 @@ function findOwnUnit(game: GameState, owner: PlayerId, unitId: string) {
   return game.units.find(u => u.id === unitId && u.owner === owner && u.alive) ?? null;
 }
 
+function healRangeFor(game: GameState, support: { type: UnitType; attackRange: number }): number {
+  return game.config.units[support.type]?.healRange ?? support.attackRange;
+}
+
 function enqueue(game: GameState, owner: PlayerId, action: PendingAction): Result<PendingAction> {
   queueOf(game, owner).push(action);
   return { ok: true, data: action };
@@ -297,7 +301,7 @@ export function queueHealAction(
   if (!isInBounds(game, q, r)) {
     return { ok: false, code: 'invalid_heal', message: 'target cell is outside the board' };
   }
-  const aim = coveredCellsFor(support, game.config.units[support.type], 'healShape', { q, r }, support.attackRange);
+  const aim = coveredCellsFor(support, game.config.units[support.type], 'healShape', { q, r }, healRangeFor(game, support));
   if (!aim) {
     return { ok: false, code: 'invalid_heal', message: `cannot aim at (${q},${r}) with this unit's heal shape` };
   }

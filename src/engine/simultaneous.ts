@@ -281,7 +281,13 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       chargeActionPoint(game, id);
       const support = game.units.find(u => u.id === action.supportId && u.owner === id && u.alive);
       const aim = support && support.type === 'support'
-        ? coveredCellsFor(support, game.config.units[support.type], 'healShape', { q: action.q!, r: action.r! }, support.attackRange)
+        ? coveredCellsFor(
+          support,
+          game.config.units[support.type],
+          'healShape',
+          { q: action.q!, r: action.r! },
+          game.config.units[support.type]?.healRange ?? support.attackRange,
+        )
         : null;
       if (!support || !aim) {
         outcomes[id]!.push({ actionId: action.id, type: 'heal', owner: id, status: 'fizzled', reason: 'out_of_range' });

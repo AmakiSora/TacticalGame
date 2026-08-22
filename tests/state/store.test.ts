@@ -88,6 +88,27 @@ describe('GameStore persistence', () => {
     expect(restored.get('legacy-actions')!.players.player_b!.stats.actionMerit).toBe(2);
   });
 
+  it('restores simultaneous AP without overcounting phase-reordered actions', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    const game = createInitialGame('simultaneous-reordered-actions', 'standoff');
+    game.events = [
+      { seq: 1, type: 'game_start', timestamp: 1, payload: { units: [] } },
+      // Planned queue positions are 1/2/3, but resolution emits move, demolish,
+      // attack in phase order: 3 -> 1 -> 2.
+      { seq: 2, type: 'move', timestamp: 2, payload: { owner: 'player_a', actionsUsed: 3 } },
+      { seq: 3, type: 'demolish', timestamp: 3, payload: { owner: 'player_a', actionsUsed: 1 } },
+      { seq: 4, type: 'attack', timestamp: 4, payload: { owner: 'player_a', actionsUsed: 2 } },
+      { seq: 5, type: 'round_resolved', timestamp: 5, payload: { roundNumber: 1 } },
+    ];
+    store.save(game);
+
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    expect(restored.get('simultaneous-reordered-actions')!.players.player_a!.stats.actionPointsUsed).toBe(3);
+  });
+
   it('keeps the store empty when the persistence file is invalid', () => {
     const file = tempFile();
     writeFileSync(file, '{ bad json');

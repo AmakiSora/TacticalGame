@@ -279,7 +279,10 @@ function restoreActionStats(game: GameState): void {
       if (payload.actionsUsed > last) {
         actionPointTotals.set(owner, (actionPointTotals.get(owner) ?? 0) + payload.actionsUsed - last);
       }
-      ownerActionsUsed.set(owner, payload.actionsUsed);
+      // simultaneous 结算按动作阶段发事件，而不是按玩家计划队列顺序发事件；
+      // 后到事件的 actionsUsed 可能更小（例如 3 -> 1 -> 2）。游标不能回退，
+      // 否则后续的 2 会被再次计入，导致重启恢复后的 AP 超额。
+      ownerActionsUsed.set(owner, Math.max(last, payload.actionsUsed));
       continue;
     }
     if (payload.actionsUsed > actionsUsed) {

@@ -100,24 +100,26 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
 ## Standoff map (对峙之地) specifics
 
 - Radius-5 hexagon (~91 cells), six-fold symmetric. `layouts`: 2 players opposite corners,
-  3 alternating, 6 all. Spawn: HQ + 2 infantry + 1 scout + 1 heavy.
+  3 alternating, 6 all. Spawn: HQ + 2 infantry + 1 scout — **heavy, ranger and support are
+  deploy-only** on this map; your composition is an economy decision.
 - Control points: center `cp_center` + one per corner axis (`cp_1`..`cp_6`), untyped
   (flat income). The center is the flashpoint for prediction-fire brawls.
 - Roster (per-map numbers — always re-read `config.units`; `atkRng` doubles as heal range):
   | unit | HP | atk | def | move | range | shape / ability |
   |---|---:|---:|---:|---:|---:|---|
-  | infantry | 100 | 30 | 8 | 2 | 2 | `line` 2 — 直线轰击前方两格 |
+  | infantry | 100 | 32 | 8 | 2 | 2 | `line` 2 — 直线轰击前方两格 |
   | scout | 65 | 16 | 4 | 4 | 1 | `single` — 单格，快速占点 |
-  | heavy | 150 | 38 | 13 | 2 | 1 | `arc` — 横扫周围三格扇形 |
-  | ranger | 72 | 44 | 3 | 2 | 3 | `single` + **锁定**（未逃出射程必命中） |
+  | heavy | 150 | 38 | 10 | 2 | 1 | `arc` — 横扫周围三格扇形 |
+  | ranger | 72 | 36 | 3 | 2 | 3 | `single` + **锁定**（未逃出射程必命中） |
   | support | 82 | 10 | 5 | 2 | 2 | `healShape` `arc` — 区域治疗三格 |
-- Balance: `startingSupplies 150`, `baseIncome 15`, `controlPointIncome 10`, `actionsPerTurn 5`,
-  `maxTurns 18`, comeback supplies from round 4 (40% gap → +20/round). Adjudication weights
+  HQ: HP 200, defense 6.
+- Balance: `startingSupplies 150`, `baseIncome 15`, `controlPointIncome 12`, `actionsPerTurn 5`,
+  `maxTurns 15`, comeback supplies from round 4 (40% gap → +20/round). Adjudication weights
   favor CPs (60) and HQ damage (5); actionScore default 2/merit point.
   Move ranges are short by design (2, scouts 4): escaping a `line`/`arc` footprint or a
   ranger's lock bubble costs the mover's whole action, so pure kiting cannot win.
 - Win conditions (standard HQ rules): destroy an enemy HQ to eliminate them; last player
-  standing wins; at round 18 adjudicate by score. No artillery, no army-wipe elimination.
+  standing wins; at round 15 adjudicate by score. No artillery, no army-wipe elimination.
 
 ## Planning checklist
 

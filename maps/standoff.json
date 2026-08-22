@@ -26,38 +26,32 @@
     { "id": "slot_1", "headquarters": { "q": 5, "r": 0 }, "startingUnits": [
       { "type": "infantry", "q": 4, "r": 0 },
       { "type": "infantry", "q": 4, "r": -1 },
-      { "type": "scout", "q": 5, "r": -1 },
-      { "type": "heavy", "q": 3, "r": 1 }
+      { "type": "scout", "q": 5, "r": -1 }
     ] },
     { "id": "slot_2", "headquarters": { "q": 0, "r": 5 }, "startingUnits": [
       { "type": "infantry", "q": 0, "r": 4 },
       { "type": "infantry", "q": 1, "r": 3 },
-      { "type": "scout", "q": 1, "r": 4 },
-      { "type": "heavy", "q": -1, "r": 4 }
+      { "type": "scout", "q": 1, "r": 4 }
     ] },
     { "id": "slot_3", "headquarters": { "q": -5, "r": 5 }, "startingUnits": [
       { "type": "infantry", "q": -4, "r": 4 },
       { "type": "infantry", "q": -3, "r": 4 },
-      { "type": "scout", "q": -4, "r": 5 },
-      { "type": "heavy", "q": -4, "r": 3 }
+      { "type": "scout", "q": -4, "r": 5 }
     ] },
     { "id": "slot_4", "headquarters": { "q": -5, "r": 0 }, "startingUnits": [
       { "type": "infantry", "q": -4, "r": 0 },
       { "type": "infantry", "q": -4, "r": 1 },
-      { "type": "scout", "q": -5, "r": 1 },
-      { "type": "heavy", "q": -3, "r": -1 }
+      { "type": "scout", "q": -5, "r": 1 }
     ] },
     { "id": "slot_5", "headquarters": { "q": 0, "r": -5 }, "startingUnits": [
       { "type": "infantry", "q": 0, "r": -4 },
       { "type": "infantry", "q": -1, "r": -3 },
-      { "type": "scout", "q": -1, "r": -4 },
-      { "type": "heavy", "q": 1, "r": -4 }
+      { "type": "scout", "q": -1, "r": -4 }
     ] },
     { "id": "slot_6", "headquarters": { "q": 5, "r": -5 }, "startingUnits": [
       { "type": "infantry", "q": 4, "r": -4 },
       { "type": "infantry", "q": 3, "r": -4 },
-      { "type": "scout", "q": 4, "r": -5 },
-      { "type": "heavy", "q": 4, "r": -3 }
+      { "type": "scout", "q": 4, "r": -5 }
     ] }
   ],
   "layouts": {
@@ -66,26 +60,26 @@
     "6": ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5", "slot_6"]
   },
   "units": {
-    "infantry": { "hp": 100, "attack": 30, "defense": 8, "moveRange": 2, "attackRange": 2, "cost": 45, "canCapture": true,
+    "infantry": { "hp": 100, "attack": 32, "defense": 8, "moveRange": 2, "attackRange": 2, "cost": 45, "canCapture": true,
       "attackShape": { "type": "line", "length": 2 } },
     "scout": { "hp": 65, "attack": 16, "defense": 4, "moveRange": 4, "attackRange": 1, "cost": 38, "canCapture": true },
-    "heavy": { "hp": 150, "attack": 38, "defense": 13, "moveRange": 2, "attackRange": 1, "cost": 92, "canCapture": false,
+    "heavy": { "hp": 150, "attack": 38, "defense": 10, "moveRange": 2, "attackRange": 1, "cost": 92, "canCapture": false,
       "attackShape": { "type": "arc" } },
-    "ranger": { "hp": 72, "attack": 44, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 72, "canCapture": false,
+    "ranger": { "hp": 72, "attack": 36, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 72, "canCapture": false,
       "attackLock": true },
     "support": { "hp": 82, "attack": 10, "defense": 5, "moveRange": 2, "attackRange": 2, "cost": 60, "canCapture": false, "healPower": 22,
       "healShape": { "type": "arc" } }
   },
-  "headquartersSpec": { "hp": 180, "defense": 6 },
+  "headquartersSpec": { "hp": 200, "defense": 6 },
   "balance": {
     "startingSupplies": 150,
     "baseIncome": 15,
-    "controlPointIncome": 10,
+    "controlPointIncome": 12,
     "damageVarianceRange": 3,
     "minimumDamage": 1,
     "healVarianceRange": 6,
     "actionsPerTurn": 5,
-    "maxTurns": 18,
+    "maxTurns": 15,
     "adjudicationWeights": {
       "enemyHqDamage": 5,
       "ownHqHp": 1,

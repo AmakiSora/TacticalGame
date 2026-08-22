@@ -60,7 +60,7 @@ describe('simultaneous mode setup', () => {
     expect(game.turn.currentOwner).toBeNull();
     expect(game.plan).toEqual({ queues: {}, committed: [] });
     expect(Object.keys(game.headquarters)).toHaveLength(2);
-    expect(game.units).toHaveLength(8);
+    expect(game.units).toHaveLength(6);
     const start = game.events.find(e => e.type === 'game_start')!;
     expect(start.payload.mode).toBe('simultaneous');
     expect(start.payload.firstPlayer).toBeNull();
@@ -70,7 +70,7 @@ describe('simultaneous mode setup', () => {
     const { game } = createStandoffGame(6);
     expect(game.turn.turnOrder).toHaveLength(6);
     expect(Object.keys(game.headquarters)).toHaveLength(6);
-    expect(game.units).toHaveLength(24);
+    expect(game.units).toHaveLength(18);
   });
 
   it('leaves sequential-mode games untouched and rejects plan actions there', () => {
@@ -115,20 +115,19 @@ describe('simultaneous planning phase', () => {
     const { game } = createStandoffGame();
     const a = game.turn.turnOrder[0]!;
     const units = game.units.filter(u => u.owner === a);
-    expect(units).toHaveLength(4);
+    expect(units).toHaveLength(3);
     // 先把出生单位挪离总部周边，腾出部署位；移动目标各不相同且均为平地。
     place(units[0]!, 1, 0);
     place(units[1]!, -1, 0);
     place(units[2]!, 1, 2);
-    place(units[3]!, 2, -2);
     const hq = game.headquarters[a]!;
-    // AP=5：4 个单位动作 + 1 次部署。
+    // AP=5：3 个单位动作 + 2 次部署。
     expect(queueMoveAction(game, a, units[0]!.id, 2, 0).ok).toBe(true);
     expect(queueMoveAction(game, a, units[1]!.id, 0, 0).ok).toBe(true);
     expect(queueMoveAction(game, a, units[2]!.id, 2, 2).ok).toBe(true);
-    expect(queueMoveAction(game, a, units[3]!.id, 3, -2).ok).toBe(true);
     expect(queueDeployAction(game, a, 'infantry', hq.id, 4, 0).ok).toBe(true);
-    expect(queueDeployAction(game, a, 'infantry', hq.id, 5, -1))
+    expect(queueDeployAction(game, a, 'infantry', hq.id, 5, -1).ok).toBe(true);
+    expect(queueDeployAction(game, a, 'infantry', hq.id, 4, 1))
       .toMatchObject({ ok: false, code: 'action_limit_reached' });
   });
 
@@ -363,7 +362,9 @@ describe('simultaneous resolution', () => {
   it('demolishes blocker terrain after movement has settled', () => {
     const { game, bus } = createStandoffGame();
     const a = game.turn.turnOrder[0]!;
-    const heavy = game.units.find(u => u.owner === a && u.type === 'heavy')!;
+    // 重装不再是初始兵种：现场把一个步兵转成重装。
+    const heavy = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    heavy.type = 'heavy';
     place(heavy, 1, -1);
     // 地图阻挡格 (2,-1) 与 (1,-1) 相邻。
     expect(getTerrain(game, 2, -1)).toBe('blocker');
@@ -394,7 +395,7 @@ describe('simultaneous resolution', () => {
     // 部署失败全额退还；回合边界仍发放收入（基础 15）。
     expect(game.resources[a]!.supplies).toBe(suppliesA + 15);
     expect(game.resources[b]!.supplies).toBe(suppliesB + 15);
-    expect(game.units).toHaveLength(8);
+    expect(game.units).toHaveLength(6);
   });
 
   it('captures control points after resolution and grants merit', () => {
@@ -422,8 +423,8 @@ describe('simultaneous resolution', () => {
     expect(unitA.hasMoved).toBe(false);
     expect(unitA.hasActed).toBe(false);
     expect(game.plan).toEqual({ queues: {}, committed: [] });
-    // a 占领了 cp_1：收入 = 基础 15 + 控制点 10；b 只有基础收入。
-    expect(game.resources[a]!.supplies).toBe(startSupplies + 25);
+    // a 占领了 cp_1：收入 = 基础 15 + 控制点 12；b 只有基础收入。
+    expect(game.resources[a]!.supplies).toBe(startSupplies + 27);
     expect(game.resources[b]!.supplies).toBe(startSupplies + 15);
     expect(events(game, 'round_end')).toHaveLength(1);
     expect(events(game, 'round_start')).toHaveLength(1);
@@ -449,7 +450,7 @@ describe('simultaneous resolution', () => {
     expect(game.phase).toBe('game_over');
     expect(['turn_limit_score', 'turn_limit_draw']).toContain(game.result!.reason);
     // 地图配置在所有对局间共享引用，测试结束必须还原。
-    game.config.balance.maxTurns = 18;
+    game.config.balance.maxTurns = 15;
   });
 
   it('force-resolves with only partially committed players', () => {
@@ -491,7 +492,7 @@ describe('simultaneous resolution', () => {
     commitAll(game, bus, [a, b]);
     expect(game.turn.roundNumber).toBe(2);
     expect(game.phase).toBe('active');
-    expect(game.units).toHaveLength(8);
+    expect(game.units).toHaveLength(6);
   });
 });
 
@@ -551,7 +552,8 @@ describe('unit shape overhaul (line / arc / lock / area heal)', () => {
   it('heavy arc attack sweeps the three adjacent cells around the aim direction', () => {
     const { game, bus } = createStandoffGame();
     const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
-    const heavy = game.units.find(u => u.owner === a && u.type === 'heavy')!;
+    const heavy = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    heavy.type = 'heavy';
     const enemies = game.units.filter(u => u.owner === b).slice(0, 3);
     place(heavy, 0, 0);
     // 朝 (1,0) 方向的扇形 = (0,1) (1,0) (1,-1)。

@@ -1,8 +1,8 @@
 # TacticalGame
 
-尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。
+尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`（对峙之地）地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待。
 
-当前版本：`3.2.13`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
+当前版本：`3.3.0`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
 ## 技术栈
 
@@ -75,8 +75,16 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 - 地图可声明 `mode: "annihilation"` 进入「歼灭模式」。该模式不生成总部，每名玩家开局拥有一个出生据点和地图配置的初始部队；最后一个单位死亡时立即淘汰，仅剩一名玩家时获胜。
 - 歼灭模式的炮火会先预告、再按配置轮次向地图中心收缩。危险区单位在每个整轮开始时同时受到无视防御的炮火伤害，危险区内禁止部署、治疗和据点维修；炮火同时消灭所有剩余玩家时判定同归于尽。
 - 歼灭模式按有效行动贡献值计算行动分：部署/爆破记 1 点，实际伤害/治疗每 20 HP 向上折算 1 点，占领据点记 2 点，纯移动不计分；贡献值默认每点折算 10 分。玩家淘汰时会冻结其裁决分，终局排名不会因单位清理而把已淘汰玩家全部记为 0 分。
+- 地图可声明 `mode: "simultaneous"` 进入「同时回合模式」（当前仅 `standoff` 对峙之地，2/3/6 人对称布局，标准 HQ 胜负规则）。该模式没有行动顺序：每回合所有玩家在**计划阶段**通过普通动作接口把指令**入队而不执行**（可撤回，`POST /api/games/:id/plan/revoke` 撤回单条、`plan/clear` 清空），`end-turn` 表示确认锁定；全员确认后（或房主 `host/force-resolve` 强制）服务器**严格同时结算**。
+  - **每单位每回合仅一个动作**：移动 或 攻击 或 治疗（支援） 或 爆破（重装），四选一；部署独立计点，新单位当回合不能行动。每个排队动作消耗 1 行动点，队列长度上限 = `actionsPerTurn`（standoff 为 5）。
+  - **攻击改为指定格子**：`POST /attack` 请求体为 `{ attackerId, q, r }`，射程内任意格均可（预测性开火）。结算时按移动/部署后的棋盘判定：格内是敌方单位/敌方总部则造成伤害（沿用伤害公式与随机浮动），友军免伤、空格落空即浪费。
+  - **目的格冲突全部失败**：跨玩家的移动/部署指向同一格时全部失败（`action_failed`，reason `destination_conflict`），不返还行动点、失败部署不扣补给；自己队列内的重复目标格在入队时直接拒绝。
+  - 移动路径按计划时刻棋盘计算（所有单位视为障碍）；爆破产生的平地在移动结算后才生效；治疗按目标移动后的最终位置复核射程，超出则落空。
+  - **净血量同时结算**：目标 HP = 当前 HP + 全部治疗 − 全部承受伤害，结果 > 0 则存活；同回合互杀成立，阵亡攻击者的炮弹仍然落地。
+  - 第 1 回合无收入；自第 2 回合起，回合边界给**所有**存活玩家同时发放收入与维修点治疗。占点在结算结束时按单位站位判定。
+  - 其他玩家的计划队列严格保密：`GET /api/games/:id` 仅返回 `plan.myQueue`（自己的队列）与 `plan.committed`（已确认名单）。
 - 地图为尖顶六边形，坐标为 `{ q, r }`。
-- 当前内置地图包含旧双人地图、`multiplayer-ring` 多人环形地图和仅支持 4 人的异形地图 `four-corners`；每张地图会声明支持的玩家人数。旧地图默认使用 `radius` 内的完整六边形，异形地图通过 `playableCells` 显式声明实际存在的格子。
+- 当前内置地图包含旧双人地图、`multiplayer-ring` 多人环形地图、仅支持 4 人的异形地图 `four-corners` 和同时回合模式的 `standoff`（对峙之地，2/3/6 人）；每张地图会声明支持的玩家人数。旧地图默认使用 `radius` 内的完整六边形，异形地图通过 `playableCells` 显式声明实际存在的格子。
 - 地形：`plain` 可通行/部署，`water` 和 `blocker` 不可通行/部署。
 - 每方开局有总部；默认图和沙漠图提供 2 个步兵、1 个侦察兵、80 补给，`dual-lanes` 不提供免费单位而是给 208 补给让玩家自行部署。
 - **每回合最多消耗 5 个行动点**（`config.balance.actionsPerTurn`）。首次操作一个单位（部署/移动/攻击/治疗）消耗 1 点并「激活」该单位；同一单位在本回合内的后续动作免费。行动点用尽后，只能继续操作已激活的单位。这是为防止资源碾压方操作过多单位而设的硬上限。
@@ -137,10 +145,13 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 |---|---|---|
 | `POST` | `/api/games/:id/deploy` | `{ unitType, fromId, q, r }` |
 | `POST` | `/api/games/:id/move` | `{ unitId, q, r }` |
-| `POST` | `/api/games/:id/attack` | `{ attackerId, targetId }` |
+| `POST` | `/api/games/:id/attack` | 顺序模式 `{ attackerId, targetId }`；同时模式 `{ attackerId, q, r }`（指定格子） |
 | `POST` | `/api/games/:id/heal` | `{ supportId, targetId }` |
 | `POST` | `/api/games/:id/demolish` | `{ unitId, q, r }` |
-| `POST` | `/api/games/:id/end-turn` | `{}` |
+| `POST` | `/api/games/:id/end-turn` | `{}`（同时模式 = 确认锁定计划；全员确认即触发结算） |
+| `POST` | `/api/games/:id/plan/revoke` | `{ actionId }`（同时模式专用，撤回一条排队指令） |
+| `POST` | `/api/games/:id/plan/clear` | 无（同时模式专用，清空自己的计划） |
+| `POST` | `/api/games/:id/host/force-resolve` | 无（房主强制立即结算，未确认者按现有队列参与） |
 
 旧版 `/build`、`/produce`、`/sell` 已移除。
 
@@ -150,13 +161,15 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 事件类型：
 
-`player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
+`player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `round_start`, `round_resolved`, `plan_committed`, `action_failed`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
 
 `game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。
 
 `income` 事件保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。`deploy` 事件中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。`control_point_repair` 事件包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 
 `demolish` 事件包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。
+
+同时回合模式新增四类事件：`plan_committed`（某玩家确认本回合计划，只含 playerId 不泄露内容）、`round_resolved`（回合结算汇总，含每个玩家每条指令的结果 `executed/failed/missed/fizzled`）、`round_start`（新回合计划阶段开启）、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit` 字段，`hit: false` 表示预测射击落空。
 
 ## 地图格式
 

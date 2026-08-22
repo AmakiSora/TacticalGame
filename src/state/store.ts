@@ -104,6 +104,7 @@ export function createLobby(id: string, mapId = 'default', options: CreateLobbyO
       roundNumber: 1, currentPlayerId: null, turnOrder: [], actedThisRound: [],
       phase: 'lobby', actionsUsed: 0, turnNumber: 1, currentOwner: null,
     },
+    plan: null,
     events: [], winner: null, result: null,
     artillery: null,
   };
@@ -160,7 +161,8 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
     player.status = 'active';
     player.spawnSlotId = slot.id;
     player.turnOrder = index;
-    if (game.config.mode === 'standard') {
+    // simultaneous 与 standard 一样按出生点建总部；仅 annihilation 改为出生点控制点归属。
+    if (game.config.mode !== 'annihilation') {
       game.headquarters[owner] = createHQ(owner, game.config, slot);
     } else {
       const point = game.controlPoints.find(candidate => candidate.id === slot.controlPointId);
@@ -175,16 +177,19 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
   const turnOrder = [...assignedPlayers.slice(startIndex), ...assignedPlayers.slice(0, startIndex)];
   turnOrder.forEach((id, index) => { game.players[id]!.turnOrder = index; });
   game.phase = 'active';
+  const simultaneous = game.config.mode === 'simultaneous';
   game.turn = {
     roundNumber: 1,
-    currentPlayerId: turnOrder[0],
+    // simultaneous 模式没有"当前玩家"：全员并行计划，结算顺序仍由 turnOrder 决定。
+    currentPlayerId: simultaneous ? null : turnOrder[0],
     turnOrder,
     actedThisRound: [],
     phase: 'active',
     actionsUsed: 0,
     turnNumber: 1,
-    currentOwner: turnOrder[0],
+    currentOwner: simultaneous ? null : turnOrder[0],
   };
+  game.plan = simultaneous ? { queues: {}, committed: [] } : null;
   game.artillery = artilleryStateForRound(game, 1);
 }
 
@@ -219,21 +224,30 @@ export function createInitialGame(id: string, mapId = 'default'): GameState {
 }
 
 function restoreActionStats(game: GameState): void {
+  // simultaneous 对局的事件带每玩家独立的 actionsUsed（队列位置），需要按玩家分别累计；
+  // 顺序模式沿用原有的全局计数器逻辑，保持与旧回放一致。
+  const simultaneous = game.config?.mode === 'simultaneous';
   const actionPointTotals = new Map<PlayerId, number>();
   const actionMeritTotals = new Map<PlayerId, number>();
   const unitOwners = new Map<string, PlayerId>();
   let actionsUsed = 0;
+  const ownerActionsUsed = new Map<PlayerId, number>();
 
   for (const event of game.events || []) {
     const payload = event.payload || {};
     if (event.type === 'game_start') {
       actionsUsed = 0;
+      ownerActionsUsed.clear();
       const units = Array.isArray(payload.units) ? payload.units : [];
       for (const unit of units) {
         if (!unit || typeof unit !== 'object') continue;
         const row = unit as Record<string, unknown>;
         if (typeof row.id === 'string' && isPlayerId(row.owner)) unitOwners.set(row.id, row.owner);
       }
+      continue;
+    }
+    if (simultaneous && (event.type === 'round_start' || event.type === 'round_resolved')) {
+      ownerActionsUsed.clear();
       continue;
     }
     if (event.type === 'turn_end' || event.type === 'reset_actions') {
@@ -248,15 +262,24 @@ function restoreActionStats(game: GameState): void {
     if (!owner) {
       const unitId = event.type === 'attack' ? payload.attackerId
         : event.type === 'heal' ? payload.supportId
-          : payload.unitId;
+          : event.type === 'action_failed' ? (payload.attackerId ?? payload.supportId ?? payload.unitId)
+            : payload.unitId;
       if (typeof unitId === 'string') owner = unitOwners.get(unitId) ?? null;
     }
     if (owner) {
       const merit = actionMeritForEvent(event.type, payload);
       if (merit > 0) actionMeritTotals.set(owner, (actionMeritTotals.get(owner) ?? 0) + merit);
     }
-    if (!['deploy', 'move', 'attack', 'heal', 'demolish'].includes(event.type)) continue;
+    if (!['deploy', 'move', 'attack', 'heal', 'demolish', 'action_failed'].includes(event.type)) continue;
     if (!owner || typeof payload.actionsUsed !== 'number') continue;
+    if (simultaneous) {
+      const last = ownerActionsUsed.get(owner) ?? 0;
+      if (payload.actionsUsed > last) {
+        actionPointTotals.set(owner, (actionPointTotals.get(owner) ?? 0) + payload.actionsUsed - last);
+      }
+      ownerActionsUsed.set(owner, payload.actionsUsed);
+      continue;
+    }
     if (payload.actionsUsed > actionsUsed) {
       actionPointTotals.set(owner, (actionPointTotals.get(owner) ?? 0) + payload.actionsUsed - actionsUsed);
     }
@@ -302,6 +325,8 @@ export class GameStore {
       this.games.clear();
       for (const game of parsed.games) {
         if (!game || typeof game.id !== 'string') continue;
+        // 旧版本持久化档案没有 plan 字段，统一补默认值。
+        if (game.plan === undefined) game.plan = null;
         restoreActionStats(game);
         this.games.set(game.id, game);
       }

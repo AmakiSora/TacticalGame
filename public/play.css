@@ -1292,3 +1292,15 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 ::-webkit-scrollbar-track { background: #0f141c; }
 ::-webkit-scrollbar-thumb { background: #2a3a4a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a5a6a; }
+
+/* 同时回合模式：计划队列面板 */
+#plan-panel { border-top: 1px solid rgba(148, 163, 184, .18); padding-top: 10px; }
+#plan-panel.hidden { display: none; }
+.plan-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.plan-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border: 1px solid rgba(148, 163, 184, .25); border-radius: 6px; background: rgba(15, 23, 42, .55); font-size: 12px; }
+.plan-revoke { border: 1px solid rgba(214, 90, 74, .55); background: transparent; color: #d65a4a; border-radius: 5px; padding: 1px 8px; font-size: 11px; cursor: pointer; }
+.plan-revoke:hover { background: rgba(214, 90, 74, .18); }
+.plan-empty { color: #7c8ba1; font-size: 12px; padding: 2px 0; }
+.plan-count { color: #9fb4cc; font-weight: normal; font-size: 12px; margin-left: 4px; }
+.plan-status { margin-top: 8px; font-size: 11px; color: #8fa3ba; }
+.res-committed { color: #49b66d; font-style: normal; margin-left: 4px; font-size: 11px; }

@@ -599,6 +599,104 @@ async function playOwnedTurn(game, args, seat) {
   }
 }
 
+/** 同时模式：提取计划队列里已被使用过的单位 id（每单位每回合一个动作）。 */
+function plannedUnitIds(queue) {
+  const ids = new Set();
+  for (const action of queue) {
+    if (action.unitId) ids.add(action.unitId);
+    if (action.attackerId) ids.add(action.attackerId);
+    if (action.supportId) ids.add(action.supportId);
+  }
+  return ids;
+}
+
+/** 同时模式的计划回合：每单位一个动作（预测射击/治疗/移动），再视预算部署一次，然后确认。 */
+async function playSimultaneousRound(game, args, seat) {
+  let queue = game.plan?.myQueue ?? [];
+  const budget = actionsPerTurn(game);
+  const planned = plannedUnitIds(queue);
+  const claimed = () => new Set(
+    queue.filter(a => (a.type === 'move' || a.type === 'deploy') && Number.isFinite(a.q))
+      .map(a => `${a.q},${a.r}`));
+
+  const enqueue = async (path, body) => {
+    try {
+      const res = await request(args.url, 'POST', `/api/games/${seat.gameId}${path}`, body, seat.token);
+      if (Array.isArray(res.queue)) queue = res.queue;
+      return true;
+    } catch (err) {
+      console.error(`Plan action failed: ${err.message}`);
+      return false;
+    }
+  };
+
+  for (const unit of livingUnits(game, seat.owner)) {
+    if (queue.length >= budget) break;
+    if (planned.has(unit.id)) continue;
+
+    // 预测射击：攻击射程内最优敌人所在的格子（目标若不动必命中）。
+    const targets = enemyTargets(game, seat.owner)
+      .filter(t => hexDistance(unit, t.entity) <= unit.attackRange)
+      .sort((a, b) => targetScore(b) - targetScore(a));
+    if (targets.length > 0) {
+      const target = targets[0].entity;
+      if (await enqueue('/attack', { attackerId: unit.id, q: target.q, r: target.r })) {
+        planned.add(unit.id);
+        console.log(`Plan attack ${unit.id} -> cell ${target.q},${target.r}`);
+        continue;
+      }
+    }
+
+    if (unit.type === 'support') {
+      const wounded = livingUnits(game, seat.owner)
+        .filter(u => u.id !== unit.id && u.hp < u.maxHp && hexDistance(unit, u) <= unit.attackRange)
+        .sort((a, b) => ((b.maxHp - b.hp) / b.maxHp) - ((a.maxHp - a.hp) / a.maxHp))[0];
+      if (wounded && await enqueue('/heal', { supportId: unit.id, targetId: wounded.id })) {
+        planned.add(unit.id);
+        console.log(`Plan heal ${unit.id} -> ${wounded.id}`);
+        continue;
+      }
+    }
+
+    const reachable = reachableCells(game, unit).filter(pos => !claimed().has(`${pos.q},${pos.r}`));
+    if (reachable.length > 0) {
+      const goal = movementGoal(game, seat.owner, unit);
+      const best = reachable
+        .map(pos => ({ pos, distance: hexDistance(pos, goal) }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      if (best.distance < hexDistance(unit, goal)
+        && await enqueue('/move', { unitId: unit.id, q: best.pos.q, r: best.pos.r })) {
+        planned.add(unit.id);
+        console.log(`Plan move ${unit.id} -> ${best.pos.q},${best.pos.r}`);
+      }
+    }
+  }
+
+  if (queue.length < budget) {
+    const origins = deployOrigins(game, seat.owner);
+    const unitType = deployChoice(game, seat.owner, origins);
+    if (unitType) {
+      const taken = claimed();
+      const candidates = [];
+      for (const origin of origins) {
+        const cost = effectiveDeployCost(game, unitType, origin);
+        if (game.resources[seat.owner].supplies < cost) continue;
+        for (const pos of neighbors(origin)) {
+          if (isEmptyPlain(game, pos) && !taken.has(`${pos.q},${pos.r}`)) candidates.push({ origin, pos, cost });
+        }
+      }
+      candidates.sort((a, b) => a.cost - b.cost);
+      const pick = candidates[0];
+      if (pick && await enqueue('/deploy', { unitType, fromId: pick.origin.id, q: pick.pos.q, r: pick.pos.r })) {
+        console.log(`Plan deploy ${unitType} at ${pick.pos.q},${pick.pos.r}`);
+      }
+    }
+  }
+
+  await request(args.url, 'POST', `/api/games/${seat.gameId}/end-turn`, {}, seat.token);
+  console.log(`Committed round ${game.turn.roundNumber} plan (${queue.length} actions, ${seat.owner})`);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const seat = await setupSeat(args);
@@ -628,6 +726,19 @@ async function main() {
 
     if (game.phase !== 'active') {
       console.log(`Waiting for game to start: ${game.phase}`);
+      await sleep(args.delayMs);
+      continue;
+    }
+
+    if (game.config?.mode === 'simultaneous') {
+      // 同时模式：计划窗口开启且自己未确认时行动；已确认则等所有人提交、结算完成。
+      if ((game.plan?.committed ?? []).includes(seat.owner)) {
+        await sleep(args.delayMs);
+        continue;
+      }
+      await playSimultaneousRound(game, args, seat);
+      playedTurns += 1;
+      if (args.once) return;
       await sleep(args.delayMs);
       continue;
     }

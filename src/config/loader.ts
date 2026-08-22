@@ -243,8 +243,8 @@ function assertPosition(obj: Record<string, unknown>, ctx: string, radius: numbe
 
 function validateMap(id: string, config: unknown): asserts config is MapConfig {
   const c = asRecord(config, `Map "${id}"`);
-  if (c.mode !== 'standard' && c.mode !== 'annihilation') {
-    throw new Error(`Map "${id}".mode must be standard or annihilation`);
+  if (c.mode !== 'standard' && c.mode !== 'annihilation' && c.mode !== 'simultaneous') {
+    throw new Error(`Map "${id}".mode must be standard, annihilation, or simultaneous`);
   }
   const name = assertString(c, 'name', `Map "${id}"`);
   const description = assertString(c, 'description', `Map "${id}"`);

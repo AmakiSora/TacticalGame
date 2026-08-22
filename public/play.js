@@ -40,7 +40,7 @@ const els = {
   availableGames: $('available-games'), btnRefreshGames: $('btn-refresh-games'),
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
-  btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'),
+  btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'), planPanel: $('plan-panel'),
   selDetail: $('selection-detail'), events: $('events'), scorePanel: $('score-panel'),
   btnSettings: $('btn-settings'), settingsPopover: $('settings-popover'),
   settingsControlToken: $('settings-control-token'), btnSaveControlToken: $('btn-save-control-token'),
@@ -403,7 +403,7 @@ function renderMapPicker(maps) {
 		    const maxTurns = map.preview?.maxTurns ?? '-';
 		    const actionsPerTurn = map.preview?.actionsPerTurn ?? '-';
 	    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
-	    const modeLabel = map.preview?.mode === 'annihilation' ? '歼灭' : '标准';
+	    const modeLabel = map.preview?.mode === 'simultaneous' ? '同时' : map.preview?.mode === 'annihilation' ? '歼灭' : '标准';
     return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}" aria-label="${esc(map.name)} (${esc(map.id)})">
       ${renderMapPreview(map.preview)}
       <span class="map-card-copy">
@@ -451,6 +451,7 @@ function createEmptyState() {
     units: new Map(),
     resources: {},
     turn: { roundNumber: 1, turnNumber: 1, currentPlayerId: null, currentOwner: null, turnOrder: [], actionsUsed: 0 },
+    plan: { committed: [], myQueue: [] },
     winner: null,
     result: null,
     adjudication: null,
@@ -483,8 +484,9 @@ function applyEvent(s, ev) {
       gameConfig = p.config; if (p.playerNames) playerNames = { ...p.playerNames };
       s.players = JSON.parse(JSON.stringify(p.players || {}));
       s.turn.turnOrder = [...(p.turnOrder || [])];
-      s.turn.currentPlayerId = p.firstPlayer || s.turn.turnOrder[0] || null;
+      s.turn.currentPlayerId = gameConfig?.mode === 'simultaneous' ? null : (p.firstPlayer || s.turn.turnOrder[0] || null);
       s.turn.currentOwner = s.turn.currentPlayerId;
+      s.plan = { committed: [], myQueue: [] };
       s.map = cloneMapPayload(p.map);
       s.cells = s.map.cells || [];
       s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
@@ -555,6 +557,23 @@ function applyEvent(s, ev) {
       if (cp) cp.owner = null;
       break;
     }
+    case 'plan_committed':
+      if (!s.plan) s.plan = { committed: [], myQueue: [] };
+      if (Array.isArray(p.committed)) s.plan.committed = [...p.committed];
+      break;
+    case 'round_end':
+      break;
+    case 'round_resolved':
+      // 结算明细由 move/attack/... 单体事件驱动棋盘；此处只重置计划阶段。
+      s.plan = { committed: [], myQueue: [] };
+      s.lastRoundResults = p.results || null;
+      break;
+    case 'round_start':
+      s.turn.roundNumber = p.roundNumber || s.turn.roundNumber + 1;
+      s.turn.turnNumber = s.turn.roundNumber;
+      s.turn.actionsUsed = 0;
+      s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : [], myQueue: [] };
+      break;
     case 'game_over':
       s.winner = p.winner;
       s.result = { winner: p.winner ?? null, reason: p.reason || 'headquarters_destroyed', scores: p.scores, rankings: p.rankings };
@@ -621,6 +640,13 @@ async function refreshAdjudication() {
         const { ok, data } = await API.get(`/api/games/${gameId}`);
         if (!ok || !data?.adjudication || !state) return false;
         state.adjudication = data.adjudication;
+        // 同时模式：合并服务器返回的计划状态（自己的队列 + 已确认名单）。
+        if (data.plan) {
+          state.plan = {
+            committed: Array.isArray(data.plan.committed) ? [...data.plan.committed] : (state.plan?.committed ?? []),
+            myQueue: Array.isArray(data.plan.myQueue) ? [...data.plan.myQueue] : (state.plan?.myQueue ?? []),
+          };
+        }
       } while (adjudicationRefreshQueued);
       return true;
     } finally {
@@ -972,9 +998,65 @@ function renderLoop(now) {
 }
 
 function actionsPerTurn() { return gameConfig?.balance?.actionsPerTurn ?? 0; }
+function isSimultaneous() { return gameConfig?.mode === 'simultaneous'; }
+function myPlanQueue() { return state?.plan?.myQueue ?? []; }
+function committedList() { return state?.plan?.committed ?? []; }
+function iCommitted() { return committedList().includes(myPlayer); }
+/** 当下是否允许我方操作：顺序模式=轮到我；同时模式=计划阶段且我未确认。 */
+function canActNow() {
+  if (!state || state.winner) return false;
+  if (isSimultaneous()) {
+    return state.players?.[myPlayer]?.status === 'active' && !iCommitted();
+  }
+  return (state.turn?.currentPlayerId || state.turn?.currentOwner) === myPlayer;
+}
+/** 同时模式：该单位本回合是否已有排队动作（每单位一个动作）。 */
+function unitHasPlannedAction(unitId) {
+  return myPlanQueue().some(a => a.unitId === unitId || a.attackerId === unitId || a.supportId === unitId);
+}
+function describePlanAction(a) {
+  const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破' }[a.type] || a.type;
+  if (a.type === 'heal') return `${typeLabel} 友方单位`;
+  if (Number.isFinite(a.q) && Number.isFinite(a.r)) return `${typeLabel} → (${a.q}, ${a.r})`;
+  return typeLabel;
+}
+function renderPlanPanel() {
+  const el = els.planPanel;
+  if (!el) return;
+  if (!isSimultaneous()) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const queue = myPlanQueue();
+  const max = actionsPerTurn();
+  const activeCount = joinedPlayerIds().filter(id => state.players[id]?.status === 'active').length;
+  const committedNames = committedList().map(id => playerName(id)).join('、') || '—';
+  const rows = queue.map(a => `
+    <li class="plan-item">
+      <span>${esc(describePlanAction(a))}</span>
+      ${iCommitted() ? '' : `<button class="plan-revoke" data-revoke="${esc(a.id)}" title="撤销该指令">撤销</button>`}
+    </li>`).join('');
+  el.innerHTML = `<h3>本回合计划 <span class="plan-count">${queue.length}/${max}</span></h3>
+    <ul class="plan-list">${rows || '<li class="plan-empty">尚未下达指令，点击棋盘单位开始排队</li>'}</ul>
+    <div class="plan-status">${iCommitted() ? '已确认，等待全员提交后统一结算' : `已确认 ${committedList().length}/${activeCount}（${esc(committedNames)}）`}</div>`;
+  el.querySelectorAll('.plan-revoke').forEach(btn => btn.addEventListener('click', async () => {
+    if (await apiAction(`/api/games/${gameId}/plan/revoke`, { actionId: btn.dataset.revoke })) {
+      await refreshAdjudication();
+      renderSidebar();
+      drawBoard();
+    }
+  }));
+}
 function renderActionsDisplay(owner) {
   const max = actionsPerTurn();
   if (!max || !els.actionsDisplay) { if (els.actionsDisplay) els.actionsDisplay.innerHTML = ''; return; }
+  if (isSimultaneous()) {
+    const used = myPlanQueue().length;
+    const remaining = Math.max(0, max - used);
+    const exhausted = remaining === 0;
+    els.actionsDisplay.classList.toggle('exhausted', exhausted);
+    els.actionsDisplay.classList.toggle('mine', true);
+    els.actionsDisplay.innerHTML = `<span class="actions-label">行动点</span><span class="actions-count ${exhausted ? 'zero' : ''}">${remaining}/${max}</span>${exhausted ? '<span class="actions-hint">计划已满，可撤销后重新排队</span>' : ''}`;
+    return;
+  }
   const used = state.turn.actionsUsed || 0;
   const remaining = Math.max(0, max - used);
   const isMine = owner === myPlayer;
@@ -1089,25 +1171,35 @@ function renderScorePanel() {
 
 function renderSidebar() {
   if (!state) return;
-  const owner = state.turn.currentPlayerId || state.turn.currentOwner;
-  els.turnBadge.innerHTML = `<strong class="turn-count">${esc(turnProgressLabel())}</strong><span class="turn-player">${esc(playerName(owner))}</span>`;
-  els.turnBadge.classList.toggle('my-turn', owner === myPlayer);
+  const simultaneous = isSimultaneous();
+  const owner = simultaneous ? null : (state.turn.currentPlayerId || state.turn.currentOwner);
+  els.turnBadge.innerHTML = `<strong class="turn-count">${esc(turnProgressLabel())}</strong><span class="turn-player">${simultaneous ? (iCommitted() ? '已确认 · 等待全员提交' : '同时计划阶段') : esc(playerName(owner))}</span>`;
+  els.turnBadge.classList.toggle('my-turn', simultaneous ? (!iCommitted() && !state.winner) : owner === myPlayer);
   const resourceRows = joinedPlayerIds().map(id => {
     const color = OWNER_COLOR[id] || '#9aa7b2';
     const supplies = state.resources?.[id]?.supplies ?? 0;
+    const planFlag = simultaneous && committedList().includes(id) ? '<em class="res-committed" title="已确认本回合计划">✓</em>' : '';
     return `<div class="resource-pill ${playerClass(id)} ${myPlayer === id ? 'mine' : ''}" style="border-left-color:${esc(color)}">
-      <span>${esc(playerName(id))}</span><strong>${supplies}</strong>
+      <span>${esc(playerName(id))}${planFlag}</span><strong>${supplies}</strong>
     </div>`;
   }).join('');
+  const statusCard = simultaneous
+    ? `<div class="status-card active-turn ${iCommitted() ? '' : 'mine'}">
+        <span>${iCommitted() ? '已确认 · 等待其他玩家' : '计划阶段 · 全员同时下令'}</span>
+        <strong>${committedList().length}/${joinedPlayerIds().filter(id => state.players[id]?.status === 'active').length || 0} 已确认</strong>
+      </div>`
+    : `<div class="status-card active-turn ${owner === myPlayer ? 'mine' : ''}">
+        <span>${owner === myPlayer ? '你的回合' : '等待对手'}</span>
+        <strong>${esc(playerName(owner))}</strong>
+      </div>`;
   els.resDisplay.innerHTML = `<div class="status-grid">
-    <div class="status-card active-turn ${owner === myPlayer ? 'mine' : ''}">
-      <span>${owner === myPlayer ? '你的回合' : '等待对手'}</span>
-      <strong>${esc(playerName(owner))}</strong>
-    </div>
+    ${statusCard}
     ${resourceRows}
   </div>`;
+  els.btnEndTurn.textContent = simultaneous ? (iCommitted() ? '等待结算…' : '确认行动') : '结束回合';
   renderActionsDisplay(owner);
   renderScorePanel();
+  renderPlanPanel();
   els.events.innerHTML = '';
   for (const ev of state.eventLog.slice(-60)) {
     const li = document.createElement('li'); li.className = `type-${ev.type}`;
@@ -1124,7 +1216,7 @@ function formatEventShort(ev) {
     case 'game_start': return '对局开始';
     case 'deploy': return `${playerName(p.owner)} 部署 ${UNIT_NAMES[p.unitType] || p.unitType}`;
     case 'move': return `移动到 (${p.toQ}, ${p.toR})`;
-    case 'attack': return `攻击造成 ${p.damage} 伤害`;
+    case 'attack': return p.hit === false ? `开火落空 (${p.q}, ${p.r})` : `攻击造成 ${p.damage} 伤害`;
     case 'heal': return `治疗 +${p.amount}`;
     case 'unit_death': return `${UNIT_NAMES[p.unitType] || '单位'} 阵亡`;
     case 'headquarters_destroyed': return `${playerName(p.owner)} 指挥部被摧毁`;
@@ -1146,6 +1238,14 @@ function formatEventShort(ev) {
       return `${playerName(p.winner)} 获胜`;
     case 'name_rename': return `${p.playerId} 改名为 ${p.name}`;
     case 'demolish': return `${playerName(p.owner)} 爆破 (${p.q}, ${p.r})`;
+    case 'plan_committed': return `${playerName(p.playerId)} 已确认本回合计划`;
+    case 'round_start': return `第 ${p.roundNumber} 回合计划阶段开始`;
+    case 'round_resolved': return `第 ${p.roundNumber} 回合同时结算完毕`;
+    case 'action_failed': {
+      const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破' }[p.type] || '动作';
+      const reasonLabel = { destination_conflict: '目标格撞车，全部失败', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', out_of_range: '超出射程，落空', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
+      return `${playerName(p.owner)} ${typeLabel}未执行：${reasonLabel}`;
+    }
     default: return JSON.stringify(p).slice(0, 100);
   }
 }
@@ -1186,11 +1286,13 @@ async function afterAction(msg) {
 function selectUnit(unit) {
   selectedUnitId = unit.id; selectedOriginId = null; selectedDeployType = null; interactionMode = 'unit_selected'; rangeHighlights = [];
   renderSidebar(); drawBoard();
-  if (unit.owner !== myPlayer || (state.turn.currentPlayerId || state.turn.currentOwner) !== myPlayer) return;
+  if (unit.owner !== myPlayer || !canActNow()) return;
+  // 同时模式：已有排队动作的单位本回合不能再下令（每单位一个动作）。
+  const plannedAlready = isSimultaneous() && unitHasPlannedAction(unit.id);
   const items = [];
-  if (!unit.hasMoved) items.push({ label: '移动', action: 'move' });
-  if (!unit.hasActed) items.push({ label: unit.type === 'support' ? '治疗' : '攻击', action: unit.type === 'support' ? 'heal' : 'attack' });
-  if (unit.type === 'heavy' && !unit.hasActed && demolishableCells(unit).length > 0) items.push({ label: '爆破', action: 'demolish' });
+  if (!unit.hasMoved && !plannedAlready) items.push({ label: '移动', action: 'move' });
+  if (!unit.hasActed && !plannedAlready) items.push({ label: unit.type === 'support' ? '治疗' : '攻击', action: unit.type === 'support' ? 'heal' : 'attack' });
+  if (unit.type === 'heavy' && !unit.hasActed && !plannedAlready && demolishableCells(unit).length > 0) items.push({ label: '爆破', action: 'demolish' });
   if (items.length) showPopup(unit, '单位操作', items, action => {
     closePopup();
     if (action === 'move') { interactionMode = 'move_mode'; rangeHighlights = reachable(unit).map(p => ({ ...p, type: 'move' })); }
@@ -1215,7 +1317,7 @@ function selectDeployOrigin(origin) {
   selectedOriginId = origin.id; selectedUnitId = null; selectedDeployType = null; interactionMode = 'deploy_origin'; rangeHighlights = [];
   renderSidebar(); drawBoard();
   if (origin.owner !== myPlayer && origin.owner !== undefined) return;
-  if ((state.turn.currentPlayerId || state.turn.currentOwner) !== myPlayer) return;
+  if (!canActNow()) return;
   const items = Object.entries(gameConfig.units).map(([type]) => ({ label: UNIT_NAMES[type], action: 'deploy', type, cost: effectiveDeployCost(type, origin) }));
   showPopup(origin, '部署单位', items, (_action, type) => {
     closePopup(); interactionMode = 'deploy_mode'; selectedOriginId = origin.id; selectedDeployType = type;
@@ -1246,27 +1348,33 @@ els.canvas.addEventListener('click', async () => {
   const cp = [...state.controlPoints.values()].find(p => p.q === hoverCell.q && p.r === hoverCell.r);
 
   if (interactionMode === 'move_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
-    if (await apiAction(`/api/games/${gameId}/move`, { unitId: selectedUnitId, q: hoverCell.q, r: hoverCell.r })) afterAction('移动成功');
+    if (await apiAction(`/api/games/${gameId}/move`, { unitId: selectedUnitId, q: hoverCell.q, r: hoverCell.r })) afterAction(isSimultaneous() ? '移动指令已入队' : '移动成功');
     return;
   }
   if (interactionMode === 'attack_mode') {
     const hit = rangeHighlights.find(h => h.q === hoverCell.q && h.r === hoverCell.r);
-    if (hit?.type === 'attack') {
-      const target = entityAt(hoverCell.q, hoverCell.r);
-      if (target && target.owner !== myPlayer && target.alive && await apiAction(`/api/games/${gameId}/attack`, { attackerId: selectedUnitId, targetId: target.id })) afterAction('攻击成功');
+    const enemyClick = hit?.type === 'attack';
+    // 同时模式下射程内任意格都可开火（预测性射击）；顺序模式仍只能点敌方实体格。
+    if (enemyClick || (isSimultaneous() && hit?.type === 'attack-radius')) {
+      if (isSimultaneous()) {
+        if (await apiAction(`/api/games/${gameId}/attack`, { attackerId: selectedUnitId, q: hoverCell.q, r: hoverCell.r })) afterAction('开火指令已入队');
+      } else {
+        const target = entityAt(hoverCell.q, hoverCell.r);
+        if (target && target.owner !== myPlayer && target.alive && await apiAction(`/api/games/${gameId}/attack`, { attackerId: selectedUnitId, targetId: target.id })) afterAction('攻击成功');
+      }
       return;
     }
   }
   if (interactionMode === 'heal_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
-    if (unit && await apiAction(`/api/games/${gameId}/heal`, { supportId: selectedUnitId, targetId: unit.id })) afterAction('治疗成功');
+    if (unit && await apiAction(`/api/games/${gameId}/heal`, { supportId: selectedUnitId, targetId: unit.id })) afterAction(isSimultaneous() ? '治疗指令已入队' : '治疗成功');
     return;
   }
   if (interactionMode === 'demolish_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
-    if (await apiAction(`/api/games/${gameId}/demolish`, { unitId: selectedUnitId, q: hoverCell.q, r: hoverCell.r })) afterAction('爆破成功');
+    if (await apiAction(`/api/games/${gameId}/demolish`, { unitId: selectedUnitId, q: hoverCell.q, r: hoverCell.r })) afterAction(isSimultaneous() ? '爆破指令已入队' : '爆破成功');
     return;
   }
   if (interactionMode === 'deploy_mode' && rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) {
-    if (await apiAction(`/api/games/${gameId}/deploy`, { unitType: selectedDeployType, fromId: selectedOriginId, q: hoverCell.q, r: hoverCell.r })) afterAction('部署成功');
+    if (await apiAction(`/api/games/${gameId}/deploy`, { unitType: selectedDeployType, fromId: selectedOriginId, q: hoverCell.q, r: hoverCell.r })) afterAction(isSimultaneous() ? '部署指令已入队' : '部署成功');
     return;
   }
 
@@ -1458,7 +1566,7 @@ async function startHostedGame() {
   await enterGame();
 }
 
-els.btnEndTurn.addEventListener('click', async () => { if (await apiAction(`/api/games/${gameId}/end-turn`, {})) afterAction('回合结束'); });
+els.btnEndTurn.addEventListener('click', async () => { if (await apiAction(`/api/games/${gameId}/end-turn`, {})) afterAction(isSimultaneous() ? '本回合计划已确认，等待全员提交' : '回合结束'); });
 els.btnRefresh.addEventListener('click', async () => { await loadFullState(); drawBoard(); renderSidebar(); toast('状态已刷新', 'ok'); });
 els.btnCreate.addEventListener('click', async () => {
   els.btnCreate.disabled = true;

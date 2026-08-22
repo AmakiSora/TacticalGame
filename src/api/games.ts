@@ -5,6 +5,7 @@ import { globalStore, createLobby, addLobbyPlayer, removeLobbyPlayer, MAX_PLAYER
 import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
+import { eliminateFromPlanAndMaybeResolve, forceResolveRound } from '../engine/simultaneous.js';
 import {
   authenticate, authenticateHost, sanitizeGameForResponse, statusForCode,
 } from './auth.js';
@@ -19,6 +20,7 @@ function lobbySummary(game: GameState) {
   }));
   return {
     gameId: game.id, mapId: game.mapId, phase: game.phase,
+    mode: game.config.mode,
     maxPlayers: game.maxPlayers, playerCount: players.length, players,
     supportedPlayerCounts: game.config.supportedPlayerCounts,
   };
@@ -134,8 +136,20 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!isPlayerId(req.body?.playerId)) return reply.code(400).send({ error: 'valid playerId required', code: 'invalid_move' });
     const result = eliminatePlayer(game, globalEventBus, req.body.playerId, 'host_eliminated', null);
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
+    // simultaneous 模式下计划期淘汰：清出其计划状态；若其余玩家均已确认则立即结算。
+    eliminateFromPlanAndMaybeResolve(game, globalEventBus, req.body.playerId);
     globalStore.persist(game);
     return { ok: true };
+  });
+
+  // simultaneous 模式专用：房主强制以当前队列立即结算（未确认玩家按现有队列参与）。
+  app.post<{ Params: { id: string } }>('/api/games/:id/host/force-resolve', async (req, reply) => {
+    const game = authenticateHost(req, reply);
+    if (!game) return;
+    const result = forceResolveRound(game, globalEventBus);
+    if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
+    globalStore.persist(game);
+    return { ok: true, resolved: true, roundNumber: result.data ? result.data.roundNumber : null, phase: game.phase };
   });
 
   app.patch<{ Params: { id: string }; Body: { name?: string } }>('/api/games/:id/player', async (req, reply) => {
@@ -188,6 +202,6 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { id: string } }>('/api/games/:id', async (req, reply) => {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
-    return sanitizeGameForResponse(ctx.game);
+    return sanitizeGameForResponse(ctx.game, ctx.player);
   });
 }

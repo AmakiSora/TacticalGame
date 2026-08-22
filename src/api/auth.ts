@@ -17,6 +17,8 @@ const errorStatus: Record<string, number> = {
   game_over: 409,
   game_not_started: 409,
   lobby_not_ready: 409,
+  already_committed: 409,
+  not_simultaneous_game: 400,
   unsupported_player_count: 400,
   insufficient_supplies: 400,
   action_limit_reached: 429,
@@ -71,9 +73,18 @@ export function authenticateHost(
   return game;
 }
 
-export function sanitizeGameForResponse(game: GameState): unknown {
+export function sanitizeGameForResponse(game: GameState, viewer?: PlayerId): unknown {
   const { tokens: _tokens, hostToken: _hostToken, ...rest } = game;
   const body = structuredClone(rest) as Record<string, unknown>;
   body.adjudication = buildAdjudicationSnapshot(game);
+  // simultaneous 模式下，其他玩家的计划队列属于秘密：只保留请求者自己的队列，
+  // committed 名单公开（"谁已确认"不是秘密）。
+  if (game.config.mode === 'simultaneous' && body.plan && typeof body.plan === 'object') {
+    const plan = body.plan as { queues: Record<string, unknown>; committed: unknown };
+    const sanitizedQueues: Record<string, unknown> = {};
+    const myQueue = viewer && game.plan?.queues[viewer] ? game.plan.queues[viewer] : [];
+    if (viewer && myQueue.length > 0) sanitizedQueues[viewer] = structuredClone(myQueue);
+    body.plan = { ...plan, queues: sanitizedQueues, myQueue: structuredClone(myQueue) };
+  }
   return body;
 }

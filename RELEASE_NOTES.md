@@ -2,6 +2,16 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.3.0
+
+- 新增**同时回合模式**（`config.mode === "simultaneous"`）与专用地图 `standoff`（对峙之地，2/3/6 人六重对称布局）：解决逐人轮流带来的先手优势与多人等待问题。所有玩家在计划阶段通过既有动作接口（`deploy/move/attack/heal/demolish`）把指令**入队而不执行**，响应回显自己的计划队列；`plan/revoke` 撤回单条、`plan/clear` 清空、`end-turn` 确认锁定；全员确认（或房主 `host/force-resolve` 强制）后由服务器**严格同时结算**。旧行为零改动：顺序模式与歼灭模式的代码路径不变，全部既有测试原样通过。
+- 同时模式核心规则：**每单位每回合仅一个动作**（移动/攻击/治疗/爆破四选一，部署独立计点、每动作 1 行动点）；**攻击改为指定格子**（`{ attackerId, q, r }`，射程内任意格预测性开火，命中移动/部署后格内的敌方单位或总部，友军免伤、落空即浪费）；**目的格冲突全部失败**（跨玩家移动/部署撞格全败不返还，自己队列内重复目标入队即拒）；**净血量同时结算**（先治疗后按序扣伤等价同时，同回合互杀成立、阵亡者炮弹仍落地）；移动按计划时刻棋盘寻路；爆破地形移动后生效；治疗按目标终点复核射程；第 1 回合无收入、第 2 回合起回合边界全员同发收入与维修；结算顺序恒按开局随机 `turnOrder`，确定性可回放。
+- 计划保密：`GET /api/games/:id` 脱敏后仅返回 `plan.myQueue`（请求者自己的队列）与 `plan.committed`（公开的已确认名单），其他玩家的队列内容绝不外泄；计划期房主淘汰玩家会清出其计划状态，若剩余玩家已全员确认则立即自动结算。
+- 新事件类型 `plan_committed` / `round_start` / `round_resolved`（含每个玩家每条指令的 `executed/failed/missed/fizzled` 结果汇总）/ `action_failed`（冲突落空及原因），既有事件（`move/attack/heal/deploy/demolish/unit_death/...`）复用并增量扩展 payload（`attack` 新增 `q/r/hit`），观战端、回放导入导出与重启统计重建（`restoreActionStats` 按玩家累计 `actionsUsed`）全部兼容。
+- 前端五端齐适配：桌面 `play.html/play.js` 与移动 `play-m.html/play-m.js` 新增计划队列面板（指令列表 + 撤销按钮 + AP 余量）、「确认行动」按钮与全员确认进度、计划阶段行动门槛（已排队单位禁止二次下令）、同时模式攻击改为射程内任意格可点；三个观战端（`app.js`、`spectator-m.js`、`spectator2.html`）补齐新事件中文标签、`round_start` 回合计数与攻击落空展示；地图选择器新增「同时」模式徽标。
+- Skill 适配：`SKILL.md` 模式路由新增 `simultaneous → simultaneous.md`（完整规则书：回合循环、硬规则、对峙之地数值、计划清单与决策序）；`wait-turn.mjs` 在同时模式下退出码 `0` 语义为「计划窗口开启且自己未确认」（顺序模式契约不变）；演示 bot `ai-player.mjs` 支持同时模式（预测射击/治疗/移动排队后确认）。
+- 引擎新增 `src/engine/planning.ts`（计划阶段校验：每单位一动作、队列长度=行动点、补给跨队列累计、自家目标格查重）与 `src/engine/simultaneous.ts`（五阶段结算器：部署/移动共享目的格声明池 → 同时落位 → 拆除/格子攻击/治疗净血量 → 占点 → 回合边界），全部复用既有引擎函数（仅新增导出），不修改任何顺序模式逻辑；`maps/standoff.json`：半径 5（91 格）、中心 + 六轴共 7 据点、每出生位 HQ + 2 步兵 + 1 侦察 + 1 重装、AP 5 / 18 回合 / 开局 150 补给、自第 4 回合起翻盘补给。新增 38 个引擎/API 用例与 11 个前端/skill 用例覆盖冲突、预测射击、净血量、强制结算、计划期淘汰、持久化重启与脱敏。
+
 ## 3.2.13
 
 - 统一版本号变更脚本：应用版本号分散硬编码在 `package.json`、`package-lock.json`（顶层与 `packages['']` 两处）、`public/version.js`、`README.md`、`skill/SKILL.md`、`.qoder/skills/play-hex-api-game/SKILL.md`（skill 的 IDE 拷贝）与 `tests/public/import-export.test.ts` 的版本断言共 7 个位置，发版时手工逐个改极易漏改——`3.2.13` 提升时就漏改了 `README.md`、`package-lock.json` 与测试断言，导致 CI 在 `tests/skill/ai-player.test.ts` 与 `tests/public/import-export.test.ts` 两处版本一致性断言上失败。新增 `script/bump-version.mjs` 统一管理：传版本号一键提升全部位置（同时把 `public/*.html` 中与旧版本一致的脚本缓存参数 `?v=` 提升，并在 `RELEASE_NOTES.md` 插入新版本占位小节）、无参以 `package.json` 为基准同步其余位置（修复漏改）、`--check` 只校验一致性并输出 `OK`/`DRIFT` 清单（不一致退出码 1）；`board-animation.js?v=3.2.6` 这类独立维护的缓存参数不受影响。

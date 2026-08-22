@@ -14,7 +14,7 @@ export function isPlayerId(value: unknown): value is PlayerId {
 }
 
 export type UnitType = 'infantry' | 'scout' | 'heavy' | 'ranger' | 'support';
-export type GameMode = 'standard' | 'annihilation';
+export type GameMode = 'standard' | 'annihilation' | 'simultaneous';
 export type GamePhase = 'lobby' | 'active' | 'game_over';
 export type PlayerStatus = 'lobby' | 'active' | 'eliminated';
 export type GameOverReason =
@@ -130,6 +130,31 @@ export interface TurnState {
   currentOwner: PlayerId | null;
 }
 
+/** simultaneous 模式下玩家在计划阶段提交的待结算动作。 */
+export interface PendingAction {
+  id: string;
+  type: 'deploy' | 'move' | 'attack' | 'heal' | 'demolish';
+  /** deploy */
+  unitType?: UnitType;
+  fromId?: string;
+  /** move / demolish */
+  unitId?: string;
+  /** attack（目标为格子） */
+  attackerId?: string;
+  /** heal */
+  supportId?: string;
+  targetId?: string;
+  /** deploy / move / attack / demolish 的目标格 */
+  q?: number;
+  r?: number;
+}
+
+/** simultaneous 模式的计划阶段状态；其他模式恒为 null。 */
+export interface PlanState {
+  queues: PlayerRecord<PendingAction[]>;
+  committed: PlayerId[];
+}
+
 export type EventType =
   | 'player_joined'
   | 'player_left'
@@ -152,6 +177,10 @@ export type EventType =
   | 'turn_skipped'
   | 'turn_end'
   | 'round_end'
+  | 'round_start'
+  | 'round_resolved'
+  | 'plan_committed'
+  | 'action_failed'
   | 'headquarters_destroyed'
   | 'player_eliminated'
   | 'game_over'
@@ -229,6 +258,7 @@ export interface GameState {
   tokens: PlayerRecord<string>;
   playerNames: PlayerRecord<string>;
   turn: TurnState;
+  plan: PlanState | null;
   events: GameEvent[];
   winner: PlayerId | null;
   result: GameResult | null;
@@ -264,4 +294,6 @@ export type ApiErrorCode =
   | 'lobby_not_ready'
   | 'unsupported_player_count'
   | 'action_limit_reached'
-  | 'invalid_demolish';
+  | 'invalid_demolish'
+  | 'not_simultaneous_game'
+  | 'already_committed';

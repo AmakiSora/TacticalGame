@@ -454,6 +454,17 @@ function applyEvent(s, ev) {
     case 'round_end':
       // Round boundary marker; turn_end that follows carries the new round number.
       break;
+    case 'round_start':
+      // 同时模式没有 turn_end，由 round_start 携带新回合号。
+      s.turn.roundNumber = p.roundNumber || s.turn.roundNumber + 1;
+      s.turn.turnNumber = s.turn.roundNumber;
+      s.turn.actionsUsed = 0;
+      break;
+    case 'plan_committed':
+    case 'round_resolved':
+    case 'action_failed':
+      // 同时模式的计划期与结算汇总事件：不驱动棋盘，仅入日志。
+      break;
     case 'turn_skipped':
       break;
     case 'player_eliminated':
@@ -850,6 +861,10 @@ const EVENT_LABELS = {
   turn_skipped: '跳过回合',
   turn_end: '回合交接',
   round_end: '轮次结束',
+  round_start: '轮次开始',
+  round_resolved: '同时结算',
+  plan_committed: '计划已确认',
+  action_failed: '动作失败',
   headquarters_destroyed: '指挥部被毁',
   player_eliminated: '玩家淘汰',
   game_over: '对局结束',
@@ -876,7 +891,7 @@ function formatEventShort(ev) {
     case 'game_start': return '对局开始';
     case 'deploy': return `部署 ${UNIT_NAMES[p.unitType] || p.unitType} @(${p.q},${p.r})`;
     case 'move': return `移动 ${String(p.unitId).slice(0, 6)} -> (${p.toQ},${p.toR})`;
-    case 'attack': return `攻击 ${String(p.targetId).slice(0, 6)} 伤害:${p.damage}`;
+    case 'attack': return p.hit === false ? `开火落空 (${p.q},${p.r})` : `攻击 ${String(p.targetId).slice(0, 6)} 伤害:${p.damage}`;
     case 'heal': return `治疗 ${String(p.targetId).slice(0, 6)} +${p.amount}`;
     case 'unit_death': return `单位阵亡 ${String(p.unitId).slice(0, 6)}`;
     case 'headquarters_destroyed': return `指挥部摧毁 ${playerName(p.owner)}`;
@@ -891,6 +906,14 @@ function formatEventShort(ev) {
     case 'artillery_damage': return `${playerName(p.owner)} 单位遭炮击 -${p.damage}`;
     case 'turn_end': return `回合结束 -> ${playerName(p.nextPlayerId || p.nextOwner)} (${p.turnNumber || p.roundNumber})`;
     case 'round_end': return `第 ${p.roundNumber || '?'} 轮结束`;
+    case 'round_start': return `第 ${p.roundNumber || '?'} 轮计划阶段开始`;
+    case 'round_resolved': return `第 ${p.roundNumber || '?'} 轮同时结算完毕`;
+    case 'plan_committed': return `${playerName(p.playerId)} 已确认本回合计划`;
+    case 'action_failed': {
+      const failedLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破' }[p.type] || '动作';
+      const failedReason = { destination_conflict: '目标格撞车', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', out_of_range: '超出射程', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
+      return `${playerName(p.owner)} ${failedLabel}未执行：${failedReason}`;
+    }
     case 'reset_actions': return `${playerName(p.owner)} 结束回合，动作点重置`;
     case 'turn_skipped': return `${playerName(p.playerId)} 跳过回合`;
     case 'player_joined': return `${p.name || playerName(p.playerId)} 加入对局`;

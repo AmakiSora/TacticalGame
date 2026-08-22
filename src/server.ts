@@ -44,7 +44,7 @@ export function readRuntimeConfig(): RuntimeConfig {
 }
 
 function isRateLimitedPath(method: string, url: string): boolean {
-  if (method === 'POST' && (url === '/api/games' || /\/api\/games\/[^/]+\/(join|deploy|move|attack|heal|demolish|end-turn|force-adjudicate)$/.test(url))) return true;
+  if (method === 'POST' && (url === '/api/games' || /\/api\/games\/[^/]+\/(join|deploy|move|attack|heal|demolish|end-turn|force-adjudicate|plan\/revoke|plan\/clear|force-resolve)$/.test(url))) return true;
   return method === 'GET' && /\/api\/games\/[^/]+\/events$/.test(url);
 }
 

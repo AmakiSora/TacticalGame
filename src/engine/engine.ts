@@ -100,7 +100,7 @@ export function joinGame(game: GameState, bus: EventBus, playerName?: string): R
   return { ok: true };
 }
 
-function captureControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
+export function captureControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
   for (const point of game.controlPoints) {
     const capturer = game.units.find(unit =>
       unit.owner === owner && unit.alive && unit.canCapture && unit.q === point.q && unit.r === point.r);
@@ -115,7 +115,7 @@ function captureControlPoints(game: GameState, bus: EventBus, owner: PlayerId): 
   }
 }
 
-function resetActions(game: GameState, owner: PlayerId): void {
+export function resetActions(game: GameState, owner: PlayerId): void {
   for (const unit of game.units) {
     if (unit.owner === owner && unit.alive) {
       unit.hasMoved = false;
@@ -125,7 +125,7 @@ function resetActions(game: GameState, owner: PlayerId): void {
   }
 }
 
-function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): void {
+export function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): void {
   const resources = game.resources[owner];
   if (!resources || game.players[owner]?.status !== 'active') return;
   const base = game.config.balance.baseIncome;
@@ -142,7 +142,7 @@ function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): void {
   });
 }
 
-function repairFromControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
+export function repairFromControlPoints(game: GameState, bus: EventBus, owner: PlayerId): void {
   const repaired = new Set<string>();
   for (const point of game.controlPoints) {
     if (point.owner !== owner) continue;
@@ -276,7 +276,7 @@ function nextActiveInOrder(game: GameState, owner: PlayerId, allowed?: Set<Playe
   return null;
 }
 
-function adjudicateAtTurnLimit(game: GameState, bus: EventBus): boolean {
+export function adjudicateAtTurnLimit(game: GameState, bus: EventBus): boolean {
   if (game.turn.roundNumber < game.config.balance.maxTurns) return false;
   const scores = buildAdjudicationScores(game);
   const active = activePlayerIds(game);
@@ -286,7 +286,7 @@ function adjudicateAtTurnLimit(game: GameState, bus: EventBus): boolean {
   return true;
 }
 
-function grantComebackSupplies(game: GameState, bus: EventBus): void {
+export function grantComebackSupplies(game: GameState, bus: EventBus): void {
   const config = game.config.balance.comebackSupply;
   if (!config || game.turn.roundNumber < config.startRound) return;
 
@@ -319,7 +319,7 @@ function grantComebackSupplies(game: GameState, bus: EventBus): void {
   }
 }
 
-function markPlayerEliminated(
+export function markPlayerEliminated(
   game: GameState,
   bus: EventBus,
   playerId: PlayerId,

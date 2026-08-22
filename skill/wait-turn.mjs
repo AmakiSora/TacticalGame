@@ -4,7 +4,9 @@ const DEFAULT_URL = process.env.TACTICAL_GAME_URL || '';
 const PLAYER_IDS = ['player_a', 'player_b', 'player_c', 'player_d', 'player_e', 'player_f', 'player_g', 'player_h'];
 
 // Exit code contract (also documented in skill/SKILL.md):
-//   0 my_turn     -> it is this player's turn again; resume the turn loop
+//   0 my_turn     -> sequential: it is this player's turn; simultaneous (config.mode
+//                    === 'simultaneous'): the planning window is open and this player
+//                    has not committed yet — resume planning/committing
 //   2 game_over   -> the game finished; report the result
 //   3 eliminated  -> this player is no longer active; report elimination
 //   4 timeout     -> nothing happened before --timeout-s; ask the user whether to keep waiting
@@ -117,6 +119,14 @@ export function classifyState(game, owner) {
   const self = game.players?.[owner];
   if (game.phase === 'active' && self?.status && self.status !== 'active') {
     return { result: 'eliminated', status: self.status, exit: EXIT.ELIMINATED };
+  }
+  if (game.config?.mode === 'simultaneous') {
+    // 同时回合模式：计划阶段且自己尚未确认提交 = "轮到你了"。
+    if (game.phase === 'active' && !(game.plan?.committed ?? []).includes(owner)) {
+      const round = game.turn?.roundNumber ?? game.turn?.turnNumber ?? null;
+      return { result: 'my_turn', round, exit: EXIT.MY_TURN };
+    }
+    return null;
   }
   const current = game.turn?.currentPlayerId ?? game.turn?.currentOwner;
   if (game.phase === 'active' && current === owner) {

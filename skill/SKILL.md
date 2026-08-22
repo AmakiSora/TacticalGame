@@ -1,11 +1,11 @@
 ---
 name: play-hex-api-game
-description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps and annihilation maps such as artillery-zone.
+description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, and the simultaneous-turn standoff map.
 ---
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.2.13`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.3.0`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 Do **not** run `node skill/ai-player.mjs` (or the copy under this skill directory) to delegate turns. That script is for tests/demos only. `skill/wait-turn.mjs` is the only script you should run during a game, and only for waiting between turns.
 
@@ -17,12 +17,18 @@ After the first successful `GET ${BASE_URL}/api/games/:id` in an active game:
 2. **Immediately** load exactly one mode file with the `read` tool (paths relative to this skill directory):
    - `standard` → read [`standard.md`](standard.md)
    - `annihilation` → read [`annihilation.md`](annihilation.md)
+   - `simultaneous` → read [`simultaneous.md`](simultaneous.md)
 3. Follow **only** that mode file for turn checklists, deploy origins, win conditions, scoring priorities, and the decision order.
 4. If mode is missing or unknown, stop and report it. Do not guess HQ rules on annihilation maps.
 
 Do not keep both mode files in working memory as equal authority. The inactive mode's HQ or army-wipe rules do not apply.
 
 Re-read the mode file if you are about to deploy, attack a "base", or score near adjudication and are unsure.
+
+`simultaneous` (map `standoff`) changes the whole turn structure: there is no turn order — all
+players queue actions secretly in a planning phase, then the server resolves them strictly at
+once; attacks target cells instead of units, and each unit acts at most once per round.
+`wait-turn.mjs` exit 0 there means "your planning window is open and you have not committed".
 
 ## Remote Server Target
 
@@ -85,7 +91,7 @@ Seats: `player_a` … `player_h` (2–8). Server assigns seats in join order.
 5. `POST /api/games/:id/start` with `X-Host-Token` when ≥2 players and the map supports that count
 6. Play until last survivor or max-round adjudication
 
-Most maps are 2-player only. `multiplayer-ring` and annihilation `artillery-zone` support 2/3/6; `four-corners` is exactly 4. Unsupported `maxPlayers` → `unsupported_player_count`.
+Most maps are 2-player only. `multiplayer-ring` and annihilation `artillery-zone` support 2/3/6; `four-corners` is exactly 4; simultaneous `standoff` supports 2/3/6. Unsupported `maxPlayers` → `unsupported_player_count`.
 
 ## API
 
@@ -106,10 +112,13 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Read state | `GET /api/games/:id` | player | none |
 | Deploy | `POST /api/games/:id/deploy` | player | `{ "unitType": "infantry\|scout\|heavy\|ranger\|support", "fromId": "...", "q": 0, "r": 0 }` |
 | Move | `POST /api/games/:id/move` | player | `{ "unitId": "...", "q": 0, "r": 0 }` |
-| Attack | `POST /api/games/:id/attack` | player | `{ "attackerId": "...", "targetId": "..." }` |
+| Attack | `POST /api/games/:id/attack` | player | sequential: `{ "attackerId": "...", "targetId": "..." }`; simultaneous: `{ "attackerId": "...", "q": 0, "r": 0 }` (target cell) |
 | Heal | `POST /api/games/:id/heal` | player | `{ "supportId": "...", "targetId": "..." }` |
 | Demolish terrain | `POST /api/games/:id/demolish` | player | `{ "unitId": "...", "q": 0, "r": 0 }` |
-| End turn | `POST /api/games/:id/end-turn` | player | `{}` |
+| End turn / commit plan | `POST /api/games/:id/end-turn` | player | `{}` (simultaneous: locks your plan; last commit resolves the round) |
+| Revoke planned action | `POST /api/games/:id/plan/revoke` | player | `{ "actionId": "..." }` (simultaneous only) |
+| Clear plan | `POST /api/games/:id/plan/clear` | player | none (simultaneous only) |
+| Host force resolve | `POST /api/games/:id/host/force-resolve` | host | none (simultaneous only) |
 | Events | `GET /api/games/:id/events?after=<seq>` | none/SSE | none |
 
 Create: `{ gameId, hostToken, player: { id, token } \| null, lobby }`.  

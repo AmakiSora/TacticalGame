@@ -33,7 +33,7 @@ function findTarget(game: GameState, targetId: string): Target | null {
   return hq ? { kind: 'headquarters', entity: hq } : null;
 }
 
-function computeDamage(game: GameState, attack: number, defense: number): number {
+export function computeDamage(game: GameState, attack: number, defense: number): number {
   return Math.max(
     game.config.balance.minimumDamage,
     attack - defense + rollVariance(game.config.balance.damageVarianceRange),

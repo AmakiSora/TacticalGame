@@ -192,7 +192,9 @@
   }
 
   function configureMapMode(input, mode, annihilationDraft = null) {
-    if (mode !== 'standard' && mode !== 'annihilation') throw new Error('玩法模式必须是 standard 或 annihilation');
+    if (mode !== 'standard' && mode !== 'annihilation' && mode !== 'simultaneous') {
+      throw new Error('玩法模式必须是 standard、annihilation 或 simultaneous');
+    }
     const configured = deepClone(input);
     const previousMode = configured.mode === 'annihilation' ? 'annihilation' : 'standard';
     const previousDefaultWeight = previousMode === 'annihilation' ? 10 : 2;
@@ -204,6 +206,9 @@
     if (mode === 'annihilation') {
       configured.radius = Math.max(2, configured.radius);
       configured.annihilation = normalizeAnnihilation(annihilationDraft || configured.annihilation, configured.radius);
+      enableSpawnMode(configured);
+    } else if (mode === 'simultaneous') {
+      // simultaneous 地图也使用总部出生槽布局，但没有炮火配置或出生据点绑定。
       enableSpawnMode(configured);
     } else {
       delete configured.annihilation;
@@ -236,7 +241,7 @@
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('地图 JSON 必须是对象');
     const defaults = createDefaultMapConfig();
     const cfg = deepClone(data);
-    const mode = cfg.mode === 'annihilation' ? 'annihilation' : 'standard';
+    const mode = cfg.mode === 'annihilation' || cfg.mode === 'simultaneous' ? cfg.mode : 'standard';
     const radius = Number.isInteger(cfg.radius) && cfg.radius > 0 ? cfg.radius : defaults.radius;
     const normalized = {
       mode,
@@ -377,7 +382,7 @@
     }
 
     const serialized = {
-      ...(config.mode === 'annihilation' ? { mode: 'annihilation' } : {}),
+      ...(config.mode !== 'standard' ? { mode: config.mode } : {}),
       name: String(config.name || ''),
       description: String(config.description || ''),
       grid: 'hex',
@@ -481,7 +486,9 @@
     }
 
     const mode = c.mode === undefined ? 'standard' : c.mode;
-    if (mode !== 'standard' && mode !== 'annihilation') errors.push(`${mapName}.mode must be standard or annihilation`);
+    if (mode !== 'standard' && mode !== 'annihilation' && mode !== 'simultaneous') {
+      errors.push(`${mapName}.mode must be standard, annihilation, or simultaneous`);
+    }
     str(c, 'name', mapName);
     str(c, 'description', mapName);
     if (c.grid !== 'hex') errors.push(`${mapName} grid must be "hex"`);
@@ -813,7 +820,7 @@
     if (error.includes('grid must be "hex"')) return '地图网格必须是 hex。';
     if (error.includes('orientation must be "pointy"')) return '地图方向必须是 pointy。';
     if (error.includes('radius must be an integer')) return '地图半径必须是整数。';
-    if (error.includes('.mode must be standard or annihilation')) return '玩法模式必须是普通模式或歼灭模式。';
+    if (error.includes('.mode must be standard, annihilation, or simultaneous')) return '玩法模式必须是普通模式、歼灭模式或同时模式。';
     if (error.includes('.annihilation is only valid in annihilation mode')) return '只有歼灭模式可以配置炮火收缩。';
     if (error.includes('.minimumSafeRadius must be smaller than radius')) return '炮火最小安全半径必须小于地图半径。';
     if (error.includes('.controlPointId must reference a control point')) return `出生槽 ${itemNumber(error)} 绑定了不存在的据点。`;

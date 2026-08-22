@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 type EditorCore = {
   createDefaultMapConfig: () => any;
-  configureMapMode: (config: any, mode: 'standard' | 'annihilation', annihilationDraft?: any) => any;
+  configureMapMode: (config: any, mode: 'standard' | 'annihilation' | 'simultaneous', annihilationDraft?: any) => any;
   normalizeImportedMap: (data: any) => any;
   serializeMapConfig: (config: any) => any;
   validateMapConfig: (config: any, id?: string) => string[];
@@ -44,6 +44,7 @@ describe('map editor page', () => {
     expect(html).toContain('id="map-mode"');
     expect(html).toContain('data-mode="standard"');
     expect(html).toContain('data-mode="annihilation"');
+    expect(html).toContain('data-mode="simultaneous"');
     expect(html).toContain('id="annihilation-panel"');
     expect(html).toContain('<script src="/map-editor.js?v=3.2.7"></script>');
   });
@@ -163,6 +164,21 @@ describe('map editor page', () => {
       3: ['slot_east', 'slot_northwest', 'slot_southwest'],
       6: ['slot_east', 'slot_northeast', 'slot_northwest', 'slot_west', 'slot_southwest', 'slot_southeast'],
     });
+  });
+
+  it('round-trips simultaneous mode and its multiplayer spawn layouts', () => {
+    const core = loadCore();
+    const simultaneous = JSON.parse(read('maps/standoff.json'));
+
+    const normalized = core.normalizeImportedMap(simultaneous);
+    const serialized = core.serializeMapConfig(normalized);
+
+    expect(normalized.mode).toBe('simultaneous');
+    expect(serialized.mode).toBe('simultaneous');
+    expect(serialized.spawnSlots).toHaveLength(6);
+    expect(serialized.layouts).toEqual(simultaneous.layouts);
+    expect(serialized).not.toHaveProperty('annihilation');
+    expect(core.validateMapConfig(serialized, 'standoff')).toEqual([]);
   });
 
   it('uses a three-zone workspace with tabbed inspector navigation', () => {

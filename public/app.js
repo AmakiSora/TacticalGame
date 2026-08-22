@@ -53,6 +53,7 @@ let playing = false;
 let playTimer = null;
 let liveSse = null;
 let pinnedReplayStep = false;
+let importedReplayMeta = null;
 let state = null;
 let hoverCell = null;
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
@@ -126,6 +127,20 @@ function turnProgressLabel() {
   const current = currentTurnNumber();
   const maxTurns = gameConfig?.balance?.maxTurns;
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
+}
+
+function isSimultaneousReplay() {
+  return gameConfig?.mode === 'simultaneous';
+}
+
+function replayActionUsageText() {
+  const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
+  if (!maxActions) return '';
+  if (!isSimultaneousReplay()) return `${state?.turn?.actionsUsed ?? 0}/${maxActions}`;
+  const entries = Object.entries(state?.turn?.actionsUsedByPlayer || {});
+  return entries.length
+    ? entries.map(([owner, used]) => `${playerLabel(owner)} ${used}/${maxActions}`).join(' · ')
+    : '各玩家独立计数';
 }
 
 function playerNameControl(owner) {
@@ -248,6 +263,7 @@ function createEmptyState() {
       turnOrder: [],
       phase: 'waiting_command',
       actionsUsed: 0,
+      actionsUsedByPlayer: {},
     },
     winner: null,
     result: null,
@@ -276,10 +292,19 @@ function cloneMapPayload(map = {}) {
 }
 
 function recordActionPoint(s, owner, payload) {
-  if (!owner || typeof payload.actionsUsed !== 'number' || payload.actionsUsed <= (s.turn.actionsUsed ?? 0)) return;
+  if (!owner || typeof payload.actionsUsed !== 'number') return;
   const player = s.players?.[owner];
   if (!player) return;
   if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
+  if (gameConfig?.mode === 'simultaneous') {
+    const previous = s.turn.actionsUsedByPlayer?.[owner] ?? 0;
+    if (payload.actionsUsed <= previous) return;
+    if (!s.turn.actionsUsedByPlayer) s.turn.actionsUsedByPlayer = {};
+    s.turn.actionsUsedByPlayer[owner] = payload.actionsUsed;
+    player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - previous;
+    return;
+  }
+  if (payload.actionsUsed <= (s.turn.actionsUsed ?? 0)) return;
   player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - (s.turn.actionsUsed ?? 0);
 }
 
@@ -299,16 +324,18 @@ function applyEvent(s, ev) {
   const p = ev.payload || {};
   switch (ev.type) {
     case 'game_start':
-      gameConfig = p.config;
+      gameConfig = p.config || null;
+      const simultaneousStart = p.mode === 'simultaneous' || p.config?.mode === 'simultaneous' || p.map?.mode === 'simultaneous';
       if (p.playerNames) playerNames = { ...p.playerNames };
       s.players = JSON.parse(JSON.stringify(p.players || {}));
       s.turn.turnOrder = [...(p.turnOrder || [])];
-      s.turn.currentPlayerId = p.firstPlayer || s.turn.turnOrder[0] || null;
+      s.turn.currentPlayerId = simultaneousStart ? null : (p.firstPlayer || s.turn.turnOrder[0] || null);
       s.turn.currentOwner = s.turn.currentPlayerId;
       s.turn.roundNumber = 1;
       s.turn.turnNumber = 1;
       s.turn.phase = 'active';
       s.turn.actionsUsed = 0;
+      s.turn.actionsUsedByPlayer = {};
       s.map = cloneMapPayload(p.map);
       s.cells = s.map.cells || [];
       s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
@@ -414,6 +441,7 @@ function applyEvent(s, ev) {
         if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
+      if (gameConfig?.mode === 'simultaneous') s.turn.actionsUsedByPlayer = {};
       break;
     case 'turn_end':
       s.turn.currentOwner = p.nextPlayerId || p.nextOwner;
@@ -430,12 +458,21 @@ function applyEvent(s, ev) {
       s.turn.roundNumber = p.roundNumber || s.turn.roundNumber + 1;
       s.turn.turnNumber = s.turn.roundNumber;
       s.turn.actionsUsed = 0;
+      s.turn.actionsUsedByPlayer = {};
+      if (gameConfig?.mode === 'simultaneous') {
+        s.turn.currentPlayerId = null;
+        s.turn.currentOwner = null;
+      }
       for (const u of s.units.values()) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       break;
     case 'plan_committed':
     case 'round_resolved':
-    case 'action_failed':
       // 同时模式的计划期与结算汇总事件：不驱动棋盘，仅入日志。
+      break;
+    case 'action_failed':
+      // 失败/落空动作仍消耗 AP；同时模式按玩家队列位置累计。
+      recordActionPoint(s, p.owner, p);
+      if (typeof p.actionsUsed === 'number' && gameConfig?.mode !== 'simultaneous') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'turn_skipped':
       break;
@@ -482,6 +519,7 @@ function applyEvent(s, ev) {
 }
 
 function rebuildToStep(step) {
+  gameConfig = null;
   playerNames = defaultPlayerNames();
   hoverCell = null;
   cellInfoEl.textContent = '';
@@ -1018,16 +1056,17 @@ function renderSidebar() {
       ${resourceCards || '<div class="resource-empty">等待对局开始</div>'}
     </div>`;
   renderScorePanel();
-  const owner = state.turn.currentPlayerId || state.turn.currentOwner;
+  const owner = isSimultaneousReplay() ? null : (state.turn.currentPlayerId || state.turn.currentOwner);
   const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
   const actionsLine = maxActions
-    ? `<div class="turn-meta"><span>行动点</span><strong>${state.turn.actionsUsed ?? 0}/${maxActions}</strong></div>`
+    ? `<div class="turn-meta"><span>行动点</span><strong>${esc(replayActionUsageText())}</strong></div>`
     : '';
+  const ownerLabel = isSimultaneousReplay() ? '同时计划阶段' : playerNameControl(owner);
   turnInfoEl.innerHTML = `<h3>回合</h3>
     <div class="turn-card ${ownerClass(owner)}">
       <div class="turn-head">
         <strong class="turn-count">${esc(turnProgressLabel())}</strong>
-        <span class="turn-player">${playerNameControl(owner)}</span>
+        <span class="turn-player">${ownerLabel}</span>
       </div>
       ${actionsLine}
       ${state.result ? `<div class="result-note">${esc(resultText(state.result))}</div>` : ''}
@@ -1229,6 +1268,7 @@ async function fetchGameList() {
 
 function resetLoadedGame(message = '请选择在线对局') {
   pausePlayback();
+  importedReplayMeta = null;
   if (liveSse) liveSse.close();
   liveSse = null;
   pinnedReplayStep = false;
@@ -1320,6 +1360,7 @@ async function deleteCurrentGame() {
 
 async function loadGameState(id) {
   pausePlayback();
+  importedReplayMeta = null;
   pinnedReplayStep = false;
   const res = await fetch(`/api/games/${id}/events`);
   const { events } = await res.json();
@@ -1457,12 +1498,12 @@ function buildReplayExport() {
   return {
     format: REPLAY_EXPORT_FORMAT,
     schemaVersion: REPLAY_SCHEMA_VERSION,
-    gameId: gameSelect.value || 'offline',
-    mapId: replayMapId(),
-    playerNames,
+    gameId: importedReplayMeta?.gameId || gameSelect.value || 'offline',
+    mapId: importedReplayMeta?.mapId || replayMapId(),
+    playerNames: importedReplayMeta?.playerNames || playerNames,
     exportedAt: new Date().toISOString(),
     eventCount: allEvents.length,
-    finalResult: latestGameOverResult(),
+    finalResult: importedReplayMeta?.finalResult ?? latestGameOverResult(),
     events: allEvents,
   };
 }
@@ -1480,16 +1521,28 @@ function normalizeImportedReplay(data) {
   if (!normalizeVersion(schemaVersion)) throw new Error('回放版本号无效');
   if (compareSemver(schemaVersion, REPLAY_SCHEMA_VERSION) > 0) throw new Error(`回放版本 ${schemaVersion} 高于当前支持版本 ${REPLAY_SCHEMA_VERSION}`);
   if (!Array.isArray(events)) throw new Error('JSON 必须是事件数组或包含 events 数组的回放对象');
+  const seenSeq = new Set();
+  let previousSeq = null;
   events.forEach((ev, index) => {
     if (!ev || typeof ev !== 'object') throw new Error(`第 ${index + 1} 个事件不是对象`);
     if (typeof ev.seq !== 'number' || !Number.isFinite(ev.seq)) throw new Error(`第 ${index + 1} 个事件缺少有效 seq`);
+    if (!Number.isInteger(ev.seq) || ev.seq <= 0) throw new Error(`第 ${index + 1} 个事件的 seq 必须是正整数`);
+    if (seenSeq.has(ev.seq) || (previousSeq !== null && ev.seq <= previousSeq)) throw new Error(`第 ${index + 1} 个事件的 seq 重复或乱序`);
+    seenSeq.add(ev.seq);
+    previousSeq = ev.seq;
     if (typeof ev.type !== 'string' || !ev.type) throw new Error(`第 ${index + 1} 个事件缺少有效 type`);
     if (!ev.payload || typeof ev.payload !== 'object' || Array.isArray(ev.payload)) throw new Error(`第 ${index + 1} 个事件缺少有效 payload`);
   });
+  const start = events.find(ev => ev.type === 'game_start');
+  if (start && (!start.payload.map || !Array.isArray(start.payload.map.cells) || !start.payload.config || typeof start.payload.config !== 'object')) {
+    throw new Error('回放包含不兼容的旧版 game_start 数据');
+  }
   return {
     format: Array.isArray(data) ? 'legacy-event-array' : data.format || 'legacy-replay-object',
     schemaVersion,
     gameId: Array.isArray(data) ? 'offline' : data.gameId,
+    mapId: Array.isArray(data) ? null : data.mapId ?? null,
+    playerNames: Array.isArray(data) ? null : data.playerNames ?? null,
     finalResult: Array.isArray(data) ? null : data.finalResult ?? null,
     events,
   };
@@ -1497,6 +1550,12 @@ function normalizeImportedReplay(data) {
 
 function loadImportedReplay(replay) {
   pausePlayback();
+  importedReplayMeta = {
+    gameId: replay.gameId || 'offline',
+    mapId: replay.mapId || null,
+    playerNames: replay.playerNames || null,
+    finalResult: replay.finalResult ?? null,
+  };
   allEvents = replay.events;
   pinnedReplayStep = false;
   buildTimelineMarkers();
@@ -1511,6 +1570,9 @@ function loadImportedReplay(replay) {
     renderDetail();
     updateControls();
   }
+  if (replay.playerNames) playerNames = { ...defaultPlayerNames(), ...replay.playerNames };
+  renderSidebar();
+  renderDetail();
   if (liveSse) liveSse.close();
   liveSse = null;
 }

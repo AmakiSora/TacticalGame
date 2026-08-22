@@ -25,7 +25,17 @@ describe('spectator import/export', () => {
     expect(source).toContain('function normalizeImportedReplay');
     expect(source).toContain('Array.isArray(data) ? data : data.events');
     expect(source).toContain('compareSemver(schemaVersion, REPLAY_SCHEMA_VERSION) > 0');
+    expect(source).toContain('seq 重复或乱序');
+    expect(source).toContain('回放包含不兼容的旧版 game_start 数据');
     expect(source).toContain('导入失败');
+  });
+
+  it('preserves imported replay metadata when exporting again', () => {
+    const source = appJs();
+    expect(source).toContain('importedReplayMeta');
+    expect(source).toContain('gameId: importedReplayMeta?.gameId');
+    expect(source).toContain('mapId: importedReplayMeta?.mapId');
+    expect(source).toContain('finalResult: importedReplayMeta?.finalResult');
   });
 
   it('only exposes JSON replay export from the spectator page', () => {

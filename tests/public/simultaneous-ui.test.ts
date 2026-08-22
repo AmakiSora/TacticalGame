@@ -13,6 +13,7 @@ describe('simultaneous mode UI', () => {
     'public/spectator-m.js',
     'public/spectator2.html',
   ];
+  const spectatorClients = ['public/app.js', 'public/spectator-m.js', 'public/spectator2.html'];
   const playerClients = ['public/play.js', 'public/play-m.js'];
 
   it('replays plan/round events on every board and labels attack misses', () => {
@@ -23,6 +24,16 @@ describe('simultaneous mode UI', () => {
       expect(source).toContain("case 'round_resolved'");
       expect(source).toContain("case 'action_failed'");
       expect(source).toContain('p.hit === false');
+    }
+  });
+
+  it('keeps simultaneous replay state player-neutral and counts AP per queue', () => {
+    for (const file of spectatorClients) {
+      const source = read(file);
+      expect(source).toContain('actionsUsedByPlayer');
+      expect(source).toContain('simultaneousStart');
+      expect(source).toContain('recordActionPoint(s, p.owner, p)');
+      expect(source).toContain('同时计划阶段');
     }
   });
 

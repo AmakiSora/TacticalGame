@@ -225,6 +225,23 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('after non-final rounds');
   });
 
+  it('documents simultaneous-mode exceptions and deterministic resolution rules', async () => {
+    const [skill, simultaneous] = await Promise.all([
+      readFile('skill/SKILL.md', 'utf8'),
+      readFile('skill/simultaneous.md', 'utf8'),
+    ]);
+
+    expect(skill).toContain('legacy V1 production queues');
+    expect(skill).toContain('Standard/annihilation: income is awarded');
+    expect(skill).toContain('Simultaneous: income and repair are issued together');
+    expect(simultaneous).toContain('plan.myQueue.length');
+    expect(simultaneous).toContain('turn.currentPlayerId` and `turn.currentOwner` are always `null`');
+    expect(simultaneous).toContain('queue-list order is not execution priority');
+    expect(simultaneous).toContain('deployment declarations/generation');
+    expect(simultaneous).toContain('destination_conflict');
+    expect(simultaneous).toContain('Once resolution\n   begins, do not try to revoke or clear');
+  });
+
   it('documents heavy terrain demolition controls and constraints', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 

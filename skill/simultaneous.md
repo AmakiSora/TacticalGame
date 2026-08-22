@@ -23,7 +23,11 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
    player's outcomes per action (`executed` / `failed` / `missed` / `fizzled`). Then the next
    planning window opens (`round_start`); run `wait-turn.mjs` again per your polling decision.
 5. Stuck because someone stopped submitting? Ask the host to `POST /api/games/:id/host/force-resolve`
-   (resolves now; uncommitted players participate with whatever they queued, possibly nothing).
+   (resolves now; uncommitted players participate with whatever they had queued at that moment,
+   possibly nothing).
+   Immediately re-read the new state and `round_resolved`/`round_start` events. Once resolution
+   begins, do not try to revoke or clear that round's plan. If resolution causes an elimination or
+   `game_over`, stop acting and report the result.
 
 ## Hard rules (differ from sequential modes)
 
@@ -39,6 +43,10 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
 - **Destination conflicts fail for everyone**: if two or more moves/deploys from ANY players
   claim the same cell, **all of them fail** (`action_failed`, reason `destination_conflict`).
   Failed attempts are NOT refunded (AP spent, no supplies deducted for failed deploys).
+  Every failed, missed, or fizzled queued action still consumes its queue slot/AP. Failed deploys
+  do not deduct supplies; failed moves, attacks, heals, and demolishes are not refunded. Common
+  resolution reasons include `destination_conflict`, `unit_gone`, `out_of_range`,
+  `already_healthy`, `invalid_target`, and `target_gone`.
   Your own queue cannot claim the same cell twice (rejected at queue time with `cell_occupied`).
 - **Movement paths use the plan-time board**: every unit (including enemies that might move)
   blocks pathing, and the destination must be empty at plan time. No swap/chase-through tricks.
@@ -48,8 +56,21 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
 - **Damage and heals settle as simultaneous net HP**: target HP = HP + heals − all incoming
   damage; survives if > 0. Two units attacking each other's cells can kill each other in the
   same round; an attacker that dies still fires its own shot.
-- **Action points**: every queued action costs 1 AP. Queue length ≤ `config.balance.actionsPerTurn`
-  (standoff: **5**). Deployed units cannot act in the round they appear (deploy is their activation).
+- **Action points**: every queued action costs 1 AP. Use `plan.myQueue.length` and
+  `config.balance.actionsPerTurn` to count remaining AP; do not use `turn.actionsUsed`.
+  In simultaneous mode `turn.currentPlayerId` and `turn.currentOwner` are always `null`
+  (`turn.currentPlayerId/currentOwner` 始终为 `null`).
+  Queue length ≤ `config.balance.actionsPerTurn` (standoff: **5**). Deployed units cannot act in
+  the round they appear (deploy is their activation).
+
+- **Deterministic settlement phases**: queue-list order is not execution priority
+  (队列列表顺序不代表执行优先级). All players'
+  inputs are locked first, then the server resolves fixed phases in the opening `turnOrder` when a
+  same-phase tie needs an order, so replays are deterministic. The phases are:
+  deployment declarations/generation → movement → demolish → attacks and net healing →
+  deaths/elimination → control-point capture → round adjudication → comeback supplies → next-round
+  income and repair. Event order may therefore differ from each player's queue order. Simultaneous
+  means simultaneous input, not random or phase-less settlement.
 - **Income is symmetric**: round 1 has NO income; from round 2 on, every living player receives
   income + repair-CP healing at the round boundary, all at once.
 - **Capture**: at the end of resolution, any of your `canCapture` units standing on a CP you do

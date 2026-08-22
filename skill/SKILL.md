@@ -135,7 +135,10 @@ Mode-specific deploy origins, elimination, artillery, and scoring live in the mo
 - Move/deploy/demolish targets must exist in `game.cells`.
 - Pathfinding blocked by water, blockers, units, and HQs **when HQs exist**.
 - Attack/heal: range only, no LOS.
-- Income on turn gain: base + owned CP income (typed CPs may override via `controlPointTypes`).
+- Standard/annihilation: income is awarded when the turn is gained (base + owned CP income;
+  typed CPs may override via `controlPointTypes`).
+- Simultaneous: income and repair are issued together for every living player at the round
+  boundary; see [`simultaneous.md`](simultaneous.md).
 
 ### Units — read stats every game (mandatory)
 
@@ -159,7 +162,8 @@ Unit numbers are **per map**. Never reuse memorized move/attack/cost values from
 Deploy cost comes from `config.units[type].cost` minus any `forward_base` (or typed) deploy discount on the origin CP. Instance `cost` is what army-value scoring uses.
 - Last survivor wins immediately (`last_player_standing`). Else adjudication at `maxTurns`.
 - Trust live `adjudication` on `GET /api/games/:id`. Always read **weights** and per-player breakdown fields before prioritizing score levers.
-- No V1 concepts: `x/y`, Manhattan, buildings, miners, queues, walls, `/build`, `/produce`, `/sell`.
+- No V1 concepts: `x/y`, Manhattan, buildings, miners, legacy V1 production queues,
+  walls, `/build`, `/produce`, `/sell`.
 
 ### Adjudication score (authoritative formula)
 

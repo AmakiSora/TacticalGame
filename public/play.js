@@ -572,6 +572,8 @@ function applyEvent(s, ev) {
       s.turn.roundNumber = p.roundNumber || s.turn.roundNumber + 1;
       s.turn.turnNumber = s.turn.roundNumber;
       s.turn.actionsUsed = 0;
+      // 同时模式没有 reset_actions 事件：新回合开启即重置全员单位行动标志。
+      for (const u of s.units.values()) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : [], myQueue: [] };
       break;
     case 'game_over':

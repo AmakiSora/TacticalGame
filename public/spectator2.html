@@ -1178,10 +1178,11 @@
       case 'round_end':
         break;
       case 'round_start':
-        // 同时模式没有 turn_end，由 round_start 携带新回合号。
+        // 同时模式没有 turn_end / reset_actions，由 round_start 携带新回合号并重置单位行动标志。
         s.turn.roundNumber = p.roundNumber || s.turn.roundNumber + 1;
         s.turn.turnNumber = s.turn.roundNumber;
         s.turn.actionsUsed = 0;
+        for (const u of s.units.values()) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
         break;
       case 'plan_committed':
       case 'round_resolved':

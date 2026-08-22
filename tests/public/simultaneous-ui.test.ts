@@ -26,6 +26,22 @@ describe('simultaneous mode UI', () => {
     }
   });
 
+  it('resets unit action flags when a new simultaneous round starts', () => {
+    // 同时模式没有 reset_actions 事件：第一回合的 move/attack 会把客户端单位的
+    // hasMoved/hasActed 置位，必须在 round_start（新计划阶段开启）时重置，
+    // 否则第二回合起弹窗不再提供移动/攻击选项。
+    for (const file of replayClients) {
+      const source = read(file);
+      const start = source.indexOf("case 'round_start'");
+      expect(start).toBeGreaterThan(-1);
+      const end = source.indexOf('break;', start);
+      const block = source.slice(start, end);
+      expect(block).toContain('hasMoved = false');
+      expect(block).toContain('hasActed = false');
+      expect(block).toContain('actionSpent = false');
+    }
+  });
+
   it('gates player interactions on the planning window in simultaneous mode', () => {
     for (const file of playerClients) {
       const source = read(file);

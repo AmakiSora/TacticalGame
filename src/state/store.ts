@@ -205,7 +205,7 @@ export function createInitialGame(id: string, mapId = 'default'): GameState {
     player.spawnSlotId = slots[index].id;
     player.turnOrder = index;
     const slot = slots[index];
-    if (config.mode === 'standard') {
+    if (config.mode !== 'annihilation') {
       game.headquarters[owner] = createHQ(owner, config, slot);
     } else {
       const point = game.controlPoints.find(candidate => candidate.id === slot.controlPointId);
@@ -217,8 +217,10 @@ export function createInitialGame(id: string, mapId = 'default'): GameState {
   game.phase = 'active';
   game.turn.phase = 'active';
   game.turn.turnOrder = ['player_a', 'player_b'];
-  game.turn.currentPlayerId = 'player_a';
-  game.turn.currentOwner = 'player_a';
+  const simultaneous = config.mode === 'simultaneous';
+  game.turn.currentPlayerId = simultaneous ? null : 'player_a';
+  game.turn.currentOwner = simultaneous ? null : 'player_a';
+  game.plan = simultaneous ? { queues: {}, committed: [] } : null;
   game.artillery = artilleryStateForRound(game, 1);
   return game;
 }

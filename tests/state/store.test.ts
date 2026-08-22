@@ -17,6 +17,16 @@ afterEach(() => {
 });
 
 describe('GameStore persistence', () => {
+  it('initializes simultaneous games with headquarters and a planning state', () => {
+    const game = createInitialGame('simultaneous-initialization', 'standoff');
+
+    expect(game.config.mode).toBe('simultaneous');
+    expect(Object.keys(game.headquarters)).toEqual(['player_a', 'player_b']);
+    expect(game.plan).toEqual({ queues: {}, committed: [] });
+    expect(game.turn.currentPlayerId).toBeNull();
+    expect(game.turn.currentOwner).toBeNull();
+  });
+
   it('saves and restores games from a persistence file', () => {
     const file = tempFile();
     const store = new GameStore({ persistenceFile: file });

@@ -139,14 +139,15 @@ export interface PendingAction {
   fromId?: string;
   /** move / demolish */
   unitId?: string;
-  /** attack（目标为格子） */
+  /** attack */
   attackerId?: string;
   /** heal */
   supportId?: string;
-  targetId?: string;
-  /** deploy / move / attack / demolish 的目标格 */
+  /** deploy / move / attack / heal / demolish 的目标格 */
   q?: number;
   r?: number;
+  /** attack / heal 的覆盖形状方向（0-5，正六方向；single 形状为 0） */
+  direction?: number;
 }
 
 /** simultaneous 模式的计划阶段状态；其他模式恒为 null。 */

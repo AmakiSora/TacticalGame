@@ -34,12 +34,24 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
 - **One action per unit per round** — a unit may queue exactly ONE of: move, attack, heal
   (support), demolish (heavy). No move-then-attack combos. Queueing a second action for the
   same unit is rejected (`invalid_*`, "unit already has a planned action this round").
-- **Attacks target a CELL, not a unit**: `POST /attack { "attackerId": "...", "q": 3, "r": 0 }`
-  — any cell within the attacker's `attackRange`. At resolution the shot hits whatever
-  **enemy** unit or enemy HQ occupies that cell after all moves/deploys settle:
-  - Enemy there at plan time that moves away → **miss** (wasted action).
-  - Empty cell an enemy moves into → **hit** (prediction fire).
-  - Friendly/own entity or still-empty cell → no effect. No friendly fire.
+- **Attacks aim at a cell/direction, not a unit**: `POST /attack { "attackerId": "...", "q": 3, "r": 0 }`.
+  What you may click depends on the unit's configured `attackShape` in `config.units`
+  (standoff roster below; unconfigured units default to `single` = any cell within `attackRange`):
+  - `single` — one cell within `attackRange`. At resolution the shot hits whatever **enemy**
+    unit or enemy HQ occupies that cell after all moves/deploys settle: an enemy that was there
+    at plan time and moves away → **miss**; an empty cell an enemy moves into → **hit**
+    (prediction fire); friendly/own entity or still-empty cell → no effect. No friendly fire.
+  - `line` (infantry) — the clicked cell must lie on one of the 6 straight rays from the
+    attacker; the shot covers the first `length` cells (standoff infantry: 2) along that ray.
+    **Every enemy in the covered cells takes a full independent damage roll** — dodging a line
+    means clearing the whole ray, not sidestepping one hex.
+  - `arc` (heavy) — click an adjacent cell to pick a direction; the shot covers that cell and
+    its two adjacent neighbours (3 cells around the attacker). Sweeps clumped enemies.
+  - `attackLock` (ranger) — if an **enemy unit** stands on the clicked cell at plan time, the
+    shot **locks onto it**: at resolution it hits that unit wherever it ended up, as long as it
+    did not escape the attacker's `attackRange` bubble; escaping the bubble is the only dodge
+    (`missed`, reason `target_escaped`). Locked shots on movers are the anti-kite tool.
+  - Attack events carry `shape` (`single/line/arc`) and `locked: true` for lock shots.
 - **Destination conflicts fail for everyone**: if two or more moves/deploys from ANY players
   claim the same cell, **all of them fail** (`action_failed`, reason `destination_conflict`).
   Failed attempts are NOT refunded (AP spent, no supplies deducted for failed deploys).
@@ -51,8 +63,14 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
 - **Movement paths use the plan-time board**: every unit (including enemies that might move)
   blocks pathing, and the destination must be empty at plan time. No swap/chase-through tricks.
 - **Demolish changes terrain only after movement**: the newly cleared cell is not walkable this round.
-- **Heals re-check range at resolution** against the target's final position: a target that
-  moved out of the support's range makes the heal fizzle (`action_failed`, reason `out_of_range`).
+- **Heals are area effects aimed at a cell/direction**: `POST /heal { "supportId": "...", "q": 1, "r": 0 }`
+  (NOT `targetId` — that is the sequential-mode body). The coverage shape comes from
+  `healShape` in `config.units` (standoff support: `arc` — click an adjacent cell to sweep
+  3 cells around the support; default is `single`). Queueing requires at least one living
+  friendly unit on the covered cells at plan time. At resolution every **wounded** friendly on
+  the final covered cells receives its own heal roll; if targets moved off the coverage the
+  heal fizzles (`action_failed`, reason `out_of_range`), and if everyone left on it is at full
+  HP the reason is `already_healthy`.
 - **Damage and heals settle as simultaneous net HP**: target HP = HP + heals − all incoming
   damage; survives if > 0. Two units attacking each other's cells can kill each other in the
   same round; an attacker that dies still fires its own shot.
@@ -85,9 +103,19 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
   3 alternating, 6 all. Spawn: HQ + 2 infantry + 1 scout + 1 heavy.
 - Control points: center `cp_center` + one per corner axis (`cp_1`..`cp_6`), untyped
   (flat income). The center is the flashpoint for prediction-fire brawls.
+- Roster (per-map numbers — always re-read `config.units`; `atkRng` doubles as heal range):
+  | unit | HP | atk | def | move | range | shape / ability |
+  |---|---:|---:|---:|---:|---:|---|
+  | infantry | 100 | 30 | 8 | 2 | 2 | `line` 2 — 直线轰击前方两格 |
+  | scout | 65 | 16 | 4 | 4 | 1 | `single` — 单格，快速占点 |
+  | heavy | 150 | 38 | 13 | 2 | 1 | `arc` — 横扫周围三格扇形 |
+  | ranger | 72 | 44 | 3 | 2 | 3 | `single` + **锁定**（未逃出射程必命中） |
+  | support | 82 | 10 | 5 | 2 | 2 | `healShape` `arc` — 区域治疗三格 |
 - Balance: `startingSupplies 150`, `baseIncome 15`, `controlPointIncome 10`, `actionsPerTurn 5`,
   `maxTurns 18`, comeback supplies from round 4 (40% gap → +20/round). Adjudication weights
   favor CPs (60) and HQ damage (5); actionScore default 2/merit point.
+  Move ranges are short by design (2, scouts 4): escaping a `line`/`arc` footprint or a
+  ranger's lock bubble costs the mover's whole action, so pure kiting cannot win.
 - Win conditions (standard HQ rules): destroy an enemy HQ to eliminate them; last player
   standing wins; at round 18 adjudicate by score. No artillery, no army-wipe elimination.
 
@@ -99,10 +127,13 @@ Before queuing each action:
 - Count your queue vs `actionsPerTurn`; each action = 1 AP, failed or not.
 - One action per unit — pick each unit's single best contribution.
 - Do not queue two of your own moves/deploys onto the same destination cell.
-- Attack ranges are measured from the attacker's **current** hex (it will not move this round).
-- For attacks, choose cells where an enemy **will be** (their shortest path, CP contest,
-  your HQ's approach lanes) or cheap insurance on cells they occupy now.
-- Keep supports behind the lines: heals must survive the target's own movement choices.
+- Attack ranges/coverage are measured from the attacker's **current** hex (it will not move
+  this round); check the unit's `attackShape` before picking a cell.
+- Lock every shot you can: rangers clicking a cell an enemy occupies NOW cannot be dodged
+  inside the range bubble. Infantry lines cover the enemy's straight escape lanes; heavy arcs
+  punish clumps around CPs and choke cells.
+- Keep supports adjacent to the line: arc heals only cover the 3 cells around the aim
+  direction, and targets must still be on them at resolution.
 - Commit early when your plan is set; the round only resolves when everyone has.
 
 ## Decision order
@@ -111,10 +142,12 @@ Unless the user asks for a different style:
 
 1. Read the previous `round_resolved` results: your misses reveal enemy movement patterns;
    `action_failed destination_conflict` cells reveal contested destinations.
-2. **Lethal prediction shots first**: any enemy unit (or HQ) you can kill with a cell attack
-   this round — it cannot be dodged if the target has no reason to move.
-3. **HQ pressure**: cell-attack enemy HQ hexes (HQs never move — guaranteed hits if in range).
-4. **Zone denial**: attack contested CP cells / choke cells where enemy capturers must stand.
+2. **Lethal shots first**: ranger **locks** on killable enemies (undodgeable inside the
+   bubble); infantry lines along the enemy's likely retreat lane; heavy arcs on clumped
+   killables. HQ cells never move — always guaranteed hits when in range/coverage.
+3. **HQ pressure**: line/arc/single fire onto enemy HQ hexes (HQs never move).
+4. **Zone denial**: sweep contested CP cells / choke cells where enemy capturers must stand —
+   area shapes make standing there costly even if they dodge one hex.
 5. **Heal** the unit most likely to be focused (net-HP can save it through the volley).
 6. **Deploy** to hold or contest (new unit doubles as a body-block this round).
 7. **Move** capturers onto CPs; move threatened units off cells enemies will predictably shell;
@@ -126,6 +159,7 @@ Unless the user asks for a different style:
 
 - Queue length ≤ AP budget; every queued action is for a different unit (or deploy).
 - No duplicate destinations within your own queue.
-- Every attack cell is inside that attacker's range; heals are inside range even after the
-  target's likely move.
+- Every attack cell matches that attacker's shape (ray cell for `line`, adjacent for `arc`,
+  in-range for `single`); heals aim at adjacent cells whose arc still covers wounded allies
+  after their likely move.
 - You are not stacking your whole army into cells enemies can predictably shell.

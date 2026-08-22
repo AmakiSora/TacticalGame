@@ -112,8 +112,8 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Read state | `GET /api/games/:id` | player | none |
 | Deploy | `POST /api/games/:id/deploy` | player | `{ "unitType": "infantry\|scout\|heavy\|ranger\|support", "fromId": "...", "q": 0, "r": 0 }` |
 | Move | `POST /api/games/:id/move` | player | `{ "unitId": "...", "q": 0, "r": 0 }` |
-| Attack | `POST /api/games/:id/attack` | player | sequential: `{ "attackerId": "...", "targetId": "..." }`; simultaneous: `{ "attackerId": "...", "q": 0, "r": 0 }` (target cell) |
-| Heal | `POST /api/games/:id/heal` | player | `{ "supportId": "...", "targetId": "..." }` |
+| Attack | `POST /api/games/:id/attack` | player | sequential: `{ "attackerId": "...", "targetId": "..." }`; simultaneous: `{ "attackerId": "...", "q": 0, "r": 0 }` (aim cell/direction; per-unit `attackShape` line/arc/single, ranger `attackLock`) |
+| Heal | `POST /api/games/:id/heal` | player | sequential: `{ "supportId": "...", "targetId": "..." }`; simultaneous: `{ "supportId": "...", "q": 0, "r": 0 }` (area heal by `healShape`) |
 | Demolish terrain | `POST /api/games/:id/demolish` | player | `{ "unitId": "...", "q": 0, "r": 0 }` |
 | End turn / commit plan | `POST /api/games/:id/end-turn` | player | `{}` (simultaneous: locks your plan; last commit resolves the round) |
 | Revoke planned action | `POST /api/games/:id/plan/revoke` | player | `{ "actionId": "..." }` (simultaneous only) |

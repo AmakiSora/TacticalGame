@@ -234,6 +234,15 @@
     }
     spec.canCapture = typeof src.canCapture === 'boolean' ? src.canCapture : fallback.canCapture;
     if (type === 'support' || 'healPower' in src) spec.healPower = numberOrDefault(src.healPower, fallback.healPower || 0);
+    // 同时模式兵种改造字段：编辑器暂不提供编辑 UI，但导入/导出必须保留，避免往返丢失。
+    for (const key of ['attackShape', 'healShape']) {
+      const shape = src[key];
+      if (shape && typeof shape === 'object' && ['single', 'line', 'arc'].includes(shape.type)) {
+        spec[key] = { type: shape.type };
+        if (Number.isInteger(shape.length)) spec[key].length = shape.length;
+      }
+    }
+    if (typeof src.attackLock === 'boolean') spec.attackLock = src.attackLock;
     return spec;
   }
 

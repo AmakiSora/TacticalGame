@@ -84,7 +84,7 @@ async function dispatchAction(
 interface DeployBody { unitType: UnitType; fromId: string; q: number; r: number }
 interface MoveBody { unitId: string; q: number; r: number }
 interface AttackBody { attackerId: string; targetId: string; q: number; r: number }
-interface HealBody { supportId: string; targetId: string }
+interface HealBody { supportId: string; targetId: string; q: number; r: number }
 interface DemolishBody { unitId: string; q: number; r: number }
 interface RevokeBody { actionId: string }
 
@@ -128,11 +128,20 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{ Params: { id: string }; Body: HealBody }>('/api/games/:id/heal', async (req, reply) => {
-    const { supportId, targetId } = req.body || {};
-    if (!supportId || !targetId) return badRequest(reply, 'supportId and targetId required');
+    const { supportId, targetId, q, r } = req.body || {};
+    if (!supportId) return badRequest(reply, 'supportId required');
+    // 顺序模式指定友方单位 targetId；同时模式改为指定格子/方向 q/r（区域治疗）。
     return dispatchAction(req, reply,
-      ({ game, player }) => healTarget(game, globalEventBus, player, supportId, targetId),
-      ({ game, player }) => queueHealAction(game, player, supportId, targetId));
+      ({ game, player }) => {
+        if (!targetId) return { ok: false, code: 'invalid_move', message: 'supportId and targetId required' };
+        return healTarget(game, globalEventBus, player, supportId, targetId);
+      },
+      ({ game, player }) => {
+        if (typeof q !== 'number' || typeof r !== 'number') {
+          return { ok: false, code: 'invalid_heal', message: 'supportId, q, r required' };
+        }
+        return queueHealAction(game, player, supportId, q, r);
+      });
   });
 
   app.post<{ Params: { id: string }; Body: DemolishBody }>('/api/games/:id/demolish', async (req, reply) => {

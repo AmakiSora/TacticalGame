@@ -745,11 +745,52 @@ function deployCells(origin) {
   if (isArtilleryDangerCell(origin.q, origin.r)) return [];
   return hexNeighbors(origin).filter(p => isPlain(p.q, p.r) && !occupied(p.q, p.r) && !isArtilleryDangerCell(p.q, p.r));
 }
+const SHAPE_HEX_DIRS = [{ q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 }, { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }];
+function unitShapeSpec(unit, kind) {
+  const shape = gameConfig?.units?.[unit.type]?.[kind];
+  if (!shape) return { type: 'single', length: 1 };
+  if (shape.type === 'line') return { type: 'line', length: shape.length ?? 2 };
+  if (shape.type === 'arc') return { type: 'arc', length: 3 };
+  return { type: 'single', length: 1 };
+}
+/** 客户端镜像服务端的形状瞄准推导：返回 { type, direction, cells } 或 null（不可瞄准）。 */
+function shapeAimFor(unit, kind, q, r) {
+  const shape = unitShapeSpec(unit, kind);
+  const dq = q - unit.q, dr = r - unit.r;
+  if (shape.type === 'single') {
+    const d = hexDistance(unit, { q, r });
+    if (d > unit.attackRange) return null;
+    if (kind === 'attackShape' && d === 0) return null;
+    return { type: 'single', direction: 0, cells: [{ q, r }] };
+  }
+  if (shape.type === 'arc') {
+    if (hexDistance(unit, { q, r }) !== 1) return null;
+    const direction = SHAPE_HEX_DIRS.findIndex(dir => dir.q === dq && dir.r === dr);
+    if (direction < 0) return null;
+    const idx = [(direction + 5) % 6, direction, (direction + 1) % 6];
+    return { type: 'arc', direction, cells: idx.map(i => ({ q: unit.q + SHAPE_HEX_DIRS[i].q, r: unit.r + SHAPE_HEX_DIRS[i].r })) };
+  }
+  for (let direction = 0; direction < 6; direction++) {
+    const dir = SHAPE_HEX_DIRS[direction];
+    const k = dir.q !== 0 ? dq / dir.q : dr / dir.r;
+    if (!Number.isInteger(k) || k < 1 || k > shape.length) continue;
+    if (dir.q * k !== dq || dir.r * k !== dr) continue;
+    const cells = [];
+    for (let s = 1; s <= shape.length; s++) cells.push({ q: unit.q + dir.q * s, r: unit.r + dir.r * s });
+    return { type: 'line', direction, cells };
+  }
+  return null;
+}
+/** 可点击的瞄准格集合。旧地图无形状配置 → single = 射程内全部格（与历史行为一致）。 */
+function aimableCells(unit, kind) {
+  const aims = [];
+  for (const c of state.cells) {
+    if (shapeAimFor(unit, kind, c.q, c.r)) aims.push({ q: c.q, r: c.r });
+  }
+  return aims;
+}
 function attackRangeCells(unit) {
-  return state.cells
-    .map(c => ({ q: c.q, r: c.r, distance: hexDistance(unit, c) }))
-    .filter(c => c.distance > 0 && c.distance <= unit.attackRange)
-    .map(({ q, r }) => ({ q, r }));
+  return aimableCells(unit, 'attackShape');
 }
 
 function drawHpBar(x, y, width, hp, maxHp) {
@@ -1059,7 +1100,7 @@ function unitHasPlannedAction(unitId) {
 }
 function describePlanAction(a) {
   const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破' }[a.type] || a.type;
-  if (a.type === 'heal') return `${typeLabel} 友方单位`;
+  if (a.type === 'heal') return Number.isFinite(a.q) && Number.isFinite(a.r) ? `${typeLabel} → (${a.q}, ${a.r})` : `${typeLabel} 友方单位`;
   if (Number.isFinite(a.q) && Number.isFinite(a.r)) return `${typeLabel} → (${a.q}, ${a.r})`;
   return typeLabel;
 }
@@ -1459,7 +1500,18 @@ function selectUnit(unit) {
         return { ...p, type: isEnemy ? 'attack' : 'attack-radius' };
       });
     }
-    if (action === 'heal') { interactionMode = 'heal_mode'; rangeHighlights = [...state.units.values()].filter(e => e.owner === myPlayer && e.alive && e.hp < e.maxHp && hexDistance(unit, e) <= unit.attackRange).map(e => ({ q: e.q, r: e.r, type: 'heal' })); }
+    if (action === 'heal') {
+      interactionMode = 'heal_mode';
+      if (isSimultaneous()) {
+        // 区域治疗：所有"覆盖格内含友军"的瞄准格都可点击。
+        rangeHighlights = aimableCells(unit, 'healShape').filter(pos => {
+          const aim = shapeAimFor(unit, 'healShape', pos.q, pos.r);
+          return aim.cells.some(c => [...state.units.values()].some(e => e.alive && e.owner === myPlayer && e.q === c.q && e.r === c.r));
+        }).map(p => ({ ...p, type: 'heal' }));
+      } else {
+        rangeHighlights = [...state.units.values()].filter(e => e.owner === myPlayer && e.alive && e.hp < e.maxHp && hexDistance(unit, e) <= unit.attackRange).map(e => ({ q: e.q, r: e.r, type: 'heal' }));
+      }
+    }
     if (action === 'demolish') {
       interactionMode = 'demolish_mode';
       rangeHighlights = demolishableCells(unit).map(p => ({ ...p, type: 'demolish' }));
@@ -1506,7 +1558,11 @@ async function handleBoardTap(cell) {
     }
   }
   if (interactionMode === 'heal_mode' && rangeHighlights.some(h => h.q === cell.q && h.r === cell.r)) {
-    if (unit && await apiAction(`/api/games/${gameId}/heal`, { supportId: selectedUnitId, targetId: unit.id })) afterAction(isSimultaneous() ? '治疗指令已入队' : '治疗成功');
+    if (isSimultaneous()) {
+      if (await apiAction(`/api/games/${gameId}/heal`, { supportId: selectedUnitId, q: cell.q, r: cell.r })) afterAction('治疗指令已入队');
+    } else if (unit && await apiAction(`/api/games/${gameId}/heal`, { supportId: selectedUnitId, targetId: unit.id })) {
+      afterAction('治疗成功');
+    }
     return;
   }
   if (interactionMode === 'demolish_mode' && rangeHighlights.some(h => h.q === cell.q && h.r === cell.r)) {

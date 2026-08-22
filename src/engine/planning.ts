@@ -2,11 +2,11 @@
 // simultaneous 模式的计划阶段：玩家把动作"入队不执行"，全部玩家确认后由
 // simultaneous.ts 统一同时结算。所有校验针对计划时刻的棋盘（结算前棋盘不会变化）。
 import { randomUUID } from 'node:crypto';
-import type { GameState, PendingAction, PlayerId, UnitType } from '../types.js';
+import type { GameState, PendingAction, PlayerId, Position, UnitType } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result, Failure } from './result.js';
 import { appendEvent } from './events.js';
-import { hexDistance } from './hex.js';
+import { hexDistance, HEX_DIRECTIONS } from './hex.js';
 import { findReachableCells, isDeployable, isInBounds, getCellOccupant, getTerrain } from './validation.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import { isArtilleryDanger } from './artillery.js';
@@ -80,6 +80,76 @@ function findOwnUnit(game: GameState, owner: PlayerId, unitId: string) {
 function enqueue(game: GameState, owner: PlayerId, action: PendingAction): Result<PendingAction> {
   queueOf(game, owner).push(action);
   return { ok: true, data: action };
+}
+
+// ---------------------------------------------------------------- 形状系统
+// 同时模式的兵种改造：攻击/治疗可配置覆盖形状（地图 JSON units.<type>.attackShape
+// / healShape）。single = 射程内任选一格；line = 沿一个正六方向覆盖前 length 格；
+// arc = 点击相邻格定向，覆盖该格及其左右相邻共 3 格。未配置默认 single。
+
+export type ShapeType = 'single' | 'line' | 'arc';
+
+export interface ShapeAim {
+  type: ShapeType;
+  /** 0-5 正六方向；single 恒 0。 */
+  direction: number;
+  cells: Position[];
+}
+
+export function shapeSpecFor(spec: UnitSpec | undefined, kind: 'attackShape' | 'healShape'): { type: ShapeType; length: number } {
+  const shape = spec?.[kind];
+  if (!shape) return { type: 'single', length: 1 };
+  if (shape.type === 'line') return { type: 'line', length: shape.length ?? 2 };
+  if (shape.type === 'arc') return { type: 'arc', length: 3 };
+  return { type: 'single', length: 1 };
+}
+
+/**
+ * 由施放者位置与点击格推导形状方向与覆盖格。瞄准不合法（超出射程、不在正六方向
+ * 射线上、非相邻格等）返回 null。攻击者/支援本回合不会移动，计划与结算结果一致。
+ */
+export function coveredCellsFor(
+  from: Position,
+  spec: UnitSpec | undefined,
+  kind: 'attackShape' | 'healShape',
+  target: Position,
+  range: number,
+): ShapeAim | null {
+  const shape = shapeSpecFor(spec, kind);
+  const dq = target.q - from.q;
+  const dr = target.r - from.r;
+  if (shape.type === 'single') {
+    const distance = hexDistance(from, target);
+    if (distance > range) return null;
+    if (kind === 'attackShape' && distance === 0) return null;
+    return { type: 'single', direction: 0, cells: [{ q: target.q, r: target.r }] };
+  }
+  if (shape.type === 'arc') {
+    if (hexDistance(from, target) !== 1) return null;
+    const direction = HEX_DIRECTIONS.findIndex(d => d.q === dq && d.r === dr);
+    if (direction < 0) return null;
+    return {
+      type: 'arc',
+      direction,
+      cells: [(direction + 5) % 6, direction, (direction + 1) % 6].map(index => ({
+        q: from.q + HEX_DIRECTIONS[index]!.q,
+        r: from.r + HEX_DIRECTIONS[index]!.r,
+      })),
+    };
+  }
+  // line：点击格必须落在某个正六方向射线上，距离 1..length。
+  for (let direction = 0; direction < 6; direction++) {
+    const d = HEX_DIRECTIONS[direction]!;
+    const k = d.q !== 0 ? dq / d.q : dr / d.r;
+    if (!Number.isInteger(k) || k < 1 || k > shape.length) continue;
+    if (d.q * k !== dq || d.r * k !== dr) continue;
+    const cells: Position[] = [];
+    for (let step = 1; step <= shape.length; step++) {
+      cells.push({ q: from.q + d.q * step, r: from.r + d.r * step });
+    }
+    return { type: 'line', direction, cells };
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- deploy
@@ -191,23 +261,29 @@ export function queueAttackAction(
   }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
-  // 攻击改为指定格子：射程内任意格均可，不要求有目标（预测性开火）。
+  // 攻击瞄准一个格子/方向：射程内任选一格；未配置形状 = 单格预测射击。
   if (!isInBounds(game, q, r)) {
     return { ok: false, code: 'invalid_attack', message: 'target cell is outside the board' };
   }
-  if (hexDistance(attacker, { q, r }) > attacker.attackRange) {
-    return { ok: false, code: 'invalid_attack', message: `out of range of (${q},${r})` };
+  const aim = coveredCellsFor(attacker, game.config.units[attacker.type], 'attackShape', { q, r }, attacker.attackRange);
+  if (!aim) {
+    return { ok: false, code: 'invalid_attack', message: `cannot aim at (${q},${r}) with this unit's attack shape` };
   }
-  return enqueue(game, owner, { id: randomUUID(), type: 'attack', attackerId, q, r });
+  return enqueue(game, owner, { id: randomUUID(), type: 'attack', attackerId, q, r, direction: aim.direction });
 }
 
 // ---------------------------------------------------------------- heal
 
+/**
+ * 治疗瞄准格子/方向（覆盖形状由 healShape 配置，默认单格）。计划时要求覆盖格内
+ * 至少站着一个存活友方单位；结算时对覆盖格内所有受伤友方单位各自掷治疗量。
+ */
 export function queueHealAction(
   game: GameState,
   owner: PlayerId,
   supportId: string,
-  targetId: string,
+  q: number,
+  r: number,
 ): Result<PendingAction> {
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
@@ -218,17 +294,26 @@ export function queueHealAction(
   if (unitAlreadyPlanned(queue, supportId)) {
     return { ok: false, code: 'invalid_heal', message: 'unit already has a planned action this round' };
   }
-  const target = findOwnUnit(game, owner, targetId);
-  if (!target) return { ok: false, code: 'invalid_heal', message: 'target is not a friendly unit' };
-  if (isArtilleryDanger(game, support) || isArtilleryDanger(game, target)) {
+  if (!isInBounds(game, q, r)) {
+    return { ok: false, code: 'invalid_heal', message: 'target cell is outside the board' };
+  }
+  const aim = coveredCellsFor(support, game.config.units[support.type], 'healShape', { q, r }, support.attackRange);
+  if (!aim) {
+    return { ok: false, code: 'invalid_heal', message: `cannot aim at (${q},${r}) with this unit's heal shape` };
+  }
+  const spec = game.config.units[support.type];
+  if (spec && (isArtilleryDanger(game, support)
+    || aim.cells.some(cell => isInBounds(game, cell.q, cell.r) && isArtilleryDanger(game, cell)))) {
     return { ok: false, code: 'invalid_heal', message: 'cannot heal inside the artillery zone' };
   }
-  if (hexDistance(support, target) > support.attackRange) {
-    return { ok: false, code: 'invalid_heal', message: 'target out of range' };
+  const coveredFriend = aim.cells.some(cell =>
+    game.units.some(unit => unit.alive && unit.owner === owner && unit.q === cell.q && unit.r === cell.r));
+  if (!coveredFriend) {
+    return { ok: false, code: 'invalid_heal', message: 'no friendly unit in the covered cells' };
   }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
-  return enqueue(game, owner, { id: randomUUID(), type: 'heal', supportId, targetId });
+  return enqueue(game, owner, { id: randomUUID(), type: 'heal', supportId, q, r, direction: aim.direction });
 }
 
 // ---------------------------------------------------------------- demolish

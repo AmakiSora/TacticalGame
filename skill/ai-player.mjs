@@ -648,12 +648,13 @@ async function playSimultaneousRound(game, args, seat) {
     }
 
     if (unit.type === 'support') {
+      // 同时模式区域治疗：点击受伤友军所在格（扇形覆盖相邻格，点其站位即可）。
       const wounded = livingUnits(game, seat.owner)
-        .filter(u => u.id !== unit.id && u.hp < u.maxHp && hexDistance(unit, u) <= unit.attackRange)
+        .filter(u => u.id !== unit.id && u.hp < u.maxHp && hexDistance(unit, u) === 1)
         .sort((a, b) => ((b.maxHp - b.hp) / b.maxHp) - ((a.maxHp - a.hp) / a.maxHp))[0];
-      if (wounded && await enqueue('/heal', { supportId: unit.id, targetId: wounded.id })) {
+      if (wounded && await enqueue('/heal', { supportId: unit.id, q: wounded.q, r: wounded.r })) {
         planned.add(unit.id);
-        console.log(`Plan heal ${unit.id} -> ${wounded.id}`);
+        console.log(`Plan heal ${unit.id} -> (${wounded.q},${wounded.r})`);
         continue;
       }
     }

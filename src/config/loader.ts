@@ -18,6 +18,18 @@ export interface UnitSpec {
   cost: number;
   canCapture: boolean;
   healPower?: number;
+  /** 同时模式兵种改造：攻击覆盖形状（single 单格 / line 定向直线 / arc 定向相邻三格扇形）。 */
+  attackShape?: ActionShapeSpec;
+  /** 同时模式兵种改造：治疗覆盖形状，语义同 attackShape。 */
+  healShape?: ActionShapeSpec;
+  /** 同时模式兵种改造：计划时目标格有敌人则锁定该单位，结算时未逃出射程必命中。 */
+  attackLock?: boolean;
+}
+
+export interface ActionShapeSpec {
+  type: 'single' | 'line' | 'arc';
+  /** line 形状的连续格数（默认 2）；single/arc 固定 1/3 格，忽略该字段。 */
+  length?: number;
 }
 
 export interface HeadquartersSpec {
@@ -283,6 +295,27 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
     if (typeof spec.canCapture !== 'boolean') throw new Error(`units.${type}.canCapture must be boolean`);
     if ('healPower' in spec) assertNumber(spec, 'healPower', `units.${type}`, 0);
+    if ('attackLock' in spec && typeof spec.attackLock !== 'boolean') {
+      throw new Error(`units.${type}.attackLock must be boolean`);
+    }
+    const validateShape = (key: 'attackShape' | 'healShape'): void => {
+      if (!(key in spec)) return;
+      const shape = asRecord(spec[key], `units.${type}.${key}`);
+      if (shape.type !== 'single' && shape.type !== 'line' && shape.type !== 'arc') {
+        throw new Error(`units.${type}.${key}.type must be single, line, or arc`);
+      }
+      if ('length' in shape) {
+        const length = assertNumber(shape, 'length', `units.${type}.${key}`, 1);
+        if (!Number.isInteger(length) || length > 6) {
+          throw new Error(`units.${type}.${key}.length must be an integer from 1 to 6`);
+        }
+        if (shape.type === 'line' && length > (spec.attackRange as number)) {
+          throw new Error(`units.${type}.${key}.length must not exceed attackRange`);
+        }
+      }
+    };
+    validateShape('attackShape');
+    validateShape('healShape');
   }
 
   const hqSpec = asRecord(c.headquartersSpec, `Map "${id}".headquartersSpec`);

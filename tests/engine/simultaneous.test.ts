@@ -238,9 +238,9 @@ describe('simultaneous resolution', () => {
     place(attacker, 1, 0);
     place(walker, 2, 0);
     place(sitter, -3, -3);
-    // 攻击 (2,0)：计划时空格。walker 自己移入该格会挨打；sitter 走远用于另一断言。
+    // 步兵现在是 2 格直线攻击：射线 (1,0)->(2,0)->(3,0)。walker 侧移到 (2,1) 躲开整条射线。
     expect(queueAttackAction(game, a, attacker.id, 2, 0).ok).toBe(true);
-    expect(queueMoveAction(game, b, walker.id, 3, 0).ok).toBe(true);
+    expect(queueMoveAction(game, b, walker.id, 2, 1).ok).toBe(true);
     commitAll(game, bus, [a, b]);
     const attacks = events(game, 'attack');
     expect(attacks).toHaveLength(1);
@@ -334,7 +334,8 @@ describe('simultaneous resolution', () => {
     const hpBefore = target.hp;
     // 伤害 19..25，治疗 22..28：净血量必 > 0。
     expect(queueAttackAction(game, a, attacker.id, 0, 0).ok).toBe(true);
-    expect(queueHealAction(game, b, support.id, target.id).ok).toBe(true);
+    // 区域治疗：点击目标所在格 (0,0)，支援的扇形覆盖该格。
+    expect(queueHealAction(game, b, support.id, 0, 0).ok).toBe(true);
     commitAll(game, bus, [a, b]);
     expect(target.alive).toBe(true);
     expect(target.hp).toBeGreaterThan(hpBefore - 6);
@@ -351,7 +352,7 @@ describe('simultaneous resolution', () => {
     const mover = game.units.find(u => u.owner === b && u.type === 'scout')!;
     place(walker, 0, 0);
     place(mover, 1, 0);
-    expect(queueHealAction(game, b, walker.id, mover.id).ok).toBe(true);
+    expect(queueHealAction(game, b, walker.id, 1, 0).ok).toBe(true);
     expect(queueMoveAction(game, b, mover.id, 3, 0).ok).toBe(true);
     commitAll(game, bus, [a, b]);
     const failed = events(game, 'action_failed');
@@ -510,5 +511,146 @@ describe('simultaneous resolution internals', () => {
     // c 的单位已随淘汰移除，其排队的动作不可能执行。
     expect(game.units.some(u => u.owner === c)).toBe(false);
     expect(events(game, 'move')).toHaveLength(0);
+  });
+});
+
+describe('unit shape overhaul (line / arc / lock / area heal)', () => {
+  it('infantry line attack hits both enemies along the ray', () => {
+    const { game, bus } = createStandoffGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    const attacker = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    const front = game.units.find(u => u.owner === b && u.type === 'infantry')!;
+    const back = game.units.find(u => u.owner === b && u.type === 'scout')!;
+    place(attacker, 1, 0);
+    place(front, 2, 0);
+    place(back, 3, 0);
+    attacker.attack = 999;
+    expect(queueAttackAction(game, a, attacker.id, 2, 0).ok).toBe(true);
+    commitAll(game, bus, [a, b]);
+    expect(front.alive).toBe(false);
+    expect(back.alive).toBe(false);
+    const attacks = events(game, 'attack');
+    expect(attacks).toHaveLength(2);
+    expect(attacks.every(e => e.payload.hit === true && e.payload.shape === 'line')).toBe(true);
+    expect(game.players[a]!.stats.unitsDestroyed).toBe(2);
+  });
+
+  it('rejects line aims that are off-ray or beyond the shape length', () => {
+    const { game } = createStandoffGame();
+    const a = game.turn.turnOrder[0]!;
+    const attacker = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    place(attacker, 1, 0);
+    // (2,1) 不在任何正六方向射线上；(4,0) 在射线上但距离 3 > 线长 2。
+    expect(queueAttackAction(game, a, attacker.id, 2, 1))
+      .toMatchObject({ ok: false, code: 'invalid_attack' });
+    expect(queueAttackAction(game, a, attacker.id, 4, 0))
+      .toMatchObject({ ok: false, code: 'invalid_attack' });
+    expect(queueAttackAction(game, a, attacker.id, 3, 0).ok).toBe(true);
+  });
+
+  it('heavy arc attack sweeps the three adjacent cells around the aim direction', () => {
+    const { game, bus } = createStandoffGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    const heavy = game.units.find(u => u.owner === a && u.type === 'heavy')!;
+    const enemies = game.units.filter(u => u.owner === b).slice(0, 3);
+    place(heavy, 0, 0);
+    // 朝 (1,0) 方向的扇形 = (0,1) (1,0) (1,-1)。
+    place(enemies[0]!, 0, 1);
+    place(enemies[1]!, 1, 0);
+    place(enemies[2]!, 1, -1);
+    heavy.attack = 999;
+    expect(queueAttackAction(game, a, heavy.id, 1, 0).ok).toBe(true);
+    commitAll(game, bus, [a, b]);
+    expect(enemies.every(u => !u.alive)).toBe(true);
+    const attacks = events(game, 'attack');
+    expect(attacks).toHaveLength(3);
+    expect(attacks.every(e => e.payload.hit === true && e.payload.shape === 'arc')).toBe(true);
+  });
+
+  it('ranger lock hits a target that moves within range, wherever it goes', () => {
+    const { game, bus } = createStandoffGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    // 现场把一个步兵改造成游侠（锁定能力来自配置 spec.attackLock）。
+    const ranger = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    ranger.type = 'ranger';
+    ranger.attack = 999;
+    ranger.attackRange = 3;
+    const runner = game.units.find(u => u.owner === b && u.type === 'scout')!;
+    place(ranger, 0, 0);
+    place(runner, 1, 0);
+    // 计划时敌人在 (1,0) → 锁定；runner 移到 (2,0) 仍在射程内 → 无论跑到哪都命中。
+    expect(queueAttackAction(game, a, ranger.id, 1, 0).ok).toBe(true);
+    expect(queueMoveAction(game, b, runner.id, 2, 0).ok).toBe(true);
+    commitAll(game, bus, [a, b]);
+    const attacks = events(game, 'attack');
+    expect(attacks).toHaveLength(1);
+    expect(attacks[0]!.payload.hit).toBe(true);
+    expect(attacks[0]!.payload.locked).toBe(true);
+    expect(attacks[0]!.payload.targetId).toBe(runner.id);
+    expect(runner.alive).toBe(false);
+  });
+
+  it('ranger lock misses only when the target escapes the range bubble', () => {
+    const { game, bus } = createStandoffGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    const ranger = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    ranger.type = 'ranger';
+    ranger.attack = 999;
+    ranger.attackRange = 3;
+    const runner = game.units.find(u => u.owner === b && u.type === 'scout')!;
+    place(ranger, 0, 0);
+    place(runner, 3, 0);
+    // 锁定射程边缘的目标；runner 全速逃离到距离 4 的 (3,-4) → 锁定失效。
+    expect(queueAttackAction(game, a, ranger.id, 3, 0).ok).toBe(true);
+    expect(queueMoveAction(game, b, runner.id, 3, -4).ok).toBe(true);
+    commitAll(game, bus, [a, b]);
+    const attacks = events(game, 'attack');
+    expect(attacks).toHaveLength(1);
+    expect(attacks[0]!.payload.hit).toBe(false);
+    expect(attacks[0]!.payload.locked).toBe(true);
+    expect(runner.alive).toBe(true);
+    const resolved = events(game, 'round_resolved')[0]!;
+    const results = resolved.payload.results as Record<string, { status: string; reason?: string }[]>;
+    expect(results[a]![0]!.status).toBe('missed');
+    expect(results[a]![0]!.reason).toBe('target_escaped');
+  });
+
+  it('area heal restores every wounded friendly in the covered cells', () => {
+    const { game, bus } = createStandoffGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    const medic = game.units.find(u => u.owner === b && u.type === 'infantry')!;
+    medic.type = 'support';
+    medic.healPower = 22;
+    const wounded1 = game.units.find(u => u.owner === b && u.type === 'infantry')!;
+    const wounded2 = game.units.find(u => u.owner === b && u.type === 'scout')!;
+    place(medic, 0, 0);
+    // 扇形朝 (1,0)：覆盖 (0,1) (1,0) (1,-1)。
+    place(wounded1, 0, 1);
+    place(wounded2, 1, -1);
+    wounded1.hp = 10;
+    wounded2.hp = 10;
+    expect(queueHealAction(game, b, medic.id, 1, 0).ok).toBe(true);
+    commitAll(game, bus, [a, b]);
+    expect(wounded1.hp).toBeGreaterThan(10);
+    expect(wounded2.hp).toBeGreaterThan(10);
+    const heals = events(game, 'heal');
+    expect(heals).toHaveLength(2);
+  });
+
+  it('rejects heal aims that do not match the configured shape', () => {
+    const { game } = createStandoffGame();
+    const b = game.turn.turnOrder[1]!;
+    const medic = game.units.find(u => u.owner === b && u.type === 'infantry')!;
+    medic.type = 'support';
+    medic.healPower = 22;
+    const friend = game.units.find(u => u.owner === b && u.type === 'infantry')!;
+    place(medic, 0, 0);
+    place(friend, 2, 0);
+    // 扇形要求点击相邻格：(2,0) 距离 2 不可瞄准。
+    expect(queueHealAction(game, b, medic.id, 2, 0))
+      .toMatchObject({ ok: false, code: 'invalid_heal' });
+    // 覆盖格内没有友军也不行。
+    expect(queueHealAction(game, b, medic.id, 0, -1))
+      .toMatchObject({ ok: false, code: 'invalid_heal' });
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "对峙之地",
-  "description": "同时回合模式专用地图。全员秘密下达指令，服务器统一同时结算：移动撞车即全部失败，攻击改为预测性开火指定格子。支持2、3、6人对称开局，出生位位于六边形六角，中央控制点为全员争夺焦点。",
+  "description": "同时回合模式专用地图。全员秘密下达指令，服务器统一同时结算：移动撞车即全部失败，攻击指定格子或方向。兵种全面改造：步兵沿方向轰击前两格、重装横扫周围三格、游侠锁定目标（未逃出射程必命中）、支援兵区域治疗。支持2、3、6人对称开局，中央控制点为全员争夺焦点。",
   "mode": "simultaneous",
   "grid": "hex",
   "orientation": "pointy",
@@ -66,11 +66,15 @@
     "6": ["slot_1", "slot_2", "slot_3", "slot_4", "slot_5", "slot_6"]
   },
   "units": {
-    "infantry": { "hp": 100, "attack": 30, "defense": 8, "moveRange": 3, "attackRange": 1, "cost": 45, "canCapture": true },
-    "scout": { "hp": 65, "attack": 16, "defense": 4, "moveRange": 5, "attackRange": 1, "cost": 38, "canCapture": true },
-    "heavy": { "hp": 150, "attack": 38, "defense": 13, "moveRange": 2, "attackRange": 1, "cost": 92, "canCapture": false },
-    "ranger": { "hp": 72, "attack": 44, "defense": 3, "moveRange": 3, "attackRange": 3, "cost": 72, "canCapture": false },
-    "support": { "hp": 82, "attack": 10, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 60, "canCapture": false, "healPower": 22 }
+    "infantry": { "hp": 100, "attack": 30, "defense": 8, "moveRange": 2, "attackRange": 2, "cost": 45, "canCapture": true,
+      "attackShape": { "type": "line", "length": 2 } },
+    "scout": { "hp": 65, "attack": 16, "defense": 4, "moveRange": 4, "attackRange": 1, "cost": 38, "canCapture": true },
+    "heavy": { "hp": 150, "attack": 38, "defense": 13, "moveRange": 2, "attackRange": 1, "cost": 92, "canCapture": false,
+      "attackShape": { "type": "arc" } },
+    "ranger": { "hp": 72, "attack": 44, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 72, "canCapture": false,
+      "attackLock": true },
+    "support": { "hp": 82, "attack": 10, "defense": 5, "moveRange": 2, "attackRange": 2, "cost": 60, "canCapture": false, "healPower": 22,
+      "healShape": { "type": "arc" } }
   },
   "headquartersSpec": { "hp": 180, "defense": 6 },
   "balance": {

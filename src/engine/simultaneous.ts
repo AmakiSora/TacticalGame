@@ -24,7 +24,8 @@ import {
   activePlayerIds, adjudicateAtTurnLimit, captureControlPoints, collectIncome,
   endGame, grantComebackSupplies, markPlayerEliminated, repairFromControlPoints, resetActions,
 } from './engine.js';
-import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound } from './planning.js';
+import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound, coveredCellsFor } from './planning.js';
+import type { ShapeAim } from './planning.js';
 import type { Result, Failure } from './result.js';
 
 export interface PlanOutcome {
@@ -97,6 +98,10 @@ function rollHeal(game: GameState, support: Unit): number {
 export function resolveRound(game: GameState, bus: EventBus): void {
   const roundNumber = game.turn.roundNumber;
   const order = game.turn.turnOrder.filter(id => game.players[id]?.status === 'active');
+  // 计划时刻各单位站位快照：锁定射击据此判定"计划时点击格上的敌人"。
+  const planTimePositions = game.units
+    .filter(u => u.alive)
+    .map(u => ({ unit: u, q: u.q, r: u.r }));
   const queues = new Map<PlayerId, PendingAction[]>(
     order.map(id => [id, [...(game.plan?.queues[id] ?? [])]]));
   const outcomes: PlayerRecord<PlanOutcome[]> = {};
@@ -226,86 +231,108 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     }
   }
 
-  // 3b. 收集攻击：按移动/部署后的棋盘判定目标格。友军免伤；空格或友军格 → 落空。
+  // 3b. 收集攻击：形状由地图配置推导（single 单格 / line 定向直线 / arc 定向三格
+  //     扇形）；锁定兵种（attackLock）在计划时点击格上站着敌人则锁定该单位。
+  //     目标判定延迟到伤害施加时，按移动/部署后的棋盘结算；友军免伤。
+  interface StrikeTargetRef {
+    kind: 'unit' | 'headquarters';
+    entity: Unit | Headquarters;
+    defense: number;
+  }
   interface Strike {
     owner: PlayerId;
     action: PendingAction;
     attacker: Unit;
-    q: number;
-    r: number;
-    hit: boolean;
-    targetKind: 'unit' | 'headquarters' | null;
-    targetId: string | null;
-    defense: number;
+    aim: ShapeAim;
+    lockedEntity?: Unit;
   }
   const strikes: Strike[] = [];
   for (const id of order) {
     for (const action of queues.get(id)!) {
       if (action.type !== 'attack') continue;
-      const used = actionsUsedOf(id, action);
       chargeActionPoint(game, id);
       const attacker = game.units.find(u => u.id === action.attackerId && u.owner === id && u.alive);
       if (!attacker) {
         recordFailure(id, action, 'unit_gone');
         continue;
       }
+      const spec = game.config.units[attacker.type];
+      const aim = coveredCellsFor(attacker, spec, 'attackShape', { q: action.q!, r: action.r! }, attacker.attackRange);
+      if (!aim) {
+        recordFailure(id, action, 'invalid_target', { q: action.q, r: action.r });
+        continue;
+      }
       attacker.hasActed = true;
-      const occupant = getCellOccupant(game, action.q!, action.r!);
-      const hit = occupant !== null && occupant.entity.owner !== id;
-      strikes.push({
-        owner: id, action, attacker, q: action.q!, r: action.r!, hit,
-        targetKind: hit ? occupant!.kind : null,
-        targetId: hit ? occupant!.entity.id : null,
-        defense: hit ? occupant!.entity.defense : 0,
-      });
-      void used;
+      const strike: Strike = { owner: id, action, attacker, aim };
+      if (spec?.attackLock) {
+        const locked = planTimePositions.find(entry =>
+          entry.unit.owner !== id && entry.q === action.q && entry.r === action.r);
+        if (locked) strike.lockedEntity = locked.unit;
+      }
+      strikes.push(strike);
     }
   }
 
-  // 3c. 收集治疗：按目标移动后的最终位置复核射程。
-  const heals: { owner: PlayerId; action: PendingAction; support: Unit; target: Unit; amount: number }[] = [];
+  // 3c. 收集治疗：覆盖形状与攻击同构；目标按移动后的最终站位在施加时判定。
+  const heals: { owner: PlayerId; action: PendingAction; support: Unit; aim: ShapeAim }[] = [];
   for (const id of order) {
     for (const action of queues.get(id)!) {
       if (action.type !== 'heal') continue;
       chargeActionPoint(game, id);
       const support = game.units.find(u => u.id === action.supportId && u.owner === id && u.alive);
-      const target = game.units.find(u => u.id === action.targetId && u.owner === id && u.alive);
-      if (!support || !target || support.type !== 'support'
-        || hexDistance(support, target) > support.attackRange) {
+      const aim = support && support.type === 'support'
+        ? coveredCellsFor(support, game.config.units[support.type], 'healShape', { q: action.q!, r: action.r! }, support.attackRange)
+        : null;
+      if (!support || !aim) {
         outcomes[id]!.push({ actionId: action.id, type: 'heal', owner: id, status: 'fizzled', reason: 'out_of_range' });
         appendEvent(game, bus, 'action_failed', {
           owner: id, actionId: action.id, type: 'heal', reason: 'out_of_range',
-          supportId: action.supportId, targetId: action.targetId, roundNumber,
+          supportId: action.supportId, q: action.q, r: action.r, roundNumber,
           actionsUsed: actionsUsedOf(id, action),
         });
         continue;
       }
       support.hasActed = true;
-      heals.push({ owner: id, action, support, target, amount: rollHeal(game, support) });
+      heals.push({ owner: id, action, support, aim });
     }
   }
 
-  // 3d. 净血量结算：先施放全部治疗（上限截断），再按 turnOrder 顺序施加伤害——
-  //     数学上等价于同时结算（hp + 治疗 - 伤害），且击杀归属确定。
+  // 3d. 净血量结算：先施放全部治疗（按最终站位、覆盖格内所有受伤友军各自掷量，
+  //     上限截断），再按 turnOrder 顺序施加伤害——数学上等价于同时结算
+  //     （hp + 治疗 - 伤害），且击杀归属确定。
   for (const heal of heals) {
-    const applied = Math.min(heal.target.maxHp - heal.target.hp, heal.amount);
-    if (applied <= 0) {
-      outcomes[heal.owner]!.push({ actionId: heal.action.id, type: 'heal', owner: heal.owner, status: 'fizzled', reason: 'already_healthy' });
+    const targets = heal.aim.cells
+      .map(cell => game.units.find(u => u.alive && u.owner === heal.owner && u.q === cell.q && u.r === cell.r))
+      .filter((u): u is Unit => Boolean(u));
+    const appliedList: { target: Unit; amount: number }[] = [];
+    for (const target of targets) {
+      if (target.hp >= target.maxHp) continue;
+      const applied = Math.min(target.maxHp - target.hp, rollHeal(game, heal.support));
+      if (applied > 0) appliedList.push({ target, amount: applied });
+    }
+    if (appliedList.length === 0) {
+      const reason = targets.length > 0 ? 'already_healthy' : 'out_of_range';
+      outcomes[heal.owner]!.push({ actionId: heal.action.id, type: 'heal', owner: heal.owner, status: 'fizzled', reason });
       appendEvent(game, bus, 'action_failed', {
-        owner: heal.owner, actionId: heal.action.id, type: 'heal', reason: 'already_healthy',
-        supportId: heal.action.supportId, targetId: heal.action.targetId, roundNumber,
+        owner: heal.owner, actionId: heal.action.id, type: 'heal', reason,
+        supportId: heal.action.supportId, q: heal.action.q, r: heal.action.r, roundNumber,
         actionsUsed: actionsUsedOf(heal.owner, heal.action),
       });
       continue;
     }
-    heal.target.hp += applied;
-    addActionMerit(game, heal.owner, effectActionMerit(applied));
-    appendEvent(game, bus, 'heal', {
-      owner: heal.owner, supportId: heal.support.id, targetId: heal.target.id,
-      amount: applied, targetHp: heal.target.hp,
-      actionsUsed: actionsUsedOf(heal.owner, heal.action), actionsRemaining: remaining(actionsUsedOf(heal.owner, heal.action)), roundNumber,
+    for (const { target, amount: applied } of appliedList) {
+      target.hp += applied;
+      addActionMerit(game, heal.owner, effectActionMerit(applied));
+      appendEvent(game, bus, 'heal', {
+        owner: heal.owner, supportId: heal.support.id, targetId: target.id,
+        amount: applied, targetHp: target.hp,
+        actionsUsed: actionsUsedOf(heal.owner, heal.action), actionsRemaining: remaining(actionsUsedOf(heal.owner, heal.action)), roundNumber,
+      });
+    }
+    outcomes[heal.owner]!.push({
+      actionId: heal.action.id, type: 'heal', owner: heal.owner, status: 'executed',
+      detail: { targets: appliedList.map(({ target, amount }) => ({ targetId: target.id, amount })) },
     });
-    outcomes[heal.owner]!.push({ actionId: heal.action.id, type: 'heal', owner: heal.owner, status: 'executed', detail: { amount: applied, targetId: heal.target.id } });
   }
 
   const deaths: { kind: 'unit' | 'headquarters'; entity: Unit | Headquarters; killer: PlayerId }[] = [];
@@ -313,46 +340,72 @@ export function resolveRound(game: GameState, bus: EventBus): void {
   for (const strike of strikes) {
     const action = strike.action;
     const used = actionsUsedOf(strike.owner, action);
-    if (!strike.hit) {
+    const spec = game.config.units[strike.attacker.type];
+    const targets: StrikeTargetRef[] = [];
+    let escapedLock = false;
+    if (strike.lockedEntity) {
+      // 锁定射击：目标只要没逃出攻击者的射程，跑到哪里都命中。
+      const entity = strike.lockedEntity;
+      if (hexDistance(strike.attacker, entity) <= strike.attacker.attackRange) {
+        targets.push({ kind: 'unit', entity, defense: entity.defense });
+      } else {
+        escapedLock = true;
+      }
+    } else {
+      for (const cell of strike.aim.cells) {
+        const occupant = getCellOccupant(game, cell.q, cell.r);
+        if (occupant !== null && occupant.entity.owner !== strike.owner) {
+          targets.push({ kind: occupant.kind, entity: occupant.entity, defense: occupant.entity.defense });
+        }
+      }
+    }
+    if (targets.length === 0) {
       appendEvent(game, bus, 'attack', {
         owner: strike.owner, attackerId: strike.attacker.id,
-        q: strike.q, r: strike.r, hit: false,
-        targetId: null, targetKind: null, damage: 0, actualDamage: 0,
+        q: action.q, r: action.r, hit: false,
+        shape: strike.aim.type,
+        locked: Boolean(strike.lockedEntity),
+        targetId: strike.lockedEntity ? strike.lockedEntity.id : null,
+        targetKind: null, damage: 0, actualDamage: 0,
         actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
       });
-      outcomes[strike.owner]!.push({ actionId: action.id, type: 'attack', owner: strike.owner, status: 'missed', detail: { q: strike.q, r: strike.r } });
+      outcomes[strike.owner]!.push({
+        actionId: action.id, type: 'attack', owner: strike.owner, status: 'missed',
+        reason: escapedLock ? 'target_escaped' : undefined,
+        detail: { q: action.q, r: action.r, shape: strike.aim.type, locked: Boolean(strike.lockedEntity) },
+      });
       continue;
     }
-    const entity = strike.targetKind === 'unit'
-      ? game.units.find(u => u.id === strike.targetId)
-      : Object.values(game.headquarters).find(h => h.id === strike.targetId);
-    if (!entity) {
-      recordFailure(strike.owner, action, 'target_gone', { q: strike.q, r: strike.r });
-      continue;
+    const hitDetails: Record<string, unknown>[] = [];
+    for (const target of targets) {
+      const entity = target.entity;
+      const damage = computeDamage(game, strike.attacker.attack, target.defense);
+      const actualDamage = Math.min(entity.hp, damage);
+      entity.hp = Math.max(0, entity.hp - damage);
+      if (target.kind === 'headquarters') {
+        const stats = game.players[strike.owner]?.stats;
+        if (stats) stats.headquartersDamage += actualDamage;
+      }
+      addActionMerit(game, strike.owner, effectActionMerit(actualDamage));
+      appendEvent(game, bus, 'attack', {
+        owner: strike.owner, attackerId: strike.attacker.id,
+        q: entity.q, r: entity.r, hit: true,
+        shape: strike.aim.type,
+        locked: Boolean(strike.lockedEntity),
+        targetId: entity.id, targetKind: target.kind,
+        damage, actualDamage, targetHp: entity.hp,
+        actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
+      });
+      hitDetails.push({ targetId: entity.id, kind: target.kind, damage, actualDamage, killed: entity.hp === 0 });
+      if (entity.hp === 0 && !recordedDeaths.has(entity.id)) {
+        recordedDeaths.add(entity.id);
+        deaths.push({ kind: target.kind, entity, killer: strike.owner });
+      }
     }
-    const damage = computeDamage(game, strike.attacker.attack, strike.defense);
-    const actualDamage = Math.min(entity.hp, damage);
-    entity.hp = Math.max(0, entity.hp - damage);
-    if (strike.targetKind === 'headquarters') {
-      const stats = game.players[strike.owner]?.stats;
-      if (stats) stats.headquartersDamage += actualDamage;
-    }
-    addActionMerit(game, strike.owner, effectActionMerit(actualDamage));
-    appendEvent(game, bus, 'attack', {
-      owner: strike.owner, attackerId: strike.attacker.id,
-      q: strike.q, r: strike.r, hit: true,
-      targetId: entity.id, targetKind: strike.targetKind,
-      damage, actualDamage, targetHp: entity.hp,
-      actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
-    });
     outcomes[strike.owner]!.push({
       actionId: action.id, type: 'attack', owner: strike.owner, status: 'executed',
-      detail: { q: strike.q, r: strike.r, targetId: entity.id, damage, actualDamage, killed: entity.hp === 0 },
+      detail: { q: action.q, r: action.r, shape: strike.aim.type, locked: Boolean(strike.lockedEntity), hits: hitDetails },
     });
-    if (entity.hp === 0 && !recordedDeaths.has(entity.id)) {
-      recordedDeaths.add(entity.id);
-      deaths.push({ kind: strike.targetKind!, entity, killer: strike.owner });
-    }
   }
 
   // 3e. 死亡与淘汰：所有伤害已施加完毕，同回合互杀成立；攻击者阵亡不影响其炮弹。

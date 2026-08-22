@@ -56,7 +56,31 @@
   const MODE_LABELS = {
     standard: '标准',
     annihilation: '歼灭',
+    simultaneous: '同时',
   };
+
+  const MODE_CLASSES = {
+    standard: 'mode-std',
+    annihilation: 'mode-anni',
+    simultaneous: 'mode-simul',
+  };
+
+  function modeLabel(mode) {
+    return MODE_LABELS[mode] || mode || '—';
+  }
+
+  function modeClass(mode) {
+    return MODE_CLASSES[mode] || 'mode-unknown';
+  }
+
+  function modeSummary(modeDist) {
+    const preferred = ['standard', 'annihilation', 'simultaneous'];
+    const extra = Object.keys(modeDist || {}).filter(mode => !preferred.includes(mode)).sort();
+    return [...preferred, ...extra]
+      .filter(mode => Object.prototype.hasOwnProperty.call(modeDist || {}, mode))
+      .map(mode => `${modeLabel(mode)} ${modeDist[mode]}`)
+      .join(' · ') || '无';
+  }
 
   function pct(n) {
     if (n == null || Number.isNaN(n)) return '—';
@@ -350,7 +374,7 @@
 
   function renderKpis(overview, sourceOverview) {
     const cards = [
-      { label: '筛选局数', value: overview.matchCount, sub: `标准 ${overview.modeDist?.standard ?? 0} · 歼灭 ${overview.modeDist?.annihilation ?? 0}` },
+      { label: '筛选局数', value: overview.matchCount, sub: modeSummary(overview.modeDist) },
       { label: '完赛', value: overview.completedCount, sub: `未完赛 ${overview.incompleteCount}` },
       { label: '模型数', value: overview.modelCount, sub: '当前筛选' },
       { label: '平均整轮', value: fmtNum(overview.avgRounds, 2), sub: 'round_end 计数' },
@@ -528,7 +552,7 @@
           <td data-label="日期">${fmtDate(m.date)}</td>
           <td data-label="版本">${escapeHtml(m.version)}</td>
           <td data-label="地图">${escapeHtml(m.mapId)}</td>
-          <td data-label="模式"><span class="tag ${m.mode === 'annihilation' ? 'mode-anni' : 'mode-std'}">${escapeHtml(MODE_LABELS[m.mode] || m.mode || '—')}</span></td>
+          <td data-label="模式"><span class="tag ${modeClass(m.mode)}">${escapeHtml(modeLabel(m.mode))}</span></td>
           <td class="num" data-label="人数">${m.playerCount}</td>
           <td data-label="参赛模型"><div class="participant-chips">${chips}</div></td>
           <td class="win" data-label="胜者">${escapeHtml(winnerLabel)}</td>

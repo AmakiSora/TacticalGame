@@ -10,6 +10,9 @@ describe('stats dashboard', () => {
     expect(source).toContain('if (!isDraw && (p.isWinner || p.rank === 1)) ag.wins += 1;');
     expect(source).toContain("let modelSort = { key: 'duelRating', dir: 'desc' };");
     expect(source).toContain('multiRating: b.multiGames > 0');
+    expect(source).toContain("simultaneous: '同时'");
+    expect(source).toContain('function modeSummary(modeDist)');
+    expect(source).toContain('modeClass(m.mode)');
   });
 
   it('does not publish the generator machine path', () => {
@@ -38,5 +41,6 @@ describe('stats dashboard', () => {
     expect(html).toContain('/mobile-icons.css');
     expect(html).toContain('icon-arrow-down');
     expect(source).toContain("classList.toggle('icon-arrow-up'");
+    expect(html).toContain('.mode-simul');
   });
 });

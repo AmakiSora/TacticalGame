@@ -11,7 +11,7 @@ import { globalStore } from './state/store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
-const PROTECTED_RATE_LIMIT = 120;
+const DEFAULT_PROTECTED_RATE_LIMIT = 120;
 const RATE_WINDOW_MS = 60_000;
 
 interface RuntimeConfig {
@@ -35,6 +35,15 @@ function parseBoolean(value: string | undefined, name: string): boolean {
   throw new Error(`${name} must be "true" or "false"`);
 }
 
+function readProtectedRateLimit(value = process.env.TACTICAL_GAME_RATE_LIMIT): number {
+  if (value === undefined || value === '') return DEFAULT_PROTECTED_RATE_LIMIT;
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error('TACTICAL_GAME_RATE_LIMIT must be a positive integer');
+  }
+  return limit;
+}
+
 export function readRuntimeConfig(): RuntimeConfig {
   return {
     host: process.env.HOST || '0.0.0.0',
@@ -52,6 +61,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   let ready = false;
   const production = process.env.NODE_ENV === 'production';
   const logLevel = process.env.LOG_LEVEL || (production ? 'info' : 'warn');
+  // The default protects a public server from accidental request floods.
+  // Local RL experiments can explicitly raise it because one environment
+  // step may issue several authenticated action requests per minute.
+  const protectedRateLimit = readProtectedRateLimit();
   const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
   loadMaps();
@@ -79,7 +92,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       return;
     }
     entry.count += 1;
-    if (entry.count > PROTECTED_RATE_LIMIT) {
+    if (entry.count > protectedRateLimit) {
       reply.code(429).send({ error: 'too many requests', code: 'rate_limit' });
     }
   });

@@ -1,5 +1,7 @@
 # 强化学习最小版本
 
+强化学习相关改动记录见 [rl/RELEASE_NOTES.md](RELEASE_NOTES.md)。以后修改训练环境、奖励、动作空间、模型部署或训练参数时，都要先在该文件顶部追加记录。
+
 这个目录是一个只针对 `default` 双人顺序模式的训练起点：`player_a` 是 PPO
 智能体，`player_b` 由一个简单的规则 AI 控制。训练默认直接调用 TypeScript
 引擎，不需要启动 HTTP 游戏服务器。
@@ -34,6 +36,34 @@ python rl/train.py
 ```
 
 正式训练建议至少 500000 步；默认值已经是 500000，可以按电脑速度调整。
+
+## GPU 训练
+
+训练脚本默认使用 `RL_DEVICE=auto`：如果 PyTorch 检测到 CUDA 就用 GPU，否则使用 CPU。
+也可以强制指定：
+
+```powershell
+$env:RL_DEVICE = "cuda"  # 或 cpu / auto
+python rl/train.py
+```
+
+先检查当前环境：
+
+```powershell
+python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')"
+```
+
+如果 `torch.cuda.is_available()` 是 `False`，说明当前安装的是 CPU 版 PyTorch。以
+NVIDIA 显卡为例，需要按 PyTorch 官网对应版本安装 CUDA wheel，例如：
+
+```powershell
+python -m pip uninstall torch -y
+python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
+```
+
+安装后重新检查，训练日志应显示 `device=cuda` 和 `Using cuda device`。不过当前单环境
+训练的主要瓶颈是 TypeScript 游戏模拟，不是神经网络；GPU 能加速 PPO 更新，但要明显
+提速还需要并行多个训练环境。
 
 新环境训练结果默认会保存为 `rl/hex_ppo_v2_default_rule_opponent.zip`。
 

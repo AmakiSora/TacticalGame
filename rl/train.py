@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+import torch
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
@@ -45,6 +46,23 @@ def tensorboard_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+def resolve_device() -> str:
+    requested = env_str("RL_DEVICE", "auto").lower()
+    if requested not in {"auto", "cpu", "cuda"}:
+        raise ValueError("RL_DEVICE must be auto, cpu, or cuda")
+    available = torch.cuda.is_available()
+    if requested == "cuda" and not available:
+        raise RuntimeError(
+            "RL_DEVICE=cuda was requested, but this Python environment has no CUDA-enabled PyTorch. "
+            "Install a CUDA PyTorch build first."
+        )
+    device = "cuda" if requested == "auto" and available else requested
+    if device == "auto":
+        device = "cpu"
+    print(f"[train] device={device} torch={torch.__version__} cuda_available={available}", flush=True)
+    return device
 
 
 class MaskableEvalCallback(BaseCallback):
@@ -105,6 +123,7 @@ def main() -> None:
     tb_dir = env_str("RL_TB_LOG", "rl/tb")
     eval_freq = env_int("RL_EVAL_FREQ", 10_000, minimum=0)
     eval_episodes = env_int("RL_EVAL_EPISODES", 20, minimum=1)
+    device = resolve_device()
 
     Path(model_path).parent.mkdir(parents=True, exist_ok=True)
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
@@ -136,7 +155,7 @@ def main() -> None:
     try:
         if resume:
             print(f"[train] loading model from {load_path}")
-            model = MaskablePPO.load(load_path, env=env)
+            model = MaskablePPO.load(load_path, env=env, device=device)
             model.tensorboard_log = tb_log
         else:
             model = MaskablePPO(
@@ -150,6 +169,7 @@ def main() -> None:
                 clip_range=env_float("RL_CLIP_RANGE", 0.2),
                 n_epochs=env_int("RL_N_EPOCHS", 10, minimum=1),
                 tensorboard_log=tb_log,
+                device=device,
                 verbose=1,
             )
 

@@ -369,6 +369,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       appendEvent(game, bus, 'attack', {
         owner: strike.owner, attackerId: strike.attacker.id,
         q: action.q, r: action.r, hit: false,
+        aimQ: action.q, aimR: action.r,
         shape: strike.aim.type,
         locked: Boolean(strike.lockedEntity),
         targetId: strike.lockedEntity ? strike.lockedEntity.id : null,
@@ -396,6 +397,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       appendEvent(game, bus, 'attack', {
         owner: strike.owner, attackerId: strike.attacker.id,
         q: entity.q, r: entity.r, hit: true,
+        aimQ: action.q, aimR: action.r,
         shape: strike.aim.type,
         locked: Boolean(strike.lockedEntity),
         targetId: entity.id, targetKind: target.kind,

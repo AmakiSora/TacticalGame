@@ -225,6 +225,8 @@ describe('simultaneous resolution', () => {
     expect(attacks).toHaveLength(1);
     expect(attacks[0]!.payload.hit).toBe(true);
     expect(attacks[0]!.payload.targetId).toBe(target.id);
+    expect(attacks[0]!.payload.aimQ).toBe(0);
+    expect(attacks[0]!.payload.aimR).toBe(0);
     expect(target.hp).toBeLessThan(hpBefore);
   });
 
@@ -245,6 +247,8 @@ describe('simultaneous resolution', () => {
     expect(attacks).toHaveLength(1);
     expect(attacks[0]!.payload.hit).toBe(false);
     expect(attacks[0]!.payload.actualDamage).toBe(0);
+    expect(attacks[0]!.payload.aimQ).toBe(2);
+    expect(attacks[0]!.payload.aimR).toBe(0);
 
     // 第二回合：攻击 walker 将要移入的格子。
     expect(game.turn.roundNumber).toBe(2);

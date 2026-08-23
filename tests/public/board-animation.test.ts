@@ -6,6 +6,7 @@ import { buildServer } from '../../src/server.js';
 type Entity = {
   id: string;
   owner?: string;
+  type?: string;
   q: number;
   r: number;
   hp: number;
@@ -29,41 +30,52 @@ type BoardState = {
 type BoardAnimationController = {
   reset(): void;
   syncState(state: BoardState, options: { animate: boolean }): void;
-  recordEvent(event: { type: string; payload?: Record<string, unknown> }, state: BoardState): void;
+  recordEvent(event: { type: string; seq?: number; payload?: Record<string, unknown> }, state: BoardState): void;
   update(now: number): void;
   forEachUnit(callback: (entity: Entity, view: AnimationView) => void): void;
   forEachHeadquarters(callback: (entity: Entity, view: AnimationView) => void): void;
   drawEffects(context: RecordingContext, now: number): void;
   isActive(): boolean;
+  _debugEffects(): string[];
 };
 
 type BoardAnimationApi = {
   create(options: {
     hexToPixel(q: number, r: number): { x: number; y: number };
     ownerColor(owner: string | null | undefined): string;
+    unitSpec?(type: string | undefined): Record<string, unknown> | undefined;
   }): BoardAnimationController;
 };
 
 class RecordingContext {
-  calls: Array<{ name: string; args: number[] }> = [];
+  calls: Array<{ name: string; args: unknown[] }> = [];
   strokeStyles: string[] = [];
   fillStyles: string[] = [];
+  texts: string[] = [];
   globalAlpha = 1;
   lineWidth = 1;
   lineCap = 'butt';
   shadowColor = '';
   shadowBlur = 0;
+  font = '';
+  textAlign = 'start';
 
   set strokeStyle(value: string) { this.strokeStyles.push(value); }
   set fillStyle(value: string) { this.fillStyles.push(value); }
   save() {}
   restore() {}
+  translate(...args: number[]) { this.calls.push({ name: 'translate', args }); }
+  rotate(...args: number[]) { this.calls.push({ name: 'rotate', args }); }
+  createLinearGradient() { return { addColorStop() {} }; }
   beginPath() {}
+  closePath() {}
   stroke() {}
   fill() { this.calls.push({ name: 'fill', args: [] }); }
   moveTo(...args: number[]) { this.calls.push({ name: 'moveTo', args }); }
   lineTo(...args: number[]) { this.calls.push({ name: 'lineTo', args }); }
   arc(...args: number[]) { this.calls.push({ name: 'arc', args }); }
+  strokeText(text: string, ...args: number[]) { this.texts.push(text); this.calls.push({ name: 'strokeText', args }); }
+  fillText(text: string, ...args: number[]) { this.texts.push(text); this.calls.push({ name: 'fillText', args }); }
 }
 
 function loadAnimation(reducedMotion = false) {
@@ -289,5 +301,110 @@ describe('shared board animation layer', () => {
     const settledContext = new RecordingContext();
     animation.drawEffects(settledContext, 2);
     expect(settledContext.calls).toHaveLength(0);
+  });
+
+  it('plays a single pierce for a multi-target line attack and per-target hit feedback', () => {
+    const loaded = loadAnimation();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+    const animation = loaded.api!.create({
+      hexToPixel: (q, r) => ({ x: q * 20, y: r * 20 }),
+      ownerColor: () => '#66ccff',
+      unitSpec: type => type === 'infantry'
+        ? { attackShape: { type: 'line', length: 2 } }
+        : undefined,
+    });
+    const state = createState();
+    state.units.get('unit-1')!.type = 'infantry';
+    state.units.set('unit-2', { id: 'unit-2', owner: 'player_b', q: 1, r: 0, hp: 80, maxHp: 100, alive: true });
+    state.units.set('unit-3', { id: 'unit-3', owner: 'player_b', q: 2, r: 0, hp: 80, maxHp: 100, alive: true });
+    animation.syncState(state, { animate: false });
+
+    // 同一次 line 攻击的两个命中事件（同 attackerId + roundNumber）。
+    animation.recordEvent({
+      type: 'attack', seq: 11,
+      payload: {
+        attackerId: 'unit-1', q: 1, r: 0, aimQ: 2, aimR: 0, hit: true,
+        shape: 'line', targetId: 'unit-2', actualDamage: 30, roundNumber: 3,
+      },
+    }, state);
+    animation.recordEvent({
+      type: 'attack', seq: 12,
+      payload: {
+        attackerId: 'unit-1', q: 2, r: 0, aimQ: 2, aimR: 0, hit: true,
+        shape: 'line', targetId: 'unit-3', actualDamage: 25, roundNumber: 3,
+      },
+    }, state);
+
+    const kinds = animation._debugEffects();
+    expect(kinds.filter(kind => kind === 'pierce')).toHaveLength(1);
+    expect(kinds.filter(kind => kind === 'hitFlash')).toHaveLength(2);
+    expect(kinds.filter(kind => kind === 'damageText')).toHaveLength(2);
+
+    const context = new RecordingContext();
+    loaded.setTime(100);
+    animation.drawEffects(context, 100);
+    expect(context.strokeStyles).toContain('#ffb347');
+    expect(context.texts).toEqual(expect.arrayContaining(['-30', '-25']));
+  });
+
+  it('plays the arc slash on an empty-cell miss without hit feedback', () => {
+    const loaded = loadAnimation();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+    const animation = loaded.api!.create({
+      hexToPixel: (q, r) => ({ x: q * 20, y: r * 20 }),
+      ownerColor: () => '#66ccff',
+      unitSpec: type => type === 'heavy' ? { attackShape: { type: 'arc' } } : undefined,
+    });
+    const state = createState();
+    state.units.get('unit-1')!.type = 'heavy';
+    animation.syncState(state, { animate: false });
+
+    animation.recordEvent({
+      type: 'attack', seq: 21,
+      payload: {
+        attackerId: 'unit-1', q: 1, r: 0, hit: false, shape: 'arc',
+        targetId: null, damage: 0, actualDamage: 0, roundNumber: 4,
+      },
+    }, state);
+
+    const kinds = animation._debugEffects();
+    expect(kinds.filter(kind => kind === 'slash')).toHaveLength(1);
+    expect(kinds).not.toContain('hitFlash');
+    expect(kinds).not.toContain('damageText');
+
+    const context = new RecordingContext();
+    loaded.setTime(100);
+    animation.drawEffects(context, 100);
+    expect(context.strokeStyles).toContain('#ff7a45');
+    expect(context.texts).toHaveLength(0);
+  });
+
+  it('maps legacy single-cell attacks to the per-type themed effect', () => {
+    const loaded = loadAnimation();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+    const animation = createController(loaded);
+    const state = createState();
+    state.units.get('unit-1')!.type = 'heavy';
+    animation.syncState(state, { animate: false });
+
+    // 旧模式 payload：无 shape/q/r，只有 targetId。
+    animation.recordEvent({
+      type: 'attack', seq: 31,
+      payload: { attackerId: 'unit-1', targetId: 'hq-1', actualDamage: 18 },
+    }, state);
+
+    const kinds = animation._debugEffects();
+    expect(kinds.filter(kind => kind === 'slash')).toHaveLength(1);
+    expect(kinds).toContain('hitFlash');
+    expect(kinds).toContain('damageText');
+
+    const context = new RecordingContext();
+    loaded.setTime(100);
+    animation.drawEffects(context, 100);
+    expect(context.strokeStyles).toContain('#ff7a45');
+    expect(context.texts).toContain('-18');
   });
 });

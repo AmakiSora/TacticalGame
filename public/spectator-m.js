@@ -70,7 +70,11 @@ const boardViewport = document.getElementById('board-viewport');
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
-const boardAnimation = window.BoardAnimation.create({ hexToPixel, ownerColor });
+const boardAnimation = window.BoardAnimation.create({
+  hexToPixel,
+  ownerColor,
+  unitSpec: type => gameConfig?.units?.[type],
+});
 const gameSelect = document.getElementById('game-select');
 const gamePicker = document.querySelector('.game-picker');
 const gamePickerButton = document.getElementById('game-picker-button');

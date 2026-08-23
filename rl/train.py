@@ -12,7 +12,8 @@ def mask_fn(env):
     return env.action_masks()
 
 
-env = ActionMasker(LocalHexGameEnv(), mask_fn)
+map_id = os.environ.get("RL_MAP_ID", "default")
+env = ActionMasker(LocalHexGameEnv(map_id=map_id), mask_fn)
 
 model = MaskablePPO(
     "MlpPolicy",
@@ -26,5 +27,6 @@ model = MaskablePPO(
 
 total_timesteps = int(os.environ.get("RL_TIMESTEPS", "100000"))
 model.learn(total_timesteps=total_timesteps)
-model.save("rl/hex_ppo_random_opponent")
+model_path = os.environ.get("RL_MODEL_PATH", f"rl/hex_ppo_{map_id}_random_opponent")
+model.save(model_path)
 env.close()

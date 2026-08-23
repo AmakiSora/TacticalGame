@@ -60,7 +60,11 @@ function apply(command: Record<string, unknown>): unknown {
 
 function handle(command: Record<string, unknown>): unknown {
   if (command.cmd === 'reset') {
-    game = createInitialGame(randomUUID(), 'default');
+    const mapId = typeof command.mapId === 'string' ? command.mapId : 'default';
+    game = createInitialGame(randomUUID(), mapId);
+    if (game.config.mode !== 'standard') {
+      throw new Error(`map "${mapId}" uses ${game.config.mode} mode; local baseline supports standard mode only`);
+    }
     return snapshot();
   }
   if (command.cmd === 'state') return snapshot();

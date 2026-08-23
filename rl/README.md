@@ -35,6 +35,27 @@ python rl/train.py
 
 训练结果会保存为 `rl/hex_ppo_random_opponent.zip`。
 
+## 训练其他地图
+
+本地基线通过 `RL_MAP_ID` 选择地图。例如训练 `dual-lanes`：
+
+```powershell
+$env:RL_MAP_ID = "dual-lanes"
+$env:RL_TIMESTEPS = "100000"
+python rl/train.py
+```
+
+默认模型会保存为 `rl/hex_ppo_dual-lanes_random_opponent.zip`，也可以指定路径：
+
+```powershell
+$env:RL_MODEL_PATH = "rl/models/dual-lanes-ppo"
+python rl/train.py
+```
+
+当前这套基线要求地图是“普通顺序模式”且支持 2 人布局。`standoff` 的同时回合
+规则、`artillery-zone` 的歼灭/炮火规则，以及只支持 3/4/6 人的地图，需要单独
+扩展环境，不能只改地图名。
+
 ## 在真实对局中使用模型
 
 先启动服务器并创建/加入一局游戏，拿到该座位的 player token。然后运行：

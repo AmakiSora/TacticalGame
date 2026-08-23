@@ -48,6 +48,14 @@ def tensorboard_available() -> bool:
         return False
 
 
+def latest_model_path(map_id: str) -> str:
+    candidates = list(Path("rl/models").glob(f"hex_ppo_v2_{map_id}_rule_opponent_*.zip"))
+    candidates += list(Path("rl").glob(f"hex_ppo_v2_{map_id}_rule_opponent_*.zip"))
+    if not candidates:
+        return ""
+    return str(max(candidates, key=lambda path: path.stat().st_mtime))
+
+
 def resolve_device() -> str:
     requested = env_str("RL_DEVICE", "auto").lower()
     if requested not in {"auto", "cpu", "cuda"}:
@@ -116,10 +124,11 @@ class MaskableEvalCallback(BaseCallback):
 def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
-    model_path = env_str("RL_MODEL_PATH", f"rl/hex_ppo_v2_{map_id}_rule_opponent")
+    run_stamp = time.strftime("%Y%m%d-%H%M%S")
+    model_path = env_str("RL_MODEL_PATH", f"rl/models/hex_ppo_v2_{map_id}_rule_opponent_{run_stamp}")
     load_path = env_str("RL_LOAD_MODEL", "")
     save_freq = env_int("RL_SAVE_FREQ", 20_000, minimum=1)
-    checkpoint_dir = env_str("RL_CHECKPOINT_DIR", f"rl/checkpoints/{map_id}")
+    checkpoint_dir = env_str("RL_CHECKPOINT_DIR", f"rl/checkpoints/{map_id}/{run_stamp}")
     tb_dir = env_str("RL_TB_LOG", "rl/tb")
     eval_freq = env_int("RL_EVAL_FREQ", 10_000, minimum=0)
     eval_episodes = env_int("RL_EVAL_EPISODES", 20, minimum=1)
@@ -130,14 +139,22 @@ def main() -> None:
     best_dir = Path(checkpoint_dir) / "best"
     best_dir.mkdir(parents=True, exist_ok=True)
 
-    if load_path == "auto":
+    if load_path in {"auto", "latest"}:
         candidates = [model_path, model_path + ".zip"]
+        if load_path == "latest":
+            latest = latest_model_path(map_id)
+            if latest:
+                candidates.insert(0, latest)
         load_path = next((candidate for candidate in candidates if os.path.exists(candidate)), "")
     if load_path and not (os.path.exists(load_path) or os.path.exists(load_path + ".zip")):
         raise FileNotFoundError(f"RL_LOAD_MODEL 指向的模型不存在: {load_path}")
 
     resume = bool(load_path)
-    run_name = f"ppo_{map_id}_{time.strftime('%Y%m%d-%H%M%S')}" + ("_resume" if resume else "")
+    if not resume and (os.path.exists(model_path) or os.path.exists(model_path + ".zip")) and env_str("RL_ALLOW_OVERWRITE", "0") != "1":
+        raise FileExistsError(
+            f"模型已存在: {model_path}. 设置 RL_ALLOW_OVERWRITE=1 才允许覆盖，或换一个 RL_MODEL_PATH。"
+        )
+    run_name = f"ppo_{map_id}_{run_stamp}" + ("_resume" if resume else "")
     print(
         f"[train] map={map_id} mode={'resume' if resume else 'fresh'} "
         f"timesteps={total_timesteps}{'(incremental)' if resume else ''}",

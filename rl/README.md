@@ -65,7 +65,11 @@ python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
 训练的主要瓶颈是 TypeScript 游戏模拟，不是神经网络；GPU 能加速 PPO 更新，但要明显
 提速还需要并行多个训练环境。
 
-新环境训练结果默认会保存为 `rl/hex_ppo_v2_default_rule_opponent.zip`。
+新环境训练结果默认会保存为带时间戳的路径，例如：
+
+```text
+rl/models/hex_ppo_v2_default_rule_opponent_20260824-153000.zip
+```
 
 这是 v2 动作空间，不能加载旧的 `hex_ppo_default_random_opponent.zip`；请从零训练
 一个新模型。
@@ -81,7 +85,9 @@ $env:RL_EVAL_EPISODES = "8"
 python rl/train.py
 ```
 
-设置 `$env:RL_LOAD_MODEL = "auto"` 时，如果最终模型存在就自动续训，否则从零开始。
+设置 `$env:RL_LOAD_MODEL = "latest"` 会自动加载该地图最近生成的 v2 模型，并把续训结果
+保存为新的时间戳文件；`auto` 只检查当前 `RL_MODEL_PATH`。默认不会覆盖已有模型，若确实
+要覆盖，显式设置 `$env:RL_ALLOW_OVERWRITE = "1"`。
 评估最优模型保存在 `rl/checkpoints/<map>/best/best_model.zip`。TensorBoard 是可选的：
 
 ```powershell
@@ -99,7 +105,7 @@ $env:RL_TIMESTEPS = "100000"
 python rl/train.py
 ```
 
-默认模型会保存为 `rl/hex_ppo_v2_dual-lanes_rule_opponent.zip`，也可以指定路径：
+默认模型会保存为带时间戳的 `rl/models/hex_ppo_v2_dual-lanes_rule_opponent_<time>.zip`，也可以指定路径：
 
 ```powershell
 $env:RL_MODEL_PATH = "rl/models/dual-lanes-ppo"

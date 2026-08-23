@@ -17,7 +17,7 @@ from env import HexGameEnv
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="rl/hex_ppo_random_opponent.zip")
+    parser.add_argument("--model", default="rl/hex_ppo_v2_default_rule_opponent.zip")
     parser.add_argument("--url", default="http://127.0.0.1:3100")
     parser.add_argument("--game", required=True)
     parser.add_argument("--token", required=True)
@@ -33,6 +33,11 @@ def main():
     args = parse_args()
     model = MaskablePPO.load(args.model)
     env = HexGameEnv(args.url)
+    if getattr(model.action_space, "n", None) != env.action_space.n:
+        raise ValueError(
+            f"模型动作空间为 {getattr(model.action_space, 'n', '?')}，当前环境需要 {env.action_space.n}; "
+            "请使用 v2 模型并从零训练。"
+        )
     env.game_id = args.game
     env.player_token = args.token
     env.owner = args.side

@@ -1,7 +1,7 @@
 # 强化学习最小版本
 
 这个目录是一个只针对 `default` 双人顺序模式的训练起点：`player_a` 是 PPO
-智能体，`player_b` 由随机合法动作策略控制。训练默认直接调用 TypeScript
+智能体，`player_b` 由一个简单的规则 AI 控制。训练默认直接调用 TypeScript
 引擎，不需要启动 HTTP 游戏服务器。
 
 ## 安装
@@ -33,7 +33,31 @@ $env:RL_TIMESTEPS = "16"
 python rl/train.py
 ```
 
-训练结果会保存为 `rl/hex_ppo_random_opponent.zip`。
+正式训练建议至少 500000 步；默认值已经是 500000，可以按电脑速度调整。
+
+新环境训练结果默认会保存为 `rl/hex_ppo_v2_default_rule_opponent.zip`。
+
+这是 v2 动作空间，不能加载旧的 `hex_ppo_default_random_opponent.zip`；请从零训练
+一个新模型。
+
+训练脚本还支持断点续训、checkpoint 和评估：
+
+```powershell
+$env:RL_LOAD_MODEL = "rl/hex_ppo_v2_default_rule_opponent"
+$env:RL_TIMESTEPS = "50000"          # 续训增加 50000 步
+$env:RL_SAVE_FREQ = "20000"           # 每 20000 步保存 checkpoint
+$env:RL_EVAL_FREQ = "10000"           # 每 10000 步评估
+$env:RL_EVAL_EPISODES = "8"
+python rl/train.py
+```
+
+设置 `$env:RL_LOAD_MODEL = "auto"` 时，如果最终模型存在就自动续训，否则从零开始。
+评估最优模型保存在 `rl/checkpoints/<map>/best/best_model.zip`。TensorBoard 是可选的：
+
+```powershell
+python -m pip install tensorboard
+tensorboard --logdir rl/tb
+```
 
 ## 训练其他地图
 
@@ -45,7 +69,7 @@ $env:RL_TIMESTEPS = "100000"
 python rl/train.py
 ```
 
-默认模型会保存为 `rl/hex_ppo_dual-lanes_random_opponent.zip`，也可以指定路径：
+默认模型会保存为 `rl/hex_ppo_v2_dual-lanes_rule_opponent.zip`，也可以指定路径：
 
 ```powershell
 $env:RL_MODEL_PATH = "rl/models/dual-lanes-ppo"
@@ -74,5 +98,5 @@ python rl/run_model.py `
 python rl/run_model.py --game <gameId> --token <playerToken> --once
 ```
 
-这是用于验证环境和奖励设计的基线，不是最终强度版本。下一步应把随机对手换成
-`skill/ai-player.mjs` 对应的规则策略，然后再加入自我对弈。
+这是 v2 训练环境：规则对手会优先攻击、治疗、部署和靠近据点。它仍不是最终强度
+版本，后续可以再加入自我对弈和更复杂的战术目标。

@@ -30,7 +30,12 @@ MAX_CELLS = 217
 CELL_FEATURES = 18
 GLOBAL_FEATURES = 16
 OBSERVATION_SIZE = MAX_CELLS * CELL_FEATURES + GLOBAL_FEATURES
-MAX_ACTIONS = 512
+# Stable intent slots.  Slot numbers have the same meaning in every state:
+# 0=end turn; then 8 unit slots x 4 intents; then 5 deploy-type slots.
+MAX_UNIT_SLOTS = 8
+UNIT_INTENTS = ("move", "attack", "heal", "special")
+DEPLOY_SLOTS = UNIT_TYPES
+MAX_ACTIONS = 1 + MAX_UNIT_SLOTS * len(UNIT_INTENTS) + len(DEPLOY_SLOTS)
 
 
 def key(q: int, r: int) -> tuple[int, int]:
@@ -68,7 +73,7 @@ class HexGameEnv(gym.Env):
         self.opponent_token = ""
         self.host_token = ""
         self.state: dict[str, Any] = {}
-        self.actions: list[tuple[str, dict[str, Any]]] = []
+        self.actions: list[tuple[str, dict[str, Any]]] = self._empty_actions()
         self.previous_score = 0.0
         self.steps = 0
 
@@ -154,10 +159,11 @@ class HexGameEnv(gym.Env):
         self.actions = self._legal_actions(self.state, self.owner)
         self.steps += 1
 
-        if action_index < 0 or action_index >= len(self.actions):
+        if action_index < 0 or action_index >= len(self.actions) or not self.actions[action_index][0]:
             return self._encode_state(self.state), -0.05, False, self.steps >= self.max_steps, {"invalid": True}
 
         action_type, payload = self.actions[action_index]
+        before = self._strategic_snapshot(self.state)
         try:
             self._apply(action_type, payload, self.player_token)
         except RuntimeError:
@@ -172,6 +178,7 @@ class HexGameEnv(gym.Env):
 
         current_score = self._score(self.state)
         reward = float(np.clip((current_score - self.previous_score) / 100.0, -1.0, 1.0))
+        reward += self._shaped_reward(before, self._strategic_snapshot(self.state), action_type)
         self.previous_score = current_score
 
         terminated = self._game_over()
@@ -183,9 +190,11 @@ class HexGameEnv(gym.Env):
 
     def action_masks(self) -> np.ndarray:
         """Mask used by sb3-contrib MaskablePPO."""
-        mask = np.zeros(MAX_ACTIONS, dtype=bool)
-        mask[: min(len(self.actions), MAX_ACTIONS)] = True
-        return mask
+        return np.asarray([bool(action[0]) for action in self.actions], dtype=bool)
+
+    @staticmethod
+    def _empty_actions():
+        return [("", {}) for _ in range(MAX_ACTIONS)]
 
     def _get_state(self, token: str) -> dict[str, Any]:
         return self._request("GET", f"/api/games/{self.game_id}", token=token)
@@ -208,18 +217,129 @@ class HexGameEnv(gym.Env):
         }[action_type]
         self._request("POST", f"/api/games/{self.game_id}{endpoint}", payload, token=token)
 
+    def _strategic_snapshot(self, state: dict[str, Any]) -> dict[str, float]:
+        units = [u for u in state.get("units", []) if u.get("alive")]
+        own_units = [u for u in units if u.get("owner") == self.owner]
+        enemy_units = [u for u in units if u.get("owner") == self.opponent]
+        points = state.get("controlPoints", [])
+        open_points = [p for p in points if p.get("owner") != self.owner]
+        capture_units = [u for u in own_units if u.get("canCapture")]
+        distances = [distance(unit, point) for unit in capture_units for point in open_points]
+        nearest_cp = min(distances) if distances else 0
+        enemy_hp = sum(float(u.get("hp", 0)) for u in enemy_units)
+        enemy_hp += sum(float(h.get("hp", 0)) for h in state.get("headquarters", {}).values() if h.get("owner") == self.opponent)
+        own_hp = sum(float(u.get("hp", 0)) for u in own_units)
+        own_hp += sum(float(h.get("hp", 0)) for h in state.get("headquarters", {}).values() if h.get("owner") == self.owner)
+        return {
+            "control_points": float(sum(p.get("owner") == self.owner for p in points)),
+            "own_units": float(len(own_units)),
+            "enemy_hp": enemy_hp,
+            "own_hp": own_hp,
+            "nearest_cp": float(nearest_cp),
+        }
+
+    @staticmethod
+    def _shaped_reward(before: dict[str, float], after: dict[str, float], action_type: str) -> float:
+        # Small dense signals teach useful direction while adjudication remains
+        # the main objective.  Distance shaping is potential-based: moving
+        # closer to an unowned CP is positive, moving away is negative.
+        reward = (after["control_points"] - before["control_points"]) * 0.7
+        reward += (before["enemy_hp"] - after["enemy_hp"]) / 100.0
+        reward += (after["own_hp"] - before["own_hp"]) / 160.0
+        reward += (before["nearest_cp"] - after["nearest_cp"]) * 0.025
+        if action_type == "deploy":
+            reward += 0.12
+        elif action_type == "attack":
+            reward += 0.05
+        elif action_type == "end_turn" and before["control_points"] == after["control_points"]:
+            reward -= 0.01
+        return float(np.clip(reward, -1.0, 1.0))
+
+    @staticmethod
+    def _unit_sort_key(unit: dict[str, Any]):
+        return (TYPE_INDEX.get(unit.get("type"), 99), int(unit.get("q", 0)), int(unit.get("r", 0)), -int(unit.get("hp", 0)))
+
+    def _best_target(self, unit: dict[str, Any], enemies: list[dict[str, Any]], hqs: list[dict[str, Any]]):
+        targets = [target for target in [*enemies, *hqs] if distance(unit, target) <= int(unit.get("attackRange", 0))]
+        if not targets:
+            return None
+        return max(targets, key=lambda target: (
+            10000 if target in hqs else 0,
+            int(target.get("maxHp", target.get("hp", 0))) - int(target.get("hp", 0)),
+            -int(target.get("hp", 0)),
+        ))
+
+    def _movement_goal(self, unit: dict[str, Any], state: dict[str, Any], owner: str):
+        points = [p for p in state.get("controlPoints", []) if p.get("owner") != owner]
+        if points and unit.get("canCapture"):
+            return min(points, key=lambda point: (distance(unit, point), -int(point.get("q", 0))))
+        enemies = [u for u in state.get("units", []) if u.get("alive") and u.get("owner") != owner]
+        hqs = [h for h in state.get("headquarters", {}).values() if h.get("alive") and h.get("owner") != owner]
+        return min([*enemies, *hqs], key=lambda target: distance(unit, target), default=unit)
+
+    def _fixed_move(self, unit: dict[str, Any], state: dict[str, Any], owner: str, cells, occupied):
+        if unit.get("hasMoved") or not (unit.get("actionSpent") or int(state.get("turn", {}).get("actionsUsed", 0)) < int(state.get("config", {}).get("balance", {}).get("actionsPerTurn", 5))):
+            return None
+        goal = self._movement_goal(unit, state, owner)
+        current_distance = distance(unit, goal)
+        reachable = self._reachable(cells, occupied, key(int(unit["q"]), int(unit["r"])), int(unit.get("moveRange", 0)))
+        candidates = [pos for pos in reachable if distance({"q": pos[0], "r": pos[1]}, goal) < current_distance]
+        if not candidates:
+            return None
+        pos = min(candidates, key=lambda candidate: distance({"q": candidate[0], "r": candidate[1]}, goal))
+        return {"unitId": unit["id"], "q": pos[0], "r": pos[1]}
+
+    def _fixed_deploy(self, state: dict[str, Any], owner: str, unit_type: str):
+        resources = state.get("resources", {}).get(owner, {}).get("supplies", 0)
+        spec = state.get("config", {}).get("units", {}).get(unit_type)
+        if not spec or resources < int(spec.get("cost", 10)):
+            return None
+        origins = []
+        hq = state.get("headquarters", {}).get(owner)
+        if hq and hq.get("alive"):
+            origins.append(hq)
+        origins.extend(p for p in state.get("controlPoints", []) if p.get("owner") == owner)
+        cells = {key(int(c["q"]), int(c["r"])): c for c in state.get("cells", [])}
+        occupied = {(int(u["q"]), int(u["r"])) for u in state.get("units", []) if u.get("alive")}
+        occupied.update((int(h["q"]), int(h["r"])) for h in state.get("headquarters", {}).values() if h.get("alive"))
+        enemy_hq = next((h for h in state.get("headquarters", {}).values() if h.get("owner") != owner), {"q": 0, "r": 0})
+        candidates = []
+        for origin in origins:
+            for dq, dr in HEX_DIRECTIONS:
+                pos = (int(origin["q"]) + dq, int(origin["r"]) + dr)
+                cell = cells.get(pos)
+                if cell and cell.get("terrain", "plain") == "plain" and pos not in occupied:
+                    candidates.append((distance({"q": pos[0], "r": pos[1]}, enemy_hq), origin, pos))
+        if not candidates:
+            return None
+        _, origin, pos = min(candidates, key=lambda item: item[0])
+        return {"unitType": unit_type, "fromId": origin["id"], "q": pos[0], "r": pos[1]}
+
     def _play_opponent_until_agent_turn(self) -> None:
-        """Use a random legal policy for player_b until player_a can act."""
+        """Use a simple goal-directed rule policy for player_b."""
         guard = 0
         while not self._game_over() and self.state.get("turn", {}).get("currentPlayerId") != self.owner:
             guard += 1
             if guard > 100:
                 raise RuntimeError("opponent turn did not finish")
             actions = self._legal_actions(self.state, self.opponent)
-            if not actions:
+            valid = [(index, action) for index, action in enumerate(actions) if action[0]]
+            if not valid:
                 break
-            index = int(self.np_random.integers(len(actions)))
-            action_type, payload = actions[index]
+            attacks = [(index, action) for index, action in valid if action[0] == "attack"]
+            heals = [(index, action) for index, action in valid if action[0] == "heal"]
+            deploys = [(index, action) for index, action in valid if action[0] == "deploy"]
+            moves = [(index, action) for index, action in valid if action[0] == "move"]
+            if attacks:
+                index, (action_type, payload) = attacks[0]
+            elif heals:
+                index, (action_type, payload) = heals[0]
+            elif deploys and self.state.get("resources", {}).get(self.opponent, {}).get("supplies", 0) >= 90:
+                index, (action_type, payload) = deploys[0]
+            elif moves:
+                index, (action_type, payload) = moves[0]
+            else:
+                index, (action_type, payload) = valid[0]
             try:
                 self._apply(action_type, payload, self.opponent_token)
             except RuntimeError as error:
@@ -230,9 +350,9 @@ class HexGameEnv(gym.Env):
 
     def _legal_actions(self, state: dict[str, Any], owner: str):
         if state.get("phase") == "game_over":
-            return []
+            return self._empty_actions()
 
-        units = [u for u in state.get("units", []) if u.get("alive") and u.get("owner") == owner]
+        units = sorted([u for u in state.get("units", []) if u.get("alive") and u.get("owner") == owner], key=self._unit_sort_key)[:MAX_UNIT_SLOTS]
         enemies = [u for u in state.get("units", []) if u.get("alive") and u.get("owner") != owner]
         hqs = [hq for hq in state.get("headquarters", {}).values() if hq.get("alive") and hq.get("owner") != owner]
         cells = {key(int(c["q"]), int(c["r"])): c for c in state.get("cells", [])}
@@ -240,7 +360,8 @@ class HexGameEnv(gym.Env):
         occupied.update((int(h["q"]), int(h["r"])) for h in state.get("headquarters", {}).values() if h.get("alive"))
         actions_used = int(state.get("turn", {}).get("actionsUsed", 0))
         ap_limit = int(state.get("config", {}).get("balance", {}).get("actionsPerTurn", 5))
-        actions = [("end_turn", {})]
+        actions = self._empty_actions()
+        actions[0] = ("end_turn", {})
 
         def can_activate(unit):
             return bool(unit.get("actionSpent")) or actions_used < ap_limit
@@ -249,50 +370,37 @@ class HexGameEnv(gym.Env):
             cell = cells.get(pos)
             return cell is not None and cell.get("terrain", "plain") == "plain" and pos not in occupied
 
-        for unit in units:
-            start = key(int(unit["q"]), int(unit["r"]))
-            if not unit.get("hasMoved") and can_activate(unit):
-                for pos in self._reachable(cells, occupied, start, int(unit.get("moveRange", 0))):
-                    if plain_empty(pos):
-                        actions.append(("move", {"unitId": unit["id"], "q": pos[0], "r": pos[1]}))
-
+        for slot, unit in enumerate(units):
+            base = 1 + slot * len(UNIT_INTENTS)
+            if can_activate(unit):
+                move = self._fixed_move(unit, state, owner, cells, occupied)
+                if move:
+                    actions[base + 0] = ("move", move)
             if not unit.get("hasActed") and can_activate(unit):
-                for target in [*enemies, *hqs]:
-                    if distance(unit, target) <= int(unit.get("attackRange", 0)):
-                        actions.append(("attack", {"attackerId": unit["id"], "targetId": target["id"]}))
-
+                target = self._best_target(unit, enemies, hqs)
+                if target:
+                    actions[base + 1] = ("attack", {"attackerId": unit["id"], "targetId": target["id"]})
                 if unit.get("type") == "support":
                     heal_range = int(state.get("config", {}).get("units", {}).get("support", {}).get("healRange", unit.get("attackRange", 0)))
-                    for target in units:
-                        if target["id"] != unit["id"] and int(target["hp"]) < int(target["maxHp"]) and distance(unit, target) <= heal_range:
-                            actions.append(("heal", {"supportId": unit["id"], "targetId": target["id"]}))
-
+                    wounded = [u for u in units if u["id"] != unit["id"] and int(u["hp"]) < int(u["maxHp"]) and distance(unit, u) <= heal_range]
+                    if wounded:
+                        target = max(wounded, key=lambda candidate: int(candidate["maxHp"]) - int(candidate["hp"]))
+                        actions[base + 2] = ("heal", {"supportId": unit["id"], "targetId": target["id"]})
                 if unit.get("type") == "heavy":
+                    start = key(int(unit["q"]), int(unit["r"]))
                     for dq, dr in HEX_DIRECTIONS:
                         pos = (start[0] + dq, start[1] + dr)
                         cell = cells.get(pos)
                         if cell and cell.get("terrain") == "blocker" and pos not in occupied:
-                            actions.append(("demolish", {"unitId": unit["id"], "q": pos[0], "r": pos[1]}))
+                            actions[base + 3] = ("demolish", {"unitId": unit["id"], "q": pos[0], "r": pos[1]})
+                            break
 
-        resources = state.get("resources", {}).get(owner, {}).get("supplies", 0)
-        origins = []
-        hq = state.get("headquarters", {}).get(owner)
-        if hq and hq.get("alive"):
-            origins.append(hq)
-        origins.extend(p for p in state.get("controlPoints", []) if p.get("owner") == owner)
-        specs = state.get("config", {}).get("units", {})
-        for origin in origins:
-            origin_pos = key(int(origin["q"]), int(origin["r"]))
-            for unit_type in UNIT_TYPES:
-                spec = specs.get(unit_type)
-                if not spec or resources < int(spec.get("cost", 10)):
-                    continue
-                for dq, dr in HEX_DIRECTIONS:
-                    pos = (origin_pos[0] + dq, origin_pos[1] + dr)
-                    if plain_empty(pos):
-                        actions.append(("deploy", {"unitType": unit_type, "fromId": origin["id"], "q": pos[0], "r": pos[1]}))
-
-        return actions[:MAX_ACTIONS]
+        if actions_used < ap_limit:
+            for index, unit_type in enumerate(DEPLOY_SLOTS):
+                payload = self._fixed_deploy(state, owner, unit_type)
+                if payload:
+                    actions[1 + MAX_UNIT_SLOTS * len(UNIT_INTENTS) + index] = ("deploy", payload)
+        return actions
 
     @staticmethod
     def _reachable(cells, occupied, start, move_range):

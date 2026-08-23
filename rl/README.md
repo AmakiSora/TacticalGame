@@ -74,6 +74,12 @@ rl/models/hex_ppo_v2_default_rule_opponent_20260824-153000.zip
 这是 v2 动作空间，不能加载旧的 `hex_ppo_default_random_opponent.zip`；请从零训练
 一个新模型。
 
+如果 PowerShell 之前设置过旧的 `RL_LOAD_MODEL`，先清除它：
+
+```powershell
+Remove-Item Env:RL_LOAD_MODEL -ErrorAction SilentlyContinue
+```
+
 训练脚本还支持断点续训、checkpoint 和评估：
 
 ```powershell

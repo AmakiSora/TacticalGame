@@ -172,7 +172,15 @@ def main() -> None:
     try:
         if resume:
             print(f"[train] loading model from {load_path}")
-            model = MaskablePPO.load(load_path, env=env, device=device)
+            try:
+                model = MaskablePPO.load(load_path, env=env, device=device)
+            except ValueError as error:
+                if "Action spaces do not match" in str(error) or "Observation spaces do not match" in str(error):
+                    raise RuntimeError(
+                        f"模型与当前 v2 环境不兼容: {load_path}。这是旧 v1 模型（Discrete(512)），"
+                        "当前环境使用 Discrete(38)，请清除 RL_LOAD_MODEL 后从零训练 v2 模型。"
+                    ) from error
+                raise
             model.tensorboard_log = tb_log
         else:
             model = MaskablePPO(

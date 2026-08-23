@@ -41,6 +41,7 @@ const els = {
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
   btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'), planPanel: $('plan-panel'),
+  btnSkipReplay: $('btn-skip-replay'),
   selDetail: $('selection-detail'), events: $('events'), scorePanel: $('score-panel'),
   btnSettings: $('btn-settings'), settingsPopover: $('settings-popover'),
   settingsControlToken: $('settings-control-token'), btnSaveControlToken: $('btn-save-control-token'),
@@ -48,12 +49,13 @@ const els = {
   btnSaveSession: $('btn-save-session'), btnEnterSession: $('btn-enter-session'), btnClearSession: $('btn-clear-session'),
 };
 const ctx = els.canvas.getContext('2d');
+let gameConfig = null;
 const boardAnimation = window.BoardAnimation.create({
   hexToPixel,
   ownerColor: owner => OWNER_COLOR[owner] || '#9aa7b2',
+  unitSpec: type => gameConfig?.units?.[type],
 });
 
-let gameConfig = null;
 let playerNames = defaultPlayerNames();
 let state = null;
 let gameId = null;
@@ -61,6 +63,17 @@ let myToken = null;
 let hostToken = null;
 let myPlayer = null;
 let sse = null;
+
+// 结算回放：SSE 事件入队，按阶段分组按序播放；「跳过结算」直达终态。
+const playback = window.PlaybackQueue.create({
+  apply: ev => applyEvent(state, ev),
+  effect: ev => boardAnimation.recordEvent(ev, state),
+  sync: animate => boardAnimation.syncState(state, { animate }),
+  render: () => { drawBoard(); renderSidebar(); },
+  refresh: async () => { await refreshAdjudication(); renderSidebar(); },
+  lastSeq: () => state?.eventLog?.at(-1)?.seq ?? 0,
+  onActiveChange: active => { els.btnSkipReplay?.classList.toggle('hidden', !active); },
+});
 let lobbyPollTimer = null;
 let availableGamesTimer = null;
 let availableGamesLoading = false;
@@ -615,6 +628,7 @@ function leadersFromGameOverPayload(p) {
 async function loadFullState() {
   const { ok, data } = await API.get(`/api/games/${gameId}/events`);
   if (!ok) return false;
+  playback.reset();
   playerNames = defaultPlayerNames();
   state = createEmptyState();
   for (const ev of data.events) applyEvent(state, ev);
@@ -1051,6 +1065,7 @@ function iCommitted() { return committedList().includes(myPlayer); }
 /** 当下是否允许我方操作：顺序模式=轮到我；同时模式=计划阶段且我未确认。 */
 function canActNow() {
   if (!state || state.winner) return false;
+  if (playback.isActive()) return false; // 结算回放中暂不可操作。
   if (isSimultaneous()) {
     return state.players?.[myPlayer]?.status === 'active' && !iCommitted();
   }
@@ -1218,9 +1233,10 @@ function renderScorePanel() {
 function renderSidebar() {
   if (!state) return;
   const simultaneous = isSimultaneous();
+  const replaying = playback.isActive();
   const owner = simultaneous ? null : (state.turn.currentPlayerId || state.turn.currentOwner);
-  els.turnBadge.innerHTML = `<strong class="turn-count">${esc(turnProgressLabel())}</strong><span class="turn-player">${simultaneous ? (iCommitted() ? '已确认 · 等待全员提交' : '同时计划阶段') : esc(playerName(owner))}</span>`;
-  els.turnBadge.classList.toggle('my-turn', simultaneous ? (!iCommitted() && !state.winner) : owner === myPlayer);
+  els.turnBadge.innerHTML = `<strong class="turn-count">${esc(turnProgressLabel())}</strong><span class="turn-player">${simultaneous ? (replaying ? '结算回放中…' : (iCommitted() ? '已确认 · 等待全员提交' : '同时计划阶段')) : esc(playerName(owner))}</span>`;
+  els.turnBadge.classList.toggle('my-turn', simultaneous ? (!iCommitted() && !state.winner && !replaying) : owner === myPlayer);
   const resourceRows = joinedPlayerIds().map(id => {
     const color = OWNER_COLOR[id] || '#9aa7b2';
     const supplies = state.resources?.[id]?.supplies ?? 0;
@@ -1400,6 +1416,7 @@ els.canvas.addEventListener('mouseleave', () => { hoverCell = null; els.cellInfo
 els.canvas.addEventListener('contextmenu', e => { e.preventDefault(); deselect(); });
 els.canvas.addEventListener('click', async () => {
   if (!hoverCell || !state) return;
+  if (playback.isActive()) return; // 回放期间棋盘点击不响应（用「跳过结算」快进）。
   const unit = [...state.units.values()].find(u => u.alive && u.q === hoverCell.q && u.r === hoverCell.r);
   const hq = [...state.headquarters.values()].find(h => h.alive && h.q === hoverCell.q && h.r === hoverCell.r);
   const cp = [...state.controlPoints.values()].find(p => p.q === hoverCell.q && p.r === hoverCell.r);
@@ -1450,14 +1467,8 @@ function subscribeSse() {
   if (sse) sse.close();
   const lastSeq = state?.eventLog.at(-1)?.seq ?? 0;
   sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}`);
-  sse.onmessage = async e => {
-    const event = JSON.parse(e.data);
-    applyEvent(state, event);
-    boardAnimation.recordEvent(event, state);
-    boardAnimation.syncState(state, { animate: event.type !== 'game_start' });
-    await refreshAdjudication();
-    drawBoard();
-    renderSidebar();
+  sse.onmessage = e => {
+    playback.enqueue(JSON.parse(e.data));
   };
   sse.onerror = () => statusBadge('SSE 断开', 'err');
   sse.onopen = () => statusBadge('已连接', 'ok');
@@ -1627,7 +1638,8 @@ async function startHostedGame() {
   await enterGame();
 }
 
-els.btnEndTurn.addEventListener('click', async () => { if (await apiAction(`/api/games/${gameId}/end-turn`, {})) afterAction(isSimultaneous() ? '本回合计划已确认，等待全员提交' : '回合结束'); });
+els.btnEndTurn.addEventListener('click', async () => { if (playback.isActive()) return; if (await apiAction(`/api/games/${gameId}/end-turn`, {})) afterAction(isSimultaneous() ? '本回合计划已确认，等待全员提交' : '回合结束'); });
+els.btnSkipReplay?.addEventListener('click', () => playback.skip());
 els.btnRefresh.addEventListener('click', async () => { await loadFullState(); drawBoard(); renderSidebar(); toast('状态已刷新', 'ok'); });
 els.btnCreate.addEventListener('click', async () => {
   els.btnCreate.disabled = true;

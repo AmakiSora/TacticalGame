@@ -124,7 +124,7 @@ describe('simultaneous planning phase', () => {
     // AP=5：3 个单位动作 + 2 次部署。
     expect(queueMoveAction(game, a, units[0]!.id, 2, 0).ok).toBe(true);
     expect(queueMoveAction(game, a, units[1]!.id, 0, 0).ok).toBe(true);
-    expect(queueMoveAction(game, a, units[2]!.id, 2, 2).ok).toBe(true);
+    expect(queueMoveAction(game, a, units[2]!.id, 2, 1).ok).toBe(true);
     expect(queueDeployAction(game, a, 'infantry', hq.id, 4, 0).ok).toBe(true);
     expect(queueDeployAction(game, a, 'infantry', hq.id, 5, -1).ok).toBe(true);
     expect(queueDeployAction(game, a, 'infantry', hq.id, 4, 1))
@@ -149,7 +149,7 @@ describe('simultaneous planning phase', () => {
     const { game } = createStandoffGame();
     const a = game.turn.turnOrder[0]!;
     const first = unitAt(game, a, 4, 0);
-    const second = unitAt(game, a, 4, -1);
+    const second = unitAt(game, a, 4, 1);
     expect(queueMoveAction(game, a, first.id, 3, 0).ok).toBe(true);
     expect(queueMoveAction(game, a, second.id, 3, 0))
       .toMatchObject({ ok: false, code: 'cell_occupied' });
@@ -369,12 +369,12 @@ describe('simultaneous resolution', () => {
     // 重装不再是初始兵种：现场把一个步兵转成重装。
     const heavy = game.units.find(u => u.owner === a && u.type === 'infantry')!;
     heavy.type = 'heavy';
-    place(heavy, 1, -1);
-    // 地图阻挡格 (2,-1) 与 (1,-1) 相邻。
-    expect(getTerrain(game, 2, -1)).toBe('blocker');
-    expect(queueDemolishAction(game, a, heavy.id, 2, -1).ok).toBe(true);
+    place(heavy, 3, 1);
+    // 地图阻挡格 (3,2) 与 (3,1) 相邻。
+    expect(getTerrain(game, 3, 2)).toBe('blocker');
+    expect(queueDemolishAction(game, a, heavy.id, 3, 2).ok).toBe(true);
     commitAll(game, bus, [a, game.turn.turnOrder[1]!]);
-    expect(getTerrain(game, 2, -1)).toBe('plain');
+    expect(getTerrain(game, 3, 2)).toBe('plain');
     expect(events(game, 'demolish')).toHaveLength(1);
   });
 
@@ -606,9 +606,9 @@ describe('unit shape overhaul (line / arc / lock / area heal)', () => {
     const runner = game.units.find(u => u.owner === b && u.type === 'scout')!;
     place(ranger, 0, 0);
     place(runner, 3, 0);
-    // 锁定射程边缘的目标；runner 全速逃离到距离 4 的 (3,-4) → 锁定失效。
+    // 锁定射程边缘的目标；runner 全速逃离到距离 4 的 (4,-3)（侦察移动力 3 内可达）→ 锁定失效。
     expect(queueAttackAction(game, a, ranger.id, 3, 0).ok).toBe(true);
-    expect(queueMoveAction(game, b, runner.id, 3, -4).ok).toBe(true);
+    expect(queueMoveAction(game, b, runner.id, 4, -3).ok).toBe(true);
     commitAll(game, bus, [a, b]);
     const attacks = events(game, 'attack');
     expect(attacks).toHaveLength(1);

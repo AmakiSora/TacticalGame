@@ -116,10 +116,34 @@ describe('simultaneous mode API', () => {
   it('queues actions via existing endpoints and echoes the queue', async () => {
     const { app, gameId, seats } = await createSimultaneousGame();
     try {
-      const state = await getState(app, gameId, seats[0]!.token);
-      const { unitId, hq } = firstInfantryNearHq(state, seats[0]!.id);
+      // 当前 standoff 出生布局占满总部的所有相邻格（首回合无处部署）：
+      // 先花一回合把踩在部署位上的步兵挪开，第二轮再验证 /deploy 的排队与撤回。
+      let state = await getState(app, gameId, seats[0]!.token);
+      const { unitId } = firstInfantryNearHq(state, seats[0]!.id);
+      const mover = state.units.find(u => u.id === unitId)!;
+      const moveTarget = emptyNeighbor(state, mover);
+      expect(moveTarget).not.toBeNull();
+      const move = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/move`,
+        headers: { 'x-player-token': seats[0]!.token },
+        payload: { unitId, q: moveTarget!.q, r: moveTarget!.r },
+      });
+      expect(move.statusCode).toBe(200);
+      for (const seat of seats) {
+        const commit = await app.inject({
+          method: 'POST',
+          url: `/api/games/${gameId}/end-turn`,
+          headers: { 'x-player-token': seat.token },
+          payload: {},
+        });
+        expect(commit.statusCode).toBe(200);
+      }
+      state = await getState(app, gameId, seats[0]!.token);
+      expect(state.turn.roundNumber).toBe(2);
+
+      const hq = state.headquarters[seats[0]!.id]!;
       const target = emptyNeighbor(state, hq);
-      expect(target).not.toBeNull();
       const deploy = await app.inject({
         method: 'POST',
         url: `/api/games/${gameId}/deploy`,

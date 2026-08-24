@@ -64,6 +64,19 @@ describe('simultaneous mode setup', () => {
     const start = game.events.find(e => e.type === 'game_start')!;
     expect(start.payload.mode).toBe('simultaneous');
     expect(start.payload.firstPlayer).toBeNull();
+    expect(game.config.units).toMatchObject({
+      infantry: { hp: 90, attack: 31, defense: 7, cost: 55 },
+      scout: { hp: 60, cost: 42 },
+      heavy: { hp: 140, attack: 40, defense: 9, cost: 100 },
+      ranger: { hp: 68, attack: 38, cost: 80 },
+      support: { hp: 76, healPower: 20, cost: 68 },
+    });
+    expect(game.config.balance).toMatchObject({
+      startingSupplies: 120,
+      baseIncome: 8,
+      controlPointIncome: 8,
+      adjudicationWeights: { armyValue: 0.35, supplies: 0.25, effectiveActions: 6 },
+    });
   });
 
   it('supports the 6-player symmetric layout', () => {
@@ -137,7 +150,8 @@ describe('simultaneous planning phase', () => {
     for (const unit of game.units.filter(u => u.owner === a)) place(unit, 1, 3);
     // 让 a 暂时持有 cp_1 (3,0)，用它的六个邻格作为部署位。
     game.controlPoints.find(point => point.id === 'cp_1')!.owner = a;
-    // 补给 150，步兵 45：第 4 次部署（累计 180）必须被拒绝。
+    // 临时补给 170，步兵 55：第 4 次部署（累计 220）必须被拒绝。
+    game.resources[a]!.supplies = 170;
     expect(queueDeployAction(game, a, 'infantry', 'cp_1', 4, 0).ok).toBe(true);
     expect(queueDeployAction(game, a, 'infantry', 'cp_1', 4, -1).ok).toBe(true);
     expect(queueDeployAction(game, a, 'infantry', 'cp_1', 3, -1).ok).toBe(true);
@@ -228,6 +242,8 @@ describe('simultaneous resolution', () => {
     expect(attacks[0]!.payload.aimQ).toBe(0);
     expect(attacks[0]!.payload.aimR).toBe(0);
     expect(target.hp).toBeLessThan(hpBefore);
+    expect(game.players[a]!.stats.actionMerit)
+      .toBe(Math.ceil((attacks[0]!.payload.actualDamage as number) / 10));
   });
 
   it('misses when the target moves away and hits a unit moving into the attacked cell', () => {
@@ -396,9 +412,9 @@ describe('simultaneous resolution', () => {
     const deploys = events(game, 'deploy');
     expect(deploys).toHaveLength(0);
     expect(events(game, 'action_failed').filter(e => e.payload.type === 'deploy')).toHaveLength(2);
-    // 部署失败全额退还；回合边界仍发放收入（基础 15）。
-    expect(game.resources[a]!.supplies).toBe(suppliesA + 15);
-    expect(game.resources[b]!.supplies).toBe(suppliesB + 15);
+    // 部署失败全额退还；回合边界仍发放收入（基础 8）。
+    expect(game.resources[a]!.supplies).toBe(suppliesA + 8);
+    expect(game.resources[b]!.supplies).toBe(suppliesB + 8);
     expect(game.units).toHaveLength(6);
   });
 
@@ -427,9 +443,9 @@ describe('simultaneous resolution', () => {
     expect(unitA.hasMoved).toBe(false);
     expect(unitA.hasActed).toBe(false);
     expect(game.plan).toEqual({ queues: {}, committed: [] });
-    // a 占领了 cp_1：收入 = 基础 15 + 控制点 12；b 只有基础收入。
-    expect(game.resources[a]!.supplies).toBe(startSupplies + 27);
-    expect(game.resources[b]!.supplies).toBe(startSupplies + 15);
+    // a 占领了 cp_1：收入 = 基础 8 + supply 据点 8；b 只有基础收入。
+    expect(game.resources[a]!.supplies).toBe(startSupplies + 16);
+    expect(game.resources[b]!.supplies).toBe(startSupplies + 8);
     expect(events(game, 'round_end')).toHaveLength(1);
     expect(events(game, 'round_start')).toHaveLength(1);
     expect(events(game, 'round_resolved')).toHaveLength(1);
@@ -443,7 +459,7 @@ describe('simultaneous resolution', () => {
     const { game } = createStandoffGame();
     expect(events(game, 'income')).toHaveLength(0);
     const [a] = game.turn.turnOrder as [PlayerId, PlayerId];
-    expect(game.resources[a]!.supplies).toBe(150);
+    expect(game.resources[a]!.supplies).toBe(120);
   });
 
   it('adjudicates at the turn limit after the final resolution', () => {

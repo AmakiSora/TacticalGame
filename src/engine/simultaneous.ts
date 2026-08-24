@@ -19,7 +19,7 @@ import { computeDamage } from './combat.js';
 import { getCellOccupant, getTerrain } from './validation.js';
 import { createUnitFromConfig } from '../state/store.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
-import { ACTION_MERIT, addActionMerit, effectActionMerit } from './actionScore.js';
+import { ACTION_MERIT, addActionMerit, attackActionMerit, effectActionMerit } from './actionScore.js';
 import {
   activePlayerIds, adjudicateAtTurnLimit, captureControlPoints, collectIncome,
   endGame, grantComebackSupplies, markPlayerEliminated, repairFromControlPoints, resetActions,
@@ -393,7 +393,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
         const stats = game.players[strike.owner]?.stats;
         if (stats) stats.headquartersDamage += actualDamage;
       }
-      addActionMerit(game, strike.owner, effectActionMerit(actualDamage));
+      addActionMerit(game, strike.owner, attackActionMerit(game, actualDamage));
       appendEvent(game, bus, 'attack', {
         owner: strike.owner, attackerId: strike.attacker.id,
         q: entity.q, r: entity.r, hit: true,

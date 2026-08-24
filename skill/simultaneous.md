@@ -102,20 +102,21 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
 - Radius-5 hexagon (~91 cells), six-fold symmetric. `layouts`: 2 players opposite corners,
   3 alternating, 6 all. Spawn: HQ + 2 infantry + 1 scout — **heavy, ranger and support are
   deploy-only** on this map; your composition is an economy decision.
-- Control points: center `cp_center` + one per corner axis (`cp_1`..`cp_6`), untyped
-  (flat income). The center is the flashpoint for prediction-fire brawls.
+- Control points: center `cp_center` (`repair`) + one `supply` point per corner axis
+  (`cp_1`..`cp_6`). The center is the flashpoint for prediction-fire brawls.
 - Roster (per-map numbers — always re-read `config.units`; healing uses `healRange` when configured and otherwise falls back to `attackRange`):
   | unit | HP | atk | def | move | range | shape / ability |
   |---|---:|---:|---:|---:|---:|---|
-  | infantry | 100 | 32 | 8 | 2 | 2 | `line` 2 — 直线轰击前方两格 |
-  | scout | 65 | 16 | 4 | 4 | 1 | `single` — 单格，快速占点 |
-  | heavy | 150 | 38 | 10 | 2 | 1 | `arc` — 横扫周围三格扇形 |
-  | ranger | 72 | 36 | 3 | 2 | 3 | `single` + **锁定**（未逃出射程必命中） |
-  | support | 82 | 10 | 5 | 2 | 2 | `healShape` `arc` — 区域治疗三格 |
+  | infantry | 90 | 31 | 7 | 2 | 2 | `line` 2 — 直线轰击前方两格；费用55 |
+  | scout | 60 | 16 | 4 | 3 | 1 | `single` — 单格，快速占点；费用42 |
+  | heavy | 140 | 40 | 9 | 2 | 1 | `arc` — 横扫周围三格扇形；费用100 |
+  | ranger | 68 | 38 | 3 | 2 | 3 | `single` + **锁定**（未逃出射程必命中）；费用80 |
+  | support | 76 | 10 | 5 | 2 | 2 | `healShape` `arc` — 区域治疗三格，治疗力20；费用68 |
   HQ: HP 200, defense 6.
-- Balance: `startingSupplies 150`, `baseIncome 15`, `controlPointIncome 12`, `actionsPerTurn 5`,
-  `maxTurns 15`, comeback supplies from round 4 (40% gap → +20/round). Adjudication weights
-  favor CPs (60) and HQ damage (5); actionScore default 2/merit point.
+- Balance: `startingSupplies 120`, `baseIncome 8`, supply control-point income 8 (repair center income 6), `actionsPerTurn 5`,
+  `maxTurns 15`, comeback supplies from round 4 (40% gap → +12/round). Adjudication weights
+  favor CPs (60) and HQ damage (5), with army/supplies at 0.35/0.25; actionScore is 6/merit point.
+  Standoff attack hits award 1 merit per 10 HP (other effect merits retain the standard 20 HP bucket).
   Move ranges are short by design (2, scouts 4): escaping a `line`/`arc` footprint or a
   ranger's lock bubble costs the mover's whole action, so pure kiting cannot win.
 - Win conditions (standard HQ rules): destroy an enemy HQ to eliminate them; last player

@@ -269,7 +269,7 @@ function restoreActionStats(game: GameState): void {
       if (typeof unitId === 'string') owner = unitOwners.get(unitId) ?? null;
     }
     if (owner) {
-      const merit = actionMeritForEvent(event.type, payload);
+      const merit = actionMeritForEvent(event.type, payload, simultaneous);
       if (merit > 0) actionMeritTotals.set(owner, (actionMeritTotals.get(owner) ?? 0) + merit);
     }
     if (!['deploy', 'move', 'attack', 'heal', 'demolish', 'action_failed'].includes(event.type)) continue;

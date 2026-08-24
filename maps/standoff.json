@@ -17,11 +17,6 @@
       "terrain": "blocker"
     },
     {
-      "q": -4,
-      "r": 2,
-      "terrain": "blocker"
-    },
-    {
       "q": -3,
       "r": -2,
       "terrain": "blocker"
@@ -38,32 +33,12 @@
     },
     {
       "q": -2,
-      "r": -2,
-      "terrain": "blocker"
-    },
-    {
-      "q": -2,
-      "r": 4,
-      "terrain": "blocker"
-    },
-    {
-      "q": -2,
       "r": 5,
       "terrain": "blocker"
     },
     {
       "q": 2,
       "r": -5,
-      "terrain": "blocker"
-    },
-    {
-      "q": 2,
-      "r": -4,
-      "terrain": "blocker"
-    },
-    {
-      "q": 2,
-      "r": 2,
       "terrain": "blocker"
     },
     {
@@ -79,11 +54,6 @@
     {
       "q": 3,
       "r": 2,
-      "terrain": "blocker"
-    },
-    {
-      "q": 4,
-      "r": -2,
       "terrain": "blocker"
     },
     {
@@ -150,12 +120,12 @@
   ],
   "units": {
     "infantry": {
-      "hp": 100,
-      "attack": 32,
-      "defense": 8,
+      "hp": 90,
+      "attack": 31,
+      "defense": 7,
       "moveRange": 2,
       "attackRange": 2,
-      "cost": 45,
+      "cost": 55,
       "canCapture": true,
       "attackShape": {
         "type": "line",
@@ -163,45 +133,45 @@
       }
     },
     "scout": {
-      "hp": 65,
+      "hp": 60,
       "attack": 16,
       "defense": 4,
       "moveRange": 3,
       "attackRange": 1,
-      "cost": 38,
+      "cost": 42,
       "canCapture": true
     },
     "heavy": {
-      "hp": 150,
-      "attack": 38,
-      "defense": 10,
+      "hp": 140,
+      "attack": 40,
+      "defense": 9,
       "moveRange": 2,
       "attackRange": 1,
-      "cost": 92,
+      "cost": 100,
       "canCapture": false,
       "attackShape": {
         "type": "arc"
       }
     },
     "ranger": {
-      "hp": 72,
-      "attack": 36,
+      "hp": 68,
+      "attack": 38,
       "defense": 3,
       "moveRange": 2,
       "attackRange": 3,
-      "cost": 72,
+      "cost": 80,
       "canCapture": false,
       "attackLock": true
     },
     "support": {
-      "hp": 82,
+      "hp": 76,
       "attack": 10,
       "defense": 5,
       "moveRange": 2,
       "attackRange": 2,
-      "cost": 60,
+      "cost": 68,
       "canCapture": false,
-      "healPower": 22,
+      "healPower": 20,
       "healShape": {
         "type": "arc"
       }
@@ -212,9 +182,9 @@
     "defense": 6
   },
   "balance": {
-    "startingSupplies": 150,
-    "baseIncome": 15,
-    "controlPointIncome": 12,
+    "startingSupplies": 120,
+    "baseIncome": 8,
+    "controlPointIncome": 8,
     "damageVarianceRange": 3,
     "minimumDamage": 1,
     "healVarianceRange": 6,
@@ -224,28 +194,28 @@
       "enemyHqDamage": 5,
       "ownHqHp": 1,
       "controlPoint": 60,
-      "armyValue": 1,
-      "supplies": 1,
-      "effectiveActions": 2
+      "armyValue": 0.35,
+      "supplies": 0.25,
+      "effectiveActions": 6
     },
     "comebackSupply": {
       "startRound": 4,
       "scoreGapPercent": 40,
-      "amountPerRound": 20
+      "amountPerRound": 12
     },
     "controlPointTypes": {
       "supply": {
-        "income": 12,
+        "income": 8,
         "deployDiscount": 0,
         "repairAmount": 0
       },
       "forward_base": {
-        "income": 8,
+        "income": 6,
         "deployDiscount": 8,
         "repairAmount": 0
       },
       "repair": {
-        "income": 8,
+        "income": 6,
         "deployDiscount": 0,
         "repairAmount": 10
       }

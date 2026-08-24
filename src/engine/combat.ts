@@ -7,7 +7,7 @@ import { consumeAction, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
 import { eliminatePlayer } from './engine.js';
 import { isArtilleryDanger } from './artillery.js';
-import { addActionMerit, effectActionMerit } from './actionScore.js';
+import { addActionMerit, attackActionMerit, effectActionMerit } from './actionScore.js';
 
 type Target =
   | { kind: 'unit'; entity: Unit }
@@ -69,7 +69,7 @@ export function attackTarget(
   if (target.kind === 'headquarters' && game.players[owner]) {
     game.players[owner]!.stats.headquartersDamage += actualDamage;
   }
-  addActionMerit(game, owner, effectActionMerit(actualDamage));
+  addActionMerit(game, owner, attackActionMerit(game, actualDamage));
   attacker.hasActed = true;
   appendEvent(game, bus, 'attack', {
     owner,

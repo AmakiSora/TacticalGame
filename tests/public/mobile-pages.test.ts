@@ -179,6 +179,33 @@ describe('mobile website pages', () => {
     expect(source).not.toContain('const tokenQuery = myToken');
   });
 
+  it('keeps the add-RL-AI lobby flow aligned across desktop and mobile clients', () => {
+    const desktopHtml = read('public/play.html');
+    const desktopJs = read('public/play.js');
+    const mobileHtml = read('public/play-m.html');
+    const mobileJs = read('public/play-m.js');
+
+    for (const source of [desktopHtml, mobileHtml]) {
+      for (const id of ['bot-dialog', 'bot-dialog-backdrop', 'bot-name', 'bot-model', 'btn-bot-confirm', 'btn-bot-cancel']) {
+        expect(source).toContain(`id="${id}"`);
+      }
+    }
+    for (const source of [desktopJs, mobileJs]) {
+      for (const marker of [
+        'data-add-bot',
+        'bot-dialog',
+        '/api/rl/models',
+        '/bots',
+        'function ensureBotModels',
+        'function openBotDialog',
+        'function closeBotDialog',
+        'async function confirmAddBot',
+      ]) {
+        expect(source).toContain(marker);
+      }
+    }
+  });
+
   it('keeps spectator scoring and control-token settings on mobile', () => {
     const html = read('public/spectator-m.html');
     const source = read('public/spectator-m.js');

@@ -2,6 +2,13 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.4.0
+
+- 新增**一键强化学习 AI 玩家**（房主专用）：玩家页「等待开局」列表新增「+ 添加 AI」入口（仅房间创建者可见，加入者与已开局视图不显示），点击弹出对话框——可自定义 AI 名称（默认「强化AI」，30 字上限）并从下拉框选择 `rl/models/` 下的训练模型（按修改时间新者优先）；确认后 AI 以普通座位身份加入大厅（`POST /api/games/:id/bots`，`X-Host-Token` 鉴权，token 仅服务器持有、任何响应不回传），房主点击开始对局后由服务器自动拉起 `rl/run_model.py` 子进程代打该座位直至终局，无需再手动输入命令行。桌面 `play.html/play.js` 与移动端 `play-m.html/play-m.js` 双端同步实现（移动端弹框为底部抽屉样式），踢出 AI 座位会同步清理其登记信息、删除对局会终止运行中的 AI 进程。
+- 服务端新增 `src/api/bots.ts`：启动时扫描并缓存模型列表（`GET /api/rl/models` 公开返回文件名、修改时间、动作空间大小与解析出的 python 路径；每次请求重新扫描，新训模型无需重启即可出现在前端下拉框）；添加 AI 时校验大厅阶段（409 `game_already_started`）、双人顺序对局限制（400 `bot_not_supported`——同时模式无 `currentPlayerId` 会让 runner 空转、且 runner 仅支持 `player_a/player_b` 两个座位）、模型动作空间兼容性（读取模型 zip 内 SB3 元数据中的 Discrete 动作空间，不等于当前环境的 54 时拒绝并提示，旧 v2.0 模型不再能误选导致 AI 启动即崩溃）；开始对局路由在 `startGame` 成功后 fire-and-forget 拉起全部登记 AI（`cwd=仓库根`、隐藏窗口、stdout/stderr 经 readline 转入 pino 日志且不打 argv 防 token 泄漏、spawn 失败仅记日志不影响开局）；新增错误码 `bot_not_supported` / `model_not_found`（均映射 400）。已知边界：AI 注册表为内存态，服务器重启后恢复的对局中 AI 座位不会再行动。
+- 前端模型下拉框按服务端返回的 `requiredActionSpace` 过滤不兼容模型（无法解析动作空间的模型保留展示、交由 run_model.py 启动后的版本守卫兜底报错）；弹框支持 Esc / 点击遮罩 / 取消按钮三种关闭方式，「确定」期间防重复提交，成功后即时刷新大厅列表并 toast 提示。
+- 测试：新增 `tests/api/bots.test.ts`（模型列表接口形状与排序、未带/错 token 401、未知模型 400、成功添加且响应不含座位 token、同时模式与多人大厅 400 `bot_not_supported`、开局后 409、踢出后可重加的注册表清理）；`tests/public/mobile-pages.test.ts` 新增桌面/移动双端「添加 AI」功能标记一致性断言（`data-add-bot`、弹框元素 id、`/api/rl/models`、`/bots` 等）。
+
 ## 3.3.3
 
 - standoff「对峙之地」地形重构（六重对称障碍群）：移除中央区域原有的 6 格环形障碍，中心高地完全开阔、无掩体可依托；在每个出生扇区外侧新增一组 3 格障碍（六重对称共 18 格），遮蔽相邻出生位之间的沿边走廊与直通路线，开局抢点路径随出生方向产生差异；六个出生位的起始单位站位随之微调避开新障碍格（构成不变：每出生位 2 步兵 + 1 侦察）。

@@ -12,9 +12,10 @@ import {
 import { authorizeControlRequest } from './controlAuth.js';
 import { listMaps } from '../config/loader.js';
 import { isPlayerId } from '../types.js';
-import type { GameState } from '../types.js';
+import type { GameState, PlayerId } from '../types.js';
+import { launchBotsForGame, removeBotRecord, clearBotsForGame } from './bots.js';
 
-function lobbySummary(game: GameState) {
+export function lobbySummary(game: GameState) {
   const players = joinedPlayerIds(game).map(id => ({
     id, name: game.players[id]!.name, status: game.players[id]!.status,
   }));
@@ -94,6 +95,10 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const result = startGame(game, globalEventBus);
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     globalStore.persist(game);
+    // 对局开始后拉起已登记的强化学习 AI（fire-and-forget，失败不影响开局）。
+    const address = req.server.server.address();
+    const port = address && typeof address === 'object' ? address.port : Number(process.env.PORT) || 3100;
+    launchBotsForGame(`http://127.0.0.1:${port}`, req.server.log, game);
     return { ok: true, game: sanitizeGameForResponse(game) };
   });
 
@@ -116,6 +121,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!isPlayerId(req.params.playerId) || !game.players[req.params.playerId] || !removeLobbyPlayer(game, req.params.playerId)) {
       return reply.code(400).send({ error: 'invalid lobby player', code: 'invalid_move' });
     }
+    removeBotRecord(game.id, req.params.playerId as PlayerId);
     appendEvent(game, globalEventBus, 'player_left', { playerId: req.params.playerId, reason: 'host' });
     globalStore.persist(game);
     return { ok: true, lobby: lobbySummary(game) };
@@ -196,6 +202,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!globalStore.get(req.params.id)) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
     globalStore.delete(req.params.id);
     globalEventBus.clear(req.params.id);
+    clearBotsForGame(req.params.id);
     return { ok: true };
   });
 

@@ -20,6 +20,8 @@ const errorStatus: Record<string, number> = {
   already_committed: 409,
   not_simultaneous_game: 400,
   unsupported_player_count: 400,
+  bot_not_supported: 400,
+  model_not_found: 400,
   insufficient_supplies: 400,
   action_limit_reached: 429,
 };

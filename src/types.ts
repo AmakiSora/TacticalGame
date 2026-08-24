@@ -297,4 +297,6 @@ export type ApiErrorCode =
   | 'action_limit_reached'
   | 'invalid_demolish'
   | 'not_simultaneous_game'
-  | 'already_committed';
+  | 'already_committed'
+  | 'bot_not_supported'
+  | 'model_not_found';

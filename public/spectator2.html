@@ -460,6 +460,21 @@
     .turn-round { font-size: 11px; letter-spacing: 2px; color: var(--ink-faint); font-weight: 800; text-transform: uppercase; }
     .turn-count { font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .turn-body { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+    .turn-commit-status { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.10); }
+    .turn-commit-count { display: block; color: var(--ink-faint); font-size: 10px; letter-spacing: 1px; margin-bottom: 6px; }
+    .turn-commit-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .turn-commit-tag { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-dim); font-size: 10px; line-height: 1; }
+    .turn-commit-icon { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 50%; font-size: 10px; line-height: 1; font-weight: 900; }
+    .turn-commit-tag.is-committed .turn-commit-icon { background: rgba(255,255,255,.08); color: currentColor; }
+    .turn-commit-tag.is-pending { opacity: .38; }
+    .turn-commit-tag.player-a { color: #66ccff; }
+    .turn-commit-tag.player-b { color: #ff9966; }
+    .turn-commit-tag.player-c { color: #9fdf6f; }
+    .turn-commit-tag.player-d { color: #d98cff; }
+    .turn-commit-tag.player-e { color: #ffd166; }
+    .turn-commit-tag.player-f { color: #72e0d1; }
+    .turn-commit-tag.player-g { color: #f27a9a; }
+    .turn-commit-tag.player-h { color: #a7b7ff; }
     .turn-player-label { font-size: 11px; color: var(--ink-faint); letter-spacing: 1px; margin-bottom: 3px; }
     .result-note {
       margin-top: 10px; padding: 8px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 700;
@@ -1019,6 +1034,7 @@
         currentPlayerId: null, currentOwner: null, turnOrder: [],
         phase: 'waiting_command', actionsUsed: 0, actionsUsedByPlayer: {},
       },
+      plan: { committed: [] },
       winner: null,
       result: null,
       artillery: null,
@@ -1086,7 +1102,8 @@
         s.turn.turnNumber = 1;
         s.turn.phase = 'active';
         s.turn.actionsUsed = 0;
-        s.turn.actionsUsedByPlayer = {};
+      s.turn.actionsUsedByPlayer = {};
+      s.plan = { committed: [] };
         s.map = cloneMapPayload(p.map);
         s.cells = s.map.cells || [];
         s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
@@ -1208,6 +1225,7 @@
         s.turn.turnNumber = s.turn.roundNumber;
         s.turn.actionsUsed = 0;
         s.turn.actionsUsedByPlayer = {};
+        s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : [] };
         if (gameConfig?.mode === 'simultaneous') {
           s.turn.currentPlayerId = null;
           s.turn.currentOwner = null;
@@ -1215,7 +1233,10 @@
         for (const u of s.units.values()) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
         break;
       case 'plan_committed':
+        s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : (s.plan?.committed || []) };
+        break;
       case 'round_resolved':
+        s.plan = { committed: [] };
         // 同时模式的计划期与结算汇总事件：不驱动棋盘，仅入日志。
         break;
       case 'action_failed':
@@ -2415,6 +2436,7 @@
     const used = state.turn.actionsUsed ?? 0;
     const apRatio = maxActions && !isSimultaneousReplay() ? Math.min(1, used / maxActions) : 0;
     const apText = isSimultaneousReplay() ? replayActionUsageText() : `${used}/${maxActions}`;
+    const commitStatus = isSimultaneousReplay() ? committedStatusHtml() : '';
     turnInfoEl.innerHTML = `<div class="turn-card o-${ownerClass(owner)}">
       <div class="turn-round">回合 ROUND</div>
       <strong class="turn-count">${esc(turnProgressLabel())}</strong>
@@ -2425,6 +2447,7 @@
         </div>
         ${maxActions ? `<div class="ap-ring" style="--p:${apRatio}" title="行动点 ${esc(apText)}"><span>${esc(apText)}</span></div>` : ''}
       </div>
+      ${commitStatus}
       ${state.result ? `<div class="result-note">${esc(resultText(state.result))}</div>` : ''}
     </div>`;
     renderWinnerBanner();
@@ -2459,6 +2482,14 @@
       eventsEl.appendChild(li);
     });
     scrollActiveEvent();
+  }
+
+  function committedStatusHtml() {
+    const players = joinedPlayerIds().filter(id => state.players?.[id]?.status !== 'eliminated');
+    const committed = new Set((state?.plan?.committed || []).filter(id => players.includes(id)));
+    if (!players.length) return '';
+    const tags = players.map(id => `<span class="turn-commit-tag ${ownerClass(id)}${committed.has(id) ? ' is-committed' : ' is-pending'}" title="${esc(playerName(id))}"><span class="turn-commit-icon" aria-hidden="true">${committed.has(id) ? '✓' : ''}</span><span>${esc(playerLabel(id))}</span></span>`).join('');
+    return `<div class="turn-commit-status" aria-label="计划提交状态"><span class="turn-commit-count">${committed.size}/${players.length} 已提交</span><div class="turn-commit-tags">${tags}</div></div>`;
   }
   function scrollActiveEvent() {
     const eventsPage = document.querySelector('.tab-page[data-page="events"]');

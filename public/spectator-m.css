@@ -657,6 +657,21 @@ main {
   border-left: 3px solid #7f98a9;
   border-radius: 7px;
 }
+.turn-commit-status { width: 100%; margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(160,190,220,.14); }
+.turn-commit-count { display: block; color: #a9bac8; font-size: 10px; letter-spacing: .04em; margin-bottom: 5px; }
+.turn-commit-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.turn-commit-tag { display: inline-flex; align-items: center; gap: 4px; color: #cfe4f3; font-size: 10px; line-height: 1; }
+.turn-commit-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 50%; font-size: 10px; line-height: 1; font-weight: 900; }
+.turn-commit-tag.is-committed .turn-commit-icon { background: rgba(255,255,255,.08); color: currentColor; }
+.turn-commit-tag.is-pending { opacity: .38; }
+.turn-commit-tag.player-a { color: #66ccff; }
+.turn-commit-tag.player-b { color: #ff9966; }
+.turn-commit-tag.player-c { color: #9fdf6f; }
+.turn-commit-tag.player-d { color: #d98cff; }
+.turn-commit-tag.player-e { color: #ffd166; }
+.turn-commit-tag.player-f { color: #72e0d1; }
+.turn-commit-tag.player-g { color: #f27a9a; }
+.turn-commit-tag.player-h { color: #a7b7ff; }
 .turn-card.player-a { border-left-color: #66ccff; }
 .turn-card.player-b { border-left-color: #ff9966; }
 .turn-card.player-c { border-left-color: #9fdf6f; }

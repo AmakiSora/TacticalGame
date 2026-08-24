@@ -1102,6 +1102,14 @@ function actionsPerTurn() { return gameConfig?.balance?.actionsPerTurn ?? 0; }
 function isSimultaneous() { return gameConfig?.mode === 'simultaneous'; }
 function myPlanQueue() { return state?.plan?.myQueue ?? []; }
 function committedList() { return state?.plan?.committed ?? []; }
+function committedStatusHtml() {
+  if (!isSimultaneous()) return '';
+  const players = joinedPlayerIds().filter(id => state.players?.[id]?.status !== 'eliminated');
+  const committed = new Set(committedList().filter(id => players.includes(id)));
+  if (!players.length) return '';
+  const tags = players.map(id => `<span class="turn-commit-tag ${playerClass(id)}${committed.has(id) ? ' is-committed' : ' is-pending'}" title="${esc(playerName(id))}"><span class="turn-commit-icon" aria-hidden="true">${committed.has(id) ? '✓' : ''}</span><span>${esc(String(id).replace(/^player_/, '').toUpperCase())}</span></span>`).join('');
+  return `<div class="turn-commit-status" aria-label="计划提交状态"><span class="turn-commit-count">${committed.size}/${players.length} 已提交</span><div class="turn-commit-tags">${tags}</div></div>`;
+}
 function iCommitted() { return committedList().includes(myPlayer); }
 /** 当下是否允许我方操作：顺序模式=轮到我；同时模式=计划阶段且我未确认。 */
 function canActNow() {
@@ -1306,10 +1314,11 @@ function renderSidebar() {
   const replaying = playback.isActive();
   const owner = simultaneous ? null : (state.turn.currentPlayerId || state.turn.currentOwner);
   const mine = simultaneous ? (!iCommitted() && !state.winner && !replaying) : owner === myPlayer;
+  const commitStatus = committedStatusHtml();
   els.turnBadge.innerHTML = `
     <span class="turn-kicker">${simultaneous ? (replaying ? '结算回放中…' : (iCommitted() ? '已确认 · 等待全员' : '同时计划阶段')) : (mine ? '你的回合' : '等待中')}</span>
     <strong class="turn-count">${esc(turnProgressLabel())}</strong>
-    <span class="turn-player">${simultaneous ? `${committedList().length}/${joinedPlayerIds().filter(id => state.players[id]?.status === 'active').length} 已确认` : esc(playerName(owner) || '—')}</span>`;
+    <span class="turn-player">${simultaneous ? `${committedList().length}/${joinedPlayerIds().filter(id => state.players[id]?.status === 'active').length} 已确认` : esc(playerName(owner) || '—')}</span>${commitStatus}`;
   els.turnBadge.classList.toggle('my-turn', mine);
 
   // Compact top strip: only my supplies (full multiplayer list lives in drawer)

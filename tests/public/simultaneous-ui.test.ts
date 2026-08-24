@@ -94,6 +94,19 @@ describe('simultaneous mode UI', () => {
     expect(read('public/play-m.css')).toContain('.plan-revoke');
   });
 
+  it('shows colored circular submission indicators on player and spectator turn cards', () => {
+    for (const file of [...playerClients, ...spectatorClients, 'public/spectator2.html']) {
+      const source = read(file);
+      expect(source).toContain('turn-commit-status');
+      expect(source).toContain('turn-commit-tag');
+      expect(source).toContain('is-committed');
+      expect(source).toContain('已提交');
+    }
+    for (const file of ['public/style.css', 'public/play.css', 'public/play-m.css', 'public/spectator-m.css', 'public/spectator2.html']) {
+      expect(read(file)).toContain('.turn-commit-icon');
+    }
+  });
+
   it('merges the sanitized server plan state into the local event state', () => {
     for (const file of playerClients) {
       const source = read(file);

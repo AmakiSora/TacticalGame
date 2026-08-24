@@ -298,6 +298,7 @@ function createEmptyState() {
       actionsUsed: 0,
       actionsUsedByPlayer: {},
     },
+    plan: { committed: [] },
     winner: null,
     result: null,
     artillery: null,
@@ -369,6 +370,7 @@ function applyEvent(s, ev) {
       s.turn.phase = 'active';
       s.turn.actionsUsed = 0;
       s.turn.actionsUsedByPlayer = {};
+      s.plan = { committed: [] };
       s.map = cloneMapPayload(p.map);
       s.cells = s.map.cells || [];
       s.controlPoints = new Map((p.controlPoints || []).map(cp => [cp.id, { ...cp }]));
@@ -492,6 +494,7 @@ function applyEvent(s, ev) {
       s.turn.turnNumber = s.turn.roundNumber;
       s.turn.actionsUsed = 0;
       s.turn.actionsUsedByPlayer = {};
+      s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : [] };
       if (gameConfig?.mode === 'simultaneous') {
         s.turn.currentPlayerId = null;
         s.turn.currentOwner = null;
@@ -499,7 +502,10 @@ function applyEvent(s, ev) {
       for (const u of s.units.values()) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       break;
     case 'plan_committed':
+      s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : (s.plan?.committed || []) };
+      break;
     case 'round_resolved':
+      s.plan = { committed: [] };
       // 同时模式的计划期与结算汇总事件：不驱动棋盘，仅入日志。
       break;
     case 'action_failed':
@@ -1094,11 +1100,12 @@ function renderSidebar() {
   const used = state.turn.actionsUsed ?? 0;
   const remaining = maxActions ? Math.max(0, maxActions - used) : 0;
   const exhausted = !isSimultaneousReplay() && maxActions > 0 && remaining === 0;
+  const commitStatus = isSimultaneousReplay() ? committedStatusHtml() : '';
 
   turnInfoEl.innerHTML = `
     <span class="turn-kicker">${state.result ? '已结束' : '当前回合'}</span>
     <strong class="turn-count">${esc(turnProgressLabel())}</strong>
-    <span class="turn-player">${isSimultaneousReplay() ? '同时计划阶段' : esc(playerName(owner) || '—')}</span>`;
+    <span class="turn-player">${isSimultaneousReplay() ? '同时计划阶段' : esc(playerName(owner) || '—')}</span>${commitStatus}`;
   turnInfoEl.className = `turn-badge ${ownerClass(owner)}${state.result ? ' finished' : ''}`;
 
   const actionsDisplay = document.getElementById('actions-display');
@@ -1124,6 +1131,14 @@ function renderSidebar() {
     eventsEl.appendChild(li);
   });
   syncMobileChrome();
+}
+
+function committedStatusHtml() {
+  const players = joinedPlayerIds().filter(id => state.players?.[id]?.status !== 'eliminated');
+  const committed = new Set((state?.plan?.committed || []).filter(id => players.includes(id)));
+  if (!players.length) return '';
+  const tags = players.map(id => `<span class="turn-commit-tag ${ownerClass(id)}${committed.has(id) ? ' is-committed' : ' is-pending'}" title="${esc(playerName(id))}"><span class="turn-commit-icon" aria-hidden="true">${committed.has(id) ? '✓' : ''}</span><span>${esc(playerLabel(id))}</span></span>`).join('');
+  return `<div class="turn-commit-status" aria-label="计划提交状态"><span class="turn-commit-count">${committed.size}/${players.length} 已提交</span><div class="turn-commit-tags">${tags}</div></div>`;
 }
 function syncMobileChrome() {
   const drawerRes = document.getElementById('drawer-resources');

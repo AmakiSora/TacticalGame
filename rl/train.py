@@ -1,4 +1,4 @@
-"""Train MaskablePPO locally against the random legal-action opponent.
+"""Train MaskablePPO locally against the simple rule opponent.
 
 Training calls the TypeScript engine directly, so no HTTP server is needed.
 Configuration is controlled with environment variables for fresh training,
@@ -49,11 +49,22 @@ def tensorboard_available() -> bool:
 
 
 def latest_model_path(map_id: str) -> str:
-    candidates = list(Path("rl/models").glob(f"hex_ppo_v2_{map_id}_rule_opponent_*.zip"))
-    candidates += list(Path("rl").glob(f"hex_ppo_v2_{map_id}_rule_opponent_*.zip"))
+    patterns = (
+        f"hex_ppo_{map_id}_rule_*_*_*.zip",  # v2.0.4+ 命名: hex_ppo_<地图>_<对手>_<版本>_<日期>_<步数>
+        f"hex_ppo_v2_{map_id}_rule_opponent_*.zip",  # 旧时间戳命名
+    )
+    candidates: list[Path] = []
+    for root in ("rl/models", "rl"):
+        for pattern in patterns:
+            candidates += list(Path(root).glob(pattern))
     if not candidates:
         return ""
     return str(max(candidates, key=lambda path: path.stat().st_mtime))
+
+
+def ensure_zip_suffix(path: str) -> str:
+    """sb3 的 save 只在“无扩展名”时才补 .zip，而版本号 v2.0.4 的 .4 会被误判为扩展名。"""
+    return path if path.endswith(".zip") else f"{path}.zip"
 
 
 def resolve_device() -> str:
@@ -123,9 +134,16 @@ class MaskableEvalCallback(BaseCallback):
 
 def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
+    opponent_kind = "rule"
+    # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
+    model_version = env_str("RL_MODEL_VERSION", "v2.0.4")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
-    model_path = env_str("RL_MODEL_PATH", f"rl/models/hex_ppo_v2_{map_id}_rule_opponent_{run_stamp}")
+    run_date = run_stamp[:8]
+    model_path = env_str(
+        "RL_MODEL_PATH",
+        f"rl/models/hex_ppo_{map_id}_{opponent_kind}_{model_version}_{run_date}_{total_timesteps}",
+    )
     load_path = env_str("RL_LOAD_MODEL", "")
     save_freq = env_int("RL_SAVE_FREQ", 20_000, minimum=1)
     checkpoint_dir = env_str("RL_CHECKPOINT_DIR", f"rl/checkpoints/{map_id}/{run_stamp}")
@@ -219,8 +237,9 @@ def main() -> None:
             tb_log_name=run_name,
             reset_num_timesteps=not resume,
         )
-        model.save(model_path)
-        print(f"[train] final model saved to {model_path}.zip")
+        final_model_path = ensure_zip_suffix(model_path)
+        model.save(final_model_path)
+        print(f"[train] final model saved to {final_model_path}")
         print(f"[train] checkpoints in {checkpoint_dir}/")
     finally:
         if eval_env is not None:

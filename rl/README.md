@@ -65,14 +65,21 @@ python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
 训练的主要瓶颈是 TypeScript 游戏模拟，不是神经网络；GPU 能加速 PPO 更新，但要明显
 提速还需要并行多个训练环境。
 
-新环境训练结果默认会保存为带时间戳的路径，例如：
+新环境训练结果默认按以下格式命名：
 
 ```text
-rl/models/hex_ppo_v2_default_rule_opponent_20260824-153000.zip
+hex_ppo_<地图名>_<对手类型>_<版本号>_<训练日期>_<步数>.zip
 ```
 
-这是 v2 动作空间，不能加载旧的 `hex_ppo_default_random_opponent.zip`；请从零训练
-一个新模型。
+例如：
+
+```text
+rl/models/hex_ppo_default_rule_v2.0.4_20260824_500000.zip
+```
+
+版本号具体到三级（如 `v2.0.4`），默认值与 `rl/RELEASE_NOTES.md` 顶部条目一致，
+变更训练环境时同步更新；也可用 `RL_MODEL_VERSION` 临时覆盖。这是 v2 动作空间，不能加载旧的
+`hex_ppo_default_random_opponent.zip`；请从零训练一个新模型。
 
 如果 PowerShell 之前设置过旧的 `RL_LOAD_MODEL`，先清除它：
 
@@ -83,7 +90,7 @@ Remove-Item Env:RL_LOAD_MODEL -ErrorAction SilentlyContinue
 训练脚本还支持断点续训、checkpoint 和评估：
 
 ```powershell
-$env:RL_LOAD_MODEL = "rl/hex_ppo_v2_default_rule_opponent"
+$env:RL_LOAD_MODEL = "rl/models/hex_ppo_default_rule_v2.0.4_20260824_500000"
 $env:RL_TIMESTEPS = "50000"          # 续训增加 50000 步
 $env:RL_SAVE_FREQ = "20000"           # 每 20000 步保存 checkpoint
 $env:RL_EVAL_FREQ = "10000"           # 每 10000 步评估
@@ -92,7 +99,7 @@ python rl/train.py
 ```
 
 设置 `$env:RL_LOAD_MODEL = "latest"` 会自动加载该地图最近生成的 v2 模型，并把续训结果
-保存为新的时间戳文件；`auto` 只检查当前 `RL_MODEL_PATH`。默认不会覆盖已有模型，若确实
+保存为新命名的文件；`auto` 只检查当前 `RL_MODEL_PATH`。默认不会覆盖已有模型，若确实
 要覆盖，显式设置 `$env:RL_ALLOW_OVERWRITE = "1"`。
 评估最优模型保存在 `rl/checkpoints/<map>/best/best_model.zip`。TensorBoard 是可选的：
 
@@ -111,7 +118,7 @@ $env:RL_TIMESTEPS = "100000"
 python rl/train.py
 ```
 
-默认模型会保存为带时间戳的 `rl/models/hex_ppo_v2_dual-lanes_rule_opponent_<time>.zip`，也可以指定路径：
+默认模型会保存为 `rl/models/hex_ppo_dual-lanes_rule_v2.0.4_<日期>_<步数>.zip`，也可以指定路径：
 
 ```powershell
 $env:RL_MODEL_PATH = "rl/models/dual-lanes-ppo"

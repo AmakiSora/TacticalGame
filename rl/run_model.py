@@ -17,7 +17,7 @@ from env import HexGameEnv
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="rl/hex_ppo_v2_default_rule_opponent.zip")
+    parser.add_argument("--model", default="rl/models/hex_ppo_default_rule_v2.0.4_20260824_500000.zip")
     parser.add_argument("--url", default="http://127.0.0.1:3100")
     parser.add_argument("--game", required=True)
     parser.add_argument("--token", required=True)

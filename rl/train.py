@@ -50,7 +50,7 @@ def tensorboard_available() -> bool:
 
 def latest_model_path(map_id: str) -> str:
     patterns = (
-        f"hex_ppo_{map_id}_rule_*_*_*.zip",  # v2.0.4+ 命名: hex_ppo_<地图>_<对手>_<版本>_<日期>_<步数>
+        f"hex_ppo_{map_id}_rule_*_*_*.zip",  # v2.0+ 命名: hex_ppo_<地图>_<对手>_<版本>_<日期>_<步数>
         f"hex_ppo_v2_{map_id}_rule_opponent_*.zip",  # 旧时间戳命名
     )
     candidates: list[Path] = []
@@ -63,7 +63,7 @@ def latest_model_path(map_id: str) -> str:
 
 
 def ensure_zip_suffix(path: str) -> str:
-    """sb3 的 save 只在“无扩展名”时才补 .zip，而版本号 v2.0.4 的 .4 会被误判为扩展名。"""
+    """sb3 的 save 只在“无扩展名”时才补 .zip，而版本号中的点会被误判为扩展名。"""
     return path if path.endswith(".zip") else f"{path}.zip"
 
 
@@ -100,6 +100,9 @@ class MaskableEvalCallback(BaseCallback):
             return True
         print(f"[eval] step={self.num_timesteps:>8d} playing {self.n_eval_episodes} games...", flush=True)
         rewards: list[float] = []
+        wins = 0
+        control_points: list[int] = []
+        action_totals = {"deploy": 0, "attack": 0, "move": 0, "end_turn": 0}
         for episode in range(self.n_eval_episodes):
             try:
                 observation, _ = self.eval_env.reset()
@@ -111,21 +114,37 @@ class MaskableEvalCallback(BaseCallback):
                         deterministic=True,
                         action_masks=self.eval_env.action_masks(),
                     )
-                    observation, reward, terminated, truncated, _ = self.eval_env.step(int(action))
+                    observation, reward, terminated, truncated, info = self.eval_env.step(int(action))
                     total += float(reward)
+                    action_type = info.get("action_type")
+                    if action_type in action_totals:
+                        action_totals[action_type] += 1
                     done = terminated or truncated
                 rewards.append(total)
+                base_env = self.eval_env
+                while hasattr(base_env, "env"):
+                    base_env = base_env.env
+                if base_env.state.get("winner") == base_env.owner:
+                    wins += 1
+                control_points.append(sum(p.get("owner") == base_env.owner for p in base_env.state.get("controlPoints", [])))
             except Exception as error:
                 print(f"[eval] episode {episode} failed: {error}", flush=True)
         if not rewards:
             return True
         mean_reward = float(np.mean(rewards))
+        win_rate = wins / len(rewards)
+        cp_mean = float(np.mean(control_points)) if control_points else 0.0
         is_best = mean_reward > self.best_mean_reward
         if is_best:
             self.best_mean_reward = mean_reward
             self.model.save(os.path.join(self.best_model_save_path, "best_model"))
+        self.logger.record("eval/mean_reward", mean_reward)
+        self.logger.record("eval/win_rate", win_rate)
+        self.logger.record("eval/control_points", cp_mean)
         print(
             f"[eval] step={self.num_timesteps:>8d} mean_reward={mean_reward:+.3f} "
+            f"win_rate={win_rate:.0%} cp={cp_mean:.2f} "
+            f"deploy={action_totals['deploy']} attack={action_totals['attack']} move={action_totals['move']} "
             f"over {len(rewards)} games{' <- new best' if is_best else ''}",
             flush=True,
         )
@@ -134,9 +153,10 @@ class MaskableEvalCallback(BaseCallback):
 
 def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
-    opponent_kind = "rule"
+    opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
+    opponent_kind = f"rule_{opponent_style}"
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.0.4")
+    model_version = env_str("RL_MODEL_VERSION", "v2.1.0")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -185,7 +205,7 @@ def main() -> None:
         print("[train] tensorboard 未安装,跳过 TB 日志;需要时运行: python -m pip install tensorboard")
         tb_log = None
 
-    env = ActionMasker(LocalHexGameEnv(map_id=map_id), mask_fn)
+    env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style), mask_fn)
     eval_env = None
     try:
         if resume:
@@ -195,8 +215,8 @@ def main() -> None:
             except ValueError as error:
                 if "Action spaces do not match" in str(error) or "Observation spaces do not match" in str(error):
                     raise RuntimeError(
-                        f"模型与当前 v2 环境不兼容: {load_path}。这是旧 v1 模型（Discrete(512)），"
-                        "当前环境使用 Discrete(38)，请清除 RL_LOAD_MODEL 后从零训练 v2 模型。"
+                        f"模型与当前 v2.1 环境不兼容: {load_path}。旧模型的动作空间与当前环境不同，"
+                        "请清除 RL_LOAD_MODEL 后从零训练 v2.1 模型。"
                     ) from error
                 raise
             model.tensorboard_log = tb_log
@@ -222,7 +242,7 @@ def main() -> None:
             name_prefix=Path(model_path).name,
         )]
         if eval_freq > 0:
-            eval_env = ActionMasker(LocalHexGameEnv(map_id=map_id), mask_fn)
+            eval_env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style), mask_fn)
             callbacks.append(MaskableEvalCallback(
                 eval_env,
                 eval_freq=eval_freq,

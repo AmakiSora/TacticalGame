@@ -21,8 +21,8 @@ except ImportError:  # ``python rl/train.py`` puts rl/ on sys.path.
 
 
 class LocalHexGameEnv(HexGameEnv):
-    def __init__(self, map_id: str = "default", max_steps: int = 500):
-        super().__init__(base_url="local://engine", max_steps=max_steps)
+    def __init__(self, map_id: str = "default", max_steps: int = 500, opponent_style: str = "mixed"):
+        super().__init__(base_url="local://engine", max_steps=max_steps, opponent_style=opponent_style)
         self.map_id = map_id
         root = Path(__file__).resolve().parent.parent
         npx = shutil.which("npx.cmd") or shutil.which("npx")
@@ -57,6 +57,9 @@ class LocalHexGameEnv(HexGameEnv):
         self.opponent_token = "opponent"
         self.state = self._rpc({"cmd": "reset", "mapId": self.map_id})
         self.steps = 0
+        self.unit_slots = {"player_a": {}, "player_b": {}}
+        self.action_counts = {}
+        self.active_opponent_style = self._choose_opponent_style()
         self._play_opponent_until_agent_turn()
         self.actions = self._legal_actions(self.state, PLAYER)
         self.previous_score = self._score(self.state)

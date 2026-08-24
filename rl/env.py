@@ -1,9 +1,7 @@
 """Gymnasium environment for the standard two-player REST game.
 
-This first version intentionally targets only the ``default`` map and the
-sequential (non-simultaneous) rules.  It is meant as a small, readable
-baseline for training against a random opponent before moving the simulator
-in-process for speed.
+This environment targets ordinary two-player sequential maps.  The local
+training wrapper runs the same logic against the in-process TypeScript engine.
 """
 
 from __future__ import annotations
@@ -31,8 +29,8 @@ CELL_FEATURES = 18
 GLOBAL_FEATURES = 16
 OBSERVATION_SIZE = MAX_CELLS * CELL_FEATURES + GLOBAL_FEATURES
 # Stable intent slots.  Slot numbers have the same meaning in every state:
-# 0=end turn; then 8 unit slots x 4 intents; then 5 deploy-type slots.
-MAX_UNIT_SLOTS = 8
+# 0=end turn; then 12 unit slots x 4 intents; then 5 deploy-type slots.
+MAX_UNIT_SLOTS = 12
 UNIT_INTENTS = ("move", "attack", "heal", "special")
 DEPLOY_SLOTS = UNIT_TYPES
 MAX_ACTIONS = 1 + MAX_UNIT_SLOTS * len(UNIT_INTENTS) + len(DEPLOY_SLOTS)
@@ -49,14 +47,18 @@ def distance(a: dict[str, Any], b: dict[str, Any]) -> int:
 
 
 class HexGameEnv(gym.Env):
-    """One RL player versus a random legal-action opponent."""
+    """One RL player versus a configurable goal-directed rule opponent."""
 
     metadata = {"render_modes": []}
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed"):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
+        if opponent_style not in {"mixed", "aggressive", "defensive", "economy"}:
+            raise ValueError("opponent_style must be mixed, aggressive, defensive, or economy")
+        self.opponent_style = opponent_style
+        self.active_opponent_style = opponent_style
 
         self.action_space = spaces.Discrete(MAX_ACTIONS)
         self.observation_space = spaces.Box(
@@ -76,6 +78,8 @@ class HexGameEnv(gym.Env):
         self.actions: list[tuple[str, dict[str, Any]]] = self._empty_actions()
         self.previous_score = 0.0
         self.steps = 0
+        self.unit_slots: dict[str, dict[str, int]] = {PLAYER: {}, OPPONENT: {}}
+        self.action_counts: dict[str, int] = {}
 
     def _request(
         self,
@@ -150,6 +154,9 @@ class HexGameEnv(gym.Env):
 
         self.state = self._get_state(self.player_token)
         self.steps = 0
+        self.unit_slots = {PLAYER: {}, OPPONENT: {}}
+        self.action_counts = {}
+        self.active_opponent_style = self._choose_opponent_style()
         self._play_opponent_until_agent_turn()
         self.actions = self._legal_actions(self.state, self.owner)
         self.previous_score = self._score(self.state)
@@ -172,21 +179,27 @@ class HexGameEnv(gym.Env):
             self.state = self._get_state(self.player_token)
             return self._encode_state(self.state), -0.05, self._game_over(), False, {"invalid": True}
 
+        # Attribute progress to the agent action before the opponent responds.
         self.state = self._get_state(self.player_token)
+        immediate_snapshot = self._strategic_snapshot(self.state)
+        immediate_score = self._score(self.state)
+        reward = float(np.clip((immediate_score - self.previous_score) / 100.0, -1.0, 1.0))
+        reward += self._shaped_reward(before, immediate_snapshot, action_type)
+        self.action_counts[action_type] = self.action_counts.get(action_type, 0) + 1
+
         self._play_opponent_until_agent_turn()
         self.state = self._get_state(self.player_token)
-
-        current_score = self._score(self.state)
-        reward = float(np.clip((current_score - self.previous_score) / 100.0, -1.0, 1.0))
-        reward += self._shaped_reward(before, self._strategic_snapshot(self.state), action_type)
-        self.previous_score = current_score
+        # The next baseline includes the opponent response, so it is not
+        # falsely attributed to the next agent action.
+        self.previous_score = self._score(self.state)
 
         terminated = self._game_over()
         if terminated:
             reward += 1.0 if self.state.get("winner") == self.owner else -1.0
         truncated = self.steps >= self.max_steps and not terminated
         self.actions = self._legal_actions(self.state, self.owner) if not terminated else []
-        return self._encode_state(self.state), float(np.clip(reward, -2.0, 2.0)), terminated, truncated, {}
+        info = {"action_type": action_type, "action_counts": dict(self.action_counts)}
+        return self._encode_state(self.state), float(np.clip(reward, -2.0, 2.0)), terminated, truncated, info
 
     def action_masks(self) -> np.ndarray:
         """Mask used by sb3-contrib MaskablePPO."""
@@ -259,6 +272,33 @@ class HexGameEnv(gym.Env):
     def _unit_sort_key(unit: dict[str, Any]):
         return (TYPE_INDEX.get(unit.get("type"), 99), int(unit.get("q", 0)), int(unit.get("r", 0)), -int(unit.get("hp", 0)))
 
+    def _choose_opponent_style(self) -> str:
+        if self.opponent_style != "mixed":
+            return self.opponent_style
+        return str(self.np_random.choice(("aggressive", "defensive", "economy")))
+
+    def _units_for_slots(self, state: dict[str, Any], owner: str) -> list[dict[str, Any] | None]:
+        """Keep units in stable action slots as they move or are deployed."""
+        live = [u for u in state.get("units", []) if u.get("alive") and u.get("owner") == owner]
+        slots = self.unit_slots.setdefault(owner, {})
+        live_ids = {str(unit.get("id")) for unit in live}
+        for uid in list(slots):
+            if uid not in live_ids:
+                del slots[uid]
+        used = set(slots.values())
+        for unit in sorted(live, key=self._unit_sort_key):
+            uid = str(unit.get("id"))
+            if uid not in slots and len(used) < MAX_UNIT_SLOTS:
+                slot = next(index for index in range(MAX_UNIT_SLOTS) if index not in used)
+                slots[uid] = slot
+                used.add(slot)
+        by_id = {str(unit.get("id")): unit for unit in live}
+        result: list[dict[str, Any] | None] = [None] * MAX_UNIT_SLOTS
+        for uid, slot in slots.items():
+            if uid in by_id and 0 <= slot < MAX_UNIT_SLOTS:
+                result[slot] = by_id[uid]
+        return result
+
     def _best_target(self, unit: dict[str, Any], enemies: list[dict[str, Any]], hqs: list[dict[str, Any]]):
         targets = [target for target in [*enemies, *hqs] if distance(unit, target) <= int(unit.get("attackRange", 0))]
         if not targets:
@@ -281,12 +321,33 @@ class HexGameEnv(gym.Env):
         if unit.get("hasMoved") or not (unit.get("actionSpent") or int(state.get("turn", {}).get("actionsUsed", 0)) < int(state.get("config", {}).get("balance", {}).get("actionsPerTurn", 5))):
             return None
         goal = self._movement_goal(unit, state, owner)
-        current_distance = distance(unit, goal)
-        reachable = self._reachable(cells, occupied, key(int(unit["q"]), int(unit["r"])), int(unit.get("moveRange", 0)))
-        candidates = [pos for pos in reachable if distance({"q": pos[0], "r": pos[1]}, goal) < current_distance]
-        if not candidates:
+        start = key(int(unit["q"]), int(unit["r"]))
+        move_range = int(unit.get("moveRange", 0))
+        reachable = self._reachable(cells, occupied, start, move_range)
+        if not reachable:
             return None
-        pos = min(candidates, key=lambda candidate: distance({"q": candidate[0], "r": candidate[1]}, goal))
+        # Pick the reachable square closest to the strategic goal, then
+        # reconstruct the first step along the BFS path. This permits detours
+        # around blockers/water instead of requiring direct hex-distance gain.
+        pos = min(reachable, key=lambda candidate: (distance({"q": candidate[0], "r": candidate[1]}, goal), candidate[0], candidate[1]))
+        parent = {start: None}
+        queue = deque([(start, 0)])
+        while queue:
+            current, depth = queue.popleft()
+            if current == pos:
+                break
+            if depth >= move_range:
+                continue
+            for dq, dr in HEX_DIRECTIONS:
+                nxt = (current[0] + dq, current[1] + dr)
+                if nxt in parent or nxt not in reachable and nxt != pos:
+                    continue
+                parent[nxt] = current
+                queue.append((nxt, depth + 1))
+        while parent.get(pos) not in (None, start):
+            pos = parent[pos]
+        if pos == start:
+            return None
         return {"unitId": unit["id"], "q": pos[0], "r": pos[1]}
 
     def _fixed_deploy(self, state: dict[str, Any], owner: str, unit_type: str):
@@ -330,16 +391,14 @@ class HexGameEnv(gym.Env):
             heals = [(index, action) for index, action in valid if action[0] == "heal"]
             deploys = [(index, action) for index, action in valid if action[0] == "deploy"]
             moves = [(index, action) for index, action in valid if action[0] == "move"]
-            if attacks:
-                index, (action_type, payload) = attacks[0]
-            elif heals:
-                index, (action_type, payload) = heals[0]
-            elif deploys and self.state.get("resources", {}).get(self.opponent, {}).get("supplies", 0) >= 90:
-                index, (action_type, payload) = deploys[0]
-            elif moves:
-                index, (action_type, payload) = moves[0]
-            else:
-                index, (action_type, payload) = valid[0]
+            supplies = self.state.get("resources", {}).get(self.opponent, {}).get("supplies", 0)
+            if self.active_opponent_style == "aggressive":
+                priority = [attacks, moves, deploys if supplies >= 60 else [], heals]
+            elif self.active_opponent_style == "defensive":
+                priority = [attacks, heals, deploys if supplies >= 70 else [], moves]
+            else:  # economy
+                priority = [deploys if supplies >= 90 else [], moves, attacks, heals]
+            index, (action_type, payload) = next((group[0] for group in priority if group), valid[0])
             try:
                 self._apply(action_type, payload, self.opponent_token)
             except RuntimeError as error:
@@ -352,7 +411,7 @@ class HexGameEnv(gym.Env):
         if state.get("phase") == "game_over":
             return self._empty_actions()
 
-        units = sorted([u for u in state.get("units", []) if u.get("alive") and u.get("owner") == owner], key=self._unit_sort_key)[:MAX_UNIT_SLOTS]
+        units = self._units_for_slots(state, owner)
         enemies = [u for u in state.get("units", []) if u.get("alive") and u.get("owner") != owner]
         hqs = [hq for hq in state.get("headquarters", {}).values() if hq.get("alive") and hq.get("owner") != owner]
         cells = {key(int(c["q"]), int(c["r"])): c for c in state.get("cells", [])}
@@ -371,6 +430,8 @@ class HexGameEnv(gym.Env):
             return cell is not None and cell.get("terrain", "plain") == "plain" and pos not in occupied
 
         for slot, unit in enumerate(units):
+            if unit is None:
+                continue
             base = 1 + slot * len(UNIT_INTENTS)
             if can_activate(unit):
                 move = self._fixed_move(unit, state, owner, cells, occupied)
@@ -438,18 +499,18 @@ class HexGameEnv(gym.Env):
 
             point = next((p for p in control_points if p["q"] == cell["q"] and p["r"] == cell["r"]), None)
             cp_owner = point.get("owner") if point else None
-            result[offset + 3 + (1 if cp_owner == PLAYER else 2 if cp_owner else 0)] = 1.0
+            result[offset + 3 + (1 if cp_owner == self.owner else 2 if cp_owner else 0)] = 1.0
 
             unit = next((u for u in units if u["q"] == cell["q"] and u["r"] == cell["r"]), None)
             hq = next((h for h in hqs if h["q"] == cell["q"] and h["r"] == cell["r"]), None)
             if unit:
-                result[offset + 6 + (1 if unit["owner"] == PLAYER else 2)] = 1.0
+                result[offset + 6 + (1 if unit["owner"] == self.owner else 2)] = 1.0
                 result[offset + 9 + TYPE_INDEX.get(unit.get("type"), 0)] = 1.0
                 result[offset + 14] = float(unit.get("hp", 0)) / max(1.0, float(unit.get("maxHp", 1)))
                 result[offset + 15] = float(bool(unit.get("hasMoved")))
                 result[offset + 16] = float(bool(unit.get("hasActed")))
             elif hq:
-                result[offset + 6 + (1 if hq["owner"] == PLAYER else 2)] = 1.0
+                result[offset + 6 + (1 if hq["owner"] == self.owner else 2)] = 1.0
 
         base = MAX_CELLS * CELL_FEATURES
         own = state.get("resources", {}).get(self.owner, {}).get("supplies", 0)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from pathlib import Path
 
 from sb3_contrib import MaskablePPO
 
@@ -17,7 +18,7 @@ from env import HexGameEnv
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="rl/models/hex_ppo_default_rule_v2.0.0_20260824_500000.zip")
+    parser.add_argument("--model", default="", help="模型路径；留空自动选择 rl/models 中最新的 v2.1 模型")
     parser.add_argument("--url", default="http://127.0.0.1:3100")
     parser.add_argument("--game", required=True)
     parser.add_argument("--token", required=True)
@@ -31,12 +32,19 @@ def parse_args():
 
 def main():
     args = parse_args()
-    model = MaskablePPO.load(args.model)
+    model_path = args.model
+    if not model_path:
+        candidates = list(Path("rl/models").glob("hex_ppo_*_v2.1.*_*.zip"))
+        if not candidates:
+            raise FileNotFoundError("未找到 v2.1 模型，请先训练，或通过 --model 指定模型路径")
+        model_path = str(max(candidates, key=lambda path: path.stat().st_mtime))
+        print(f"Using latest model: {model_path}")
+    model = MaskablePPO.load(model_path)
     env = HexGameEnv(args.url)
     if getattr(model.action_space, "n", None) != env.action_space.n:
         raise ValueError(
             f"模型动作空间为 {getattr(model.action_space, 'n', '?')}，当前环境需要 {env.action_space.n}; "
-            "请使用 v2 模型并从零训练。"
+            "请使用当前 v2.1 模型并从零训练。"
         )
     env.game_id = args.game
     env.player_token = args.token

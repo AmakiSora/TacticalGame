@@ -68,13 +68,13 @@ python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
 新环境训练结果默认按以下格式命名：
 
 ```text
-hex_ppo_<地图名>_<对手类型>_<版本号>_<训练日期>_<步数>.zip
+hex_ppo_<版本号>_<训练日期>_<地图名>_<对手类型>_<步数>.zip
 ```
 
 例如：
 
 ```text
-rl/models/hex_ppo_default_rule_mixed_v2.1.1_20260825_500000.zip
+rl/models/hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip
 ```
 
 版本号具体到三级（如 `v2.0.4`），默认值与 `rl/RELEASE_NOTES.md` 顶部条目一致，
@@ -91,7 +91,7 @@ Remove-Item Env:RL_LOAD_MODEL -ErrorAction SilentlyContinue
 训练脚本还支持断点续训、checkpoint 和评估：
 
 ```powershell
-$env:RL_LOAD_MODEL = "rl/models/hex_ppo_default_rule_mixed_v2.1.0_20260825_500000"
+$env:RL_LOAD_MODEL = "rl/models/hex_ppo_v2.1.0_20260825_default_rule_mixed_500000"
 $env:RL_TIMESTEPS = "50000"          # 续训增加 50000 步
 $env:RL_SAVE_FREQ = "20000"           # 每 20000 步保存 checkpoint
 $env:RL_EVAL_FREQ = "10000"           # 每 10000 步评估
@@ -119,7 +119,7 @@ $env:RL_TIMESTEPS = "100000"
 python rl/train.py
 ```
 
-默认模型会保存为 `rl/models/hex_ppo_dual-lanes_rule_mixed_v2.1.0_<日期>_<步数>.zip`，也可以指定路径：
+默认模型会保存为 `rl/models/hex_ppo_v2.1.0_<日期>_dual-lanes_rule_mixed_<步数>.zip`，也可以指定路径：
 
 ```powershell
 $env:RL_MODEL_PATH = "rl/models/dual-lanes-ppo"
@@ -178,8 +178,8 @@ python rl/run_model.py --game <gameId> --token <playerToken> --once
 
 ```powershell
 rl/.venv/Scripts/python.exe rl/evaluate_cross.py `
-  --model-a rl/models/hex_ppo_default_rule_v2.0.0_20260824_500000.zip `
-  --model-b rl/models/hex_ppo_default_rule_mixed_v2.1.1_20260825_500000.zip `
+  --model-a rl/models/hex_ppo_v2.0.0_20260824_default_rule_500000.zip `
+  --model-b rl/models/hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip `
   --games 4
 ```
 

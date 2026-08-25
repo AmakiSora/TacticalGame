@@ -34,7 +34,8 @@ def main():
     args = parse_args()
     model_path = args.model
     if not model_path:
-        candidates = list(Path("rl/models").glob("hex_ppo_*_v2.1.*_*.zip"))
+        candidates = list(Path("rl/models").glob("hex_ppo_v2.1.*_*_*.zip"))
+        candidates += list(Path("rl/models").glob("hex_ppo_*_v2.1.*_*.zip"))
         if not candidates:
             raise FileNotFoundError("未找到 v2.1 模型，请先训练，或通过 --model 指定模型路径")
         model_path = str(max(candidates, key=lambda path: path.stat().st_mtime))

@@ -8,8 +8,8 @@
 对每个座位使用其模型训练时期的编码与合法动作生成逻辑：
 
     rl/.venv/Scripts/python.exe rl/evaluate_cross.py \
-        --model-a rl/models/hex_ppo_default_rule_v2.0.0_20260824_500000.zip \
-        --model-b rl/models/hex_ppo_default_rule_mixed_v2.1.1_20260825_500000.zip \
+        --model-a rl/models/hex_ppo_v2.0.0_20260824_default_rule_500000.zip \
+        --model-b rl/models/hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip \
         --games 4
 
 注意：v2.0.0 的编码固定以 player_a 为己方视角，因此旧模型默认固定坐

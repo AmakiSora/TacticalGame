@@ -11,7 +11,7 @@ v2.0.0 模型（38 动作 / 8 单位槽）与当前 v2.1 环境（54 动作）�
 由服务器 src/api/bots.ts 按模型的动作空间自动选择本运行器；
 也可手动指定：
 
-    python rl/run_model_v200.py --model rl/models/hex_ppo_default_rule_v2.0.0_*.zip \
+    python rl/run_model_v200.py --model rl/models/hex_ppo_v2.0.0_*_default_rule_*.zip \
         --game <gameId> --token <playerToken> [--side player_a]
 """
 
@@ -44,7 +44,8 @@ def main():
     args = parse_args()
     model_path = args.model
     if not model_path:
-        candidates = list(Path("rl/models").glob("hex_ppo_*_v2.0.*_*.zip"))
+        candidates = list(Path("rl/models").glob("hex_ppo_v2.0.*_*_*.zip"))
+        candidates += list(Path("rl/models").glob("hex_ppo_*_v2.0.*_*.zip"))
         if not candidates:
             raise FileNotFoundError("未找到 v2.0 模型，请先通过 --model 指定模型路径")
         model_path = str(max(candidates, key=lambda path: path.stat().st_mtime))

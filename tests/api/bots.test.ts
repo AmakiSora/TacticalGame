@@ -206,11 +206,10 @@ describe('RL bot legacy model support', () => {
     for (const model of data.models) {
       expect(typeof model.runner).toBe('string');
       expect(model.supported).toBe(model.actionSpace === 54 || model.actionSpace === 38 || model.actionSpace === 512);
-      // v2.1 模型走当前运行器，v2.0 模型走旧版运行器。
-      if (/v2\.1\./.test(model.file)) expect(model.runner.endsWith('run_model.py')).toBe(true);
-      if (/v2\.0\./.test(model.file)) expect(model.runner.endsWith('run_model_v200.py')).toBe(true);
-      if (/random_opponent/.test(model.file)) {
-        expect(model.actionSpace).toBe(512);
+      // 每个动作空间都走训练时期对应的快照运行器。
+      if (model.actionSpace === 54) expect(model.runner.endsWith('run_model.py')).toBe(true);
+      if (model.actionSpace === 38) expect(model.runner.endsWith('run_model_v200.py')).toBe(true);
+      if (model.actionSpace === 512) {
         expect(model.runner.endsWith('run_model_v100.py')).toBe(true);
         expect(model.supported).toBe(true);
       }

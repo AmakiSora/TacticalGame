@@ -50,7 +50,8 @@ def tensorboard_available() -> bool:
 
 def latest_model_path(map_id: str) -> str:
     patterns = (
-        f"hex_ppo_{map_id}_rule_*_*_*.zip",  # v2.0+ 命名: hex_ppo_<地图>_<对手>_<版本>_<日期>_<步数>
+        f"hex_ppo_*_*_{map_id}_*.zip",  # 新命名: hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数>
+        f"hex_ppo_{map_id}_rule_*_*_*.zip",  # 兼容旧命名
         f"hex_ppo_v2_{map_id}_rule_opponent_*.zip",  # 旧时间戳命名
     )
     candidates: list[Path] = []
@@ -156,13 +157,13 @@ def main() -> None:
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     opponent_kind = f"rule_{opponent_style}"
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.1.1")
+    model_version = env_str("RL_MODEL_VERSION", "v2.1.3")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
     model_path = env_str(
         "RL_MODEL_PATH",
-        f"rl/models/hex_ppo_{map_id}_{opponent_kind}_{model_version}_{run_date}_{total_timesteps}",
+        f"rl/models/hex_ppo_{model_version}_{run_date}_{map_id}_{opponent_kind}_{total_timesteps}",
     )
     load_path = env_str("RL_LOAD_MODEL", "")
     save_freq = env_int("RL_SAVE_FREQ", 20_000, minimum=1)

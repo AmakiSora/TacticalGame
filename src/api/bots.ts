@@ -3,7 +3,8 @@
 // 强化学习 AI 玩家：房主在大厅中添加 AI 座位，开始对局时由服务器自动启动
 // rl/run_model.py，让训练好的模型作为普通玩家参与 REST 对局。
 import { spawn, type ChildProcess } from 'node:child_process';
-import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { inflateRawSync } from 'node:zlib';
 import { createInterface } from 'node:readline';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,23 +20,46 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const MODELS_DIR = join(PROJECT_ROOT, 'rl', 'models');
 const RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model.py');
+// 旧版运行器：v2.0.0 模型（38 动作）使用其训练时期的编码快照 rl/env_v200.py。
+const LEGACY_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v200.py');
 const DEFAULT_BOT_NAME = '强化AI';
+
+/** 当前 rl/env.py 的动作空间大小（12 单位槽 × 4 意图 + 5 部署 + 结束回合）。 */
+const CURRENT_ACTION_SPACE = 54;
+
+/**
+ * 动作空间 → 运行脚本。每次迭代环境后，旧模型仍需可玩：在这里登记新版本
+ * 的动作空间与运行器，同时保留历史版本的映射（运行器内部用对应的 env
+ * 快照做编码/合法动作）。未注册的动作空间不会被允许加入对局。
+ */
+const RUNNERS_BY_ACTION_SPACE: ReadonlyMap<number, { runner: string; label: string }> = new Map([
+  [CURRENT_ACTION_SPACE, { runner: RUNNER_SCRIPT, label: 'v2.1' }],
+  [38, { runner: LEGACY_RUNNER_SCRIPT, label: 'v2.0' }],
+]);
 
 export interface RlModelInfo {
   file: string;
   mtimeMs: number;
-  /** 模型动作空间大小；无法解析时为 null（此时由 run_model.py 自行校验）。 */
+  /** 模型动作空间大小；无法解析时为 null，模型会被标记为不可运行。 */
   actionSpace: number | null;
+  /** 与该模型兼容的运行脚本绝对路径；不可运行模型仅用于诊断。 */
+  runner: string;
+  /** 面向前端的版本标签，如 "v2.1"、"v2.0" 或空串。 */
+  label: string;
+  /** 只有能确定动作空间且已有快照运行器时才可启动。 */
+  supported: boolean;
 }
 
-/** 当前 rl/env.py 的动作空间大小，与 run_model.py 的版本守卫保持一致。 */
-const REQUIRED_ACTION_SPACE = 54;
+/** 当前 rl/env.py 的动作空间大小；run_model.py 启动后的版本守卫兜底校验。 */
+const REQUIRED_ACTION_SPACE = CURRENT_ACTION_SPACE;
 
 interface BotRecord {
   gameId: string;
   playerId: PlayerId;
   token: string;
   modelFile: string;
+  /** 与该模型动作空间匹配的运行脚本；缺省时用当前版运行器。 */
+  runnerScript?: string;
   child?: ChildProcess;
 }
 
@@ -59,32 +83,59 @@ let activeSpawner: NonNullable<BotDeps['spawner']> = defaultSpawner;
 
 let modelsCache: RlModelInfo[] = [];
 
+/** Extract one ordinary ZIP entry without adding a runtime dependency. */
+function readZipEntry(zip: Buffer, wantedName: string): Buffer | null {
+  try {
+    // Walk the central directory. SB3 archives use ordinary ZIP32 entries;
+    // this also works when the data entry is deflated or not the first entry.
+    for (let offset = 0; offset + 46 <= zip.length; offset++) {
+      if (zip.readUInt32LE(offset) !== 0x02014b50) continue;
+      const compression = zip.readUInt16LE(offset + 10);
+      const compressedSize = zip.readUInt32LE(offset + 20);
+      const nameLength = zip.readUInt16LE(offset + 28);
+      const extraLength = zip.readUInt16LE(offset + 30);
+      const commentLength = zip.readUInt16LE(offset + 32);
+      const localOffset = zip.readUInt32LE(offset + 42);
+      const name = zip.toString('utf8', offset + 46, offset + 46 + nameLength);
+      offset += 46 + nameLength + extraLength + commentLength - 1;
+      if (name !== wantedName || localOffset + 30 > zip.length) continue;
+      if (zip.readUInt32LE(localOffset) !== 0x04034b50) return null;
+      const localNameLength = zip.readUInt16LE(localOffset + 26);
+      const localExtraLength = zip.readUInt16LE(localOffset + 28);
+      const start = localOffset + 30 + localNameLength + localExtraLength;
+      const end = start + compressedSize;
+      if (end > zip.length) return null;
+      const payload = zip.subarray(start, end);
+      if (compression === 0) return payload;
+      if (compression === 8) return inflateRawSync(payload);
+      return null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * 读取模型 zip 内的 Discrete 动作空间大小。
- * SB3 把元数据 JSON（含 action_space 的 base64 cloudpickle）作为第一个条目
- * 原样存放在 zip 起始处；pickle 中 numpy int64 标量以 BINBYTES(0x43) +
- * 长度 + 小端字节出现。解析失败时返回 null，交由 run_model.py 启动后的版本守卫兜底。
+ * Read SB3's Discrete action-space size from the model metadata.
+ * The cloudpickle payload is embedded as base64 in the ``data`` JSON entry;
+ * the pickle stores the numpy integer as BINBYTES(8) followed by little-endian
+ * bytes. Returning null means the archive is not safely identifiable.
  */
 function readActionSpace(modelPath: string): number | null {
   try {
-    const handle = openSync(modelPath, 'r');
-    try {
-      const head = Buffer.alloc(256 * 1024);
-      const bytesRead = readSync(handle, head, 0, head.length, 0);
-      const text = head.toString('latin1');
-      for (const match of text.matchAll(/[A-Za-z0-9+/=]{200,}/g)) {
-        const decoded = Buffer.from(match[0], 'base64');
-        for (let i = 0; i < decoded.length - 10; i++) {
-          if (decoded[i] === 0x43 && decoded[i + 1] === 0x08) {
-            const value = decoded.readInt32LE(i + 2);
-            if (value > 0 && value < 100_000) return value;
-          }
-        }
+    const data = readZipEntry(readFileSync(modelPath), 'data');
+    if (!data) return null;
+    const text = data.toString('utf8');
+    for (const match of text.matchAll(/[A-Za-z0-9+/=]{200,}/g)) {
+      const decoded = Buffer.from(match[0], 'base64');
+      for (let i = 0; i + 6 <= decoded.length; i++) {
+        if (decoded[i] !== 0x43 || decoded[i + 1] !== 0x08) continue;
+        const value = decoded.readInt32LE(i + 2);
+        if (value > 0 && value < 100_000) return value;
       }
-      return null;
-    } finally {
-      closeSync(handle);
     }
+    return null;
   } catch {
     return null;
   }
@@ -98,7 +149,17 @@ export function refreshRlModels(): RlModelInfo[] {
       .filter(file => file.toLowerCase().endsWith('.zip'))
       .map(file => ({ file, mtimeMs: statSync(join(MODELS_DIR, file)).mtimeMs }))
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
-      .map(info => ({ ...info, actionSpace: readActionSpace(join(MODELS_DIR, info.file)) }));
+      .map(info => {
+        const actionSpace = readActionSpace(join(MODELS_DIR, info.file));
+        const route = actionSpace !== null ? RUNNERS_BY_ACTION_SPACE.get(actionSpace) : undefined;
+        return {
+          ...info,
+          actionSpace,
+          runner: route?.runner ?? RUNNER_SCRIPT,
+          label: route?.label ?? '',
+          supported: route !== undefined,
+        };
+      });
   } catch {
     // 目录缺失或不可读：视为没有可用模型。
   }
@@ -147,8 +208,9 @@ export function launchBotsForGame(baseUrl: string, logger: FastifyBaseLogger, ga
   if (!records.length) return;
   const python = resolvePython();
   for (const record of records) {
+    const runnerScript = record.runnerScript ?? RUNNER_SCRIPT;
     const args = [
-      RUNNER_SCRIPT,
+      runnerScript,
       '--url', baseUrl,
       '--game', record.gameId,
       '--token', record.token,
@@ -197,6 +259,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
     python: resolvePython(),
     runner: RUNNER_SCRIPT,
     requiredActionSpace: REQUIRED_ACTION_SPACE,
+    supportedActionSpaces: [...RUNNERS_BY_ACTION_SPACE.keys()],
   }));
 
   app.post<{ Params: { id: string }; Body: { name?: string; model?: string } }>(
@@ -217,9 +280,13 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       if (!model || !known) {
         return reply.code(400).send({ error: `model "${model ?? ''}" not found`, code: 'model_not_found' });
       }
-      if (known.actionSpace !== null && known.actionSpace !== REQUIRED_ACTION_SPACE) {
+      // 未能可靠识别动作空间的模型也拒绝加入：否则它会在开局后才由
+      // 当前运行器的版本守卫抛错，留下一个无人控制的 AI 座位。
+      if (!known.supported) {
         return reply.code(400).send({
-          error: `模型动作空间为 ${known.actionSpace}，当前环境需要 ${REQUIRED_ACTION_SPACE}；请使用当前 v2.1 模型。`,
+          error: known.actionSpace === null
+            ? '无法识别模型动作空间；请重新导出模型或使用已支持的模型版本。'
+            : `模型动作空间为 ${known.actionSpace}，没有对应的运行器；请使用已支持的模型版本。`,
           code: 'bot_not_supported',
         });
       }
@@ -229,7 +296,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
       globalStore.persist(game);
       const records = botsByGame.get(game.id) ?? [];
-      records.push({ gameId: game.id, playerId: joined.id, token: joined.token, modelFile: model });
+      records.push({ gameId: game.id, playerId: joined.id, token: joined.token, modelFile: model, runnerScript: known.runner });
       botsByGame.set(game.id, records);
       return {
         ok: true,

@@ -150,3 +150,37 @@ python rl/run_model.py --game <gameId> --token <playerToken> --once
 
 这是 v2 训练环境：规则对手会优先攻击、治疗、部署和靠近据点。它仍不是最终强度
 版本，后续可以再加入自我对弈和更复杂的战术目标。
+
+## 版本兼容策略
+
+环境每次迭代都会改变动作空间（v2.0.0=38，v2.1=54），但历史模型必须始终可玩：
+
+- `rl/env_v200.py` 保存 v2.0.0 时期 env.py 的原样快照（编码/合法动作逻辑），
+  请勿按新版本逻辑修改它。
+- `src/api/bots.ts` 的 `RUNNERS_BY_ACTION_SPACE` 注册表把每个动作空间映射到
+  对应运行器：v2.1 → `run_model.py`，v2.0.0 → `run_model_v200.py`。
+  环境出新版时：先复制一份旧环境为不可变快照、实现对应运行器，再在注册表里加一行；
+  旧条目不得改写。若新版本沿用相同动作数但改变编码语义，也必须使用独立运行器，
+  不要复用旧动作空间条目。
+- 前端下拉列表只展示已识别且有快照运行器的模型，并带版本标签；无法识别的模型会被服务端拒绝。
+
+注意：v2.0.0 观测按固定 player_a 视角编码（当时实现），旧模型坐 player_b
+属于训练分布之外，强度会失真但仍可正常对局（运行器会打印警告）。
+
+## 跨版本模型对战（离线评估）
+
+`rl/evaluate_cross.py` 让两代模型在进程内引擎上互打（无需游戏服务器），
+每个座位使用其训练时期的编码与合法动作逻辑：
+
+```powershell
+rl/.venv/Scripts/python.exe rl/evaluate_cross.py `
+  --model-a rl/models/hex_ppo_default_rule_v2.0.0_20260824_500000.zip `
+  --model-b rl/models/hex_ppo_default_rule_mixed_v2.1.1_20260825_500000.zip `
+  --games 4
+```
+
+常用参数：`--games` 对局数；`--stochastic` 按策略采样（默认确定性）；`--max-rounds`
+单局回合上限（超过记平局）；`--verbose` 打印每步动作。
+
+注意：v2.0.0 的观测按固定 player_a 视角编码，因此旧模型固定坐 player_a；
+`--swap-sides` 每局交换座位，但交换后旧模型处于训练分布之外，结果会失真。

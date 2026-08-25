@@ -1633,13 +1633,14 @@ async function ensureBotModels() {
     const res = await fetch('/api/rl/models');
     if (!res.ok) throw new Error('request failed');
     const data = await res.json();
-    let models = Array.isArray(data.models) ? data.models : [];
-    // 过滤掉动作空间不兼容的旧模型（无法解析时保留，由运行端兜底校验）。
-    if (data.requiredActionSpace) {
-      models = models.filter(model => model.actionSpace === null || model.actionSpace === data.requiredActionSpace);
-    }
+    const models = (Array.isArray(data.models) ? data.models : [])
+      .filter(model => model.supported === true);
+    // 只展示已有版本快照运行器的模型；旧版本仍会按标签显示。
     els.botModel.innerHTML = models.length
-      ? models.map(model => `<option value="${esc(model.file)}">${esc(model.file)}</option>`).join('')
+      ? models.map(model => {
+          const label = model.label ? `（${model.label}）` : '';
+          return `<option value="${esc(model.file)}">${esc(model.file)}${label}</option>`;
+        }).join('')
       : '<option value="">（服务器未找到可用模型）</option>';
     botModelsLoaded = models.length > 0;
   } catch {

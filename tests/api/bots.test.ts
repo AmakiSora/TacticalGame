@@ -182,3 +182,50 @@ describe('RL bot endpoints', () => {
     expect(second.statusCode).toBe(200);
   });
 });
+
+describe('RL bot legacy model support', () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = await startTestServer();
+  });
+
+  afterEach(async () => {
+    for (const id of globalStore.list()) globalStore.delete(id);
+    if (app) await app.close();
+  });
+
+  it('exposes per-model runner routing and supported action spaces', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/rl/models' });
+    expect(res.statusCode).toBe(200);
+    const data = res.json() as {
+      models: Array<{ file: string; actionSpace: number | null; runner: string; label: string; supported: boolean }>;
+      supportedActionSpaces: number[];
+    };
+    expect(data.supportedActionSpaces).toEqual(expect.arrayContaining([54, 38]));
+    for (const model of data.models) {
+      expect(typeof model.runner).toBe('string');
+      expect(model.supported).toBe(model.actionSpace === 54 || model.actionSpace === 38);
+      // v2.1 模型走当前运行器，v2.0 模型走旧版运行器。
+      if (/v2\.1\./.test(model.file)) expect(model.runner.endsWith('run_model.py')).toBe(true);
+      if (/v2\.0\./.test(model.file)) expect(model.runner.endsWith('run_model_v200.py')).toBe(true);
+    }
+  });
+
+  it('accepts adding a legacy v2.0 model as a bot', async () => {
+    const created = await createTwoPlayerLobby(app);
+    const listRes = await app.inject({ method: 'GET', url: '/api/rl/models' });
+    const models = (listRes.json() as { models: Array<{ file: string }> }).models;
+    const legacy = models.find(model => /v2\.0\./.test(model.file));
+    if (!legacy) return; // nothing to verify on machines without legacy weights
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { name: '旧版AI', model: legacy.file },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { bot: { model: string } }).bot.model).toBe(legacy.file);
+  });
+});

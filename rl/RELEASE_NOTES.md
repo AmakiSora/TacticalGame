@@ -5,8 +5,8 @@
 
 ## 2026-08-26 · v2.1.2
 
-- 新增 `env_v200.py`：v2.0.0（38 动作）时期 env.py 的原样快照，供旧模型的编码与合法动作逻辑使用。
-- 新增 `run_model_v200.py`：v2.0.0 模型的 REST 运行器；`run_model.py` 继续服务 v2.1 模型。
+- 新增 `env_v100.py` / `run_model_v100.py`：v1 随机对手模型（512 动作）的原样环境快照与 REST 运行器。
+- 新增 `env_v200.py` / `run_model_v200.py`：v2.0.0（38 动作）时期的环境快照与 REST 运行器；`run_model.py` 继续服务 v2.1 模型。
 - `src/api/bots.ts` 按 zip 内动作空间把模型路由到对应运行器（RUNNERS_BY_ACTION_SPACE 注册表），
   前端大厅 AI 下拉列表展示所有已识别且可运行的历史版本并附版本标签；无法识别的模型会被拒绝。
 - 新增 `evaluate_cross.py`：两代模型离线互打评估（进程内引擎，无需服务器）。

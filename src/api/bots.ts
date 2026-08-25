@@ -22,6 +22,8 @@ const MODELS_DIR = join(PROJECT_ROOT, 'rl', 'models');
 const RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model.py');
 // 旧版运行器：v2.0.0 模型（38 动作）使用其训练时期的编码快照 rl/env_v200.py。
 const LEGACY_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v200.py');
+// 最早的动态动作列表（512 动作）模型使用 v1 环境快照。
+const V100_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v100.py');
 const DEFAULT_BOT_NAME = '强化AI';
 
 /** 当前 rl/env.py 的动作空间大小（12 单位槽 × 4 意图 + 5 部署 + 结束回合）。 */
@@ -35,6 +37,7 @@ const CURRENT_ACTION_SPACE = 54;
 const RUNNERS_BY_ACTION_SPACE: ReadonlyMap<number, { runner: string; label: string }> = new Map([
   [CURRENT_ACTION_SPACE, { runner: RUNNER_SCRIPT, label: 'v2.1' }],
   [38, { runner: LEGACY_RUNNER_SCRIPT, label: 'v2.0' }],
+  [512, { runner: V100_RUNNER_SCRIPT, label: 'v1' }],
 ]);
 
 export interface RlModelInfo {

@@ -153,12 +153,16 @@ python rl/run_model.py --game <gameId> --token <playerToken> --once
 
 ## 版本兼容策略
 
-环境每次迭代都会改变动作空间（v2.0.0=38，v2.1=54），但历史模型必须始终可玩：
+环境每次迭代都会改变动作空间（v1=512，v2.0.0=38，v2.1=54），但历史模型必须始终可玩：
+
+- `rl/env_v100.py` 保存 v1 随机对手模型时期的 env.py 快照，
+  `rl/run_model_v100.py` 专门运行 512 动作模型。
 
 - `rl/env_v200.py` 保存 v2.0.0 时期 env.py 的原样快照（编码/合法动作逻辑），
   请勿按新版本逻辑修改它。
 - `src/api/bots.ts` 的 `RUNNERS_BY_ACTION_SPACE` 注册表把每个动作空间映射到
-  对应运行器：v2.1 → `run_model.py`，v2.0.0 → `run_model_v200.py`。
+  对应运行器：v2.1 → `run_model.py`，v2.0.0 → `run_model_v200.py`，
+  v1 → `run_model_v100.py`。
   环境出新版时：先复制一份旧环境为不可变快照、实现对应运行器，再在注册表里加一行；
   旧条目不得改写。若新版本沿用相同动作数但改变编码语义，也必须使用独立运行器，
   不要复用旧动作空间条目。

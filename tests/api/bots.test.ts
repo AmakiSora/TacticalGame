@@ -205,10 +205,15 @@ describe('RL bot legacy model support', () => {
     expect(data.supportedActionSpaces).toEqual(expect.arrayContaining([54, 38]));
     for (const model of data.models) {
       expect(typeof model.runner).toBe('string');
-      expect(model.supported).toBe(model.actionSpace === 54 || model.actionSpace === 38);
+      expect(model.supported).toBe(model.actionSpace === 54 || model.actionSpace === 38 || model.actionSpace === 512);
       // v2.1 模型走当前运行器，v2.0 模型走旧版运行器。
       if (/v2\.1\./.test(model.file)) expect(model.runner.endsWith('run_model.py')).toBe(true);
       if (/v2\.0\./.test(model.file)) expect(model.runner.endsWith('run_model_v200.py')).toBe(true);
+      if (/random_opponent/.test(model.file)) {
+        expect(model.actionSpace).toBe(512);
+        expect(model.runner.endsWith('run_model_v100.py')).toBe(true);
+        expect(model.supported).toBe(true);
+      }
     }
   });
 
@@ -227,5 +232,22 @@ describe('RL bot legacy model support', () => {
     });
     expect(res.statusCode).toBe(200);
     expect((res.json() as { bot: { model: string } }).bot.model).toBe(legacy.file);
+  });
+
+  it('accepts the original 512-action random-opponent models', async () => {
+    const created = await createTwoPlayerLobby(app);
+    const listRes = await app.inject({ method: 'GET', url: '/api/rl/models' });
+    const models = (listRes.json() as { models: Array<{ file: string; actionSpace: number | null }> }).models;
+    const legacy = models.find(model => /random_opponent/.test(model.file));
+    if (!legacy) return;
+    expect(legacy.actionSpace).toBe(512);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { name: '早期AI', model: legacy.file },
+    });
+    expect(res.statusCode).toBe(200);
   });
 });

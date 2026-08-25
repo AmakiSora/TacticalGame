@@ -443,7 +443,13 @@ class HexGameEnv(gym.Env):
                     actions[base + 1] = ("attack", {"attackerId": unit["id"], "targetId": target["id"]})
                 if unit.get("type") == "support":
                     heal_range = int(state.get("config", {}).get("units", {}).get("support", {}).get("healRange", unit.get("attackRange", 0)))
-                    wounded = [u for u in units if u["id"] != unit["id"] and int(u["hp"]) < int(u["maxHp"]) and distance(unit, u) <= heal_range]
+                    wounded = [
+                        u for u in units
+                        if u is not None
+                        and u["id"] != unit["id"]
+                        and int(u["hp"]) < int(u["maxHp"])
+                        and distance(unit, u) <= heal_range
+                    ]
                     if wounded:
                         target = max(wounded, key=lambda candidate: int(candidate["maxHp"]) - int(candidate["hp"]))
                         actions[base + 2] = ("heal", {"supportId": unit["id"], "targetId": target["id"]})

@@ -74,7 +74,7 @@ hex_ppo_<地图名>_<对手类型>_<版本号>_<训练日期>_<步数>.zip
 例如：
 
 ```text
-rl/models/hex_ppo_default_rule_mixed_v2.1.0_20260825_500000.zip
+rl/models/hex_ppo_default_rule_mixed_v2.1.1_20260825_500000.zip
 ```
 
 版本号具体到三级（如 `v2.0.4`），默认值与 `rl/RELEASE_NOTES.md` 顶部条目一致，

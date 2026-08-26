@@ -274,23 +274,25 @@ class HexGameEnv(gym.Env):
                         if cell and cell.get("terrain") == "blocker" and pos not in occupied:
                             actions.append(("demolish", {"unitId": unit["id"], "q": pos[0], "r": pos[1]}))
 
-        resources = state.get("resources", {}).get(owner, {}).get("supplies", 0)
-        origins = []
-        hq = state.get("headquarters", {}).get(owner)
-        if hq and hq.get("alive"):
-            origins.append(hq)
-        origins.extend(p for p in state.get("controlPoints", []) if p.get("owner") == owner)
-        specs = state.get("config", {}).get("units", {})
-        for origin in origins:
-            origin_pos = key(int(origin["q"]), int(origin["r"]))
-            for unit_type in UNIT_TYPES:
-                spec = specs.get(unit_type)
-                if not spec or resources < int(spec.get("cost", 10)):
-                    continue
-                for dq, dr in HEX_DIRECTIONS:
-                    pos = (origin_pos[0] + dq, origin_pos[1] + dr)
-                    if plain_empty(pos):
-                        actions.append(("deploy", {"unitType": unit_type, "fromId": origin["id"], "q": pos[0], "r": pos[1]}))
+        # Deploy consumes an action: only legal while the turn still has AP.
+        if actions_used < ap_limit:
+            resources = state.get("resources", {}).get(owner, {}).get("supplies", 0)
+            origins = []
+            hq = state.get("headquarters", {}).get(owner)
+            if hq and hq.get("alive"):
+                origins.append(hq)
+            origins.extend(p for p in state.get("controlPoints", []) if p.get("owner") == owner)
+            specs = state.get("config", {}).get("units", {})
+            for origin in origins:
+                origin_pos = key(int(origin["q"]), int(origin["r"]))
+                for unit_type in UNIT_TYPES:
+                    spec = specs.get(unit_type)
+                    if not spec or resources < int(spec.get("cost", 10)):
+                        continue
+                    for dq, dr in HEX_DIRECTIONS:
+                        pos = (origin_pos[0] + dq, origin_pos[1] + dr)
+                        if plain_empty(pos):
+                            actions.append(("deploy", {"unitType": unit_type, "fromId": origin["id"], "q": pos[0], "r": pos[1]}))
 
         return actions[:MAX_ACTIONS]
 

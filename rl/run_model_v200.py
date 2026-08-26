@@ -97,7 +97,25 @@ def main():
         action_type, payload = env.actions[index]
         if not action_type:
             action_type, payload = "end_turn", {}
-        env._apply(action_type, payload, env.player_token)
+        while True:
+            try:
+                env._apply(action_type, payload, env.player_token)
+                break
+            except RuntimeError as error:
+                if "rate_limit" not in str(error):
+                    print(f"action rejected ({error}); falling back to end_turn")
+                    action_type, payload = "end_turn", {}
+                    try:
+                        env._apply("end_turn", {}, env.player_token)
+                    except RuntimeError as fallback_error:
+                        if "rate_limit" not in str(fallback_error):
+                            raise
+                        print("rate limited; waiting 5s before retry")
+                        time.sleep(5)
+                        continue
+                    break
+                print("rate limited; waiting 5s before retry")
+                time.sleep(5)
         acted += 1
         print(f"{acted}: {action_type} {payload}")
         if args.once:

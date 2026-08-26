@@ -80,7 +80,27 @@ def main():
         if index < 0 or index >= len(env.actions) or not env.actions[index][0]:
             index = 0
         action_type, payload = env.actions[index]
-        env._apply(action_type, payload, env.player_token)
+        # 兜底：限流则等待重试；其他拒绝（如 action_limit_reached，动作已过期）
+        # 改为结束回合，绝不让异常杀死整局。
+        while True:
+            try:
+                env._apply(action_type, payload, env.player_token)
+                break
+            except RuntimeError as error:
+                if "rate_limit" not in str(error):
+                    print(f"action rejected ({error}); falling back to end_turn")
+                    action_type, payload = "end_turn", {}
+                    try:
+                        env._apply("end_turn", {}, env.player_token)
+                    except RuntimeError as fallback_error:
+                        if "rate_limit" not in str(fallback_error):
+                            raise
+                        print("rate limited; waiting 5s before retry")
+                        time.sleep(5)
+                        continue
+                    break
+                print("rate limited; waiting 5s before retry")
+                time.sleep(5)
         acted += 1
         print(f"{acted}: {action_type} {payload}")
         if args.once:

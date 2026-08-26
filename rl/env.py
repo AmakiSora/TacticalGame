@@ -348,28 +348,12 @@ class HexGameEnv(gym.Env):
                 return None
             pos = min(candidates, key=lambda candidate: distance({"q": candidate[0], "r": candidate[1]}, goal))
             return {"unitId": unit["id"], "q": pos[0], "r": pos[1]}
-        # Pick the reachable square closest to the strategic goal, then
-        # reconstruct the first step along the BFS path. This permits detours
-        # around blockers/water instead of requiring direct hex-distance gain.
+        # Move directly to the reachable square closest to the strategic goal.
+        # `_reachable` already BFS-es around blockers/water, so detours are
+        # supported.  The engine teleports the unit to any reachable cell in
+        # one action; emitting only the first step wastes AP and slows the
+        # agent 3-5x compared to the v2.0.0 movement semantics.
         pos = min(reachable, key=lambda candidate: (distance({"q": candidate[0], "r": candidate[1]}, goal), candidate[0], candidate[1]))
-        parent = {start: None}
-        queue = deque([(start, 0)])
-        while queue:
-            current, depth = queue.popleft()
-            if current == pos:
-                break
-            if depth >= move_range:
-                continue
-            for dq, dr in HEX_DIRECTIONS:
-                nxt = (current[0] + dq, current[1] + dr)
-                if nxt in parent or nxt not in reachable and nxt != pos:
-                    continue
-                parent[nxt] = current
-                queue.append((nxt, depth + 1))
-        while parent.get(pos) not in (None, start):
-            pos = parent[pos]
-        if pos == start:
-            return None
         return {"unitId": unit["id"], "q": pos[0], "r": pos[1]}
 
     def _fixed_deploy(self, state: dict[str, Any], owner: str, unit_type: str):

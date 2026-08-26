@@ -210,8 +210,8 @@ class HexGameEnv(gym.Env):
         return np.asarray([bool(action[0]) for action in self.actions], dtype=bool)
 
     @staticmethod
-    def _empty_actions():
-        return [("", {}) for _ in range(MAX_ACTIONS)]
+    def _empty_actions(size: int = MAX_ACTIONS):
+        return [("", {}) for _ in range(size)]
 
     def _get_state(self, token: str) -> dict[str, Any]:
         return self._request("GET", f"/api/games/{self.game_id}", token=token)
@@ -331,7 +331,7 @@ class HexGameEnv(gym.Env):
         hqs = [h for h in state.get("headquarters", {}).values() if h.get("alive") and h.get("owner") != owner]
         return min([*enemies, *hqs], key=lambda target: distance(unit, target), default=unit)
 
-    def _fixed_move(self, unit: dict[str, Any], state: dict[str, Any], owner: str, cells, occupied):
+    def _fixed_move(self, unit: dict[str, Any], state: dict[str, Any], owner: str, cells, occupied, legacy: bool = False):
         if unit.get("hasMoved") or not (unit.get("actionSpent") or int(state.get("turn", {}).get("actionsUsed", 0)) < int(state.get("config", {}).get("balance", {}).get("actionsPerTurn", 5))):
             return None
         goal = self._movement_goal(unit, state, owner)
@@ -340,6 +340,14 @@ class HexGameEnv(gym.Env):
         reachable = self._reachable(cells, occupied, start, move_range)
         if not reachable:
             return None
+        if legacy:
+            # v2.0.0 训练时的移动规则：只允许严格接近目标，不允许绕路。
+            current_distance = distance(unit, goal)
+            candidates = [pos for pos in reachable if distance({"q": pos[0], "r": pos[1]}, goal) < current_distance]
+            if not candidates:
+                return None
+            pos = min(candidates, key=lambda candidate: distance({"q": candidate[0], "r": candidate[1]}, goal))
+            return {"unitId": unit["id"], "q": pos[0], "r": pos[1]}
         # Pick the reachable square closest to the strategic goal, then
         # reconstruct the first step along the BFS path. This permits detours
         # around blockers/water instead of requiring direct hex-distance gain.
@@ -406,23 +414,16 @@ class HexGameEnv(gym.Env):
             deploys = [(index, action) for index, action in valid if action[0] == "deploy"]
             moves = [(index, action) for index, action in valid if action[0] == "move"]
             if self.active_opponent_style == "model" and self.opponent_model is not None:
-                # v2.0 opponents use 38 actions: the first 33 intent slots are
-                # unchanged, while deploy slots 33..37 map to v2.1 49..53.
-                self.actions = actions
-                legacy_mask = np.asarray(
-                    [bool(actions[index][0]) for index in range(33)]
-                    + [bool(actions[index][0]) for index in range(49, 54)],
-                    dtype=bool,
-                )
+                # 旧模型按它训练时的 38 动作语义行动（逐步排序分槽、严格接近移动），
+                # 观测用对手相对视角编码，动作直接取旧动作表，不再经过当前槽位映射。
+                legacy_actions = self._legal_actions(self.state, self.opponent, legacy=True)
+                legacy_mask = np.asarray([bool(action[0]) for action in legacy_actions], dtype=bool)
                 observation = self._encode_from_perspective(self.state, self.opponent)
                 legacy_action, _ = self.opponent_model.predict(
                     observation, deterministic=True, action_masks=legacy_mask
                 )
-                legacy_index = int(legacy_action)
-                current_index = legacy_index if legacy_index < 33 else legacy_index + 16
-                if 0 <= current_index < len(actions) and actions[current_index][0]:
-                    index, (action_type, payload) = current_index, actions[current_index]
-                else:
+                action_type, payload = legacy_actions[int(legacy_action)]
+                if not action_type:
                     self.active_opponent_style = "mixed"
                     index, (action_type, payload) = valid[0]
             else:
@@ -442,11 +443,19 @@ class HexGameEnv(gym.Env):
                 self._apply("end_turn", {}, self.opponent_token)
             self.state = self._get_state(self.player_token)
 
-    def _legal_actions(self, state: dict[str, Any], owner: str):
+    def _legal_actions(self, state: dict[str, Any], owner: str, legacy: bool = False):
+        """legacy=True 时复现 v2.0.0 的 38 动作语义，供旧模型对手使用。
+
+        v2.0.0 每步按排序取前 8 个单位分槽，移动要求严格接近目标；
+        与当前的 12 个稳定槽位和绕路移动不兼容，不能直接按下标映射。
+        """
         if state.get("phase") == "game_over":
             return self._empty_actions()
 
-        units = self._units_for_slots(state, owner)
+        if legacy:
+            units = sorted((u for u in state.get("units", []) if u.get("alive") and u.get("owner") == owner), key=self._unit_sort_key)[:8]
+        else:
+            units = self._units_for_slots(state, owner)
         enemies = [u for u in state.get("units", []) if u.get("alive") and u.get("owner") != owner]
         hqs = [hq for hq in state.get("headquarters", {}).values() if hq.get("alive") and hq.get("owner") != owner]
         cells = {key(int(c["q"]), int(c["r"])): c for c in state.get("cells", [])}
@@ -454,7 +463,8 @@ class HexGameEnv(gym.Env):
         occupied.update((int(h["q"]), int(h["r"])) for h in state.get("headquarters", {}).values() if h.get("alive"))
         actions_used = int(state.get("turn", {}).get("actionsUsed", 0))
         ap_limit = int(state.get("config", {}).get("balance", {}).get("actionsPerTurn", 5))
-        actions = self._empty_actions()
+        unit_slots = 8 if legacy else MAX_UNIT_SLOTS
+        actions = self._empty_actions(1 + unit_slots * len(UNIT_INTENTS) + len(DEPLOY_SLOTS))
         actions[0] = ("end_turn", {})
 
         def can_activate(unit):
@@ -469,7 +479,7 @@ class HexGameEnv(gym.Env):
                 continue
             base = 1 + slot * len(UNIT_INTENTS)
             if can_activate(unit):
-                move = self._fixed_move(unit, state, owner, cells, occupied)
+                move = self._fixed_move(unit, state, owner, cells, occupied, legacy=legacy)
                 if move:
                     actions[base + 0] = ("move", move)
             if not unit.get("hasActed") and can_activate(unit):
@@ -501,7 +511,7 @@ class HexGameEnv(gym.Env):
             for index, unit_type in enumerate(DEPLOY_SLOTS):
                 payload = self._fixed_deploy(state, owner, unit_type)
                 if payload:
-                    actions[1 + MAX_UNIT_SLOTS * len(UNIT_INTENTS) + index] = ("deploy", payload)
+                    actions[1 + unit_slots * len(UNIT_INTENTS) + index] = ("deploy", payload)
         return actions
 
     @staticmethod

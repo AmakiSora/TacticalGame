@@ -28,6 +28,15 @@ npm install
 python rl/train.py
 ```
 
+2.1.4 训练默认会加载旧的 v2.0.0 模型作为部分对手，建议先用 800000 步：
+
+```powershell
+$env:RL_MODEL_VERSION = "v2.1.4"
+$env:RL_TIMESTEPS = "800000"
+$env:RL_MODEL_OPPONENT_PROB = "0.5"
+python rl/train.py
+```
+
 想先做一个快速冒烟测试，可以把步数临时调小：
 
 ```powershell
@@ -74,13 +83,20 @@ hex_ppo_<版本号>_<训练日期>_<地图名>_<对手类型>_<步数>.zip
 例如：
 
 ```text
-rl/models/hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip
+rl/models/hex_ppo_v2.1.4_20260826_default_modelmix_800000.zip
 ```
 
 版本号具体到三级（如 `v2.0.4`），默认值与 `rl/RELEASE_NOTES.md` 顶部条目一致，
 变更训练环境时同步更新；也可用 `RL_MODEL_VERSION` 临时覆盖。v2.1 使用 `Discrete(54)` 动作空间，
 不能加载 v2.0 或更旧模型；请从零训练一个新模型。可用 `$env:RL_OPPONENT_STYLE = "aggressive"`
 等值固定对手风格，默认 `mixed` 每局随机选择。
+
+2.1.4 默认会自动寻找 v2.0.0 模型作为模型对手。也可以指定路径和比例：
+
+```powershell
+$env:RL_OPPONENT_MODEL = "rl/models/hex_ppo_default_rule_v2.0.0_20260824_500000.zip"
+$env:RL_MODEL_OPPONENT_PROB = "0.5"
+```
 
 如果 PowerShell 之前设置过旧的 `RL_LOAD_MODEL`，先清除它：
 

@@ -63,6 +63,23 @@ def latest_model_path(map_id: str) -> str:
     return str(max(candidates, key=lambda path: path.stat().st_mtime))
 
 
+def opponent_model_path(map_id: str) -> str:
+    configured = env_str("RL_OPPONENT_MODEL", "")
+    if configured:
+        return configured[:-4] if configured.endswith(".zip") else configured
+    patterns = (
+        f"hex_ppo_{map_id}_rule_v2.0.0_*.zip",
+        f"hex_ppo_v2.0.0_*_{map_id}_rule_*.zip",
+        f"hex_ppo_v2_{map_id}_rule_opponent_*.zip",
+    )
+    candidates: list[Path] = []
+    for root in (Path("rl/models"), Path("rl")):
+        for pattern in patterns:
+            candidates.extend(root.glob(pattern))
+    result = max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
+    return str(result.with_suffix("")) if result else ""
+
+
 def ensure_zip_suffix(path: str) -> str:
     """sb3 的 save 只在“无扩展名”时才补 .zip，而版本号中的点会被误判为扩展名。"""
     return path if path.endswith(".zip") else f"{path}.zip"
@@ -94,7 +111,7 @@ class MaskableEvalCallback(BaseCallback):
         self.eval_freq = max(1, eval_freq)
         self.n_eval_episodes = max(1, n_eval_episodes)
         self.best_model_save_path = best_model_save_path
-        self.best_mean_reward = -float("inf")
+        self.best_score = (-1.0, -float("inf"), -float("inf"))
 
     def _on_step(self) -> bool:
         if self.num_timesteps % self.eval_freq != 0:
@@ -135,9 +152,12 @@ class MaskableEvalCallback(BaseCallback):
         mean_reward = float(np.mean(rewards))
         win_rate = wins / len(rewards)
         cp_mean = float(np.mean(control_points)) if control_points else 0.0
-        is_best = mean_reward > self.best_mean_reward
+        # Production selection follows gameplay outcomes first: win rate,
+        # then average control points, then shaped reward as a tie-breaker.
+        selection_score = (win_rate, cp_mean, mean_reward)
+        is_best = selection_score > self.best_score
         if is_best:
-            self.best_mean_reward = mean_reward
+            self.best_score = selection_score
             self.model.save(os.path.join(self.best_model_save_path, "best_model"))
         self.logger.record("eval/mean_reward", mean_reward)
         self.logger.record("eval/win_rate", win_rate)
@@ -155,9 +175,9 @@ class MaskableEvalCallback(BaseCallback):
 def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
-    opponent_kind = f"rule_{opponent_style}"
+    opponent_kind = "modelmix"
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.1.3")
+    model_version = env_str("RL_MODEL_VERSION", "v2.1.4")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -171,7 +191,16 @@ def main() -> None:
     tb_dir = env_str("RL_TB_LOG", "rl/tb")
     eval_freq = env_int("RL_EVAL_FREQ", 10_000, minimum=0)
     eval_episodes = env_int("RL_EVAL_EPISODES", 20, minimum=1)
+    model_opponent_probability = env_float("RL_MODEL_OPPONENT_PROB", 0.5)
     device = resolve_device()
+
+    old_model_path = opponent_model_path(map_id)
+    opponent_model = None
+    if old_model_path:
+        print(f"[train] model opponent={old_model_path} probability={model_opponent_probability:.0%}", flush=True)
+        opponent_model = MaskablePPO.load(old_model_path, device="cpu")
+    else:
+        print("[train] no v2.0 opponent model found; using rule opponents only", flush=True)
 
     Path(model_path).parent.mkdir(parents=True, exist_ok=True)
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
@@ -206,7 +235,7 @@ def main() -> None:
         print("[train] tensorboard 未安装,跳过 TB 日志;需要时运行: python -m pip install tensorboard")
         tb_log = None
 
-    env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style), mask_fn)
+    env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability), mask_fn)
     eval_env = None
     try:
         if resume:
@@ -243,7 +272,7 @@ def main() -> None:
             name_prefix=Path(model_path).name,
         )]
         if eval_freq > 0:
-            eval_env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style), mask_fn)
+            eval_env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability), mask_fn)
             callbacks.append(MaskableEvalCallback(
                 eval_env,
                 eval_freq=eval_freq,

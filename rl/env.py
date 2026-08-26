@@ -51,13 +51,17 @@ class HexGameEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed"):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
         if opponent_style not in {"mixed", "aggressive", "defensive", "economy"}:
             raise ValueError("opponent_style must be mixed, aggressive, defensive, or economy")
+        if not 0.0 <= model_opponent_probability <= 1.0:
+            raise ValueError("model_opponent_probability must be between 0 and 1")
         self.opponent_style = opponent_style
+        self.opponent_model = opponent_model
+        self.model_opponent_probability = model_opponent_probability
         self.active_opponent_style = opponent_style
 
         self.action_space = spaces.Discrete(MAX_ACTIONS)
@@ -273,9 +277,19 @@ class HexGameEnv(gym.Env):
         return (TYPE_INDEX.get(unit.get("type"), 99), int(unit.get("q", 0)), int(unit.get("r", 0)), -int(unit.get("hp", 0)))
 
     def _choose_opponent_style(self) -> str:
+        if self.opponent_model is not None and float(self.np_random.random()) < self.model_opponent_probability:
+            return "model"
         if self.opponent_style != "mixed":
             return self.opponent_style
-        return str(self.np_random.choice(("aggressive", "defensive", "economy")))
+        return str(self.np_random.choice(("aggressive", "mixed")))
+
+    def _encode_from_perspective(self, state: dict[str, Any], owner: str) -> np.ndarray:
+        old_owner, old_opponent = self.owner, self.opponent
+        self.owner, self.opponent = owner, (OPPONENT if owner == PLAYER else PLAYER)
+        try:
+            return self._encode_state(state)
+        finally:
+            self.owner, self.opponent = old_owner, old_opponent
 
     def _units_for_slots(self, state: dict[str, Any], owner: str) -> list[dict[str, Any] | None]:
         """Keep units in stable action slots as they move or are deployed."""
@@ -391,14 +405,35 @@ class HexGameEnv(gym.Env):
             heals = [(index, action) for index, action in valid if action[0] == "heal"]
             deploys = [(index, action) for index, action in valid if action[0] == "deploy"]
             moves = [(index, action) for index, action in valid if action[0] == "move"]
-            supplies = self.state.get("resources", {}).get(self.opponent, {}).get("supplies", 0)
-            if self.active_opponent_style == "aggressive":
-                priority = [attacks, moves, deploys if supplies >= 60 else [], heals]
-            elif self.active_opponent_style == "defensive":
-                priority = [attacks, heals, deploys if supplies >= 70 else [], moves]
-            else:  # economy
-                priority = [deploys if supplies >= 90 else [], moves, attacks, heals]
-            index, (action_type, payload) = next((group[0] for group in priority if group), valid[0])
+            if self.active_opponent_style == "model" and self.opponent_model is not None:
+                # v2.0 opponents use 38 actions: the first 33 intent slots are
+                # unchanged, while deploy slots 33..37 map to v2.1 49..53.
+                self.actions = actions
+                legacy_mask = np.asarray(
+                    [bool(actions[index][0]) for index in range(33)]
+                    + [bool(actions[index][0]) for index in range(49, 54)],
+                    dtype=bool,
+                )
+                observation = self._encode_from_perspective(self.state, self.opponent)
+                legacy_action, _ = self.opponent_model.predict(
+                    observation, deterministic=True, action_masks=legacy_mask
+                )
+                legacy_index = int(legacy_action)
+                current_index = legacy_index if legacy_index < 33 else legacy_index + 16
+                if 0 <= current_index < len(actions) and actions[current_index][0]:
+                    index, (action_type, payload) = current_index, actions[current_index]
+                else:
+                    self.active_opponent_style = "mixed"
+                    index, (action_type, payload) = valid[0]
+            else:
+                supplies = self.state.get("resources", {}).get(self.opponent, {}).get("supplies", 0)
+                if self.active_opponent_style == "aggressive":
+                    priority = [attacks, moves, deploys if supplies >= 60 else [], heals]
+                elif self.active_opponent_style == "defensive":
+                    priority = [attacks, heals, deploys if supplies >= 70 else [], moves]
+                else:  # economy/mixed
+                    priority = [deploys if supplies >= 90 else [], moves, attacks, heals]
+                index, (action_type, payload) = next((group[0] for group in priority if group), valid[0])
             try:
                 self._apply(action_type, payload, self.opponent_token)
             except RuntimeError as error:

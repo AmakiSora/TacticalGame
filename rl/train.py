@@ -177,7 +177,7 @@ def main() -> None:
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     opponent_kind = "modelmix"
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.1.7")
+    model_version = env_str("RL_MODEL_VERSION", "v2.1.8")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]

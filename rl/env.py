@@ -424,7 +424,14 @@ class HexGameEnv(gym.Env):
             except RuntimeError as error:
                 if "rate_limit" in str(error):
                     raise
-                self._apply("end_turn", {}, self.opponent_token)
+                try:
+                    self._apply("end_turn", {}, self.opponent_token)
+                except RuntimeError as fallback_error:
+                    # A stale action can coincide with the game ending (e.g.
+                    # HQ destroyed by the agent's last move); the loop guard
+                    # below exits once state shows game_over.
+                    if "rate_limit" in str(fallback_error):
+                        raise
             self.state = self._get_state(self.player_token)
 
     def _legal_actions(self, state: dict[str, Any], owner: str, legacy: bool = False):

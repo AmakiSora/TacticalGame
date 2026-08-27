@@ -15,9 +15,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .env import HexGameEnv, PLAYER
+    from .env import HexGameEnv, OPPONENT, PLAYER
 except ImportError:  # ``python rl/train.py`` puts rl/ on sys.path.
-    from env import HexGameEnv, PLAYER
+    from env import HexGameEnv, OPPONENT, PLAYER
 
 
 class LocalHexGameEnv(HexGameEnv):
@@ -56,12 +56,18 @@ class LocalHexGameEnv(HexGameEnv):
         self.player_token = "agent"
         self.opponent_token = "opponent"
         self.state = self._rpc({"cmd": "reset", "mapId": self.map_id})
+        # 随机座位：智能体坐 player_b 时，模型对手恰好坐在它的主场 player_a，
+        # 相对视角编码与 v2.0.0 的原生编码完全一致，对手即满血真身。
+        if float(self.np_random.random()) < 0.5:
+            self.owner, self.opponent = OPPONENT, PLAYER
+        else:
+            self.owner, self.opponent = PLAYER, OPPONENT
         self.steps = 0
-        self.unit_slots = {"player_a": {}, "player_b": {}}
+        self.unit_slots = {PLAYER: {}, OPPONENT: {}}
         self.action_counts = {}
         self.active_opponent_style = self._choose_opponent_style()
         self._play_opponent_until_agent_turn()
-        self.actions = self._legal_actions(self.state, PLAYER)
+        self.actions = self._legal_actions(self.state, self.owner)
         self.previous_score = self._score(self.state)
         return self._encode_state(self.state), {}
 
@@ -69,7 +75,7 @@ class LocalHexGameEnv(HexGameEnv):
         return self._rpc({"cmd": "state"})
 
     def _apply(self, action_type: str, payload: dict[str, Any], token: str) -> None:
-        self._rpc({"cmd": "apply", "owner": PLAYER if token == "agent" else "player_b", "action": {"type": action_type, **payload}})
+        self._rpc({"cmd": "apply", "owner": self.owner if token == "agent" else self.opponent, "action": {"type": action_type, **payload}})
 
     def close(self):
         if getattr(self, "worker", None) and self.worker.poll() is None:

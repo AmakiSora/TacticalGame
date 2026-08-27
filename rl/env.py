@@ -183,6 +183,14 @@ class HexGameEnv(gym.Env):
             self.state = self._get_state(self.player_token)
             return self._encode_state(self.state), -0.05, self._game_over(), False, {"invalid": True}
 
+        # Refresh before the opponent phase: the loop below gates on
+        # self.state's currentPlayerId.  Without this refresh it reads the
+        # pre-action state, skips the opponent turn after the agent ends its
+        # turn, and the agent then steals a bonus action on the opponent's
+        # turn (the engine only checks turn ownership on end-turn).  This
+        # corrupted every v2.1.7/v2.1.8 training run.
+        self.state = self._get_state(self.player_token)
+
         # Score adjudication (control-point capture, income) settles at turn
         # boundaries, i.e. during/after the opponent response.  Settling the
         # reward after the opponent acts (like v2.0.0) keeps the dominant

@@ -8,6 +8,7 @@ resume, checkpoints, TensorBoard, and periodic masked evaluation.
 from __future__ import annotations
 
 import os
+import shutil
 import time
 from pathlib import Path
 
@@ -177,7 +178,7 @@ def main() -> None:
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     opponent_kind = "modelmix"
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.2.0")
+    model_version = env_str("RL_MODEL_VERSION", "v2.2.1")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -287,9 +288,16 @@ def main() -> None:
             tb_log_name=run_name,
             reset_num_timesteps=not resume,
         )
+        # 交付模型优先用评估选出的 best 断点：训练终点模型常在后期震荡中退化，
+        # 实测 v2.2.0 终点 0:8 而同期 best 对 v2.0.0 16:0。未启用评估时退回终点模型。
         final_model_path = ensure_zip_suffix(model_path)
-        model.save(final_model_path)
-        print(f"[train] final model saved to {final_model_path}")
+        best_zip = best_dir / "best_model.zip"
+        if best_zip.exists():
+            shutil.copy(best_zip, final_model_path)
+            print(f"[train] best eval checkpoint delivered to {final_model_path}")
+        else:
+            model.save(final_model_path)
+            print(f"[train] final model saved to {final_model_path} (no eval checkpoint; endpoint model)")
         print(f"[train] checkpoints in {checkpoint_dir}/")
     finally:
         if eval_env is not None:

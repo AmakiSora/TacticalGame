@@ -1,21 +1,21 @@
 {
-  "generatedAt": "2026-08-22T16:16:16.859Z",
+  "generatedAt": "2026-08-27T19:08:01.542Z",
   "source": {
     "versions": [
       "V2",
       "V3"
     ],
-    "replayCount": 121,
+    "replayCount": 125,
     "parseErrors": 0
   },
   "warnings": [],
   "overview": {
-    "matchCount": 121,
-    "completedCount": 118,
+    "matchCount": 125,
+    "completedCount": 122,
     "incompleteCount": 3,
     "parseErrorCount": 0,
     "playerCountDist": {
-      "2": 110,
+      "2": 114,
       "3": 6,
       "4": 1,
       "6": 4
@@ -23,8 +23,8 @@
     "reasonDist": {
       "headquarters_destroyed": 16,
       "incomplete": 3,
-      "turn_limit_score": 62,
-      "last_player_standing": 36,
+      "turn_limit_score": 65,
+      "last_player_standing": 37,
       "forced_adjudication_score": 4
     },
     "mapDist": {
@@ -33,18 +33,20 @@
       "breach": 15,
       "multiplayer-ring": 6,
       "forge": 8,
-      "danger-close": 25,
+      "danger-close": 26,
       "four-corners": 1,
-      "artillery-zone": 30,
-      "desert": 1
+      "artillery-zone": 31,
+      "desert": 1,
+      "standoff": 2
     },
     "modeDist": {
-      "standard": 91,
-      "annihilation": 30
+      "standard": 92,
+      "annihilation": 31,
+      "simultaneous": 2
     },
     "versionDist": {
       "V2": 30,
-      "V3": 91
+      "V3": 95
     },
     "schemaDist": {
       "2.0.0": 14,
@@ -75,12 +77,14 @@
       "3.2.10": 4,
       "3.2.11": 16,
       "3.2.12": 10,
-      "3.2.13": 3
+      "3.2.13": 3,
+      "3.3.3": 1,
+      "3.3.4": 3
     },
-    "totalEvents": 29897,
-    "avgRounds": 9.4,
+    "totalEvents": 30878,
+    "avgRounds": 9.62,
     "dateMin": "20260614",
-    "dateMax": "20260822"
+    "dateMax": "20260827"
   },
   "modelLeaderboard": [
     {
@@ -265,6 +269,97 @@
     },
     {
       "rank": 3,
+      "model": "qwen3.8v27b",
+      "games": 10,
+      "wins": 7,
+      "losses": 3,
+      "draws": 0,
+      "top3": 10,
+      "winRate": 0.7,
+      "top3Rate": 1,
+      "avgRank": 1.3,
+      "avgScore": 1164.2,
+      "avgHqDamage": 12,
+      "duelGames": 9,
+      "duelWins": 7,
+      "duelLosses": 2,
+      "duelDraws": 0,
+      "duelWinRate": 0.7778,
+      "duelRating": 0.4526,
+      "multiGames": 1,
+      "multiPlacement": 0.8,
+      "multiRating": 0.1335,
+      "agents": {
+        "OMP": 8,
+        "PI": 2
+      },
+      "maps": {
+        "artillery-zone": 8,
+        "danger-close": 1,
+        "default": 1
+      },
+      "versions": {
+        "V3": 10
+      },
+      "vs": {
+        "step3.7flash": {
+          "games": 1,
+          "wins": 1
+        },
+        "sensenova6.8flp": {
+          "games": 1,
+          "wins": 1
+        },
+        "hy3": {
+          "games": 2,
+          "wins": 1
+        },
+        "dsv4flash0731": {
+          "games": 2,
+          "wins": 1
+        },
+        "gpt5.6terra": {
+          "games": 2,
+          "wins": 2
+        },
+        "longcat2.0": {
+          "games": 1,
+          "wins": 1
+        },
+        "dots3noteprev": {
+          "games": 1,
+          "wins": 1
+        },
+        "dots3-note-prev": {
+          "games": 1,
+          "wins": 1
+        },
+        "glm5.2": {
+          "games": 1,
+          "wins": 1
+        },
+        "kimik3": {
+          "games": 1,
+          "wins": 0
+        },
+        "qwen3.8flash": {
+          "games": 1,
+          "wins": 1
+        }
+      },
+      "recent": [
+        "tg_0108",
+        "tg_0111",
+        "tg_0112",
+        "tg_0114",
+        "tg_0116",
+        "tg_0117",
+        "tg_0118",
+        "tg_0123"
+      ]
+    },
+    {
+      "rank": 4,
       "model": "kimik3",
       "games": 7,
       "wins": 5,
@@ -330,93 +425,6 @@
         "tg_0088",
         "tg_0095",
         "tg_0104",
-        "tg_0118"
-      ]
-    },
-    {
-      "rank": 4,
-      "model": "qwen3.8v27b",
-      "games": 9,
-      "wins": 6,
-      "losses": 3,
-      "draws": 0,
-      "top3": 9,
-      "winRate": 0.6667,
-      "top3Rate": 1,
-      "avgRank": 1.33,
-      "avgScore": 1182.9,
-      "avgHqDamage": 13.3,
-      "duelGames": 8,
-      "duelWins": 6,
-      "duelLosses": 2,
-      "duelDraws": 0,
-      "duelWinRate": 0.75,
-      "duelRating": 0.4093,
-      "multiGames": 1,
-      "multiPlacement": 0.8,
-      "multiRating": 0.1335,
-      "agents": {
-        "OMP": 7,
-        "PI": 2
-      },
-      "maps": {
-        "artillery-zone": 7,
-        "danger-close": 1,
-        "default": 1
-      },
-      "versions": {
-        "V3": 9
-      },
-      "vs": {
-        "step3.7flash": {
-          "games": 1,
-          "wins": 1
-        },
-        "sensenova6.8flp": {
-          "games": 1,
-          "wins": 1
-        },
-        "hy3": {
-          "games": 2,
-          "wins": 1
-        },
-        "dsv4flash0731": {
-          "games": 2,
-          "wins": 1
-        },
-        "gpt5.6terra": {
-          "games": 2,
-          "wins": 2
-        },
-        "longcat2.0": {
-          "games": 1,
-          "wins": 1
-        },
-        "dots3noteprev": {
-          "games": 1,
-          "wins": 1
-        },
-        "dots3-note-prev": {
-          "games": 1,
-          "wins": 1
-        },
-        "glm5.2": {
-          "games": 1,
-          "wins": 1
-        },
-        "kimik3": {
-          "games": 1,
-          "wins": 0
-        }
-      },
-      "recent": [
-        "tg_0107",
-        "tg_0108",
-        "tg_0111",
-        "tg_0112",
-        "tg_0114",
-        "tg_0116",
-        "tg_0117",
         "tg_0118"
       ]
     },
@@ -548,6 +556,151 @@
     },
     {
       "rank": 6,
+      "model": "hy3",
+      "games": 22,
+      "wins": 14,
+      "losses": 8,
+      "draws": 0,
+      "top3": 21,
+      "winRate": 0.6364,
+      "top3Rate": 0.9545,
+      "avgRank": 1.45,
+      "avgScore": 1434.1,
+      "avgHqDamage": 31.1,
+      "duelGames": 15,
+      "duelWins": 9,
+      "duelLosses": 6,
+      "duelDraws": 0,
+      "duelWinRate": 0.6,
+      "duelRating": 0.3575,
+      "multiGames": 7,
+      "multiPlacement": 0.8286,
+      "multiRating": 0.4594,
+      "agents": {
+        "WB": 22
+      },
+      "maps": {
+        "breach": 5,
+        "multiplayer-ring": 4,
+        "forge": 1,
+        "dual-lanes": 2,
+        "danger-close": 5,
+        "four-corners": 1,
+        "artillery-zone": 2,
+        "default": 1,
+        "standoff": 1
+      },
+      "versions": {
+        "V2": 3,
+        "V3": 19
+      },
+      "vs": {
+        "step3.7flash": {
+          "games": 4,
+          "wins": 4
+        },
+        "DeepseekV4FlashPreview": {
+          "games": 2,
+          "wins": 1
+        },
+        "longcat2.0": {
+          "games": 5,
+          "wins": 4
+        },
+        "sensenova6.7fl": {
+          "games": 1,
+          "wins": 1
+        },
+        "mimo2.5pro": {
+          "games": 2,
+          "wins": 2
+        },
+        "minimaxm3": {
+          "games": 3,
+          "wins": 3
+        },
+        "doubaoseed2.1pro": {
+          "games": 3,
+          "wins": 2
+        },
+        "Qwen3.8MaxPreview": {
+          "games": 2,
+          "wins": 1
+        },
+        "glm5.2": {
+          "games": 3,
+          "wins": 1
+        },
+        "DeepseekV4ProPreview": {
+          "games": 1,
+          "wins": 0
+        },
+        "qwen3.7max": {
+          "games": 1,
+          "wins": 1
+        },
+        "gptoss120b": {
+          "games": 1,
+          "wins": 1
+        },
+        "dsv4flash0731": {
+          "games": 3,
+          "wins": 2
+        },
+        "gpt5.6luna": {
+          "games": 1,
+          "wins": 1
+        },
+        "agnes2.5flash": {
+          "games": 1,
+          "wins": 1
+        },
+        "sensenova6.8flp": {
+          "games": 1,
+          "wins": 1
+        },
+        "Qwen3.8Max": {
+          "games": 1,
+          "wins": 0
+        },
+        "glm5.3": {
+          "games": 1,
+          "wins": 1
+        },
+        "qwen3.8v27b": {
+          "games": 2,
+          "wins": 1
+        },
+        "dots3-note-prev": {
+          "games": 1,
+          "wins": 1
+        },
+        "gpt5.6terra": {
+          "games": 1,
+          "wins": 1
+        },
+        "oxalpha": {
+          "games": 1,
+          "wins": 1
+        },
+        "glm5.3flash": {
+          "games": 1,
+          "wins": 1
+        }
+      },
+      "recent": [
+        "tg_0089",
+        "tg_0093",
+        "tg_0100",
+        "tg_0108",
+        "tg_0117",
+        "tg_0121",
+        "tg_0122",
+        "tg_0125"
+      ]
+    },
+    {
+      "rank": 7,
       "model": "DeepseekV4FlashPreview",
       "games": 19,
       "wins": 10,
@@ -651,7 +804,111 @@
       ]
     },
     {
-      "rank": 7,
+      "rank": 8,
+      "model": "minimaxm3",
+      "games": 15,
+      "wins": 7,
+      "losses": 7,
+      "draws": 1,
+      "top3": 13,
+      "winRate": 0.4667,
+      "top3Rate": 0.8667,
+      "avgRank": 1.93,
+      "avgScore": 1384.9,
+      "avgHqDamage": 38.5,
+      "duelGames": 11,
+      "duelWins": 6,
+      "duelLosses": 4,
+      "duelDraws": 1,
+      "duelWinRate": 0.5455,
+      "duelRating": 0.3161,
+      "multiGames": 4,
+      "multiPlacement": 0.475,
+      "multiRating": 0.1375,
+      "agents": {
+        "CC": 2,
+        "OMP": 10,
+        "PI": 3
+      },
+      "maps": {
+        "default": 3,
+        "multiplayer-ring": 2,
+        "danger-close": 3,
+        "breach": 2,
+        "artillery-zone": 4,
+        "standoff": 1
+      },
+      "versions": {
+        "V2": 3,
+        "V3": 12
+      },
+      "vs": {
+        "glm5.2": {
+          "games": 2,
+          "wins": 0
+        },
+        "mimo2.5pro": {
+          "games": 2,
+          "wins": 1
+        },
+        "hy3": {
+          "games": 3,
+          "wins": 0
+        },
+        "longcat2.0": {
+          "games": 4,
+          "wins": 3
+        },
+        "agnes2.0flash": {
+          "games": 1,
+          "wins": 1
+        },
+        "Qwen3.8MaxPreview": {
+          "games": 1,
+          "wins": 1
+        },
+        "step3.7flash": {
+          "games": 4,
+          "wins": 2
+        },
+        "dsv4flash0731": {
+          "games": 2,
+          "wins": 0
+        },
+        "gpt5.6luna": {
+          "games": 2,
+          "wins": 1
+        },
+        "doubaoseed2.1pro": {
+          "games": 1,
+          "wins": 0
+        },
+        "agnes2.5flash": {
+          "games": 1,
+          "wins": 1
+        },
+        "sensenova6.8flp": {
+          "games": 1,
+          "wins": 0
+        },
+        "qwen3.7max": {
+          "games": 1,
+          "wins": 1
+        }
+      },
+      "recent": [
+        "tg_0048",
+        "tg_0065",
+        "tg_0074",
+        "tg_0075",
+        "tg_0077",
+        "tg_0089",
+        "tg_0091",
+        "tg_0124"
+      ]
+    },
+    {
+      "rank": 9,
       "model": "doubaoseed2.1pro",
       "games": 7,
       "wins": 3,
@@ -747,249 +1004,6 @@
       ]
     },
     {
-      "rank": 8,
-      "model": "hy3",
-      "games": 20,
-      "wins": 12,
-      "losses": 8,
-      "draws": 0,
-      "top3": 19,
-      "winRate": 0.6,
-      "top3Rate": 0.95,
-      "avgRank": 1.5,
-      "avgScore": 1362.9,
-      "avgHqDamage": 27.6,
-      "duelGames": 13,
-      "duelWins": 7,
-      "duelLosses": 6,
-      "duelDraws": 0,
-      "duelWinRate": 0.5385,
-      "duelRating": 0.2914,
-      "multiGames": 7,
-      "multiPlacement": 0.8286,
-      "multiRating": 0.4594,
-      "agents": {
-        "WB": 20
-      },
-      "maps": {
-        "breach": 5,
-        "multiplayer-ring": 4,
-        "forge": 1,
-        "dual-lanes": 2,
-        "danger-close": 4,
-        "four-corners": 1,
-        "artillery-zone": 2,
-        "default": 1
-      },
-      "versions": {
-        "V2": 3,
-        "V3": 17
-      },
-      "vs": {
-        "step3.7flash": {
-          "games": 4,
-          "wins": 4
-        },
-        "DeepseekV4FlashPreview": {
-          "games": 2,
-          "wins": 1
-        },
-        "longcat2.0": {
-          "games": 4,
-          "wins": 3
-        },
-        "sensenova6.7fl": {
-          "games": 1,
-          "wins": 1
-        },
-        "mimo2.5pro": {
-          "games": 2,
-          "wins": 2
-        },
-        "minimaxm3": {
-          "games": 3,
-          "wins": 3
-        },
-        "doubaoseed2.1pro": {
-          "games": 3,
-          "wins": 2
-        },
-        "Qwen3.8MaxPreview": {
-          "games": 2,
-          "wins": 1
-        },
-        "glm5.2": {
-          "games": 3,
-          "wins": 1
-        },
-        "DeepseekV4ProPreview": {
-          "games": 1,
-          "wins": 0
-        },
-        "qwen3.7max": {
-          "games": 1,
-          "wins": 1
-        },
-        "gptoss120b": {
-          "games": 1,
-          "wins": 1
-        },
-        "dsv4flash0731": {
-          "games": 3,
-          "wins": 2
-        },
-        "gpt5.6luna": {
-          "games": 1,
-          "wins": 1
-        },
-        "agnes2.5flash": {
-          "games": 1,
-          "wins": 1
-        },
-        "sensenova6.8flp": {
-          "games": 1,
-          "wins": 1
-        },
-        "Qwen3.8Max": {
-          "games": 1,
-          "wins": 0
-        },
-        "glm5.3": {
-          "games": 1,
-          "wins": 1
-        },
-        "qwen3.8v27b": {
-          "games": 2,
-          "wins": 1
-        },
-        "dots3-note-prev": {
-          "games": 1,
-          "wins": 1
-        },
-        "gpt5.6terra": {
-          "games": 1,
-          "wins": 1
-        },
-        "oxalpha": {
-          "games": 1,
-          "wins": 1
-        }
-      },
-      "recent": [
-        "tg_0068",
-        "tg_0074",
-        "tg_0089",
-        "tg_0093",
-        "tg_0100",
-        "tg_0108",
-        "tg_0117",
-        "tg_0121"
-      ]
-    },
-    {
-      "rank": 9,
-      "model": "minimaxm3",
-      "games": 14,
-      "wins": 6,
-      "losses": 7,
-      "draws": 1,
-      "top3": 12,
-      "winRate": 0.4286,
-      "top3Rate": 0.8571,
-      "avgRank": 2,
-      "avgScore": 1399.3,
-      "avgHqDamage": 41.7,
-      "duelGames": 10,
-      "duelWins": 5,
-      "duelLosses": 4,
-      "duelDraws": 1,
-      "duelWinRate": 0.5,
-      "duelRating": 0.2737,
-      "multiGames": 4,
-      "multiPlacement": 0.475,
-      "multiRating": 0.1375,
-      "agents": {
-        "CC": 2,
-        "OMP": 9,
-        "PI": 3
-      },
-      "maps": {
-        "default": 3,
-        "multiplayer-ring": 2,
-        "danger-close": 3,
-        "breach": 2,
-        "artillery-zone": 4
-      },
-      "versions": {
-        "V2": 3,
-        "V3": 11
-      },
-      "vs": {
-        "glm5.2": {
-          "games": 2,
-          "wins": 0
-        },
-        "mimo2.5pro": {
-          "games": 2,
-          "wins": 1
-        },
-        "hy3": {
-          "games": 3,
-          "wins": 0
-        },
-        "longcat2.0": {
-          "games": 3,
-          "wins": 2
-        },
-        "agnes2.0flash": {
-          "games": 1,
-          "wins": 1
-        },
-        "Qwen3.8MaxPreview": {
-          "games": 1,
-          "wins": 1
-        },
-        "step3.7flash": {
-          "games": 4,
-          "wins": 2
-        },
-        "dsv4flash0731": {
-          "games": 2,
-          "wins": 0
-        },
-        "gpt5.6luna": {
-          "games": 2,
-          "wins": 1
-        },
-        "doubaoseed2.1pro": {
-          "games": 1,
-          "wins": 0
-        },
-        "agnes2.5flash": {
-          "games": 1,
-          "wins": 1
-        },
-        "sensenova6.8flp": {
-          "games": 1,
-          "wins": 0
-        },
-        "qwen3.7max": {
-          "games": 1,
-          "wins": 1
-        }
-      },
-      "recent": [
-        "tg_0047",
-        "tg_0048",
-        "tg_0065",
-        "tg_0074",
-        "tg_0075",
-        "tg_0077",
-        "tg_0089",
-        "tg_0091"
-      ]
-    },
-    {
       "rank": 10,
       "model": "Qwen3.8Max",
       "games": 7,
@@ -1061,136 +1075,6 @@
     },
     {
       "rank": 11,
-      "model": "longcat2.0",
-      "games": 19,
-      "wins": 9,
-      "losses": 10,
-      "draws": 0,
-      "top3": 17,
-      "winRate": 0.4737,
-      "top3Rate": 0.8947,
-      "avgRank": 1.89,
-      "avgScore": 1152.7,
-      "avgHqDamage": 27.3,
-      "duelGames": 15,
-      "duelWins": 7,
-      "duelLosses": 8,
-      "duelDraws": 0,
-      "duelWinRate": 0.4667,
-      "duelRating": 0.2481,
-      "multiGames": 4,
-      "multiPlacement": 0.55,
-      "multiRating": 0.1764,
-      "agents": {
-        "PI": 8,
-        "OMP": 8,
-        "CP": 3
-      },
-      "maps": {
-        "default": 1,
-        "dual-lanes": 1,
-        "breach": 4,
-        "multiplayer-ring": 2,
-        "danger-close": 5,
-        "forge": 1,
-        "four-corners": 1,
-        "artillery-zone": 4
-      },
-      "versions": {
-        "V2": 3,
-        "V3": 16
-      },
-      "vs": {
-        "qwen3.6v35b": {
-          "games": 1,
-          "wins": 1
-        },
-        "agnes2.0flash": {
-          "games": 2,
-          "wins": 2
-        },
-        "hy3": {
-          "games": 4,
-          "wins": 1
-        },
-        "step3.7flash": {
-          "games": 3,
-          "wins": 2
-        },
-        "DeepseekV4FlashPreview": {
-          "games": 1,
-          "wins": 0
-        },
-        "mimo2.5pro": {
-          "games": 1,
-          "wins": 0
-        },
-        "doubaoseed2.1pro": {
-          "games": 2,
-          "wins": 1
-        },
-        "Qwen3.8MaxPreview": {
-          "games": 1,
-          "wins": 0
-        },
-        "minimaxm3": {
-          "games": 3,
-          "wins": 1
-        },
-        "glm5.1": {
-          "games": 1,
-          "wins": 1
-        },
-        "grok4.5": {
-          "games": 1,
-          "wins": 0
-        },
-        "glm5.2": {
-          "games": 2,
-          "wins": 1
-        },
-        "ring2.6": {
-          "games": 1,
-          "wins": 0
-        },
-        "dsv4flash0731": {
-          "games": 2,
-          "wins": 1
-        },
-        "agnes2.5pro": {
-          "games": 1,
-          "wins": 1
-        },
-        "agnes2.5flash": {
-          "games": 1,
-          "wins": 1
-        },
-        "sensenova6.8flp": {
-          "games": 1,
-          "wins": 0
-        },
-        "glm5.3": {
-          "games": 1,
-          "wins": 0
-        },
-        "qwen3.8v27b": {
-          "games": 1,
-          "wins": 0
-        }
-      },
-      "recent": [
-        "tg_0060",
-        "tg_0061",
-        "tg_0071",
-        "tg_0083",
-        "tg_0086",
-        "tg_0089",
-        "tg_0102",
-        "tg_0114"
-      ]
-    },
-    {
-      "rank": 12,
       "model": "grok4.5",
       "games": 6,
       "wins": 3,
@@ -1261,6 +1145,137 @@
         "tg_0055",
         "tg_0059",
         "tg_0072"
+      ]
+    },
+    {
+      "rank": 12,
+      "model": "longcat2.0",
+      "games": 21,
+      "wins": 9,
+      "losses": 12,
+      "draws": 0,
+      "top3": 19,
+      "winRate": 0.4286,
+      "top3Rate": 0.9048,
+      "avgRank": 1.9,
+      "avgScore": 1128.9,
+      "avgHqDamage": 24.6,
+      "duelGames": 17,
+      "duelWins": 7,
+      "duelLosses": 10,
+      "duelDraws": 0,
+      "duelWinRate": 0.4118,
+      "duelRating": 0.2161,
+      "multiGames": 4,
+      "multiPlacement": 0.55,
+      "multiRating": 0.1764,
+      "agents": {
+        "PI": 9,
+        "OMP": 8,
+        "CP": 4
+      },
+      "maps": {
+        "default": 1,
+        "dual-lanes": 1,
+        "breach": 4,
+        "multiplayer-ring": 2,
+        "danger-close": 5,
+        "forge": 1,
+        "four-corners": 1,
+        "artillery-zone": 4,
+        "standoff": 2
+      },
+      "versions": {
+        "V2": 3,
+        "V3": 18
+      },
+      "vs": {
+        "qwen3.6v35b": {
+          "games": 1,
+          "wins": 1
+        },
+        "agnes2.0flash": {
+          "games": 2,
+          "wins": 2
+        },
+        "hy3": {
+          "games": 5,
+          "wins": 1
+        },
+        "step3.7flash": {
+          "games": 3,
+          "wins": 2
+        },
+        "DeepseekV4FlashPreview": {
+          "games": 1,
+          "wins": 0
+        },
+        "mimo2.5pro": {
+          "games": 1,
+          "wins": 0
+        },
+        "doubaoseed2.1pro": {
+          "games": 2,
+          "wins": 1
+        },
+        "Qwen3.8MaxPreview": {
+          "games": 1,
+          "wins": 0
+        },
+        "minimaxm3": {
+          "games": 4,
+          "wins": 1
+        },
+        "glm5.1": {
+          "games": 1,
+          "wins": 1
+        },
+        "grok4.5": {
+          "games": 1,
+          "wins": 0
+        },
+        "glm5.2": {
+          "games": 2,
+          "wins": 1
+        },
+        "ring2.6": {
+          "games": 1,
+          "wins": 0
+        },
+        "dsv4flash0731": {
+          "games": 2,
+          "wins": 1
+        },
+        "agnes2.5pro": {
+          "games": 1,
+          "wins": 1
+        },
+        "agnes2.5flash": {
+          "games": 1,
+          "wins": 1
+        },
+        "sensenova6.8flp": {
+          "games": 1,
+          "wins": 0
+        },
+        "glm5.3": {
+          "games": 1,
+          "wins": 0
+        },
+        "qwen3.8v27b": {
+          "games": 1,
+          "wins": 0
+        }
+      },
+      "recent": [
+        "tg_0071",
+        "tg_0083",
+        "tg_0086",
+        "tg_0089",
+        "tg_0102",
+        "tg_0114",
+        "tg_0122",
+        "tg_0124"
       ]
     },
     {
@@ -2696,6 +2711,88 @@
     },
     {
       "rank": 37,
+      "model": "qwen3.8flash",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "draws": 0,
+      "top3": 1,
+      "winRate": 0,
+      "top3Rate": 1,
+      "avgRank": 2,
+      "avgScore": 462,
+      "avgHqDamage": 0,
+      "duelGames": 1,
+      "duelWins": 0,
+      "duelLosses": 1,
+      "duelDraws": 0,
+      "duelWinRate": 0,
+      "duelRating": 0,
+      "multiGames": 0,
+      "multiPlacement": null,
+      "multiRating": null,
+      "agents": {
+        "QD": 1
+      },
+      "maps": {
+        "artillery-zone": 1
+      },
+      "versions": {
+        "V3": 1
+      },
+      "vs": {
+        "qwen3.8v27b": {
+          "games": 1,
+          "wins": 0
+        }
+      },
+      "recent": [
+        "tg_0123"
+      ]
+    },
+    {
+      "rank": 38,
+      "model": "glm5.3flash",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "draws": 0,
+      "top3": 1,
+      "winRate": 0,
+      "top3Rate": 1,
+      "avgRank": 2,
+      "avgScore": 1354,
+      "avgHqDamage": 52,
+      "duelGames": 1,
+      "duelWins": 0,
+      "duelLosses": 1,
+      "duelDraws": 0,
+      "duelWinRate": 0,
+      "duelRating": 0,
+      "multiGames": 0,
+      "multiPlacement": null,
+      "multiRating": null,
+      "agents": {
+        "OMP": 1
+      },
+      "maps": {
+        "danger-close": 1
+      },
+      "versions": {
+        "V3": 1
+      },
+      "vs": {
+        "hy3": {
+          "games": 1,
+          "wins": 0
+        }
+      },
+      "recent": [
+        "tg_0125"
+      ]
+    },
+    {
+      "rank": 39,
       "model": "gpt5.6luna",
       "games": 2,
       "wins": 0,
@@ -2754,7 +2851,7 @@
       ]
     },
     {
-      "rank": 38,
+      "rank": 40,
       "model": "dots3-note-prev",
       "games": 1,
       "wins": 0,
@@ -2814,12 +2911,12 @@
   "agentLeaderboard": [
     {
       "agent": "OMP",
-      "games": 95,
-      "wins": 37,
-      "winRate": 0.3895,
+      "games": 98,
+      "wins": 39,
+      "winRate": 0.398,
       "models": {
         "mimo2.5pro": 3,
-        "minimaxm3": 9,
+        "minimaxm3": 10,
         "glm5.1": 4,
         "agnes2.0flash": 4,
         "longcat2.0": 8,
@@ -2838,23 +2935,24 @@
         "sensenova6.8flp": 6,
         "agnes2.5pro": 1,
         "gpt5.6terra": 4,
-        "qwen3.8v27b": 7,
+        "qwen3.8v27b": 8,
         "dots3noteprev": 3,
-        "dots3-note-prev": 1
+        "dots3-note-prev": 1,
+        "glm5.3flash": 1
       }
     },
     {
       "agent": "PI",
-      "games": 71,
+      "games": 72,
       "wins": 30,
-      "winRate": 0.4225,
+      "winRate": 0.4167,
       "models": {
         "mimo2.5pro": 9,
         "DeepseekV4FlashPreview": 8,
         "glm4.7": 1,
         "qwen3.6v35b": 3,
         "step3.7flash": 6,
-        "longcat2.0": 8,
+        "longcat2.0": 9,
         "sensenova6.7fl": 2,
         "agnes2.0flash": 2,
         "doubaoseed2.1pro": 4,
@@ -2875,12 +2973,12 @@
     },
     {
       "agent": "WB",
-      "games": 38,
-      "wins": 24,
-      "winRate": 0.6316,
+      "games": 40,
+      "wins": 26,
+      "winRate": 0.65,
       "models": {
         "DeepseekV4ProPreview": 3,
-        "hy3": 20,
+        "hy3": 22,
         "glm5.2": 8,
         "kimik3": 6,
         "glm5.1": 1
@@ -2898,15 +2996,16 @@
     },
     {
       "agent": "QD",
-      "games": 13,
+      "games": 14,
       "wins": 5,
-      "winRate": 0.3846,
+      "winRate": 0.3571,
       "models": {
         "Qwen3.8MaxPreview": 5,
         "Qwen3.8Max": 5,
         "qwen3.7max": 1,
         "dsv4flash0731": 1,
-        "dsv4pro0813": 1
+        "dsv4pro0813": 1,
+        "qwen3.8flash": 1
       }
     },
     {
@@ -2931,11 +3030,11 @@
     },
     {
       "agent": "CP",
-      "games": 6,
+      "games": 7,
       "wins": 3,
-      "winRate": 0.5,
+      "winRate": 0.4286,
       "models": {
-        "longcat2.0": 3,
+        "longcat2.0": 4,
         "dsv4flash0731": 2,
         "kimik3": 1
       }
@@ -2974,17 +3073,29 @@
   "mapStats": [
     {
       "mapId": "artillery-zone",
-      "games": 30,
+      "games": 31,
       "reasons": {
         "last_player_standing": 8,
-        "turn_limit_score": 22
+        "turn_limit_score": 23
       },
       "playerCounts": {
-        "2": 26,
+        "2": 27,
         "3": 2,
         "6": 2
       },
-      "avgRounds": 11.67
+      "avgRounds": 11.68
+    },
+    {
+      "mapId": "danger-close",
+      "games": 26,
+      "reasons": {
+        "last_player_standing": 24,
+        "forced_adjudication_score": 2
+      },
+      "playerCounts": {
+        "2": 26
+      },
+      "avgRounds": 13.12
     },
     {
       "mapId": "default",
@@ -2998,18 +3109,6 @@
         "2": 25
       },
       "avgRounds": 0.6
-    },
-    {
-      "mapId": "danger-close",
-      "games": 25,
-      "reasons": {
-        "last_player_standing": 23,
-        "forced_adjudication_score": 2
-      },
-      "playerCounts": {
-        "2": 25
-      },
-      "avgRounds": 12.72
     },
     {
       "mapId": "breach",
@@ -3062,6 +3161,17 @@
       "avgRounds": 15.5
     },
     {
+      "mapId": "standoff",
+      "games": 2,
+      "reasons": {
+        "turn_limit_score": 2
+      },
+      "playerCounts": {
+        "2": 2
+      },
+      "avgRounds": 15
+    },
+    {
       "mapId": "four-corners",
       "games": 1,
       "reasons": {
@@ -3085,6 +3195,190 @@
     }
   ],
   "matches": [
+    {
+      "recordId": "tg_0125",
+      "version": "V3",
+      "date": "20260827",
+      "fileName": "tg_0125_20260827.json",
+      "gameId": "aa20256e-adb3-401d-a240-f452a99aa3a0",
+      "mapId": "danger-close",
+      "mode": "standard",
+      "schemaVersion": "3.3.4",
+      "playerCount": 2,
+      "winner": "player_a",
+      "reason": "last_player_standing",
+      "completed": true,
+      "eventCount": 221,
+      "rounds": 23,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "Hy3-WB",
+          "model": "hy3",
+          "agent": "WB",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 2722,
+          "headquartersDamage": 120,
+          "artilleryDamage": 0
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "GLM5.3Flash-OMP",
+          "model": "glm5.3flash",
+          "agent": "OMP",
+          "rank": 2,
+          "isWinner": false,
+          "status": "eliminated",
+          "scoreTotal": 1354,
+          "headquartersDamage": 52,
+          "artilleryDamage": 0
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
+    {
+      "recordId": "tg_0124",
+      "version": "V3",
+      "date": "20260827",
+      "fileName": "tg_0124_20260827.json",
+      "gameId": "a8303c83-8ad1-4bfa-bc15-2e3b1c433100",
+      "mapId": "standoff",
+      "mode": "simultaneous",
+      "schemaVersion": "3.3.4",
+      "playerCount": 2,
+      "winner": "player_a",
+      "reason": "turn_limit_score",
+      "completed": true,
+      "eventCount": 273,
+      "rounds": 15,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "MiniMaxM3-OMP",
+          "model": "minimaxm3",
+          "agent": "OMP",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 1212.05,
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "LongCat2.0-CP",
+          "model": "longcat2.0",
+          "agent": "CP",
+          "rank": 2,
+          "isWinner": false,
+          "status": "active",
+          "scoreTotal": 722.25,
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
+    {
+      "recordId": "tg_0123",
+      "version": "V3",
+      "date": "20260827",
+      "fileName": "tg_0123_20260827.json",
+      "gameId": "6fce3079-32cf-49bd-9e84-65dc54e62ed9",
+      "mapId": "artillery-zone",
+      "mode": "annihilation",
+      "schemaVersion": "3.3.4",
+      "playerCount": 2,
+      "winner": "player_a",
+      "reason": "turn_limit_score",
+      "completed": true,
+      "eventCount": 216,
+      "rounds": 12,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "Qwen3.8v27b-OMP",
+          "model": "qwen3.8v27b",
+          "agent": "OMP",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 996,
+          "headquartersDamage": 0,
+          "artilleryDamage": 50
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "Qwen3.8Flash-QD",
+          "model": "qwen3.8flash",
+          "agent": "QD",
+          "rank": 2,
+          "isWinner": false,
+          "status": "active",
+          "scoreTotal": 462,
+          "headquartersDamage": 0,
+          "artilleryDamage": 150
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
+    {
+      "recordId": "tg_0122",
+      "version": "V3",
+      "date": "20260825",
+      "fileName": "tg_0122_20260825.json",
+      "gameId": "9c0b9970-6920-49a8-9d3a-2c9dc1d89b83",
+      "mapId": "standoff",
+      "mode": "simultaneous",
+      "schemaVersion": "3.3.3",
+      "playerCount": 2,
+      "winner": "player_a",
+      "reason": "turn_limit_score",
+      "completed": true,
+      "eventCount": 271,
+      "rounds": 15,
+      "participants": [
+        {
+          "playerId": "player_a",
+          "displayName": "Hy3-WB",
+          "model": "hy3",
+          "agent": "WB",
+          "rank": 1,
+          "isWinner": true,
+          "status": "active",
+          "scoreTotal": 1357,
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
+        },
+        {
+          "playerId": "player_b",
+          "displayName": "LongCat2.0-PI",
+          "model": "longcat2.0",
+          "agent": "PI",
+          "rank": 2,
+          "isWinner": false,
+          "status": "active",
+          "scoreTotal": 1106,
+          "headquartersDamage": 0,
+          "artilleryDamage": 0
+        }
+      ],
+      "reviewFlags": {
+        "terminated": false,
+        "deadlock": false
+      }
+    },
     {
       "recordId": "tg_0121",
       "version": "V3",

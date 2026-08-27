@@ -1,0 +1,153 @@
+/* ══════════ 布局编辑器（拖拽自定义布局） ══════════ */
+
+/* 布局分区：左侧 / 右侧 / 底部 */
+.tg-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  align-self: start;
+}
+/* 底部区域：与中间地图同列同宽，卡片撑满列宽 */
+.tg-zone-bottom .tg-card {
+  width: 100%;
+  position: static !important;
+}
+.tg-zone-bottom .tg-drop-placeholder {
+  width: 100%;
+}
+
+/* 单位状态卡片原本固定 200px 宽，进入分区后与其他卡片同宽 */
+.tg-zone #selection-panel,
+.tg-zone .selection-panel {
+  width: auto;
+}
+
+/* 拖拽状态 */
+.tg-card.tg-dragging { opacity: .4; }
+.tg-drop-placeholder {
+  border: 2px dashed #4d7892;
+  border-radius: 8px;
+  background: rgba(77, 120, 146, .1);
+  flex-shrink: 0;
+}
+.tg-zone.tg-over {
+  outline: 1px dashed #4d7892;
+  outline-offset: -1px;
+  border-radius: 10px;
+}
+
+/* 编辑模式 */
+body.tg-editing { user-select: none; }
+body.tg-editing .tg-card {
+  cursor: grab;
+  outline: 1px dashed rgba(122, 154, 170, .55);
+  outline-offset: 3px;
+}
+body.tg-editing .tg-card:active { cursor: grabbing; }
+body.tg-editing .tg-card > * { pointer-events: none !important; }
+body.tg-editing #board { pointer-events: none; }
+body.tg-editing #replay-controls { pointer-events: none; opacity: .55; }
+body.tg-editing #cell-info,
+body.tg-editing .cell-info,
+body.tg-editing #map-popup { display: none; }
+
+/* 编辑模式下的空分区提示 */
+body.tg-editing .tg-zone.tg-empty {
+  display: flex !important;
+  min-height: 84px;
+  border: 2px dashed rgba(42, 64, 84, .9);
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+}
+body.tg-editing .tg-zone.tg-empty::before {
+  content: '拖拽卡片到此区域';
+  font-size: 12px;
+  color: #55707f;
+}
+body.tg-editing .tg-zone.tg-empty:has(.tg-drop-placeholder)::before { display: none; }
+
+/* 编辑工具栏 */
+#tg-edit-toolbar {
+  position: fixed;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100vw - 40px);
+  background: #101923;
+  border: 1px solid #2a4054;
+  border-radius: 10px;
+  padding: 8px 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .45);
+}
+#tg-edit-toolbar .tg-hint {
+  font-size: 12px;
+  color: #7a9aaa;
+  line-height: 1.4;
+}
+#tg-edit-toolbar button {
+  background: #1e2e3e;
+  color: #b0c8d8;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+}
+#tg-edit-toolbar button:hover { background: #26384a; color: #d8e0e8; }
+#tg-edit-toolbar button.tg-primary {
+  background: #1a4a2a;
+  border-color: #2a8a4a;
+  color: #8fda9f;
+}
+#tg-edit-toolbar button.tg-primary:hover { background: #205934; }
+
+/* 地图框缩放（整体大小，非地图缩放） */
+.tg-board { position: relative; }
+.tg-board-resizer {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+  z-index: 40;
+  background: linear-gradient(135deg, transparent 50%, #4d7892 50%);
+  border-bottom-right-radius: 8px;
+  touch-action: none;
+}
+body.tg-editing .tg-board-resizer { display: block; }
+body.tg-editing .tg-board-resizer:hover {
+  background: linear-gradient(135deg, transparent 50%, #6cf 50%);
+}
+.tg-board.tg-board-resized { max-width: 100%; }
+.tg-board.tg-board-resized canvas { width: 100%; height: auto; }
+
+/* 窄屏回退（与页面原有 @media 1180px 堆叠布局配合） */
+@media (max-width: 1180px) {
+  .tg-zone-left {
+    order: 1;
+    width: 100%;
+    max-width: 760px;
+  }
+  .tg-zone-right {
+    order: 3;
+    width: 100%;
+    max-width: 760px;
+  }
+  .tg-zone-bottom {
+    order: 4;
+    width: 100%;
+    max-width: 760px;
+  }
+}

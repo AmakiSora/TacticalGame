@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>TacticalGame — 观战</title>
   <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/layout-editor.css" />
   <script>
     if (window.matchMedia('(max-width: 820px)').matches) {
       location.replace('/spectator-m.html' + location.search + location.hash);
@@ -56,6 +57,8 @@
             <span>跟随最新</span>
             <span class="toggle"><input type="checkbox" id="follow-latest" /><span class="slider"></span></span>
           </label>
+          <div class="settings-divider"></div>
+          <button id="btn-edit-layout" type="button" class="settings-action">改变布局</button>
           <div class="settings-divider"></div>
           <label class="setting-field">
             <span>Control token</span>
@@ -111,6 +114,7 @@
   </main>
   <script src="/version.js"></script>
 <script src="/board-animation.js?v=3.2.6"></script>
-<script src="/app.js?v=3.3.4"></script>
+<script src="/app.js?v=3.3.5"></script>
+<script src="/layout-editor.js?v=3.3.5"></script>
 </body>
 </html>

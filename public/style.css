@@ -381,7 +381,7 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .5px; 
 /* Main layout */
 main {
   display: grid;
-  grid-template-columns: minmax(190px, 220px) minmax(420px, auto) minmax(300px, 340px);
+  grid-template-columns: var(--tg-grid, minmax(190px, 220px) minmax(420px, auto) minmax(300px, 340px));
   padding: 16px 20px 24px;
   gap: 16px;
   justify-content: center;
@@ -679,21 +679,19 @@ main {
 .marker-other { background: #3a5a7a; }
 
 /* Sidebar */
+/* 去除侧栏自身滚动条与粘性定位，整页统一滚动（布局编辑器可将其作为右侧分区） */
 #sidebar {
-  width: 300px;
-  flex-shrink: 0;
+  width: auto;
   display: flex; flex-direction: column; gap: 12px;
-  position: sticky; top: 16px;
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
 }
-#sidebar section {
+#sidebar section,
+.tg-zone section {
   background: #141c26;
   border: 1px solid #1e2e3e;
   border-radius: 8px;
   padding: 12px 14px;
 }
-#sidebar h3 { margin: 0 0 8px; font-size: 13px; color: #7a9aaa; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+#sidebar h3, .tg-zone h3 { margin: 0 0 8px; font-size: 13px; color: #7a9aaa; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
 
 .resource-grid {
   display: grid;
@@ -815,7 +813,7 @@ main {
   font-weight: 700;
   font-size: 12px;
 }
-#events { list-style: none; padding: 0; margin: 0; font-size: 12px; max-height: 300px; overflow-y: auto; font-family: "SF Mono", "Consolas", "Cascadia Code", monospace; }
+#events { list-style: none; padding: 0; margin: 0; font-size: 12px; font-family: "SF Mono", "Consolas", "Cascadia Code", monospace; }
 #events li {
   padding: 4px 8px; margin: 2px 0;
   background: #0f141c; border-left: 3px solid #3a5a7a;
@@ -1050,6 +1048,16 @@ main {
     max-height: none;
     position: static;
     order: 3;
+  }
+  .tg-zone-left {
+    width: 100%;
+    max-width: 760px;
+    order: 1;
+  }
+  .tg-zone-bottom {
+    width: 100%;
+    max-width: 760px;
+    order: 4;
   }
 }
 

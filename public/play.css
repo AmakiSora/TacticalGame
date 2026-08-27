@@ -709,7 +709,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 /* ══════════ main layout ══════════ */
 #game-ui {
   display: grid;
-  grid-template-columns: minmax(200px, 240px) minmax(420px, auto) minmax(330px, 380px);
+  grid-template-columns: var(--tg-grid, minmax(200px, 240px) minmax(420px, auto) minmax(330px, 380px));
   padding: 18px 24px 24px;
   gap: 18px;
   align-items: flex-start;
@@ -900,21 +900,21 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .sel-coord, .sel-note { color: #668495; font-size: 12px; }
 
 /* ══════════ sidebar ══════════ */
+/* 去除侧栏自身滚动条，整页统一滚动（布局编辑器可将其作为右侧分区） */
 #sidebar {
-  width: 360px;
-  max-height: calc(100vh - 90px);
-  overflow-y: auto;
+  width: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-#sidebar section {
+#sidebar section,
+.tg-zone section {
   background: #141c26;
   border: 1px solid #1e2e3e;
   border-radius: 8px;
   padding: 14px 16px;
 }
-#sidebar h3 { font-size: 13px; font-weight: 700; color: #7a9aaa; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+#sidebar h3, .tg-zone h3 { font-size: 13px; font-weight: 700; color: #7a9aaa; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
 
 /* turn badge */
 .turn-badge {
@@ -1129,7 +1129,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .hint-key { color: #8ab; font-weight: 600; }
 
 /* event log */
-#events { list-style: none; max-height: 240px; overflow-y: auto; font-size: 12px; font-family: "SF Mono", "Consolas", monospace; }
+#events { list-style: none; font-size: 12px; font-family: "SF Mono", "Consolas", monospace; }
 #events li {
   padding: 4px 8px;
   margin: 2px 0;
@@ -1247,6 +1247,16 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
     max-width: 760px;
     max-height: none;
     order: 3;
+  }
+  .tg-zone-left {
+    width: 100%;
+    max-width: 760px;
+    order: 1;
+  }
+  .tg-zone-bottom {
+    width: 100%;
+    max-width: 760px;
+    order: 4;
   }
 }
 

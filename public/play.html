@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>TacticalGame — 玩家控制台</title>
   <link rel="stylesheet" href="/play.css" />
+  <link rel="stylesheet" href="/layout-editor.css" />
   <script>
     if (window.matchMedia('(max-width: 820px)').matches) {
       location.replace('/play-m.html' + location.search + location.hash);
@@ -29,6 +30,8 @@
       <div id="settings-wrap" class="settings-tools">
         <button id="btn-settings" type="button" title="设置">&#9881;</button>
         <div id="settings-popover">
+          <button id="btn-edit-layout" type="button" class="settings-action">改变布局</button>
+          <div class="settings-divider"></div>
           <label class="setting-field">
             <span>Control token</span>
             <input id="settings-control-token" type="password" placeholder="Control token" autocomplete="off" />
@@ -223,5 +226,6 @@
 <script src="/board-animation.js?v=3.2.6"></script>
 <script src="/playback.js?v=3.2.6"></script>
 <script src="/play.js?v=3.2.6"></script>
+<script src="/layout-editor.js?v=3.3.5"></script>
 </body>
 </html>

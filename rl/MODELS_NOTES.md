@@ -190,8 +190,8 @@ v2.1.7 改动误删了“智能体动作后、对手阶段前”的状态刷新�
 - `rl/checkpoints/default/20260827-044352/`：v2.1.6，至 800,000 步。
 - `rl/checkpoints/default/20260827-124430/`：v2.1.7→v2.1.8 续训运行（首次运行在约 13 万步处崩溃），至 920,000 步。
 - `rl/checkpoints/default/20260827-182746/`：**v2.2.0，至 800,000 步；`best/best_model.zip` 即当前推荐模型的来源**。
-- `rl/checkpoints/default/`：v1 随机对手的 20,000–120,000 步 checkpoint 与 best 文件。
-- `rl/test-output/model.zip`、`rl/test-v2/model.zip`：v1/v2.0 接口测试（256 步）。
+- `rl/checkpoints/default/`：v1 随机对手的 20,000–120,000 步 checkpoint 和 best 文件。
+- `rl/test-output/`：仅存历史评估脚本（`eval_candidates.py` / `eval_final.py`），接口测试模型快照已清理。
 
 检查点文件名中的 `_steps` 是保存时累计步数；正式模型文件名最后的数字是训练目标步数（续训产物的实际步数可能更高，以 zip 内 `num_timesteps` 为准）。自 v2.2.1 起，`rl/models/` 的交付文件为评估 best 断点而非训练终点。
 

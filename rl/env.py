@@ -183,19 +183,19 @@ class HexGameEnv(gym.Env):
             self.state = self._get_state(self.player_token)
             return self._encode_state(self.state), -0.05, self._game_over(), False, {"invalid": True}
 
-        # Attribute progress to the agent action before the opponent responds.
-        self.state = self._get_state(self.player_token)
-        immediate_snapshot = self._strategic_snapshot(self.state)
-        immediate_score = self._score(self.state)
-        reward = float(np.clip((immediate_score - self.previous_score) / 100.0, -1.0, 1.0))
-        reward += self._shaped_reward(before, immediate_snapshot, action_type)
-        self.action_counts[action_type] = self.action_counts.get(action_type, 0) + 1
-
+        # Score adjudication (control-point capture, income) settles at turn
+        # boundaries, i.e. during/after the opponent response.  Settling the
+        # reward after the opponent acts (like v2.0.0) keeps the dominant
+        # capture signal inside the reward; settling immediately loses it to
+        # the next baseline update and the agent stops contesting points.
         self._play_opponent_until_agent_turn()
         self.state = self._get_state(self.player_token)
-        # The next baseline includes the opponent response, so it is not
-        # falsely attributed to the next agent action.
-        self.previous_score = self._score(self.state)
+
+        current_score = self._score(self.state)
+        reward = float(np.clip((current_score - self.previous_score) / 100.0, -1.0, 1.0))
+        reward += self._shaped_reward(before, self._strategic_snapshot(self.state), action_type)
+        self.action_counts[action_type] = self.action_counts.get(action_type, 0) + 1
+        self.previous_score = current_score
 
         terminated = self._game_over()
         if terminated:

@@ -313,7 +313,7 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
   );
 
   // 出生位配置（总部 + 初始单位）。
-  const spawnSlots = buildSpawnSlots(spawnPositions, playableSet, controlPoints);
+  const spawnSlots = buildSpawnSlots(spawnPositions, playableSet, controlPoints, symmetric);
 
   const config = {
     mode: 'standard',
@@ -527,29 +527,62 @@ function buildSpawnSlots(
   spawnPositions: Position[],
   playableSet: Set<string>,
   controlPoints: GeneratedControlPoint[],
+  symmetric: boolean,
 ): SpawnSlotConfig[] {
   const occupied = new Set<string>(controlPoints.map(cp => hexKey(cp)));
-  return spawnPositions.map((hq, index) => {
-    occupied.add(hexKey(hq));
-    const slotLetter = String.fromCharCode(97 + index);
-    // 初始单位放在最靠近地图中心的三个邻格：正对中心放侦察兵，两侧放步兵，
-    // 对称模式下镜像出生位的单位布局因此也严格镜像。
+  const slots: SpawnSlotConfig[] = new Array(spawnPositions.length);
+  const placed: boolean[] = new Array(spawnPositions.length).fill(false);
+
+  // 初始单位放在最靠近地图中心的三个邻格：正对中心放侦察兵，两侧放步兵。
+  const unitCellsFor = (hq: Position): Position[] => {
     const hqAngle = pixelAngle(mirror(hq));
-    const neighbors = HEX_OFFSETS
+    return HEX_OFFSETS
       .map(offset => ({ q: hq.q + offset.q, r: hq.r + offset.r }))
       .filter(cell => playableSet.has(hexKey(cell)) && !occupied.has(hexKey(cell)))
       .sort((a, b) => angleDiff(pixelAngle({ q: a.q - hq.q, r: a.r - hq.r }), hqAngle)
-        - angleDiff(pixelAngle({ q: b.q - hq.q, r: b.r - hq.r }), hqAngle));
-    const startingUnits = neighbors.slice(0, 3).map((cell, unitIndex) => {
-      occupied.add(hexKey(cell));
-      return { type: (unitIndex === 0 ? 'scout' : 'infantry') as UnitType, q: cell.q, r: cell.r };
-    });
-    return {
-      id: `slot_${slotLetter}`,
-      headquarters: { q: hq.q, r: hq.r },
-      startingUnits,
-    };
+        - angleDiff(pixelAngle({ q: b.q - hq.q, r: b.r - hq.r }), hqAngle))
+      .slice(0, 3);
+  };
+  const assignUnits = (cells: Position[]) => cells.map((cell, unitIndex) => {
+    occupied.add(hexKey(cell));
+    return { type: (unitIndex === 0 ? 'scout' : 'infantry') as UnitType, q: cell.q, r: cell.r };
   });
+
+  for (let index = 0; index < spawnPositions.length; index++) {
+    if (placed[index]) continue;
+    const hq = spawnPositions[index];
+    occupied.add(hexKey(hq));
+    // 偶数玩家对称局：镜像出生位成对处理，单位布局直接取反，
+    // 规避「最靠中心方向」出现角度平局时两侧侦察兵站位不镜像的边角情况。
+    const mirrorIndex = symmetric && spawnPositions.length % 2 === 0
+      ? (index + spawnPositions.length / 2) % spawnPositions.length
+      : -1;
+    if (mirrorIndex >= 0 && !placed[mirrorIndex]) {
+      const mirrorHq = mirror(hq);
+      occupied.add(hexKey(mirrorHq));
+      const cells = unitCellsFor(hq);
+      slots[index] = {
+        id: `slot_${String.fromCharCode(97 + index)}`,
+        headquarters: { q: hq.q, r: hq.r },
+        startingUnits: assignUnits(cells),
+      };
+      slots[mirrorIndex] = {
+        id: `slot_${String.fromCharCode(97 + mirrorIndex)}`,
+        headquarters: { q: mirrorHq.q, r: mirrorHq.r },
+        startingUnits: assignUnits(cells.map(cell => mirror(cell))),
+      };
+      placed[index] = true;
+      placed[mirrorIndex] = true;
+    } else {
+      slots[index] = {
+        id: `slot_${String.fromCharCode(97 + index)}`,
+        headquarters: { q: hq.q, r: hq.r },
+        startingUnits: assignUnits(unitCellsFor(hq)),
+      };
+      placed[index] = true;
+    }
+  }
+  return slots;
 }
 
 function buildUnitSpecs(variation: number, rng: () => number): Record<UnitType, UnitSpec> {

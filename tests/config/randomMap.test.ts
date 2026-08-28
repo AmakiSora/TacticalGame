@@ -81,6 +81,20 @@ describe('random map generator', () => {
         for (const slot of config.spawnSlots) {
           expect(slot.startingUnits.length).toBeGreaterThan(0);
         }
+        // 偶数人数对称局：成对出生位的总部与初始单位（含兵种）严格镜像。
+        if (playerCount % 2 === 0) {
+          for (let i = 0; i < playerCount / 2; i++) {
+            const slotA = config.spawnSlots[i];
+            const slotB = config.spawnSlots[i + playerCount / 2];
+            expect(slotB.headquarters).toEqual({ q: -slotA.headquarters.q, r: -slotA.headquarters.r });
+            expect(slotB.startingUnits).toHaveLength(slotA.startingUnits.length);
+            for (const unit of slotA.startingUnits) {
+              const twin = slotB.startingUnits.find(other => other.q === -unit.q && other.r === -unit.r);
+              expect(twin, `unit ${unit.type}@(${unit.q},${unit.r}) missing mirror`).toBeDefined();
+              expect(twin!.type).toBe(unit.type);
+            }
+          }
+        }
       }
     }
     resetConfig();

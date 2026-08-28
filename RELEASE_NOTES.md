@@ -7,6 +7,7 @@
 - **强化学习 AI 正式上线**：引入 `rl/` 本地 RL 训练全套——PPO 训练脚本与 `standoff` 同时回合环境（`rl/train.py`、`rl/env.py` 等）、按版本命名的模型库 `rl/models/`（档案见 `rl/MODELS_NOTES.md`）、按模型版本路由的代打脚本（`run_model.py` 系列，兼容 v1 512 动作空间与 v2.0 旧模型）；训练交付改用评估选出的 best 断点。v2.1.0–v2.2.1 迭代陆续修复回合交替损坏、奖励结算时机、对手动作语义错位等问题，并引入对手模型训练与座位随机化，详见 `rl/RELEASE_NOTES.md`。
 - **一键添加强化学习 AI 玩家**（房主专用）：桌面/移动端玩家页「等待开局」大厅新增「+ 添加 AI」入口，可自定义名称并从下拉框选择 `rl/models/` 中的训练模型；开局后服务器自动拉起 `rl/run_model.py` 子进程代打该座位直至终局（`X-Host-Token` 鉴权，token 仅服务器持有、任何响应不回传）。服务端新增 `src/api/bots.ts`：`GET /api/rl/models` 返回模型列表（含动作空间大小），`POST /api/games/:id/bots` 添加 AI 时校验大厅阶段、双人顺序对局限制与模型动作空间兼容性（非 54 拒选）；踢出 AI 同步清理登记、删除对局终止运行中的 AI 进程。
 - 测试：新增 `tests/api/bots.test.ts` 覆盖模型列表、token 鉴权、兼容性拒选、开局后 409 与注册表清理；桌面/移动双端新增「添加 AI」功能标记一致性断言。
+- 部署：Docker 镜像内置 Python RL 运行时（独立 venv + CPU 版 torch/SB3）与 `rl/models/` 模型库，容器内可直接拉起强化 AI；`deploy/deploy.py` 上传时排除 `.venv`/`checkpoints`/`tb` 等训练产物。
 
 ## 3.3.5
 

@@ -521,6 +521,13 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   void description;
 }
 
+/** 随机地图等运行时生成的配置复用与静态地图相同的完整校验。 */
+export function validateGeneratedMap(config: unknown, id = 'random'): MapConfig {
+  const normalized = normalizeMapConfig(config);
+  validateMap(id, normalized);
+  return normalized as MapConfig;
+}
+
 export function loadMaps(mapsDir?: string): void {
   const dir = mapsDir ?? join(PROJECT_ROOT, 'maps');
   let files: string[];
@@ -546,31 +553,36 @@ export function getMapConfig(id: string): MapConfig {
   return config;
 }
 
+/** 由完整地图配置构造前端预览数据；静态地图列表与随机地图预览共用。 */
+export function previewForConfig(cfg: MapConfig): MapPreview {
+  return {
+    mode: cfg.mode,
+    radius: cfg.radius,
+    maxTurns: cfg.balance.maxTurns,
+    actionsPerTurn: cfg.balance.actionsPerTurn,
+    cells: createMapCells(cfg.playableCells, cfg.terrainCells),
+    terrainCells: cfg.terrainCells.map(cell => ({ ...cell })),
+    controlPoints: cfg.controlPoints.map(point => ({ ...point })),
+    headquarters: {
+      player_a: { ...cfg.headquarters.player_a },
+      player_b: { ...cfg.headquarters.player_b },
+    },
+    spawnSlots: cfg.spawnSlots.map(slot => ({
+      ...slot,
+      headquarters: { ...slot.headquarters },
+      startingUnits: slot.startingUnits.map(unit => ({ ...unit })),
+    })),
+    supportedPlayerCounts: [...cfg.supportedPlayerCounts],
+    artillery: cfg.annihilation?.artillery ? { ...cfg.annihilation.artillery } : undefined,
+  };
+}
+
 export function listMaps(): MapListItem[] {
   return [...maps.entries()].map(([id, cfg]) => ({
     id,
     name: cfg.name,
     description: cfg.description,
-    preview: {
-      mode: cfg.mode,
-      radius: cfg.radius,
-      maxTurns: cfg.balance.maxTurns,
-      actionsPerTurn: cfg.balance.actionsPerTurn,
-      cells: createMapCells(cfg.playableCells, cfg.terrainCells),
-      terrainCells: cfg.terrainCells.map(cell => ({ ...cell })),
-      controlPoints: cfg.controlPoints.map(point => ({ ...point })),
-      headquarters: {
-        player_a: { ...cfg.headquarters.player_a },
-        player_b: { ...cfg.headquarters.player_b },
-      },
-      spawnSlots: cfg.spawnSlots.map(slot => ({
-        ...slot,
-        headquarters: { ...slot.headquarters },
-        startingUnits: slot.startingUnits.map(unit => ({ ...unit })),
-      })),
-      supportedPlayerCounts: [...cfg.supportedPlayerCounts],
-      artillery: cfg.annihilation?.artillery ? { ...cfg.annihilation.artillery } : undefined,
-    },
+    preview: previewForConfig(cfg),
   }));
 }
 

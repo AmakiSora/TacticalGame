@@ -88,7 +88,11 @@ function createCells(config: MapConfig): MapCell[] {
 }
 
 export function createLobby(id: string, mapId = 'default', options: CreateLobbyOptions): GameState {
-  const config = getMapConfig(mapId);
+  return createLobbyWithConfig(id, mapId, getMapConfig(mapId), options);
+}
+
+/** 用完整地图配置建大厅；随机地图等运行时生成的配置不注册进全局地图表，直接传入。 */
+export function createLobbyWithConfig(id: string, mapId: string, config: MapConfig, options: CreateLobbyOptions): GameState {
   const maxPlayers = Math.max(2, Math.min(8, Math.trunc(options.maxPlayers)));
   const game: GameState = {
     id, mapId, config, phase: 'lobby', maxPlayers, hostToken: generateToken(),

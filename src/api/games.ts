@@ -1,7 +1,7 @@
 // src/api/games.ts
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { globalStore, createLobby, addLobbyPlayer, removeLobbyPlayer, MAX_PLAYER_NAME_LEN } from '../state/store.js';
+import { globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer, MAX_PLAYER_NAME_LEN } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
@@ -11,6 +11,7 @@ import {
 } from './auth.js';
 import { authorizeControlRequest } from './controlAuth.js';
 import { listMaps } from '../config/loader.js';
+import { generateRandomMapConfig, sanitizeRandomOptions } from '../config/randomMap.js';
 import { isPlayerId } from '../types.js';
 import type { GameState, PlayerId } from '../types.js';
 import { launchBotsForGame, removeBotRecord, clearBotsForGame } from './bots.js';
@@ -47,20 +48,37 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     }).sort((a, b) => b.createdAt - a.createdAt),
   }));
 
-  app.post<{ Body: { mapId?: string; maxPlayers?: number; participate?: boolean; playerName?: string } }>(
+  app.post<{ Body: { mapId?: string; maxPlayers?: number; participate?: boolean; playerName?: string; random?: unknown } }>(
     '/api/games', async (req, reply) => {
       const mapId = req.body?.mapId || 'default';
-      const map = listMaps().find(item => item.id === mapId);
-      if (!map) return reply.code(400).send({ error: `Map "${mapId}" not found`, code: 'invalid_move' });
       const maxPlayers = Number(req.body?.maxPlayers ?? 2);
-      if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8 || !map.preview.supportedPlayerCounts.includes(maxPlayers)) {
+      if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8) {
         return reply.code(400).send({ error: 'unsupported player count', code: 'unsupported_player_count' });
       }
-      const game = createLobby(randomUUID(), mapId, {
+      const lobbyOptions = {
         maxPlayers,
         participate: req.body?.participate !== false,
         playerName: req.body?.playerName,
-      });
+      };
+      let game;
+      if (mapId === 'random') {
+        // 随机地图：服务端按参数现生成完整配置，不写入静态地图表。
+        try {
+          const options = sanitizeRandomOptions(req.body?.random);
+          const config = generateRandomMapConfig(options, maxPlayers);
+          game = createLobbyWithConfig(randomUUID(), 'random', config, lobbyOptions);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'invalid random options';
+          return reply.code(400).send({ error: `random map: ${message}`, code: 'invalid_move' });
+        }
+      } else {
+        const map = listMaps().find(item => item.id === mapId);
+        if (!map) return reply.code(400).send({ error: `Map "${mapId}" not found`, code: 'invalid_move' });
+        if (!map.preview.supportedPlayerCounts.includes(maxPlayers)) {
+          return reply.code(400).send({ error: 'unsupported player count', code: 'unsupported_player_count' });
+        }
+        game = createLobby(randomUUID(), mapId, lobbyOptions);
+      }
       globalStore.save(game);
       const creatorId = joinedPlayerIds(game)[0];
       return {

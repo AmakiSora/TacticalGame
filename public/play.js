@@ -210,9 +210,13 @@ async function loadMapList() {
   const res = await fetch('/api/maps');
   const { maps } = await res.json();
   availableMaps = maps || [];
-  els.mapSelect.innerHTML = maps.map(m => `<option value="${esc(m.id)}">${esc(m.name)} - ${esc(m.description)}</option>`).join('');
+  els.mapSelect.innerHTML = `<option value="random">随机地图（参数可配）</option>`
+    + maps.map(m => `<option value="${esc(m.id)}">${esc(m.name)} - ${esc(m.description)}</option>`).join('');
+  // 默认仍选中第一张静态地图，保持原有创建习惯。
+  if (maps[0]) els.mapSelect.value = maps[0].id;
   renderMapPicker(maps);
   syncMaxPlayersOptions();
+  window.RandomMapUI?.setSelected(els.mapSelect.value);
 }
 function persistSession() {
   try {
@@ -389,12 +393,16 @@ function selectMap(mapId) {
   els.mapSelect.value = mapId;
   syncMapSelection();
   syncMaxPlayersOptions();
+  window.RandomMapUI?.setSelected(mapId);
 }
 
 function syncMaxPlayersOptions() {
   if (!els.maxPlayers) return;
-  const map = availableMaps.find(item => item.id === els.mapSelect.value);
-  const supported = new Set(map?.preview?.supportedPlayerCounts || [2]);
+  // 随机地图支持任意 2-8 人；静态地图按各自支持的人数。
+  const selected = els.mapSelect.value;
+  const supported = selected === 'random'
+    ? new Set([2, 3, 4, 5, 6, 7, 8])
+    : new Set(availableMaps.find(item => item.id === selected)?.preview?.supportedPlayerCounts || [2]);
   for (const option of els.maxPlayers.options) {
     option.disabled = !supported.has(Number(option.value));
   }
@@ -411,7 +419,8 @@ function renderMapPicker(maps) {
   }
   const selected = els.mapSelect.value || maps[0].id;
   els.mapSelect.value = selected;
-  els.mapPicker.innerHTML = maps.map(map => {
+  const randomCard = window.RandomMapUI?.renderRandomMapCard(selected === 'random') || '';
+  els.mapPicker.innerHTML = randomCard + maps.map(map => {
     const isSelected = map.id === selected;
 	    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
 	    const radius = map.preview?.radius ?? '-';
@@ -1732,6 +1741,7 @@ els.btnCreate.addEventListener('click', async () => {
         maxPlayers: Number(els.maxPlayers?.value || 2),
         participate: els.hostParticipate?.checked !== false,
         playerName: els.createName.value.trim() || undefined,
+        ...(els.mapSelect.value === 'random' ? { random: window.RandomMapUI.collectRandomOptions() } : {}),
       }),
     });
     const data = await res.json();
@@ -1910,6 +1920,7 @@ els.btnClearSession?.addEventListener('click', e => {
 });
 restoreSessionIntoMemory();
 fillSettingsFromSession();
+window.RandomMapUI?.setPreviewRenderer(renderMapPreview);
 loadMapList();
 startAvailableGamesRefresh();
 requestAnimationFrame(renderLoop);

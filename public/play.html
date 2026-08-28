@@ -97,8 +97,9 @@
       </div>
       <div class="field map-field">
         <label>选择地图</label>
-        <select id="map-select" hidden><option value="default">default</option></select>
+        <select id="map-select" hidden><option value="random">随机地图</option><option value="default">default</option></select>
         <div id="map-picker" class="map-picker" role="radiogroup" aria-label="选择地图"></div>
+        <div id="random-map-options" class="random-map-options hidden"></div>
       </div>
     </div>
     <button id="btn-create" class="btn primary" style="margin-top:14px;width:100%">创建新游戏</button>
@@ -244,7 +245,8 @@
 <script src="/version.js"></script>
 <script src="/board-animation.js?v=3.2.6"></script>
 <script src="/playback.js?v=3.2.6"></script>
-<script src="/play.js?v=3.2.6"></script>
+<script src="/random-map-ui.js?v=3.4.1"></script>
+<script src="/play.js?v=3.4.1"></script>
 <script src="/layout-editor.js?v=3.3.5"></script>
 </body>
 </html>

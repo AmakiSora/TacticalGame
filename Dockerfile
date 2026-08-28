@@ -24,15 +24,20 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 # 强化学习 AI 运行时：src/api/bots.ts 会以子进程拉起 rl/run_model.py，
-# 需要 python 虚拟环境与训练模型（CPU 版 torch，避免引入 CUDA 依赖）。
-RUN apt-get update \
+# 需要 python 虚拟环境与训练模型（CPU 版 torch）。
+# 部署目标为国内 VPS，apt/pip 使用阿里云镜像加速；
+# torch 从阿里云 pytorch-wheels 的 cpu 目录取 CPU-only 轮子，避免引入 CUDA 依赖。
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+  && apt-get update \
   && apt-get install -y --no-install-recommends python3 python3-venv \
   && rm -rf /var/lib/apt/lists/* \
   && python3 -m venv /opt/rl-venv
 
 COPY rl/requirements.txt /tmp/rl-requirements.txt
-RUN /opt/rl-venv/bin/pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-  && /opt/rl-venv/bin/pip install --no-cache-dir -r /tmp/rl-requirements.txt \
+RUN /opt/rl-venv/bin/pip install --no-cache-dir \
+      --find-links https://mirrors.aliyun.com/pytorch-wheels/cpu/ \
+      --index-url https://mirrors.aliyun.com/pypi/simple/ torch \
+  && /opt/rl-venv/bin/pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r /tmp/rl-requirements.txt \
   && rm /tmp/rl-requirements.txt
 
 ENV RL_PYTHON=/opt/rl-venv/bin/python

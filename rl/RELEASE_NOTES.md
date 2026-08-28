@@ -3,6 +3,30 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加一条记录。
 
+## 2026-08-29 · v2.3.0
+
+- **训练环境接入对称随机地图**（依赖游戏侧 3.4.1 的随机地图生成器）：`RL_MAP_ID=random` 即可训练，
+  每局由引擎现生成一张标准模式对称随机图（地形/复活点/据点/回合数/行动点/兵种数值/经济与总部全部随机，
+  可玩性由服务端连通性校验保证）。种子从 `np_random` 派生，gym seed 可复现整条训练序列；
+  `RL_RANDOM_OPTIONS`（JSON）可覆盖默认随机域，如固定半径/回合数。
+- **观测空间 3922 → 5974 维，旧模型全部不兼容**：`MAX_CELLS` 217 → 331（半径 10 标准六边形），
+  格子改为按绝对 (q, r) 映射到半径 10 标准定序表，半径 6-9 地图余槽补零，位置语义跨半径一致。
+  动作空间仍 `Discrete(54)` 不变，但按仓库兼容策略（同动作数不同编码语义也需独立快照/运行器）：
+  新增不可变快照 `env_v22.py` 与运行器 `run_model_v22.py` 承载全部现存 54 动作模型（v2.1.x/v2.2.x），
+  `src/api/bots.ts` 对 54 动作按文件名版本分流（≥ v2.3 → `run_model.py`，否则 → `run_model_v22.py`）。
+- **归一化随局配置动态化**：回合数/行动点/补给/总部血量的观测归一除数改读本局 `config.balance` 与
+  `headquartersSpec`（随机参数下固定除数会失真）；新增半径与地形障碍占比两个全局特征；
+  单位格补齐归一化攻击力、总部格补防御（槽 17），随机兵种数值因此可被感知。
+- **模型对手降级编码**：modelmix 对手（v2.0.0，3922 维）的观测改由 `env_v22` 快照编码器产出
+  相对视角编码，与其训练时逐格一致；v2.3 的 5974 维观测不会喂给旧模型。
+  随机地图上 v2.0.0 对手属分布外，`RL_MAP_ID=random` 时 `RL_MODEL_OPPONENT_PROB` 默认 0（只用规则对手）。
+- **本地引擎 worker**：`rl/local-worker.ts` 的 `reset` 支持 `mapId: "random"` + `random` 参数（与 REST 同一套生成/校验）；
+  `handleCommand` 导出供测试直接调用，仅主进程运行时监听 stdin。`src/state/store.ts` 新增
+  `createInitialGameWithConfig` 支持任意配置开局。`evaluate_cross.py` 支持 `--map random`（每局种子 `cross-<局序>`）。
+- 训练命令：`$env:RL_MAP_ID = "random"; python rl/train.py`；模型命名
+  `hex_ppo_v2.3.0_<日期>_random_modelmix_<步数>.zip`，checkpoint 落 `rl/checkpoints/random/`。
+  从零训练，不能加载任何旧模型。
+
 ## 2026-08-28 · v2.2.1
 
 - 交付模型改为评估选出的 best 断点：训练结束后把 `checkpoints/<run>/best/best_model.zip`

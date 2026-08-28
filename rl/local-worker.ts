@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
+import { pathToFileURL } from 'node:url';
 import { globalEventBus } from '../src/events/bus.js';
 import { attackTarget, healTarget } from '../src/engine/combat.js';
 import { demolishTerrain } from '../src/engine/demolition.js';
@@ -7,8 +8,9 @@ import { endTurn } from '../src/engine/engine.js';
 import { deployUnit } from '../src/engine/deployment.js';
 import { moveUnit } from '../src/engine/units.js';
 import { buildAdjudicationSnapshot } from '../src/engine/engine.js';
-import { createInitialGame } from '../src/state/store.js';
+import { createInitialGame, createInitialGameWithConfig } from '../src/state/store.js';
 import { loadMaps } from '../src/config/loader.js';
+import { generateRandomMapConfig, sanitizeRandomOptions } from '../src/config/randomMap.js';
 import type { GameState, PlayerId, UnitType } from '../src/types.js';
 
 let game: GameState | null = null;
@@ -58,10 +60,18 @@ function apply(command: Record<string, unknown>): unknown {
   return snapshot();
 }
 
-function handle(command: Record<string, unknown>): unknown {
+/** 导出供测试直接调用；作为主进程运行时由下方 stdin 循环驱动。 */
+export function handleCommand(command: Record<string, unknown>): unknown {
   if (command.cmd === 'reset') {
     const mapId = typeof command.mapId === 'string' ? command.mapId : 'default';
-    game = createInitialGame(randomUUID(), mapId);
+    if (mapId === 'random') {
+      // 本地训练用随机地图：与 REST 创建走同一套生成与校验逻辑，固定双人。
+      const options = sanitizeRandomOptions(command.random);
+      const config = generateRandomMapConfig(options, 2);
+      game = createInitialGameWithConfig(randomUUID(), config, 'random');
+    } else {
+      game = createInitialGame(randomUUID(), mapId);
+    }
     if (game.config.mode !== 'standard') {
       throw new Error(`map "${mapId}" uses ${game.config.mode} mode; local baseline supports standard mode only`);
     }
@@ -72,13 +82,17 @@ function handle(command: Record<string, unknown>): unknown {
   throw new Error(`unknown command: ${String(command.cmd)}`);
 }
 
-const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
-input.on('line', line => {
-  try {
-    const command = JSON.parse(line) as Record<string, unknown>;
-    process.stdout.write(`${JSON.stringify({ ok: true, state: handle(command) })}\n`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stdout.write(`${JSON.stringify({ ok: false, error: message })}\n`);
-  }
-});
+// 仅当作为主进程运行时才监听 stdin（vitest 直接导入 handleCommand 不启动循环）。
+const entry = process.argv[1];
+if (entry && import.meta.url === pathToFileURL(entry).href) {
+  const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  input.on('line', line => {
+    try {
+      const command = JSON.parse(line) as Record<string, unknown>;
+      process.stdout.write(`${JSON.stringify({ ok: true, state: handleCommand(command) })}\n`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stdout.write(`${JSON.stringify({ ok: false, error: message })}\n`);
+    }
+  });
+}

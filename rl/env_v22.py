@@ -1,17 +1,14 @@
-"""Gymnasium environment for the standard two-player REST game (v2.3).
+"""Immutable snapshot of the v2.2.1 training environment (3,922-dim observation).
 
-v2.3 targets symmetric random maps (radius 6-10, randomized terrain, spawn
-points, turn limits, action points and unit stats) in addition to the static
-two-player sequential maps.  The observation grew from 3,922 to 5,974 dims
-(331 canonical cells x 18 features + 16 globals); models trained on the old
-encoding must use the ``env_v22`` snapshot via ``run_model_v22.py``.
+Do NOT evolve this file: it exists so that the 54-action / 3,922-dim models
+(v2.1.x and v2.2.x) keep their exact training-time encoding via
+``run_model_v22.py`` after ``env.py`` moved to the v2.3 random-map
+observation (5,974 dims).  New training changes belong in ``env.py``.
 """
 
 from __future__ import annotations
 
 from collections import deque
-import json
-import os
 import time
 from typing import Any
 
@@ -27,22 +24,9 @@ UNIT_TYPES = ("infantry", "scout", "heavy", "ranger", "support")
 TYPE_INDEX = {name: index for index, name in enumerate(UNIT_TYPES)}
 HEX_DIRECTIONS = ((1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1))
 
-# Canonical board: the full radius-10 hexagon (331 cells).  Every map's cells
-# map into these fixed slots by absolute (q, r), so positional semantics stay
-# consistent across radius 6-10 random maps; smaller maps pad with zeros.
-def _canonical_cells(radius: int) -> list[tuple[int, int]]:
-    cells = [
-        (q, r)
-        for q in range(-radius, radius + 1)
-        for r in range(-radius, radius + 1)
-        if max(abs(q), abs(r), abs(-q - r)) <= radius
-    ]
-    return sorted(cells)
-
-
-CANONICAL_CELLS = _canonical_cells(10)
-CANONICAL_INDEX = {cell: index for index, cell in enumerate(CANONICAL_CELLS)}
-MAX_CELLS = len(CANONICAL_CELLS)
+# default is a radius-8 board (217 cells).  Padding keeps the observation and
+# action spaces fixed while the encoder still uses the authoritative game.cells.
+MAX_CELLS = 217
 CELL_FEATURES = 18
 GLOBAL_FEATURES = 16
 OBSERVATION_SIZE = MAX_CELLS * CELL_FEATURES + GLOBAL_FEATURES
@@ -69,7 +53,7 @@ class HexGameEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
@@ -81,10 +65,6 @@ class HexGameEnv(gym.Env):
         self.opponent_model = opponent_model
         self.model_opponent_probability = model_opponent_probability
         self.active_opponent_style = opponent_style
-        self.map_id = map_id
-        self.random_options = dict(random_options) if random_options else {}
-        # 旧模型对手（v2.0.0，3922 维观测）需要 env_v22 快照编码器，懒加载。
-        self._legacy_env: Any = None
 
         self.action_space = spaces.Discrete(MAX_ACTIONS)
         self.observation_space = spaces.Box(
@@ -149,35 +129,18 @@ class HexGameEnv(gym.Env):
             raise RuntimeError(f"{method} {path} failed: {response.status_code} {detail}")
         return response.json() if response.content else {}
 
-    def _build_random_options(self) -> dict[str, Any]:
-        """每局随机图参数：默认对称，RL_RANDOM_OPTIONS 与构造参数逐层覆盖。
-
-        种子始终从 np_random 派生，保证 gym seed 下整条训练序列可复现；
-        若显式传入了 seed 则作为固定种子使用（所有回合同一张图）。
-        """
-        options: dict[str, Any] = {"symmetric": True}
-        raw = os.environ.get("RL_RANDOM_OPTIONS", "").strip()
-        if raw:
-            parsed = json.loads(raw)
-            if not isinstance(parsed, dict):
-                raise ValueError("RL_RANDOM_OPTIONS must be a JSON object")
-            options.update(parsed)
-        options.update(self.random_options)
-        if "seed" not in options:
-            options["seed"] = f"ep-{int(self.np_random.integers(0, 2**31 - 1))}"
-        return options
-
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
-        body: dict[str, Any] = {
-            "mapId": self.map_id,
-            "maxPlayers": 2,
-            "participate": True,
-            "playerName": "RL Agent",
-        }
-        if self.map_id == "random":
-            body["random"] = self._build_random_options()
-        created = self._request("POST", "/api/games", body)
+        created = self._request(
+            "POST",
+            "/api/games",
+            {
+                "mapId": "default",
+                "maxPlayers": 2,
+                "participate": True,
+                "playerName": "RL Agent",
+            },
+        )
         self.game_id = created["gameId"]
         self.player_token = created["player"]["token"]
         self.host_token = created["hostToken"]
@@ -338,20 +301,6 @@ class HexGameEnv(gym.Env):
         finally:
             self.owner, self.opponent = old_owner, old_opponent
 
-    def _encode_for_legacy_model(self, state: dict[str, Any], owner: str) -> np.ndarray:
-        """旧模型对手（v2.0.0，3922 维）用 env_v22 快照编码器产出相对视角观测。
-
-        v2.3 本体的 5974 维观测对旧模型是分布外输入，直接喂会导致
-        sb3 维度校验报错或行为失真；快照编码与其训练时逐格一致。
-        """
-        if self._legacy_env is None:
-            try:
-                from env_v22 import HexGameEnv as LegacyHexGameEnv
-            except ImportError:  # ``python -m rl.train`` 等调用方式。
-                from rl.env_v22 import HexGameEnv as LegacyHexGameEnv
-            self._legacy_env = LegacyHexGameEnv(base_url="local://legacy-snapshot")
-        return self._legacy_env._encode_from_perspective(state, owner)
-
     def _units_for_slots(self, state: dict[str, Any], owner: str) -> list[dict[str, Any] | None]:
         """Keep units in stable action slots as they move or are deployed."""
         live = [u for u in state.get("units", []) if u.get("alive") and u.get("owner") == owner]
@@ -463,7 +412,7 @@ class HexGameEnv(gym.Env):
                 # 观测用对手相对视角编码，动作直接取旧动作表，不再经过当前槽位映射。
                 legacy_actions = self._legal_actions(self.state, self.opponent, legacy=True)
                 legacy_mask = np.asarray([bool(action[0]) for action in legacy_actions], dtype=bool)
-                observation = self._encode_for_legacy_model(self.state, self.opponent)
+                observation = self._encode_from_perspective(self.state, self.opponent)
                 legacy_action, _ = self.opponent_model.predict(
                     observation, deterministic=True, action_masks=legacy_mask
                 )
@@ -589,15 +538,13 @@ class HexGameEnv(gym.Env):
 
     def _encode_state(self, state: dict[str, Any]) -> np.ndarray:
         result = np.zeros(OBSERVATION_SIZE, dtype=np.float32)
+        cells = sorted(state.get("cells", []), key=lambda c: (int(c["q"]), int(c["r"])))[:MAX_CELLS]
         units = [u for u in state.get("units", []) if u.get("alive")]
         control_points = state.get("controlPoints", [])
         hqs = list(state.get("headquarters", {}).values())
         terrain_index = {"plain": 0, "water": 1, "blocker": 2}
 
-        for cell in state.get("cells", []):
-            index = CANONICAL_INDEX.get((int(cell["q"]), int(cell["r"])))
-            if index is None:
-                continue
+        for index, cell in enumerate(cells):
             offset = index * CELL_FEATURES
             terrain = terrain_index.get(cell.get("terrain", "plain"), 0)
             result[offset + terrain] = 1.0
@@ -614,38 +561,24 @@ class HexGameEnv(gym.Env):
                 result[offset + 14] = float(unit.get("hp", 0)) / max(1.0, float(unit.get("maxHp", 1)))
                 result[offset + 15] = float(bool(unit.get("hasMoved")))
                 result[offset + 16] = float(bool(unit.get("hasActed")))
-                # 槽 17：归一化攻击力，随机兵种数值因此可被感知。
-                result[offset + 17] = float(unit.get("attack", 0)) / 60.0
             elif hq:
                 result[offset + 6 + (1 if hq["owner"] == self.owner else 2)] = 1.0
-                result[offset + 17] = float(hq.get("defense", 0)) / 15.0
 
         base = MAX_CELLS * CELL_FEATURES
-        config = state.get("config", {})
-        balance = config.get("balance", {})
-        # 随机地图的回合/行动点/经济参数逐局变化，归一化除数改读本局配置。
-        ap_limit = max(1.0, float(balance.get("actionsPerTurn", 5)))
-        max_turns = max(1.0, float(balance.get("maxTurns", 20)))
-        supply_scale = max(300.0, 2.5 * float(balance.get("startingSupplies", 80)))
-        hq_hp_scale = max(1.0, float(config.get("headquartersSpec", {}).get("hp", 180)))
         own = state.get("resources", {}).get(self.owner, {}).get("supplies", 0)
         other = state.get("resources", {}).get(self.opponent, {}).get("supplies", 0)
         own_hq = state.get("headquarters", {}).get(self.owner, {})
         enemy_hq = state.get("headquarters", {}).get(self.opponent, {})
-        cells_list = state.get("cells", [])
-        impassable = sum(1 for c in cells_list if c.get("terrain", "plain") != "plain")
         values = [
-            float(own) / supply_scale, float(other) / supply_scale,
-            float(own_hq.get("hp", 0)) / hq_hp_scale,
-            float(enemy_hq.get("hp", 0)) / hq_hp_scale,
-            float(state.get("turn", {}).get("roundNumber", 1)) / max_turns,
-            float(state.get("turn", {}).get("actionsUsed", 0)) / ap_limit,
+            float(own) / 300.0, float(other) / 300.0,
+            float(own_hq.get("hp", 0)) / 200.0,
+            float(enemy_hq.get("hp", 0)) / 200.0,
+            float(state.get("turn", {}).get("roundNumber", 1)) / 20.0,
+            float(state.get("turn", {}).get("actionsUsed", 0)) / 5.0,
             sum(p.get("owner") == self.owner for p in control_points) / max(1, len(control_points)),
             sum(p.get("owner") == self.opponent for p in control_points) / max(1, len(control_points)),
             sum(u.get("owner") == self.owner for u in units) / 20.0,
             sum(u.get("owner") == self.opponent for u in units) / 20.0,
-            float(config.get("radius", 8)) / 10.0,
-            impassable / max(1, len(cells_list)),
         ]
         result[base:base + len(values)] = np.clip(values, -1.0, 1.0)
         return result

@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument("--name-a", default=None, help="player_a 模型的显示名（默认取文件名）")
     parser.add_argument("--name-b", default=None, help="player_b 模型的显示名（默认取文件名）")
     parser.add_argument("--games", type=int, default=2, help="总对局数（每局结束后交换座位需开 --swap-sides）")
-    parser.add_argument("--map", dest="map_id", default="default", help="地图 id（默认 default）")
+    parser.add_argument("--map", dest="map_id", default="default", help="地图 id（默认 default；random 为每局一张对称随机地图）")
     parser.add_argument("--max-rounds", type=int, default=100, help="单局回合数上限，超过记为 draw")
     parser.add_argument("--max-actions", type=int, default=5000, help="单局动作数上限，超过记为 draw")
     parser.add_argument("--stochastic", action="store_true", help="按策略采样而非确定性取最优动作")
@@ -152,8 +152,16 @@ class SideController:
         return f"{self.label}[{self.side}, {self.version}]"
 
 
-def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], args) -> tuple[str | None, int, int]:
-    state = worker.call({"cmd": "reset", "mapId": args.map_id})
+def reset_command(args, game_index: int) -> dict[str, Any]:
+    command: dict[str, Any] = {"cmd": "reset", "mapId": args.map_id}
+    if args.map_id == "random":
+        # 每局一张对称随机地图；种子由局序派生，同参数评估可复现。
+        command["random"] = {"seed": f"cross-{game_index}", "symmetric": True}
+    return command
+
+
+def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], args, game_index: int) -> tuple[str | None, int, int]:
+    state = worker.call(reset_command(args, game_index))
     acted = 0
     while acted < args.max_actions:
         if state.get("phase") == "game_over":
@@ -202,7 +210,7 @@ def main():
 
             print(f"— 第 {game_index}/{args.games} 局（{controllers['player_a'].short}"
                   f" vs {controllers['player_b'].short}）")
-            winner, acted, rounds = play_one_game(workers[0], controllers, args)
+            winner, acted, rounds = play_one_game(workers[0], controllers, args, game_index)
             if winner in (None, "draw"):
                 tally["draw"] += 1
                 result = "平局（达到回合/动作上限）"

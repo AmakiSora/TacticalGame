@@ -25,6 +25,9 @@ const LEGACY_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v200.py');
 // 最早的动态动作列表（512 动作）模型使用 v1 环境快照。
 const V100_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v100.py');
 const DEFAULT_BOT_NAME = '强化AI';
+// v2.1.x / v2.2.x 的 54 动作模型（3922 维观测）专用快照运行器；
+// v2.3 起观测扩为 5974 维，当前运行器只服务新模型。
+const RUNNER_SCRIPT_V22 = join(PROJECT_ROOT, 'rl', 'run_model_v22.py');
 
 /** 当前 rl/env.py 的动作空间大小（12 单位槽 × 4 意图 + 5 部署 + 结束回合）。 */
 const CURRENT_ACTION_SPACE = 54;
@@ -33,12 +36,34 @@ const CURRENT_ACTION_SPACE = 54;
  * 动作空间 → 运行脚本。每次迭代环境后，旧模型仍需可玩：在这里登记新版本
  * 的动作空间与运行器，同时保留历史版本的映射（运行器内部用对应的 env
  * 快照做编码/合法动作）。未注册的动作空间不会被允许加入对局。
+ * 54 动作存在两个观测语义世代（见 routeModel）：v2.1/v2.2 的 3922 维与
+ * v2.3 随机地图的 5974 维，需按文件名版本分流到不同运行器。
  */
 const RUNNERS_BY_ACTION_SPACE: ReadonlyMap<number, { runner: string; label: string }> = new Map([
-  [CURRENT_ACTION_SPACE, { runner: RUNNER_SCRIPT, label: 'v2.1' }],
   [38, { runner: LEGACY_RUNNER_SCRIPT, label: 'v2.0' }],
   [512, { runner: V100_RUNNER_SCRIPT, label: 'v1' }],
 ]);
+
+/** 文件名中的版本号是否 ≥ v2.3（v2.3 随机地图观测世代）。 */
+function isV23OrLaterModel(file: string): boolean {
+  const match = file.match(/v(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return major > 2 || (major === 2 && minor >= 3);
+}
+
+function routeModel(actionSpace: number | null, file: string): { runner: string; label: string } | undefined {
+  if (actionSpace === null) return undefined;
+  if (actionSpace === CURRENT_ACTION_SPACE) {
+    return isV23OrLaterModel(file)
+      ? { runner: RUNNER_SCRIPT, label: 'v2.3' }
+      : { runner: RUNNER_SCRIPT_V22, label: 'v2.2' };
+  }
+  return RUNNERS_BY_ACTION_SPACE.get(actionSpace);
+}
+
+const SUPPORTED_ACTION_SPACES = [CURRENT_ACTION_SPACE, ...RUNNERS_BY_ACTION_SPACE.keys()];
 
 export interface RlModelInfo {
   file: string;
@@ -154,7 +179,7 @@ export function refreshRlModels(): RlModelInfo[] {
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
       .map(info => {
         const actionSpace = readActionSpace(join(MODELS_DIR, info.file));
-        const route = actionSpace !== null ? RUNNERS_BY_ACTION_SPACE.get(actionSpace) : undefined;
+        const route = routeModel(actionSpace, info.file);
         return {
           ...info,
           actionSpace,
@@ -262,7 +287,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
     python: resolvePython(),
     runner: RUNNER_SCRIPT,
     requiredActionSpace: REQUIRED_ACTION_SPACE,
-    supportedActionSpaces: [...RUNNERS_BY_ACTION_SPACE.keys()],
+    supportedActionSpaces: SUPPORTED_ACTION_SPACES,
   }));
 
   app.post<{ Params: { id: string }; Body: { name?: string; model?: string } }>(

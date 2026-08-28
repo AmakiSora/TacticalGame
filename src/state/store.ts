@@ -199,9 +199,13 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
 
 // 旧的引擎测试仍通过该构造器创建一局双人战场。
 export function createInitialGame(id: string, mapId = 'default'): GameState {
-  const game = createLobby(id, mapId, { maxPlayers: 2, participate: true });
+  return createInitialGameWithConfig(id, getMapConfig(mapId), mapId);
+}
+
+/** 用任意地图配置直接开一局双人战场；随机地图等运行时配置不经过全局地图表。 */
+export function createInitialGameWithConfig(id: string, config: MapConfig, mapId = 'random'): GameState {
+  const game = createLobbyWithConfig(id, mapId, config, { maxPlayers: 2, participate: true });
   addLobbyPlayer(game);
-  const config = game.config;
   const slots = config.layouts['2'].map(slotId => config.spawnSlots.find(slot => slot.id === slotId)!);
   for (const [index, owner] of (['player_a', 'player_b'] as PlayerId[]).entries()) {
     const player = game.players[owner]!;

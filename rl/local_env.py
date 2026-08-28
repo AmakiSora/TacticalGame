@@ -21,9 +21,8 @@ except ImportError:  # ``python rl/train.py`` puts rl/ on sys.path.
 
 
 class LocalHexGameEnv(HexGameEnv):
-    def __init__(self, map_id: str = "default", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5):
-        super().__init__(base_url="local://engine", max_steps=max_steps, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability)
-        self.map_id = map_id
+    def __init__(self, map_id: str = "default", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, random_options: dict[str, Any] | None = None):
+        super().__init__(base_url="local://engine", max_steps=max_steps, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability, map_id=map_id, random_options=random_options)
         root = Path(__file__).resolve().parent.parent
         npx = shutil.which("npx.cmd") or shutil.which("npx")
         if not npx:
@@ -55,7 +54,11 @@ class LocalHexGameEnv(HexGameEnv):
         super(HexGameEnv, self).reset(seed=seed)
         self.player_token = "agent"
         self.opponent_token = "opponent"
-        self.state = self._rpc({"cmd": "reset", "mapId": self.map_id})
+        command: dict[str, Any] = {"cmd": "reset", "mapId": self.map_id}
+        if self.map_id == "random":
+            # 每局一张新的对称随机地图；种子从 np_random 派生，gym seed 可复现。
+            command["random"] = self._build_random_options()
+        self.state = self._rpc(command)
         # 随机座位：智能体坐 player_b 时，模型对手恰好坐在它的主场 player_a，
         # 相对视角编码与 v2.0.0 的原生编码完全一致，对手即满血真身。
         if float(self.np_random.random()) < 0.5:

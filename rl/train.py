@@ -178,7 +178,7 @@ def main() -> None:
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     opponent_kind = "modelmix"
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.2.1")
+    model_version = env_str("RL_MODEL_VERSION", "v2.3.0")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -192,16 +192,24 @@ def main() -> None:
     tb_dir = env_str("RL_TB_LOG", "rl/tb")
     eval_freq = env_int("RL_EVAL_FREQ", 10_000, minimum=0)
     eval_episodes = env_int("RL_EVAL_EPISODES", 20, minimum=1)
-    model_opponent_probability = env_float("RL_MODEL_OPPONENT_PROB", 0.5)
+    # 随机地图上 v2.0.0 模型对手属于分布外对手，默认只用规则对手；
+    # 需要时可用 RL_MODEL_OPPONENT_PROB 显式开启。
+    default_model_prob = 0.0 if map_id == "random" else 0.5
+    model_opponent_probability = env_float("RL_MODEL_OPPONENT_PROB", default_model_prob)
     device = resolve_device()
 
-    old_model_path = opponent_model_path(map_id)
     opponent_model = None
-    if old_model_path:
-        print(f"[train] model opponent={old_model_path} probability={model_opponent_probability:.0%}", flush=True)
-        opponent_model = MaskablePPO.load(old_model_path, device="cpu")
+    if model_opponent_probability > 0:
+        if map_id == "random":
+            print("[train] 注意：v2.0.0 模型对手只在 default 地图训练过，随机地图上为分布外对手", flush=True)
+        old_model_path = opponent_model_path(map_id)
+        if old_model_path:
+            print(f"[train] model opponent={old_model_path} probability={model_opponent_probability:.0%}", flush=True)
+            opponent_model = MaskablePPO.load(old_model_path, device="cpu")
+        else:
+            print("[train] no v2.0 opponent model found; using rule opponents only", flush=True)
     else:
-        print("[train] no v2.0 opponent model found; using rule opponents only", flush=True)
+        print("[train] model opponents disabled; using rule opponents only", flush=True)
 
     Path(model_path).parent.mkdir(parents=True, exist_ok=True)
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)

@@ -166,6 +166,20 @@ python rl/train.py
 - 随机地图上 v2.0.0 模型对手属分布外，默认只用规则对手；需要时用 `$env:RL_MODEL_OPPONENT_PROB = "0.5"` 显式开启。
 - 静态地图训练行为不变（`RL_MAP_ID=default` 等）。
 
+## 并行训练（RL_NUM_ENVS）
+
+训练吞吐的瓶颈是 TypeScript 引擎模拟（单进程单线程）。`RL_NUM_ENVS` 用 `SubprocVecEnv`
+并行多个训练环境，每个环境一个独立的引擎 worker 进程，样本吞吐成倍提升；GPU 负责 PPO 更新：
+
+```powershell
+$env:RL_MAP_ID = "random"
+$env:RL_NUM_ENVS = "4"     # 默认 4；建议不超过物理核数，留余量给系统与引擎启动
+python rl/train.py
+```
+
+注意：并行下 `RL_TIMESTEPS` 仍是总帧数（跨环境累计），同一目标步数的墙钟时间约为单环境的 1/N；
+每轮 rollout 收集 `n_steps × RL_NUM_ENVS` 帧，默认 `RL_N_STEPS=256`、`RL_BATCH_SIZE=64` 对任意环境数都整除。
+
 ## 在真实对局中使用模型
 
 先启动服务器并创建/加入一局游戏，拿到该座位的 player token。然后运行：

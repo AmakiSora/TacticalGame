@@ -69,7 +69,7 @@ class HexGameEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
@@ -79,6 +79,8 @@ class HexGameEnv(gym.Env):
             raise ValueError("model_opponent_probability must be between 0 and 1")
         self.opponent_style = opponent_style
         self.opponent_model = opponent_model
+        # 子进程（SubprocVecEnv）里模型对象不可序列化，改传路径在子进程内懒加载。
+        self.opponent_model_path = opponent_model_path
         self.model_opponent_probability = model_opponent_probability
         self.active_opponent_style = opponent_style
         self.map_id = map_id
@@ -323,8 +325,18 @@ class HexGameEnv(gym.Env):
     def _unit_sort_key(unit: dict[str, Any]):
         return (TYPE_INDEX.get(unit.get("type"), 99), int(unit.get("q", 0)), int(unit.get("r", 0)), -int(unit.get("hp", 0)))
 
+    def _has_model_opponent(self) -> bool:
+        return self.opponent_model is not None or bool(self.opponent_model_path)
+
+    def _ensure_opponent_model(self) -> Any:
+        """模型对象存在则直接用；只传了路径时在子进程内懒加载（对象不可跨进程序列化）。"""
+        if self.opponent_model is None and self.opponent_model_path:
+            from sb3_contrib import MaskablePPO
+            self.opponent_model = MaskablePPO.load(self.opponent_model_path, device="cpu")
+        return self.opponent_model
+
     def _choose_opponent_style(self) -> str:
-        if self.opponent_model is not None and float(self.np_random.random()) < self.model_opponent_probability:
+        if self._has_model_opponent() and float(self.np_random.random()) < self.model_opponent_probability:
             return "model"
         if self.opponent_style != "mixed":
             return self.opponent_style
@@ -458,13 +470,14 @@ class HexGameEnv(gym.Env):
             heals = [(index, action) for index, action in valid if action[0] == "heal"]
             deploys = [(index, action) for index, action in valid if action[0] == "deploy"]
             moves = [(index, action) for index, action in valid if action[0] == "move"]
-            if self.active_opponent_style == "model" and self.opponent_model is not None:
+            if self.active_opponent_style == "model" and self._has_model_opponent():
+                opponent_model = self._ensure_opponent_model()
                 # 旧模型按它训练时的 38 动作语义行动（逐步排序分槽、严格接近移动），
                 # 观测用对手相对视角编码，动作直接取旧动作表，不再经过当前槽位映射。
                 legacy_actions = self._legal_actions(self.state, self.opponent, legacy=True)
                 legacy_mask = np.asarray([bool(action[0]) for action in legacy_actions], dtype=bool)
                 observation = self._encode_for_legacy_model(self.state, self.opponent)
-                legacy_action, _ = self.opponent_model.predict(
+                legacy_action, _ = opponent_model.predict(
                     observation, deterministic=True, action_masks=legacy_mask
                 )
                 action_type, payload = legacy_actions[int(legacy_action)]

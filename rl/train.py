@@ -3,6 +3,11 @@
 Training calls the TypeScript engine directly, so no HTTP server is needed.
 Configuration is controlled with environment variables for fresh training,
 resume, checkpoints, TensorBoard, and periodic masked evaluation.
+
+RL_NUM_ENVS > 1 时用 SubprocVecEnv 并行多个训练环境（每个环境一个独立的
+tsx 引擎 worker 进程），样本吞吐成倍提升；GPU 负责 PPO 更新。Windows 上子进程用
+spawn 启动，因此 make_train_env 必须是模块级可 pickle 的工厂，对手模型也只能传路径、
+由子进程内懒加载（对象不可跨进程序列化）。
 """
 
 from __future__ import annotations
@@ -17,12 +22,29 @@ import torch
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from local_env import LocalHexGameEnv
 
 
 def mask_fn(env):
     return env.action_masks()
+
+
+def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str):
+    """模块级工厂：返回可被 spawn 子进程 pickle 的 env 构造器。每个环境自带一个引擎 worker。"""
+
+    def _init():
+        env = LocalHexGameEnv(
+            map_id=map_id,
+            opponent_style=opponent_style,
+            model_opponent_probability=model_opponent_probability,
+            opponent_model_path=opponent_model_path or None,
+        )
+        return Monitor(env)
+
+    return _init
 
 
 def env_str(name: str, default: str) -> str:
@@ -178,7 +200,7 @@ def main() -> None:
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     opponent_kind = "modelmix"
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.3.0")
+    model_version = env_str("RL_MODEL_VERSION", "v2.3.1")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -196,16 +218,17 @@ def main() -> None:
     # 需要时可用 RL_MODEL_OPPONENT_PROB 显式开启。
     default_model_prob = 0.0 if map_id == "random" else 0.5
     model_opponent_probability = env_float("RL_MODEL_OPPONENT_PROB", default_model_prob)
+    num_envs = env_int("RL_NUM_ENVS", 4, minimum=1)
     device = resolve_device()
 
-    opponent_model = None
+    # 并行环境（子进程）里模型对象不可序列化：主进程只解析路径，由子进程懒加载。
+    resolved_opponent_path = ""
     if model_opponent_probability > 0:
         if map_id == "random":
             print("[train] 注意：v2.0.0 模型对手只在 default 地图训练过，随机地图上为分布外对手", flush=True)
-        old_model_path = opponent_model_path(map_id)
-        if old_model_path:
-            print(f"[train] model opponent={old_model_path} probability={model_opponent_probability:.0%}", flush=True)
-            opponent_model = MaskablePPO.load(old_model_path, device="cpu")
+        resolved_opponent_path = opponent_model_path(map_id)
+        if resolved_opponent_path:
+            print(f"[train] model opponent={resolved_opponent_path} probability={model_opponent_probability:.0%}", flush=True)
         else:
             print("[train] no v2.0 opponent model found; using rule opponents only", flush=True)
     else:
@@ -233,7 +256,7 @@ def main() -> None:
         )
     run_name = f"ppo_{map_id}_{run_stamp}" + ("_resume" if resume else "")
     print(
-        f"[train] map={map_id} mode={'resume' if resume else 'fresh'} "
+        f"[train] map={map_id} mode={'resume' if resume else 'fresh'} envs={num_envs} "
         f"timesteps={total_timesteps}{'(incremental)' if resume else ''}",
         flush=True,
     )
@@ -244,7 +267,13 @@ def main() -> None:
         print("[train] tensorboard 未安装,跳过 TB 日志;需要时运行: python -m pip install tensorboard")
         tb_log = None
 
-    env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability), mask_fn)
+    # 并行训练环境：每个环境一个独立引擎 worker；sb3 通过 env_method("action_masks")
+    # 从各子环境收集动作掩码，无需 ActionMasker 包装。单环境用 DummyVecEnv 保持同构。
+    env_fns = [
+        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path)
+        for _ in range(num_envs)
+    ]
+    env = SubprocVecEnv(env_fns) if num_envs > 1 else DummyVecEnv(env_fns)
     eval_env = None
     try:
         if resume:
@@ -281,7 +310,7 @@ def main() -> None:
             name_prefix=Path(model_path).name,
         )]
         if eval_freq > 0:
-            eval_env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability), mask_fn)
+            eval_env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style, model_opponent_probability=model_opponent_probability, opponent_model_path=resolved_opponent_path or None), mask_fn)
             callbacks.append(MaskableEvalCallback(
                 eval_env,
                 eval_freq=eval_freq,

@@ -226,10 +226,11 @@ describe('AI player skill documentation', () => {
   });
 
   it('documents simultaneous-mode exceptions and deterministic resolution rules', async () => {
-    const [skill, simultaneous] = await Promise.all([
+    const [skill, rawSimultaneous] = await Promise.all([
       readFile('skill/SKILL.md', 'utf8'),
       readFile('skill/simultaneous.md', 'utf8'),
     ]);
+    const simultaneous = rawSimultaneous.replace(/\r\n/g, '\n');
 
     expect(skill).toContain('legacy V1 production queues');
     expect(skill).toContain('Standard/annihilation: income is awarded');

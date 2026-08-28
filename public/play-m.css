@@ -328,6 +328,17 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   font-size: 12px;
 }
 
+.lobby-add-bot {
+  cursor: pointer;
+  border-style: dashed;
+  border-color: #2f4a44;
+  color: #7fd8c0;
+  background: #0f1b20;
+}
+.lobby-add-bot:hover { border-color: #57c2a6; color: #aef0dd; background: #14262a; }
+body.player-m-shell .lobby-add-bot { min-height: 28px; }
+.lobby-add-bot-plus, .lobby-add-bot .ui-icon { font-size: 13px; line-height: 1; }
+
 .available-games-section {
   margin-top: 22px;
   padding-top: 18px;
@@ -1804,3 +1815,38 @@ body.player-m-shell #m-data-mounts { display: none !important; }
 .plan-empty { color: #7c8ba1; font-size: 12px; padding: 2px 0; }
 .plan-count { color: #9fb4cc; font-weight: normal; font-size: 12px; margin-left: 4px; }
 .plan-status { margin-top: 8px; font-size: 11px; color: #8fa3ba; }
+
+/* 添加强化学习 AI 弹框（底部抽屉样式） */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  z-index: 100;
+}
+.bot-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 36px));
+  background: #141c26;
+  border: 1px solid #2a3a4a;
+  border-radius: 10px;
+  padding: 18px;
+  z-index: 110;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+}
+body.player-m-shell .bot-dialog {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
+  width: auto;
+  border-radius: 16px 16px 0 0;
+  z-index: 120;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+}
+.bot-dialog h3 { margin: 0 0 12px; font-size: 15px; color: #cbd8e2; }
+.bot-dialog-hint { font-size: 11px; color: #5a7a8a; line-height: 1.5; margin: 8px 0 0; }
+.bot-dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }

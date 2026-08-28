@@ -47,6 +47,8 @@ const els = {
   settingsControlToken: $('settings-control-token'), btnSaveControlToken: $('btn-save-control-token'),
   settingsGameId: $('settings-game-id'), settingsPlayerToken: $('settings-player-token'), settingsHostToken: $('settings-host-token'),
   btnSaveSession: $('btn-save-session'), btnEnterSession: $('btn-enter-session'), btnClearSession: $('btn-clear-session'),
+  botDialog: $('bot-dialog'), botDialogBackdrop: $('bot-dialog-backdrop'),
+  botName: $('bot-name'), botModel: $('bot-model'), btnBotConfirm: $('btn-bot-confirm'), btnBotCancel: $('btn-bot-cancel'),
 };
 const ctx = els.canvas.getContext('2d');
 let gameConfig = null;
@@ -1499,12 +1501,13 @@ function subscribeLobbyStart() {
 function lobbySummaryMarkup(lobby, canKick = false) {
   const players = lobby.players || [];
   const supported = (lobby.supportedPlayerCounts || []).join('/');
+  const canAddBot = canKick && lobby.phase === 'lobby' && players.length < lobby.maxPlayers;
   return `<div class="lobby-summary-head">
     <span>${esc(lobby.phase === 'active' ? '已开始' : '等待开局')}</span>
     <strong>${players.length}/${lobby.maxPlayers}</strong>
   </div>
   <div class="lobby-summary-meta">地图 ${esc(lobby.mapId)} · 支持 ${esc(supported)} 人</div>
-  <div class="lobby-player-list">${players.map(player => `<span class="lobby-player" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}"><span>${esc(player.name || player.id)}</span>${canKick && lobby.phase === 'lobby' && player.id !== myPlayer ? `<button type="button" class="lobby-kick" data-kick-player="${esc(player.id)}">踢出</button>` : ''}</span>`).join('')}</div>`;
+  <div class="lobby-player-list">${players.map(player => `<span class="lobby-player" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}"><span>${esc(player.name || player.id)}</span>${canKick && lobby.phase === 'lobby' && player.id !== myPlayer ? `<button type="button" class="lobby-kick" data-kick-player="${esc(player.id)}">踢出</button>` : ''}</span>`).join('')}${canAddBot ? `<button type="button" class="lobby-player lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="lobby-add-bot-plus">+</span><span>添加 AI</span></button>` : ''}</div>`;
 }
 
 function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target === els.lobbySummary && Boolean(hostToken)) {
@@ -1629,6 +1632,74 @@ async function kickLobbyPlayer(playerId) {
   renderLobbySummary(data.lobby, els.lobbySummary, true);
   toast('玩家已移出大厅', 'ok');
 }
+
+// —— 强化学习 AI：房主在大厅中一键添加 ——
+let botModelsLoaded = false;
+
+async function ensureBotModels() {
+  if (botModelsLoaded) return;
+  try {
+    const res = await fetch('/api/rl/models');
+    if (!res.ok) throw new Error('request failed');
+    const data = await res.json();
+    const models = (Array.isArray(data.models) ? data.models : [])
+      .filter(model => model.supported === true);
+    // 只展示已有版本快照运行器的模型；旧版本仍会按标签显示。
+    els.botModel.innerHTML = models.length
+      ? models.map(model => {
+          const label = model.label ? `（${model.label}）` : '';
+          return `<option value="${esc(model.file)}">${esc(model.file)}${label}</option>`;
+        }).join('')
+      : '<option value="">（服务器未找到可用模型）</option>';
+    botModelsLoaded = models.length > 0;
+  } catch {
+    els.botModel.innerHTML = '<option value="">（无法获取模型列表）</option>';
+  }
+}
+
+function openBotDialog() {
+  if (!gameId || !hostToken) return;
+  closeBotDialog();
+  els.botName.value = '';
+  els.botDialog.classList.remove('hidden');
+  els.botDialogBackdrop.classList.remove('hidden');
+  ensureBotModels();
+  els.botName.focus();
+}
+
+function closeBotDialog() {
+  if (!els.botDialog.classList.contains('hidden')) {
+    els.botDialog.classList.add('hidden');
+    els.botDialogBackdrop.classList.add('hidden');
+  }
+}
+
+async function confirmAddBot() {
+  if (!gameId || !hostToken) return;
+  const model = els.botModel.value;
+  if (!model) return toast('没有可用模型', 'err');
+  els.btnBotConfirm.disabled = true;
+  try {
+    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/bots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Host-Token': hostToken },
+      body: JSON.stringify({ name: els.botName.value.trim() || undefined, model }),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast(data.error || '添加 AI 失败', 'err');
+    closeBotDialog();
+    renderLobbySummary(data.lobby, els.lobbySummary, true);
+    toast('AI 已加入，等待开局', 'ok');
+  } catch {
+    toast('添加 AI 失败：无法连接服务器', 'err');
+  } finally {
+    els.btnBotConfirm.disabled = false;
+  }
+}
+
+els.btnBotConfirm.addEventListener('click', confirmAddBot);
+els.btnBotCancel.addEventListener('click', closeBotDialog);
+els.botDialogBackdrop.addEventListener('click', closeBotDialog);
 
 async function startHostedGame() {
   if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
@@ -1763,6 +1834,12 @@ document.addEventListener('click', e => {
     });
     return;
   }
+  const addBot = e.target.closest?.('[data-add-bot]');
+  if (addBot) {
+    e.preventDefault();
+    openBotDialog();
+    return;
+  }
   const button = e.target.closest?.('[data-kick-player]');
   if (!button) return;
   e.preventDefault();
@@ -1802,7 +1879,7 @@ document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('clic
     toast('复制失败', 'err');
   }
 }));
-document.addEventListener('keydown', e => { if (e.key === 'Escape') deselect(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeBotDialog(); deselect(); } });
 document.addEventListener('click', e => { const popup = $('map-popup'); if (!popup.classList.contains('hidden') && !popup.contains(e.target) && e.target !== els.canvas) closePopup(); });
 els.btnSettings?.addEventListener('click', e => {
   e.stopPropagation();

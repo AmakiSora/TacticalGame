@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { loadMaps } from './config/loader.js';
 import { gamesRoutes } from './api/games.js';
+import { botsRoutes } from './api/bots.js';
 import { actionsRoutes } from './api/actions.js';
 import { closeSseConnections, eventsRoutes } from './api/events.js';
 import { mapsRoutes } from './api/maps.js';
@@ -11,7 +12,7 @@ import { globalStore } from './state/store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
-const PROTECTED_RATE_LIMIT = 120;
+const DEFAULT_PROTECTED_RATE_LIMIT = 120;
 const RATE_WINDOW_MS = 60_000;
 
 interface RuntimeConfig {
@@ -35,6 +36,15 @@ function parseBoolean(value: string | undefined, name: string): boolean {
   throw new Error(`${name} must be "true" or "false"`);
 }
 
+function readProtectedRateLimit(value = process.env.TACTICAL_GAME_RATE_LIMIT): number {
+  if (value === undefined || value === '') return DEFAULT_PROTECTED_RATE_LIMIT;
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error('TACTICAL_GAME_RATE_LIMIT must be a positive integer');
+  }
+  return limit;
+}
+
 export function readRuntimeConfig(): RuntimeConfig {
   return {
     host: process.env.HOST || '0.0.0.0',
@@ -52,6 +62,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   let ready = false;
   const production = process.env.NODE_ENV === 'production';
   const logLevel = process.env.LOG_LEVEL || (production ? 'info' : 'warn');
+  // The default protects a public server from accidental request floods.
+  // Local RL experiments can explicitly raise it because one environment
+  // step may issue several authenticated action requests per minute.
+  const protectedRateLimit = readProtectedRateLimit();
   const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
   loadMaps();
@@ -79,7 +93,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       return;
     }
     entry.count += 1;
-    if (entry.count > PROTECTED_RATE_LIMIT) {
+    if (entry.count > protectedRateLimit) {
       reply.code(429).send({ error: 'too many requests', code: 'rate_limit' });
     }
   });
@@ -91,6 +105,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
   await app.register(mapsRoutes);
   await app.register(gamesRoutes);
+  await app.register(botsRoutes);
   await app.register(actionsRoutes);
   await app.register(eventsRoutes);
   await app.register(fastifyStatic, { root: PUBLIC_DIR, prefix: '/' });

@@ -265,6 +265,25 @@
     </div>
   </aside>
 
+  <!-- 添加强化学习 AI 弹框（房主专用） -->
+  <div id="bot-dialog-backdrop" class="modal-backdrop hidden"></div>
+  <div id="bot-dialog" class="bot-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="bot-dialog-title">
+    <h3 id="bot-dialog-title">添加强化学习 AI</h3>
+    <div class="field">
+      <label for="bot-name">AI 名称</label>
+      <input id="bot-name" maxlength="30" placeholder="强化AI" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="bot-model">模型</label>
+      <select id="bot-model"></select>
+    </div>
+    <p class="bot-dialog-hint">开始对局后自动运行所选模型（基于 default 地图训练），AI 加载需要数秒。</p>
+    <div class="bot-dialog-actions">
+      <button id="btn-bot-cancel" type="button" class="btn">取消</button>
+      <button id="btn-bot-confirm" type="button" class="btn primary">确定</button>
+    </div>
+  </div>
+
   <toast id="toast"></toast>
 
   <script src="/version.js"></script>

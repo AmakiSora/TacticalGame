@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const appJs = () => readFileSync('public/app.js', 'utf-8');
 const versionJs = () => readFileSync('public/version.js', 'utf-8');
-const expectedAppVersion = '3.3.5';
+const expectedAppVersion = '3.4.0';
 
 describe('spectator import/export', () => {
   it('exports replay metadata with events and final result', () => {

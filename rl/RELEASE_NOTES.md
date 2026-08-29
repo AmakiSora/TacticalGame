@@ -3,6 +3,15 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加一条记录。
 
+## 2026-08-30 · 交付清洗（不升模型版本）
+
+- **交付 zip 清洗**：启用学习率衰减后，`model.save` 会把 lr 调度闭包经 cloudpickle 序列化进 zip，
+  该闭包在异构机器上反序列化直接段错误（v2.3.3 部署时服务器 load 即 SIGSEGV，本地正常；
+  用 `custom_objects` 跳过 lr 反序列化可加载，证明根因即此）。
+- `train.py` 新增 `sanitize_delivery_zip`：交付前把 `learning_rate` 改为常数、移除 `lr_schedule` 字段；
+  推理只需策略权重，续训时 `load(learning_rate=schedule)` 会重新注入调度，不影响任何训练能力。
+- 已对 `hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip` 补做清洗并重新部署，服务器加载通过。
+
 ## 2026-08-29 · v2.3.3
 
 - **学习率线性衰减**：从 `RL_LEARNING_RATE`（默认 3e-4）线性降到 `RL_LR_END`（默认 3e-5），治后期胜率震荡；

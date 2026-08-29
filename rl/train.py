@@ -124,6 +124,42 @@ def ensure_zip_suffix(path: str) -> str:
     return path if path.endswith(".zip") else f"{path}.zip"
 
 
+def sanitize_delivery_zip(zip_path: str, fallback_lr: float) -> bool:
+    """清洗交付模型：把学习率调度闭包替换为常数。
+
+    启用学习率衰减后，模型保存会把 lr 调度闭包经 cloudpickle 序列化进 zip；
+    该闭包在异构机器上反序列化可能直接段错误（v2.3.3 部署时服务器 load 即 SIGSEGV，
+    本地却正常）。推理只需策略权重，交付前把 learning_rate 改为常数、移除
+    lr_schedule 字段即可；未来续训时 load(learning_rate=schedule) 会重新注入调度。
+    """
+    import io
+    import json
+    import shutil
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(zip_path, "r") as archive:
+            names = archive.namelist()
+            data = json.loads(archive.read("data").decode("utf-8"))
+            lr_entry = data.get("learning_rate")
+            if not isinstance(lr_entry, dict) or ":serialized:" not in lr_entry:
+                return False
+            data["learning_rate"] = fallback_lr
+            data.pop("lr_schedule", None)
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as rewritten:
+                for name in names:
+                    payload = json.dumps(data).encode("utf-8") if name == "data" else archive.read(name)
+                    rewritten.writestr(name, payload)
+    except Exception:
+        return False
+    tmp_path = zip_path + ".tmp"
+    with open(tmp_path, "wb") as handle:
+        handle.write(buffer.getvalue())
+    shutil.move(tmp_path, zip_path)
+    return True
+
+
 def resolve_device() -> str:
     requested = env_str("RL_DEVICE", "auto").lower()
     if requested not in {"auto", "cpu", "cuda"}:
@@ -411,6 +447,8 @@ def main() -> None:
         else:
             model.save(final_model_path)
             print(f"[train] final model saved to {final_model_path} (no eval checkpoint; endpoint model)")
+        if sanitize_delivery_zip(final_model_path, lr_start):
+            print("[train] delivery sanitized: learning-rate schedule closure replaced by constant")
         print(f"[train] checkpoints in {checkpoint_dir}/")
     finally:
         if eval_env is not None:

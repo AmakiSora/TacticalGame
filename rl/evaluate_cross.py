@@ -34,11 +34,13 @@ try:
     from env import HexGameEnv as CurrentHexGameEnv
     from env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
     from env_v200 import HexGameEnv as LegacyHexGameEnv
+    from env_v22 import HexGameEnv as V22HexGameEnv
 except ImportError:  # 兼容 ``python -m rl.evaluate_cross`` 等调用方式。
     from rl.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
     from rl.env import HexGameEnv as CurrentHexGameEnv
     from rl.env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
     from rl.env_v200 import HexGameEnv as LegacyHexGameEnv
+    from rl.env_v22 import HexGameEnv as V22HexGameEnv
 
 
 def parse_args():
@@ -114,16 +116,26 @@ class SideController:
         self.model = MaskablePPO.load(model_path, device=device)
 
         n_actions = int(getattr(self.model.action_space, "n", -1))
-        if n_actions == CURRENT_MAX_ACTIONS:
-            helper_cls, self.version = CurrentHexGameEnv, f"v2.1 ({n_actions} 动作)"
-        elif n_actions == LEGACY_MAX_ACTIONS:
+        obs_dim = int(self.model.observation_space.shape[0]) if getattr(self.model.observation_space, "shape", ()) else 0
+        if n_actions == LEGACY_MAX_ACTIONS:
             helper_cls, self.version = LegacyHexGameEnv, f"v2.0.0 ({n_actions} 动作)"
+        elif n_actions == CURRENT_MAX_ACTIONS:
+            # 同为 54 动作但观测语义按版本分化：按观测维度选编码器，
+            # 5974 维 → v2.3（当前，支持随机地图）；3922 维 → v2.1/v2.2 快照。
+            if obs_dim == 5974:
+                helper_cls, self.version = CurrentHexGameEnv, f"v2.3 ({n_actions} 动作)"
+            elif obs_dim == 3922:
+                helper_cls, self.version = V22HexGameEnv, f"v2.2 ({n_actions} 动作)"
+            else:
+                raise ValueError(f"{label}: 54 动作模型的观测维度 {obs_dim} 无法识别（支持 5974 或 3922）")
         else:
             raise ValueError(
                 f"{label}: 动作空间 {n_actions} 无法识别（支持 "
-                f"{LEGACY_MAX_ACTIONS}=v2.0.0 或 {CURRENT_MAX_ACTIONS}=v2.1）"
+                f"{LEGACY_MAX_ACTIONS}=v2.0.0 或 {CURRENT_MAX_ACTIONS}=v2.1+）"
             )
         # helper 仅用于纯计算（合法动作/编码），不做任何网络或子进程操作。
+        # 注意：v2.2 helper 在随机地图上属分布外（编码只覆盖半径 8 的 217 格、
+        # 归一化常数为静态图数值），观察到的正是旧模型面对未知地图的退化量。
         self.helper = helper_cls()
         self.helper.owner = side
         self.helper.opponent = self.opponent

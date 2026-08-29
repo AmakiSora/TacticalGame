@@ -13,6 +13,7 @@ from collections import deque
 import json
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 import gymnasium as gym
@@ -69,7 +70,7 @@ class HexGameEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
@@ -77,11 +78,19 @@ class HexGameEnv(gym.Env):
             raise ValueError("opponent_style must be mixed, aggressive, defensive, or economy")
         if not 0.0 <= model_opponent_probability <= 1.0:
             raise ValueError("model_opponent_probability must be between 0 and 1")
+        if not 0.0 <= self_play_probability <= 1.0:
+            raise ValueError("self_play_probability must be between 0 and 1")
         self.opponent_style = opponent_style
         self.opponent_model = opponent_model
         # 子进程（SubprocVecEnv）里模型对象不可序列化，改传路径在子进程内懒加载。
         self.opponent_model_path = opponent_model_path
         self.model_opponent_probability = model_opponent_probability
+        # 自对弈：对手从 self_play_dir 的快照阶梯里随机挑一个，随训练变强。
+        # 目录为空（训练初期未存过快照）时自动退回规则对手。
+        self.self_play_dir = self_play_dir
+        self.self_play_probability = self_play_probability
+        self._self_play_path = ""
+        self._self_play_cache: dict[str, Any] = {}
         self.active_opponent_style = opponent_style
         self.map_id = map_id
         self.random_options = dict(random_options) if random_options else {}
@@ -335,7 +344,39 @@ class HexGameEnv(gym.Env):
             self.opponent_model = MaskablePPO.load(self.opponent_model_path, device="cpu")
         return self.opponent_model
 
+    def _self_play_snapshots(self) -> list[str]:
+        """快照阶梯：按训练步数排序取最近 8 个（太旧的对手太弱，只保留梯度）。"""
+        if not self.self_play_dir:
+            return []
+        try:
+            files = [path for path in Path(self.self_play_dir).glob("snapshot_*_steps.zip") if path.is_file()]
+        except OSError:
+            return []
+
+        def step_of(path: Path) -> int:
+            try:
+                return int(path.stem.rsplit("_", 2)[1])
+            except (IndexError, ValueError):
+                return -1
+
+        files.sort(key=step_of)
+        return [str(path) for path in files][-8:]
+
+    def _ensure_self_play_model(self) -> Any:
+        model = self._self_play_cache.get(self._self_play_path)
+        if model is None:
+            from sb3_contrib import MaskablePPO
+            model = MaskablePPO.load(self._self_play_path, device="cpu")
+            if len(self._self_play_cache) >= 8:
+                self._self_play_cache.pop(next(iter(self._self_play_cache)))
+            self._self_play_cache[self._self_play_path] = model
+        return model
+
     def _choose_opponent_style(self) -> str:
+        snapshots = self._self_play_snapshots()
+        if snapshots and self.self_play_probability > 0 and float(self.np_random.random()) < self.self_play_probability:
+            self._self_play_path = snapshots[int(self.np_random.integers(len(snapshots)))]
+            return "self"
         if self._has_model_opponent() and float(self.np_random.random()) < self.model_opponent_probability:
             return "model"
         if self.opponent_style != "mixed":
@@ -470,7 +511,12 @@ class HexGameEnv(gym.Env):
             heals = [(index, action) for index, action in valid if action[0] == "heal"]
             deploys = [(index, action) for index, action in valid if action[0] == "deploy"]
             moves = [(index, action) for index, action in valid if action[0] == "move"]
-            if self.active_opponent_style == "model" and self._has_model_opponent():
+            self_play_move = None
+            if self.active_opponent_style == "self":
+                self_play_move = self._self_play_pick(actions)
+            if self_play_move is not None:
+                index, (action_type, payload) = self_play_move
+            elif self.active_opponent_style == "model" and self._has_model_opponent():
                 opponent_model = self._ensure_opponent_model()
                 # 旧模型按它训练时的 38 动作语义行动（逐步排序分槽、严格接近移动），
                 # 观测用对手相对视角编码，动作直接取旧动作表，不再经过当前槽位映射。
@@ -507,6 +553,26 @@ class HexGameEnv(gym.Env):
                     if "rate_limit" in str(fallback_error):
                         raise
             self.state = self._get_state(self.player_token)
+
+    def _self_play_pick(self, actions):
+        """自对弈快照对手的当前动作；失败（快照被清理/损坏）时降级为 mixed 规则。
+
+        快照与当前环境同为 v2.3 系（54 动作、稳定槽位、同套编码），
+        直接按对手视角编码后用当前动作表行动，无需 legacy 分支。
+        """
+        try:
+            model = self._ensure_self_play_model()
+            mask = np.asarray([bool(action[0]) for action in actions], dtype=bool)
+            observation = self._encode_from_perspective(self.state, self.opponent)
+            action_index, _ = model.predict(observation, deterministic=True, action_masks=mask)
+            index = int(action_index)
+            if index >= len(actions) or not actions[index][0]:
+                index = 0  # end_turn 永远合法。
+            return index, actions[index]
+        except Exception:
+            self.active_opponent_style = "mixed"
+            self._self_play_path = ""
+            return None
 
     def _legal_actions(self, state: dict[str, Any], owner: str, legacy: bool = False):
         """legacy=True 时复现 v2.0.0 的 38 动作语义，供旧模型对手使用。

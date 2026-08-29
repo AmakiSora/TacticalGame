@@ -32,7 +32,7 @@ def mask_fn(env):
     return env.action_masks()
 
 
-def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str):
+def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float):
     """模块级工厂：返回可被 spawn 子进程 pickle 的 env 构造器。每个环境自带一个引擎 worker。"""
 
     def _init():
@@ -41,6 +41,8 @@ def make_train_env(map_id: str, opponent_style: str, model_opponent_probability:
             opponent_style=opponent_style,
             model_opponent_probability=model_opponent_probability,
             opponent_model_path=opponent_model_path or None,
+            self_play_dir=self_play_dir or None,
+            self_play_probability=self_play_probability,
         )
         return Monitor(env)
 
@@ -195,19 +197,48 @@ class MaskableEvalCallback(BaseCallback):
         return True
 
 
+class SnapshotCallback(BaseCallback):
+    """定期保存策略快照供自对弈对手使用（原子写入，只保留最近 keep 个）。
+
+    快照频率单位与 CheckpointCallback 的 save_freq 相同：回调调用次数，
+    并行环境下 1 次调用 = RL_NUM_ENVS 帧。
+    """
+
+    def __init__(self, snapshot_dir: str, save_freq: int, keep: int = 20):
+        super().__init__()
+        self.snapshot_dir = Path(snapshot_dir)
+        self.save_freq = max(1, save_freq)
+        self.keep = max(2, keep)
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.save_freq != 0:
+            return True
+        self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+        steps = int(self.num_timesteps)
+        tmp = self.snapshot_dir / f"snapshot_{steps}_steps_tmp.zip"
+        target = self.snapshot_dir / f"snapshot_{steps}_steps.zip"
+        self.model.save(str(tmp))
+        os.replace(tmp, target)
+        snapshots = sorted(
+            self.snapshot_dir.glob("snapshot_*_steps.zip"),
+            key=lambda path: int(path.stem.rsplit("_", 2)[1]),
+        )
+        for stale in snapshots[: max(0, len(snapshots) - self.keep)]:
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+        return True
+
+
 def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
-    opponent_kind = "modelmix"
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.3.1")
+    model_version = env_str("RL_MODEL_VERSION", "v2.3.2")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
-    model_path = env_str(
-        "RL_MODEL_PATH",
-        f"rl/models/hex_ppo_{model_version}_{run_date}_{map_id}_{opponent_kind}_{total_timesteps}",
-    )
     load_path = env_str("RL_LOAD_MODEL", "")
     save_freq = env_int("RL_SAVE_FREQ", 20_000, minimum=1)
     checkpoint_dir = env_str("RL_CHECKPOINT_DIR", f"rl/checkpoints/{map_id}/{run_stamp}")
@@ -218,6 +249,18 @@ def main() -> None:
     # 需要时可用 RL_MODEL_OPPONENT_PROB 显式开启。
     default_model_prob = 0.0 if map_id == "random" else 0.5
     model_opponent_probability = env_float("RL_MODEL_OPPONENT_PROB", default_model_prob)
+    # 自对弈：随机地图默认 60% 局打自己的历史快照（对手强度随训练提升，
+    # 解决只会打弱规则对手、遇上强模型对手就崩的瓶颈）；静态图默认关闭。
+    default_self_play_prob = 0.6 if map_id == "random" else 0.0
+    self_play_probability = env_float("RL_SELF_PLAY_PROB", default_self_play_prob)
+    snapshot_dir = env_str("RL_SNAPSHOT_DIR", f"rl/selfplay/{map_id}")
+    snapshot_freq = env_int("RL_SNAPSHOT_FREQ", 5_000, minimum=1)
+    snapshot_keep = env_int("RL_SNAPSHOT_KEEP", 20, minimum=2)
+    opponent_kind = "selfplay" if self_play_probability > 0 else "modelmix"
+    model_path = env_str(
+        "RL_MODEL_PATH",
+        f"rl/models/hex_ppo_{model_version}_{run_date}_{map_id}_{opponent_kind}_{total_timesteps}",
+    )
     num_envs = env_int("RL_NUM_ENVS", 4, minimum=1)
     device = resolve_device()
 
@@ -238,6 +281,13 @@ def main() -> None:
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
     best_dir = Path(checkpoint_dir) / "best"
     best_dir.mkdir(parents=True, exist_ok=True)
+    if self_play_probability > 0:
+        Path(snapshot_dir).mkdir(parents=True, exist_ok=True)
+        print(
+            f"[train] self-play probability={self_play_probability:.0%} snapshots={snapshot_dir} "
+            f"every {snapshot_freq} calls keep={snapshot_keep}（训练初期无快照时自动用规则对手）",
+            flush=True,
+        )
 
     if load_path in {"auto", "latest"}:
         candidates = [model_path, model_path + ".zip"]
@@ -270,7 +320,7 @@ def main() -> None:
     # 并行训练环境：每个环境一个独立引擎 worker；sb3 通过 env_method("action_masks")
     # 从各子环境收集动作掩码，无需 ActionMasker 包装。单环境用 DummyVecEnv 保持同构。
     env_fns = [
-        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path)
+        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability)
         for _ in range(num_envs)
     ]
     env = SubprocVecEnv(env_fns) if num_envs > 1 else DummyVecEnv(env_fns)
@@ -309,6 +359,9 @@ def main() -> None:
             save_path=checkpoint_dir,
             name_prefix=Path(model_path).name,
         )]
+        if self_play_probability > 0:
+            # 快照是子进程自对弈对手的唯一来源；原子写入避免读到半截 zip。
+            callbacks.append(SnapshotCallback(snapshot_dir, snapshot_freq, snapshot_keep))
         if eval_freq > 0:
             eval_env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style, model_opponent_probability=model_opponent_probability, opponent_model_path=resolved_opponent_path or None), mask_fn)
             callbacks.append(MaskableEvalCallback(

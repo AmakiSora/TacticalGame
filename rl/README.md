@@ -180,6 +180,22 @@ python rl/train.py
 注意：并行下 `RL_TIMESTEPS` 仍是总帧数（跨环境累计），同一目标步数的墙钟时间约为单环境的 1/N；
 每轮 rollout 收集 `n_steps × RL_NUM_ENVS` 帧，默认 `RL_N_STEPS=256`、`RL_BATCH_SIZE=64` 对任意环境数都整除。
 
+## 自对弈（RL_SELF_PLAY_PROB，v2.3.2）
+
+随机地图训练默认 60% 的局让智能体打自己的历史策略快照（对手强度随训练一起提升），其余局打 mixed 规则对手；
+静态地图默认关闭（`RL_SELF_PLAY_PROB=0`）。
+
+```powershell
+$env:RL_MAP_ID = "random"
+$env:RL_SELF_PLAY_PROB = "0.6"   # 默认值；设 0 关闭自对弈回到纯规则对手训练
+python rl/train.py
+```
+
+机制：训练每 `RL_SNAPSHOT_FREQ`（默认 5000 次回调）存一个快照到 `RL_SNAPSHOT_DIR`（默认 `rl/selfplay/<地图>`），
+只保留最近 `RL_SNAPSHOT_KEEP`（默认 20）个；环境每局从最近 8 个快照里随机选一个当对手。
+训练初期目录为空时自动用规则对手；快照损坏/被清理时当局降级为 mixed 规则。
+评估环境始终只用规则对手，保证训练期胜率与历史模型可比。
+
 ## 在真实对局中使用模型
 
 先启动服务器并创建/加入一局游戏，拿到该座位的 player token。然后运行：

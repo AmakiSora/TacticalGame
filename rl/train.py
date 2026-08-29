@@ -283,7 +283,7 @@ def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.3.3")
+    model_version = env_str("RL_MODEL_VERSION", "v2.4.0")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -311,6 +311,11 @@ def main() -> None:
         f"rl/models/hex_ppo_{model_version}_{run_date}_{map_id}_{opponent_kind}_{total_timesteps}",
     )
     num_envs = env_int("RL_NUM_ENVS", 4, minimum=1)
+    # 网络宽度：5974 维观测压进默认 64 宽是信息瓶颈，256 起步。
+    # 仅对从零训练生效；续训时架构以模型内保存的 policy_kwargs 为准
+    # （sb3 加载时会校验，不一致直接报错，避免默默用错架构）。
+    net_width = env_int("RL_NET_WIDTH", 256, minimum=16)
+    policy_kwargs = {"net_arch": {"pi": [net_width, net_width], "vf": [net_width, net_width]}}
     lr_start = env_float("RL_LEARNING_RATE", 3e-4)
     lr_end = env_float("RL_LR_END", 3e-5)
     lr_schedule = make_lr_schedule(lr_start, lr_end)
@@ -366,6 +371,7 @@ def main() -> None:
     run_name = f"ppo_{map_id}_{run_stamp}" + ("_resume" if resume else "")
     print(
         f"[train] map={map_id} mode={'resume' if resume else 'fresh'} envs={num_envs} "
+        f"net={net_width}x{net_width}{'(from checkpoint)' if resume else ''} "
         f"timesteps={total_timesteps}{'(incremental)' if resume else ''}",
         flush=True,
     )
@@ -402,6 +408,7 @@ def main() -> None:
                 "MlpPolicy",
                 env,
                 learning_rate=lr_schedule,
+                policy_kwargs=policy_kwargs,
                 n_steps=env_int("RL_N_STEPS", 256, minimum=1),
                 batch_size=env_int("RL_BATCH_SIZE", 64, minimum=1),
                 gamma=env_float("RL_GAMMA", 0.99),

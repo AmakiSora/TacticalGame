@@ -70,7 +70,7 @@ class HexGameEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
@@ -89,6 +89,8 @@ class HexGameEnv(gym.Env):
         # 目录为空（训练初期未存过快照）时自动退回规则对手。
         self.self_play_dir = self_play_dir
         self.self_play_probability = self_play_probability
+        # 锚点对手：常驻候选池的强基准（如上一代最强模型），防策略漂移退化。
+        self.anchor_model_path = anchor_model_path
         self._self_play_path = ""
         self._self_play_cache: dict[str, Any] = {}
         self.active_opponent_style = opponent_style
@@ -345,22 +347,25 @@ class HexGameEnv(gym.Env):
         return self.opponent_model
 
     def _self_play_snapshots(self) -> list[str]:
-        """快照阶梯：按训练步数排序取最近 8 个（太旧的对手太弱，只保留梯度）。"""
+        """快照阶梯：按保存时间取最近 8 个（太旧的对手太弱，只保留梯度）。
+
+        按 mtime 而非文件名步数排序：续训时新快照的步数计数器可能低于旧快照，
+        时间序才是真正的「最近」。
+        """
         if not self.self_play_dir:
             return []
         try:
             files = [path for path in Path(self.self_play_dir).glob("snapshot_*_steps.zip") if path.is_file()]
         except OSError:
             return []
-
-        def step_of(path: Path) -> int:
-            try:
-                return int(path.stem.rsplit("_", 2)[1])
-            except (IndexError, ValueError):
-                return -1
-
-        files.sort(key=step_of)
+        files.sort(key=lambda path: path.stat().st_mtime)
         return [str(path) for path in files][-8:]
+
+    def _self_play_candidates(self) -> list[str]:
+        candidates = self._self_play_snapshots()
+        if self.anchor_model_path and Path(self.anchor_model_path).is_file():
+            candidates.append(self.anchor_model_path)
+        return candidates
 
     def _ensure_self_play_model(self) -> Any:
         model = self._self_play_cache.get(self._self_play_path)
@@ -373,9 +378,9 @@ class HexGameEnv(gym.Env):
         return model
 
     def _choose_opponent_style(self) -> str:
-        snapshots = self._self_play_snapshots()
-        if snapshots and self.self_play_probability > 0 and float(self.np_random.random()) < self.self_play_probability:
-            self._self_play_path = snapshots[int(self.np_random.integers(len(snapshots)))]
+        candidates = self._self_play_candidates()
+        if candidates and self.self_play_probability > 0 and float(self.np_random.random()) < self.self_play_probability:
+            self._self_play_path = candidates[int(self.np_random.integers(len(candidates)))]
             return "self"
         if self._has_model_opponent() and float(self.np_random.random()) < self.model_opponent_probability:
             return "model"

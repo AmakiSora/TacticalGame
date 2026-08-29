@@ -21,8 +21,8 @@ except ImportError:  # ``python rl/train.py`` puts rl/ on sys.path.
 
 
 class LocalHexGameEnv(HexGameEnv):
-    def __init__(self, map_id: str = "default", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0):
-        super().__init__(base_url="local://engine", max_steps=max_steps, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability, map_id=map_id, random_options=random_options, opponent_model_path=opponent_model_path, self_play_dir=self_play_dir, self_play_probability=self_play_probability)
+    def __init__(self, map_id: str = "default", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None):
+        super().__init__(base_url="local://engine", max_steps=max_steps, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability, map_id=map_id, random_options=random_options, opponent_model_path=opponent_model_path, self_play_dir=self_play_dir, self_play_probability=self_play_probability, anchor_model_path=anchor_model_path)
         root = Path(__file__).resolve().parent.parent
         npx = shutil.which("npx.cmd") or shutil.which("npx")
         if not npx:

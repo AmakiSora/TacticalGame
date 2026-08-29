@@ -32,7 +32,7 @@ def mask_fn(env):
     return env.action_masks()
 
 
-def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float):
+def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str):
     """模块级工厂：返回可被 spawn 子进程 pickle 的 env 构造器。每个环境自带一个引擎 worker。"""
 
     def _init():
@@ -43,10 +43,24 @@ def make_train_env(map_id: str, opponent_style: str, model_opponent_probability:
             opponent_model_path=opponent_model_path or None,
             self_play_dir=self_play_dir or None,
             self_play_probability=self_play_probability,
+            anchor_model_path=anchor_model_path or None,
         )
         return Monitor(env)
 
     return _init
+
+
+def make_lr_schedule(lr_start: float, lr_end: float):
+    """学习率线性衰减：progress_remaining 1→0 对应起始值→终点值。
+
+    治后期胜率震荡（v2.2.0 峰值 90%→终点 45%）的标准手段；续训时经
+    MaskablePPO.load(learning_rate=...) 覆盖，进度按本次 learn 的总步数计。
+    """
+
+    def schedule(progress_remaining: float) -> float:
+        return lr_end + (lr_start - lr_end) * progress_remaining
+
+    return schedule
 
 
 def env_str(name: str, default: str) -> str:
@@ -219,10 +233,8 @@ class SnapshotCallback(BaseCallback):
         target = self.snapshot_dir / f"snapshot_{steps}_steps.zip"
         self.model.save(str(tmp))
         os.replace(tmp, target)
-        snapshots = sorted(
-            self.snapshot_dir.glob("snapshot_*_steps.zip"),
-            key=lambda path: int(path.stem.rsplit("_", 2)[1]),
-        )
+        # 按保存时间裁剪（续训时步数计数器可能与旧快照错位，时间序才可靠）。
+        snapshots = sorted(self.snapshot_dir.glob("snapshot_*_steps.zip"), key=lambda path: path.stat().st_mtime)
         for stale in snapshots[: max(0, len(snapshots) - self.keep)]:
             try:
                 stale.unlink()
@@ -235,7 +247,7 @@ def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.3.2")
+    model_version = env_str("RL_MODEL_VERSION", "v2.3.3")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -256,12 +268,16 @@ def main() -> None:
     snapshot_dir = env_str("RL_SNAPSHOT_DIR", f"rl/selfplay/{map_id}")
     snapshot_freq = env_int("RL_SNAPSHOT_FREQ", 5_000, minimum=1)
     snapshot_keep = env_int("RL_SNAPSHOT_KEEP", 20, minimum=2)
+    anchor_model = env_str("RL_ANCHOR_MODEL", "")
     opponent_kind = "selfplay" if self_play_probability > 0 else "modelmix"
     model_path = env_str(
         "RL_MODEL_PATH",
         f"rl/models/hex_ppo_{model_version}_{run_date}_{map_id}_{opponent_kind}_{total_timesteps}",
     )
     num_envs = env_int("RL_NUM_ENVS", 4, minimum=1)
+    lr_start = env_float("RL_LEARNING_RATE", 3e-4)
+    lr_end = env_float("RL_LR_END", 3e-5)
+    lr_schedule = make_lr_schedule(lr_start, lr_end)
     device = resolve_device()
 
     # 并行环境（子进程）里模型对象不可序列化：主进程只解析路径，由子进程懒加载。
@@ -300,6 +316,13 @@ def main() -> None:
         raise FileNotFoundError(f"RL_LOAD_MODEL 指向的模型不存在: {load_path}")
 
     resume = bool(load_path)
+    # 锚点对手：防自对弈策略漂移退化的常驻强对手；未显式指定时续训默认用被续训的模型自身。
+    if self_play_probability > 0 and not anchor_model and resume:
+        anchor_model = load_path if os.path.exists(load_path) else load_path + ".zip"
+    if anchor_model and not os.path.exists(anchor_model):
+        raise FileNotFoundError(f"RL_ANCHOR_MODEL 指向的模型不存在: {anchor_model}")
+    if anchor_model:
+        print(f"[train] anchor opponent={anchor_model}（加入自对弈候选池）", flush=True)
     if not resume and (os.path.exists(model_path) or os.path.exists(model_path + ".zip")) and env_str("RL_ALLOW_OVERWRITE", "0") != "1":
         raise FileExistsError(
             f"模型已存在: {model_path}. 设置 RL_ALLOW_OVERWRITE=1 才允许覆盖，或换一个 RL_MODEL_PATH。"
@@ -320,7 +343,7 @@ def main() -> None:
     # 并行训练环境：每个环境一个独立引擎 worker；sb3 通过 env_method("action_masks")
     # 从各子环境收集动作掩码，无需 ActionMasker 包装。单环境用 DummyVecEnv 保持同构。
     env_fns = [
-        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability)
+        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "")
         for _ in range(num_envs)
     ]
     env = SubprocVecEnv(env_fns) if num_envs > 1 else DummyVecEnv(env_fns)
@@ -329,7 +352,7 @@ def main() -> None:
         if resume:
             print(f"[train] loading model from {load_path}")
             try:
-                model = MaskablePPO.load(load_path, env=env, device=device)
+                model = MaskablePPO.load(load_path, env=env, device=device, learning_rate=lr_schedule)
             except ValueError as error:
                 if "Action spaces do not match" in str(error) or "Observation spaces do not match" in str(error):
                     raise RuntimeError(
@@ -342,7 +365,7 @@ def main() -> None:
             model = MaskablePPO(
                 "MlpPolicy",
                 env,
-                learning_rate=env_float("RL_LEARNING_RATE", 3e-4),
+                learning_rate=lr_schedule,
                 n_steps=env_int("RL_N_STEPS", 256, minimum=1),
                 batch_size=env_int("RL_BATCH_SIZE", 64, minimum=1),
                 gamma=env_float("RL_GAMMA", 0.99),

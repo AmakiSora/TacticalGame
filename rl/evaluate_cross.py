@@ -35,12 +35,14 @@ try:
     from env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
     from env_v200 import HexGameEnv as LegacyHexGameEnv
     from env_v22 import HexGameEnv as V22HexGameEnv
+    from env_v24 import HexGameEnv as V24HexGameEnv
 except ImportError:  # 兼容 ``python -m rl.evaluate_cross`` 等调用方式。
     from rl.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
     from rl.env import HexGameEnv as CurrentHexGameEnv
     from rl.env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
     from rl.env_v200 import HexGameEnv as LegacyHexGameEnv
     from rl.env_v22 import HexGameEnv as V22HexGameEnv
+    from rl.env_v24 import HexGameEnv as V24HexGameEnv
 
 
 def parse_args():
@@ -122,13 +124,16 @@ class SideController:
             helper_cls, self.version = LegacyHexGameEnv, f"v2.0.0 ({n_actions} 动作)"
         elif n_actions == CURRENT_MAX_ACTIONS:
             # 同为 54 动作但观测语义按版本分化：按观测维度选编码器，
-            # 5974 维 → v2.3（当前，支持随机地图）；3922 维 → v2.1/v2.2 快照。
-            if obs_dim == 5974:
-                helper_cls, self.version = CurrentHexGameEnv, f"v2.3 ({n_actions} 动作)"
+            # 6024 维 → v2.5（当前，含对手动作历史）；5974 维 → v2.3/v2.4 快照；
+            # 3922 维 → v2.1/v2.2 快照。
+            if obs_dim == 6024:
+                helper_cls, self.version = CurrentHexGameEnv, f"v2.5 ({n_actions} 动作)"
+            elif obs_dim == 5974:
+                helper_cls, self.version = V24HexGameEnv, f"v2.3/v2.4 ({n_actions} 动作)"
             elif obs_dim == 3922:
                 helper_cls, self.version = V22HexGameEnv, f"v2.2 ({n_actions} 动作)"
             else:
-                raise ValueError(f"{label}: 54 动作模型的观测维度 {obs_dim} 无法识别（支持 5974 或 3922）")
+                raise ValueError(f"{label}: 54 动作模型的观测维度 {obs_dim} 无法识别（支持 6024 / 5974 / 3922）")
         else:
             raise ValueError(
                 f"{label}: 动作空间 {n_actions} 无法识别（支持 "

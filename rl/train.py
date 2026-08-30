@@ -283,7 +283,7 @@ def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.4.0")
+    model_version = env_str("RL_MODEL_VERSION", "v2.5.0")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -301,7 +301,8 @@ def main() -> None:
     # 解决只会打弱规则对手、遇上强模型对手就崩的瓶颈）；静态图默认关闭。
     default_self_play_prob = 0.6 if map_id == "random" else 0.0
     self_play_probability = env_float("RL_SELF_PLAY_PROB", default_self_play_prob)
-    snapshot_dir = env_str("RL_SNAPSHOT_DIR", f"rl/selfplay/{map_id}")
+    # 快照目录按模型版本隔离：观测世代不同的旧快照（如 5974 维）不混入新世代阶梯。
+    snapshot_dir = env_str("RL_SNAPSHOT_DIR", f"rl/selfplay/{map_id}/{model_version}")
     snapshot_freq = env_int("RL_SNAPSHOT_FREQ", 5_000, minimum=1)
     snapshot_keep = env_int("RL_SNAPSHOT_KEEP", 20, minimum=2)
     anchor_model = env_str("RL_ANCHOR_MODEL", "")
@@ -311,7 +312,7 @@ def main() -> None:
         f"rl/models/hex_ppo_{model_version}_{run_date}_{map_id}_{opponent_kind}_{total_timesteps}",
     )
     num_envs = env_int("RL_NUM_ENVS", 4, minimum=1)
-    # 网络宽度：5974 维观测压进默认 64 宽是信息瓶颈，256 起步。
+    # 网络宽度：6024 维观测压进默认 64 宽是信息瓶颈，256 起步。
     # 仅对从零训练生效；续训时架构以模型内保存的 policy_kwargs 为准
     # （sb3 加载时会校验，不一致直接报错，避免默默用错架构）。
     net_width = env_int("RL_NET_WIDTH", 256, minimum=16)

@@ -16,10 +16,18 @@ import type { GameState, PlayerId, UnitType } from '../src/types.js';
 let game: GameState | null = null;
 loadMaps();
 
+/** 快照携带最近的事件尾部：v2.5 观测编码对手上一回合动作需要事件日志，
+ * 编码只读最近一个回合，80 条足够覆盖且限制消息体积。 */
+const SNAPSHOT_EVENT_TAIL = 80;
+
 function snapshot(): unknown {
   if (!game) throw new Error('game is not initialized');
-  const { tokens: _tokens, hostToken: _hostToken, events: _events, ...rest } = structuredClone(game);
-  return { ...rest, events: [], adjudication: buildAdjudicationSnapshot(game) };
+  const { tokens: _tokens, hostToken: _hostToken, ...rest } = structuredClone(game);
+  return {
+    ...rest,
+    events: structuredClone(game.events.slice(-SNAPSHOT_EVENT_TAIL)),
+    adjudication: buildAdjudicationSnapshot(game),
+  };
 }
 
 function owner(value: unknown): PlayerId {

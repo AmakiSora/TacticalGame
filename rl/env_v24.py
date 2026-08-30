@@ -1,11 +1,10 @@
-"""Gymnasium environment for the standard two-player REST game (v2.5).
+"""Immutable snapshot of the v2.4.x training environment (5,974-dim observation).
 
-v2.5 keeps the v2.3/v2.4 canonical board encoding and appends the opponent's
-last-turn action history (type, position, magnitude per action) parsed from
-the game event log, which both the REST API and the local training worker
-expose.  The observation grew from 5,974 to 6,024 dims (331 canonical cells
-x 18 features + 16 globals + 50 opponent-history features); models trained
-on the old encoding must use the ``env_v24`` snapshot via ``run_model_v24.py``.
+Do NOT evolve this file: it exists so that the 54-action / 5,974-dim models
+(v2.3.0 through v2.4.0) keep their exact training-time encoding via
+``run_model.py`` after ``env.py`` moved to the v2.5 observation (6,018 dims,
+opponent last-turn action history appended).  New training changes belong in
+``env.py``.
 """
 
 from __future__ import annotations
@@ -47,15 +46,7 @@ CANONICAL_INDEX = {cell: index for index, cell in enumerate(CANONICAL_CELLS)}
 MAX_CELLS = len(CANONICAL_CELLS)
 CELL_FEATURES = 18
 GLOBAL_FEATURES = 16
-# v2.5：对手上一回合的动作历史。每个动作槽 8 维：
-# 5 维类型 one-hot（move/attack/heal/deploy/demolish）+ 2 维目标位置（/10）
-# + 1 维强度（伤害/治疗/花费归一化）；另加 2 维汇总（动作数与总伤害）。
-OPPONENT_ACTION_TYPES = ("move", "attack", "heal", "deploy", "demolish")
-OPPONENT_ACTION_INDEX = {name: index for index, name in enumerate(OPPONENT_ACTION_TYPES)}
-OPPONENT_ACTION_SLOTS = 6
-OPPONENT_ACTION_FEATURES = 8
-OPPONENT_HISTORY_SIZE = OPPONENT_ACTION_SLOTS * OPPONENT_ACTION_FEATURES + 2
-OBSERVATION_SIZE = MAX_CELLS * CELL_FEATURES + GLOBAL_FEATURES + OPPONENT_HISTORY_SIZE
+OBSERVATION_SIZE = MAX_CELLS * CELL_FEATURES + GLOBAL_FEATURES
 # Stable intent slots.  Slot numbers have the same meaning in every state:
 # 0=end turn; then 12 unit slots x 4 intents; then 5 deploy-type slots.
 MAX_UNIT_SLOTS = 12
@@ -107,8 +98,6 @@ class HexGameEnv(gym.Env):
         self.random_options = dict(random_options) if random_options else {}
         # 旧模型对手（v2.0.0，3922 维观测）需要 env_v22 快照编码器，懒加载。
         self._legacy_env: Any = None
-        # v2.3/v2.4 模型对手（5974 维，如锚点）需要 env_v24 快照编码器，懒加载。
-        self._v24_env: Any = None
 
         self.action_space = spaces.Discrete(MAX_ACTIONS)
         self.observation_space = spaces.Box(
@@ -421,28 +410,6 @@ class HexGameEnv(gym.Env):
             self._legacy_env = LegacyHexGameEnv(base_url="local://legacy-snapshot")
         return self._legacy_env._encode_from_perspective(state, owner)
 
-    def _encode_for_v24_model(self, state: dict[str, Any], owner: str) -> np.ndarray:
-        """v2.3/v2.4 模型对手（5974 维）用 env_v24 快照编码器产出相对视角观测。
-
-        v2.5 本体的 6024 维观测对它们是分布外输入；快照编码与其训练时逐格一致。
-        """
-        if self._v24_env is None:
-            try:
-                from env_v24 import HexGameEnv as V24HexGameEnv
-            except ImportError:  # ``python -m rl.train`` 等调用方式。
-                from rl.env_v24 import HexGameEnv as V24HexGameEnv
-            self._v24_env = V24HexGameEnv(base_url="local://v24-snapshot")
-        return self._v24_env._encode_from_perspective(state, owner)
-
-    def _encode_for_candidate_model(self, model: Any, state: dict[str, Any], owner: str) -> np.ndarray:
-        """按候选对手模型的观测维度选择对应编码器（同代/快照）。"""
-        dim = int(model.observation_space.shape[0])
-        if dim == OBSERVATION_SIZE:
-            return self._encode_from_perspective(state, owner)
-        if dim == 5974:  # env_v24.OBSERVATION_SIZE：v2.3/v2.4 世代。
-            return self._encode_for_v24_model(state, owner)
-        return self._encode_for_legacy_model(state, owner)
-
     def _units_for_slots(self, state: dict[str, Any], owner: str) -> list[dict[str, Any] | None]:
         """Keep units in stable action slots as they move or are deployed."""
         live = [u for u in state.get("units", []) if u.get("alive") and u.get("owner") == owner]
@@ -595,13 +562,13 @@ class HexGameEnv(gym.Env):
     def _self_play_pick(self, actions):
         """自对弈快照对手的当前动作；失败（快照被清理/损坏）时降级为 mixed 规则。
 
-        快照可能跨观测世代（锚点是 5974 维的 v2.3/v2.4 模型，新快照是 6024 维），
-        按候选模型的观测维度选对应编码器，用当前动作表行动。
+        快照与当前环境同为 v2.3 系（54 动作、稳定槽位、同套编码），
+        直接按对手视角编码后用当前动作表行动，无需 legacy 分支。
         """
         try:
             model = self._ensure_self_play_model()
             mask = np.asarray([bool(action[0]) for action in actions], dtype=bool)
-            observation = self._encode_for_candidate_model(model, self.state, self.opponent)
+            observation = self._encode_from_perspective(self.state, self.opponent)
             action_index, _ = model.predict(observation, deterministic=True, action_masks=mask)
             index = int(action_index)
             if index >= len(actions) or not actions[index][0]:
@@ -765,72 +732,4 @@ class HexGameEnv(gym.Env):
             impassable / max(1, len(cells_list)),
         ]
         result[base:base + len(values)] = np.clip(values, -1.0, 1.0)
-        self._encode_opponent_history(state, result, base + GLOBAL_FEATURES)
         return result
-
-    def _opponent_last_turn_events(self, state: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-        """对手上一回合的动作事件（时间序）。
-
-        回合边界：最近一条 previousOwner == 己方的 turn_end（己方交回合给对手）；
-        找不到则从事件头算起（对手先手的第一回合）。编码只依赖 self.owner /
-        self.opponent，因此 _encode_from_perspective 的视角交换自动生效。
-        """
-        events = state.get("events") or []
-        boundary = -1
-        for index, event in enumerate(events):
-            if event.get("type") == "turn_end" and event.get("payload", {}).get("previousOwner") == self.owner:
-                boundary = index
-        actions: list[tuple[str, dict[str, Any]]] = []
-        for event in events[boundary + 1:]:
-            event_type = event.get("type")
-            payload = event.get("payload", {}) or {}
-            if event_type in OPPONENT_ACTION_INDEX and payload.get("owner") == self.opponent:
-                actions.append((str(event_type), payload))
-        return actions
-
-    @staticmethod
-    def _action_position(state: dict[str, Any], event_type: str, payload: dict[str, Any]) -> tuple[float, float] | None:
-        """动作的目标/终点坐标；attack/heal 事件只带目标 id，查当前棋盘（阵亡单位仍留有坐标）。"""
-        if event_type == "move" and "toQ" in payload:
-            return float(payload["toQ"]), float(payload["toR"])
-        if event_type in ("deploy", "demolish") and "q" in payload:
-            return float(payload["q"]), float(payload["r"])
-        target_id = payload.get("targetId")
-        if target_id:
-            for unit in state.get("units", []):
-                if unit.get("id") == target_id:
-                    return float(unit.get("q", 0)), float(unit.get("r", 0))
-            for hq in state.get("headquarters", {}).values():
-                if hq.get("id") == target_id:
-                    return float(hq.get("q", 0)), float(hq.get("r", 0))
-        return None
-
-    def _encode_opponent_history(self, state: dict[str, Any], result: np.ndarray, base: int) -> None:
-        """把对手上一回合动作写入观测尾部（槽位按时间序，不足补零）。"""
-        actions = self._opponent_last_turn_events(state)[-OPPONENT_ACTION_SLOTS:]
-        damage_total = 0.0
-        for slot, (event_type, payload) in enumerate(actions):
-            offset = base + slot * OPPONENT_ACTION_FEATURES
-            result[offset + OPPONENT_ACTION_INDEX[event_type]] = 1.0
-            position = self._action_position(state, event_type, payload)
-            if position:
-                result[offset + 5] = position[0] / 10.0
-                result[offset + 6] = position[1] / 10.0
-            if event_type == "attack":
-                damage = float(payload.get("actualDamage", 0))
-                damage_total += damage
-                result[offset + 7] = damage / 60.0
-            elif event_type == "heal":
-                result[offset + 7] = float(payload.get("amount", 0)) / 60.0
-            elif event_type == "deploy":
-                result[offset + 7] = float(payload.get("cost", 0)) / 200.0
-            elif event_type == "demolish":
-                result[offset + 7] = 1.0
-            else:  # move：强度用位移格数（六角距离）。
-                dq = int(payload.get("toQ", 0)) - int(payload.get("fromQ", 0))
-                dr = int(payload.get("toR", 0)) - int(payload.get("fromR", 0))
-                result[offset + 7] = max(abs(dq), abs(dr), abs(-dq - dr)) / 6.0
-        summary = base + OPPONENT_ACTION_SLOTS * OPPONENT_ACTION_FEATURES
-        result[summary] = len(actions) / OPPONENT_ACTION_SLOTS
-        result[summary + 1] = damage_total / 100.0
-        result[base:base + OPPONENT_HISTORY_SIZE] = np.clip(result[base:base + OPPONENT_HISTORY_SIZE], -1.0, 1.0)

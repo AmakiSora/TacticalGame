@@ -26,8 +26,10 @@ const LEGACY_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v200.py');
 const V100_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v100.py');
 const DEFAULT_BOT_NAME = '强化AI';
 // v2.1.x / v2.2.x 的 54 动作模型（3922 维观测）专用快照运行器；
-// v2.3 起观测扩为 5974 维，当前运行器只服务新模型。
+// v2.3 起观测扩为 5974 维，v2.5 起再扩为 6024 维（对手动作历史）。
 const RUNNER_SCRIPT_V22 = join(PROJECT_ROOT, 'rl', 'run_model_v22.py');
+// v2.3.x / v2.4.x 的 54 动作模型（5974 维观测）专用快照运行器。
+const RUNNER_SCRIPT_V24 = join(PROJECT_ROOT, 'rl', 'run_model_v24.py');
 
 /** 当前 rl/env.py 的动作空间大小（12 单位槽 × 4 意图 + 5 部署 + 结束回合）。 */
 const CURRENT_ACTION_SPACE = 54;
@@ -36,29 +38,31 @@ const CURRENT_ACTION_SPACE = 54;
  * 动作空间 → 运行脚本。每次迭代环境后，旧模型仍需可玩：在这里登记新版本
  * 的动作空间与运行器，同时保留历史版本的映射（运行器内部用对应的 env
  * 快照做编码/合法动作）。未注册的动作空间不会被允许加入对局。
- * 54 动作存在两个观测语义世代（见 routeModel）：v2.1/v2.2 的 3922 维与
- * v2.3 随机地图的 5974 维，需按文件名版本分流到不同运行器。
+ * 54 动作存在三个观测语义世代（见 routeModel）：v2.1/v2.2 的 3922 维、
+ * v2.3/v2.4 随机地图的 5974 维与 v2.5（+对手动作历史）的 6024 维，
+ * 需按文件名版本分流到不同运行器。
  */
 const RUNNERS_BY_ACTION_SPACE: ReadonlyMap<number, { runner: string; label: string }> = new Map([
   [38, { runner: LEGACY_RUNNER_SCRIPT, label: 'v2.0' }],
   [512, { runner: V100_RUNNER_SCRIPT, label: 'v1' }],
 ]);
 
-/** 文件名中的版本号是否 ≥ v2.3（v2.3 随机地图观测世代）。 */
-function isV23OrLaterModel(file: string): boolean {
+/** 解析文件名中的版本号；无版本号返回 null。 */
+function parseModelVersion(file: string): { major: number; minor: number } | null {
   const match = file.match(/v(\d+)\.(\d+)\.(\d+)/);
-  if (!match) return false;
-  const major = Number(match[1]);
-  const minor = Number(match[2]);
-  return major > 2 || (major === 2 && minor >= 3);
+  if (!match) return null;
+  return { major: Number(match[1]), minor: Number(match[2]) };
 }
 
 function routeModel(actionSpace: number | null, file: string): { runner: string; label: string } | undefined {
   if (actionSpace === null) return undefined;
   if (actionSpace === CURRENT_ACTION_SPACE) {
-    return isV23OrLaterModel(file)
-      ? { runner: RUNNER_SCRIPT, label: 'v2.3' }
-      : { runner: RUNNER_SCRIPT_V22, label: 'v2.2' };
+    const version = parseModelVersion(file);
+    const isV25OrLater = version !== null && (version.major > 2 || (version.major === 2 && version.minor >= 5));
+    const isV23OrLater = version !== null && (version.major > 2 || (version.major === 2 && version.minor >= 3));
+    if (isV25OrLater) return { runner: RUNNER_SCRIPT, label: 'v2.5' };
+    if (isV23OrLater) return { runner: RUNNER_SCRIPT_V24, label: 'v2.3' };
+    return { runner: RUNNER_SCRIPT_V22, label: 'v2.2' };
   }
   return RUNNERS_BY_ACTION_SPACE.get(actionSpace);
 }

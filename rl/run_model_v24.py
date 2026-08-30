@@ -1,11 +1,11 @@
-"""Run a trained MaskablePPO model in an existing REST game (v2.5 runner).
+"""Run a trained MaskablePPO model in an existing REST game (v2.3/v2.4 runner).
 
-The model expects the v2.5 observation/action representation from env.py
-(6,024-dim canonical board encoding + opponent last-turn action history).
-It can act as either player_a or player_b because observations are encoded
-from the selected player's perspective.  v2.3/v2.4 models (5,974 dims) must
-use ``run_model_v24.py``; older 3,922-dim models (v2.1.x/v2.2.x) must use
-``run_model_v22.py``.
+The model expects the v2.3/v2.4 random-map observation/action representation
+(5,974-dim canonical board encoding) from the ``env_v24`` snapshot.  It can
+act as either player_a or player_b because observations are encoded from the
+selected player's perspective.  v2.5 models (6,024 dims, opponent-action
+history) must use ``run_model.py``; older 3,922-dim models (v2.1.x/v2.2.x)
+must use ``run_model_v22.py``.
 """
 
 from __future__ import annotations
@@ -16,12 +16,12 @@ from pathlib import Path
 
 from sb3_contrib import MaskablePPO
 
-from env import HexGameEnv
+from env_v24 import HexGameEnv
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="", help="模型路径；留空自动选择 rl/models 中最新的 v2.5 模型")
+    parser.add_argument("--model", default="", help="模型路径；留空自动选择 rl/models 中最新的 v2.3/v2.4 模型")
     parser.add_argument("--url", default="http://127.0.0.1:3100")
     parser.add_argument("--game", required=True)
     parser.add_argument("--token", required=True)
@@ -37,10 +37,12 @@ def main():
     args = parse_args()
     model_path = args.model
     if not model_path:
-        candidates = list(Path("rl/models").glob("hex_ppo_v2.5.*_*_*.zip"))
-        candidates += list(Path("rl/models").glob("hex_ppo_*_v2.5.*_*.zip"))
+        candidates = list(Path("rl/models").glob("hex_ppo_v2.3.*_*_*.zip"))
+        candidates += list(Path("rl/models").glob("hex_ppo_v2.4.*_*_*.zip"))
+        candidates += list(Path("rl/models").glob("hex_ppo_*_v2.3.*_*.zip"))
+        candidates += list(Path("rl/models").glob("hex_ppo_*_v2.4.*_*.zip"))
         if not candidates:
-            raise FileNotFoundError("未找到 v2.5 模型，请先训练，或通过 --model 指定模型路径；v2.3/v2.4 模型请用 run_model_v24.py，v2.1/v2.2 模型用 run_model_v22.py")
+            raise FileNotFoundError("未找到 v2.3/v2.4 模型，请先训练，或通过 --model 指定模型路径；v2.5 模型请用 run_model.py，v2.1/v2.2 模型用 run_model_v22.py")
         model_path = str(max(candidates, key=lambda path: path.stat().st_mtime))
         print(f"Using latest model: {model_path}")
     model = MaskablePPO.load(model_path)
@@ -52,8 +54,8 @@ def main():
         )
     if getattr(model.observation_space, "shape", (None,))[0] != env.observation_space.shape[0]:
         raise ValueError(
-            f"模型观测维度为 {getattr(model.observation_space, 'shape', ('?',))[0]}，v2.5 环境需要 {env.observation_space.shape[0]}；"
-            "v2.3/v2.4 模型请改用 run_model_v24.py，v2.1/v2.2 旧模型请改用 run_model_v22.py。"
+            f"模型观测维度为 {getattr(model.observation_space, 'shape', ('?',))[0]}，v2.3/v2.4 环境需要 {env.observation_space.shape[0]}；"
+            "v2.5 模型请改用 run_model.py，v2.1/v2.2 旧模型请改用 run_model_v22.py。"
         )
     env.game_id = args.game
     env.player_token = args.token

@@ -23,6 +23,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -59,8 +60,57 @@ def parse_args():
     parser.add_argument("--device", default="auto", help="torch 设备：auto / cuda / cpu")
     parser.add_argument("--swap-sides", action="store_true",
                         help="每局交换座位。注意 v2.0.0 编码固定 player_a 视角，交换后旧模型会失真")
+    parser.add_argument("--stats-file", default=None,
+                        help="每局结果追加到该 JSONL 文件，结束时输出与历史运行累计合并的统计（大样本验收用）")
     parser.add_argument("--verbose", action="store_true", help="打印每个动作")
     return parser.parse_args()
+
+
+def seat_breakdown(records: list[dict[str, Any]]) -> list[str]:
+    """按模型 × 座位统计胜局；确定性策略互打方差极高，分座位是拆穿先手效应的必要维度。"""
+    games: dict[str, dict[str, int]] = {}
+    wins: dict[str, dict[str, int]] = {}
+    for record in records:
+        for seat, name in record["players"].items():
+            games.setdefault(name, {})[seat] = games.get(name, {}).get(seat, 0) + 1
+            if record["winner"] == name:
+                wins.setdefault(name, {})[seat] = wins.get(name, {}).get(seat, 0) + 1
+    lines = []
+    for name, by_seat in games.items():
+        parts, total_w, total_g, draws = [], 0, 0, 0
+        for seat in ("player_a", "player_b"):
+            g = by_seat.get(seat, 0)
+            if not g:
+                continue
+            w = wins.get(name, {}).get(seat, 0)
+            parts.append(f"{seat} 座 {w} 胜/{g} 局")
+            total_w += w
+            total_g += g
+        draws = sum(1 for r in records if r["winner"] == "draw" and name in r["players"].values())
+        suffix = f"，平 {draws}" if draws else ""
+        lines.append(f"  {name}: 共 {total_w}/{total_g}{suffix}（{'；'.join(parts)}）")
+    return lines
+
+
+def load_stats(stats_file: Path, pair: set[str], map_id: str) -> list[dict[str, Any]]:
+    """读累计文件，只保留同一模型对与同一地图的记录。"""
+    records: list[dict[str, Any]] = []
+    if not stats_file.exists():
+        return records
+    for line in stats_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if record.get("map") != map_id:
+            continue
+        if set(record.get("players", {}).values()) != pair:
+            continue
+        records.append(record)
+    return records
 
 
 class EngineWorker:
@@ -215,32 +265,62 @@ def main():
             for side, path in (("player_a", args.model_a), ("player_b", args.model_b))
         }
         tally: dict[str, int] = {name_a: 0, name_b: 0, "draw": 0}
+        records: list[dict[str, Any]] = []
 
         for game_index in range(1, args.games + 1):
             if args.swap_sides and game_index > 1:
                 # 交换座位：重建控制器以匹配新的 owner 视角。
+                # 注意：必须按当前座位映射取模型路径/名字——上一次重建后控制器
+                # 的 label 已与初始 names 字典相反，直接取 names[side] 会导致
+                # 第 3 局起座位反复失效（v2.5.0 验收时踩到）。
+                current = {seat: (controller.label, controller.model_path) for seat, controller in controllers.items()}
                 controllers = {
-                    "player_a": SideController(name_b, args.model_b, "player_a", args.device),
-                    "player_b": SideController(name_a, args.model_a, "player_b", args.device),
+                    "player_a": SideController(current["player_b"][0], current["player_b"][1], "player_a", args.device),
+                    "player_b": SideController(current["player_a"][0], current["player_a"][1], "player_b", args.device),
                 }
+                names = {"player_a": current["player_b"][0], "player_b": current["player_a"][0]}
             for controller in controllers.values():
                 controller.reset_for_game()
 
             print(f"— 第 {game_index}/{args.games} 局（{controllers['player_a'].short}"
                   f" vs {controllers['player_b'].short}）")
             winner, acted, rounds = play_one_game(workers[0], controllers, args, game_index)
+            seats = {seat: controller.label for seat, controller in controllers.items()}
             if winner in (None, "draw"):
                 tally["draw"] += 1
+                winner_label = "draw"
                 result = "平局（达到回合/动作上限）"
             else:
                 winner_name = names.get(winner, winner)
                 tally[winner_name] = tally.get(winner_name, 0) + 1
+                winner_label = winner_name
                 result = f"胜者：{winner_name}"
+            records.append({
+                "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "map": args.map_id,
+                "players": seats,
+                "winner": winner_label,
+                "rounds": rounds,
+            })
             print(f"  结果：{result}（{rounds} 回合 / {acted} 动作）")
 
-        print("\n===== 总结 =====")
+        print("\n===== 总结（本次运行）=====")
         for name in (name_a, name_b, "draw"):
             print(f"{name}: {tally.get(name, 0)}")
+        print("分座位（本次运行）：")
+        for line in seat_breakdown(records):
+            print(line)
+
+        if args.stats_file:
+            stats_file = Path(args.stats_file)
+            stats_file.parent.mkdir(parents=True, exist_ok=True)
+            with stats_file.open("a", encoding="utf-8") as handle:
+                for record in records:
+                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+            cumulative = load_stats(stats_file, {name_a, name_b}, args.map_id)
+            print(f"\n===== 累计统计（{stats_file.name}，{len(cumulative)} 局）=====")
+            for line in seat_breakdown(cumulative):
+                print(line)
     finally:
         for worker in workers:
             worker.close()

@@ -32,7 +32,7 @@ def mask_fn(env):
     return env.action_masks()
 
 
-def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str):
+def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str, anchor_probability: float):
     """模块级工厂：返回可被 spawn 子进程 pickle 的 env 构造器。每个环境自带一个引擎 worker。"""
 
     def _init():
@@ -44,6 +44,7 @@ def make_train_env(map_id: str, opponent_style: str, model_opponent_probability:
             self_play_dir=self_play_dir or None,
             self_play_probability=self_play_probability,
             anchor_model_path=anchor_model_path or None,
+            anchor_probability=anchor_probability,
         )
         return Monitor(env)
 
@@ -283,7 +284,7 @@ def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.5.0")
+    model_version = env_str("RL_MODEL_VERSION", "v2.6.0")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -297,15 +298,16 @@ def main() -> None:
     # 需要时可用 RL_MODEL_OPPONENT_PROB 显式开启。
     default_model_prob = 0.0 if map_id == "random" else 0.5
     model_opponent_probability = env_float("RL_MODEL_OPPONENT_PROB", default_model_prob)
-    # 自对弈：随机地图默认 60% 局打自己的历史快照（对手强度随训练提升，
-    # 解决只会打弱规则对手、遇上强模型对手就崩的瓶颈）；静态图默认关闭。
-    default_self_play_prob = 0.6 if map_id == "random" else 0.0
+    # 自对弈：随机地图默认 85% 局打自己的历史快照（v2.6 起加压：对手生态是棋力上限的
+    # 主要约束，留 15% 规则对手仅防评估退化）；静态图默认关闭。
+    default_self_play_prob = 0.85 if map_id == "random" else 0.0
     self_play_probability = env_float("RL_SELF_PLAY_PROB", default_self_play_prob)
     # 快照目录按模型版本隔离：观测世代不同的旧快照（如 5974 维）不混入新世代阶梯。
     snapshot_dir = env_str("RL_SNAPSHOT_DIR", f"rl/selfplay/{map_id}/{model_version}")
     snapshot_freq = env_int("RL_SNAPSHOT_FREQ", 5_000, minimum=1)
     snapshot_keep = env_int("RL_SNAPSHOT_KEEP", 20, minimum=2)
     anchor_model = env_str("RL_ANCHOR_MODEL", "")
+    anchor_probability = env_float("RL_ANCHOR_PROB", 0.15)
     opponent_kind = "selfplay" if self_play_probability > 0 else "modelmix"
     model_path = env_str(
         "RL_MODEL_PATH",
@@ -364,7 +366,7 @@ def main() -> None:
     if anchor_model and not os.path.exists(anchor_model):
         raise FileNotFoundError(f"RL_ANCHOR_MODEL 指向的模型不存在: {anchor_model}")
     if anchor_model:
-        print(f"[train] anchor opponent={anchor_model}（加入自对弈候选池）", flush=True)
+        print(f"[train] anchor opponent={anchor_model}（自对弈局 {anchor_probability:.0%} 出场，其余快照阶梯近期加权）", flush=True)
     if not resume and (os.path.exists(model_path) or os.path.exists(model_path + ".zip")) and env_str("RL_ALLOW_OVERWRITE", "0") != "1":
         raise FileExistsError(
             f"模型已存在: {model_path}. 设置 RL_ALLOW_OVERWRITE=1 才允许覆盖，或换一个 RL_MODEL_PATH。"
@@ -386,7 +388,7 @@ def main() -> None:
     # 并行训练环境：每个环境一个独立引擎 worker；sb3 通过 env_method("action_masks")
     # 从各子环境收集动作掩码，无需 ActionMasker 包装。单环境用 DummyVecEnv 保持同构。
     env_fns = [
-        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "")
+        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "", anchor_probability)
         for _ in range(num_envs)
     ]
     env = SubprocVecEnv(env_fns) if num_envs > 1 else DummyVecEnv(env_fns)

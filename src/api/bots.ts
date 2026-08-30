@@ -26,10 +26,13 @@ const LEGACY_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v200.py');
 const V100_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v100.py');
 const DEFAULT_BOT_NAME = '强化AI';
 // v2.1.x / v2.2.x 的 54 动作模型（3922 维观测）专用快照运行器；
-// v2.3 起观测扩为 5974 维，v2.5 起再扩为 6024 维（对手动作历史）。
+// v2.3 起观测扩为 5974 维，v2.5 曾扩为 6024 维（对手动作历史，已回退），
+// v2.6 起观测回到 5974 维。
 const RUNNER_SCRIPT_V22 = join(PROJECT_ROOT, 'rl', 'run_model_v22.py');
 // v2.3.x / v2.4.x 的 54 动作模型（5974 维观测）专用快照运行器。
 const RUNNER_SCRIPT_V24 = join(PROJECT_ROOT, 'rl', 'run_model_v24.py');
+// v2.5.x 的 54 动作模型（6024 维观测，对手动作历史）专用快照运行器。
+const RUNNER_SCRIPT_V25 = join(PROJECT_ROOT, 'rl', 'run_model_v25.py');
 
 /** 当前 rl/env.py 的动作空间大小（12 单位槽 × 4 意图 + 5 部署 + 结束回合）。 */
 const CURRENT_ACTION_SPACE = 54;
@@ -38,9 +41,9 @@ const CURRENT_ACTION_SPACE = 54;
  * 动作空间 → 运行脚本。每次迭代环境后，旧模型仍需可玩：在这里登记新版本
  * 的动作空间与运行器，同时保留历史版本的映射（运行器内部用对应的 env
  * 快照做编码/合法动作）。未注册的动作空间不会被允许加入对局。
- * 54 动作存在三个观测语义世代（见 routeModel）：v2.1/v2.2 的 3922 维、
- * v2.3/v2.4 随机地图的 5974 维与 v2.5（+对手动作历史）的 6024 维，
- * 需按文件名版本分流到不同运行器。
+ * 54 动作存在四个观测语义世代（见 routeModel）：v2.1/v2.2 的 3922 维、
+ * v2.3/v2.4 随机地图的 5974 维、v2.5（+对手动作历史）的 6024 维与
+ * v2.6+（回退 5974 维但对手生态不同），需按文件名版本分流到不同运行器。
  */
 const RUNNERS_BY_ACTION_SPACE: ReadonlyMap<number, { runner: string; label: string }> = new Map([
   [38, { runner: LEGACY_RUNNER_SCRIPT, label: 'v2.0' }],
@@ -58,10 +61,11 @@ function routeModel(actionSpace: number | null, file: string): { runner: string;
   if (actionSpace === null) return undefined;
   if (actionSpace === CURRENT_ACTION_SPACE) {
     const version = parseModelVersion(file);
-    const isV25OrLater = version !== null && (version.major > 2 || (version.major === 2 && version.minor >= 5));
-    const isV23OrLater = version !== null && (version.major > 2 || (version.major === 2 && version.minor >= 3));
-    if (isV25OrLater) return { runner: RUNNER_SCRIPT, label: 'v2.5' };
-    if (isV23OrLater) return { runner: RUNNER_SCRIPT_V24, label: 'v2.3' };
+    const minorAtLeast = (minor: number) =>
+      version !== null && (version.major > 2 || (version.major === 2 && version.minor >= minor));
+    if (minorAtLeast(6)) return { runner: RUNNER_SCRIPT, label: 'v2.6' };
+    if (minorAtLeast(5)) return { runner: RUNNER_SCRIPT_V25, label: 'v2.5' };
+    if (minorAtLeast(3)) return { runner: RUNNER_SCRIPT_V24, label: 'v2.3' };
     return { runner: RUNNER_SCRIPT_V22, label: 'v2.2' };
   }
   return RUNNERS_BY_ACTION_SPACE.get(actionSpace);

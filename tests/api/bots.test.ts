@@ -207,19 +207,21 @@ describe('RL bot legacy model support', () => {
       expect(typeof model.runner).toBe('string');
       expect(model.supported).toBe(model.actionSpace === 54 || model.actionSpace === 38 || model.actionSpace === 512);
       // 每个动作空间都走训练时期对应的快照运行器。
-      // 54 动作有三个观测世代：v2.5+（6024 维）走当前运行器，
-      // v2.3/v2.4（5974 维）走 env_v24 快照运行器，
+      // 54 动作有四个观测世代：v2.6+（5974 维，回退）走当前运行器，
+      // v2.5（6024 维）走 env_v25 快照运行器，v2.3/v2.4（5974 维）走 env_v24，
       // v2.1/v2.2（3922 维）走 env_v22 快照运行器。
       if (model.actionSpace === 54) {
         const versionMatch = /v(\d+)\.(\d+)\./.exec(model.file);
         const major = versionMatch !== null ? Number(versionMatch[1]) : 0;
         const minor = versionMatch !== null ? Number(versionMatch[2]) : 0;
-        const isV25 = versionMatch !== null && (major > 2 || (major === 2 && minor >= 5));
-        const isV23 = versionMatch !== null && (major > 2 || (major === 2 && minor >= 3));
-        if (isV25) {
+        const atLeast = (m: number) => versionMatch !== null && (major > 2 || (major === 2 && minor >= m));
+        if (atLeast(6)) {
           expect(model.runner.endsWith('run_model.py')).toBe(true);
+          expect(model.label).toBe('v2.6');
+        } else if (atLeast(5)) {
+          expect(model.runner.endsWith('run_model_v25.py')).toBe(true);
           expect(model.label).toBe('v2.5');
-        } else if (isV23) {
+        } else if (atLeast(3)) {
           expect(model.runner.endsWith('run_model_v24.py')).toBe(true);
           expect(model.label).toBe('v2.3');
         } else {

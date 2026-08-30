@@ -76,6 +76,7 @@ class EngineWorker:
             stdout=subprocess.PIPE,
             text=True,
             encoding="utf-8",
+            errors="replace",
             bufsize=1,
         )
 

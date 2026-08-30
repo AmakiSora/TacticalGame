@@ -34,6 +34,9 @@ class LocalHexGameEnv(HexGameEnv):
             stdout=subprocess.PIPE,
             text=True,
             encoding="utf-8",
+            # 宿主控制台代码页（如中文 Windows 的 936）可能传染给子进程链，
+            # 导致偶发的非 UTF-8 输出；解码容错避免直接崩掉整个训练。
+            errors="replace",
             bufsize=1,
         )
 

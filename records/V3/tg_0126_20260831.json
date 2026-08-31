@@ -1,0 +1,6431 @@
+{
+  "format": "hex-v2-replay",
+  "schemaVersion": "3.4.1",
+  "gameId": "ec6df5ae-47fb-43ce-b5f7-f8374c22526b",
+  "mapId": "artillery-zone",
+  "playerNames": {
+    "player_a": "Hy4-WB",
+    "player_b": "Hy3-WB"
+  },
+  "exportedAt": "2026-08-31T08:06:56.048Z",
+  "eventCount": 220,
+  "finalResult": {
+    "winner": "player_a",
+    "reason": "turn_limit_score",
+    "scores": {
+      "player_a": {
+        "headquartersDamage": 0,
+        "ownHqHp": 0,
+        "controlPoints": 7,
+        "armyValue": 384,
+        "supplies": 129,
+        "actionScore": 670,
+        "total": 1438
+      },
+      "player_b": {
+        "headquartersDamage": 0,
+        "ownHqHp": 0,
+        "controlPoints": 3,
+        "armyValue": 57,
+        "supplies": 93,
+        "actionScore": 360,
+        "total": 474
+      }
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "type": "player_joined",
+      "timestamp": 1788117519332,
+      "payload": {
+        "playerId": "player_a",
+        "name": "Hy4-WB"
+      }
+    },
+    {
+      "seq": 2,
+      "type": "player_joined",
+      "timestamp": 1788117542391,
+      "payload": {
+        "playerId": "player_b",
+        "name": "Hy3-WB"
+      }
+    },
+    {
+      "seq": 3,
+      "type": "game_start",
+      "timestamp": 1788117544188,
+      "payload": {
+        "mapId": "artillery-zone",
+        "mode": "annihilation",
+        "map": {
+          "id": "artillery-zone",
+          "name": "炮火禁区",
+          "description": "支持2、3、6人的三阶段歼灭战。前期争夺内圈补给点，中期利用补给扩军，后期在炮火覆盖据点前完成决战。",
+          "mode": "annihilation",
+          "grid": "hex",
+          "orientation": "pointy",
+          "radius": 6,
+          "terrainCells": [],
+          "cells": [
+            {
+              "q": -6,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -6,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -6,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -6,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -6,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -6,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": -6,
+              "r": 6,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 6,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 6,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 6,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 6,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 6,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -6,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 6,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -6,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -6,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -6,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -6,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -6,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 6,
+              "r": -6,
+              "terrain": "plain"
+            },
+            {
+              "q": 6,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 6,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 6,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 6,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 6,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 6,
+              "r": 0,
+              "terrain": "plain"
+            }
+          ]
+        },
+        "players": {
+          "player_a": {
+            "id": "player_a",
+            "name": "Hy4-WB",
+            "joinedAt": 1788117519332,
+            "status": "active",
+            "spawnSlotId": "slot_east",
+            "turnOrder": 1,
+            "eliminatedAt": null,
+            "eliminatedBy": null,
+            "stats": {
+              "headquartersDamage": 0,
+              "unitsDestroyed": 0,
+              "playersEliminated": 0,
+              "actionPointsUsed": 0,
+              "actionMerit": 0
+            }
+          },
+          "player_b": {
+            "id": "player_b",
+            "name": "Hy3-WB",
+            "joinedAt": 1788117542391,
+            "status": "active",
+            "spawnSlotId": "slot_west",
+            "turnOrder": 0,
+            "eliminatedAt": null,
+            "eliminatedBy": null,
+            "stats": {
+              "headquartersDamage": 0,
+              "unitsDestroyed": 0,
+              "playersEliminated": 0,
+              "actionPointsUsed": 0,
+              "actionMerit": 0
+            }
+          }
+        },
+        "turnOrder": [
+          "player_b",
+          "player_a"
+        ],
+        "controlPoints": [
+          {
+            "id": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "q": 4,
+            "r": 0,
+            "owner": "player_a"
+          },
+          {
+            "id": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "q": 4,
+            "r": -4,
+            "owner": null
+          },
+          {
+            "id": "cp_northwest",
+            "name": "西北集结点",
+            "kind": "forward_base",
+            "q": 0,
+            "r": -4,
+            "owner": null
+          },
+          {
+            "id": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "q": -4,
+            "r": 0,
+            "owner": "player_b"
+          },
+          {
+            "id": "cp_southwest",
+            "name": "西南集结点",
+            "kind": "forward_base",
+            "q": -4,
+            "r": 4,
+            "owner": null
+          },
+          {
+            "id": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "q": 0,
+            "r": 4,
+            "owner": null
+          },
+          {
+            "id": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "q": 3,
+            "r": 0,
+            "owner": null
+          },
+          {
+            "id": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "q": 3,
+            "r": -3,
+            "owner": null
+          },
+          {
+            "id": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "q": 0,
+            "r": -3,
+            "owner": null
+          },
+          {
+            "id": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "q": -3,
+            "r": 0,
+            "owner": null
+          },
+          {
+            "id": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "q": -3,
+            "r": 3,
+            "owner": null
+          },
+          {
+            "id": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "q": 0,
+            "r": 3,
+            "owner": null
+          }
+        ],
+        "headquarters": {},
+        "units": [
+          {
+            "id": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+            "owner": "player_a",
+            "type": "infantry",
+            "q": 5,
+            "r": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "attack": 30,
+            "defense": 8,
+            "moveRange": 3,
+            "attackRange": 1,
+            "cost": 45,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+            "owner": "player_a",
+            "type": "infantry",
+            "q": 5,
+            "r": -1,
+            "hp": 100,
+            "maxHp": 100,
+            "attack": 30,
+            "defense": 8,
+            "moveRange": 3,
+            "attackRange": 1,
+            "cost": 45,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+            "owner": "player_a",
+            "type": "heavy",
+            "q": 4,
+            "r": 1,
+            "hp": 150,
+            "maxHp": 150,
+            "attack": 38,
+            "defense": 13,
+            "moveRange": 2,
+            "attackRange": 1,
+            "cost": 92,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": false
+          },
+          {
+            "id": "b92786e4-d232-4e30-94c8-2911189466fc",
+            "owner": "player_b",
+            "type": "infantry",
+            "q": -5,
+            "r": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "attack": 30,
+            "defense": 8,
+            "moveRange": 3,
+            "attackRange": 1,
+            "cost": 45,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+            "owner": "player_b",
+            "type": "infantry",
+            "q": -5,
+            "r": 1,
+            "hp": 100,
+            "maxHp": 100,
+            "attack": 30,
+            "defense": 8,
+            "moveRange": 3,
+            "attackRange": 1,
+            "cost": 45,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+            "owner": "player_b",
+            "type": "heavy",
+            "q": -4,
+            "r": -1,
+            "hp": 150,
+            "maxHp": 150,
+            "attack": 38,
+            "defense": 13,
+            "moveRange": 2,
+            "attackRange": 1,
+            "cost": 92,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": false
+          }
+        ],
+        "resources": {
+          "player_a": {
+            "supplies": 45
+          },
+          "player_b": {
+            "supplies": 45
+          }
+        },
+        "artillery": {
+          "safeRadius": 6,
+          "dangerCells": [],
+          "warningCells": [],
+          "nextShrinkRound": 5
+        },
+        "firstPlayer": "player_b",
+        "playerNames": {
+          "player_a": "Hy4-WB",
+          "player_b": "Hy3-WB"
+        },
+        "config": {
+          "mode": "annihilation",
+          "units": {
+            "infantry": {
+              "hp": 100,
+              "attack": 30,
+              "defense": 8,
+              "moveRange": 3,
+              "attackRange": 1,
+              "cost": 45,
+              "canCapture": true
+            },
+            "scout": {
+              "hp": 65,
+              "attack": 16,
+              "defense": 4,
+              "moveRange": 5,
+              "attackRange": 1,
+              "cost": 38,
+              "canCapture": true
+            },
+            "heavy": {
+              "hp": 150,
+              "attack": 38,
+              "defense": 13,
+              "moveRange": 2,
+              "attackRange": 1,
+              "cost": 92,
+              "canCapture": false
+            },
+            "ranger": {
+              "hp": 72,
+              "attack": 44,
+              "defense": 3,
+              "moveRange": 3,
+              "attackRange": 3,
+              "cost": 72,
+              "canCapture": false
+            },
+            "support": {
+              "hp": 82,
+              "attack": 10,
+              "defense": 5,
+              "moveRange": 3,
+              "attackRange": 1,
+              "cost": 60,
+              "canCapture": false,
+              "healPower": 22
+            }
+          },
+          "headquartersSpec": {
+            "hp": 1,
+            "defense": 0
+          },
+          "balance": {
+            "startingSupplies": 45,
+            "baseIncome": 8,
+            "controlPointIncome": 8,
+            "damageVarianceRange": 3,
+            "minimumDamage": 1,
+            "healVarianceRange": 6,
+            "actionsPerTurn": 4,
+            "maxTurns": 12,
+            "adjudicationWeights": {
+              "enemyHqDamage": 0,
+              "ownHqHp": 0,
+              "controlPoint": 0,
+              "armyValue": 2,
+              "supplies": 0,
+              "effectiveActions": 10
+            },
+            "controlPointTypes": {
+              "supply": {
+                "income": 8,
+                "deployDiscount": 0,
+                "repairAmount": 0
+              },
+              "forward_base": {
+                "income": 4,
+                "deployDiscount": 0,
+                "repairAmount": 0
+              },
+              "repair": {
+                "income": 0,
+                "deployDiscount": 0,
+                "repairAmount": 0
+              }
+            }
+          },
+          "annihilation": {
+            "artillery": {
+              "startRound": 5,
+              "intervalRounds": 2,
+              "damage": 25,
+              "minimumSafeRadius": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "type": "move",
+      "timestamp": 1788117720917,
+      "payload": {
+        "unitId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "owner": "player_b",
+        "fromQ": -5,
+        "fromR": 0,
+        "toQ": -3,
+        "toR": 0,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 5,
+      "type": "deploy",
+      "timestamp": 1788117721805,
+      "payload": {
+        "unitId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "owner": "player_b",
+        "unitType": "infantry",
+        "fromId": "cp_west",
+        "q": -3,
+        "r": -1,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 6,
+      "type": "move",
+      "timestamp": 1788117722696,
+      "payload": {
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "owner": "player_b",
+        "fromQ": -5,
+        "fromR": 1,
+        "toQ": -3,
+        "toR": 1,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 7,
+      "type": "move",
+      "timestamp": 1788117738939,
+      "payload": {
+        "unitId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "owner": "player_b",
+        "fromQ": -4,
+        "fromR": -1,
+        "toQ": -4,
+        "toR": 1,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 8,
+      "type": "control_point_captured",
+      "timestamp": 1788117739886,
+      "payload": {
+        "pointId": "supply_west",
+        "name": "西部补给点",
+        "owner": "player_b",
+        "previousOwner": null,
+        "unitId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "q": -3,
+        "r": 0
+      }
+    },
+    {
+      "seq": 9,
+      "type": "reset_actions",
+      "timestamp": 1788117739886,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 10,
+      "type": "income",
+      "timestamp": 1788117739886,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 4,
+        "controlPoints": 1,
+        "amount": 12,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          }
+        ]
+      }
+    },
+    {
+      "seq": 11,
+      "type": "turn_end",
+      "timestamp": 1788117739886,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 1,
+        "turnNumber": 1
+      }
+    },
+    {
+      "seq": 12,
+      "type": "deploy",
+      "timestamp": 1788117955271,
+      "payload": {
+        "unitId": "1d0e5122-86ff-434f-977a-3a88cc96d79d",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "cp_east",
+        "q": 3,
+        "r": 0,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 13,
+      "type": "move",
+      "timestamp": 1788118051061,
+      "payload": {
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "owner": "player_a",
+        "fromQ": 5,
+        "fromR": -1,
+        "toQ": 4,
+        "toR": -2,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 14,
+      "type": "move",
+      "timestamp": 1788118051796,
+      "payload": {
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "owner": "player_a",
+        "fromQ": 5,
+        "fromR": 0,
+        "toQ": 2,
+        "toR": 1,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 15,
+      "type": "move",
+      "timestamp": 1788118052534,
+      "payload": {
+        "unitId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "owner": "player_a",
+        "fromQ": 4,
+        "fromR": 1,
+        "toQ": 2,
+        "toR": 2,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 16,
+      "type": "control_point_captured",
+      "timestamp": 1788118060443,
+      "payload": {
+        "pointId": "supply_east",
+        "name": "东部补给点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "1d0e5122-86ff-434f-977a-3a88cc96d79d",
+        "q": 3,
+        "r": 0
+      }
+    },
+    {
+      "seq": 17,
+      "type": "reset_actions",
+      "timestamp": 1788118060443,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 18,
+      "type": "round_end",
+      "timestamp": 1788118060443,
+      "payload": {
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 19,
+      "type": "income",
+      "timestamp": 1788118060444,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 12,
+        "controlPoints": 2,
+        "amount": 20,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 20,
+      "type": "turn_end",
+      "timestamp": 1788118060444,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 2,
+        "turnNumber": 2
+      }
+    },
+    {
+      "seq": 21,
+      "type": "move",
+      "timestamp": 1788118138302,
+      "payload": {
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": 1,
+        "toQ": -3,
+        "toR": 3,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 22,
+      "type": "move",
+      "timestamp": 1788118139451,
+      "payload": {
+        "unitId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": -1,
+        "toQ": 0,
+        "toR": -3,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 23,
+      "type": "move",
+      "timestamp": 1788118140456,
+      "payload": {
+        "unitId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "owner": "player_b",
+        "fromQ": -4,
+        "fromR": 1,
+        "toQ": -2,
+        "toR": 1,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 24,
+      "type": "control_point_captured",
+      "timestamp": 1788118141422,
+      "payload": {
+        "pointId": "supply_northwest",
+        "name": "西北补给点",
+        "owner": "player_b",
+        "previousOwner": null,
+        "unitId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "q": 0,
+        "r": -3
+      }
+    },
+    {
+      "seq": 25,
+      "type": "control_point_captured",
+      "timestamp": 1788118141422,
+      "payload": {
+        "pointId": "supply_southwest",
+        "name": "西南补给点",
+        "owner": "player_b",
+        "previousOwner": null,
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "q": -3,
+        "r": 3
+      }
+    },
+    {
+      "seq": 26,
+      "type": "reset_actions",
+      "timestamp": 1788118141422,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 27,
+      "type": "income",
+      "timestamp": 1788118141422,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 12,
+        "controlPoints": 2,
+        "amount": 20,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 28,
+      "type": "turn_end",
+      "timestamp": 1788118141422,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 2,
+        "turnNumber": 2
+      }
+    },
+    {
+      "seq": 29,
+      "type": "move",
+      "timestamp": 1788118194485,
+      "payload": {
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 1,
+        "toQ": 0,
+        "toR": 3,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 30,
+      "type": "move",
+      "timestamp": 1788118195277,
+      "payload": {
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "owner": "player_a",
+        "fromQ": 4,
+        "fromR": -2,
+        "toQ": 3,
+        "toR": -3,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 31,
+      "type": "move",
+      "timestamp": 1788118213661,
+      "payload": {
+        "unitId": "1d0e5122-86ff-434f-977a-3a88cc96d79d",
+        "owner": "player_a",
+        "fromQ": 3,
+        "fromR": 0,
+        "toQ": 1,
+        "toR": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 32,
+      "type": "move",
+      "timestamp": 1788118214463,
+      "payload": {
+        "unitId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 2,
+        "toQ": 0,
+        "toR": 2,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 33,
+      "type": "control_point_captured",
+      "timestamp": 1788118215201,
+      "payload": {
+        "pointId": "supply_northeast",
+        "name": "东北补给点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "q": 3,
+        "r": -3
+      }
+    },
+    {
+      "seq": 34,
+      "type": "control_point_captured",
+      "timestamp": 1788118215201,
+      "payload": {
+        "pointId": "supply_southeast",
+        "name": "东南补给点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "q": 0,
+        "r": 3
+      }
+    },
+    {
+      "seq": 35,
+      "type": "reset_actions",
+      "timestamp": 1788118215201,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 36,
+      "type": "round_end",
+      "timestamp": 1788118215201,
+      "payload": {
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 37,
+      "type": "income",
+      "timestamp": 1788118215202,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 28,
+        "controlPoints": 4,
+        "amount": 36,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 38,
+      "type": "turn_end",
+      "timestamp": 1788118215202,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 3,
+        "turnNumber": 3
+      }
+    },
+    {
+      "seq": 39,
+      "type": "deploy",
+      "timestamp": 1788118264058,
+      "payload": {
+        "unitId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "owner": "player_b",
+        "unitType": "infantry",
+        "fromId": "cp_west",
+        "q": -3,
+        "r": -1,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 40,
+      "type": "move",
+      "timestamp": 1788118265090,
+      "payload": {
+        "unitId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": 1,
+        "toQ": 0,
+        "toR": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 41,
+      "type": "move",
+      "timestamp": 1788118266036,
+      "payload": {
+        "unitId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": 0,
+        "toQ": -1,
+        "toR": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 42,
+      "type": "move",
+      "timestamp": 1788118267037,
+      "payload": {
+        "unitId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "owner": "player_b",
+        "fromQ": 0,
+        "fromR": -3,
+        "toQ": -1,
+        "toR": -1,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 43,
+      "type": "reset_actions",
+      "timestamp": 1788118268083,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 44,
+      "type": "income",
+      "timestamp": 1788118268083,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 28,
+        "controlPoints": 4,
+        "amount": 36,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 45,
+      "type": "turn_end",
+      "timestamp": 1788118268083,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 3,
+        "turnNumber": 3
+      }
+    },
+    {
+      "seq": 46,
+      "type": "move",
+      "timestamp": 1788118443198,
+      "payload": {
+        "unitId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "owner": "player_a",
+        "fromQ": 0,
+        "fromR": 2,
+        "toQ": 0,
+        "toR": 1,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 47,
+      "type": "attack",
+      "timestamp": 1788118466940,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "targetId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "damage": 22,
+        "actualDamage": 22,
+        "targetHp": 128,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 48,
+      "type": "move",
+      "timestamp": 1788118548202,
+      "payload": {
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "owner": "player_a",
+        "fromQ": 0,
+        "fromR": 3,
+        "toQ": 0,
+        "toR": 4,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 49,
+      "type": "move",
+      "timestamp": 1788118548943,
+      "payload": {
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "owner": "player_a",
+        "fromQ": 3,
+        "fromR": -3,
+        "toQ": 4,
+        "toR": -4,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 50,
+      "type": "move",
+      "timestamp": 1788118549656,
+      "payload": {
+        "unitId": "1d0e5122-86ff-434f-977a-3a88cc96d79d",
+        "owner": "player_a",
+        "fromQ": 1,
+        "fromR": 0,
+        "toQ": 1,
+        "toR": 1,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 51,
+      "type": "control_point_captured",
+      "timestamp": 1788118550430,
+      "payload": {
+        "pointId": "cp_northeast",
+        "name": "东北集结点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "q": 4,
+        "r": -4
+      }
+    },
+    {
+      "seq": 52,
+      "type": "control_point_captured",
+      "timestamp": 1788118550430,
+      "payload": {
+        "pointId": "cp_southeast",
+        "name": "东南集结点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "q": 0,
+        "r": 4
+      }
+    },
+    {
+      "seq": 53,
+      "type": "reset_actions",
+      "timestamp": 1788118550430,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 54,
+      "type": "round_end",
+      "timestamp": 1788118550430,
+      "payload": {
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 55,
+      "type": "artillery_warning",
+      "timestamp": 1788118550431,
+      "payload": {
+        "roundNumber": 4,
+        "safeRadius": 6,
+        "warningCells": [
+          {
+            "q": -6,
+            "r": 0
+          },
+          {
+            "q": -6,
+            "r": 1
+          },
+          {
+            "q": -6,
+            "r": 2
+          },
+          {
+            "q": -6,
+            "r": 3
+          },
+          {
+            "q": -6,
+            "r": 4
+          },
+          {
+            "q": -6,
+            "r": 5
+          },
+          {
+            "q": -6,
+            "r": 6
+          },
+          {
+            "q": -5,
+            "r": -1
+          },
+          {
+            "q": -5,
+            "r": 6
+          },
+          {
+            "q": -4,
+            "r": -2
+          },
+          {
+            "q": -4,
+            "r": 6
+          },
+          {
+            "q": -3,
+            "r": -3
+          },
+          {
+            "q": -3,
+            "r": 6
+          },
+          {
+            "q": -2,
+            "r": -4
+          },
+          {
+            "q": -2,
+            "r": 6
+          },
+          {
+            "q": -1,
+            "r": -5
+          },
+          {
+            "q": -1,
+            "r": 6
+          },
+          {
+            "q": 0,
+            "r": -6
+          },
+          {
+            "q": 0,
+            "r": 6
+          },
+          {
+            "q": 1,
+            "r": -6
+          },
+          {
+            "q": 1,
+            "r": 5
+          },
+          {
+            "q": 2,
+            "r": -6
+          },
+          {
+            "q": 2,
+            "r": 4
+          },
+          {
+            "q": 3,
+            "r": -6
+          },
+          {
+            "q": 3,
+            "r": 3
+          },
+          {
+            "q": 4,
+            "r": -6
+          },
+          {
+            "q": 4,
+            "r": 2
+          },
+          {
+            "q": 5,
+            "r": -6
+          },
+          {
+            "q": 5,
+            "r": 1
+          },
+          {
+            "q": 6,
+            "r": -6
+          },
+          {
+            "q": 6,
+            "r": -5
+          },
+          {
+            "q": 6,
+            "r": -4
+          },
+          {
+            "q": 6,
+            "r": -3
+          },
+          {
+            "q": 6,
+            "r": -2
+          },
+          {
+            "q": 6,
+            "r": -1
+          },
+          {
+            "q": 6,
+            "r": 0
+          }
+        ],
+        "nextShrinkRound": 5
+      }
+    },
+    {
+      "seq": 56,
+      "type": "income",
+      "timestamp": 1788118550431,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 28,
+        "controlPoints": 4,
+        "amount": 36,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 57,
+      "type": "turn_end",
+      "timestamp": 1788118550431,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 4,
+        "turnNumber": 4
+      }
+    },
+    {
+      "seq": 58,
+      "type": "deploy",
+      "timestamp": 1788118636860,
+      "payload": {
+        "unitId": "627e4bd2-c885-457f-92d5-e93bb7a1992c",
+        "owner": "player_b",
+        "unitType": "infantry",
+        "fromId": "cp_west",
+        "q": -3,
+        "r": 0,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 59,
+      "type": "move",
+      "timestamp": 1788118637808,
+      "payload": {
+        "unitId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "owner": "player_b",
+        "fromQ": -1,
+        "fromR": -1,
+        "toQ": 0,
+        "toR": -1,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 60,
+      "type": "reset_actions",
+      "timestamp": 1788118638884,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 61,
+      "type": "income",
+      "timestamp": 1788118638884,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 36,
+        "controlPoints": 6,
+        "amount": 44,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 62,
+      "type": "turn_end",
+      "timestamp": 1788118638884,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 4,
+        "turnNumber": 4
+      }
+    },
+    {
+      "seq": 63,
+      "type": "deploy",
+      "timestamp": 1788118846070,
+      "payload": {
+        "unitId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "owner": "player_a",
+        "unitType": "ranger",
+        "fromId": "supply_east",
+        "q": 2,
+        "r": 0,
+        "cost": 72,
+        "unitCost": 72,
+        "discount": 0,
+        "hp": 72,
+        "attack": 44,
+        "defense": 3,
+        "moveRange": 3,
+        "attackRange": 3,
+        "canCapture": false,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 64,
+      "type": "deploy",
+      "timestamp": 1788118846769,
+      "payload": {
+        "unitId": "cb7f49ae-5d98-49f8-9871-b30d1acc1772",
+        "owner": "player_a",
+        "unitType": "scout",
+        "fromId": "cp_southeast",
+        "q": 0,
+        "r": 3,
+        "cost": 38,
+        "unitCost": 38,
+        "discount": 0,
+        "hp": 65,
+        "attack": 16,
+        "defense": 4,
+        "moveRange": 5,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 65,
+      "type": "attack",
+      "timestamp": 1788118847437,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "targetId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "damage": 27,
+        "actualDamage": 27,
+        "targetHp": 101,
+        "targetKind": "unit",
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 66,
+      "type": "move",
+      "timestamp": 1788118874509,
+      "payload": {
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "owner": "player_a",
+        "fromQ": 4,
+        "fromR": -4,
+        "toQ": 1,
+        "toR": -3,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 67,
+      "type": "reset_actions",
+      "timestamp": 1788118875296,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 68,
+      "type": "round_end",
+      "timestamp": 1788118875296,
+      "payload": {
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 69,
+      "type": "artillery_shrunk",
+      "timestamp": 1788118875297,
+      "payload": {
+        "roundNumber": 5,
+        "safeRadius": 5,
+        "dangerCells": [
+          {
+            "q": -6,
+            "r": 0
+          },
+          {
+            "q": -6,
+            "r": 1
+          },
+          {
+            "q": -6,
+            "r": 2
+          },
+          {
+            "q": -6,
+            "r": 3
+          },
+          {
+            "q": -6,
+            "r": 4
+          },
+          {
+            "q": -6,
+            "r": 5
+          },
+          {
+            "q": -6,
+            "r": 6
+          },
+          {
+            "q": -5,
+            "r": -1
+          },
+          {
+            "q": -5,
+            "r": 6
+          },
+          {
+            "q": -4,
+            "r": -2
+          },
+          {
+            "q": -4,
+            "r": 6
+          },
+          {
+            "q": -3,
+            "r": -3
+          },
+          {
+            "q": -3,
+            "r": 6
+          },
+          {
+            "q": -2,
+            "r": -4
+          },
+          {
+            "q": -2,
+            "r": 6
+          },
+          {
+            "q": -1,
+            "r": -5
+          },
+          {
+            "q": -1,
+            "r": 6
+          },
+          {
+            "q": 0,
+            "r": -6
+          },
+          {
+            "q": 0,
+            "r": 6
+          },
+          {
+            "q": 1,
+            "r": -6
+          },
+          {
+            "q": 1,
+            "r": 5
+          },
+          {
+            "q": 2,
+            "r": -6
+          },
+          {
+            "q": 2,
+            "r": 4
+          },
+          {
+            "q": 3,
+            "r": -6
+          },
+          {
+            "q": 3,
+            "r": 3
+          },
+          {
+            "q": 4,
+            "r": -6
+          },
+          {
+            "q": 4,
+            "r": 2
+          },
+          {
+            "q": 5,
+            "r": -6
+          },
+          {
+            "q": 5,
+            "r": 1
+          },
+          {
+            "q": 6,
+            "r": -6
+          },
+          {
+            "q": 6,
+            "r": -5
+          },
+          {
+            "q": 6,
+            "r": -4
+          },
+          {
+            "q": 6,
+            "r": -3
+          },
+          {
+            "q": 6,
+            "r": -2
+          },
+          {
+            "q": 6,
+            "r": -1
+          },
+          {
+            "q": 6,
+            "r": 0
+          }
+        ],
+        "warningCells": [],
+        "nextShrinkRound": 7
+      }
+    },
+    {
+      "seq": 70,
+      "type": "income",
+      "timestamp": 1788118875297,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 28,
+        "controlPoints": 4,
+        "amount": 36,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 71,
+      "type": "turn_end",
+      "timestamp": 1788118875297,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 5,
+        "turnNumber": 5
+      }
+    },
+    {
+      "seq": 72,
+      "type": "move",
+      "timestamp": 1788119016665,
+      "payload": {
+        "unitId": "627e4bd2-c885-457f-92d5-e93bb7a1992c",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": 0,
+        "toQ": -2,
+        "toR": 1,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 73,
+      "type": "move",
+      "timestamp": 1788119017837,
+      "payload": {
+        "unitId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": -1,
+        "toQ": -2,
+        "toR": -1,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 74,
+      "type": "move",
+      "timestamp": 1788119018776,
+      "payload": {
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": 3,
+        "toQ": -2,
+        "toR": 2,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 75,
+      "type": "reset_actions",
+      "timestamp": 1788119019832,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 76,
+      "type": "income",
+      "timestamp": 1788119019832,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 36,
+        "controlPoints": 6,
+        "amount": 44,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 77,
+      "type": "turn_end",
+      "timestamp": 1788119019832,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 5,
+        "turnNumber": 5
+      }
+    },
+    {
+      "seq": 78,
+      "type": "attack",
+      "timestamp": 1788119122312,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "targetId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "damage": 34,
+        "actualDamage": 34,
+        "targetHp": 67,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 79,
+      "type": "attack",
+      "timestamp": 1788119123129,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "targetId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "damage": 23,
+        "actualDamage": 23,
+        "targetHp": 44,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 80,
+      "type": "move",
+      "timestamp": 1788119123861,
+      "payload": {
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "owner": "player_a",
+        "fromQ": 1,
+        "fromR": -3,
+        "toQ": 0,
+        "toR": -3,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 81,
+      "type": "move",
+      "timestamp": 1788119124603,
+      "payload": {
+        "unitId": "cb7f49ae-5d98-49f8-9871-b30d1acc1772",
+        "owner": "player_a",
+        "fromQ": 0,
+        "fromR": 3,
+        "toQ": -3,
+        "toR": 3,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 82,
+      "type": "control_point_captured",
+      "timestamp": 1788119134814,
+      "payload": {
+        "pointId": "supply_northwest",
+        "name": "西北补给点",
+        "owner": "player_a",
+        "previousOwner": "player_b",
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "q": 0,
+        "r": -3
+      }
+    },
+    {
+      "seq": 83,
+      "type": "control_point_captured",
+      "timestamp": 1788119134814,
+      "payload": {
+        "pointId": "supply_southwest",
+        "name": "西南补给点",
+        "owner": "player_a",
+        "previousOwner": "player_b",
+        "unitId": "cb7f49ae-5d98-49f8-9871-b30d1acc1772",
+        "q": -3,
+        "r": 3
+      }
+    },
+    {
+      "seq": 84,
+      "type": "reset_actions",
+      "timestamp": 1788119134814,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 85,
+      "type": "round_end",
+      "timestamp": 1788119134814,
+      "payload": {
+        "roundNumber": 5
+      }
+    },
+    {
+      "seq": 86,
+      "type": "artillery_warning",
+      "timestamp": 1788119134814,
+      "payload": {
+        "roundNumber": 6,
+        "safeRadius": 5,
+        "warningCells": [
+          {
+            "q": -5,
+            "r": 0
+          },
+          {
+            "q": -5,
+            "r": 1
+          },
+          {
+            "q": -5,
+            "r": 2
+          },
+          {
+            "q": -5,
+            "r": 3
+          },
+          {
+            "q": -5,
+            "r": 4
+          },
+          {
+            "q": -5,
+            "r": 5
+          },
+          {
+            "q": -4,
+            "r": -1
+          },
+          {
+            "q": -4,
+            "r": 5
+          },
+          {
+            "q": -3,
+            "r": -2
+          },
+          {
+            "q": -3,
+            "r": 5
+          },
+          {
+            "q": -2,
+            "r": -3
+          },
+          {
+            "q": -2,
+            "r": 5
+          },
+          {
+            "q": -1,
+            "r": -4
+          },
+          {
+            "q": -1,
+            "r": 5
+          },
+          {
+            "q": 0,
+            "r": -5
+          },
+          {
+            "q": 0,
+            "r": 5
+          },
+          {
+            "q": 1,
+            "r": -5
+          },
+          {
+            "q": 1,
+            "r": 4
+          },
+          {
+            "q": 2,
+            "r": -5
+          },
+          {
+            "q": 2,
+            "r": 3
+          },
+          {
+            "q": 3,
+            "r": -5
+          },
+          {
+            "q": 3,
+            "r": 2
+          },
+          {
+            "q": 4,
+            "r": -5
+          },
+          {
+            "q": 4,
+            "r": 1
+          },
+          {
+            "q": 5,
+            "r": -5
+          },
+          {
+            "q": 5,
+            "r": -4
+          },
+          {
+            "q": 5,
+            "r": -3
+          },
+          {
+            "q": 5,
+            "r": -2
+          },
+          {
+            "q": 5,
+            "r": -1
+          },
+          {
+            "q": 5,
+            "r": 0
+          }
+        ],
+        "nextShrinkRound": 7
+      }
+    },
+    {
+      "seq": 87,
+      "type": "income",
+      "timestamp": 1788119134815,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 12,
+        "controlPoints": 2,
+        "amount": 20,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 88,
+      "type": "turn_end",
+      "timestamp": 1788119134815,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 6,
+        "turnNumber": 6
+      }
+    },
+    {
+      "seq": 89,
+      "type": "attack",
+      "timestamp": 1788119258152,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "targetId": "cb7f49ae-5d98-49f8-9871-b30d1acc1772",
+        "damage": 28,
+        "actualDamage": 28,
+        "targetHp": 37,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 90,
+      "type": "deploy",
+      "timestamp": 1788119259198,
+      "payload": {
+        "unitId": "533ee4d4-c258-449b-8bb7-8150f2c0573e",
+        "owner": "player_b",
+        "unitType": "infantry",
+        "fromId": "cp_west",
+        "q": -3,
+        "r": 0,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 91,
+      "type": "move",
+      "timestamp": 1788119260179,
+      "payload": {
+        "unitId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "owner": "player_b",
+        "fromQ": -1,
+        "fromR": 0,
+        "toQ": -2,
+        "toR": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 92,
+      "type": "reset_actions",
+      "timestamp": 1788119261047,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 93,
+      "type": "income",
+      "timestamp": 1788119261048,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 52,
+        "controlPoints": 8,
+        "amount": 60,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 94,
+      "type": "turn_end",
+      "timestamp": 1788119261048,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 6,
+        "turnNumber": 6
+      }
+    },
+    {
+      "seq": 95,
+      "type": "attack",
+      "timestamp": 1788119351739,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "targetId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "damage": 24,
+        "actualDamage": 24,
+        "targetHp": 20,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 96,
+      "type": "attack",
+      "timestamp": 1788119352573,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "targetId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "damage": 34,
+        "actualDamage": 20,
+        "targetHp": 0,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 97,
+      "type": "unit_death",
+      "timestamp": 1788119352573,
+      "payload": {
+        "unitId": "c665fa39-3348-4fa9-8fbb-97a70e07c5ee",
+        "owner": "player_b",
+        "type": "heavy",
+        "q": 0,
+        "r": 0
+      }
+    },
+    {
+      "seq": 98,
+      "type": "deploy",
+      "timestamp": 1788119353328,
+      "payload": {
+        "unitId": "07a4a77e-b877-4f6a-a3c5-bce8b1bbec47",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "supply_southeast",
+        "q": 0,
+        "r": 2,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 99,
+      "type": "move",
+      "timestamp": 1788119354064,
+      "payload": {
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "owner": "player_a",
+        "fromQ": 0,
+        "fromR": 4,
+        "toQ": -2,
+        "toR": 3,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 100,
+      "type": "reset_actions",
+      "timestamp": 1788119366186,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 101,
+      "type": "round_end",
+      "timestamp": 1788119366186,
+      "payload": {
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 102,
+      "type": "artillery_shrunk",
+      "timestamp": 1788119366187,
+      "payload": {
+        "roundNumber": 7,
+        "safeRadius": 4,
+        "dangerCells": [
+          {
+            "q": -6,
+            "r": 0
+          },
+          {
+            "q": -6,
+            "r": 1
+          },
+          {
+            "q": -6,
+            "r": 2
+          },
+          {
+            "q": -6,
+            "r": 3
+          },
+          {
+            "q": -6,
+            "r": 4
+          },
+          {
+            "q": -6,
+            "r": 5
+          },
+          {
+            "q": -6,
+            "r": 6
+          },
+          {
+            "q": -5,
+            "r": -1
+          },
+          {
+            "q": -5,
+            "r": 0
+          },
+          {
+            "q": -5,
+            "r": 1
+          },
+          {
+            "q": -5,
+            "r": 2
+          },
+          {
+            "q": -5,
+            "r": 3
+          },
+          {
+            "q": -5,
+            "r": 4
+          },
+          {
+            "q": -5,
+            "r": 5
+          },
+          {
+            "q": -5,
+            "r": 6
+          },
+          {
+            "q": -4,
+            "r": -2
+          },
+          {
+            "q": -4,
+            "r": -1
+          },
+          {
+            "q": -4,
+            "r": 5
+          },
+          {
+            "q": -4,
+            "r": 6
+          },
+          {
+            "q": -3,
+            "r": -3
+          },
+          {
+            "q": -3,
+            "r": -2
+          },
+          {
+            "q": -3,
+            "r": 5
+          },
+          {
+            "q": -3,
+            "r": 6
+          },
+          {
+            "q": -2,
+            "r": -4
+          },
+          {
+            "q": -2,
+            "r": -3
+          },
+          {
+            "q": -2,
+            "r": 5
+          },
+          {
+            "q": -2,
+            "r": 6
+          },
+          {
+            "q": -1,
+            "r": -5
+          },
+          {
+            "q": -1,
+            "r": -4
+          },
+          {
+            "q": -1,
+            "r": 5
+          },
+          {
+            "q": -1,
+            "r": 6
+          },
+          {
+            "q": 0,
+            "r": -6
+          },
+          {
+            "q": 0,
+            "r": -5
+          },
+          {
+            "q": 0,
+            "r": 5
+          },
+          {
+            "q": 0,
+            "r": 6
+          },
+          {
+            "q": 1,
+            "r": -6
+          },
+          {
+            "q": 1,
+            "r": -5
+          },
+          {
+            "q": 1,
+            "r": 4
+          },
+          {
+            "q": 1,
+            "r": 5
+          },
+          {
+            "q": 2,
+            "r": -6
+          },
+          {
+            "q": 2,
+            "r": -5
+          },
+          {
+            "q": 2,
+            "r": 3
+          },
+          {
+            "q": 2,
+            "r": 4
+          },
+          {
+            "q": 3,
+            "r": -6
+          },
+          {
+            "q": 3,
+            "r": -5
+          },
+          {
+            "q": 3,
+            "r": 2
+          },
+          {
+            "q": 3,
+            "r": 3
+          },
+          {
+            "q": 4,
+            "r": -6
+          },
+          {
+            "q": 4,
+            "r": -5
+          },
+          {
+            "q": 4,
+            "r": 1
+          },
+          {
+            "q": 4,
+            "r": 2
+          },
+          {
+            "q": 5,
+            "r": -6
+          },
+          {
+            "q": 5,
+            "r": -5
+          },
+          {
+            "q": 5,
+            "r": -4
+          },
+          {
+            "q": 5,
+            "r": -3
+          },
+          {
+            "q": 5,
+            "r": -2
+          },
+          {
+            "q": 5,
+            "r": -1
+          },
+          {
+            "q": 5,
+            "r": 0
+          },
+          {
+            "q": 5,
+            "r": 1
+          },
+          {
+            "q": 6,
+            "r": -6
+          },
+          {
+            "q": 6,
+            "r": -5
+          },
+          {
+            "q": 6,
+            "r": -4
+          },
+          {
+            "q": 6,
+            "r": -3
+          },
+          {
+            "q": 6,
+            "r": -2
+          },
+          {
+            "q": 6,
+            "r": -1
+          },
+          {
+            "q": 6,
+            "r": 0
+          }
+        ],
+        "warningCells": [],
+        "nextShrinkRound": 9
+      }
+    },
+    {
+      "seq": 103,
+      "type": "income",
+      "timestamp": 1788119366187,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 12,
+        "controlPoints": 2,
+        "amount": 20,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 104,
+      "type": "turn_end",
+      "timestamp": 1788119366187,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 7,
+        "turnNumber": 7
+      }
+    },
+    {
+      "seq": 105,
+      "type": "attack",
+      "timestamp": 1788119416107,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "targetId": "cb7f49ae-5d98-49f8-9871-b30d1acc1772",
+        "damage": 25,
+        "actualDamage": 25,
+        "targetHp": 12,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 106,
+      "type": "move",
+      "timestamp": 1788119417143,
+      "payload": {
+        "unitId": "627e4bd2-c885-457f-92d5-e93bb7a1992c",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": 1,
+        "toQ": -1,
+        "toR": 1,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 107,
+      "type": "move",
+      "timestamp": 1788119418215,
+      "payload": {
+        "unitId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": 0,
+        "toQ": -1,
+        "toR": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 108,
+      "type": "move",
+      "timestamp": 1788119419196,
+      "payload": {
+        "unitId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": -1,
+        "toQ": -1,
+        "toR": -1,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 109,
+      "type": "reset_actions",
+      "timestamp": 1788119420069,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 110,
+      "type": "income",
+      "timestamp": 1788119420069,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 52,
+        "controlPoints": 8,
+        "amount": 60,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 111,
+      "type": "turn_end",
+      "timestamp": 1788119420069,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 7,
+        "turnNumber": 7
+      }
+    },
+    {
+      "seq": 112,
+      "type": "attack",
+      "timestamp": 1788119554133,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "targetId": "627e4bd2-c885-457f-92d5-e93bb7a1992c",
+        "damage": 39,
+        "actualDamage": 39,
+        "targetHp": 61,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 113,
+      "type": "attack",
+      "timestamp": 1788119554950,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "targetId": "627e4bd2-c885-457f-92d5-e93bb7a1992c",
+        "damage": 30,
+        "actualDamage": 30,
+        "targetHp": 31,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 114,
+      "type": "deploy",
+      "timestamp": 1788119555756,
+      "payload": {
+        "unitId": "09e36224-1f61-418c-9da3-40218c6750e9",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "supply_southeast",
+        "q": 1,
+        "r": 2,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 115,
+      "type": "deploy",
+      "timestamp": 1788119556533,
+      "payload": {
+        "unitId": "4f3d68d4-e6b6-484b-9455-d7ddaa3174d8",
+        "owner": "player_a",
+        "unitType": "ranger",
+        "fromId": "supply_east",
+        "q": 2,
+        "r": 1,
+        "cost": 72,
+        "unitCost": 72,
+        "discount": 0,
+        "hp": 72,
+        "attack": 44,
+        "defense": 3,
+        "moveRange": 3,
+        "attackRange": 3,
+        "canCapture": false,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 116,
+      "type": "reset_actions",
+      "timestamp": 1788119566225,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 117,
+      "type": "round_end",
+      "timestamp": 1788119566225,
+      "payload": {
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 118,
+      "type": "artillery_warning",
+      "timestamp": 1788119566226,
+      "payload": {
+        "roundNumber": 8,
+        "safeRadius": 4,
+        "warningCells": [
+          {
+            "q": -4,
+            "r": 0
+          },
+          {
+            "q": -4,
+            "r": 1
+          },
+          {
+            "q": -4,
+            "r": 2
+          },
+          {
+            "q": -4,
+            "r": 3
+          },
+          {
+            "q": -4,
+            "r": 4
+          },
+          {
+            "q": -3,
+            "r": -1
+          },
+          {
+            "q": -3,
+            "r": 4
+          },
+          {
+            "q": -2,
+            "r": -2
+          },
+          {
+            "q": -2,
+            "r": 4
+          },
+          {
+            "q": -1,
+            "r": -3
+          },
+          {
+            "q": -1,
+            "r": 4
+          },
+          {
+            "q": 0,
+            "r": -4
+          },
+          {
+            "q": 0,
+            "r": 4
+          },
+          {
+            "q": 1,
+            "r": -4
+          },
+          {
+            "q": 1,
+            "r": 3
+          },
+          {
+            "q": 2,
+            "r": -4
+          },
+          {
+            "q": 2,
+            "r": 2
+          },
+          {
+            "q": 3,
+            "r": -4
+          },
+          {
+            "q": 3,
+            "r": 1
+          },
+          {
+            "q": 4,
+            "r": -4
+          },
+          {
+            "q": 4,
+            "r": -3
+          },
+          {
+            "q": 4,
+            "r": -2
+          },
+          {
+            "q": 4,
+            "r": -1
+          },
+          {
+            "q": 4,
+            "r": 0
+          }
+        ],
+        "nextShrinkRound": 9
+      }
+    },
+    {
+      "seq": 119,
+      "type": "income",
+      "timestamp": 1788119566226,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 12,
+        "controlPoints": 2,
+        "amount": 20,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 120,
+      "type": "turn_end",
+      "timestamp": 1788119566226,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 8,
+        "turnNumber": 8
+      }
+    },
+    {
+      "seq": 121,
+      "type": "attack",
+      "timestamp": 1788119606701,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "targetId": "cb7f49ae-5d98-49f8-9871-b30d1acc1772",
+        "damage": 29,
+        "actualDamage": 12,
+        "targetHp": 0,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 122,
+      "type": "unit_death",
+      "timestamp": 1788119606701,
+      "payload": {
+        "unitId": "cb7f49ae-5d98-49f8-9871-b30d1acc1772",
+        "owner": "player_a",
+        "type": "scout",
+        "q": -3,
+        "r": 3
+      }
+    },
+    {
+      "seq": 123,
+      "type": "move",
+      "timestamp": 1788119607591,
+      "payload": {
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": 2,
+        "toQ": -3,
+        "toR": 3,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 124,
+      "type": "attack",
+      "timestamp": 1788119609054,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "627e4bd2-c885-457f-92d5-e93bb7a1992c",
+        "targetId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "damage": 19,
+        "actualDamage": 19,
+        "targetHp": 131,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 125,
+      "type": "control_point_captured",
+      "timestamp": 1788119610551,
+      "payload": {
+        "pointId": "supply_southwest",
+        "name": "西南补给点",
+        "owner": "player_b",
+        "previousOwner": "player_a",
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "q": -3,
+        "r": 3
+      }
+    },
+    {
+      "seq": 126,
+      "type": "reset_actions",
+      "timestamp": 1788119610551,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 127,
+      "type": "income",
+      "timestamp": 1788119610552,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 44,
+        "controlPoints": 7,
+        "amount": 52,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 128,
+      "type": "turn_end",
+      "timestamp": 1788119610552,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 8,
+        "turnNumber": 8
+      }
+    },
+    {
+      "seq": 129,
+      "type": "attack",
+      "timestamp": 1788119674088,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "targetId": "627e4bd2-c885-457f-92d5-e93bb7a1992c",
+        "damage": 32,
+        "actualDamage": 31,
+        "targetHp": 0,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 130,
+      "type": "unit_death",
+      "timestamp": 1788119674088,
+      "payload": {
+        "unitId": "627e4bd2-c885-457f-92d5-e93bb7a1992c",
+        "owner": "player_b",
+        "type": "infantry",
+        "q": -1,
+        "r": 1
+      }
+    },
+    {
+      "seq": 131,
+      "type": "attack",
+      "timestamp": 1788119675330,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "targetId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "damage": 23,
+        "actualDamage": 23,
+        "targetHp": 77,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 132,
+      "type": "deploy",
+      "timestamp": 1788119676101,
+      "payload": {
+        "unitId": "2129f636-0d63-4945-8b5b-6fa33bf5a5cc",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "supply_southeast",
+        "q": -1,
+        "r": 3,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 133,
+      "type": "attack",
+      "timestamp": 1788119693819,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "targetId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "damage": 35,
+        "actualDamage": 35,
+        "targetHp": 65,
+        "targetKind": "unit",
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 134,
+      "type": "reset_actions",
+      "timestamp": 1788119694620,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 135,
+      "type": "round_end",
+      "timestamp": 1788119694620,
+      "payload": {
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 136,
+      "type": "artillery_shrunk",
+      "timestamp": 1788119694620,
+      "payload": {
+        "roundNumber": 9,
+        "safeRadius": 3,
+        "dangerCells": [
+          {
+            "q": -6,
+            "r": 0
+          },
+          {
+            "q": -6,
+            "r": 1
+          },
+          {
+            "q": -6,
+            "r": 2
+          },
+          {
+            "q": -6,
+            "r": 3
+          },
+          {
+            "q": -6,
+            "r": 4
+          },
+          {
+            "q": -6,
+            "r": 5
+          },
+          {
+            "q": -6,
+            "r": 6
+          },
+          {
+            "q": -5,
+            "r": -1
+          },
+          {
+            "q": -5,
+            "r": 0
+          },
+          {
+            "q": -5,
+            "r": 1
+          },
+          {
+            "q": -5,
+            "r": 2
+          },
+          {
+            "q": -5,
+            "r": 3
+          },
+          {
+            "q": -5,
+            "r": 4
+          },
+          {
+            "q": -5,
+            "r": 5
+          },
+          {
+            "q": -5,
+            "r": 6
+          },
+          {
+            "q": -4,
+            "r": -2
+          },
+          {
+            "q": -4,
+            "r": -1
+          },
+          {
+            "q": -4,
+            "r": 0
+          },
+          {
+            "q": -4,
+            "r": 1
+          },
+          {
+            "q": -4,
+            "r": 2
+          },
+          {
+            "q": -4,
+            "r": 3
+          },
+          {
+            "q": -4,
+            "r": 4
+          },
+          {
+            "q": -4,
+            "r": 5
+          },
+          {
+            "q": -4,
+            "r": 6
+          },
+          {
+            "q": -3,
+            "r": -3
+          },
+          {
+            "q": -3,
+            "r": -2
+          },
+          {
+            "q": -3,
+            "r": -1
+          },
+          {
+            "q": -3,
+            "r": 4
+          },
+          {
+            "q": -3,
+            "r": 5
+          },
+          {
+            "q": -3,
+            "r": 6
+          },
+          {
+            "q": -2,
+            "r": -4
+          },
+          {
+            "q": -2,
+            "r": -3
+          },
+          {
+            "q": -2,
+            "r": -2
+          },
+          {
+            "q": -2,
+            "r": 4
+          },
+          {
+            "q": -2,
+            "r": 5
+          },
+          {
+            "q": -2,
+            "r": 6
+          },
+          {
+            "q": -1,
+            "r": -5
+          },
+          {
+            "q": -1,
+            "r": -4
+          },
+          {
+            "q": -1,
+            "r": -3
+          },
+          {
+            "q": -1,
+            "r": 4
+          },
+          {
+            "q": -1,
+            "r": 5
+          },
+          {
+            "q": -1,
+            "r": 6
+          },
+          {
+            "q": 0,
+            "r": -6
+          },
+          {
+            "q": 0,
+            "r": -5
+          },
+          {
+            "q": 0,
+            "r": -4
+          },
+          {
+            "q": 0,
+            "r": 4
+          },
+          {
+            "q": 0,
+            "r": 5
+          },
+          {
+            "q": 0,
+            "r": 6
+          },
+          {
+            "q": 1,
+            "r": -6
+          },
+          {
+            "q": 1,
+            "r": -5
+          },
+          {
+            "q": 1,
+            "r": -4
+          },
+          {
+            "q": 1,
+            "r": 3
+          },
+          {
+            "q": 1,
+            "r": 4
+          },
+          {
+            "q": 1,
+            "r": 5
+          },
+          {
+            "q": 2,
+            "r": -6
+          },
+          {
+            "q": 2,
+            "r": -5
+          },
+          {
+            "q": 2,
+            "r": -4
+          },
+          {
+            "q": 2,
+            "r": 2
+          },
+          {
+            "q": 2,
+            "r": 3
+          },
+          {
+            "q": 2,
+            "r": 4
+          },
+          {
+            "q": 3,
+            "r": -6
+          },
+          {
+            "q": 3,
+            "r": -5
+          },
+          {
+            "q": 3,
+            "r": -4
+          },
+          {
+            "q": 3,
+            "r": 1
+          },
+          {
+            "q": 3,
+            "r": 2
+          },
+          {
+            "q": 3,
+            "r": 3
+          },
+          {
+            "q": 4,
+            "r": -6
+          },
+          {
+            "q": 4,
+            "r": -5
+          },
+          {
+            "q": 4,
+            "r": -4
+          },
+          {
+            "q": 4,
+            "r": -3
+          },
+          {
+            "q": 4,
+            "r": -2
+          },
+          {
+            "q": 4,
+            "r": -1
+          },
+          {
+            "q": 4,
+            "r": 0
+          },
+          {
+            "q": 4,
+            "r": 1
+          },
+          {
+            "q": 4,
+            "r": 2
+          },
+          {
+            "q": 5,
+            "r": -6
+          },
+          {
+            "q": 5,
+            "r": -5
+          },
+          {
+            "q": 5,
+            "r": -4
+          },
+          {
+            "q": 5,
+            "r": -3
+          },
+          {
+            "q": 5,
+            "r": -2
+          },
+          {
+            "q": 5,
+            "r": -1
+          },
+          {
+            "q": 5,
+            "r": 0
+          },
+          {
+            "q": 5,
+            "r": 1
+          },
+          {
+            "q": 6,
+            "r": -6
+          },
+          {
+            "q": 6,
+            "r": -5
+          },
+          {
+            "q": 6,
+            "r": -4
+          },
+          {
+            "q": 6,
+            "r": -3
+          },
+          {
+            "q": 6,
+            "r": -2
+          },
+          {
+            "q": 6,
+            "r": -1
+          },
+          {
+            "q": 6,
+            "r": 0
+          }
+        ],
+        "warningCells": [],
+        "nextShrinkRound": 11
+      }
+    },
+    {
+      "seq": 137,
+      "type": "income",
+      "timestamp": 1788119694621,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 20,
+        "controlPoints": 3,
+        "amount": 28,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 138,
+      "type": "turn_end",
+      "timestamp": 1788119694621,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 9,
+        "turnNumber": 9
+      }
+    },
+    {
+      "seq": 139,
+      "type": "deploy",
+      "timestamp": 1788119736266,
+      "payload": {
+        "unitId": "de3ed93f-9cc3-48df-b5ef-4573b94c9703",
+        "owner": "player_b",
+        "unitType": "ranger",
+        "fromId": "supply_west",
+        "q": -2,
+        "r": 0,
+        "cost": 72,
+        "unitCost": 72,
+        "discount": 0,
+        "hp": 72,
+        "attack": 44,
+        "defense": 3,
+        "moveRange": 3,
+        "attackRange": 3,
+        "canCapture": false,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 140,
+      "type": "attack",
+      "timestamp": 1788119737197,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "targetId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "damage": 23,
+        "actualDamage": 23,
+        "targetHp": 77,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 141,
+      "type": "move",
+      "timestamp": 1788119738030,
+      "payload": {
+        "unitId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "owner": "player_b",
+        "fromQ": -1,
+        "fromR": -1,
+        "toQ": -2,
+        "toR": -1,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 142,
+      "type": "move",
+      "timestamp": 1788119738921,
+      "payload": {
+        "unitId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "owner": "player_b",
+        "fromQ": -1,
+        "fromR": 0,
+        "toQ": -2,
+        "toR": 1,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 143,
+      "type": "reset_actions",
+      "timestamp": 1788119739845,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 144,
+      "type": "income",
+      "timestamp": 1788119739845,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 44,
+        "controlPoints": 7,
+        "amount": 52,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 145,
+      "type": "turn_end",
+      "timestamp": 1788119739846,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 9,
+        "turnNumber": 9
+      }
+    },
+    {
+      "seq": 146,
+      "type": "attack",
+      "timestamp": 1788119961126,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "targetId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "damage": 34,
+        "actualDamage": 34,
+        "targetHp": 66,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 147,
+      "type": "move",
+      "timestamp": 1788119961836,
+      "payload": {
+        "unitId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "owner": "player_a",
+        "fromQ": 0,
+        "fromR": 1,
+        "toQ": -1,
+        "toR": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 148,
+      "type": "attack",
+      "timestamp": 1788119962528,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "targetId": "de3ed93f-9cc3-48df-b5ef-4573b94c9703",
+        "damage": 36,
+        "actualDamage": 36,
+        "targetHp": 36,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 149,
+      "type": "attack",
+      "timestamp": 1788119963265,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "targetId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "damage": 22,
+        "actualDamage": 22,
+        "targetHp": 55,
+        "targetKind": "unit",
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 150,
+      "type": "deploy",
+      "timestamp": 1788119963981,
+      "payload": {
+        "unitId": "d873a3aa-d9b6-42ef-b1ae-df838e89631b",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "supply_northeast",
+        "q": 2,
+        "r": -2,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 151,
+      "type": "reset_actions",
+      "timestamp": 1788120091048,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 152,
+      "type": "round_end",
+      "timestamp": 1788120091048,
+      "payload": {
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 153,
+      "type": "artillery_warning",
+      "timestamp": 1788120091049,
+      "payload": {
+        "roundNumber": 10,
+        "safeRadius": 3,
+        "warningCells": [
+          {
+            "q": -3,
+            "r": 0
+          },
+          {
+            "q": -3,
+            "r": 1
+          },
+          {
+            "q": -3,
+            "r": 2
+          },
+          {
+            "q": -3,
+            "r": 3
+          },
+          {
+            "q": -2,
+            "r": -1
+          },
+          {
+            "q": -2,
+            "r": 3
+          },
+          {
+            "q": -1,
+            "r": -2
+          },
+          {
+            "q": -1,
+            "r": 3
+          },
+          {
+            "q": 0,
+            "r": -3
+          },
+          {
+            "q": 0,
+            "r": 3
+          },
+          {
+            "q": 1,
+            "r": -3
+          },
+          {
+            "q": 1,
+            "r": 2
+          },
+          {
+            "q": 2,
+            "r": -3
+          },
+          {
+            "q": 2,
+            "r": 1
+          },
+          {
+            "q": 3,
+            "r": -3
+          },
+          {
+            "q": 3,
+            "r": -2
+          },
+          {
+            "q": 3,
+            "r": -1
+          },
+          {
+            "q": 3,
+            "r": 0
+          }
+        ],
+        "nextShrinkRound": 11
+      }
+    },
+    {
+      "seq": 154,
+      "type": "income",
+      "timestamp": 1788120091049,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 20,
+        "controlPoints": 3,
+        "amount": 28,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 155,
+      "type": "turn_end",
+      "timestamp": 1788120091049,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 10,
+        "turnNumber": 10
+      }
+    },
+    {
+      "seq": 156,
+      "type": "attack",
+      "timestamp": 1788120214845,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "de3ed93f-9cc3-48df-b5ef-4573b94c9703",
+        "targetId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "damage": 30,
+        "actualDamage": 30,
+        "targetHp": 101,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 157,
+      "type": "attack",
+      "timestamp": 1788120215744,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "targetId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "damage": 20,
+        "actualDamage": 20,
+        "targetHp": 81,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 158,
+      "type": "attack",
+      "timestamp": 1788120216560,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "targetId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "damage": 14,
+        "actualDamage": 14,
+        "targetHp": 67,
+        "targetKind": "unit",
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 159,
+      "type": "move",
+      "timestamp": 1788120228992,
+      "payload": {
+        "unitId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": -1,
+        "toQ": -1,
+        "toR": -1,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 160,
+      "type": "attack",
+      "timestamp": 1788120229883,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "targetId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "damage": 16,
+        "actualDamage": 16,
+        "targetHp": 51,
+        "targetKind": "unit",
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 161,
+      "type": "reset_actions",
+      "timestamp": 1788120243802,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 162,
+      "type": "income",
+      "timestamp": 1788120243802,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 44,
+        "controlPoints": 7,
+        "amount": 52,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 163,
+      "type": "turn_end",
+      "timestamp": 1788120243802,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 10,
+        "turnNumber": 10
+      }
+    },
+    {
+      "seq": 164,
+      "type": "attack",
+      "timestamp": 1788120831372,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "targetId": "de3ed93f-9cc3-48df-b5ef-4573b94c9703",
+        "damage": 33,
+        "actualDamage": 33,
+        "targetHp": 3,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 165,
+      "type": "move",
+      "timestamp": 1788120948108,
+      "payload": {
+        "unitId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 0,
+        "toQ": 1,
+        "toR": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 166,
+      "type": "attack",
+      "timestamp": 1788120955614,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "targetId": "de3ed93f-9cc3-48df-b5ef-4573b94c9703",
+        "damage": 44,
+        "actualDamage": 3,
+        "targetHp": 0,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 167,
+      "type": "unit_death",
+      "timestamp": 1788120955614,
+      "payload": {
+        "unitId": "de3ed93f-9cc3-48df-b5ef-4573b94c9703",
+        "owner": "player_b",
+        "type": "ranger",
+        "q": -2,
+        "r": 0
+      }
+    },
+    {
+      "seq": 168,
+      "type": "move",
+      "timestamp": 1788121011380,
+      "payload": {
+        "unitId": "4f3d68d4-e6b6-484b-9455-d7ddaa3174d8",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 1,
+        "toQ": 2,
+        "toR": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 169,
+      "type": "attack",
+      "timestamp": 1788121020360,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "4f3d68d4-e6b6-484b-9455-d7ddaa3174d8",
+        "targetId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "damage": 37,
+        "actualDamage": 37,
+        "targetHp": 29,
+        "targetKind": "unit",
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 170,
+      "type": "deploy",
+      "timestamp": 1788121030622,
+      "payload": {
+        "unitId": "a2d020d6-015a-48c5-b5cb-21ca7589b1dc",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "supply_northwest",
+        "q": 0,
+        "r": -2,
+        "cost": 45,
+        "unitCost": 45,
+        "discount": 0,
+        "hp": 100,
+        "attack": 30,
+        "defense": 8,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 171,
+      "type": "reset_actions",
+      "timestamp": 1788121049476,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 172,
+      "type": "round_end",
+      "timestamp": 1788121049476,
+      "payload": {
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 173,
+      "type": "artillery_shrunk",
+      "timestamp": 1788121049477,
+      "payload": {
+        "roundNumber": 11,
+        "safeRadius": 2,
+        "dangerCells": [
+          {
+            "q": -6,
+            "r": 0
+          },
+          {
+            "q": -6,
+            "r": 1
+          },
+          {
+            "q": -6,
+            "r": 2
+          },
+          {
+            "q": -6,
+            "r": 3
+          },
+          {
+            "q": -6,
+            "r": 4
+          },
+          {
+            "q": -6,
+            "r": 5
+          },
+          {
+            "q": -6,
+            "r": 6
+          },
+          {
+            "q": -5,
+            "r": -1
+          },
+          {
+            "q": -5,
+            "r": 0
+          },
+          {
+            "q": -5,
+            "r": 1
+          },
+          {
+            "q": -5,
+            "r": 2
+          },
+          {
+            "q": -5,
+            "r": 3
+          },
+          {
+            "q": -5,
+            "r": 4
+          },
+          {
+            "q": -5,
+            "r": 5
+          },
+          {
+            "q": -5,
+            "r": 6
+          },
+          {
+            "q": -4,
+            "r": -2
+          },
+          {
+            "q": -4,
+            "r": -1
+          },
+          {
+            "q": -4,
+            "r": 0
+          },
+          {
+            "q": -4,
+            "r": 1
+          },
+          {
+            "q": -4,
+            "r": 2
+          },
+          {
+            "q": -4,
+            "r": 3
+          },
+          {
+            "q": -4,
+            "r": 4
+          },
+          {
+            "q": -4,
+            "r": 5
+          },
+          {
+            "q": -4,
+            "r": 6
+          },
+          {
+            "q": -3,
+            "r": -3
+          },
+          {
+            "q": -3,
+            "r": -2
+          },
+          {
+            "q": -3,
+            "r": -1
+          },
+          {
+            "q": -3,
+            "r": 0
+          },
+          {
+            "q": -3,
+            "r": 1
+          },
+          {
+            "q": -3,
+            "r": 2
+          },
+          {
+            "q": -3,
+            "r": 3
+          },
+          {
+            "q": -3,
+            "r": 4
+          },
+          {
+            "q": -3,
+            "r": 5
+          },
+          {
+            "q": -3,
+            "r": 6
+          },
+          {
+            "q": -2,
+            "r": -4
+          },
+          {
+            "q": -2,
+            "r": -3
+          },
+          {
+            "q": -2,
+            "r": -2
+          },
+          {
+            "q": -2,
+            "r": -1
+          },
+          {
+            "q": -2,
+            "r": 3
+          },
+          {
+            "q": -2,
+            "r": 4
+          },
+          {
+            "q": -2,
+            "r": 5
+          },
+          {
+            "q": -2,
+            "r": 6
+          },
+          {
+            "q": -1,
+            "r": -5
+          },
+          {
+            "q": -1,
+            "r": -4
+          },
+          {
+            "q": -1,
+            "r": -3
+          },
+          {
+            "q": -1,
+            "r": -2
+          },
+          {
+            "q": -1,
+            "r": 3
+          },
+          {
+            "q": -1,
+            "r": 4
+          },
+          {
+            "q": -1,
+            "r": 5
+          },
+          {
+            "q": -1,
+            "r": 6
+          },
+          {
+            "q": 0,
+            "r": -6
+          },
+          {
+            "q": 0,
+            "r": -5
+          },
+          {
+            "q": 0,
+            "r": -4
+          },
+          {
+            "q": 0,
+            "r": -3
+          },
+          {
+            "q": 0,
+            "r": 3
+          },
+          {
+            "q": 0,
+            "r": 4
+          },
+          {
+            "q": 0,
+            "r": 5
+          },
+          {
+            "q": 0,
+            "r": 6
+          },
+          {
+            "q": 1,
+            "r": -6
+          },
+          {
+            "q": 1,
+            "r": -5
+          },
+          {
+            "q": 1,
+            "r": -4
+          },
+          {
+            "q": 1,
+            "r": -3
+          },
+          {
+            "q": 1,
+            "r": 2
+          },
+          {
+            "q": 1,
+            "r": 3
+          },
+          {
+            "q": 1,
+            "r": 4
+          },
+          {
+            "q": 1,
+            "r": 5
+          },
+          {
+            "q": 2,
+            "r": -6
+          },
+          {
+            "q": 2,
+            "r": -5
+          },
+          {
+            "q": 2,
+            "r": -4
+          },
+          {
+            "q": 2,
+            "r": -3
+          },
+          {
+            "q": 2,
+            "r": 1
+          },
+          {
+            "q": 2,
+            "r": 2
+          },
+          {
+            "q": 2,
+            "r": 3
+          },
+          {
+            "q": 2,
+            "r": 4
+          },
+          {
+            "q": 3,
+            "r": -6
+          },
+          {
+            "q": 3,
+            "r": -5
+          },
+          {
+            "q": 3,
+            "r": -4
+          },
+          {
+            "q": 3,
+            "r": -3
+          },
+          {
+            "q": 3,
+            "r": -2
+          },
+          {
+            "q": 3,
+            "r": -1
+          },
+          {
+            "q": 3,
+            "r": 0
+          },
+          {
+            "q": 3,
+            "r": 1
+          },
+          {
+            "q": 3,
+            "r": 2
+          },
+          {
+            "q": 3,
+            "r": 3
+          },
+          {
+            "q": 4,
+            "r": -6
+          },
+          {
+            "q": 4,
+            "r": -5
+          },
+          {
+            "q": 4,
+            "r": -4
+          },
+          {
+            "q": 4,
+            "r": -3
+          },
+          {
+            "q": 4,
+            "r": -2
+          },
+          {
+            "q": 4,
+            "r": -1
+          },
+          {
+            "q": 4,
+            "r": 0
+          },
+          {
+            "q": 4,
+            "r": 1
+          },
+          {
+            "q": 4,
+            "r": 2
+          },
+          {
+            "q": 5,
+            "r": -6
+          },
+          {
+            "q": 5,
+            "r": -5
+          },
+          {
+            "q": 5,
+            "r": -4
+          },
+          {
+            "q": 5,
+            "r": -3
+          },
+          {
+            "q": 5,
+            "r": -2
+          },
+          {
+            "q": 5,
+            "r": -1
+          },
+          {
+            "q": 5,
+            "r": 0
+          },
+          {
+            "q": 5,
+            "r": 1
+          },
+          {
+            "q": 6,
+            "r": -6
+          },
+          {
+            "q": 6,
+            "r": -5
+          },
+          {
+            "q": 6,
+            "r": -4
+          },
+          {
+            "q": 6,
+            "r": -3
+          },
+          {
+            "q": 6,
+            "r": -2
+          },
+          {
+            "q": 6,
+            "r": -1
+          },
+          {
+            "q": 6,
+            "r": 0
+          }
+        ],
+        "warningCells": [],
+        "nextShrinkRound": null
+      }
+    },
+    {
+      "seq": 174,
+      "type": "artillery_damage",
+      "timestamp": 1788121049477,
+      "payload": {
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "owner": "player_a",
+        "damage": 25,
+        "unitHp": 52,
+        "q": -2,
+        "r": 3,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 175,
+      "type": "artillery_damage",
+      "timestamp": 1788121049477,
+      "payload": {
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "owner": "player_a",
+        "damage": 25,
+        "unitHp": 75,
+        "q": 0,
+        "r": -3,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 176,
+      "type": "artillery_damage",
+      "timestamp": 1788121049477,
+      "payload": {
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "owner": "player_b",
+        "damage": 25,
+        "unitHp": 30,
+        "q": -3,
+        "r": 3,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 177,
+      "type": "artillery_damage",
+      "timestamp": 1788121049477,
+      "payload": {
+        "unitId": "533ee4d4-c258-449b-8bb7-8150f2c0573e",
+        "owner": "player_b",
+        "damage": 25,
+        "unitHp": 75,
+        "q": -3,
+        "r": 0,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 178,
+      "type": "artillery_damage",
+      "timestamp": 1788121049477,
+      "payload": {
+        "unitId": "09e36224-1f61-418c-9da3-40218c6750e9",
+        "owner": "player_a",
+        "damage": 25,
+        "unitHp": 75,
+        "q": 1,
+        "r": 2,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 179,
+      "type": "artillery_damage",
+      "timestamp": 1788121049477,
+      "payload": {
+        "unitId": "2129f636-0d63-4945-8b5b-6fa33bf5a5cc",
+        "owner": "player_a",
+        "damage": 25,
+        "unitHp": 75,
+        "q": -1,
+        "r": 3,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 180,
+      "type": "income",
+      "timestamp": 1788121049477,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 20,
+        "controlPoints": 3,
+        "amount": 28,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 181,
+      "type": "turn_end",
+      "timestamp": 1788121049477,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 11,
+        "turnNumber": 11
+      }
+    },
+    {
+      "seq": 182,
+      "type": "move",
+      "timestamp": 1788121101780,
+      "payload": {
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": 3,
+        "toQ": -2,
+        "toR": 2,
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 183,
+      "type": "attack",
+      "timestamp": 1788121102733,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "targetId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "damage": 23,
+        "actualDamage": 23,
+        "targetHp": 29,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 184,
+      "type": "move",
+      "timestamp": 1788121103685,
+      "payload": {
+        "unitId": "533ee4d4-c258-449b-8bb7-8150f2c0573e",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": 0,
+        "toQ": -2,
+        "toR": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 185,
+      "type": "attack",
+      "timestamp": 1788121104612,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "533ee4d4-c258-449b-8bb7-8150f2c0573e",
+        "targetId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "damage": 16,
+        "actualDamage": 16,
+        "targetHp": 35,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 186,
+      "type": "attack",
+      "timestamp": 1788121105562,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "targetId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "damage": 18,
+        "actualDamage": 18,
+        "targetHp": 17,
+        "targetKind": "unit",
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 187,
+      "type": "attack",
+      "timestamp": 1788121106523,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "targetId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "damage": 17,
+        "actualDamage": 17,
+        "targetHp": 0,
+        "targetKind": "unit",
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 188,
+      "type": "unit_death",
+      "timestamp": 1788121106523,
+      "payload": {
+        "unitId": "a6d5fa28-69c6-47cb-9ab4-c832c8b8460b",
+        "owner": "player_a",
+        "type": "heavy",
+        "q": -1,
+        "r": 0
+      }
+    },
+    {
+      "seq": 189,
+      "type": "reset_actions",
+      "timestamp": 1788121120883,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 190,
+      "type": "income",
+      "timestamp": 1788121120883,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 44,
+        "controlPoints": 7,
+        "amount": 52,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 191,
+      "type": "turn_end",
+      "timestamp": 1788121120883,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 11,
+        "turnNumber": 11
+      }
+    },
+    {
+      "seq": 192,
+      "type": "attack",
+      "timestamp": 1788121239864,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "targetId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "damage": 37,
+        "actualDamage": 30,
+        "targetHp": 0,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 193,
+      "type": "unit_death",
+      "timestamp": 1788121239865,
+      "payload": {
+        "unitId": "b462c645-61b0-47ca-8f43-7c9021a186bc",
+        "owner": "player_b",
+        "type": "infantry",
+        "q": -2,
+        "r": 2
+      }
+    },
+    {
+      "seq": 194,
+      "type": "attack",
+      "timestamp": 1788121247208,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "4f3d68d4-e6b6-484b-9455-d7ddaa3174d8",
+        "targetId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "damage": 35,
+        "actualDamage": 29,
+        "targetHp": 0,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 195,
+      "type": "unit_death",
+      "timestamp": 1788121247208,
+      "payload": {
+        "unitId": "d8590b2f-02ca-4550-8220-8c7a960a7a11",
+        "owner": "player_b",
+        "type": "infantry",
+        "q": 0,
+        "r": -1
+      }
+    },
+    {
+      "seq": 196,
+      "type": "move",
+      "timestamp": 1788121258879,
+      "payload": {
+        "unitId": "d873a3aa-d9b6-42ef-b1ae-df838e89631b",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": -2,
+        "toQ": 2,
+        "toR": -1,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 197,
+      "type": "move",
+      "timestamp": 1788121320588,
+      "payload": {
+        "unitId": "2129f636-0d63-4945-8b5b-6fa33bf5a5cc",
+        "owner": "player_a",
+        "fromQ": -1,
+        "fromR": 3,
+        "toQ": -1,
+        "toR": 2,
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 198,
+      "type": "reset_actions",
+      "timestamp": 1788121397537,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 199,
+      "type": "round_end",
+      "timestamp": 1788121397537,
+      "payload": {
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 200,
+      "type": "artillery_damage",
+      "timestamp": 1788121397538,
+      "payload": {
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "owner": "player_a",
+        "damage": 25,
+        "unitHp": 4,
+        "q": -2,
+        "r": 3,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 201,
+      "type": "artillery_damage",
+      "timestamp": 1788121397538,
+      "payload": {
+        "unitId": "e01d0e36-307a-4c42-ae19-7b3be4ebc315",
+        "owner": "player_a",
+        "damage": 25,
+        "unitHp": 50,
+        "q": 0,
+        "r": -3,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 202,
+      "type": "artillery_damage",
+      "timestamp": 1788121397538,
+      "payload": {
+        "unitId": "09e36224-1f61-418c-9da3-40218c6750e9",
+        "owner": "player_a",
+        "damage": 25,
+        "unitHp": 50,
+        "q": 1,
+        "r": 2,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 203,
+      "type": "income",
+      "timestamp": 1788121397538,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 20,
+        "controlPoints": 3,
+        "amount": 28,
+        "breakdown": [
+          {
+            "pointId": "cp_west",
+            "name": "西部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_west",
+            "name": "西部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southwest",
+            "name": "西南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 204,
+      "type": "turn_end",
+      "timestamp": 1788121397538,
+      "payload": {
+        "previousOwner": "player_a",
+        "nextOwner": "player_b",
+        "previousPlayerId": "player_a",
+        "nextPlayerId": "player_b",
+        "roundNumber": 12,
+        "turnNumber": 12
+      }
+    },
+    {
+      "seq": 205,
+      "type": "attack",
+      "timestamp": 1788121453254,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "targetId": "a2d020d6-015a-48c5-b5cb-21ca7589b1dc",
+        "damage": 22,
+        "actualDamage": 22,
+        "targetHp": 78,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 206,
+      "type": "move",
+      "timestamp": 1788121454217,
+      "payload": {
+        "unitId": "533ee4d4-c258-449b-8bb7-8150f2c0573e",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": 0,
+        "toQ": -1,
+        "toR": 1,
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 207,
+      "type": "attack",
+      "timestamp": 1788121455067,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "533ee4d4-c258-449b-8bb7-8150f2c0573e",
+        "targetId": "2129f636-0d63-4945-8b5b-6fa33bf5a5cc",
+        "damage": 22,
+        "actualDamage": 22,
+        "targetHp": 53,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 208,
+      "type": "move",
+      "timestamp": 1788121455907,
+      "payload": {
+        "unitId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": 1,
+        "toQ": -2,
+        "toR": 2,
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 209,
+      "type": "attack",
+      "timestamp": 1788121456781,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "targetId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "damage": 20,
+        "actualDamage": 4,
+        "targetHp": 0,
+        "targetKind": "unit",
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 210,
+      "type": "unit_death",
+      "timestamp": 1788121456781,
+      "payload": {
+        "unitId": "c7f2fd1b-618b-4e6c-ba08-130ddf7882ed",
+        "owner": "player_a",
+        "type": "infantry",
+        "q": -2,
+        "r": 3
+      }
+    },
+    {
+      "seq": 211,
+      "type": "reset_actions",
+      "timestamp": 1788121469238,
+      "payload": {
+        "owner": "player_b",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 212,
+      "type": "income",
+      "timestamp": 1788121469239,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 44,
+        "controlPoints": 7,
+        "amount": 52,
+        "breakdown": [
+          {
+            "pointId": "cp_east",
+            "name": "东部集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_northeast",
+            "name": "东北集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "cp_southeast",
+            "name": "东南集结点",
+            "kind": "forward_base",
+            "amount": 4
+          },
+          {
+            "pointId": "supply_east",
+            "name": "东部补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northeast",
+            "name": "东北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_northwest",
+            "name": "西北补给点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "supply_southeast",
+            "name": "东南补给点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ]
+      }
+    },
+    {
+      "seq": 213,
+      "type": "turn_end",
+      "timestamp": 1788121469239,
+      "payload": {
+        "previousOwner": "player_b",
+        "nextOwner": "player_a",
+        "previousPlayerId": "player_b",
+        "nextPlayerId": "player_a",
+        "roundNumber": 12,
+        "turnNumber": 12
+      }
+    },
+    {
+      "seq": 214,
+      "type": "attack",
+      "timestamp": 1788121562097,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "7c02a3cf-5d44-4ffa-8249-8f9412c3084e",
+        "targetId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "damage": 35,
+        "actualDamage": 35,
+        "targetHp": 30,
+        "targetKind": "unit",
+        "actionsUsed": 1,
+        "actionsRemaining": 3
+      }
+    },
+    {
+      "seq": 215,
+      "type": "attack",
+      "timestamp": 1788121569307,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "4f3d68d4-e6b6-484b-9455-d7ddaa3174d8",
+        "targetId": "533ee4d4-c258-449b-8bb7-8150f2c0573e",
+        "damage": 33,
+        "actualDamage": 33,
+        "targetHp": 42,
+        "targetKind": "unit",
+        "actionsUsed": 2,
+        "actionsRemaining": 2
+      }
+    },
+    {
+      "seq": 216,
+      "type": "attack",
+      "timestamp": 1788121576640,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "2129f636-0d63-4945-8b5b-6fa33bf5a5cc",
+        "targetId": "b92786e4-d232-4e30-94c8-2911189466fc",
+        "damage": 23,
+        "actualDamage": 23,
+        "targetHp": 7,
+        "targetKind": "unit",
+        "actionsUsed": 3,
+        "actionsRemaining": 1
+      }
+    },
+    {
+      "seq": 217,
+      "type": "attack",
+      "timestamp": 1788121583373,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "a2d020d6-015a-48c5-b5cb-21ca7589b1dc",
+        "targetId": "396a3724-b635-4427-863a-f8b4a7159002",
+        "damage": 22,
+        "actualDamage": 22,
+        "targetHp": 78,
+        "targetKind": "unit",
+        "actionsUsed": 4,
+        "actionsRemaining": 0
+      }
+    },
+    {
+      "seq": 218,
+      "type": "reset_actions",
+      "timestamp": 1788121594256,
+      "payload": {
+        "owner": "player_a",
+        "actionsUsed": 0
+      }
+    },
+    {
+      "seq": 219,
+      "type": "round_end",
+      "timestamp": 1788121594256,
+      "payload": {
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 220,
+      "type": "game_over",
+      "timestamp": 1788121594256,
+      "payload": {
+        "winner": "player_a",
+        "reason": "turn_limit_score",
+        "scores": {
+          "player_a": {
+            "headquartersDamage": 0,
+            "ownHqHp": 0,
+            "controlPoints": 7,
+            "armyValue": 384,
+            "supplies": 129,
+            "actionScore": 670,
+            "total": 1438
+          },
+          "player_b": {
+            "headquartersDamage": 0,
+            "ownHqHp": 0,
+            "controlPoints": 3,
+            "armyValue": 57,
+            "supplies": 93,
+            "actionScore": 360,
+            "total": 474
+          }
+        },
+        "rankings": [
+          {
+            "playerId": "player_a",
+            "rank": 1,
+            "status": "active",
+            "score": {
+              "headquartersDamage": 0,
+              "ownHqHp": 0,
+              "controlPoints": 7,
+              "armyValue": 384,
+              "supplies": 129,
+              "actionScore": 670,
+              "total": 1438
+            }
+          },
+          {
+            "playerId": "player_b",
+            "rank": 2,
+            "status": "active",
+            "score": {
+              "headquartersDamage": 0,
+              "ownHqHp": 0,
+              "controlPoints": 3,
+              "armyValue": 57,
+              "supplies": 93,
+              "actionScore": 360,
+              "total": 474
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

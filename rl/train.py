@@ -16,6 +16,7 @@ import os
 import shutil
 import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -32,7 +33,7 @@ def mask_fn(env):
     return env.action_masks()
 
 
-def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str, anchor_probability: float):
+def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str, anchor_probability: float, map_mix: list[tuple[str, float]]):
     """模块级工厂：返回可被 spawn 子进程 pickle 的 env 构造器。每个环境自带一个引擎 worker。"""
 
     def _init():
@@ -45,6 +46,7 @@ def make_train_env(map_id: str, opponent_style: str, model_opponent_probability:
             self_play_probability=self_play_probability,
             anchor_model_path=anchor_model_path or None,
             anchor_probability=anchor_probability,
+            map_mix=map_mix,
         )
         return Monitor(env)
 
@@ -78,6 +80,18 @@ def env_int(name: str, default: int, *, minimum: int | None = None) -> int:
 
 def env_float(name: str, default: float) -> float:
     return float(env_str(name, str(default)))
+
+
+def parse_map_mix(raw: str) -> list[tuple[str, float]]:
+    result: list[tuple[str, float]] = []
+    for entry in raw.split(","):
+        name, separator, weight = entry.strip().partition(":")
+        if not name:
+            continue
+        result.append((name, float(weight) if separator else 1.0))
+    if any(weight <= 0 for _, weight in result):
+        raise ValueError("RL_TRAIN_MAP_MIX weights must be positive")
+    return result
 
 
 def tensorboard_available() -> bool:
@@ -118,6 +132,14 @@ def opponent_model_path(map_id: str) -> str:
             candidates.extend(root.glob(pattern))
     result = max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
     return str(result.with_suffix("")) if result else ""
+
+
+def champion_model_path() -> str:
+    """Find the strongest frozen 5974-dim champion for v2.7 anchoring."""
+    candidates = list(Path("rl/models").glob("hex_ppo_v2.4.*_random_selfplay_*.zip"))
+    if not candidates:
+        candidates = list(Path("rl/models").glob("hex_ppo_v2.3.*_random_selfplay_*.zip"))
+    return str(max(candidates, key=lambda path: path.stat().st_mtime)) if candidates else ""
 
 
 def ensure_zip_suffix(path: str) -> str:
@@ -179,70 +201,85 @@ def resolve_device() -> str:
 
 
 class MaskableEvalCallback(BaseCallback):
-    """Evaluate with action masks and save the best mean episode reward."""
+    """Evaluate deterministic paired seeds against multiple validation opponents."""
 
-    def __init__(self, eval_env, eval_freq: int, n_eval_episodes: int, best_model_save_path: str):
+    def __init__(self, eval_envs: dict[str, Any], eval_freq: int, n_eval_episodes: int, best_model_save_path: str, seed_prefix: int = 27_000):
         super().__init__()
-        self.eval_env = eval_env
+        self.eval_envs = eval_envs
         self.eval_freq = max(1, eval_freq)
-        self.n_eval_episodes = max(1, n_eval_episodes)
+        self.n_eval_episodes = max(2, n_eval_episodes + n_eval_episodes % 2)
         self.best_model_save_path = best_model_save_path
-        self.best_score = (-1.0, -float("inf"), -float("inf"))
+        self.seed_prefix = seed_prefix
+        self.best_score = (-1.0, -1.0, -float("inf"), -float("inf"))
 
     def _on_step(self) -> bool:
         if self.num_timesteps % self.eval_freq != 0:
             return True
         print(f"[eval] step={self.num_timesteps:>8d} playing {self.n_eval_episodes} games...", flush=True)
-        rewards: list[float] = []
-        wins = 0
-        control_points: list[int] = []
-        action_totals = {"deploy": 0, "attack": 0, "move": 0, "end_turn": 0}
-        for episode in range(self.n_eval_episodes):
-            try:
-                observation, _ = self.eval_env.reset()
-                done = False
-                total = 0.0
-                while not done:
-                    action, _ = self.model.predict(
-                        observation,
-                        deterministic=True,
-                        action_masks=self.eval_env.action_masks(),
+        scenario_scores: list[tuple[float, float, float]] = []
+        for scenario, eval_env in self.eval_envs.items():
+            rewards: list[float] = []
+            wins = 0
+            control_points: list[int] = []
+            for episode in range(self.n_eval_episodes):
+                try:
+                    pair_index = episode // 2
+                    owner = "player_a" if episode % 2 == 0 else "player_b"
+                    observation, _ = eval_env.reset(
+                        seed=self.seed_prefix + pair_index,
+                        options={"owner": owner},
                     )
-                    observation, reward, terminated, truncated, info = self.eval_env.step(int(action))
-                    total += float(reward)
-                    action_type = info.get("action_type")
-                    if action_type in action_totals:
-                        action_totals[action_type] += 1
-                    done = terminated or truncated
-                rewards.append(total)
-                base_env = self.eval_env
-                while hasattr(base_env, "env"):
-                    base_env = base_env.env
-                if base_env.state.get("winner") == base_env.owner:
-                    wins += 1
-                control_points.append(sum(p.get("owner") == base_env.owner for p in base_env.state.get("controlPoints", [])))
-            except Exception as error:
-                print(f"[eval] episode {episode} failed: {error}", flush=True)
-        if not rewards:
+                    done = False
+                    total = 0.0
+                    while not done:
+                        action, _ = self.model.predict(
+                            observation,
+                            deterministic=True,
+                            action_masks=eval_env.action_masks(),
+                        )
+                        observation, reward, terminated, truncated, _ = eval_env.step(int(action))
+                        total += float(reward)
+                        done = terminated or truncated
+                    rewards.append(total)
+                    base_env = eval_env
+                    while hasattr(base_env, "env"):
+                        base_env = base_env.env
+                    if base_env.state.get("winner") == base_env.owner:
+                        wins += 1
+                    control_points.append(sum(p.get("owner") == base_env.owner for p in base_env.state.get("controlPoints", [])))
+                except Exception as error:
+                    print(f"[eval:{scenario}] episode {episode} failed: {error}", flush=True)
+            if rewards:
+                win_rate = wins / len(rewards)
+                cp_mean = float(np.mean(control_points)) if control_points else 0.0
+                mean_reward = float(np.mean(rewards))
+                scenario_scores.append((win_rate, cp_mean, mean_reward))
+                self.logger.record(f"eval/{scenario}_win_rate", win_rate)
+                print(
+                    f"[eval:{scenario}] win_rate={win_rate:.0%} cp={cp_mean:.2f} "
+                    f"mean_reward={mean_reward:+.3f} over {len(rewards)} paired games",
+                    flush=True,
+                )
+        if not scenario_scores:
             return True
-        mean_reward = float(np.mean(rewards))
-        win_rate = wins / len(rewards)
-        cp_mean = float(np.mean(control_points)) if control_points else 0.0
-        # Production selection follows gameplay outcomes first: win rate,
-        # then average control points, then shaped reward as a tie-breaker.
-        selection_score = (win_rate, cp_mean, mean_reward)
+        win_rates = [score[0] for score in scenario_scores]
+        mean_win_rate = float(np.mean(win_rates))
+        min_win_rate = min(win_rates)
+        cp_mean = float(np.mean([score[1] for score in scenario_scores]))
+        mean_reward = float(np.mean([score[2] for score in scenario_scores]))
+        selection_score = (min_win_rate, mean_win_rate, cp_mean, mean_reward)
         is_best = selection_score > self.best_score
         if is_best:
             self.best_score = selection_score
             self.model.save(os.path.join(self.best_model_save_path, "best_model"))
         self.logger.record("eval/mean_reward", mean_reward)
-        self.logger.record("eval/win_rate", win_rate)
+        self.logger.record("eval/win_rate", mean_win_rate)
+        self.logger.record("eval/min_win_rate", min_win_rate)
         self.logger.record("eval/control_points", cp_mean)
         print(
-            f"[eval] step={self.num_timesteps:>8d} mean_reward={mean_reward:+.3f} "
-            f"win_rate={win_rate:.0%} cp={cp_mean:.2f} "
-            f"deploy={action_totals['deploy']} attack={action_totals['attack']} move={action_totals['move']} "
-            f"over {len(rewards)} games{' <- new best' if is_best else ''}",
+            f"[eval] step={self.num_timesteps:>8d} min_win_rate={min_win_rate:.0%} "
+            f"mean_win_rate={mean_win_rate:.0%} cp={cp_mean:.2f} mean_reward={mean_reward:+.3f}"
+            f"{' <- new best' if is_best else ''}",
             flush=True,
         )
         return True
@@ -284,7 +321,7 @@ def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.6.0")
+    model_version = env_str("RL_MODEL_VERSION", "v2.7.0")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -298,16 +335,18 @@ def main() -> None:
     # 需要时可用 RL_MODEL_OPPONENT_PROB 显式开启。
     default_model_prob = 0.0 if map_id == "random" else 0.5
     model_opponent_probability = env_float("RL_MODEL_OPPONENT_PROB", default_model_prob)
-    # 自对弈：随机地图默认 85% 局打自己的历史快照（v2.6 起加压：对手生态是棋力上限的
-    # 主要约束，留 15% 规则对手仅防评估退化）；静态图默认关闭。
-    default_self_play_prob = 0.85 if map_id == "random" else 0.0
+    # v2.7 uses 30% rule opponents and 70% self-play. Within self-play,
+    # 40% anchor probability gives the fixed champion 28% of all episodes.
+    default_self_play_prob = 0.70 if map_id == "random" else 0.0
     self_play_probability = env_float("RL_SELF_PLAY_PROB", default_self_play_prob)
     # 快照目录按模型版本隔离：观测世代不同的旧快照（如 5974 维）不混入新世代阶梯。
     snapshot_dir = env_str("RL_SNAPSHOT_DIR", f"rl/selfplay/{map_id}/{model_version}")
     snapshot_freq = env_int("RL_SNAPSHOT_FREQ", 5_000, minimum=1)
     snapshot_keep = env_int("RL_SNAPSHOT_KEEP", 20, minimum=2)
     anchor_model = env_str("RL_ANCHOR_MODEL", "")
-    anchor_probability = env_float("RL_ANCHOR_PROB", 0.15)
+    anchor_probability = env_float("RL_ANCHOR_PROB", 0.40)
+    default_map_mix = "random:0.7,default:0.15,dual-lanes:0.075,forge:0.075" if map_id == "random" else ""
+    map_mix = parse_map_mix(env_str("RL_TRAIN_MAP_MIX", default_map_mix))
     opponent_kind = "selfplay" if self_play_probability > 0 else "modelmix"
     model_path = env_str(
         "RL_MODEL_PATH",
@@ -322,6 +361,10 @@ def main() -> None:
     lr_start = env_float("RL_LEARNING_RATE", 3e-4)
     lr_end = env_float("RL_LR_END", 3e-5)
     lr_schedule = make_lr_schedule(lr_start, lr_end)
+    # 常数学习率模式：续训微调时避免 callable lr 经 cloudpickle 序列化进断点，
+    # 防止异构环境反序列化段错误（见 sanitize_delivery_zip 背景）。
+    use_constant_lr = env_str("RL_LR_MODE", "schedule") == "constant"
+    learning_rate: Any = lr_start if use_constant_lr else lr_schedule
     device = resolve_device()
 
     # 并行环境（子进程）里模型对象不可序列化：主进程只解析路径，由子进程懒加载。
@@ -360,9 +403,9 @@ def main() -> None:
         raise FileNotFoundError(f"RL_LOAD_MODEL 指向的模型不存在: {load_path}")
 
     resume = bool(load_path)
+    if self_play_probability > 0 and not anchor_model:
+        anchor_model = load_path if resume and (os.path.exists(load_path) or os.path.exists(load_path + ".zip")) else champion_model_path()
     # 锚点对手：防自对弈策略漂移退化的常驻强对手；未显式指定时续训默认用被续训的模型自身。
-    if self_play_probability > 0 and not anchor_model and resume:
-        anchor_model = load_path if os.path.exists(load_path) else load_path + ".zip"
     if anchor_model and not os.path.exists(anchor_model):
         raise FileNotFoundError(f"RL_ANCHOR_MODEL 指向的模型不存在: {anchor_model}")
     if anchor_model:
@@ -375,7 +418,9 @@ def main() -> None:
     print(
         f"[train] map={map_id} mode={'resume' if resume else 'fresh'} envs={num_envs} "
         f"net={net_width}x{net_width}{'(from checkpoint)' if resume else ''} "
-        f"timesteps={total_timesteps}{'(incremental)' if resume else ''}",
+        f"lr={'constant ' + str(lr_start) if use_constant_lr else f'schedule {lr_start}->{lr_end}'} "
+        f"timesteps={total_timesteps}{'(incremental)' if resume else ''} "
+        f"map_mix={map_mix or [(map_id, 1.0)]}",
         flush=True,
     )
 
@@ -388,16 +433,16 @@ def main() -> None:
     # 并行训练环境：每个环境一个独立引擎 worker；sb3 通过 env_method("action_masks")
     # 从各子环境收集动作掩码，无需 ActionMasker 包装。单环境用 DummyVecEnv 保持同构。
     env_fns = [
-        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "", anchor_probability)
+        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "", anchor_probability, map_mix)
         for _ in range(num_envs)
     ]
     env = SubprocVecEnv(env_fns) if num_envs > 1 else DummyVecEnv(env_fns)
-    eval_env = None
+    eval_envs: dict[str, Any] = {}
     try:
         if resume:
             print(f"[train] loading model from {load_path}")
             try:
-                model = MaskablePPO.load(load_path, env=env, device=device, learning_rate=lr_schedule)
+                model = MaskablePPO.load(load_path, env=env, device=device, learning_rate=learning_rate)
             except ValueError as error:
                 if "Action spaces do not match" in str(error) or "Observation spaces do not match" in str(error):
                     raise RuntimeError(
@@ -432,9 +477,26 @@ def main() -> None:
             # 快照是子进程自对弈对手的唯一来源；原子写入避免读到半截 zip。
             callbacks.append(SnapshotCallback(snapshot_dir, snapshot_freq, snapshot_keep))
         if eval_freq > 0:
-            eval_env = ActionMasker(LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style, model_opponent_probability=model_opponent_probability, opponent_model_path=resolved_opponent_path or None), mask_fn)
+            eval_envs["random_rule"] = ActionMasker(
+                LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style), mask_fn,
+            )
+            if anchor_model:
+                eval_envs["random_champion"] = ActionMasker(LocalHexGameEnv(
+                    map_id=map_id,
+                    opponent_style=opponent_style,
+                    self_play_probability=1.0,
+                    anchor_model_path=anchor_model,
+                    anchor_probability=1.0,
+                ), mask_fn)
+                eval_envs["default_champion"] = ActionMasker(LocalHexGameEnv(
+                    map_id="default",
+                    opponent_style=opponent_style,
+                    self_play_probability=1.0,
+                    anchor_model_path=anchor_model,
+                    anchor_probability=1.0,
+                ), mask_fn)
             callbacks.append(MaskableEvalCallback(
-                eval_env,
+                eval_envs,
                 eval_freq=eval_freq,
                 n_eval_episodes=eval_episodes,
                 best_model_save_path=str(best_dir),
@@ -461,7 +523,7 @@ def main() -> None:
             print("[train] delivery sanitized: learning-rate schedule closure replaced by constant")
         print(f"[train] checkpoints in {checkpoint_dir}/")
     finally:
-        if eval_env is not None:
+        for eval_env in eval_envs.values():
             eval_env.close()
         env.close()
 

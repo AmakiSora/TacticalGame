@@ -1,8 +1,9 @@
-"""跨版本模型对战：让 v2.0.0（38 动作）与 v2.1（54 动作）模型互相对弈。
+"""跨版本模型对战：让不同观测/动作世代的模型互相对弈。
 
 两个模型的动作空间不同，无法在同一套编码下运行：
 - v2.0.0：8 个单位槽 / 38 动作；观测按固定 player_a 视角编码（当时的实现）。
-- v2.1.x：12 个单位槽 / 54 动作；观测按所选座位视角编码。
+- v2.1.x/v2.2：12 个单位槽 / 54 动作；观测按所选座位视角编码。
+- v2.7：54 动作 / 6205 维（槽位和规则特征）；v2.6 及更早版本走冻结快照。
 
 本脚本通过 rl/local-worker.ts 在进程内跑引擎（无需启动游戏服务器），
 对每个座位使用其模型训练时期的编码与合法动作生成逻辑：
@@ -38,6 +39,7 @@ try:
     from env_v22 import HexGameEnv as V22HexGameEnv
     from env_v24 import HexGameEnv as V24HexGameEnv
     from env_v25 import HexGameEnv as V25HexGameEnv
+    from env_v26 import HexGameEnv as V26HexGameEnv
 except ImportError:  # 兼容 ``python -m rl.evaluate_cross`` 等调用方式。
     from rl.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
     from rl.env import HexGameEnv as CurrentHexGameEnv
@@ -46,6 +48,7 @@ except ImportError:  # 兼容 ``python -m rl.evaluate_cross`` 等调用方式。
     from rl.env_v22 import HexGameEnv as V22HexGameEnv
     from rl.env_v24 import HexGameEnv as V24HexGameEnv
     from rl.env_v25 import HexGameEnv as V25HexGameEnv
+    from rl.env_v26 import HexGameEnv as V26HexGameEnv
 
 
 def parse_args():
@@ -54,7 +57,7 @@ def parse_args():
     parser.add_argument("--model-b", required=True, help="坐 player_b 座位的模型 zip 路径")
     parser.add_argument("--name-a", default=None, help="player_a 模型的显示名（默认取文件名）")
     parser.add_argument("--name-b", default=None, help="player_b 模型的显示名（默认取文件名）")
-    parser.add_argument("--games", type=int, default=2, help="总对局数（每局结束后交换座位需开 --swap-sides）")
+    parser.add_argument("--games", type=int, default=2, help="总对局数（--swap-sides 时按相同种子成对换座）")
     parser.add_argument("--map", dest="map_id", default="default", help="地图 id（默认 default；random 为每局一张对称随机地图）")
     parser.add_argument("--max-rounds", type=int, default=100, help="单局回合数上限，超过记为 draw")
     parser.add_argument("--max-actions", type=int, default=5000, help="单局动作数上限，超过记为 draw")
@@ -65,6 +68,7 @@ def parse_args():
     parser.add_argument("--stats-file", default=None,
                         help="每局结果追加到该 JSONL 文件，结束时输出与历史运行累计合并的统计（大样本验收用）")
     parser.add_argument("--verbose", action="store_true", help="打印每个动作")
+    parser.add_argument("--seed-prefix", default="cross", help="随机图评估种子前缀；配对换边局共享同一种子")
     return parser.parse_args()
 
 
@@ -176,16 +180,18 @@ class SideController:
             helper_cls, self.version = LegacyHexGameEnv, f"v2.0.0 ({n_actions} 动作)"
         elif n_actions == CURRENT_MAX_ACTIONS:
             # 同为 54 动作但观测语义按版本分化：按观测维度选编码器，
-            # 5974 维 → 当前环境（v2.6，与 v2.3/v2.4 编码逐格一致，统一用当前本体）；
+            # 6205 维 → 当前 v2.7 环境；5974 维 → 冻结的 v2.6 兼容环境；
             # 6024 维 → v2.5 快照；3922 维 → v2.1/v2.2 快照。
-            if obs_dim == 5974:
-                helper_cls, self.version = CurrentHexGameEnv, f"v2.3-v2.4/v2.6 ({n_actions} 动作)"
+            if obs_dim == 6205:
+                helper_cls, self.version = CurrentHexGameEnv, f"v2.7 ({n_actions} 动作)"
+            elif obs_dim == 5974:
+                helper_cls, self.version = V26HexGameEnv, f"v2.3-v2.4/v2.6 ({n_actions} 动作)"
             elif obs_dim == 6024:
                 helper_cls, self.version = V25HexGameEnv, f"v2.5 ({n_actions} 动作)"
             elif obs_dim == 3922:
                 helper_cls, self.version = V22HexGameEnv, f"v2.2 ({n_actions} 动作)"
             else:
-                raise ValueError(f"{label}: 54 动作模型的观测维度 {obs_dim} 无法识别（支持 6024 / 5974 / 3922）")
+                raise ValueError(f"{label}: 54 动作模型的观测维度 {obs_dim} 无法识别（支持 6205 / 6024 / 5974 / 3922）")
         else:
             raise ValueError(
                 f"{label}: 动作空间 {n_actions} 无法识别（支持 "
@@ -226,7 +232,8 @@ def reset_command(args, game_index: int) -> dict[str, Any]:
     command: dict[str, Any] = {"cmd": "reset", "mapId": args.map_id}
     if args.map_id == "random":
         # 每局一张对称随机地图；种子由局序派生，同参数评估可复现。
-        command["random"] = {"seed": f"cross-{game_index}", "symmetric": True}
+        pair_index = (game_index + 1) // 2 if args.swap_sides else game_index
+        command["random"] = {"seed": f"{args.seed_prefix}-{pair_index}", "symmetric": True}
     return command
 
 

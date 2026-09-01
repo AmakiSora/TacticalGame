@@ -1,11 +1,8 @@
-"""Gymnasium environment for the standard two-player REST game (v2.6).
+"""Gymnasium environment for the standard two-player REST game (v2.7).
 
-v2.6 rolls the observation back to the v2.3/v2.4 5,974-dim canonical board
-encoding (the v2.5 opponent-action-history extension was measured as no
-improvement and is frozen in the ``env_v25`` snapshot), and upgrades the
-self-play opponent ecosystem: recency-weighted snapshot sampling plus a
-fixed-probability anchor opponent.  v2.5 models (6,024 dims) must use the
-``env_v25`` snapshot via ``run_model_v25.py``.
+v2.7 keeps the v2.6 board/action representation but makes the stable action
+slots and per-game rules observable. Older v2.6 models must use the frozen
+``env_v26`` snapshot via ``run_model_v26.py``.
 """
 
 from __future__ import annotations
@@ -47,10 +44,19 @@ CANONICAL_INDEX = {cell: index for index, cell in enumerate(CANONICAL_CELLS)}
 MAX_CELLS = len(CANONICAL_CELLS)
 CELL_FEATURES = 18
 GLOBAL_FEATURES = 16
-OBSERVATION_SIZE = MAX_CELLS * CELL_FEATURES + GLOBAL_FEATURES
 # Stable intent slots.  Slot numbers have the same meaning in every state:
 # 0=end turn; then 12 unit slots x 4 intents; then 5 deploy-type slots.
 MAX_UNIT_SLOTS = 12
+SLOT_FEATURES = 15
+RULE_FEATURES_PER_UNIT = 8
+GLOBAL_RULE_FEATURES = 11
+RULE_FEATURES = len(UNIT_TYPES) * RULE_FEATURES_PER_UNIT + GLOBAL_RULE_FEATURES
+OBSERVATION_SIZE = (
+    MAX_CELLS * CELL_FEATURES
+    + GLOBAL_FEATURES
+    + MAX_UNIT_SLOTS * SLOT_FEATURES
+    + RULE_FEATURES
+)
 UNIT_INTENTS = ("move", "attack", "heal", "special")
 DEPLOY_SLOTS = UNIT_TYPES
 MAX_ACTIONS = 1 + MAX_UNIT_SLOTS * len(UNIT_INTENTS) + len(DEPLOY_SLOTS)
@@ -103,6 +109,7 @@ class HexGameEnv(gym.Env):
         self.random_options = dict(random_options) if random_options else {}
         # 旧模型对手（v2.0.0，3922 维观测）需要 env_v22 快照编码器，懒加载。
         self._legacy_env: Any = None
+        self._v26_env: Any = None
 
         self.action_space = spaces.Discrete(MAX_ACTIONS)
         self.observation_space = spaces.Box(
@@ -364,7 +371,7 @@ class HexGameEnv(gym.Env):
         except OSError:
             return []
         files.sort(key=lambda path: path.stat().st_mtime)
-        return [str(path) for path in files][-8:]
+        return [str(path) for path in files][-16:]
 
     def _has_anchor(self) -> bool:
         return bool(self.anchor_model_path) and Path(self.anchor_model_path).is_file()
@@ -386,11 +393,9 @@ class HexGameEnv(gym.Env):
                 if self._has_anchor() and float(self.np_random.random()) < self.anchor_probability:
                     self._self_play_path = self.anchor_model_path
                 else:
-                    # 近期加权：阶梯按保存时间升序，权重几何递增，
-                    # 让对手强度紧跟当前策略（均匀采样会把大量弱旧快照混进来拖慢军备竞赛）。
-                    weights = 2.0 ** np.arange(len(snapshots), dtype=np.float64)
-                    weights /= weights.sum()
-                    self._self_play_path = snapshots[int(self.np_random.choice(len(snapshots), p=weights))]
+                    # Uniform history sampling preserves diverse counters and
+                    # avoids the short-memory co-adaptation observed in v2.6.
+                    self._self_play_path = str(self.np_random.choice(snapshots))
                 return "self"
             if self._has_anchor():
                 # 训练早期还没有快照时，锚点直接当老师。
@@ -423,6 +428,23 @@ class HexGameEnv(gym.Env):
                 from rl.env_v22 import HexGameEnv as LegacyHexGameEnv
             self._legacy_env = LegacyHexGameEnv(base_url="local://legacy-snapshot")
         return self._legacy_env._encode_from_perspective(state, owner)
+
+    def _encode_for_candidate_model(self, model: Any, state: dict[str, Any], owner: str) -> np.ndarray:
+        """Encode from a self-play opponent's own observation generation."""
+        obs_dim = int(model.observation_space.shape[0])
+        if obs_dim == OBSERVATION_SIZE:
+            return self._encode_from_perspective(state, owner)
+        if obs_dim == 5974:
+            if self._v26_env is None:
+                try:
+                    from env_v26 import HexGameEnv as V26HexGameEnv
+                except ImportError:
+                    from rl.env_v26 import HexGameEnv as V26HexGameEnv
+                self._v26_env = V26HexGameEnv(base_url="local://v26-snapshot")
+            return self._v26_env._encode_from_perspective(state, owner)
+        if obs_dim == 3922:
+            return self._encode_for_legacy_model(state, owner)
+        raise ValueError(f"unsupported self-play observation size: {obs_dim}")
 
     def _units_for_slots(self, state: dict[str, Any], owner: str) -> list[dict[str, Any] | None]:
         """Keep units in stable action slots as they move or are deployed."""
@@ -582,7 +604,7 @@ class HexGameEnv(gym.Env):
         try:
             model = self._ensure_self_play_model()
             mask = np.asarray([bool(action[0]) for action in actions], dtype=bool)
-            observation = self._encode_from_perspective(self.state, self.opponent)
+            observation = self._encode_for_candidate_model(model, self.state, self.opponent)
             action_index, _ = model.predict(observation, deterministic=True, action_masks=mask)
             index = int(action_index)
             if index >= len(actions) or not actions[index][0]:
@@ -746,4 +768,57 @@ class HexGameEnv(gym.Env):
             impassable / max(1, len(cells_list)),
         ]
         result[base:base + len(values)] = np.clip(values, -1.0, 1.0)
+        slot_base = base + GLOBAL_FEATURES
+        own_slots = self._units_for_slots(state, self.owner)
+        for slot, unit in enumerate(own_slots):
+            if unit is None:
+                continue
+            offset = slot_base + slot * SLOT_FEATURES
+            unit_type = TYPE_INDEX.get(unit.get("type"), 0)
+            result[offset] = 1.0
+            result[offset + 1 + unit_type] = 1.0
+            result[offset + 6] = float(unit.get("q", 0)) / 10.0
+            result[offset + 7] = float(unit.get("r", 0)) / 10.0
+            result[offset + 8] = float(unit.get("hp", 0)) / max(1.0, float(unit.get("maxHp", 1)))
+            result[offset + 9] = float(bool(unit.get("hasMoved")))
+            result[offset + 10] = float(bool(unit.get("hasActed")))
+            result[offset + 11] = float(bool(unit.get("actionSpent")))
+            result[offset + 12] = float(unit.get("attack", 0)) / 60.0
+            result[offset + 13] = float(unit.get("moveRange", 0)) / 8.0
+            result[offset + 14] = float(unit.get("attackRange", 0)) / 6.0
+
+        rule_base = slot_base + MAX_UNIT_SLOTS * SLOT_FEATURES
+        unit_specs = config.get("units", {})
+        for index, unit_type in enumerate(UNIT_TYPES):
+            spec = unit_specs.get(unit_type, {})
+            offset = rule_base + index * RULE_FEATURES_PER_UNIT
+            rule_values = [
+                float(spec.get("hp", 0)) / 200.0,
+                float(spec.get("attack", 0)) / 60.0,
+                float(spec.get("defense", 0)) / 20.0,
+                float(spec.get("moveRange", 0)) / 8.0,
+                float(spec.get("attackRange", 0)) / 6.0,
+                float(spec.get("cost", 0)) / 150.0,
+                float(spec.get("healPower", 0)) / 60.0,
+                float(bool(spec.get("canCapture"))),
+            ]
+            result[offset:offset + RULE_FEATURES_PER_UNIT] = rule_values
+
+        global_rule_base = rule_base + len(UNIT_TYPES) * RULE_FEATURES_PER_UNIT
+        weights = balance.get("adjudicationWeights", {})
+        global_rule_values = [
+            float(balance.get("startingSupplies", 0)) / 150.0,
+            float(balance.get("baseIncome", 0)) / 30.0,
+            float(balance.get("controlPointIncome", 0)) / 30.0,
+            float(balance.get("damageVarianceRange", 0)) / 10.0,
+            float(balance.get("healVarianceRange", 0)) / 15.0,
+            float(config.get("headquartersSpec", {}).get("defense", 0)) / 20.0,
+            float(weights.get("enemyHqDamage", 0)) / 100.0,
+            float(weights.get("ownHqHp", 0)) / 100.0,
+            float(weights.get("controlPoint", 0)) / 100.0,
+            float(weights.get("armyValue", 0)) / 100.0,
+            float(weights.get("supplies", 0)) / 100.0,
+        ]
+        result[global_rule_base:global_rule_base + GLOBAL_RULE_FEATURES] = global_rule_values
+        result[slot_base:] = np.clip(result[slot_base:], -1.0, 1.0)
         return result

@@ -21,8 +21,14 @@ except ImportError:  # ``python rl/train.py`` puts rl/ on sys.path.
 
 
 class LocalHexGameEnv(HexGameEnv):
-    def __init__(self, map_id: str = "default", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None, anchor_probability: float = 0.15):
+    def __init__(self, map_id: str = "default", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None, anchor_probability: float = 0.15, map_mix: list[tuple[str, float]] | None = None):
         super().__init__(base_url="local://engine", max_steps=max_steps, opponent_style=opponent_style, opponent_model=opponent_model, model_opponent_probability=model_opponent_probability, map_id=map_id, random_options=random_options, opponent_model_path=opponent_model_path, self_play_dir=self_play_dir, self_play_probability=self_play_probability, anchor_model_path=anchor_model_path, anchor_probability=anchor_probability)
+        self.map_mix = list(map_mix or [])
+        if self.map_mix:
+            if any(not name or weight <= 0 for name, weight in self.map_mix):
+                raise ValueError("map_mix entries require a map name and positive weight")
+            total = sum(weight for _, weight in self.map_mix)
+            self.map_mix = [(name, weight / total) for name, weight in self.map_mix]
         root = Path(__file__).resolve().parent.parent
         npx = shutil.which("npx.cmd") or shutil.which("npx")
         if not npx:
@@ -57,14 +63,25 @@ class LocalHexGameEnv(HexGameEnv):
         super(HexGameEnv, self).reset(seed=seed)
         self.player_token = "agent"
         self.opponent_token = "opponent"
-        command: dict[str, Any] = {"cmd": "reset", "mapId": self.map_id}
-        if self.map_id == "random":
+        active_map = self.map_id
+        if self.map_mix:
+            names = [name for name, _ in self.map_mix]
+            probabilities = [weight for _, weight in self.map_mix]
+            active_map = str(self.np_random.choice(names, p=probabilities))
+        command: dict[str, Any] = {"cmd": "reset", "mapId": active_map}
+        if active_map == "random":
             # 每局一张新的对称随机地图；种子从 np_random 派生，gym seed 可复现。
             command["random"] = self._build_random_options()
         self.state = self._rpc(command)
         # 随机座位：智能体坐 player_b 时，模型对手恰好坐在它的主场 player_a，
         # 相对视角编码与 v2.0.0 的原生编码完全一致，对手即满血真身。
-        if float(self.np_random.random()) < 0.5:
+        forced_owner = (options or {}).get("owner")
+        if forced_owner not in (None, PLAYER, OPPONENT):
+            raise ValueError("reset option owner must be player_a or player_b")
+        if forced_owner is not None:
+            self.owner = forced_owner
+            self.opponent = OPPONENT if forced_owner == PLAYER else PLAYER
+        elif float(self.np_random.random()) < 0.5:
             self.owner, self.opponent = OPPONENT, PLAYER
         else:
             self.owner, self.opponent = PLAYER, OPPONENT

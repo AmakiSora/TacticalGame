@@ -33,6 +33,8 @@ const RUNNER_SCRIPT_V22 = join(PROJECT_ROOT, 'rl', 'run_model_v22.py');
 const RUNNER_SCRIPT_V24 = join(PROJECT_ROOT, 'rl', 'run_model_v24.py');
 // v2.5.x 的 54 动作模型（6024 维观测，对手动作历史）专用快照运行器。
 const RUNNER_SCRIPT_V25 = join(PROJECT_ROOT, 'rl', 'run_model_v25.py');
+// v2.6.x 的 54 动作模型（5974 维观测）专用兼容运行器。
+const RUNNER_SCRIPT_V26 = join(PROJECT_ROOT, 'rl', 'run_model_v26.py');
 
 /** 当前 rl/env.py 的动作空间大小（12 单位槽 × 4 意图 + 5 部署 + 结束回合）。 */
 const CURRENT_ACTION_SPACE = 54;
@@ -43,7 +45,7 @@ const CURRENT_ACTION_SPACE = 54;
  * 快照做编码/合法动作）。未注册的动作空间不会被允许加入对局。
  * 54 动作存在四个观测语义世代（见 routeModel）：v2.1/v2.2 的 3922 维、
  * v2.3/v2.4 随机地图的 5974 维、v2.5（+对手动作历史）的 6024 维与
- * v2.6+（回退 5974 维但对手生态不同），需按文件名版本分流到不同运行器。
+ * v2.6（回退 5974 维）以及 v2.7+（6205 维），需按文件名版本分流。
  */
 const RUNNERS_BY_ACTION_SPACE: ReadonlyMap<number, { runner: string; label: string }> = new Map([
   [38, { runner: LEGACY_RUNNER_SCRIPT, label: 'v2.0' }],
@@ -63,7 +65,8 @@ function routeModel(actionSpace: number | null, file: string): { runner: string;
     const version = parseModelVersion(file);
     const minorAtLeast = (minor: number) =>
       version !== null && (version.major > 2 || (version.major === 2 && version.minor >= minor));
-    if (minorAtLeast(6)) return { runner: RUNNER_SCRIPT, label: 'v2.6' };
+    if (minorAtLeast(7)) return { runner: RUNNER_SCRIPT, label: 'v2.7' };
+    if (minorAtLeast(6)) return { runner: RUNNER_SCRIPT_V26, label: 'v2.6' };
     if (minorAtLeast(5)) return { runner: RUNNER_SCRIPT_V25, label: 'v2.5' };
     if (minorAtLeast(3)) return { runner: RUNNER_SCRIPT_V24, label: 'v2.3' };
     return { runner: RUNNER_SCRIPT_V22, label: 'v2.2' };

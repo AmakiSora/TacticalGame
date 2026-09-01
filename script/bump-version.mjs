@@ -85,6 +85,13 @@ const TARGETS = [
     write: (text, version) =>
       replaceVersion(text, new RegExp(String.raw`(const expectedAppVersion = ')${SEMVER}(')`), version),
   },
+  {
+    label: 'tests/public/random-map-ui.test.ts（random-map-ui.js 缓存参数断言，出现多处需全量替换）',
+    file: 'tests/public/random-map-ui.test.ts',
+    read: text => firstCapture(text, new RegExp(String.raw`/random-map-ui\.js\?v=(${SEMVER})`)),
+    write: (text, version) =>
+      text.replace(new RegExp(String.raw`(/random-map-ui\.js\?v=)${SEMVER}`, 'g'), `$1${version}`),
+  },
 ];
 
 function firstCapture(text, re) {

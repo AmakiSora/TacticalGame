@@ -292,3 +292,29 @@ JSONL 并输出跨运行累计的分座位统计（同一模型对与地图的�
 
 注意：v2.0.0 的观测按固定 player_a 视角编码，因此旧模型固定坐 player_a；
 `--swap-sides` 每局交换座位，但交换后旧模型处于训练分布之外，结果会失真。
+
+## 批量对战与排行榜
+
+`rl/round_robin.py` 自动发现 `rl/models/` 下全部可对战模型（排除 v1.0.0 的 512 动作格式），
+两两 × 全地图批量对战，结果累积写入 `rl/leaderboard/matches.jsonl`：
+
+```powershell
+# 先小规模冒烟（只跑 default 图、3 个模型、每对 2 局）
+rl/.venv/Scripts/python.exe rl/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --games 2
+
+# 全量跑批（120 对 × 7 图 × 24 局 ≈ 2 万局，建议先跑随机图约 3 小时出第一版榜单）
+rl/.venv/Scripts/python.exe rl/round_robin.py --maps random
+rl/.venv/Scripts/python.exe rl/round_robin.py --maps default,breach,danger-close,desert,dual-lanes,forge
+```
+
+要点：
+
+- **断点续跑**：启动时统计 JSONL 里已有局数，`need = 目标 − 已有`（取偶保证换座对称），
+  已跑对局不重复浪费；同命令重跑全部 skip。随机图重跑会通过新 `--salt` 生成全新地图。
+- **并行**：`--jobs N` 并发多个 evaluate_cross 子进程（每个独立加载模型，显存/内存有限时保持 1）。
+- **评分**：跑完执行 `npm run rl-leaderboard`（已并入 `stats-all`），
+  从 JSONL 生成 `public/data/rl-leaderboard.json`，页面 `/leaderboard.html` 展示。
+- **评分协议**：Bradley-Terry MLE（MM 迭代，平局记 0.5，已交手对附加 1 局虚拟平局先验防发散），
+  Elo 映射 `1500 + 400/ln10 × ln p`；95% CI 为按（对,图）分层 bootstrap（固定种子可复现）；
+  小样本另附 Wilson 下界参考列。先手/后手只做展示统计，不进评分。
+  各地图独立出分图榜单（局数少，CI 更宽）。

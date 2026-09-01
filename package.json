@@ -1,6 +1,6 @@
 {
   "name": "tactical-game",
-  "version": "3.4.1",
+  "version": "3.4.2",
   "engines": {
     "node": ">=24 <25"
   },
@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "stats": "node script/generateStats.mjs",
     "fun-stats": "node script/generateFunStats.mjs",
-    "stats-all": "node script/generateStats.mjs && node script/generateFunStats.mjs",
+    "rl-leaderboard": "node script/generateRlLeaderboard.mjs",
+    "stats-all": "node script/generateStats.mjs && node script/generateFunStats.mjs && node script/generateRlLeaderboard.mjs",
     "version": "node script/bump-version.mjs",
     "sync-version": "node script/bump-version.mjs",
     "check-version": "node script/bump-version.mjs --check"

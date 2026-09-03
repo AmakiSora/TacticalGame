@@ -12,8 +12,11 @@ spawn 启动，因此 make_train_env 必须是模块级可 pickle 的工厂，�
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -33,10 +36,13 @@ def mask_fn(env):
     return env.action_masks()
 
 
-def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str, anchor_probability: float, map_mix: list[tuple[str, float]]):
+def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str, anchor_probability: float, map_mix: list[tuple[str, float]], opponent_stochastic_probability: float = 0.0):
     """模块级工厂：返回可被 spawn 子进程 pickle 的 env 构造器。每个环境自带一个引擎 worker。"""
 
     def _init():
+        # 子进程里只跑对手模型的单样本推理；torch 默认按核数开线程，
+        # N 个环境 × 核数个线程会互相争抢，单线程反而更快。
+        torch.set_num_threads(1)
         env = LocalHexGameEnv(
             map_id=map_id,
             opponent_style=opponent_style,
@@ -47,6 +53,7 @@ def make_train_env(map_id: str, opponent_style: str, model_opponent_probability:
             anchor_model_path=anchor_model_path or None,
             anchor_probability=anchor_probability,
             map_mix=map_mix,
+            opponent_stochastic_probability=opponent_stochastic_probability,
         )
         return Monitor(env)
 
@@ -200,8 +207,135 @@ def resolve_device() -> str:
     return device
 
 
+class AsyncEvalCallback(BaseCallback):
+    """Evaluate checkpoints in a background subprocess (v2.8).
+
+    Every ``eval_freq`` timesteps the current policy is saved to a temp zip and
+    ``rl/eval_worker.py`` plays the paired-seed validation games against all
+    scenarios while rollouts keep running.  At most one evaluation is in flight;
+    if the previous one has not finished the new trigger is skipped (logged),
+    so evaluation cost never blocks training.  Best-checkpoint selection uses
+    the weakest scenario's Wilson lower bound instead of the raw win rate,
+    which stops single lucky 40-game samples from overwriting the best model.
+    """
+
+    def __init__(self, *, map_id: str, opponent_style: str, anchor_model: str, eval_freq: int, n_eval_episodes: int, best_model_save_path: str, eval_dir: str, seed_prefix: int = 27_000, wait_at_end: bool = True):
+        super().__init__()
+        self.map_id = map_id
+        self.opponent_style = opponent_style
+        self.anchor_model = anchor_model
+        self.eval_freq = max(1, eval_freq)
+        self.n_eval_episodes = max(2, n_eval_episodes + n_eval_episodes % 2)
+        self.best_model_save_path = best_model_save_path
+        self.eval_dir = Path(eval_dir)
+        self.seed_prefix = seed_prefix
+        self.wait_at_end = wait_at_end
+        self.best_score = (-1.0, -1.0, -float("inf"), -float("inf"))
+        self.best_step = 0
+        self._pending: tuple[subprocess.Popen, str, str, int] | None = None
+        self._skipped = 0
+        self.history: list[dict[str, Any]] = []
+
+    def _launch(self) -> None:
+        self.eval_dir.mkdir(parents=True, exist_ok=True)
+        step = int(self.num_timesteps)
+        model_zip = str(self.eval_dir / f"eval_{step}.zip")
+        result_json = str(self.eval_dir / f"eval_{step}.json")
+        self.model.save(model_zip)
+        command = [
+            sys.executable, str(Path(__file__).resolve().parent / "eval_worker.py"),
+            "--model", model_zip, "--out", result_json,
+            "--map", self.map_id, "--opponent-style", self.opponent_style,
+            "--episodes", str(self.n_eval_episodes), "--seed-prefix", str(self.seed_prefix),
+        ]
+        if self.anchor_model:
+            command += ["--anchor", self.anchor_model]
+        env = {**os.environ, "PYTHONUTF8": "1"}
+        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", env=env)
+        self._pending = (process, model_zip, result_json, step)
+        print(f"[eval] step={step:>8d} launched {self.n_eval_episodes} paired games per scenario in background", flush=True)
+
+    def _collect(self, block: bool) -> bool:
+        if self._pending is None:
+            return False
+        process, model_zip, result_json, step = self._pending
+        if not block and process.poll() is None:
+            return False
+        _, stderr = process.communicate()
+        self._pending = None
+        try:
+            if process.returncode != 0 or not os.path.exists(result_json):
+                print(f"[eval] step={step} evaluation failed (rc={process.returncode}): {stderr.strip()[-800:]}", flush=True)
+                return True
+            with open(result_json, encoding="utf-8") as handle:
+                results = json.load(handle)
+            self._record(step, results, model_zip)
+        finally:
+            for path in (model_zip, result_json):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+        return True
+
+    def _record(self, step: int, results: dict[str, Any], model_zip: str) -> None:
+        try:
+            from eval_worker import selection_score
+        except ImportError:  # ``python -m rl.train``
+            from rl.eval_worker import selection_score
+
+        scenarios = results.get("scenarios", {})
+        for name, scenario in scenarios.items():
+            self.logger.record(f"eval/{name}_win_rate", scenario["win_rate"])
+            self.logger.record(f"eval/{name}_wilson_lb", scenario["wilson_lb"])
+            print(
+                f"[eval:{name}] step={step} win_rate={scenario['win_rate']:.0%} wilson_lb={scenario['wilson_lb']:.0%} "
+                f"cp={scenario['cp_mean']:.2f} mean_reward={scenario['mean_reward']:+.3f} over {scenario['games']} paired games",
+                flush=True,
+            )
+        if not scenarios:
+            return
+        score = selection_score(results)
+        is_best = score > self.best_score
+        if is_best:
+            self.best_score = score
+            self.best_step = step
+            os.makedirs(self.best_model_save_path, exist_ok=True)
+            shutil.copy(model_zip, os.path.join(self.best_model_save_path, "best_model.zip"))
+        mean_win_rate = float(np.mean([s["win_rate"] for s in scenarios.values()]))
+        self.logger.record("eval/win_rate", mean_win_rate)
+        self.logger.record("eval/min_wilson_lb", score[0])
+        self.logger.record("eval/control_points", score[2])
+        self.logger.record("eval/mean_reward", score[3])
+        # 结果晚于训练步数到达，随下一次常规 dump 写入 TB；eval/evaluated_step 记录真实评估步数。
+        self.logger.record("eval/evaluated_step", step)
+        self.history.append({"step": step, "score": score, "scenarios": scenarios})
+        print(
+            f"[eval] step={step:>8d} min_wilson_lb={score[0]:.0%} mean_wilson_lb={score[1]:.0%} "
+            f"mean_win_rate={mean_win_rate:.0%} cp={score[2]:.2f} mean_reward={score[3]:+.3f}"
+            f"{' <- new best' if is_best else ''}",
+            flush=True,
+        )
+
+    def _on_step(self) -> bool:
+        self._collect(block=False)
+        if self.num_timesteps % self.eval_freq != 0:
+            return True
+        if self._pending is not None:
+            self._skipped += 1
+            print(f"[eval] step={self.num_timesteps} skipped: previous evaluation still running (skipped {self._skipped} so far)", flush=True)
+            return True
+        self._launch()
+        return True
+
+    def _on_training_end(self) -> None:
+        if self._pending is not None and self.wait_at_end:
+            print("[eval] waiting for the last background evaluation to finish...", flush=True)
+            self._collect(block=True)
+
+
 class MaskableEvalCallback(BaseCallback):
-    """Evaluate deterministic paired seeds against multiple validation opponents."""
+    """Legacy inline evaluation (v2.7).  Kept for RL_EVAL_MODE=inline."""
 
     def __init__(self, eval_envs: dict[str, Any], eval_freq: int, n_eval_episodes: int, best_model_save_path: str, seed_prefix: int = 27_000):
         super().__init__()
@@ -321,7 +455,7 @@ def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.7.0")
+    model_version = env_str("RL_MODEL_VERSION", "v2.8.0")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -329,8 +463,13 @@ def main() -> None:
     save_freq = env_int("RL_SAVE_FREQ", 20_000, minimum=1)
     checkpoint_dir = env_str("RL_CHECKPOINT_DIR", f"rl/checkpoints/{map_id}/{run_stamp}")
     tb_dir = env_str("RL_TB_LOG", "rl/tb")
-    eval_freq = env_int("RL_EVAL_FREQ", 10_000, minimum=0)
-    eval_episodes = env_int("RL_EVAL_EPISODES", 20, minimum=1)
+    # v2.8：评估默认改为后台子进程（RL_EVAL_MODE=async），频率放宽到 5 万步、
+    # 每场景 48 局配对；v2.7.1 主进程每 1 万步串行 120 局把有效 fps 砍掉一半。
+    eval_mode = env_str("RL_EVAL_MODE", "async")
+    if eval_mode not in {"async", "inline"}:
+        raise ValueError("RL_EVAL_MODE must be async or inline")
+    eval_freq = env_int("RL_EVAL_FREQ", 50_000 if eval_mode == "async" else 10_000, minimum=0)
+    eval_episodes = env_int("RL_EVAL_EPISODES", 48 if eval_mode == "async" else 20, minimum=1)
     # 随机地图上 v2.0.0 模型对手属于分布外对手，默认只用规则对手；
     # 需要时可用 RL_MODEL_OPPONENT_PROB 显式开启。
     default_model_prob = 0.0 if map_id == "random" else 0.5
@@ -345,6 +484,8 @@ def main() -> None:
     snapshot_keep = env_int("RL_SNAPSHOT_KEEP", 20, minimum=2)
     anchor_model = env_str("RL_ANCHOR_MODEL", "")
     anchor_probability = env_float("RL_ANCHOR_PROB", 0.40)
+    # v2.8：模型对手（快照/锚点）有 30% 的局按策略分布采样动作，防止只学会针对一条贪心走法。
+    opponent_stochastic_probability = env_float("RL_OPPONENT_STOCHASTIC_PROB", 0.30)
     default_map_mix = "random:0.7,default:0.15,dual-lanes:0.075,forge:0.075" if map_id == "random" else ""
     map_mix = parse_map_mix(env_str("RL_TRAIN_MAP_MIX", default_map_mix))
     opponent_kind = "selfplay" if self_play_probability > 0 else "modelmix"
@@ -352,7 +493,9 @@ def main() -> None:
         "RL_MODEL_PATH",
         f"rl/models/hex_ppo_{model_version}_{run_date}_{map_id}_{opponent_kind}_{total_timesteps}",
     )
-    num_envs = env_int("RL_NUM_ENVS", 4, minimum=1)
+    # v2.8：默认 8 个并行环境。6 物理核 / 12 逻辑核机器上实测（含锚点对手推理）：
+    # 4 环境 170 fps、8 环境 238 fps；子进程 torch 单线程化后比 v2.7.1 的 42 有效 fps 提升约 5 倍。
+    num_envs = env_int("RL_NUM_ENVS", 8, minimum=1)
     # 网络宽度：6024 维观测压进默认 64 宽是信息瓶颈，256 起步。
     # 仅对从零训练生效；续训时架构以模型内保存的 policy_kwargs 为准
     # （sb3 加载时会校验，不一致直接报错，避免默默用错架构）。
@@ -365,6 +508,13 @@ def main() -> None:
     # 防止异构环境反序列化段错误（见 sanitize_delivery_zip 背景）。
     use_constant_lr = env_str("RL_LR_MODE", "schedule") == "constant"
     learning_rate: Any = lr_start if use_constant_lr else lr_schedule
+    # v2.8 PPO 稳定性：v2.7.1 日志 approx_kl 常驻 0.02-0.03、clip_fraction 0.16-0.20，
+    # 对 PPO 偏高，与历代“后期震荡/终点退化”一致。target_kl 提前截断更新轮次，
+    # n_steps/batch_size 加大降低梯度噪声。续训时同样生效（load 后覆盖）。
+    n_steps = env_int("RL_N_STEPS", 512, minimum=1)
+    batch_size = env_int("RL_BATCH_SIZE", 256, minimum=1)
+    target_kl_raw = env_str("RL_TARGET_KL", "0.02")
+    target_kl: float | None = None if target_kl_raw.lower() in {"0", "none", "off"} else float(target_kl_raw)
     device = resolve_device()
 
     # 并行环境（子进程）里模型对象不可序列化：主进程只解析路径，由子进程懒加载。
@@ -419,8 +569,9 @@ def main() -> None:
         f"[train] map={map_id} mode={'resume' if resume else 'fresh'} envs={num_envs} "
         f"net={net_width}x{net_width}{'(from checkpoint)' if resume else ''} "
         f"lr={'constant ' + str(lr_start) if use_constant_lr else f'schedule {lr_start}->{lr_end}'} "
+        f"n_steps={n_steps} batch={batch_size} target_kl={target_kl} "
         f"timesteps={total_timesteps}{'(incremental)' if resume else ''} "
-        f"map_mix={map_mix or [(map_id, 1.0)]}",
+        f"map_mix={map_mix or [(map_id, 1.0)]} opponent_stochastic={opponent_stochastic_probability:.0%}",
         flush=True,
     )
 
@@ -433,7 +584,7 @@ def main() -> None:
     # 并行训练环境：每个环境一个独立引擎 worker；sb3 通过 env_method("action_masks")
     # 从各子环境收集动作掩码，无需 ActionMasker 包装。单环境用 DummyVecEnv 保持同构。
     env_fns = [
-        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "", anchor_probability, map_mix)
+        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "", anchor_probability, map_mix, opponent_stochastic_probability)
         for _ in range(num_envs)
     ]
     env = SubprocVecEnv(env_fns) if num_envs > 1 else DummyVecEnv(env_fns)
@@ -442,7 +593,12 @@ def main() -> None:
         if resume:
             print(f"[train] loading model from {load_path}")
             try:
-                model = MaskablePPO.load(load_path, env=env, device=device, learning_rate=learning_rate)
+                # 续训同样应用 v2.8 的 PPO 稳定性参数：n_steps 改变需要重建 rollout buffer，
+                # sb3 在 load 时按新 n_steps 重新分配缓冲，安全。
+                model = MaskablePPO.load(
+                    load_path, env=env, device=device, learning_rate=learning_rate,
+                    custom_objects={"n_steps": n_steps, "batch_size": batch_size, "target_kl": target_kl},
+                )
             except ValueError as error:
                 if "Action spaces do not match" in str(error) or "Observation spaces do not match" in str(error):
                     raise RuntimeError(
@@ -457,12 +613,13 @@ def main() -> None:
                 env,
                 learning_rate=lr_schedule,
                 policy_kwargs=policy_kwargs,
-                n_steps=env_int("RL_N_STEPS", 256, minimum=1),
-                batch_size=env_int("RL_BATCH_SIZE", 64, minimum=1),
+                n_steps=n_steps,
+                batch_size=batch_size,
                 gamma=env_float("RL_GAMMA", 0.99),
                 ent_coef=env_float("RL_ENT_COEF", 0.01),
                 clip_range=env_float("RL_CLIP_RANGE", 0.2),
                 n_epochs=env_int("RL_N_EPOCHS", 10, minimum=1),
+                target_kl=target_kl,
                 tensorboard_log=tb_log,
                 device=device,
                 verbose=1,
@@ -476,7 +633,18 @@ def main() -> None:
         if self_play_probability > 0:
             # 快照是子进程自对弈对手的唯一来源；原子写入避免读到半截 zip。
             callbacks.append(SnapshotCallback(snapshot_dir, snapshot_freq, snapshot_keep))
-        if eval_freq > 0:
+        if eval_freq > 0 and eval_mode == "async":
+            callbacks.append(AsyncEvalCallback(
+                map_id=map_id,
+                opponent_style=opponent_style,
+                anchor_model=anchor_model,
+                eval_freq=eval_freq,
+                n_eval_episodes=eval_episodes,
+                best_model_save_path=str(best_dir),
+                eval_dir=str(Path(checkpoint_dir) / "eval_tmp"),
+            ))
+            print(f"[train] async eval every {eval_freq} steps x {eval_episodes} games per scenario (background subprocess)")
+        elif eval_freq > 0:
             eval_envs["random_rule"] = ActionMasker(
                 LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style), mask_fn,
             )

@@ -172,12 +172,25 @@ python rl/train.py
 
 ```powershell
 $env:RL_MAP_ID = "random"
-$env:RL_NUM_ENVS = "4"     # 默认 4；建议不超过物理核数，留余量给系统与引擎启动
+$env:RL_NUM_ENVS = "8"     # v2.8 默认 8；6 物理核机器实测 4→170 fps、8→238 fps
 python rl/train.py
 ```
 
 注意：并行下 `RL_TIMESTEPS` 仍是总帧数（跨环境累计），同一目标步数的墙钟时间约为单环境的 1/N；
-每轮 rollout 收集 `n_steps × RL_NUM_ENVS` 帧，默认 `RL_N_STEPS=256`、`RL_BATCH_SIZE=64` 对任意环境数都整除。
+每轮 rollout 收集 `n_steps × RL_NUM_ENVS` 帧，v2.8 默认 `RL_N_STEPS=512`、`RL_BATCH_SIZE=256`。
+
+## 训练管线（v2.8.0）
+
+v2.8 不改观测/动作/奖励语义（v2.7 断点可续训），只让训练更快、更稳：
+
+- **后台评估** `RL_EVAL_MODE=async`（默认）：每 `RL_EVAL_FREQ`（默认 50000）步把当前策略交给
+  `rl/eval_worker.py` 子进程跑 3 个场景 × `RL_EVAL_EPISODES`（默认 48）局配对换座，训练不停。
+  上一次评估未完时本次跳过并记日志。`RL_EVAL_MODE=inline` 回到 v2.7 的主进程串行评估。
+- **best 断点按 Wilson 下界选**：选择键 (最弱场景 95% 下界, 平均下界, 占点, 回报)，40 局样本的原始胜率噪声太大。
+- **PPO 稳定性**：`RL_TARGET_KL`（默认 0.02，设 `off` 关闭）提前截断 KL 超标的更新轮次；续训时 n_steps/batch/target_kl 都以本次环境变量为准。
+- **PFSP 自对弈采样**：快照对手按 (1 − 智能体对其胜率)² 加权抽取，输得多的多打；锚点仍按 `RL_ANCHOR_PROB` 固定出场。
+- **对手随机采样** `RL_OPPONENT_STOCHASTIC_PROB`（默认 0.3）：该比例的模型对手局按策略分布采样动作，防止只学会针对贪心走法。
+- **引擎往返减半**：`local_env.py` 复用 `apply`/`reset` 回传的快照，不再每步多发 `state`；worker `reset` 支持 `eventTail: 0` 省掉事件序列化。
 
 ## 自对弈（RL_SELF_PLAY_PROB）
 
@@ -191,8 +204,8 @@ python rl/train.py
 ```
 
 机制：训练每 `RL_SNAPSHOT_FREQ`（默认 5000 次回调）存一个快照到 `RL_SNAPSHOT_DIR`（默认 `rl/selfplay/<地图>/<模型版本>`，按版本隔离），
-只保留最近 `RL_SNAPSHOT_KEEP`（默认 20）个；环境每局从最近 8 个快照（按保存时间）里选一个当对手，
-v2.7 起默认保留更长的历史快照池并均匀采样，避免策略共同适应。
+只保留最近 `RL_SNAPSHOT_KEEP`（默认 20）个；环境每局从最近 16 个快照（按保存时间）里选一个当对手，
+v2.7 均匀采样，v2.8 起改为 PFSP 按输给谁最多加权（见上节）。
 训练初期目录为空时自动用规则对手；快照损坏/被清理时当局降级为 mixed 规则。
 评估环境始终只用规则对手，保证训练期胜率与历史模型可比。
 自 v2.3.3 起支持锚点对手 `RL_ANCHOR_MODEL`（常驻强基准，防策略漂移；续训时默认为被续训的模型自身）；

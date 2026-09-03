@@ -17,17 +17,28 @@ let game: GameState | null = null;
 loadMaps();
 
 /** 快照携带最近的事件尾部：v2.5 观测编码对手上一回合动作需要事件日志，
- * 编码只读最近一个回合，80 条足够覆盖且限制消息体积。 */
-const SNAPSHOT_EVENT_TAIL = 80;
+ * 编码只读最近一个回合，80 条足够覆盖且限制消息体积。
+ * v2.8 起 reset 可用 eventTail 覆盖（训练环境不读事件，传 0 省掉序列化）。 */
+const DEFAULT_SNAPSHOT_EVENT_TAIL = 80;
+let snapshotEventTail = DEFAULT_SNAPSHOT_EVENT_TAIL;
 
 function snapshot(): unknown {
   if (!game) throw new Error('game is not initialized');
-  const { tokens: _tokens, hostToken: _hostToken, ...rest } = structuredClone(game);
-  return {
+  // 只克隆一次：事件先切尾再随整体克隆，避免此前对全量事件日志的二次 structuredClone。
+  const { tokens: _tokens, hostToken: _hostToken, events, ...rest } = game;
+  return structuredClone({
     ...rest,
-    events: structuredClone(game.events.slice(-SNAPSHOT_EVENT_TAIL)),
+    events: snapshotEventTail > 0 ? events.slice(-snapshotEventTail) : [],
     adjudication: buildAdjudicationSnapshot(game),
-  };
+  });
+}
+
+function parseEventTail(value: unknown): number {
+  if (value === undefined) return DEFAULT_SNAPSHOT_EVENT_TAIL;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new Error('eventTail must be a non-negative integer');
+  }
+  return value;
 }
 
 function owner(value: unknown): PlayerId {
@@ -71,6 +82,7 @@ function apply(command: Record<string, unknown>): unknown {
 /** 导出供测试直接调用；作为主进程运行时由下方 stdin 循环驱动。 */
 export function handleCommand(command: Record<string, unknown>): unknown {
   if (command.cmd === 'reset') {
+    snapshotEventTail = parseEventTail(command.eventTail);
     const mapId = typeof command.mapId === 'string' ? command.mapId : 'default';
     if (mapId === 'random') {
       // 本地训练用随机地图：与 REST 创建走同一套生成与校验逻辑，固定双人。

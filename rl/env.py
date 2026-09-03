@@ -1,8 +1,12 @@
-"""Gymnasium environment for the standard two-player REST game (v2.7).
+"""Gymnasium environment for the standard two-player REST game (v2.7/v2.8).
 
 v2.7 keeps the v2.6 board/action representation but makes the stable action
 slots and per-game rules observable. Older v2.6 models must use the frozen
 ``env_v26`` snapshot via ``run_model_v26.py``.
+
+v2.8 leaves observation/action/reward semantics untouched (v2.7 checkpoints
+load and resume) and only changes the training pipeline: PFSP self-play
+sampling, optionally stochastic model opponents, and a faster encoder.
 """
 
 from __future__ import annotations
@@ -77,7 +81,7 @@ class HexGameEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None, anchor_probability: float = 0.15):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None, anchor_probability: float = 0.15, opponent_stochastic_probability: float = 0.0):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
@@ -87,6 +91,8 @@ class HexGameEnv(gym.Env):
             raise ValueError("model_opponent_probability must be between 0 and 1")
         if not 0.0 <= self_play_probability <= 1.0:
             raise ValueError("self_play_probability must be between 0 and 1")
+        if not 0.0 <= opponent_stochastic_probability <= 1.0:
+            raise ValueError("opponent_stochastic_probability must be between 0 and 1")
         self.opponent_style = opponent_style
         self.opponent_model = opponent_model
         # 子进程（SubprocVecEnv）里模型对象不可序列化，改传路径在子进程内懒加载。
@@ -102,6 +108,12 @@ class HexGameEnv(gym.Env):
         if not 0.0 <= anchor_probability <= 1.0:
             raise ValueError("anchor_probability must be between 0 and 1")
         self.anchor_probability = anchor_probability
+        # v2.8：按此概率让模型对手（快照/锚点）按策略分布采样动作而非贪心，
+        # 避免智能体只学会针对一条确定性走法。
+        self.opponent_stochastic_probability = opponent_stochastic_probability
+        self._opponent_stochastic = False
+        # v2.8 PFSP：按快照路径记录 (对局数, 智能体胜场)，输得多的对手抽得更频繁。
+        self._self_play_record: dict[str, list[int]] = {}
         self._self_play_path = ""
         self._self_play_cache: dict[str, Any] = {}
         self.active_opponent_style = opponent_style
@@ -271,7 +283,9 @@ class HexGameEnv(gym.Env):
 
         terminated = self._game_over()
         if terminated:
-            reward += 1.0 if self.state.get("winner") == self.owner else -1.0
+            won = self.state.get("winner") == self.owner
+            reward += 1.0 if won else -1.0
+            self._record_self_play_result(won)
         truncated = self.steps >= self.max_steps and not terminated
         self.actions = self._legal_actions(self.state, self.owner) if not terminated else []
         info = {"action_type": action_type, "action_counts": dict(self.action_counts)}
@@ -386,16 +400,44 @@ class HexGameEnv(gym.Env):
             self._self_play_cache[self._self_play_path] = model
         return model
 
+    def _record_self_play_result(self, won: bool) -> None:
+        """PFSP 记账：只统计快照阶梯对手（锚点固定出场，不参与优先级）。"""
+        if self.active_opponent_style != "self" or not self._self_play_path or self._self_play_path == self.anchor_model_path:
+            return
+        record = self._self_play_record.setdefault(self._self_play_path, [0, 0])
+        record[0] += 1
+        record[1] += int(won)
+
+    def _self_play_weights(self, snapshots: list[str]) -> np.ndarray:
+        """优先虚构自对弈（PFSP）：权重 (1 - 胜率)^2，未交手的快照按 0.5 胜率对待。
+
+        v2.6 的近期加权导致共同适应、v2.7 的均匀采样让已被打穿的旧快照白占样本；
+        按“输给谁最多就多打谁”分配对局是两者之间更稳的折中。
+        """
+        weights = np.empty(len(snapshots), dtype=np.float64)
+        for index, path in enumerate(snapshots):
+            games, wins = self._self_play_record.get(path, (0, 0))
+            # 拉普拉斯平滑：先验 1 胜 1 负，避免单局结果把权重推到 0 或 1。
+            win_rate = (wins + 1.0) / (games + 2.0)
+            weights[index] = (1.0 - win_rate) ** 2 + 1e-3
+        return weights / weights.sum()
+
     def _choose_opponent_style(self) -> str:
+        self._opponent_stochastic = (
+            self.opponent_stochastic_probability > 0
+            and float(self.np_random.random()) < self.opponent_stochastic_probability
+        )
         if self.self_play_probability > 0 and float(self.np_random.random()) < self.self_play_probability:
             snapshots = self._self_play_snapshots()
             if snapshots:
                 if self._has_anchor() and float(self.np_random.random()) < self.anchor_probability:
                     self._self_play_path = self.anchor_model_path
                 else:
-                    # Uniform history sampling preserves diverse counters and
-                    # avoids the short-memory co-adaptation observed in v2.6.
-                    self._self_play_path = str(self.np_random.choice(snapshots))
+                    self._self_play_path = str(self.np_random.choice(snapshots, p=self._self_play_weights(snapshots)))
+                # 清掉已被裁剪快照的记录，避免字典无限增长。
+                live = set(snapshots)
+                for stale in [path for path in self._self_play_record if path not in live]:
+                    del self._self_play_record[stale]
                 return "self"
             if self._has_anchor():
                 # 训练早期还没有快照时，锚点直接当老师。
@@ -605,7 +647,7 @@ class HexGameEnv(gym.Env):
             model = self._ensure_self_play_model()
             mask = np.asarray([bool(action[0]) for action in actions], dtype=bool)
             observation = self._encode_for_candidate_model(model, self.state, self.opponent)
-            action_index, _ = model.predict(observation, deterministic=True, action_masks=mask)
+            action_index, _ = model.predict(observation, deterministic=not self._opponent_stochastic, action_masks=mask)
             index = int(action_index)
             if index >= len(actions) or not actions[index][0]:
                 index = 0  # end_turn 永远合法。
@@ -713,6 +755,16 @@ class HexGameEnv(gym.Env):
         control_points = state.get("controlPoints", [])
         hqs = list(state.get("headquarters", {}).values())
         terrain_index = {"plain": 0, "water": 1, "blocker": 2}
+        # 位置索引一次建好；setdefault 保留“取第一个匹配”的旧语义，编码逐位等价。
+        point_at: dict[tuple[int, int], dict[str, Any]] = {}
+        for point in control_points:
+            point_at.setdefault((point["q"], point["r"]), point)
+        unit_at: dict[tuple[int, int], dict[str, Any]] = {}
+        for unit in units:
+            unit_at.setdefault((unit["q"], unit["r"]), unit)
+        hq_at: dict[tuple[int, int], dict[str, Any]] = {}
+        for hq in hqs:
+            hq_at.setdefault((hq["q"], hq["r"]), hq)
 
         for cell in state.get("cells", []):
             index = CANONICAL_INDEX.get((int(cell["q"]), int(cell["r"])))
@@ -722,12 +774,13 @@ class HexGameEnv(gym.Env):
             terrain = terrain_index.get(cell.get("terrain", "plain"), 0)
             result[offset + terrain] = 1.0
 
-            point = next((p for p in control_points if p["q"] == cell["q"] and p["r"] == cell["r"]), None)
+            pos = (cell["q"], cell["r"])
+            point = point_at.get(pos)
             cp_owner = point.get("owner") if point else None
             result[offset + 3 + (1 if cp_owner == self.owner else 2 if cp_owner else 0)] = 1.0
 
-            unit = next((u for u in units if u["q"] == cell["q"] and u["r"] == cell["r"]), None)
-            hq = next((h for h in hqs if h["q"] == cell["q"] and h["r"] == cell["r"]), None)
+            unit = unit_at.get(pos)
+            hq = hq_at.get(pos)
             if unit:
                 result[offset + 6 + (1 if unit["owner"] == self.owner else 2)] = 1.0
                 result[offset + 9 + TYPE_INDEX.get(unit.get("type"), 0)] = 1.0

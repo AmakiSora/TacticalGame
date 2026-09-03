@@ -77,4 +77,19 @@ describe('local engine worker random maps', () => {
     expect(state.config.mode).toBe('standard');
     expect(state.config.radius).toBe(8);
   });
+
+  it('honors eventTail: default keeps events, 0 drops them, invalid rejected', () => {
+    const withEvents = handleCommand({ cmd: 'reset', mapId: 'default' }) as WorkerState & { events: unknown[] };
+    handleCommand({ cmd: 'apply', owner: 'player_a', action: { type: 'end_turn' } });
+    const afterTurn = handleCommand({ cmd: 'state' }) as WorkerState & { events: unknown[] };
+    expect(afterTurn.events.length).toBeGreaterThan(withEvents.events.length);
+
+    handleCommand({ cmd: 'reset', mapId: 'default', eventTail: 0 });
+    const trimmed = handleCommand({ cmd: 'apply', owner: 'player_a', action: { type: 'end_turn' } }) as WorkerState & { events: unknown[] };
+    expect(trimmed.events).toEqual([]);
+    expect(trimmed.units.length).toBeGreaterThan(0);
+
+    expect(() => handleCommand({ cmd: 'reset', mapId: 'default', eventTail: -1 })).toThrow('eventTail');
+    expect(() => handleCommand({ cmd: 'reset', mapId: 'default', eventTail: 'all' })).toThrow('eventTail');
+  });
 });

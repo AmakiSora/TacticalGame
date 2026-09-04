@@ -29,6 +29,7 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
+from extractors import build_policy_kwargs
 from local_env import LocalHexGameEnv
 
 
@@ -142,11 +143,16 @@ def opponent_model_path(map_id: str) -> str:
 
 
 def champion_model_path() -> str:
-    """Find the strongest frozen 5974-dim champion for v2.7 anchoring."""
-    candidates = list(Path("rl/models").glob("hex_ppo_v2.4.*_random_selfplay_*.zip"))
-    if not candidates:
-        candidates = list(Path("rl/models").glob("hex_ppo_v2.3.*_random_selfplay_*.zip"))
-    return str(max(candidates, key=lambda path: path.stat().st_mtime)) if candidates else ""
+    """Find the strongest frozen v2.7 champion (6205-dim / 54 actions) for v3.0 anchoring.
+
+    v3.0 translates the 54-action teacher into its own index space via
+    ``env.map_v27_action``, so the previous generation can still anchor.
+    """
+    for pattern in ("hex_ppo_v2.7.*_random_selfplay_*.zip", "hex_ppo_v2.8.*_random_selfplay_*.zip", "hex_ppo_v2.4.*_random_selfplay_*.zip"):
+        candidates = list(Path("rl/models").glob(pattern))
+        if candidates:
+            return str(max(candidates, key=lambda path: path.stat().st_mtime))
+    return ""
 
 
 def ensure_zip_suffix(path: str) -> str:
@@ -455,7 +461,7 @@ def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
     # 与 rl/RELEASE_NOTES.md 顶部条目的版本号保持一致，每次变更训练环境时同步更新。
-    model_version = env_str("RL_MODEL_VERSION", "v2.8.0")
+    model_version = env_str("RL_MODEL_VERSION", "v3.0.0")
     total_timesteps = env_int("RL_TIMESTEPS", 500_000, minimum=1)
     run_stamp = time.strftime("%Y%m%d-%H%M%S")
     run_date = run_stamp[:8]
@@ -500,7 +506,10 @@ def main() -> None:
     # 仅对从零训练生效；续训时架构以模型内保存的 policy_kwargs 为准
     # （sb3 加载时会校验，不一致直接报错，避免默默用错架构）。
     net_width = env_int("RL_NET_WIDTH", 256, minimum=16)
-    policy_kwargs = {"net_arch": {"pi": [net_width, net_width], "vf": [net_width, net_width]}}
+    # v3.0：RL_EXTRACTOR=hex_transformer（默认）在 331 格上跑小 Transformer 再接策略头；
+    # mlp 保持 v2.4 的纯 MLP 以便同条件对比。
+    extractor = env_str("RL_EXTRACTOR", "hex_transformer")
+    policy_kwargs = build_policy_kwargs(extractor, net_width)
     lr_start = env_float("RL_LEARNING_RATE", 3e-4)
     lr_end = env_float("RL_LR_END", 3e-5)
     lr_schedule = make_lr_schedule(lr_start, lr_end)
@@ -554,7 +563,13 @@ def main() -> None:
 
     resume = bool(load_path)
     if self_play_probability > 0 and not anchor_model:
-        anchor_model = load_path if resume and (os.path.exists(load_path) or os.path.exists(load_path + ".zip")) else champion_model_path()
+        # v3.0：从蒸馏冷启动断点续训时，锚点必须是真正的上一代冠军而不是断点本身
+        # （蒸馏产物只是老师的近似）。RL_ANCHOR_FROM_LOAD=1 恢复“续训锚定自身”的旧行为。
+        anchor_from_load = env_str("RL_ANCHOR_FROM_LOAD", "0") == "1"
+        if anchor_from_load and resume and (os.path.exists(load_path) or os.path.exists(load_path + ".zip")):
+            anchor_model = load_path
+        else:
+            anchor_model = champion_model_path()
     # 锚点对手：防自对弈策略漂移退化的常驻强对手；未显式指定时续训默认用被续训的模型自身。
     if anchor_model and not os.path.exists(anchor_model):
         raise FileNotFoundError(f"RL_ANCHOR_MODEL 指向的模型不存在: {anchor_model}")
@@ -567,7 +582,7 @@ def main() -> None:
     run_name = f"ppo_{map_id}_{run_stamp}" + ("_resume" if resume else "")
     print(
         f"[train] map={map_id} mode={'resume' if resume else 'fresh'} envs={num_envs} "
-        f"net={net_width}x{net_width}{'(from checkpoint)' if resume else ''} "
+        f"extractor={extractor} net={net_width}{'(from checkpoint)' if resume else ''} "
         f"lr={'constant ' + str(lr_start) if use_constant_lr else f'schedule {lr_start}->{lr_end}'} "
         f"n_steps={n_steps} batch={batch_size} target_kl={target_kl} "
         f"timesteps={total_timesteps}{'(incremental)' if resume else ''} "
@@ -607,6 +622,8 @@ def main() -> None:
                     ) from error
                 raise
             model.tensorboard_log = tb_log
+            # sb3 的 load 不恢复 verbose；不设则续训日志里没有 rollout/train 表。
+            model.verbose = 1
         else:
             model = MaskablePPO(
                 "MlpPolicy",

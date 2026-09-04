@@ -40,6 +40,7 @@ try:
     from env_v24 import HexGameEnv as V24HexGameEnv
     from env_v25 import HexGameEnv as V25HexGameEnv
     from env_v26 import HexGameEnv as V26HexGameEnv
+    from env_v27 import HexGameEnv as V27HexGameEnv
 except ImportError:  # 兼容 ``python -m rl.evaluate_cross`` 等调用方式。
     from rl.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
     from rl.env import HexGameEnv as CurrentHexGameEnv
@@ -49,6 +50,7 @@ except ImportError:  # 兼容 ``python -m rl.evaluate_cross`` 等调用方式。
     from rl.env_v24 import HexGameEnv as V24HexGameEnv
     from rl.env_v25 import HexGameEnv as V25HexGameEnv
     from rl.env_v26 import HexGameEnv as V26HexGameEnv
+    from rl.env_v27 import HexGameEnv as V27HexGameEnv
 
 
 def parse_args():
@@ -179,11 +181,13 @@ class SideController:
         if n_actions == LEGACY_MAX_ACTIONS:
             helper_cls, self.version = LegacyHexGameEnv, f"v2.0.0 ({n_actions} 动作)"
         elif n_actions == CURRENT_MAX_ACTIONS:
+            helper_cls, self.version = CurrentHexGameEnv, f"v3.0 ({n_actions} 动作)"
+        elif n_actions == 54:
             # 同为 54 动作但观测语义按版本分化：按观测维度选编码器，
-            # 6205 维 → 当前 v2.7 环境；5974 维 → 冻结的 v2.6 兼容环境；
+            # 6205 维 → 冻结的 v2.7 快照；5974 维 → 冻结的 v2.6 兼容环境；
             # 6024 维 → v2.5 快照；3922 维 → v2.1/v2.2 快照。
             if obs_dim == 6205:
-                helper_cls, self.version = CurrentHexGameEnv, f"v2.7 ({n_actions} 动作)"
+                helper_cls, self.version = V27HexGameEnv, f"v2.7/v2.8 ({n_actions} 动作)"
             elif obs_dim == 5974:
                 helper_cls, self.version = V26HexGameEnv, f"v2.3-v2.4/v2.6 ({n_actions} 动作)"
             elif obs_dim == 6024:
@@ -195,7 +199,7 @@ class SideController:
         else:
             raise ValueError(
                 f"{label}: 动作空间 {n_actions} 无法识别（支持 "
-                f"{LEGACY_MAX_ACTIONS}=v2.0.0 或 {CURRENT_MAX_ACTIONS}=v2.1+）"
+                f"{LEGACY_MAX_ACTIONS}=v2.0.0、54=v2.1-v2.8 或 {CURRENT_MAX_ACTIONS}=v3.0+）"
             )
         # helper 仅用于纯计算（合法动作/编码），不做任何网络或子进程操作。
         # 注意：v2.2 helper 在随机地图上属分布外（编码只覆盖半径 8 的 217 格、

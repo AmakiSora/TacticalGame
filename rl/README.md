@@ -3,12 +3,19 @@
 强化学习相关改动记录见 [rl/RELEASE_NOTES.md](RELEASE_NOTES.md)。以后修改训练环境、奖励、动作空间、模型部署或训练参数时，都要先在该文件顶部追加记录。
 
 这个目录提供标准双人顺序模式的 PPO 训练环境：训练直接调用 TypeScript
-引擎，不需要启动 HTTP 游戏服务器。v2.7 默认使用 6205 维可观测状态、混合地图和配对评估；旧模型继续通过版本快照运行。
+引擎，不需要启动 HTTP 游戏服务器。v3.0 默认使用 6715 维观测（含候选描述）、155 个分层动作、
+Transformer 棋盘编码器、混合地图、后台配对评估和蒸馏冷启动；旧模型继续通过版本快照运行。
 
 ## 安装
 
 ```powershell
 python -m pip install -r rl/requirements.txt
+```
+
+训练环境的 Python 单元测试（动作空间/掩码/候选一致性/v2.7 映射）：
+
+```powershell
+npm run test:rl        # 等价于 rl/.venv/Scripts/python.exe -m pytest tests/rl -q
 ```
 
 ## 安装项目依赖
@@ -192,6 +199,33 @@ v2.8 不改观测/动作/奖励语义（v2.7 断点可续训），只让训练�
 - **对手随机采样** `RL_OPPONENT_STOCHASTIC_PROB`（默认 0.3）：该比例的模型对手局按策略分布采样动作，防止只学会针对贪心走法。
 - **引擎往返减半**：`local_env.py` 复用 `apply`/`reset` 回传的快照，不再每步多发 `state`；worker `reset` 支持 `eventTail: 0` 省掉事件序列化。
 
+## v3.0：分层动作、结构化编码器与蒸馏冷启动
+
+v3.0 把 v2.x 写死在规则里的“去哪、打谁”交给策略，并换掉纯 MLP：
+
+- **动作 `Discrete(155)`**：每单位槽 7 个移动候选（趋近目标格 + 六方向最远格）、3 个攻击候选（启发式 / 最低血 / 最高攻）、
+  治疗、特殊；部署每兵种 2 个落点（贴敌总部 / 贴无主据点）。重复候选被掩码屏蔽。
+- **观测 6715 维**：前 6205 维同 v2.7，尾部 510 维描述每个候选（坐标、到据点距离、目标血量/攻击、是否总部）。
+- **编码器** `RL_EXTRACTOR=hex_transformer`（默认，`RL_TF_LAYERS`/`RL_TF_DIM` 调深宽）或 `mlp`（v2.4 同构，对照用）。
+- **奖励**：胜负 ±5、塑形 ×0.5、无固定动作加分（`RL_REWARD_WIN` / `RL_REWARD_SHAPING_SCALE` / `RL_REWARD_*_BONUS`）。
+- **冷启动**：不能加载任何 v2 权重，改用 v2.7.0 老师蒸馏：
+
+```powershell
+rl/.venv/Scripts/python.exe rl/distill.py collect --teacher rl/models/hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip --games 400
+rl/.venv/Scripts/python.exe rl/distill.py train --out rl/models/hex_ppo_v3.0.0_<日期>_distilled
+$env:RL_MAP_ID = "random"; $env:RL_LOAD_MODEL = "rl/models/hex_ppo_v3.0.0_<日期>_distilled.zip"; $env:RL_TIMESTEPS = "3000000"
+rl/.venv/Scripts/python.exe rl/train.py
+```
+
+老师的 54 动作与 v3.0 每槽的候选 0 一一对应（`env.map_v27_action`），因此 v2.7/v2.8 模型可以直接当自对弈锚点；
+`RL_ANCHOR_MODEL` 未设时默认取最新 v2.7 模型。完整流程见 `rl/test-output/run_train_v301.bat`。
+
+**蒸馏的价值头必须与 PPO 同尺度。** `distill.py` 在【未缩放】回报上训练价值头，结束时打印保留集 RMSE
+与回报 std；RMSE 必须远小于 std 才能续训。v3.0.0 曾把目标除以 std，交付断点的 std(V)/std(return) 只有 0.16，
+PPO 首轮 GAE 拿到系统性错误的优势估计，把克隆策略的胜率从 74% 打到 11%、两百万帧后才爬回来。
+续训架构以断点内保存的 `policy_kwargs` 为准，此时 `RL_EXTRACTOR`/`RL_TF_LAYERS`/`RL_NET_WIDTH` 不再生效
+（要换编码器必须重新蒸馏）；PPO 阶段建议初始学习率 5e-5 保护克隆策略。
+
 ## 自对弈（RL_SELF_PLAY_PROB）
 
 随机地图训练默认 60% 的局让智能体打自己的历史策略快照（对手强度随训练一起提升），其余局打 mixed 规则对手；
@@ -258,7 +292,7 @@ python rl/run_model.py --game <gameId> --token <playerToken> --once
 
 ## 版本兼容策略
 
-环境每次迭代都会改变动作空间或观测语义（v1=512，v2.0.0=38，v2.1=54；v2.3/v2.4/v2.6=5974 维，v2.5=6024 维，v2.7=6205 维），但历史模型必须始终可玩：
+环境每次迭代都会改变动作空间或观测语义（v1=512，v2.0.0=38，v2.1–v2.8=54，v3.0=155；v2.3/v2.4/v2.6=5974 维，v2.5=6024 维，v2.7/v2.8=6205 维，v3.0=6715 维），但历史模型必须始终可玩：
 
 - `rl/env_v100.py` 保存 v1 随机对手模型时期的 env.py 快照，
   `rl/run_model_v100.py` 专门运行 512 动作模型。
@@ -271,8 +305,10 @@ python rl/run_model.py --game <gameId> --token <playerToken> --once
   `rl/run_model_v24.py` 承载全部 v2.3.x/v2.4.x 模型。
 - `rl/env_v25.py` 保存 v2.5.x 时期 env.py 的快照（54 动作 / 6024 维观测，对手动作历史），
   `rl/run_model_v25.py` 承载 v2.5.x 模型。
-- `src/api/bots.ts` 的路由：38 → `run_model_v200.py`，512 → `run_model_v100.py`；
-  54 动作按文件名版本五代分流：≥ v2.7 → `run_model.py`（当前 6205 维环境），v2.6 → `run_model_v26.py`,
+- `rl/env_v27.py` 保存 v2.7/v2.8 时期 env.py 的快照（54 动作 / 6205 维观测），
+  `rl/run_model_v27.py` 承载全部 v2.7.x/v2.8.x 模型；它同时是 v3.0 训练时老师/锚点的编码器。
+- `src/api/bots.ts` 的路由：155 → `run_model.py`（当前 v3.0 环境），38 → `run_model_v200.py`，512 → `run_model_v100.py`；
+  54 动作按文件名版本五代分流：≥ v2.7 → `run_model_v27.py`（6205 维快照），v2.6 → `run_model_v26.py`,
   v2.5 → `run_model_v25.py`（6024 维快照），v2.3/v2.4 → `run_model_v24.py`（5974 维快照），
   其余 → `run_model_v22.py`（3922 维快照）。
   环境出新版时：先复制一份旧环境为不可变快照、实现对应运行器，再在注册表里加一行；

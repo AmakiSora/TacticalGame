@@ -35,17 +35,22 @@ const RUNNER_SCRIPT_V24 = join(PROJECT_ROOT, 'rl', 'run_model_v24.py');
 const RUNNER_SCRIPT_V25 = join(PROJECT_ROOT, 'rl', 'run_model_v25.py');
 // v2.6.x 的 54 动作模型（5974 维观测）专用兼容运行器。
 const RUNNER_SCRIPT_V26 = join(PROJECT_ROOT, 'rl', 'run_model_v26.py');
+// v2.7.x / v2.8.x 的 54 动作模型（6205 维观测）冻结快照运行器。
+const RUNNER_SCRIPT_V27 = join(PROJECT_ROOT, 'rl', 'run_model_v27.py');
 
-/** 当前 rl/env.py 的动作空间大小（12 单位槽 × 4 意图 + 5 部署 + 结束回合）。 */
-const CURRENT_ACTION_SPACE = 54;
+/** 当前 rl/env.py 的动作空间大小（v3.0：12 单位槽 × 12 分层候选 + 5 兵种 × 2 部署点 + 结束回合）。 */
+const CURRENT_ACTION_SPACE = 155;
+/** v2.1–v2.8 共用的 54 动作空间，按文件名版本分五代冻结运行器。 */
+const V2_ACTION_SPACE = 54;
 
 /**
  * 动作空间 → 运行脚本。每次迭代环境后，旧模型仍需可玩：在这里登记新版本
  * 的动作空间与运行器，同时保留历史版本的映射（运行器内部用对应的 env
  * 快照做编码/合法动作）。未注册的动作空间不会被允许加入对局。
- * 54 动作存在四个观测语义世代（见 routeModel）：v2.1/v2.2 的 3922 维、
- * v2.3/v2.4 随机地图的 5974 维、v2.5（+对手动作历史）的 6024 维与
- * v2.6（回退 5974 维）以及 v2.7+（6205 维），需按文件名版本分流。
+ * 54 动作存在五个观测语义世代（见 routeModel）：v2.1/v2.2 的 3922 维、
+ * v2.3/v2.4 随机地图的 5974 维、v2.5（+对手动作历史）的 6024 维、
+ * v2.6（回退 5974 维）以及 v2.7/v2.8（6205 维），需按文件名版本分流。
+ * 155 动作为 v3.0+ 当前环境。
  */
 const RUNNERS_BY_ACTION_SPACE: ReadonlyMap<number, { runner: string; label: string }> = new Map([
   [38, { runner: LEGACY_RUNNER_SCRIPT, label: 'v2.0' }],
@@ -61,11 +66,12 @@ function parseModelVersion(file: string): { major: number; minor: number } | nul
 
 function routeModel(actionSpace: number | null, file: string): { runner: string; label: string } | undefined {
   if (actionSpace === null) return undefined;
-  if (actionSpace === CURRENT_ACTION_SPACE) {
+  if (actionSpace === CURRENT_ACTION_SPACE) return { runner: RUNNER_SCRIPT, label: 'v3.0' };
+  if (actionSpace === V2_ACTION_SPACE) {
     const version = parseModelVersion(file);
     const minorAtLeast = (minor: number) =>
       version !== null && (version.major > 2 || (version.major === 2 && version.minor >= minor));
-    if (minorAtLeast(7)) return { runner: RUNNER_SCRIPT, label: 'v2.7' };
+    if (minorAtLeast(7)) return { runner: RUNNER_SCRIPT_V27, label: 'v2.7' };
     if (minorAtLeast(6)) return { runner: RUNNER_SCRIPT_V26, label: 'v2.6' };
     if (minorAtLeast(5)) return { runner: RUNNER_SCRIPT_V25, label: 'v2.5' };
     if (minorAtLeast(3)) return { runner: RUNNER_SCRIPT_V24, label: 'v2.3' };
@@ -74,7 +80,7 @@ function routeModel(actionSpace: number | null, file: string): { runner: string;
   return RUNNERS_BY_ACTION_SPACE.get(actionSpace);
 }
 
-const SUPPORTED_ACTION_SPACES = [CURRENT_ACTION_SPACE, ...RUNNERS_BY_ACTION_SPACE.keys()];
+const SUPPORTED_ACTION_SPACES = [CURRENT_ACTION_SPACE, V2_ACTION_SPACE, ...RUNNERS_BY_ACTION_SPACE.keys()];
 
 export interface RlModelInfo {
   file: string;

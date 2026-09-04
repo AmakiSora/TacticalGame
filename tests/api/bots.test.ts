@@ -202,12 +202,16 @@ describe('RL bot legacy model support', () => {
       models: Array<{ file: string; actionSpace: number | null; runner: string; label: string; supported: boolean }>;
       supportedActionSpaces: number[];
     };
-    expect(data.supportedActionSpaces).toEqual(expect.arrayContaining([54, 38]));
+    expect(data.supportedActionSpaces).toEqual(expect.arrayContaining([155, 54, 38]));
     for (const model of data.models) {
       expect(typeof model.runner).toBe('string');
-      expect(model.supported).toBe(model.actionSpace === 54 || model.actionSpace === 38 || model.actionSpace === 512);
+      expect(model.supported).toBe(model.actionSpace === 155 || model.actionSpace === 54 || model.actionSpace === 38 || model.actionSpace === 512);
       // 每个动作空间都走训练时期对应的快照运行器。
-      // 54 动作有五个观测世代：v2.7+（6205 维）走当前运行器，
+      if (model.actionSpace === 155) {
+        expect(model.runner.endsWith('run_model.py')).toBe(true);
+        expect(model.label).toBe('v3.0');
+      }
+      // 54 动作有五个观测世代：v2.7/v2.8（6205 维）走 env_v27 冻结运行器，
       // v2.6（5974 维，回退）走 env_v26 兼容运行器，
       // v2.5（6024 维）走 env_v25 快照运行器，v2.3/v2.4（5974 维）走 env_v24，
       // v2.1/v2.2（3922 维）走 env_v22 快照运行器。
@@ -217,7 +221,7 @@ describe('RL bot legacy model support', () => {
         const minor = versionMatch !== null ? Number(versionMatch[2]) : 0;
         const atLeast = (m: number) => versionMatch !== null && (major > 2 || (major === 2 && minor >= m));
         if (atLeast(7)) {
-          expect(model.runner.endsWith('run_model.py')).toBe(true);
+          expect(model.runner.endsWith('run_model_v27.py')).toBe(true);
           expect(model.label).toBe('v2.7');
         } else if (atLeast(6)) {
           expect(model.runner.endsWith('run_model_v26.py')).toBe(true);

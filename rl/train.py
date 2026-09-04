@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,7 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
+from env import ATTACK_CANDIDATES, DEPLOY_CANDIDATES, MOVE_CANDIDATES, classify_action
 from extractors import build_policy_kwargs
 from local_env import LocalHexGameEnv
 
@@ -196,6 +198,25 @@ def sanitize_delivery_zip(zip_path: str, fallback_lr: float) -> bool:
     return True
 
 
+def resume_custom_objects(n_steps: int, batch_size: int, target_kl: float | None, gamma: float, ent_coef: float, clip_range: float, n_epochs: int) -> dict[str, Any]:
+    """续训时必须覆盖的断点内超参，否则对应的 RL_* 环境变量对 resume 完全无效。
+
+    sb3 的 ``load`` 以断点保存的值为准，只有 ``custom_objects`` 里的项会被覆盖。
+    v3.0.0/v3.0.1 的 ``RL_ENT_COEF`` 就是这样成为死变量的：``distill.py`` 建的断点
+    存的是 sb3 默认 **0.0**，于是整个 PPO 阶段零熵正则，策略熵从 0.94 一路压到 0.78、
+    新候选概率质量从 5.5% 掉到 1.4%。新增环境变量驱动的超参时记得同步这里。
+    """
+    return {
+        "n_steps": n_steps,
+        "batch_size": batch_size,
+        "target_kl": target_kl,
+        "gamma": gamma,
+        "ent_coef": ent_coef,
+        "clip_range": clip_range,
+        "n_epochs": n_epochs,
+    }
+
+
 def resolve_device() -> str:
     requested = env_str("RL_DEVICE", "auto").lower()
     if requested not in {"auto", "cpu", "cuda"}:
@@ -236,7 +257,8 @@ class AsyncEvalCallback(BaseCallback):
         self.eval_dir = Path(eval_dir)
         self.seed_prefix = seed_prefix
         self.wait_at_end = wait_at_end
-        self.best_score = (-1.0, -1.0, -float("inf"), -float("inf"))
+        # 五元组：(最弱场景下界, 后手座合并下界, 平均下界, 占点, 回报)。
+        self.best_score = (-1.0, -1.0, -1.0, -float("inf"), -float("inf"))
         self.best_step = 0
         self._pending: tuple[subprocess.Popen, str, str, int] | None = None
         self._skipped = 0
@@ -294,8 +316,13 @@ class AsyncEvalCallback(BaseCallback):
         for name, scenario in scenarios.items():
             self.logger.record(f"eval/{name}_win_rate", scenario["win_rate"])
             self.logger.record(f"eval/{name}_wilson_lb", scenario["wilson_lb"])
+            first = scenario.get("seat_first", {})
+            second = scenario.get("seat_second", {})
+            self.logger.record(f"eval/{name}_first_seat", first.get("win_rate", 0.0))
+            self.logger.record(f"eval/{name}_second_seat", second.get("win_rate", 0.0))
             print(
                 f"[eval:{name}] step={step} win_rate={scenario['win_rate']:.0%} wilson_lb={scenario['wilson_lb']:.0%} "
+                f"first={first.get('win_rate', 0.0):.0%} second={second.get('win_rate', 0.0):.0%} "
                 f"cp={scenario['cp_mean']:.2f} mean_reward={scenario['mean_reward']:+.3f} over {scenario['games']} paired games",
                 flush=True,
             )
@@ -311,15 +338,16 @@ class AsyncEvalCallback(BaseCallback):
         mean_win_rate = float(np.mean([s["win_rate"] for s in scenarios.values()]))
         self.logger.record("eval/win_rate", mean_win_rate)
         self.logger.record("eval/min_wilson_lb", score[0])
-        self.logger.record("eval/control_points", score[2])
-        self.logger.record("eval/mean_reward", score[3])
+        self.logger.record("eval/second_seat_lb", score[1])
+        self.logger.record("eval/control_points", score[3])
+        self.logger.record("eval/mean_reward", score[4])
         # 结果晚于训练步数到达，随下一次常规 dump 写入 TB；eval/evaluated_step 记录真实评估步数。
         self.logger.record("eval/evaluated_step", step)
         self.history.append({"step": step, "score": score, "scenarios": scenarios})
         print(
-            f"[eval] step={step:>8d} min_wilson_lb={score[0]:.0%} mean_wilson_lb={score[1]:.0%} "
-            f"mean_win_rate={mean_win_rate:.0%} cp={score[2]:.2f} mean_reward={score[3]:+.3f}"
-            f"{' <- new best' if is_best else ''}",
+            f"[eval] step={step:>8d} min_wilson_lb={score[0]:.0%} second_seat_lb={score[1]:.0%} "
+            f"mean_wilson_lb={score[2]:.0%} mean_win_rate={mean_win_rate:.0%} cp={score[3]:.2f} "
+            f"mean_reward={score[4]:+.3f}{' <- new best' if is_best else ''}",
             flush=True,
         )
 
@@ -457,6 +485,84 @@ class SnapshotCallback(BaseCallback):
         return True
 
 
+class ActionDiversityCallback(BaseCallback):
+    """记录 rollout 中实际采样到的动作分布（v3.0.2 探索监控）。
+
+    v3.0.1 的诊断结论：蒸馏把老师（v2.7，54 动作）的行为克隆到候选 0，新增的
+    move 方向 1-6 / attack 候选 1-2 / deploy 候选 1 在合法时选用率 **0.00%**，
+    策略熵 0.85-1.15 nats 而 25 个合法动作的均匀分布为 3.2 nats——155 动作空间
+    在行为上退化回 54 动作，v3.0 “去哪、打谁”的决策权没有兑现。
+
+    这个回调把「探索是否被打开」变成训练期可见指标，不必等训练结束后跑离线探针。
+    核心读数 `explore/new_candidate_rate` 持续为 0 就说明标签平滑/熵系数仍不足以
+    打破死锁，应立即止损调参而不是白烧几小时。
+
+    数据取自 collect_rollouts 的局部变量：sb3 在 env.step 之后、on_step 之前调用
+    update_locals，因此 actions 与 action_masks 严格配对（同一批环境）。
+    """
+
+    def __init__(self, log_every: int = 20_000):
+        super().__init__()
+        self.log_every = max(1, log_every)
+        self._picked: Counter = Counter()
+        self._legal: Counter = Counter()
+        self._window = 0
+        self._total = 0
+
+    def _on_step(self) -> bool:
+        actions = self.locals.get("actions")
+        if actions is None:
+            return True
+        flat = np.asarray(actions).reshape(-1)
+        self._window += len(flat)
+        self._total += len(flat)
+        for value in flat:
+            self._picked[classify_action(int(value))] += 1
+        masks = self.locals.get("action_masks")
+        if masks is not None:
+            table = np.asarray(masks)
+            # SubprocVecEnv 下为 (n_envs, n_actions)；形状不符时只统计占比、不统计选用率。
+            if table.ndim == 2 and table.shape[0] == len(flat):
+                for row in table:
+                    for index in np.nonzero(row)[0]:
+                        self._legal[classify_action(int(index))] += 1
+        if self._window >= self.log_every:
+            self._log_window()
+        return True
+
+    def _new_candidate_counts(self, intent: str | None) -> tuple[int, int]:
+        """(候选序号 ≥ 1 的被选中次数, 合法次数)；intent=None 表示全部意图。"""
+        picked = sum(c for (name, cand), c in self._picked.items() if cand >= 1 and (intent is None or name == intent))
+        legal = sum(c for (name, cand), c in self._legal.items() if cand >= 1 and (intent is None or name == intent))
+        return picked, legal
+
+    def _log_window(self) -> None:
+        if not self._picked:
+            return
+        parts: list[str] = []
+        for intent in ("move", "attack", "deploy"):
+            picked, legal = self._new_candidate_counts(intent)
+            if legal:
+                rate = picked / legal
+                self.logger.record(f"explore/{intent}_new_rate", rate)
+                parts.append(f"{intent} {rate:.2%}")
+        picked, legal = self._new_candidate_counts(None)
+        overall = picked / legal if legal else 0.0
+        self.logger.record("explore/new_candidate_rate", overall)
+        self.logger.record("explore/new_candidate_count", picked)
+        legal_total = sum(self._legal.values())
+        legal_mean = legal_total / self._window if self._window else 0.0
+        self.logger.record("explore/legal_actions_mean", legal_mean)
+        print(
+            f"[explore] frames={self._total} new_candidate_rate={overall:.3%} "
+            f"({' | '.join(parts) if parts else 'no mask data'}) legal_mean={legal_mean:.1f}",
+            flush=True,
+        )
+        self._picked.clear()
+        self._legal.clear()
+        self._window = 0
+
+
 def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
@@ -469,13 +575,16 @@ def main() -> None:
     save_freq = env_int("RL_SAVE_FREQ", 20_000, minimum=1)
     checkpoint_dir = env_str("RL_CHECKPOINT_DIR", f"rl/checkpoints/{map_id}/{run_stamp}")
     tb_dir = env_str("RL_TB_LOG", "rl/tb")
-    # v2.8：评估默认改为后台子进程（RL_EVAL_MODE=async），频率放宽到 5 万步、
-    # 每场景 48 局配对；v2.7.1 主进程每 1 万步串行 120 局把有效 fps 砍掉一半。
+    # v2.8：评估搬到后台子进程（RL_EVAL_MODE=async），不阻塞 rollout。
+    # v3.0.2：频率 5 万→**10 万步**、单场景 48→**96 局**。总评估开销不变（同样每步 0.96 局），
+    # 但单次决策的抽样噪声减半：48 局胜率标准差约 ±23pt，实测 default_champion 在 14 次评估中
+    # 出现过 27%~79%，而 best 选择键取最弱场景下界——等于让噪声决定交付哪个断点
+    # （350k 与 480k 总分同为噪声内，后手座却差 10pt）。
     eval_mode = env_str("RL_EVAL_MODE", "async")
     if eval_mode not in {"async", "inline"}:
         raise ValueError("RL_EVAL_MODE must be async or inline")
-    eval_freq = env_int("RL_EVAL_FREQ", 50_000 if eval_mode == "async" else 10_000, minimum=0)
-    eval_episodes = env_int("RL_EVAL_EPISODES", 48 if eval_mode == "async" else 20, minimum=1)
+    eval_freq = env_int("RL_EVAL_FREQ", 100_000 if eval_mode == "async" else 10_000, minimum=0)
+    eval_episodes = env_int("RL_EVAL_EPISODES", 96 if eval_mode == "async" else 20, minimum=1)
     # 随机地图上 v2.0.0 模型对手属于分布外对手，默认只用规则对手；
     # 需要时可用 RL_MODEL_OPPONENT_PROB 显式开启。
     default_model_prob = 0.0 if map_id == "random" else 0.5
@@ -524,6 +633,14 @@ def main() -> None:
     batch_size = env_int("RL_BATCH_SIZE", 256, minimum=1)
     target_kl_raw = env_str("RL_TARGET_KL", "0.02")
     target_kl: float | None = None if target_kl_raw.lower() in {"0", "none", "off"} else float(target_kl_raw)
+    # v3.0.2：这四个超参以前只在【从零训练】分支里读环境变量，续训时走 sb3 的 load，
+    # 断点内保存的值优先——而 distill.py 造的断点 ent_coef 是 sb3 默认 **0.0**，
+    # 于是 RL_ENT_COEF 对续训成了死变量：v3.0.0/v3.0.1 整个 PPO 阶段零熵正则，
+    # 策略熵从 0.94 一路压到 0.78、新候选概率质量从 5.5% 掉到 1.4%。现在统一在 load 时覆盖。
+    gamma = env_float("RL_GAMMA", 0.99)
+    ent_coef = env_float("RL_ENT_COEF", 0.01)
+    clip_range = env_float("RL_CLIP_RANGE", 0.2)
+    n_epochs = env_int("RL_N_EPOCHS", 10, minimum=1)
     device = resolve_device()
 
     # 并行环境（子进程）里模型对象不可序列化：主进程只解析路径，由子进程懒加载。
@@ -585,6 +702,7 @@ def main() -> None:
         f"extractor={extractor} net={net_width}{'(from checkpoint)' if resume else ''} "
         f"lr={'constant ' + str(lr_start) if use_constant_lr else f'schedule {lr_start}->{lr_end}'} "
         f"n_steps={n_steps} batch={batch_size} target_kl={target_kl} "
+        f"ent_coef={ent_coef} gamma={gamma} clip={clip_range} epochs={n_epochs} "
         f"timesteps={total_timesteps}{'(incremental)' if resume else ''} "
         f"map_mix={map_mix or [(map_id, 1.0)]} opponent_stochastic={opponent_stochastic_probability:.0%}",
         flush=True,
@@ -608,11 +726,13 @@ def main() -> None:
         if resume:
             print(f"[train] loading model from {load_path}")
             try:
-                # 续训同样应用 v2.8 的 PPO 稳定性参数：n_steps 改变需要重建 rollout buffer，
+                # 续训同样应用本次环境变量的 PPO 超参：n_steps 改变需要重建 rollout buffer，
                 # sb3 在 load 时按新 n_steps 重新分配缓冲，安全。
                 model = MaskablePPO.load(
                     load_path, env=env, device=device, learning_rate=learning_rate,
-                    custom_objects={"n_steps": n_steps, "batch_size": batch_size, "target_kl": target_kl},
+                    custom_objects=resume_custom_objects(
+                        n_steps, batch_size, target_kl, gamma, ent_coef, clip_range, n_epochs,
+                    ),
                 )
             except ValueError as error:
                 if "Action spaces do not match" in str(error) or "Observation spaces do not match" in str(error):
@@ -632,10 +752,10 @@ def main() -> None:
                 policy_kwargs=policy_kwargs,
                 n_steps=n_steps,
                 batch_size=batch_size,
-                gamma=env_float("RL_GAMMA", 0.99),
-                ent_coef=env_float("RL_ENT_COEF", 0.01),
-                clip_range=env_float("RL_CLIP_RANGE", 0.2),
-                n_epochs=env_int("RL_N_EPOCHS", 10, minimum=1),
+                gamma=gamma,
+                ent_coef=ent_coef,
+                clip_range=clip_range,
+                n_epochs=n_epochs,
                 target_kl=target_kl,
                 tensorboard_log=tb_log,
                 device=device,
@@ -647,6 +767,8 @@ def main() -> None:
             save_path=checkpoint_dir,
             name_prefix=Path(model_path).name,
         )]
+        # 探索监控：每 2 万帧（8 环境约 2500 次回调）汇报一次新候选选用率。
+        callbacks.append(ActionDiversityCallback(env_int("RL_EXPLORE_LOG_EVERY", 20_000, minimum=1)))
         if self_play_probability > 0:
             # 快照是子进程自对弈对手的唯一来源；原子写入避免读到半截 zip。
             callbacks.append(SnapshotCallback(snapshot_dir, snapshot_freq, snapshot_keep))

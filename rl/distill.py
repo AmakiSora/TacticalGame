@@ -15,8 +15,13 @@ Two phases:
    and store (observation, action mask, teacher action, discounted return).
 2. ``train``: build a MaskablePPO with the requested extractor, then minimise
    masked cross-entropy on the teacher action plus MSE on the return for the
-   value head.  Save as a normal sb3 zip that ``train.py`` can resume from
-   with ``RL_LOAD_MODEL``.
+   value head.  The cross-entropy is **label-smoothed inside the legal action
+   set** (``--label-smoothing``, default 0.15): pure cloning pushes the 101
+   actions the teacher never used to probability ~0, and since PPO's policy
+   gradient only touches *sampled* actions they can never recover (measured on
+   v3.0.1: move candidates 1-6 selected 0.00% of the time they were legal).
+   Save as a normal sb3 zip that ``train.py`` can resume from with
+   ``RL_LOAD_MODEL``.
 
 Usage:
     python rl/distill.py collect --teacher rl/models/hex_ppo_v2.7.0_... --games 400 --out rl/distill/v27_teacher.npz
@@ -38,6 +43,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import env as E  # noqa: E402
 from local_env import LocalHexGameEnv  # noqa: E402
+
+
+def smoothed_target(mask: torch.Tensor, actions: torch.Tensor, eps: float) -> torch.Tensor:
+    """在合法动作集内构造标签平滑目标分布（v3.0.2）。
+
+        target = (1-eps)·onehot(老师动作) + eps·uniform(合法动作)
+
+    为何需要：老师的 54 动作经 map_v27_action 全部落在候选 0，纯克隆会把其余 101 个
+    新动作的 logit 反复下压，而 PPO 的策略梯度只对**采样到的**动作有信号，于是
+    概率≈0 → 采样不到 → 无梯度 → 永远为 0（v3.0.1 实测：move 候选 1-6 合法时选用率 0.00%）。
+    给其他合法动作保留 eps 的目标概率，新候选在 PPO 起点就可采样。
+
+    不能用 F.cross_entropy(..., label_smoothing=eps)：它把 eps 均分给全部 155 类（包含被
+    masked_fill(-1e9) 屏蔽的非法类），log(≈0) 量级的项会让 loss 直接爆炸。
+    """
+    legal = mask.to(torch.float32)
+    legal_count = legal.sum(dim=-1, keepdim=True).clamp(min=1.0)
+    teacher = torch.zeros_like(legal).scatter_(1, actions.unsqueeze(-1), 1.0)
+    return teacher * (1.0 - eps) + (legal / legal_count) * eps
+
+
+def masked_smoothed_ce(logits: torch.Tensor, mask: torch.Tensor, actions: torch.Tensor, eps: float) -> torch.Tensor:
+    """掩码 + 标签平滑交叉熵；非法位既不进 softmax 也不进求和。"""
+    log_probs = torch.log_softmax(logits.masked_fill(~mask, -1e9), dim=-1)
+    target = smoothed_target(mask, actions, eps)
+    # 非法位 target=0 而 log_prob≈-1e9，用 where 归零避免 0×(-1e9) 参与求和。
+    return -(target * torch.where(mask, log_probs, torch.zeros_like(log_probs))).sum(dim=-1).mean()
 
 
 def collect(args: argparse.Namespace) -> None:
@@ -135,6 +167,11 @@ def train(args: argparse.Namespace) -> None:
         policy_kwargs=build_policy_kwargs(args.extractor, args.net_width),
         n_steps=64, batch_size=64, device=device, verbose=0,
         learning_rate=args.lr,
+        # 蒸馏是监督学习，ent_coef 不参与本阶段训练，但会被写进 zip。
+        # 不显式设定就会存入 sb3 默认值 **0.0**，而 train.py 续训时断点值曾优先于
+        # RL_ENT_COEF，导致 v3.0.0/v3.0.1 整个 PPO 阶段零熵正则（现已在 load 时覆盖，
+        # 这里仍保留合理默认以让断点自洽）。
+        ent_coef=args.ent_coef,
     )
     policy = model.policy
     optimizer = torch.optim.AdamW(policy.parameters(), lr=args.lr, weight_decay=1e-4)
@@ -152,6 +189,14 @@ def train(args: argparse.Namespace) -> None:
     print(f"[train] return targets: mean {float(ret.mean()):+.2f} std {float(ret.std()):.2f} "
           f"range [{float(ret.min()):+.2f}, {float(ret.max()):+.2f}] (unscaled, PPO-compatible)", flush=True)
 
+    # 掩码标签平滑（v3.0.2）。目标分布构造见 smoothed_target；为何不能用
+    # F.cross_entropy 的 label_smoothing 参数也记在那里。蒸馏轮数由 12 降到 8 弱化克隆强度。
+    smoothing = float(args.label_smoothing)
+    if not 0.0 <= smoothing < 0.5:
+        raise ValueError("--label-smoothing must be in [0, 0.5)")
+    print(f"[train] masked label smoothing eps={smoothing:.2f}"
+          f"{'（纯克隆，新候选有锁死风险）' if smoothing == 0 else ''}", flush=True)
+
     def batch_loss(idx: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         o = obs[idx].to(device)
         m = mask[idx].to(device)
@@ -165,11 +210,10 @@ def train(args: argparse.Namespace) -> None:
             latent_pi = policy.mlp_extractor.forward_actor(pi_features)
             latent_vf = policy.mlp_extractor.forward_critic(vf_features)
         logits = policy.action_net(latent_pi)
-        logits = logits.masked_fill(~m, -1e9)
-        ce = torch.nn.functional.cross_entropy(logits, a)
+        ce = masked_smoothed_ce(logits, m, a, smoothing)
         values = policy.value_net(latent_vf).squeeze(-1)
         value_loss = torch.nn.functional.smooth_l1_loss(values, r)
-        acc = (logits.argmax(dim=-1) == a).float().mean()
+        acc = (logits.masked_fill(~m, -1e9).argmax(dim=-1) == a).float().mean()
         return ce, value_loss, acc
 
     policy.train()
@@ -240,8 +284,12 @@ def main() -> None:
     t.add_argument("--net-width", type=int, default=256)
     t.add_argument("--epochs", type=int, default=8)
     t.add_argument("--batch-size", type=int, default=512)
+    t.add_argument("--label-smoothing", type=float, default=0.15,
+                   help="在合法动作集内均分的目标概率质量，防止新候选被纯克隆锁死（0 = v3.0.1 行为）")
     t.add_argument("--lr", type=float, default=1e-3)
     t.add_argument("--value-coef", type=float, default=0.5)
+    t.add_argument("--ent-coef", type=float, default=0.01,
+                   help="写入断点的 PPO 熵系数（不参与蒸馏训练，仅避免存入 sb3 默认 0.0）")
     t.add_argument("--device", default="auto")
     t.set_defaults(func=train)
 

@@ -111,6 +111,28 @@ def map_v27_action(index: int) -> int:
     return DEPLOY_BASE + unit_type * DEPLOY_CANDIDATES
 
 
+def classify_action(index: int) -> tuple[str, int]:
+    """动作下标 → (意图, 候选序号)。供探索监控与动作分布诊断共用。
+
+    候选序号是 v3.0 新增的决策维度：蒸馏老师（v2.7，54 动作）经
+    ``map_v27_action`` 全部落在候选 0，因此「候选 ≥ 1 的选用率」直接
+    衡量 PPO 是否真的用上了新维度；持续为 0 意味着 155 动作空间在
+    行为上退化回 54 动作（v3.0.1 实测：move 候选 1-6 选用率 0.00%）。
+    """
+    if index == 0:
+        return ("end_turn", 0)
+    if index < DEPLOY_BASE:
+        offset = (index - 1) % SLOT_ACTIONS
+        if offset < MOVE_CANDIDATES:
+            return ("move", offset)
+        if offset < HEAL_OFFSET:
+            return ("attack", offset - ATTACK_OFFSET)
+        if offset == HEAL_OFFSET:
+            return ("heal", 0)
+        return ("special", 0)
+    return ("deploy", (index - DEPLOY_BASE) % DEPLOY_CANDIDATES)
+
+
 def env_reward_float(name: str, default: float) -> float:
     raw = os.environ.get(name, "").strip()
     return float(raw) if raw else default

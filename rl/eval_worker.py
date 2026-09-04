@@ -66,11 +66,15 @@ def play_scenario(model: Any, env: LocalHexGameEnv, episodes: int, seed_prefix: 
     rewards: list[float] = []
     control_points: list[int] = []
     failures = 0
+    # 分座位记账：配对换座下 episode 索引为偶数的局坐 player_a（先手）、奇数索引坐 player_b（后手）。
+    seat_wins = {"first": 0, "second": 0}
+    seat_games = {"first": 0, "second": 0}
     for episode in range(episodes):
+        seat = "first" if episode % 2 == 0 else "second"
         try:
             observation, _ = env.reset(
                 seed=seed_prefix + episode // 2,
-                options={"owner": "player_a" if episode % 2 == 0 else "player_b"},
+                options={"owner": "player_a" if seat == "first" else "player_b"},
             )
             done = False
             total = 0.0
@@ -80,19 +84,33 @@ def play_scenario(model: Any, env: LocalHexGameEnv, episodes: int, seed_prefix: 
                 total += float(reward)
                 done = terminated or truncated
             rewards.append(total)
-            if env.state.get("winner") == env.owner:
-                wins += 1
+            won = env.state.get("winner") == env.owner
+            wins += int(won)
+            seat_wins[seat] += int(won)
+            seat_games[seat] += 1
             control_points.append(sum(p.get("owner") == env.owner for p in env.state.get("controlPoints", [])))
         except Exception as error:  # 单局失败不拖垮整轮评估。
             failures += 1
             print(f"[eval-worker] episode {episode} failed: {error}", file=sys.stderr, flush=True)
     games = len(rewards)
+
+    def seat_report(name: str) -> dict[str, Any]:
+        played = seat_games[name]
+        return {
+            "games": played,
+            "wins": seat_wins[name],
+            "win_rate": seat_wins[name] / played if played else 0.0,
+            "wilson_lb": wilson_lower_bound(seat_wins[name], played),
+        }
+
     return {
         "games": games,
         "wins": wins,
         "failures": failures,
         "win_rate": wins / games if games else 0.0,
         "wilson_lb": wilson_lower_bound(wins, games),
+        "seat_first": seat_report("first"),
+        "seat_second": seat_report("second"),
         "cp_mean": float(np.mean(control_points)) if control_points else 0.0,
         "mean_reward": float(np.mean(rewards)) if rewards else 0.0,
     }
@@ -117,14 +135,23 @@ def evaluate(model_path: str, map_id: str, opponent_style: str, anchor_model: st
     return results
 
 
-def selection_score(results: dict[str, Any]) -> tuple[float, float, float, float]:
-    """Lexicographic best-checkpoint key: weakest-scenario Wilson LB first."""
+def selection_score(results: dict[str, Any]) -> tuple[float, float, float, float, float]:
+    """Lexicographic best-checkpoint key: weakest scenario, then second-seat LB.
+
+    后手座下界进第二位是因为 v3.0.1 的实测反例：350k 与 480k 两个断点对 v2.7.0
+    总分 49:47 vs 50:46（噪声内相同），但后手座 39.6% vs **50.0%** 差 10pt。
+    只看总分或最弱场景会挑中座位严重不对称的断点，而后手座能力正是历代短板
+    （v2.8.0 仅 29.2%）。
+    """
     scenarios = list(results.get("scenarios", {}).values())
     if not scenarios:
-        return (-1.0, -1.0, -float("inf"), -float("inf"))
+        return (-1.0, -1.0, -1.0, -float("inf"), -float("inf"))
     lbs = [float(s["wilson_lb"]) for s in scenarios]
+    second_wins = sum(int(s.get("seat_second", {}).get("wins", 0)) for s in scenarios)
+    second_games = sum(int(s.get("seat_second", {}).get("games", 0)) for s in scenarios)
     return (
         min(lbs),
+        wilson_lower_bound(second_wins, second_games),
         float(np.mean(lbs)),
         float(np.mean([s["cp_mean"] for s in scenarios])),
         float(np.mean([s["mean_reward"] for s in scenarios])),
@@ -151,6 +178,7 @@ def main() -> None:
     for name, scenario in results["scenarios"].items():
         print(
             f"[eval-worker:{name}] win_rate={scenario['win_rate']:.0%} wilson_lb={scenario['wilson_lb']:.0%} "
+            f"first={scenario['seat_first']['win_rate']:.0%} second={scenario['seat_second']['win_rate']:.0%} "
             f"cp={scenario['cp_mean']:.2f} mean_reward={scenario['mean_reward']:+.3f} over {scenario['games']} paired games",
             flush=True,
         )

@@ -1,7 +1,7 @@
 // src/api/bots.ts
 //
 // 强化学习 AI 玩家：房主在大厅中添加 AI 座位，开始对局时由服务器自动启动
-// rl/run_model.py，让训练好的模型作为普通玩家参与 REST 对局。
+// rl/runners/run_model.py，让训练好的模型作为普通玩家参与 REST 对局。
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { inflateRawSync } from 'node:zlib';
@@ -19,26 +19,26 @@ import { lobbySummary } from './games.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const MODELS_DIR = join(PROJECT_ROOT, 'rl', 'models');
-const RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model.py');
-// 旧版运行器：v2.0.0 模型（38 动作）使用其训练时期的编码快照 rl/env_v200.py。
-const LEGACY_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v200.py');
+const RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'runners', 'run_model.py');
+// 旧版运行器：v2.0.0 模型（38 动作）使用其训练时期的编码快照 rl/envs/env_v200.py。
+const LEGACY_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'runners', 'run_model_v200.py');
 // 最早的动态动作列表（512 动作）模型使用 v1 环境快照。
-const V100_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'run_model_v100.py');
+const V100_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'runners', 'run_model_v100.py');
 const DEFAULT_BOT_NAME = '强化AI';
 // v2.1.x / v2.2.x 的 54 动作模型（3922 维观测）专用快照运行器；
 // v2.3 起观测扩为 5974 维，v2.5 曾扩为 6024 维（对手动作历史，已回退），
 // v2.6 起观测回到 5974 维。
-const RUNNER_SCRIPT_V22 = join(PROJECT_ROOT, 'rl', 'run_model_v22.py');
+const RUNNER_SCRIPT_V22 = join(PROJECT_ROOT, 'rl', 'runners', 'run_model_v22.py');
 // v2.3.x / v2.4.x 的 54 动作模型（5974 维观测）专用快照运行器。
-const RUNNER_SCRIPT_V24 = join(PROJECT_ROOT, 'rl', 'run_model_v24.py');
+const RUNNER_SCRIPT_V24 = join(PROJECT_ROOT, 'rl', 'runners', 'run_model_v24.py');
 // v2.5.x 的 54 动作模型（6024 维观测，对手动作历史）专用快照运行器。
-const RUNNER_SCRIPT_V25 = join(PROJECT_ROOT, 'rl', 'run_model_v25.py');
+const RUNNER_SCRIPT_V25 = join(PROJECT_ROOT, 'rl', 'runners', 'run_model_v25.py');
 // v2.6.x 的 54 动作模型（5974 维观测）专用兼容运行器。
-const RUNNER_SCRIPT_V26 = join(PROJECT_ROOT, 'rl', 'run_model_v26.py');
+const RUNNER_SCRIPT_V26 = join(PROJECT_ROOT, 'rl', 'runners', 'run_model_v26.py');
 // v2.7.x / v2.8.x 的 54 动作模型（6205 维观测）冻结快照运行器。
-const RUNNER_SCRIPT_V27 = join(PROJECT_ROOT, 'rl', 'run_model_v27.py');
+const RUNNER_SCRIPT_V27 = join(PROJECT_ROOT, 'rl', 'runners', 'run_model_v27.py');
 
-/** 当前 rl/env.py 的动作空间大小（v3.0：12 单位槽 × 12 分层候选 + 5 兵种 × 2 部署点 + 结束回合）。 */
+/** 当前 rl/envs/env.py 的动作空间大小（v3.0：12 单位槽 × 12 分层候选 + 5 兵种 × 2 部署点 + 结束回合）。 */
 const CURRENT_ACTION_SPACE = 155;
 /** v2.1–v2.8 共用的 54 动作空间，按文件名版本分五代冻结运行器。 */
 const V2_ACTION_SPACE = 54;
@@ -95,7 +95,7 @@ export interface RlModelInfo {
   supported: boolean;
 }
 
-/** 当前 rl/env.py 的动作空间大小；run_model.py 启动后的版本守卫兜底校验。 */
+/** 当前 rl/envs/env.py 的动作空间大小；run_model.py 启动后的版本守卫兜底校验。 */
 const REQUIRED_ACTION_SPACE = CURRENT_ACTION_SPACE;
 
 interface BotRecord {

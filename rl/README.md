@@ -1,10 +1,40 @@
 # 强化学习训练与部署
 
-强化学习相关改动记录见 [rl/RELEASE_NOTES.md](RELEASE_NOTES.md)。以后修改训练环境、奖励、动作空间、模型部署或训练参数时，都要先在该文件顶部追加记录。
+强化学习相关改动记录见 [rl/docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)。以后修改训练环境、奖励、动作空间、模型部署或训练参数时，都要先在该文件顶部追加记录。
 
 这个目录提供标准双人顺序模式的 PPO 训练环境：训练直接调用 TypeScript
 引擎，不需要启动 HTTP 游戏服务器。v3.0 默认使用 6715 维观测（含候选描述）、155 个分层动作、
 Transformer 棋盘编码器、混合地图、后台配对评估和蒸馏冷启动；旧模型继续通过版本快照运行。
+
+## 目录结构
+
+| 目录 | 职责 |
+| --- | --- |
+| `rl/envs/` | 训练环境。`env.py` 是当前版本（v3.0）；`env_vNN.py` 是各历史迭代的**不可变快照**，只服务于旧模型的观测编码，不得修改 |
+| `rl/runners/` | 推理入口。`run_model.py` 对应当前环境；`run_model_vNN.py` 与同名 env 快照配对，由 `src/api/bots.ts` 按动作空间路由 |
+| `rl/training/` | 训练与数据管线：`train.py`（PPO 主循环）、`distill.py`（老师采样/蒸馏冷启动）、`local_env.py` + `local-worker.ts`（进程内调用 TS 引擎）、`extractors.py`（网络结构）、`eval_worker.py`（后台配对评估） |
+| `rl/evaluation/` | 离线评估：`evaluate_cross.py`（跨版本对战）、`round_robin.py`（循环赛） |
+| `rl/docs/` | `RELEASE_NOTES.md`（改动记录，必读）、`MODELS_NOTES.md`（模型档案） |
+| `rl/models/`、`rl/checkpoints/`、`rl/tb/`、`rl/selfplay/`、`rl/distill/`、`rl/leaderboard/` | 训练产物（模型 zip、断点、TensorBoard 日志、自对弈快照、蒸馏数据、榜单），均已 gitignore |
+| `rl/test-output/` | 本地实验区：`scripts/`（一次性诊断与评估脚本）、`launchers/`（.bat 训练配方）、`logs/`、`stats/`、`models/`、`checkpoints/`，已 gitignore |
+
+根目录只保留 `README.md` 与 `requirements.txt`。
+
+### 导入约定
+
+各子目录内的模块**仍用扁平名相互导入**（如 `from env_v22 import HexGameEnv`），不写 `rl.envs.` 前缀。为兼容这一点，每个可执行入口都在文件头部把四个代码目录挂上 `sys.path`：
+
+```python
+_RL_ROOT = Path(__file__).resolve().parent.parent
+for _sub in ("envs", "runners", "training", "evaluation"):
+    _p = str(_RL_ROOT / _sub)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+```
+
+新增入口脚本时必须带上这段 bootstrap，否则扁平导入会失败。`python -m rl.xxx` 的包模式则由 `try/except ImportError` 回退分支覆盖（回退路径要写全，如 `rl.envs.env_v22`）。
+
+另外，子目录内的脚本推导项目根需上溯**三**级（`Path(__file__).resolve().parent.parent.parent`），因为它们位于 `rl/<子目录>/` 而非 `rl/`。
 
 ## 安装
 
@@ -31,7 +61,7 @@ npm install
 ## 运行训练
 
 ```powershell
-python rl/train.py
+python rl/training/train.py
 ```
 
 2.1.4 训练默认会加载旧的 v2.0.0 模型作为部分对手，建议先用 800000 步：
@@ -40,14 +70,14 @@ python rl/train.py
 $env:RL_MODEL_VERSION = "v2.1.4"
 $env:RL_TIMESTEPS = "800000"
 $env:RL_MODEL_OPPONENT_PROB = "0.5"
-python rl/train.py
+python rl/training/train.py
 ```
 
 想先做一个快速冒烟测试，可以把步数临时调小：
 
 ```powershell
 $env:RL_TIMESTEPS = "16"
-python rl/train.py
+python rl/training/train.py
 ```
 
 正式训练建议至少 500000 步；默认值已经是 500000，可以按电脑速度调整。
@@ -59,7 +89,7 @@ python rl/train.py
 
 ```powershell
 $env:RL_DEVICE = "cuda"  # 或 cpu / auto
-python rl/train.py
+python rl/training/train.py
 ```
 
 先检查当前环境：
@@ -92,7 +122,7 @@ hex_ppo_<版本号>_<训练日期>_<地图名>_<对手类型>_<步数>.zip
 rl/models/hex_ppo_v2.1.4_20260826_default_modelmix_800000.zip
 ```
 
-版本号具体到三级（如 `v2.0.4`），默认值与 `rl/RELEASE_NOTES.md` 顶部条目一致，
+版本号具体到三级（如 `v2.0.4`），默认值与 `rl/docs/RELEASE_NOTES.md` 顶部条目一致，
 变更训练环境时同步更新；也可用 `RL_MODEL_VERSION` 临时覆盖。v2.1 使用 `Discrete(54)` 动作空间，
 不能加载 v2.0 或更旧模型；请从零训练一个新模型。可用 `$env:RL_OPPONENT_STYLE = "aggressive"`
 等值固定对手风格，默认 `mixed` 每局随机选择。
@@ -118,7 +148,7 @@ $env:RL_TIMESTEPS = "50000"          # 续训增加 50000 步
 $env:RL_SAVE_FREQ = "20000"           # 每 20000 步保存 checkpoint
 $env:RL_EVAL_FREQ = "10000"           # 每 10000 步评估
 $env:RL_EVAL_EPISODES = "8"
-python rl/train.py
+python rl/training/train.py
 ```
 
 设置 `$env:RL_LOAD_MODEL = "latest"` 会自动加载该地图最近生成的 v2 模型，并把续训结果
@@ -138,14 +168,14 @@ tensorboard --logdir rl/tb
 ```powershell
 $env:RL_MAP_ID = "dual-lanes"
 $env:RL_TIMESTEPS = "100000"
-python rl/train.py
+python rl/training/train.py
 ```
 
 默认模型会保存为 `rl/models/hex_ppo_v2.1.0_<日期>_dual-lanes_rule_mixed_<步数>.zip`，也可以指定路径：
 
 ```powershell
 $env:RL_MODEL_PATH = "rl/models/dual-lanes-ppo"
-python rl/train.py
+python rl/training/train.py
 ```
 
 当前这套基线要求地图是“普通顺序模式”且支持 2 人布局。`standoff` 的同时回合
@@ -161,7 +191,7 @@ python rl/train.py
 ```powershell
 $env:RL_MAP_ID = "random"
 $env:RL_TIMESTEPS = "800000"
-python rl/train.py
+python rl/training/train.py
 ```
 
 - 观测为 v2.3 编码（331 格标准定序 × 18 特征 + 16 全局 = 5,974 维），**与所有旧模型不兼容**，
@@ -180,7 +210,7 @@ python rl/train.py
 ```powershell
 $env:RL_MAP_ID = "random"
 $env:RL_NUM_ENVS = "8"     # v2.8 默认 8；6 物理核机器实测 4→170 fps、8→238 fps
-python rl/train.py
+python rl/training/train.py
 ```
 
 注意：并行下 `RL_TIMESTEPS` 仍是总帧数（跨环境累计），同一目标步数的墙钟时间约为单环境的 1/N；
@@ -191,7 +221,7 @@ python rl/train.py
 v2.8 不改观测/动作/奖励语义（v2.7 断点可续训），只让训练更快、更稳：
 
 - **后台评估** `RL_EVAL_MODE=async`（默认）：每 `RL_EVAL_FREQ`（v3.0.2 起默认 **100000**，原 50000）步把当前策略交给
-  `rl/eval_worker.py` 子进程跑 3 个场景 × `RL_EVAL_EPISODES`（v3.0.2 起默认 **96**，原 48）局配对换座，训练不停。
+  `rl/training/eval_worker.py` 子进程跑 3 个场景 × `RL_EVAL_EPISODES`（v3.0.2 起默认 **96**，原 48）局配对换座，训练不停。
   总评估开销不变（同样每步 0.96 局），但单次决策的抽样噪声减半：48 局胜率标准差约 ±23pt，
   实测 `default_champion` 在 14 次评估中出现过 27%~79%。
   上一次评估未完时本次跳过并记日志。`RL_EVAL_MODE=inline` 回到 v2.7 的主进程串行评估。
@@ -215,14 +245,14 @@ v3.0 把 v2.x 写死在规则里的“去哪、打谁”交给策略，并换掉
 - **冷启动**：不能加载任何 v2 权重，改用 v2.7.0 老师蒸馏：
 
 ```powershell
-rl/.venv/Scripts/python.exe rl/distill.py collect --teacher rl/models/hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip --games 400
-rl/.venv/Scripts/python.exe rl/distill.py train --out rl/models/hex_ppo_v3.0.0_<日期>_distilled
+rl/.venv/Scripts/python.exe rl/training/distill.py collect --teacher rl/models/hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip --games 400
+rl/.venv/Scripts/python.exe rl/training/distill.py train --out rl/models/hex_ppo_v3.0.0_<日期>_distilled
 $env:RL_MAP_ID = "random"; $env:RL_LOAD_MODEL = "rl/models/hex_ppo_v3.0.0_<日期>_distilled.zip"; $env:RL_TIMESTEPS = "3000000"
-rl/.venv/Scripts/python.exe rl/train.py
+rl/.venv/Scripts/python.exe rl/training/train.py
 ```
 
 老师的 54 动作与 v3.0 每槽的候选 0 一一对应（`env.map_v27_action`），因此 v2.7/v2.8 模型可以直接当自对弈锚点；
-`RL_ANCHOR_MODEL` 未设时默认取最新 v2.7 模型。完整流程见 `rl/test-output/run_train_v301.bat`。
+`RL_ANCHOR_MODEL` 未设时默认取最新 v2.7 模型。完整流程见 `rl/test-output/launchers/run_train_v301.bat`。
 
 **蒸馏的价值头必须与 PPO 同尺度。** `distill.py` 在【未缩放】回报上训练价值头，结束时打印保留集 RMSE
 与回报 std；RMSE 必须远小于 std 才能续训。v3.0.0 曾把目标除以 std，交付断点的 std(V)/std(return) 只有 0.16，
@@ -232,7 +262,7 @@ PPO 首轮 GAE 拿到系统性错误的优势估计，把克隆策略的胜率�
 
 ### v3.0.2：打破蒸馏造成的探索死锁
 
-v3.0.1 训练中断后做离线探针（`rl/test-output/probe_action_dist.py`）发现：新增候选**几乎从未被使用**。
+v3.0.1 训练中断后做离线探针（`rl/test-output/scripts/probe_action_dist.py`）发现：新增候选**几乎从未被使用**。
 
 | 断点 | move 候选 1-6 合法时选用率 | attack 候选 1-2 | deploy 候选 1 | 实测策略熵 |
 |---|---|---|---|---|
@@ -250,7 +280,7 @@ v3.0.1 训练中断后做离线探针（`rl/test-output/probe_action_dist.py`）
 
 三处修复：
 
-- **掩码标签平滑** `rl/distill.py train --label-smoothing 0.15`（默认）：目标分布 = 0.85·老师动作 + 0.15·合法动作上的均匀分布，
+- **掩码标签平滑** `rl/training/distill.py train --label-smoothing 0.15`（默认）：目标分布 = 0.85·老师动作 + 0.15·合法动作上的均匀分布，
   新候选在 PPO 起点就保留可采样的概率质量。蒸馏轮数同时由 12 降到 8 弱化克隆强度。
   ⚠️ **不能**用 `F.cross_entropy(..., label_smoothing=eps)`：它把 eps 均分给全部 155 类（含被
   `masked_fill(-1e9)` 的非法类），`log(≈0)` 量级的项会让 loss 直接爆炸；必须在合法集内手工构造目标分布。
@@ -264,7 +294,7 @@ v3.0.1 训练中断后做离线探针（`rl/test-output/probe_action_dist.py`）
 
 `env.py` 新增公共函数 `classify_action(index) -> (意图, 候选序号)`，供训练回调与离线探针共用。
 观测/动作/奖励语义未变，**无需新快照，`bots.ts` 路由不变**（仍是 155 动作 → `run_model.py`）。
-完整配方见 `rl/test-output/run_train_v302.bat`。
+完整配方见 `rl/test-output/launchers/run_train_v302.bat`。
 
 ## 自对弈（RL_SELF_PLAY_PROB）
 
@@ -274,7 +304,7 @@ v3.0.1 训练中断后做离线探针（`rl/test-output/probe_action_dist.py`）
 ```powershell
 $env:RL_MAP_ID = "random"
 $env:RL_SELF_PLAY_PROB = "0.6"   # 默认值；设 0 关闭自对弈回到纯规则对手训练
-python rl/train.py
+python rl/training/train.py
 ```
 
 机制：训练每 `RL_SNAPSHOT_FREQ`（默认 5000 次回调）存一个快照到 `RL_SNAPSHOT_DIR`（默认 `rl/selfplay/<地图>/<模型版本>`，按版本隔离），
@@ -314,7 +344,7 @@ v2.7 起锚点按 `RL_ANCHOR_PROB`（默认 40%）在自对弈局中固定出场
 先启动服务器并创建/加入一局游戏，拿到该座位的 player token。然后运行：
 
 ```powershell
-python rl/run_model.py `
+python rl/runners/run_model.py `
   --url http://127.0.0.1:3100 `
   --game <gameId> `
   --token <playerToken> `
@@ -324,7 +354,7 @@ python rl/run_model.py `
 模型会等待轮到自己的回合，自动执行动作，直到游戏结束。只测试一次动作：
 
 ```powershell
-python rl/run_model.py --game <gameId> --token <playerToken> --once
+python rl/runners/run_model.py --game <gameId> --token <playerToken> --once
 ```
 
 这是 v2 训练环境：规则对手会优先攻击、治疗、部署和靠近据点。它仍不是最终强度
@@ -334,19 +364,19 @@ python rl/run_model.py --game <gameId> --token <playerToken> --once
 
 环境每次迭代都会改变动作空间或观测语义（v1=512，v2.0.0=38，v2.1–v2.8=54，v3.0=155；v2.3/v2.4/v2.6=5974 维，v2.5=6024 维，v2.7/v2.8=6205 维，v3.0=6715 维），但历史模型必须始终可玩：
 
-- `rl/env_v100.py` 保存 v1 随机对手模型时期的 env.py 快照，
-  `rl/run_model_v100.py` 专门运行 512 动作模型。
+- `rl/envs/env_v100.py` 保存 v1 随机对手模型时期的 env.py 快照，
+  `rl/runners/run_model_v100.py` 专门运行 512 动作模型。
 
-- `rl/env_v200.py` 保存 v2.0.0 时期 env.py 的原样快照（编码/合法动作逻辑），
+- `rl/envs/env_v200.py` 保存 v2.0.0 时期 env.py 的原样快照（编码/合法动作逻辑），
   请勿按新版本逻辑修改它。
-- `rl/env_v22.py` 保存 v2.2.1 时期 env.py 的快照（54 动作 / 3922 维观测），
-  `rl/run_model_v22.py` 承载全部 v2.1.x/v2.2.x 模型；它同时作为新版训练时旧模型对手的观测降级编码器。
-- `rl/env_v24.py` 保存 v2.4.x 时期 env.py 的快照（54 动作 / 5974 维观测）；`rl/env_v26.py` 为 v2.6 兼容别名，
-  `rl/run_model_v24.py` 承载全部 v2.3.x/v2.4.x 模型。
-- `rl/env_v25.py` 保存 v2.5.x 时期 env.py 的快照（54 动作 / 6024 维观测，对手动作历史），
-  `rl/run_model_v25.py` 承载 v2.5.x 模型。
-- `rl/env_v27.py` 保存 v2.7/v2.8 时期 env.py 的快照（54 动作 / 6205 维观测），
-  `rl/run_model_v27.py` 承载全部 v2.7.x/v2.8.x 模型；它同时是 v3.0 训练时老师/锚点的编码器。
+- `rl/envs/env_v22.py` 保存 v2.2.1 时期 env.py 的快照（54 动作 / 3922 维观测），
+  `rl/runners/run_model_v22.py` 承载全部 v2.1.x/v2.2.x 模型；它同时作为新版训练时旧模型对手的观测降级编码器。
+- `rl/envs/env_v24.py` 保存 v2.4.x 时期 env.py 的快照（54 动作 / 5974 维观测）；`rl/envs/env_v26.py` 为 v2.6 兼容别名，
+  `rl/runners/run_model_v24.py` 承载全部 v2.3.x/v2.4.x 模型。
+- `rl/envs/env_v25.py` 保存 v2.5.x 时期 env.py 的快照（54 动作 / 6024 维观测，对手动作历史），
+  `rl/runners/run_model_v25.py` 承载 v2.5.x 模型。
+- `rl/envs/env_v27.py` 保存 v2.7/v2.8 时期 env.py 的快照（54 动作 / 6205 维观测），
+  `rl/runners/run_model_v27.py` 承载全部 v2.7.x/v2.8.x 模型；它同时是 v3.0 训练时老师/锚点的编码器。
 - `src/api/bots.ts` 的路由：155 → `run_model.py`（当前 v3.0 环境），38 → `run_model_v200.py`，512 → `run_model_v100.py`；
   54 动作按文件名版本五代分流：≥ v2.7 → `run_model_v27.py`（6205 维快照），v2.6 → `run_model_v26.py`,
   v2.5 → `run_model_v25.py`（6024 维快照），v2.3/v2.4 → `run_model_v24.py`（5974 维快照），
@@ -355,7 +385,7 @@ python rl/run_model.py --game <gameId> --token <playerToken> --once
   旧条目不得改写。若新版本沿用相同动作数但改变编码语义（如 v2.3），也必须使用独立运行器，
   不要复用旧动作空间条目。
 - 前端下拉列表只展示已识别且有快照运行器的模型，并带版本标签；无法识别的模型会被服务端拒绝。
-- 在随机地图上评估模型：`rl/evaluate_cross.py --map random --swap-sides`；每两局共享同一地图种子并交换座位，`--seed-prefix` 可隔离不同批次。
+- 在随机地图上评估模型：`rl/evaluation/evaluate_cross.py --map random --swap-sides`；每两局共享同一地图种子并交换座位，`--seed-prefix` 可隔离不同批次。
 - **评估协议（v2.5.0 验收教训固化）**：确定性策略互打方差极高，单次 8 局无统计意义（同配置复测可在 6:2↔4:4 摆动）；
   某些地图还有系统性座位效应（default 上随机图世代模型先手全崩）。验收必须：
   初筛累计 ≥24 局；正式晋级建议 ≥96 局（用 `--stats-file` 跨运行累积），并检查总体与分座位 95% Wilson 区间。
@@ -365,11 +395,11 @@ python rl/run_model.py --game <gameId> --token <playerToken> --once
 
 ## 跨版本模型对战（离线评估）
 
-`rl/evaluate_cross.py` 让两代模型在进程内引擎上互打（无需游戏服务器），
+`rl/evaluation/evaluate_cross.py` 让两代模型在进程内引擎上互打（无需游戏服务器），
 每个座位使用其训练时期的编码与合法动作逻辑：
 
 ```powershell
-rl/.venv/Scripts/python.exe rl/evaluate_cross.py `
+rl/.venv/Scripts/python.exe rl/evaluation/evaluate_cross.py `
   --model-a rl/models/hex_ppo_v2.0.0_20260824_default_rule_500000.zip `
   --model-b rl/models/hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip `
   --games 4
@@ -384,16 +414,16 @@ JSONL 并输出跨运行累计的分座位统计（同一模型对与地图的�
 
 ## 批量对战与排行榜
 
-`rl/round_robin.py` 自动发现 `rl/models/` 下全部可对战模型（排除 v1.0.0 的 512 动作格式），
+`rl/evaluation/round_robin.py` 自动发现 `rl/models/` 下全部可对战模型（排除 v1.0.0 的 512 动作格式），
 两两 × 全地图批量对战，结果累积写入 `rl/leaderboard/matches.jsonl`：
 
 ```powershell
 # 先小规模冒烟（只跑 default 图、3 个模型、每对 2 局）
-rl/.venv/Scripts/python.exe rl/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --games 2
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --games 2
 
 # 全量跑批（120 对 × 7 图 × 24 局 ≈ 2 万局，建议先跑随机图约 3 小时出第一版榜单）
-rl/.venv/Scripts/python.exe rl/round_robin.py --maps random
-rl/.venv/Scripts/python.exe rl/round_robin.py --maps default,breach,danger-close,desert,dual-lanes,forge
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default,breach,danger-close,desert,dual-lanes,forge
 ```
 
 要点：

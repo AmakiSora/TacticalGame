@@ -17,7 +17,10 @@ import numpy as np
 import pytest
 
 RL_DIR = Path(__file__).resolve().parents[2] / "rl"
-sys.path.insert(0, str(RL_DIR))
+# rl/ 已重组为 envs/runners/training/evaluation 子目录；逐个挂上 sys.path，
+# 以保持既有的扁平模块名（如 ``import env``）可用。
+for _sub in ("envs", "runners", "training", "evaluation"):
+    sys.path.insert(0, str(RL_DIR / _sub))
 
 import env as E  # noqa: E402
 from local_env import LocalHexGameEnv  # noqa: E402

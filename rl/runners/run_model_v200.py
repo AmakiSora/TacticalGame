@@ -1,27 +1,43 @@
-"""Run a trained MaskablePPO model in an existing REST game (v2.3/v2.4 runner).
+"""Run a trained v2.0.0-era MaskablePPO model in an existing REST game.
 
-The model expects the v2.3/v2.4 random-map observation/action representation
-(5,974-dim canonical board encoding) from the ``env_v24`` snapshot.  It can
-act as either player_a or player_b because observations are encoded from the
-selected player's perspective.  v2.5 models (6,024 dims, opponent-action
-history) must use ``run_model.py``; older 3,922-dim models (v2.1.x/v2.2.x)
-must use ``run_model_v22.py``.
+v2.0.0 模型（38 动作 / 8 单位槽）与当前 v2.1 环境（54 动作）不兼容。
+本运行器配合 rl/env_v200.py（v2.0.0 时期 env.py 的原样快照），让旧模型
+继续以训练时的表示参与真实 REST 对局。REST 端点在两个版本间一致，
+因此仅替换编码/合法动作逻辑即可。
+
+注意：v2.0.0 的观测按固定 player_a 视角编码（当时的实现），因此该模型
+坐在 player_b 时属于训练分布之外，强度会失真但仍可正常对局。
+
+由服务器 src/api/bots.ts 按模型的动作空间自动选择本运行器；
+也可手动指定：
+
+    python rl/run_model_v200.py --model rl/models/hex_ppo_v2.0.0_*_default_rule_*.zip \
+        --game <gameId> --token <playerToken> [--side player_a]
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from pathlib import Path
 
+# rl/ 已重组为 envs/runners/training/evaluation 子目录；把各代码目录挂上 sys.path，
+# 让既有的扁平模块名（如 ``from env_v200 import ...``）在脚本模式下继续可用。
+_RL_ROOT = Path(__file__).resolve().parent.parent
+for _sub in ("envs", "runners", "training", "evaluation"):
+    _p = str(_RL_ROOT / _sub)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from sb3_contrib import MaskablePPO
 
-from env_v24 import HexGameEnv
+from env_v200 import HexGameEnv
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="", help="模型路径；留空自动选择 rl/models 中最新的 v2.3/v2.4 模型")
+    parser.add_argument("--model", default="", help="模型路径；留空自动选择 rl/models 中最新的 v2.0 模型")
     parser.add_argument("--url", default="http://127.0.0.1:3100")
     parser.add_argument("--game", required=True)
     parser.add_argument("--token", required=True)
@@ -37,30 +53,28 @@ def main():
     args = parse_args()
     model_path = args.model
     if not model_path:
-        candidates = list(Path("rl/models").glob("hex_ppo_v2.3.*_*_*.zip"))
-        candidates += list(Path("rl/models").glob("hex_ppo_v2.4.*_*_*.zip"))
-        candidates += list(Path("rl/models").glob("hex_ppo_*_v2.3.*_*.zip"))
-        candidates += list(Path("rl/models").glob("hex_ppo_*_v2.4.*_*.zip"))
+        candidates = list(Path("rl/models").glob("hex_ppo_v2.0.*_*_*.zip"))
+        candidates += list(Path("rl/models").glob("hex_ppo_*_v2.0.*_*.zip"))
         if not candidates:
-            raise FileNotFoundError("未找到 v2.3/v2.4 模型，请先训练，或通过 --model 指定模型路径；v2.5 模型请用 run_model.py，v2.1/v2.2 模型用 run_model_v22.py")
+            raise FileNotFoundError("未找到 v2.0 模型，请先通过 --model 指定模型路径")
         model_path = str(max(candidates, key=lambda path: path.stat().st_mtime))
-        print(f"Using latest model: {model_path}")
+        print(f"Using latest v2.0 model: {model_path}")
     model = MaskablePPO.load(model_path)
     env = HexGameEnv(args.url)
     if getattr(model.action_space, "n", None) != env.action_space.n:
         raise ValueError(
-            f"模型动作空间为 {getattr(model.action_space, 'n', '?')}，当前环境需要 {env.action_space.n}; "
-            "动作数不同的模型请使用对应版本的运行器。"
-        )
-    if getattr(model.observation_space, "shape", (None,))[0] != env.observation_space.shape[0]:
-        raise ValueError(
-            f"模型观测维度为 {getattr(model.observation_space, 'shape', ('?',))[0]}，v2.3/v2.4 环境需要 {env.observation_space.shape[0]}；"
-            "v2.5 模型请改用 run_model.py，v2.1/v2.2 旧模型请改用 run_model_v22.py。"
+            f"模型动作空间为 {getattr(model.action_space, 'n', '?')}，"
+            f"v2.0.0 运行器需要 {env.action_space.n}；请确认模型版本。"
         )
     env.game_id = args.game
     env.player_token = args.token
     env.owner = args.side
     env.opponent = "player_b" if args.side == "player_a" else "player_a"
+    if args.side != "player_a":
+        print(
+            "[警告] v2.0.0 观测按固定 player_a 视角编码；"
+            "该模型坐在 player_b 时决策会失真（仍可正常对局）。"
+        )
 
     acted = 0
     while acted < args.max_actions:
@@ -90,8 +104,8 @@ def main():
         if index >= len(env.actions):
             index = 0
         action_type, payload = env.actions[index]
-        # 兜底：限流则等待重试；其他拒绝（如 action_limit_reached，动作已过期）
-        # 改为结束回合，绝不让异常杀死整局。
+        if not action_type:
+            action_type, payload = "end_turn", {}
         while True:
             try:
                 env._apply(action_type, payload, env.player_token)

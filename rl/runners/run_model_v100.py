@@ -1,30 +1,33 @@
-"""Run v2.7 / v2.8 MaskablePPO models with the frozen 6,205-dim environment.
+"""Run a v1-era (512-action) MaskablePPO model in a REST game.
 
-The model expects the v2.7 observation/action representation from env.py
-(6,205-dim board, stable-unit-slot, and game-rule encoding). It can act as either player_a or player_b
-because observations are encoded from the selected player's perspective.
-v2.6 models (5,974 dims) must use ``run_model_v26.py``; v2.5 models use
-``run_model_v25.py``; v2.3/v2.4 models
-use ``run_model_v24.py``; older 3,922-dim models use ``run_model_v22.py``.
+The two ``random_opponent`` weights predate the fixed intent-slot action
+space.  They must keep using ``env_v100.py`` so their dynamic action ordering
+and observation encoding remain exactly as trained.
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from pathlib import Path
 
+# rl/ 已重组为 envs/runners/training/evaluation 子目录；把各代码目录挂上 sys.path，
+# 让既有的扁平模块名（如 ``from env_v100 import ...``）在脚本模式下继续可用。
+_RL_ROOT = Path(__file__).resolve().parent.parent
+for _sub in ("envs", "runners", "training", "evaluation"):
+    _p = str(_RL_ROOT / _sub)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from sb3_contrib import MaskablePPO
 
-try:
-    from .env_v27 import HexGameEnv
-except ImportError:
-    from env_v27 import HexGameEnv
+from env_v100 import HexGameEnv
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="", help="模型路径；留空自动选择 rl/models 中最新的 v2.7 模型")
+    parser.add_argument("--model", default="", help="模型路径；留空自动选择 random_opponent 模型")
     parser.add_argument("--url", default="http://127.0.0.1:3100")
     parser.add_argument("--game", required=True)
     parser.add_argument("--token", required=True)
@@ -32,7 +35,7 @@ def parse_args():
     parser.add_argument("--poll-seconds", type=float, default=0.5)
     parser.add_argument("--max-actions", type=int, default=1000)
     parser.add_argument("--stochastic", action="store_true")
-    parser.add_argument("--once", action="store_true", help="act once, then exit")
+    parser.add_argument("--once", action="store_true")
     return parser.parse_args()
 
 
@@ -40,23 +43,18 @@ def main():
     args = parse_args()
     model_path = args.model
     if not model_path:
-        candidates = list(Path("rl/models").glob("hex_ppo_v2.7.*_*_*.zip"))
-        candidates += list(Path("rl/models").glob("hex_ppo_v2.8.*_*_*.zip"))
+        candidates = list(Path("rl/models").glob("hex_ppo_*random_opponent*.zip"))
         if not candidates:
-            raise FileNotFoundError("未找到 v2.7/v2.8 模型，请通过 --model 指定模型路径")
+            raise FileNotFoundError("未找到 512 动作 random_opponent 模型")
         model_path = str(max(candidates, key=lambda path: path.stat().st_mtime))
         print(f"Using latest model: {model_path}")
+
     model = MaskablePPO.load(model_path)
     env = HexGameEnv(args.url)
     if getattr(model.action_space, "n", None) != env.action_space.n:
         raise ValueError(
-            f"模型动作空间为 {getattr(model.action_space, 'n', '?')}，当前环境需要 {env.action_space.n}; "
-            "动作数不同的模型请使用对应版本的运行器。"
-        )
-    if getattr(model.observation_space, "shape", (None,))[0] != env.observation_space.shape[0]:
-        raise ValueError(
-            f"模型观测维度为 {getattr(model.observation_space, 'shape', ('?',))[0]}，v2.7 环境需要 {env.observation_space.shape[0]}；"
-            "v2.6 模型请改用 run_model_v26.py，其他旧模型请使用对应快照运行器。"
+            f"模型动作空间为 {getattr(model.action_space, 'n', '?')}，"
+            f"v1 运行器需要 {env.action_space.n}；请确认模型版本。"
         )
     env.game_id = args.game
     env.player_token = args.token
@@ -88,7 +86,7 @@ def main():
             action_masks=env.action_masks(),
         )
         index = int(action)
-        if index >= len(env.actions):
+        if index < 0 or index >= len(env.actions) or not env.actions[index][0]:
             index = 0
         action_type, payload = env.actions[index]
         # 兜底：限流则等待重试；其他拒绝（如 action_limit_reached，动作已过期）

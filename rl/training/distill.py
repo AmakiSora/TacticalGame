@@ -39,7 +39,13 @@ from pathlib import Path
 import numpy as np
 import torch
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# rl/ 已重组为 envs/runners/training/evaluation 子目录；把各代码目录挂上 sys.path，
+# 让既有的扁平模块名（如 ``import env``）在脚本模式下继续可用。
+_RL_ROOT = Path(__file__).resolve().parent.parent
+for _sub in ("envs", "runners", "training", "evaluation"):
+    _p = str(_RL_ROOT / _sub)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 import env as E  # noqa: E402
 from local_env import LocalHexGameEnv  # noqa: E402

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handleCommand } from '../../rl/local-worker.js';
+import { handleCommand } from '../../rl/training/local-worker.js';
 
 interface WorkerState {
   phase: string;

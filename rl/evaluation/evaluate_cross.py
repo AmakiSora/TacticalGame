@@ -31,6 +31,14 @@ from typing import Any
 import numpy as np
 from sb3_contrib import MaskablePPO
 
+# rl/ 已重组为 envs/runners/training/evaluation 子目录；把各代码目录挂上 sys.path，
+# 让既有的扁平模块名（如 ``import env``）在脚本模式下继续可用。
+_RL_ROOT = Path(__file__).resolve().parent.parent
+for _sub in ("envs", "runners", "training", "evaluation"):
+    _p = str(_RL_ROOT / _sub)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 try:
     from env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
     from env import HexGameEnv as CurrentHexGameEnv
@@ -41,16 +49,16 @@ try:
     from env_v25 import HexGameEnv as V25HexGameEnv
     from env_v26 import HexGameEnv as V26HexGameEnv
     from env_v27 import HexGameEnv as V27HexGameEnv
-except ImportError:  # 兼容 ``python -m rl.evaluate_cross`` 等调用方式。
-    from rl.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
-    from rl.env import HexGameEnv as CurrentHexGameEnv
-    from rl.env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
-    from rl.env_v200 import HexGameEnv as LegacyHexGameEnv
-    from rl.env_v22 import HexGameEnv as V22HexGameEnv
-    from rl.env_v24 import HexGameEnv as V24HexGameEnv
-    from rl.env_v25 import HexGameEnv as V25HexGameEnv
-    from rl.env_v26 import HexGameEnv as V26HexGameEnv
-    from rl.env_v27 import HexGameEnv as V27HexGameEnv
+except ImportError:  # 兼容 ``python -m rl.evaluation.evaluate_cross`` 等调用方式。
+    from rl.envs.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
+    from rl.envs.env import HexGameEnv as CurrentHexGameEnv
+    from rl.envs.env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
+    from rl.envs.env_v200 import HexGameEnv as LegacyHexGameEnv
+    from rl.envs.env_v22 import HexGameEnv as V22HexGameEnv
+    from rl.envs.env_v24 import HexGameEnv as V24HexGameEnv
+    from rl.envs.env_v25 import HexGameEnv as V25HexGameEnv
+    from rl.envs.env_v26 import HexGameEnv as V26HexGameEnv
+    from rl.envs.env_v27 import HexGameEnv as V27HexGameEnv
 
 
 def parse_args():
@@ -122,15 +130,16 @@ def load_stats(stats_file: Path, pair: set[str], map_id: str) -> list[dict[str, 
 
 
 class EngineWorker:
-    """rl/local-worker.ts 的 JSON-lines 客户端（与 rl/local_env.py 相同协议）。"""
+    """rl/training/local-worker.ts 的 JSON-lines 客户端（与 rl/training/local_env.py 相同协议）。"""
 
     def __init__(self):
         npx = shutil.which("npx.cmd") or shutil.which("npx")
         if not npx:
             raise RuntimeError("npx was not found; run npm install first")
-        root = Path(__file__).resolve().parent.parent
+        # 本文件位于 rl/evaluation/，项目根需上溯三级。
+        root = Path(__file__).resolve().parent.parent.parent
         self.proc = subprocess.Popen(
-            [npx, "tsx", "rl/local-worker.ts"],
+            [npx, "tsx", "rl/training/local-worker.ts"],
             cwd=root,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,

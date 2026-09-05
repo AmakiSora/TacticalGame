@@ -30,6 +30,14 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
+# rl/ 已重组为 envs/runners/training/evaluation 子目录；把各代码目录挂上 sys.path，
+# 让既有的扁平模块名（如 ``from env import ...``）在脚本模式下继续可用。
+_RL_ROOT = Path(__file__).resolve().parent.parent
+for _sub in ("envs", "runners", "training", "evaluation"):
+    _p = str(_RL_ROOT / _sub)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from env import ATTACK_CANDIDATES, DEPLOY_CANDIDATES, MOVE_CANDIDATES, classify_action
 from extractors import build_policy_kwargs
 from local_env import LocalHexGameEnv
@@ -309,8 +317,8 @@ class AsyncEvalCallback(BaseCallback):
     def _record(self, step: int, results: dict[str, Any], model_zip: str) -> None:
         try:
             from eval_worker import selection_score
-        except ImportError:  # ``python -m rl.train``
-            from rl.eval_worker import selection_score
+        except ImportError:  # ``python -m rl.training.train``
+            from rl.training.eval_worker import selection_score
 
         scenarios = results.get("scenarios", {})
         for name, scenario in scenarios.items():

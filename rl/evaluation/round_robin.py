@@ -6,18 +6,18 @@
 - 断点续跑：按（模型对, 地图）统计 JSONL 已有局数，只补差额，已跑对局不重复；
 - 每次运行带随机盐 seed-prefix：重跑 random 图必产生新地图（静态图种子不生效，
   但引擎战斗带随机伤害浮动，每局同样不重复）；
-- 复用 rl/evaluate_cross.py 子进程，原样保留其跨版本编码路由与配对换座逻辑。
+- 复用 rl/evaluation/evaluate_cross.py 子进程，原样保留其跨版本编码路由与配对换座逻辑。
 
 用法示例：
 
     # 全量（120 对 × 7 图 × 24 局，约 20+ 小时，可分批跑）
-    rl/.venv/Scripts/python.exe rl/round_robin.py
+    rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py
 
     # 先跑随机图池（约 3 小时）
-    rl/.venv/Scripts/python.exe rl/round_robin.py --maps random
+    rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random
 
     # 冒烟测试
-    rl/.venv/Scripts/python.exe rl/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --games 2
+    rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --games 2
 
 完成后运行 ``npm run rl-leaderboard`` 刷新排行榜数据。
 """
@@ -171,7 +171,7 @@ def run_task(command: list[str], label: str, games: int, progress: Progress) -> 
     try:
         result = subprocess.run(
             command,
-            cwd=str(Path(__file__).resolve().parent.parent),
+            cwd=str(Path(__file__).resolve().parent.parent.parent),
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -191,7 +191,8 @@ def main():
             stream.reconfigure(encoding="utf-8", errors="replace")
     args = parse_args()
 
-    root = Path(__file__).resolve().parent.parent
+    # 本文件位于 rl/evaluation/，项目根需上溯三级。
+    root = Path(__file__).resolve().parent.parent.parent
     models_dir = root / "rl" / "models"
     stats_file = root / args.stats_file if args.stats_file else root / DEFAULT_STATS_FILE
     maps = [m.strip() for m in args.maps.split(",") if m.strip()]
@@ -209,7 +210,7 @@ def main():
 
     salt = args.salt or f"{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
     python = resolve_python(root)
-    evaluate_script = root / "rl" / "evaluate_cross.py"
+    evaluate_script = root / "rl" / "evaluation" / "evaluate_cross.py"
 
     print(f"参评模型 {len(included)} 个：")
     for path in included:

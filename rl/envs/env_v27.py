@@ -1,10 +1,8 @@
-"""Immutable snapshot of the v2.5.x training environment (6,024-dim observation).
+"""Frozen v2.7/v2.8 environment snapshot (6,205-dim observation, 54 actions).
 
-Do NOT evolve this file: it exists so that the 54-action / 6,024-dim models
-(v2.5.0, opponent last-turn action history appended) keep their exact
-training-time encoding via ``run_model_v25.py`` after ``env.py`` rolled back
-to the 5,974-dim observation in v2.6.  New training changes belong in
-``env.py``.
+Immutable: this file preserves the exact encoding and legal-action semantics
+used to train all v2.7.x / v2.8.x models.  Do not edit for new versions; the
+live environment is ``env.py`` (v3.0+, hierarchical action space).
 """
 
 from __future__ import annotations
@@ -46,18 +44,19 @@ CANONICAL_INDEX = {cell: index for index, cell in enumerate(CANONICAL_CELLS)}
 MAX_CELLS = len(CANONICAL_CELLS)
 CELL_FEATURES = 18
 GLOBAL_FEATURES = 16
-# v2.5：对手上一回合的动作历史。每个动作槽 8 维：
-# 5 维类型 one-hot（move/attack/heal/deploy/demolish）+ 2 维目标位置（/10）
-# + 1 维强度（伤害/治疗/花费归一化）；另加 2 维汇总（动作数与总伤害）。
-OPPONENT_ACTION_TYPES = ("move", "attack", "heal", "deploy", "demolish")
-OPPONENT_ACTION_INDEX = {name: index for index, name in enumerate(OPPONENT_ACTION_TYPES)}
-OPPONENT_ACTION_SLOTS = 6
-OPPONENT_ACTION_FEATURES = 8
-OPPONENT_HISTORY_SIZE = OPPONENT_ACTION_SLOTS * OPPONENT_ACTION_FEATURES + 2
-OBSERVATION_SIZE = MAX_CELLS * CELL_FEATURES + GLOBAL_FEATURES + OPPONENT_HISTORY_SIZE
 # Stable intent slots.  Slot numbers have the same meaning in every state:
 # 0=end turn; then 12 unit slots x 4 intents; then 5 deploy-type slots.
 MAX_UNIT_SLOTS = 12
+SLOT_FEATURES = 15
+RULE_FEATURES_PER_UNIT = 8
+GLOBAL_RULE_FEATURES = 11
+RULE_FEATURES = len(UNIT_TYPES) * RULE_FEATURES_PER_UNIT + GLOBAL_RULE_FEATURES
+OBSERVATION_SIZE = (
+    MAX_CELLS * CELL_FEATURES
+    + GLOBAL_FEATURES
+    + MAX_UNIT_SLOTS * SLOT_FEATURES
+    + RULE_FEATURES
+)
 UNIT_INTENTS = ("move", "attack", "heal", "special")
 DEPLOY_SLOTS = UNIT_TYPES
 MAX_ACTIONS = 1 + MAX_UNIT_SLOTS * len(UNIT_INTENTS) + len(DEPLOY_SLOTS)
@@ -78,7 +77,7 @@ class HexGameEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None, anchor_probability: float = 0.15, opponent_stochastic_probability: float = 0.0):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
@@ -88,6 +87,8 @@ class HexGameEnv(gym.Env):
             raise ValueError("model_opponent_probability must be between 0 and 1")
         if not 0.0 <= self_play_probability <= 1.0:
             raise ValueError("self_play_probability must be between 0 and 1")
+        if not 0.0 <= opponent_stochastic_probability <= 1.0:
+            raise ValueError("opponent_stochastic_probability must be between 0 and 1")
         self.opponent_style = opponent_style
         self.opponent_model = opponent_model
         # 子进程（SubprocVecEnv）里模型对象不可序列化，改传路径在子进程内懒加载。
@@ -97,8 +98,18 @@ class HexGameEnv(gym.Env):
         # 目录为空（训练初期未存过快照）时自动退回规则对手。
         self.self_play_dir = self_play_dir
         self.self_play_probability = self_play_probability
-        # 锚点对手：常驻候选池的强基准（如上一代最强模型），防策略漂移退化。
+        # 锚点对手：常驻强基准（如上一代最强模型），防策略漂移退化；
+        # 自对弈局中按 anchor_probability 固定出场，其余从快照阶梯近期加权抽。
         self.anchor_model_path = anchor_model_path
+        if not 0.0 <= anchor_probability <= 1.0:
+            raise ValueError("anchor_probability must be between 0 and 1")
+        self.anchor_probability = anchor_probability
+        # v2.8：按此概率让模型对手（快照/锚点）按策略分布采样动作而非贪心，
+        # 避免智能体只学会针对一条确定性走法。
+        self.opponent_stochastic_probability = opponent_stochastic_probability
+        self._opponent_stochastic = False
+        # v2.8 PFSP：按快照路径记录 (对局数, 智能体胜场)，输得多的对手抽得更频繁。
+        self._self_play_record: dict[str, list[int]] = {}
         self._self_play_path = ""
         self._self_play_cache: dict[str, Any] = {}
         self.active_opponent_style = opponent_style
@@ -106,8 +117,7 @@ class HexGameEnv(gym.Env):
         self.random_options = dict(random_options) if random_options else {}
         # 旧模型对手（v2.0.0，3922 维观测）需要 env_v22 快照编码器，懒加载。
         self._legacy_env: Any = None
-        # v2.3/v2.4 模型对手（5974 维，如锚点）需要 env_v24 快照编码器，懒加载。
-        self._v24_env: Any = None
+        self._v26_env: Any = None
 
         self.action_space = spaces.Discrete(MAX_ACTIONS)
         self.observation_space = spaces.Box(
@@ -269,7 +279,9 @@ class HexGameEnv(gym.Env):
 
         terminated = self._game_over()
         if terminated:
-            reward += 1.0 if self.state.get("winner") == self.owner else -1.0
+            won = self.state.get("winner") == self.owner
+            reward += 1.0 if won else -1.0
+            self._record_self_play_result(won)
         truncated = self.steps >= self.max_steps and not terminated
         self.actions = self._legal_actions(self.state, self.owner) if not terminated else []
         info = {"action_type": action_type, "action_counts": dict(self.action_counts)}
@@ -369,13 +381,10 @@ class HexGameEnv(gym.Env):
         except OSError:
             return []
         files.sort(key=lambda path: path.stat().st_mtime)
-        return [str(path) for path in files][-8:]
+        return [str(path) for path in files][-16:]
 
-    def _self_play_candidates(self) -> list[str]:
-        candidates = self._self_play_snapshots()
-        if self.anchor_model_path and Path(self.anchor_model_path).is_file():
-            candidates.append(self.anchor_model_path)
-        return candidates
+    def _has_anchor(self) -> bool:
+        return bool(self.anchor_model_path) and Path(self.anchor_model_path).is_file()
 
     def _ensure_self_play_model(self) -> Any:
         model = self._self_play_cache.get(self._self_play_path)
@@ -387,11 +396,49 @@ class HexGameEnv(gym.Env):
             self._self_play_cache[self._self_play_path] = model
         return model
 
+    def _record_self_play_result(self, won: bool) -> None:
+        """PFSP 记账：只统计快照阶梯对手（锚点固定出场，不参与优先级）。"""
+        if self.active_opponent_style != "self" or not self._self_play_path or self._self_play_path == self.anchor_model_path:
+            return
+        record = self._self_play_record.setdefault(self._self_play_path, [0, 0])
+        record[0] += 1
+        record[1] += int(won)
+
+    def _self_play_weights(self, snapshots: list[str]) -> np.ndarray:
+        """优先虚构自对弈（PFSP）：权重 (1 - 胜率)^2，未交手的快照按 0.5 胜率对待。
+
+        v2.6 的近期加权导致共同适应、v2.7 的均匀采样让已被打穿的旧快照白占样本；
+        按“输给谁最多就多打谁”分配对局是两者之间更稳的折中。
+        """
+        weights = np.empty(len(snapshots), dtype=np.float64)
+        for index, path in enumerate(snapshots):
+            games, wins = self._self_play_record.get(path, (0, 0))
+            # 拉普拉斯平滑：先验 1 胜 1 负，避免单局结果把权重推到 0 或 1。
+            win_rate = (wins + 1.0) / (games + 2.0)
+            weights[index] = (1.0 - win_rate) ** 2 + 1e-3
+        return weights / weights.sum()
+
     def _choose_opponent_style(self) -> str:
-        candidates = self._self_play_candidates()
-        if candidates and self.self_play_probability > 0 and float(self.np_random.random()) < self.self_play_probability:
-            self._self_play_path = candidates[int(self.np_random.integers(len(candidates)))]
-            return "self"
+        self._opponent_stochastic = (
+            self.opponent_stochastic_probability > 0
+            and float(self.np_random.random()) < self.opponent_stochastic_probability
+        )
+        if self.self_play_probability > 0 and float(self.np_random.random()) < self.self_play_probability:
+            snapshots = self._self_play_snapshots()
+            if snapshots:
+                if self._has_anchor() and float(self.np_random.random()) < self.anchor_probability:
+                    self._self_play_path = self.anchor_model_path
+                else:
+                    self._self_play_path = str(self.np_random.choice(snapshots, p=self._self_play_weights(snapshots)))
+                # 清掉已被裁剪快照的记录，避免字典无限增长。
+                live = set(snapshots)
+                for stale in [path for path in self._self_play_record if path not in live]:
+                    del self._self_play_record[stale]
+                return "self"
+            if self._has_anchor():
+                # 训练早期还没有快照时，锚点直接当老师。
+                self._self_play_path = self.anchor_model_path
+                return "self"
         if self._has_model_opponent() and float(self.np_random.random()) < self.model_opponent_probability:
             return "model"
         if self.opponent_style != "mixed":
@@ -415,32 +462,27 @@ class HexGameEnv(gym.Env):
         if self._legacy_env is None:
             try:
                 from env_v22 import HexGameEnv as LegacyHexGameEnv
-            except ImportError:  # ``python -m rl.train`` 等调用方式。
-                from rl.env_v22 import HexGameEnv as LegacyHexGameEnv
+            except ImportError:  # ``python -m rl.training.train`` 等调用方式。
+                from rl.envs.env_v22 import HexGameEnv as LegacyHexGameEnv
             self._legacy_env = LegacyHexGameEnv(base_url="local://legacy-snapshot")
         return self._legacy_env._encode_from_perspective(state, owner)
 
-    def _encode_for_v24_model(self, state: dict[str, Any], owner: str) -> np.ndarray:
-        """v2.3/v2.4 模型对手（5974 维）用 env_v24 快照编码器产出相对视角观测。
-
-        v2.5 本体的 6024 维观测对它们是分布外输入；快照编码与其训练时逐格一致。
-        """
-        if self._v24_env is None:
-            try:
-                from env_v24 import HexGameEnv as V24HexGameEnv
-            except ImportError:  # ``python -m rl.train`` 等调用方式。
-                from rl.env_v24 import HexGameEnv as V24HexGameEnv
-            self._v24_env = V24HexGameEnv(base_url="local://v24-snapshot")
-        return self._v24_env._encode_from_perspective(state, owner)
-
     def _encode_for_candidate_model(self, model: Any, state: dict[str, Any], owner: str) -> np.ndarray:
-        """按候选对手模型的观测维度选择对应编码器（同代/快照）。"""
-        dim = int(model.observation_space.shape[0])
-        if dim == OBSERVATION_SIZE:
+        """Encode from a self-play opponent's own observation generation."""
+        obs_dim = int(model.observation_space.shape[0])
+        if obs_dim == OBSERVATION_SIZE:
             return self._encode_from_perspective(state, owner)
-        if dim == 5974:  # env_v24.OBSERVATION_SIZE：v2.3/v2.4 世代。
-            return self._encode_for_v24_model(state, owner)
-        return self._encode_for_legacy_model(state, owner)
+        if obs_dim == 5974:
+            if self._v26_env is None:
+                try:
+                    from env_v26 import HexGameEnv as V26HexGameEnv
+                except ImportError:
+                    from rl.envs.env_v26 import HexGameEnv as V26HexGameEnv
+                self._v26_env = V26HexGameEnv(base_url="local://v26-snapshot")
+            return self._v26_env._encode_from_perspective(state, owner)
+        if obs_dim == 3922:
+            return self._encode_for_legacy_model(state, owner)
+        raise ValueError(f"unsupported self-play observation size: {obs_dim}")
 
     def _units_for_slots(self, state: dict[str, Any], owner: str) -> list[dict[str, Any] | None]:
         """Keep units in stable action slots as they move or are deployed."""
@@ -594,14 +636,14 @@ class HexGameEnv(gym.Env):
     def _self_play_pick(self, actions):
         """自对弈快照对手的当前动作；失败（快照被清理/损坏）时降级为 mixed 规则。
 
-        快照可能跨观测世代（锚点是 5974 维的 v2.3/v2.4 模型，新快照是 6024 维），
-        按候选模型的观测维度选对应编码器，用当前动作表行动。
+        快照与当前环境同为 v2.3 系（54 动作、稳定槽位、同套编码），
+        直接按对手视角编码后用当前动作表行动，无需 legacy 分支。
         """
         try:
             model = self._ensure_self_play_model()
             mask = np.asarray([bool(action[0]) for action in actions], dtype=bool)
             observation = self._encode_for_candidate_model(model, self.state, self.opponent)
-            action_index, _ = model.predict(observation, deterministic=True, action_masks=mask)
+            action_index, _ = model.predict(observation, deterministic=not self._opponent_stochastic, action_masks=mask)
             index = int(action_index)
             if index >= len(actions) or not actions[index][0]:
                 index = 0  # end_turn 永远合法。
@@ -709,6 +751,16 @@ class HexGameEnv(gym.Env):
         control_points = state.get("controlPoints", [])
         hqs = list(state.get("headquarters", {}).values())
         terrain_index = {"plain": 0, "water": 1, "blocker": 2}
+        # 位置索引一次建好；setdefault 保留“取第一个匹配”的旧语义，编码逐位等价。
+        point_at: dict[tuple[int, int], dict[str, Any]] = {}
+        for point in control_points:
+            point_at.setdefault((point["q"], point["r"]), point)
+        unit_at: dict[tuple[int, int], dict[str, Any]] = {}
+        for unit in units:
+            unit_at.setdefault((unit["q"], unit["r"]), unit)
+        hq_at: dict[tuple[int, int], dict[str, Any]] = {}
+        for hq in hqs:
+            hq_at.setdefault((hq["q"], hq["r"]), hq)
 
         for cell in state.get("cells", []):
             index = CANONICAL_INDEX.get((int(cell["q"]), int(cell["r"])))
@@ -718,12 +770,13 @@ class HexGameEnv(gym.Env):
             terrain = terrain_index.get(cell.get("terrain", "plain"), 0)
             result[offset + terrain] = 1.0
 
-            point = next((p for p in control_points if p["q"] == cell["q"] and p["r"] == cell["r"]), None)
+            pos = (cell["q"], cell["r"])
+            point = point_at.get(pos)
             cp_owner = point.get("owner") if point else None
             result[offset + 3 + (1 if cp_owner == self.owner else 2 if cp_owner else 0)] = 1.0
 
-            unit = next((u for u in units if u["q"] == cell["q"] and u["r"] == cell["r"]), None)
-            hq = next((h for h in hqs if h["q"] == cell["q"] and h["r"] == cell["r"]), None)
+            unit = unit_at.get(pos)
+            hq = hq_at.get(pos)
             if unit:
                 result[offset + 6 + (1 if unit["owner"] == self.owner else 2)] = 1.0
                 result[offset + 9 + TYPE_INDEX.get(unit.get("type"), 0)] = 1.0
@@ -764,72 +817,57 @@ class HexGameEnv(gym.Env):
             impassable / max(1, len(cells_list)),
         ]
         result[base:base + len(values)] = np.clip(values, -1.0, 1.0)
-        self._encode_opponent_history(state, result, base + GLOBAL_FEATURES)
+        slot_base = base + GLOBAL_FEATURES
+        own_slots = self._units_for_slots(state, self.owner)
+        for slot, unit in enumerate(own_slots):
+            if unit is None:
+                continue
+            offset = slot_base + slot * SLOT_FEATURES
+            unit_type = TYPE_INDEX.get(unit.get("type"), 0)
+            result[offset] = 1.0
+            result[offset + 1 + unit_type] = 1.0
+            result[offset + 6] = float(unit.get("q", 0)) / 10.0
+            result[offset + 7] = float(unit.get("r", 0)) / 10.0
+            result[offset + 8] = float(unit.get("hp", 0)) / max(1.0, float(unit.get("maxHp", 1)))
+            result[offset + 9] = float(bool(unit.get("hasMoved")))
+            result[offset + 10] = float(bool(unit.get("hasActed")))
+            result[offset + 11] = float(bool(unit.get("actionSpent")))
+            result[offset + 12] = float(unit.get("attack", 0)) / 60.0
+            result[offset + 13] = float(unit.get("moveRange", 0)) / 8.0
+            result[offset + 14] = float(unit.get("attackRange", 0)) / 6.0
+
+        rule_base = slot_base + MAX_UNIT_SLOTS * SLOT_FEATURES
+        unit_specs = config.get("units", {})
+        for index, unit_type in enumerate(UNIT_TYPES):
+            spec = unit_specs.get(unit_type, {})
+            offset = rule_base + index * RULE_FEATURES_PER_UNIT
+            rule_values = [
+                float(spec.get("hp", 0)) / 200.0,
+                float(spec.get("attack", 0)) / 60.0,
+                float(spec.get("defense", 0)) / 20.0,
+                float(spec.get("moveRange", 0)) / 8.0,
+                float(spec.get("attackRange", 0)) / 6.0,
+                float(spec.get("cost", 0)) / 150.0,
+                float(spec.get("healPower", 0)) / 60.0,
+                float(bool(spec.get("canCapture"))),
+            ]
+            result[offset:offset + RULE_FEATURES_PER_UNIT] = rule_values
+
+        global_rule_base = rule_base + len(UNIT_TYPES) * RULE_FEATURES_PER_UNIT
+        weights = balance.get("adjudicationWeights", {})
+        global_rule_values = [
+            float(balance.get("startingSupplies", 0)) / 150.0,
+            float(balance.get("baseIncome", 0)) / 30.0,
+            float(balance.get("controlPointIncome", 0)) / 30.0,
+            float(balance.get("damageVarianceRange", 0)) / 10.0,
+            float(balance.get("healVarianceRange", 0)) / 15.0,
+            float(config.get("headquartersSpec", {}).get("defense", 0)) / 20.0,
+            float(weights.get("enemyHqDamage", 0)) / 100.0,
+            float(weights.get("ownHqHp", 0)) / 100.0,
+            float(weights.get("controlPoint", 0)) / 100.0,
+            float(weights.get("armyValue", 0)) / 100.0,
+            float(weights.get("supplies", 0)) / 100.0,
+        ]
+        result[global_rule_base:global_rule_base + GLOBAL_RULE_FEATURES] = global_rule_values
+        result[slot_base:] = np.clip(result[slot_base:], -1.0, 1.0)
         return result
-
-    def _opponent_last_turn_events(self, state: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-        """对手上一回合的动作事件（时间序）。
-
-        回合边界：最近一条 previousOwner == 己方的 turn_end（己方交回合给对手）；
-        找不到则从事件头算起（对手先手的第一回合）。编码只依赖 self.owner /
-        self.opponent，因此 _encode_from_perspective 的视角交换自动生效。
-        """
-        events = state.get("events") or []
-        boundary = -1
-        for index, event in enumerate(events):
-            if event.get("type") == "turn_end" and event.get("payload", {}).get("previousOwner") == self.owner:
-                boundary = index
-        actions: list[tuple[str, dict[str, Any]]] = []
-        for event in events[boundary + 1:]:
-            event_type = event.get("type")
-            payload = event.get("payload", {}) or {}
-            if event_type in OPPONENT_ACTION_INDEX and payload.get("owner") == self.opponent:
-                actions.append((str(event_type), payload))
-        return actions
-
-    @staticmethod
-    def _action_position(state: dict[str, Any], event_type: str, payload: dict[str, Any]) -> tuple[float, float] | None:
-        """动作的目标/终点坐标；attack/heal 事件只带目标 id，查当前棋盘（阵亡单位仍留有坐标）。"""
-        if event_type == "move" and "toQ" in payload:
-            return float(payload["toQ"]), float(payload["toR"])
-        if event_type in ("deploy", "demolish") and "q" in payload:
-            return float(payload["q"]), float(payload["r"])
-        target_id = payload.get("targetId")
-        if target_id:
-            for unit in state.get("units", []):
-                if unit.get("id") == target_id:
-                    return float(unit.get("q", 0)), float(unit.get("r", 0))
-            for hq in state.get("headquarters", {}).values():
-                if hq.get("id") == target_id:
-                    return float(hq.get("q", 0)), float(hq.get("r", 0))
-        return None
-
-    def _encode_opponent_history(self, state: dict[str, Any], result: np.ndarray, base: int) -> None:
-        """把对手上一回合动作写入观测尾部（槽位按时间序，不足补零）。"""
-        actions = self._opponent_last_turn_events(state)[-OPPONENT_ACTION_SLOTS:]
-        damage_total = 0.0
-        for slot, (event_type, payload) in enumerate(actions):
-            offset = base + slot * OPPONENT_ACTION_FEATURES
-            result[offset + OPPONENT_ACTION_INDEX[event_type]] = 1.0
-            position = self._action_position(state, event_type, payload)
-            if position:
-                result[offset + 5] = position[0] / 10.0
-                result[offset + 6] = position[1] / 10.0
-            if event_type == "attack":
-                damage = float(payload.get("actualDamage", 0))
-                damage_total += damage
-                result[offset + 7] = damage / 60.0
-            elif event_type == "heal":
-                result[offset + 7] = float(payload.get("amount", 0)) / 60.0
-            elif event_type == "deploy":
-                result[offset + 7] = float(payload.get("cost", 0)) / 200.0
-            elif event_type == "demolish":
-                result[offset + 7] = 1.0
-            else:  # move：强度用位移格数（六角距离）。
-                dq = int(payload.get("toQ", 0)) - int(payload.get("fromQ", 0))
-                dr = int(payload.get("toR", 0)) - int(payload.get("fromR", 0))
-                result[offset + 7] = max(abs(dq), abs(dr), abs(-dq - dr)) / 6.0
-        summary = base + OPPONENT_ACTION_SLOTS * OPPONENT_ACTION_FEATURES
-        result[summary] = len(actions) / OPPONENT_ACTION_SLOTS
-        result[summary + 1] = damage_total / 100.0
-        result[base:base + OPPONENT_HISTORY_SIZE] = np.clip(result[base:base + OPPONENT_HISTORY_SIZE], -1.0, 1.0)

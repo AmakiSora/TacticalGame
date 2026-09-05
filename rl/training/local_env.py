@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .env import HexGameEnv, OPPONENT, PLAYER
-except ImportError:  # ``python rl/train.py`` puts rl/ on sys.path.
+    from rl.envs.env import HexGameEnv, OPPONENT, PLAYER
+except ImportError:  # 脚本模式（``python rl/training/train.py``）：入口已把 rl/envs 挂上 sys.path。
     from env import HexGameEnv, OPPONENT, PLAYER
 
 
@@ -36,12 +36,13 @@ class LocalHexGameEnv(HexGameEnv):
             self.map_mix = [(name, weight / total) for name, weight in self.map_mix]
         # 最近一次 reset/apply 返回的快照；None 表示必须真正向 worker 查询。
         self._cached_state: dict[str, Any] | None = None
-        root = Path(__file__).resolve().parent.parent
+        # 本文件位于 rl/training/，项目根需上溯三级。
+        root = Path(__file__).resolve().parent.parent.parent
         npx = shutil.which("npx.cmd") or shutil.which("npx")
         if not npx:
             raise RuntimeError("npx was not found; run npm install first")
         self.worker = subprocess.Popen(
-            [npx, "tsx", "rl/local-worker.ts"],
+            [npx, "tsx", "rl/training/local-worker.ts"],
             cwd=root,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,

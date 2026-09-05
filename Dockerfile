@@ -23,7 +23,7 @@ FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
-# 强化学习 AI 运行时：src/api/bots.ts 会以子进程拉起 rl/run_model.py，
+# 强化学习 AI 运行时：src/api/bots.ts 会以子进程拉起 rl/runners/run_model.py，
 # 需要 python 虚拟环境与训练模型（CPU 版 torch）。
 # 部署目标为国内 VPS，apt/pip 使用阿里云镜像加速；
 # torch 从阿里云 pytorch-wheels 的 cpu 目录取 CPU-only 轮子，避免引入 CUDA 依赖。

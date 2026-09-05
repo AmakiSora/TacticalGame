@@ -24,10 +24,10 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
 try:
-    from .env import (
+    from rl.envs.env import (
         BOARD_SIZE, CELL_FEATURES, MAX_CELLS, OBSERVATION_SIZE,
     )
-except ImportError:
+except ImportError:  # 脚本模式：入口已把 rl/envs 挂上 sys.path。
     from env import (  # type: ignore
         BOARD_SIZE, CELL_FEATURES, MAX_CELLS, OBSERVATION_SIZE,
     )

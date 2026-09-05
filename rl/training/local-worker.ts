@@ -1,17 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
-import { globalEventBus } from '../src/events/bus.js';
-import { attackTarget, healTarget } from '../src/engine/combat.js';
-import { demolishTerrain } from '../src/engine/demolition.js';
-import { endTurn } from '../src/engine/engine.js';
-import { deployUnit } from '../src/engine/deployment.js';
-import { moveUnit } from '../src/engine/units.js';
-import { buildAdjudicationSnapshot } from '../src/engine/engine.js';
-import { createInitialGame, createInitialGameWithConfig } from '../src/state/store.js';
-import { loadMaps } from '../src/config/loader.js';
-import { generateRandomMapConfig, sanitizeRandomOptions } from '../src/config/randomMap.js';
-import type { GameState, PlayerId, UnitType } from '../src/types.js';
+import { globalEventBus } from '../../src/events/bus.js';
+import { attackTarget, healTarget } from '../../src/engine/combat.js';
+import { demolishTerrain } from '../../src/engine/demolition.js';
+import { endTurn } from '../../src/engine/engine.js';
+import { deployUnit } from '../../src/engine/deployment.js';
+import { moveUnit } from '../../src/engine/units.js';
+import { buildAdjudicationSnapshot } from '../../src/engine/engine.js';
+import { createInitialGame, createInitialGameWithConfig } from '../../src/state/store.js';
+import { loadMaps } from '../../src/config/loader.js';
+import { generateRandomMapConfig, sanitizeRandomOptions } from '../../src/config/randomMap.js';
+import type { GameState, PlayerId, UnitType } from '../../src/types.js';
 
 let game: GameState | null = null;
 loadMaps();

@@ -3,6 +3,33 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加一条记录。
 
+## 2026-09-06 · rl/ 目录重组：按职责拆分为 envs/、runners/、training/、evaluation/、docs/ 子目录
+
+纯代码搬移与引用同步，**不改任何观测/动作/奖励语义**（`bots.ts` 路由规则不变，仅指向路径改为
+`rl/runners/`），既有模型 zip、checkpoint 与 `rl/models/` 命名兼容性全部不受影响。
+
+| 子目录 | 内容 |
+|---|---|
+| `rl/envs/` | `env.py`（当前 v3.0）与 `env_v100`–`env_v27` 历史快照 |
+| `rl/runners/` | `run_model.py` 及各版本冻结运行器，`src/api/bots.ts` 按动作空间路由至此 |
+| `rl/training/` | `train.py`、`distill.py`、`local_env.py` + `local-worker.ts`、`extractors.py`、`eval_worker.py` |
+| `rl/evaluation/` | `evaluate_cross.py`、`round_robin.py` |
+| `rl/docs/` | 本文件与 `MODELS_NOTES.md`（自 `rl/` 根迁入） |
+
+**导入约定**（详见 `rl/README.md`「目录结构」「导入约定」两节）：子目录内模块仍用扁平名互导
+（如 `from env_v22 import HexGameEnv`），每个可执行入口在文件头部把四个代码目录统一挂上 `sys.path`
+（bootstrap 块，带 `if _p not in sys.path` 防重）；`python -m rl.training.train` 等包模式由
+`try/except ImportError` 回退分支覆盖，回退路径必须写全（如 `rl.envs.env_v22`）。
+子目录内脚本推导项目根需上溯**三级**（`Path(__file__).resolve().parent.parent.parent`）。
+**新增入口脚本必须带上 bootstrap 块，否则扁平导入会失败。**
+
+同步更新的外部引用：`src/api/bots.ts`（7 个 runner 路径）、`tests/rl/` 三个测试的导入路径、
+`Dockerfile` 注释、`.dockerignore`（顺带补上此前遗漏的 `rl/distill`，与 `deploy/deploy.py` 排除列表对齐）、
+`.gitignore`（移除已不存在的 `rl/test-v2/`）、`deploy/deploy.py`（排除项由 `rl/bridge`/`rl/shared`
+改为 `rl/distill`）、根 `RELEASE_NOTES.md` 历史条目中的路径。
+
+验证：`rl/` 全部 Python 文件编译通过；`pytest tests/rl` 15 项通过；`vitest` local-worker 7 项通过。
+
 ## 2026-09-05 · v3.0.2 验收与 champion 替换：1.4M 断点 192 局累计 123:69 超越 v2.7.0
 
 150 万帧训练完整跑完，探索死锁修复被验证（`explore/new_candidate_rate` 0%→0.6%-1.5%、策略熵稳定 1.5-1.8 nats），
@@ -35,7 +62,7 @@ v3.0.1 49:47 → **v3.0.2-1.4M 61:35**。
 
 ### 诊断（本版起因）
 
-v3.0.1 中断后用离线探针 `rl/test-output/probe_action_dist.py` 检查动作分布，发现 v3.0 新增的候选**几乎从未被使用**：
+v3.0.1 中断后用离线探针 `rl/test-output/scripts/probe_action_dist.py` 检查动作分布，发现 v3.0 新增的候选**几乎从未被使用**：
 
 | 断点 | move 候选 1-6 合法时选用率 | attack 候选 1-2 | deploy 候选 1 | 实测策略熵 |
 |---|---|---|---|---|
@@ -66,18 +93,18 @@ v3.0.1 中断后用离线探针 `rl/test-output/probe_action_dist.py` 检查动�
 
 ### 四处修复
 
-- **掩码标签平滑**（`rl/distill.py`，`--label-smoothing` 默认 **0.15**）：目标分布 = 0.85·老师动作 + 0.15·合法动作上的均匀分布，
+- **掩码标签平滑**（`rl/training/distill.py`，`--label-smoothing` 默认 **0.15**）：目标分布 = 0.85·老师动作 + 0.15·合法动作上的均匀分布，
   新候选在 PPO 起点就保留可采样概率质量；蒸馏轮数 12→8 弱化克隆强度。
   ⚠️ **不能**用 `F.cross_entropy(..., label_smoothing=eps)`：它把 eps 均分给全部 155 类（包含被
   `masked_fill(-1e9)` 的非法类），`log(≈0)` 量级的项会让 loss 直接爆炸。必须在合法集内手工构造目标分布，
   并用 `torch.where` 把非法位归零，避免 0×(-1e9) 参与求和。
-- **探索监控**（`rl/train.py` 新增 `ActionDiversityCallback`）：每 `RL_EXPLORE_LOG_EVERY`（默认 20000）帧把
+- **探索监控**（`rl/training/train.py` 新增 `ActionDiversityCallback`）：每 `RL_EXPLORE_LOG_EVERY`（默认 20000）帧把
   `explore/new_candidate_rate`、`explore/{move,attack,deploy}_new_rate`、`explore/legal_actions_mean` 写入 TB 并打印。
   数据取自 `collect_rollouts` 局部变量（sb3 在 `env.step` 之后、`on_step` 之前调 `update_locals`，
   因此 `actions` 与 `action_masks` 严格配对）。持续为 0 即可立即止损，不必等训练结束。
 - **评估降噪**：`RL_EVAL_FREQ` 5 万→**10 万步**、`RL_EVAL_EPISODES` 48→**96 局**。总开销不变（同样每步 0.96 局），
   单次决策噪声减半（48 局胜率标准差约 ±23pt）。
-- **best 选择键加入后手座下界**（`rl/eval_worker.py`）：`play_scenario` 新增分座位记账，选择键由四元组改为
+- **best 选择键加入后手座下界**（`rl/training/eval_worker.py`）：`play_scenario` 新增分座位记账，选择键由四元组改为
   **(最弱场景下界, 后手座合并下界, 平均下界, 占点, 回报)**。针对上表 350k/480k 的反例。
 - **熵系数**：v3.0.2 配方用 `RL_ENT_COEF=0.03`（原 0.01）。**默认值未改**，由启动脚本显式设定，避免污染其他训练线。
 
@@ -113,7 +140,7 @@ v3.0.1 中断后用离线探针 `rl/test-output/probe_action_dist.py` 检查动�
 - 测试：`npm run test:rl` **15 项全通过**（新增 8 项）；`npm run build` 通过；`npm test` 379 项通过
   （`tests/skill/ai-player.test.ts` 一次 5s 超时为并行跑 build 时的 CPU 竞争，单独复测 19 项全通过）。
 
-训练命令：`rl/test-output/run_train_v302.bat`（复用 v2.7 老师数据 npz → 蒸馏 8 轮 eps=0.15 → PPO 150 万帧，
+训练命令：`rl/test-output/launchers/run_train_v302.bat`（复用 v2.7 老师数据 npz → 蒸馏 8 轮 eps=0.15 → PPO 150 万帧，
 锚点 v2.7.0，约 2.6 小时）。**止损判据**：开跑 10 分钟内 `explore/new_candidate_rate` 仍为 0.000% 则停掉调大参数。
 
 ## 2026-09-04 · v3.0.1 训练中断（GPU 驱动错误）+ 35 万步 best 验收：49:47 与 v2.7.0 打平，不替换 champion
@@ -144,8 +171,8 @@ random_champion 60% / default_champion 73%），其后 8 次评估（40 万→70
   v3.0 基础设施全部保留为净收益：不再崩溃、159 fps、约 40 分钟训练 + 蒸馏即打平 v2.7.0 的 400 万步（约 7 小时）。
 - **产物**：`rl/checkpoints/random/20260904-143009/`（16/32/48/64 万步断点 + `best/best_model.zip`=35 万步）、
   `rl/selfplay/random/v3.0.1/`（快照至 72 万步）、TB `rl/tb/ppo_random_20260904-143009_resume_0`、
-  验收日志 `rl/test-output/eval_v301_v270_96.log` 与 `stats_v301_v270_random.jsonl`、
-  已清洗受测断点 `rl/test-output/hex_ppo_v3.0.1_20260904_random_selfplay_350000_best.zip`。
+  验收日志 `rl/test-output/logs/eval_v301_v270_96.log` 与 `stats_v301_v270_random.jsonl`、
+  已清洗受测断点 `rl/test-output/models/hex_ppo_v3.0.1_20260904_random_selfplay_350000_best.zip`。
   **交付模型未生成**（`train.py` 在训练正常结束时才复制 best 并清洗）。
 - **下一步方向（未执行）**：架构已不是瓶颈，瓶颈在对手生态与评估精度——锚点 v2.7.0 固定占自对弈局 40%
   且不参与 PFSP 优先级，智能体对其胜率被钉在约 52%。
@@ -167,7 +194,7 @@ RMSE 5.53（回报 std 仅 5.78，等于价值头几乎无信息）。PPO 首轮
   保证大幅值下的数值稳定；`distill.py train` 结束时打印保留集价值 RMSE 与回报 std 作为闸门。
   修复后同数据 std(V)/std(return) 由 0.16 升到 0.85、平均偏差 −2.56 → −0.91。
 - **v3.0.1 配方**：PPO 阶段初始学习率 2e-4 → **5e-5**（v3.0.0 用 2e-4 仍在前期退化），
-  启动器 `rl/test-output/run_train_v301.bat`。
+  启动器 `rl/test-output/launchers/run_train_v301.bat`。
 - v2.7.0 暂时仍是推荐模型；v3.0.0 与 v2.7.0 在同一水平，等 v3.0.1 训练完再决定是否替换 champion。
 - 新增 `tests/rl/test_env_v300.py`（pytest，`npm run test:rl`）：动作空间尺寸、54→155 映射的单射性与
   槽位对应、掩码与观测里候选有效位逐项一致、300 步随机合法回放零非法动作、移动候选互不重复且均可达。
@@ -181,12 +208,12 @@ v2.8 验收证明同一观测/动作空间下再堆步数已无收益；v3.0 改
   重复候选留空，掩码保证每个下标都是真正不同的选择。策略首次拿到“去哪、打谁”的决策权。
 - **候选可观测**：观测 6205 → **6715 维**，尾部追加 510 维候选描述（移动：有效位/坐标/到无主据点距离；攻击：有效位/血量比/攻击力/是否总部；部署：有效位/坐标），
   动作下标在观测里有落点。前 6205 维与 v2.7 逐位相同。
-- **结构化编码器** `rl/extractors.py`：`RL_EXTRACTOR=hex_transformer`（默认）把 331 格切成 token（18 特征 + 位置嵌入），
+- **结构化编码器** `rl/training/extractors.py`：`RL_EXTRACTOR=hex_transformer`（默认）把 331 格切成 token（18 特征 + 位置嵌入），
   小 Transformer（`RL_TF_LAYERS` 默认 1、`RL_TF_DIM` 默认 64）带 padding 掩码编码后 mean+max 池化，与标量特征 MLP 拼接成 512 维给策略头；
   actor/critic 共享。`RL_EXTRACTOR=mlp` 保留 v2.4 纯 MLP 供同条件对比。8 环境实测 1 层 145 fps、2 层 104 fps（v2.8 MLP 为 300）。
 - **奖励重配**：胜负 ±1 → **±5**（`RL_REWARD_WIN`），塑形整体 ×0.5（`RL_REWARD_SHAPING_SCALE`），删除 deploy +0.12 / attack +0.05 固定加分
   （`RL_REWARD_*_BONUS` 默认 0）。v2.x 单局塑形累计 15-18 而胜负只有 ±1，终局信号被淹没。
-- **蒸馏冷启动** `rl/distill.py`：`collect` 让 v2.7.0 老师在 v3.0 环境里对打（70% 自对弈 / 30% 规则，15% 动作采样），
+- **蒸馏冷启动** `rl/training/distill.py`：`collect` 让 v2.7.0 老师在 v3.0 环境里对打（70% 自对弈 / 30% 规则，15% 动作采样），
   老师的 54 动作经 `env.map_v27_action` 一一映射到 v3.0 同槽位候选 0；`train` 用掩码交叉熵 + 回报 MSE 训练出 sb3 断点，
   `train.py` 用 `RL_LOAD_MODEL` 直接续训。冒烟 2304 样本 3 轮验证集准确率 61%。
 - **老师/锚点兼容**：v3.0 环境的自对弈对手支持 54 动作模型（观测走 `env_v27` 冻结编码，动作经映射），
@@ -195,7 +222,7 @@ v2.8 验收证明同一观测/动作空间下再堆步数已无收益；v3.0 改
   54 动作按版本五代分流（≥v2.7 → `run_model_v27.py`）；`evaluate_cross.py` 同步（155 → 当前环境，54/6205 → env_v27）。
   `tests/api/bots.test.ts` 已更新。
 - 修复：续训时 sb3 `load` 不恢复 `verbose`，导致所有 resume 日志缺少 rollout/train 表；现显式置 1。
-- 训练命令：`rl/test-output/run_train_v300.bat`（collect 400 局 → 蒸馏 8 轮 → PPO 300 万帧，锚点 v2.7.0）。
+- 训练命令：`rl/test-output/launchers/run_train_v300.bat`（collect 400 局 → 蒸馏 8 轮 → PPO 300 万帧，锚点 v2.7.0）。
   验收沿用 96 局配对换座 + Wilson 下界，分座位下界为硬门槛（v2.8 后手座仅 29%）。
 
 ## 2026-09-03 · v2.8.0 验收：管线目标达成，棋力未超 v2.7.0（不推荐替换 champion）
@@ -214,7 +241,7 @@ v2.8 验收证明同一观测/动作空间下再堆步数已无收益；v3.0 改
 v2.7.1 续训（400 万→494 万步）对锚点 v2.7.0 胜率始终 43% 左右，同配方已到平台期；
 本版不改模型语义（v2.7 断点可直接续训、`run_model.py`/`bots.ts` 路由不变），只修训练管线。
 
-- **评估搬出主进程**：新增 `rl/eval_worker.py`，`train.py` 默认 `RL_EVAL_MODE=async` 每 5 万步把当前策略存临时 zip，
+- **评估搬出主进程**：新增 `rl/training/eval_worker.py`，`train.py` 默认 `RL_EVAL_MODE=async` 每 5 万步把当前策略存临时 zip，
   由后台子进程跑 3 个场景 × 48 局配对换座（约 2 分 15 秒），训练不再停下等评估；上一次未完时跳过并记日志。
   v2.7.1 主进程每 1 万步串行 120 局，fps 从 98 掉到稳态 42。`RL_EVAL_MODE=inline` 保留旧行为。
 - **best 断点改按 Wilson 下界选**：选择键为 (最弱场景 95% Wilson 下界, 平均下界, 占点, 回报)，
@@ -236,11 +263,11 @@ v2.7.1 续训（400 万→494 万步）对锚点 v2.7.0 胜率始终 43% 左右�
 - **对手随机采样**：新增 `RL_OPPONENT_STOCHASTIC_PROB`（默认 30%），该比例的模型对手局按策略分布采样动作而非贪心，
   避免智能体只学会针对一条确定性走法。评估对手仍全部确定性，与历史可比。
 - 单元测试：`tests/rl/local-worker.test.ts` 新增 `eventTail` 用例；`evaluate_cross.py` 对 v2.7/v2.5 模型互打复测正常。
-- 训练命令见 `rl/test-output/run_train_v280_resume.bat`（从 v2.7.0 400 万步断点续训 200 万步，锚点 v2.7.0）。
+- 训练命令见 `rl/test-output/launchers/run_train_v280_resume.bat`（从 v2.7.0 400 万步断点续训 200 万步，锚点 v2.7.0）。
 
 ## 2026-09-02 · 批量对战与排行榜系统
 
-- **新增 `rl/round_robin.py`**：自动发现全部 15 个可对战模型（排除 v1.0.0 的 512 动作格式），
+- **新增 `rl/evaluation/round_robin.py`**：自动发现全部 15 个可对战模型（排除 v1.0.0 的 512 动作格式），
   两两 × 全地图（random + 6 张标准双人图）批量对战；以 `evaluate_cross.py --swap-sides` 子进程运行，
   配对换座协议不变。支持断点续跑（按 对×图 统计已有局数，补差取偶）、`--jobs` 并行、
   随机图 `--salt` 保证重跑出新图；结果累积写入 `rl/leaderboard/matches.jsonl`。
@@ -300,8 +327,8 @@ v2.7.1 续训（400 万→494 万步）对锚点 v2.7.0 胜率始终 43% 左右�
   turn_end；REST 响应与本地训练 worker 同源。`local-worker.ts` 快照从丢弃事件改为携带最近 80 条。
 - 编码只依赖 `self.owner/self.opponent`，相对视角编码在换座/自对弈对手场景自动生效；
   动作/奖励语义不变。观测维度变化，与旧断点不兼容，必须从零训练。
-- **版本快照分流**：旧 `env.py`（5974 维）固化为不可变快照 `rl/env_v24.py`，
-  新 `rl/run_model_v24.py` 承载全部 v2.3.x/v2.4.x 模型；`bots.ts` 的 54 动作三代路由：
+- **版本快照分流**：旧 `env.py`（5974 维）固化为不可变快照 `rl/envs/env_v24.py`，
+  新 `rl/runners/run_model_v24.py` 承载全部 v2.3.x/v2.4.x 模型；`bots.ts` 的 54 动作三代路由：
   ≥ v2.5 → `run_model.py`（6024 维），v2.3/v2.4 → `run_model_v24.py`，其余 → `run_model_v22.py`。
   `evaluate_cross.py` 按观测维度路由编码器：6024→env、5974→env_v24、3922→env_v22。
 - 自对弈候选对手按观测维度自适应编码（5974 维锚点如 v2.4.0 走 env_v24 快照）；
@@ -386,10 +413,10 @@ tsx 引擎 worker 进程，样本吞吐（此前唯一瓶颈）成倍提升；GP
 - **模型对手降级编码**：modelmix 对手（v2.0.0，3922 维）的观测改由 `env_v22` 快照编码器产出
   相对视角编码，与其训练时逐格一致；v2.3 的 5974 维观测不会喂给旧模型。
   随机地图上 v2.0.0 对手属分布外，`RL_MAP_ID=random` 时 `RL_MODEL_OPPONENT_PROB` 默认 0（只用规则对手）。
-- **本地引擎 worker**：`rl/local-worker.ts` 的 `reset` 支持 `mapId: "random"` + `random` 参数（与 REST 同一套生成/校验）；
+- **本地引擎 worker**：`rl/training/local-worker.ts` 的 `reset` 支持 `mapId: "random"` + `random` 参数（与 REST 同一套生成/校验）；
   `handleCommand` 导出供测试直接调用，仅主进程运行时监听 stdin。`src/state/store.ts` 新增
   `createInitialGameWithConfig` 支持任意配置开局。`evaluate_cross.py` 支持 `--map random`（每局种子 `cross-<局序>`）。
-- 训练命令：`$env:RL_MAP_ID = "random"; python rl/train.py`；模型命名
+- 训练命令：`$env:RL_MAP_ID = "random"; python rl/training/train.py`；模型命名
   `hex_ppo_v2.3.0_<日期>_random_modelmix_<步数>.zip`，checkpoint 落 `rl/checkpoints/random/`。
   从零训练，不能加载任何旧模型。
 

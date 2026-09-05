@@ -54,8 +54,8 @@ EXCLUDE_PATTERNS = [
     r'\.log$', r'hexstate\.json$', r'state\.json$', r'skill\.zip$',
     r'records/', r'records$', r'deploy/', r'deploy$',
     # RL 训练产物与 Windows 本地环境体积大且服务器用不上（镜像内重建）
-    r'^rl/\.venv', r'^rl/checkpoints', r'^rl/tb', r'^rl/bridge',
-    r'^rl/shared', r'^rl/test-output', r'^rl/selfplay', r'__pycache__',
+    r'^rl/\.venv', r'^rl/checkpoints', r'^rl/tb', r'^rl/distill',
+    r'^rl/test-output', r'^rl/selfplay', r'__pycache__',
 ]
 
 

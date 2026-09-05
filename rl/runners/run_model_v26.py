@@ -3,6 +3,14 @@
 import sys
 from pathlib import Path
 
+# rl/ 已重组为 envs/runners/training/evaluation 子目录；把各代码目录挂上 sys.path，
+# 让被转发的 run_model_v24 能以扁平模块名找到 rl/envs 下的冻结快照。
+_RL_ROOT = Path(__file__).resolve().parent.parent
+for _sub in ("envs", "runners", "training", "evaluation"):
+    _p = str(_RL_ROOT / _sub)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 try:
     from .run_model_v24 import main
 except ImportError:

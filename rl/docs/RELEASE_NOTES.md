@@ -18,9 +18,13 @@
 - 行为变化（预期内）：
   - `bots.ts`「添加 AI」模型列表只扫 `rl/models` 顶层，4 个作废模型不再出现在下拉框；
   - `round_robin.py` 自动发现同样只扫顶层，可发现模型 18→14，作废模型不再进入批量对战；
-  - `deploy/deploy.py` 新增 `^rl/models/deprecated` 排除项，归档目录不上传服务器。
-- 排行榜历史数据不动：`rl-leaderboard.json`/`matches.jsonl` 保留作废模型的历史对局，
-  榜单页状态标签仍显示「作废」。
+  - `deploy/deploy.py` 新增 `^rl/models/deprecated` 排除项，归档目录不上传服务器；
+  - `generateRlLeaderboard.mjs` 显式排除作废版本（`RETIRED_VERSIONS` 由状态表 retired 条目
+    派生）：模型注册表跳过（也不进「未参评」区），`matches.jsonl` 中作废模型对局整局
+    不计分、跳过局数记入 `source.retiredMatchesDropped`；重算后评分榜/热力矩阵/单模型
+    详情不再出现 v2.1.4–v2.1.8（模型行 18→14）。
+- 历史对局数据不删改：作废模型的历史对局行保留在 `matches.jsonl`，仅在评分与展示端排除；
+  新增 `tests/script/generateRlLeaderboard.test.ts` 3 例锁定「注册表跳过 + 对局过滤计数」。
 
 ## 2026-09-07 · evaluate_cross 每局明细落盘：事件流回放/战略曲线/动作日志/策略内部量
 

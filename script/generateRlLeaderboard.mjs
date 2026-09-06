@@ -7,6 +7,8 @@
  *   node script/generateRlLeaderboard.mjs --stats-file rl/leaderboard/matches.jsonl --out public/data/rl-leaderboard.json
  *
  * 评分口径：
+ *   - 作废模型（MODEL_STATUS_BY_VERSION 中 status=retired 的版本）不参评：注册表跳过、
+ *     历史对局不计分，跳过局数记入 source.retiredMatchesDropped；
  *   - Bradley-Terry MLE（MM 迭代），平局记 0.5 胜；每对交手过的模型对附加 1 局虚拟
  *     平局作先验，防全败模型评分发散并让稀疏对向均值收缩；
  *   - rating = 1500 + 400/ln(10) × ln p（Elo 刻度）；
@@ -36,6 +38,12 @@ export const MODEL_STATUS_BY_VERSION = {
   'v2.1.6': 'retired',
   'v2.1.8': 'retired',
 };
+/** 作废模型不进排行榜：注册表跳过（也不进「未参评」区），历史对局不计分，只按计数留痕。 */
+export const RETIRED_VERSIONS = new Set(
+  Object.entries(MODEL_STATUS_BY_VERSION)
+    .filter(([, status]) => status === 'retired')
+    .map(([version]) => version),
+);
 /** 评估协议已知限制：v2.0.0 观测固定 player_a 视角，坐 player_b 属分布外。 */
 export const STATUS_NOTES = {
   'v2.0.0': 'player_b 座位观测失真，成绩仅供参考',
@@ -83,7 +91,10 @@ export function shortName(meta) {
     : `${meta.version}@${Math.round(meta.steps / 1000)}K`;
 }
 
-/** 注册全部 rl/models/*.zip（含被排除的 v1.0.0），作为合法玩家名与"未参评"清单来源。 */
+/**
+ * 注册 rl/models/*.zip 作为合法玩家名与"未参评"清单来源。作废版本（RETIRED_VERSIONS）
+ * 直接跳过：不注册、不进"未参评"区（排行榜任何区域都不展示），其历史对局由 loadMatches 单独过滤。
+ */
 export function collectRegistry(modelsDir) {
   const registry = new Map();
   const excluded = [];
@@ -97,6 +108,7 @@ export function collectRegistry(modelsDir) {
     if (!f.endsWith('.zip')) continue;
     const meta = parseModelFile(f);
     if (!meta) continue;
+    if (RETIRED_VERSIONS.has(meta.version)) continue;
     registry.set(meta.id, meta);
     if (EXCLUDED_VERSIONS.has(meta.version)) {
       excluded.push({ id: meta.id, version: meta.version, reason: '512 动作旧格式，评估脚本不支持进程内互打' });
@@ -106,13 +118,14 @@ export function collectRegistry(modelsDir) {
   return { registry, excluded, warning: null };
 }
 
-/** 读 JSONL，丢弃玩家名不在注册表/格式非法的行。 */
+/** 读 JSONL，丢弃玩家名不在注册表/格式非法的行；作废模型（已归档）的对局不计分，按 retiredDropped 计数。 */
 export function loadMatches(statsFile, registry) {
   const matches = [];
   const warnings = [];
+  let retiredDropped = 0;
   if (!existsSync(statsFile)) {
     warnings.push(`stats file not found: ${statsFile}`);
-    return { matches, warnings };
+    return { matches, warnings, retiredDropped };
   }
   const lines = readFileSync(statsFile, 'utf8').split('\n');
   for (let idx = 0; idx < lines.length; idx++) {
@@ -136,6 +149,12 @@ export function loadMatches(statsFile, registry) {
       warnings.push(`line ${idx + 1}: players must be player_a/player_b`);
       continue;
     }
+    // 作废模型的文件已归档出 rl/models，正常不会出现在注册表；这里按文件名版本兜底过滤，
+    // 避免 zip 被拷回主目录或历史 JSONL 恢复后作废对局重新计入评分。
+    if ([a, b].some(name => RETIRED_VERSIONS.has(parseModelFile(name)?.version))) {
+      retiredDropped += 1;
+      continue;
+    }
     if (!registry.has(a) || !registry.has(b)) {
       warnings.push(`line ${idx + 1}: unknown model name(s): ${[a, b].filter(n => !registry.has(n)).join(', ')}`);
       continue;
@@ -153,7 +172,7 @@ export function loadMatches(statsFile, registry) {
       rounds: Number.isFinite(record.rounds) ? record.rounds : null,
     });
   }
-  return { matches, warnings };
+  return { matches, warnings, retiredDropped };
 }
 
 /**
@@ -384,7 +403,7 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const { registry, excluded, warning } = collectRegistry(join(PROJECT_DIR, 'rl', 'models'));
   const warnings = warning ? [warning] : [];
-  const { matches, warnings: loadWarnings } = loadMatches(opts.statsFile, registry);
+  const { matches, warnings: loadWarnings, retiredDropped } = loadMatches(opts.statsFile, registry);
   warnings.push(...loadWarnings);
 
   const ids = [...registry.keys()]
@@ -427,6 +446,7 @@ function main() {
     source: {
       file: opts.statsFile,
       matchCount: matches.length,
+      retiredMatchesDropped: retiredDropped,
       mapDist: Object.fromEntries(maps.map(map => [map, matches.filter(m => m.map === map).length])),
       targetGamesPerPair: opts.targetGamesPerPair,
       dateMin: tsList[0] ?? null,
@@ -440,7 +460,8 @@ function main() {
 
   mkdirSync(dirname(opts.out), { recursive: true });
   writeFileSync(opts.out, JSON.stringify(payload, null, 2), 'utf8');
-  console.log(`Wrote ${opts.out} — ${matches.length} matches, ${ids.length} rated models, ${maps.length + 1} league(s)`);
+  console.log(`Wrote ${opts.out} — ${matches.length} matches, ${ids.length} rated models, ${maps.length + 1} league(s)` +
+    (retiredDropped > 0 ? `（另跳过作废模型对局 ${retiredDropped} 局）` : ''));
 
   const rows = leagues.all.models.filter(m => m.games > 0)
     .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));

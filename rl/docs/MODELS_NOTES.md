@@ -43,7 +43,7 @@ v3.0.2（合法集内标签平滑 + `RL_ENT_COEF` 死变量修复 + 探索监控
 
 ### 已作废模型（归档留底，勿部署、勿纳入评估）
 
-作废模型不进上面的主列表：模型 zip 统一移入 `rl/models/deprecated/`，对应训练断点移入 `rl/checkpoints/deprecated/`，档案移入 `rl/docs/models/deprecated/`。文件全部保留仅供追溯；服务端「添加 AI」模型列表与 `round_robin` 自动发现都只扫描 `rl/models/` 顶层，不会读到这些目录。
+作废模型不进上面的主列表：模型 zip 统一移入 `rl/models/deprecated/`，对应训练断点移入 `rl/checkpoints/deprecated/`，档案移入 `rl/docs/models/deprecated/`。文件全部保留仅供追溯；服务端「添加 AI」模型列表与 `round_robin` 自动发现都只扫描 `rl/models/` 顶层，不会读到这些目录；`generateRlLeaderboard.mjs` 按版本显式排除作废模型，RL 排行榜不评分、不展示（含「未参评」区）。
 
 | 模型文件（已归档） | 档案 | 作废原因 |
 |---|---|---|

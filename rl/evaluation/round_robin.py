@@ -6,7 +6,9 @@
 - 断点续跑：按（模型对, 地图）统计 JSONL 已有局数，只补差额，已跑对局不重复；
 - 每次运行带随机盐 seed-prefix：重跑 random 图必产生新地图（静态图种子不生效，
   但引擎战斗带随机伤害浮动，每局同样不重复）；
-- 复用 rl/evaluation/evaluate_cross.py 子进程，原样保留其跨版本编码路由与配对换座逻辑。
+- 复用 rl/evaluation/evaluate_cross.py 子进程，原样保留其跨版本编码路由与配对换座逻辑；
+- 明细数据：每批次在 rl/leaderboard/details/ 落一个 JSONL（事件流回放/战略曲线/
+  动作日志/终局摘要），matches.jsonl 摘要行经 detailFile 字段关联。
 
 用法示例：
 
@@ -61,6 +63,8 @@ def parse_args():
     parser.add_argument("--device", default="auto", help="torch 设备：auto / cuda / cpu")
     parser.add_argument("--models", default=None,
                         help="逗号分隔的文件名子串过滤，只评测匹配的模型（冒烟测试用）")
+    parser.add_argument("--policy-stats", action="store_true",
+                        help="透传给 evaluate_cross：每步额外记录价值估计/策略熵，跑批耗时约翻倍")
     parser.add_argument("--dry-run", action="store_true", help="只打印任务计划，不实际对战")
     return parser.parse_args()
 
@@ -112,8 +116,8 @@ def count_existing(stats_file: Path) -> dict[tuple[str, str, str], int]:
 
 def build_command(python: str, script: Path, model_a: Path, model_b: Path,
                   map_id: str, games: int, stats_file: Path, seed_prefix: str,
-                  device: str) -> list[str]:
-    return [
+                  device: str, policy_stats: bool = False) -> list[str]:
+    command = [
         python, str(script),
         "--model-a", str(model_a),
         "--model-b", str(model_b),
@@ -124,6 +128,9 @@ def build_command(python: str, script: Path, model_a: Path, model_b: Path,
         "--seed-prefix", seed_prefix,
         "--device", device,
     ]
+    if policy_stats:
+        command.append("--policy-stats")
+    return command
 
 
 def format_eta(seconds: float) -> str:
@@ -263,7 +270,7 @@ def main():
     commands = [
         (build_command(python, evaluate_script, task["model_a"], task["model_b"],
                        task["map"], task["games"], stats_file,
-                       task["seed_prefix"], args.device),
+                       task["seed_prefix"], args.device, args.policy_stats),
          f"{task['model_a'].name} vs {task['model_b'].name} @ {task['map']}",
          task["games"])
         for task in tasks

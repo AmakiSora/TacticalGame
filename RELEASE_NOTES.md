@@ -2,6 +2,14 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.4.3
+
+- **排行榜页新增 RL 评估控制台**：把 3.4.2 的 round_robin 跑批从命令行搬进网页——在 `/leaderboard.html` 即可启动/监控/停止批量对战，结束后自动重算榜单，形成「网页编排 → 跑批 → 榜单更新」闭环。不改观测/动作/奖励语义，`rl/evaluation/round_robin.py` 本身零改动，只是加了一层 Web 管控；依赖本机 `rl/.venv`，Docker 容器内不可用（面板明示）。
+- **新增评估 API `src/api/rlEval.ts`**（`server.ts` 注册为 `rlEvalRoutes`）：`GET /api/rl/eval/status`（状态徽标、批次计划、待跑/已完成局数、本次新增局数、输出尾、knownMaps；快照含命令行与本地路径，读接口同样鉴权）；`POST /api/rl/eval/start`（maps/models 子串过滤、每对×每图目标局数、并发数、种子盐、dry-run，参数校验通过后 spawn `rl/.venv` 的 python 运行 `round_robin.py`，已有跑批进行中拒绝重复启动）；`POST /api/rl/eval/stop`（Windows 下 `taskkill /T /F` 终止整棵进程树——round_robin 下挂着 evaluate_cross 子进程与 tsx 引擎进程，必须整树杀灭否则残留）；`POST /api/rl/leaderboard/regenerate`（按需重跑 `script/generateRlLeaderboard.mjs`）。全部接口统一经 `authorizeControlRequest` 鉴权（AUTO_CONTROL_TOKEN 或仅限本机请求），前端状态轮询同样携带令牌头，401 时徽标显示「无权限」。
+- **状态持久化与断点续跑衔接**：跑批状态落盘 `runtime/rl-eval-state.json`，服务器重启后恢复展示，上次仍在运行的批次标记为 interrupted 并提示用同参数重跑断点续跑（固定 `--salt` 才会跳过已有局数）；跑批正常结束或失败后自动重算榜单，无需手动执行 `npm run rl-leaderboard`。
+- **前端「评估控制台」面板**（`public/leaderboard.html` + `leaderboard.js`）：地图池 chip 勾选、参评模型复选列表（全选/清空/已选计数，不勾选 = 全部可对战模型）、目标局数/并发/种子盐输入、dry-run 试跑；3 秒轮询驱动状态徽标、进度条与实时输出尾；「开始跑批 / 停止 / 重算榜单」操作按钮；跑批结束自动刷新页面榜单数据。地图 chip 以服务端 knownMaps 为准且仅在变化时重绘，保留用户已勾选项。
+- 测试：新增 `tests/api/rl-eval.test.ts` 13 例（状态快照与默认地图、参数校验、启动后进度跟踪与结束自动重算榜单、并发启动拒绝、停止置 stopped、重启后 running 标记 interrupted、控制令牌鉴权含状态接口、按需重算榜单、真实格式输出行解析、统计文件变化后的局数重计、进程无法启动时回落 failed 而非幽灵 running、服务器关闭时杀进程树并标记 interrupted；全部注入伪进程，不触发真实跑批）；Python 侧新增 `tests/rl/test_event_collector.py` 锁定事件流合并去重与 seq 空洞检测不变量。
+
 ## 3.4.2
 
 - **RL 模型批量对战与排行榜系统**：解决多代强化学习模型无法系统性对比实力的问题，新增「编排 → 评分 → 展示」完整闭环。

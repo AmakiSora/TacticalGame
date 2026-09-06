@@ -19,6 +19,40 @@
     .detail-meta strong { color: #dce8f0; }
     .detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 900px) { .detail-cols { grid-template-columns: 1fr; } }
+    /* 页内页签 */
+    .tab-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab-bar .tab { background: #141c22; border: 1px solid #2a3a44; color: #9ab; border-radius: 999px; padding: 7px 20px; font-size: 13px; cursor: pointer; }
+    .tab-bar .tab:hover { border-color: #3a6a7a; color: #dce8f0; }
+    .tab-bar .tab.active { border-color: #3f9b6c; color: #fff; background: #16301f; }
+    .tab-bar .tab.has-run::after { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3f9b6c; margin-left: 8px; vertical-align: 1px; animation: eval-pulse 1.6s ease-in-out infinite; }
+    @keyframes eval-pulse { 50% { opacity: .3; } }
+    /* 跑批运行中的迷你状态条（仅榜单页签显示） */
+    .eval-mini-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; background: #16301f; border: 1px solid #2f7d54; border-radius: 6px; padding: 8px 14px; margin-bottom: 14px; font-size: 13px; color: #cdd; }
+    .eval-mini-strip .dot { width: 9px; height: 9px; border-radius: 50%; background: #3f9b6c; animation: eval-pulse 1.6s ease-in-out infinite; flex: none; }
+    .eval-mini-strip button { padding: 4px 12px; font-size: 12px; }
+    /* 评估控制台 */
+    .eval-form { display: grid; gap: 14px; }
+    .eval-label { display: block; font-size: 12px; color: #9ab; margin-bottom: 6px; }
+    .eval-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .eval-chip-list label { display: inline-flex; align-items: center; gap: 6px; background: #141c22; border: 1px solid #2a3a44; border-radius: 999px; padding: 4px 12px; font-size: 12px; color: #cdd; cursor: pointer; }
+    .eval-chip-list label:has(input:checked) { border-color: #3f9b6c; color: #fff; background: #16301f; }
+    .eval-model-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .eval-model-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 2px 14px; max-height: 190px; overflow: auto; background: #141c22; border: 1px solid #2a3a44; border-radius: 6px; padding: 8px 10px; }
+    .eval-model-list label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #cdd; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .eval-model-list .ver { color: #6a8496; flex: none; }
+    .eval-row { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: flex-end; }
+    .eval-row > label { display: grid; gap: 4px; font-size: 12px; color: #9ab; }
+    .eval-row input[type="number"], .eval-row input[type="text"] { background: #141c22; border: 1px solid #2a3a44; color: #dce8f0; border-radius: 4px; padding: 5px 8px; width: 100px; }
+    #eval-salt { width: 250px; }
+    .eval-inline { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }
+    .eval-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    #eval-msg.eval-msg-err { color: #f0a0a0; }
+    .eval-hint { color: #66788a; font-size: 11px; }
+    .eval-progress { height: 10px; background: #141c22; border: 1px solid #2a3a44; border-radius: 5px; overflow: hidden; }
+    .eval-progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, #2f7d54, #3f9b6c); transition: width .5s; }
+    .eval-progress-text { margin-top: 6px; font-size: 12px; color: #9ab; }
+    #eval-output { max-height: 200px; overflow: auto; background: #0d1216; border: 1px solid #22303a; border-radius: 6px; padding: 8px 10px; font-size: 11px; line-height: 1.55; color: #9ab; white-space: pre-wrap; word-break: break-all; margin: 0; }
+    @media (max-width: 700px) { #eval-salt { width: 100%; } }
   </style>
   <script src="/version.js" defer></script>
   <script src="/leaderboard.js" defer></script>
@@ -41,6 +75,18 @@
   </header>
 
   <main>
+    <div class="tab-bar" role="tablist" aria-label="排行榜视图">
+      <button type="button" class="tab active" data-tab="board" role="tab" aria-selected="true">模型榜单</button>
+      <button type="button" class="tab" data-tab="console" role="tab" aria-selected="false" id="eval-tab-btn">评估控制台</button>
+    </div>
+
+    <div id="tab-board">
+    <div id="eval-mini-strip" class="eval-mini-strip" hidden>
+      <span class="dot" aria-hidden="true"></span>
+      <span id="eval-mini-text">评估跑批运行中</span>
+      <button type="button" class="ghost" id="eval-mini-go">查看控制台 →</button>
+    </div>
+
     <section class="meta-bar panel">
       <div class="meta-item">
         <span>数据生成时间</span>
@@ -140,6 +186,59 @@
         <div id="excluded-body" class="empty-block">加载中…</div>
       </section>
     </section>
+    </div>
+
+    <div id="tab-console" hidden>
+    <section id="eval-console" class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>评估控制台</h2>
+          <span>网页启动 round_robin.py 跑批 · 需要本机 Python venv（rl/.venv），Docker 容器内不可用</span>
+        </div>
+        <strong id="eval-status-pill" class="status-pill">加载中…</strong>
+      </div>
+      <div class="eval-form">
+        <div class="eval-field">
+          <span class="eval-label">地图池</span>
+          <div id="eval-maps" class="eval-chip-list"></div>
+        </div>
+        <div class="eval-field">
+          <span class="eval-label">参评模型（不勾选 = 全部可对战模型）</span>
+          <div class="eval-model-tools">
+            <button id="eval-model-all" type="button" class="ghost">全选</button>
+            <button id="eval-model-none" type="button" class="ghost">清空</button>
+            <span id="eval-model-count" class="eval-hint"></span>
+          </div>
+          <div id="eval-models" class="eval-model-list"></div>
+        </div>
+        <div class="eval-row">
+          <label>每对×每图目标局数
+            <input id="eval-games" type="number" value="24" min="2" max="500" step="2" />
+          </label>
+          <label>并发任务数
+            <input id="eval-jobs" type="number" value="1" min="1" max="8" />
+          </label>
+          <label>种子盐（固定盐 + 同参数重跑 = 断点续跑）
+            <input id="eval-salt" type="text" placeholder="留空 = 时间戳+随机" />
+          </label>
+          <label class="eval-inline">
+            <input id="eval-dry" type="checkbox" /> 只打印计划（试跑）
+          </label>
+        </div>
+        <div class="eval-actions">
+          <button id="eval-start" type="button">▶ 开始跑批</button>
+          <button id="eval-stop" type="button" disabled>■ 停止</button>
+          <button id="eval-regen" type="button" class="ghost">↻ 重算榜单</button>
+          <span id="eval-msg" class="eval-hint"></span>
+        </div>
+        <div id="eval-progress-wrap" hidden>
+          <div class="eval-progress"><div id="eval-progress-fill"></div></div>
+          <div id="eval-progress-text" class="eval-progress-text"></div>
+        </div>
+        <pre id="eval-output" hidden></pre>
+      </div>
+    </section>
+    </div>
   </main>
 
   <footer class="page-footer">

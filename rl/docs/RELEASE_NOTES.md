@@ -3,6 +3,66 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加一条记录。
 
+## 2026-09-07 · evaluate_cross 每局明细落盘：事件流回放/战略曲线/动作日志/策略内部量
+
+为后续离线评估模型弱点（部署构成、HQ 攻击节奏、占领行为、翻盘曲线等）提供数据基础，
+不改任何观测/动作/奖励语义与既有评分链路：
+
+- `matches.jsonl` 摘要行向后兼容扩展 6 字段：`endReason`（引擎 `result.reason`；
+  Python 侧回合/动作上限记 `max_rounds_exceeded`/`max_actions_exceeded`）、`scores`（终局双方
+  裁决分总分）、`actions`（双方动作数）、`durationSec`、`seed`（随机图种子）、`detailFile`。
+  旧读取方（round_robin 断点计数、`generateRlLeaderboard.mjs`、评估控制台行数统计）对新增字段
+  均容忍，历史记录不受影响。
+- 每批次在 `rl/leaderboard/details/<seed_prefix-时间戳-pid>.jsonl` 落盘一局一行完整明细
+  （`meta`/`summary`/`final`/`derived`/`timeline`/`actions`/`events`，schema 1）：
+  - `events`：完整事件流回放。利用 worker 快照事件带单调 seq、默认 80 条尾巴的特性，
+    Python 侧按 seq 增量合并（`EventCollector`），零协议改动拿到全量日志。
+    引擎 seq 严格连续（`src/engine/events.ts`：`seq = events.length + 1`），合并时按
+    seq 断档检测窗口滑落：单步新增超过尾巴容量导致事件永久丢失时，该局
+    `meta.eventsIncomplete=true`、`meta.eventGaps` 列出缺失区间并在 stdout 告警，
+    `derived` 同步按残缺数据对待（`timeline`/`final` 来自状态快照，不受影响）；
+    不变量单测 `tests/rl/test_event_collector.py` 锁定合并去重与空洞检测；
+  - `timeline`：每回合一帧战略快照（双方裁决分 7 分项/补给/HQ 血量/控制点/存活单位构成）；
+  - `actions`：每步决策日志（动作/合法动作数/原始下标；v3.0 模型另记 `classify_action`
+    意图与候选序号，验证候选维度选用率）；
+  - `derived`：从事件流聚合的部署构成、击杀/损失（按兵种，取自阵亡方归属）、
+    输出/承受伤害（unitId/HQ id 归属自 `game_start` 回放 payload）、经济收入、占领/偷取、
+    首占回合、CCS 补给；
+  - `final`：终局 `result`、引擎记分板（`headquartersDamage`/`unitsDestroyed`/
+    `playersEliminated`/`actionPointsUsed`/`actionMerit`）、阵亡元信息、存活构成。
+  每局结束立即追加落盘，跑批被中断时已完成对局的明细不丢（对应摘要行未写则成为
+  孤立明细，可分析、不进评分）。
+- 新 CLI：`--details-dir`（默认 `rl/leaderboard/details`）、`--no-details`、
+  `--policy-stats`（每步额外一次策略前向，记录价值估计 `value` 与掩码后策略熵 `entropy`，
+  跑批耗时约翻倍，默认关）。`round_robin.py` 增加同名开关透传（不动任何打印格式，
+  评估控制台的输出解析不受影响）。
+- 明细目录已纳入 git 管理（不在 .gitignore）；体积约 100-300KB/局。引擎战斗伤害带随机
+  浮动，同种子每局也不完全可复现，明细数据按"单局唯一快照"使用而非可重放模拟。
+- 详见 `rl/README.md`「每局明细数据（评估改进用）」。
+
+## 2026-09-06 · 排行榜页新增评估控制台：网页启动/监控/停止 round_robin 跑批
+
+不改观测/动作/奖励语义，也不改 `round_robin.py` 本身，只是给它加了一层 Web 管控：
+
+- 新增 `src/api/rlEval.ts`（`server.ts` 注册为 `rlEvalRoutes`）：
+  `GET /api/rl/eval/status`（批次进度、本次新增局数、输出尾、knownMaps；快照含命令行与
+  本地路径，与写接口同样走 `authorizeControlRequest`）；
+  `POST /api/rl/eval/start`（maps/models 子串过滤/games/jobs/salt/dryRun，参数校验后 spawn
+  `rl/.venv` 的 python 跑 `round_robin.py`）；`POST /api/rl/eval/stop`（Windows 下
+  `taskkill /T /F` 杀整棵进程树，否则 evaluate_cross 与 tsx worker 会残留）；
+  `POST /api/rl/leaderboard/regenerate`（重跑 `script/generateRlLeaderboard.mjs`）。
+  全部接口统一经 `authorizeControlRequest`（AUTO_CONTROL_TOKEN 或仅限本机请求），
+  前端状态轮询同样携带令牌头。
+- 跑批状态持久化到 `runtime/rl-eval-state.json`；服务器重启后 running 标记为 interrupted
+  并提示同参数重跑断点续跑（固定 --salt 才会跳过已有局数）。跑批正常结束/失败后自动重算榜单。
+- `/leaderboard.html` 改为页内页签：「模型榜单」（默认，原榜单内容）与「评估控制台」
+  （`#console` 哈希直达）。控制台含地图/模型勾选、局数/并发/盐配置、dry-run 试跑、
+  实时进度条与输出尾；跑批结束自动刷新页面榜单数据。跑批运行中榜单页签顶部显示
+  迷你状态条、控制台页签带呼吸指示灯。依赖本机 `rl/.venv`，Docker 容器内不可用。
+- 单元测试 `tests/api/rl-eval.test.ts`（13 例：状态快照、参数校验、进度解析、并发拒绝、停止、
+  重启中断、控制令牌（含状态接口鉴权）、榜单重算、局数重计、幽灵 running 防护、关闭杀进程树；
+  通过注入伪进程避免真实跑批）。
+
 ## 2026-09-06 · rl/ 目录重组：按职责拆分为 envs/、runners/、training/、evaluation/、docs/ 子目录
 
 纯代码搬移与引用同步，**不改任何观测/动作/奖励语义**（`bots.ts` 路由规则不变，仅指向路径改为

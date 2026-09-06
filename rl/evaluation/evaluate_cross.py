@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import torch
 from sb3_contrib import MaskablePPO
 
 # rl/ 已重组为 envs/runners/training/evaluation 子目录；把各代码目录挂上 sys.path，
@@ -42,6 +44,7 @@ for _sub in ("envs", "runners", "training", "evaluation"):
 try:
     from env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
     from env import HexGameEnv as CurrentHexGameEnv
+    from env import classify_action as classify_current_action
     from env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
     from env_v200 import HexGameEnv as LegacyHexGameEnv
     from env_v22 import HexGameEnv as V22HexGameEnv
@@ -52,6 +55,7 @@ try:
 except ImportError:  # 兼容 ``python -m rl.evaluation.evaluate_cross`` 等调用方式。
     from rl.envs.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
     from rl.envs.env import HexGameEnv as CurrentHexGameEnv
+    from rl.envs.env import classify_action as classify_current_action
     from rl.envs.env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
     from rl.envs.env_v200 import HexGameEnv as LegacyHexGameEnv
     from rl.envs.env_v22 import HexGameEnv as V22HexGameEnv
@@ -59,6 +63,11 @@ except ImportError:  # 兼容 ``python -m rl.evaluation.evaluate_cross`` 等调�
     from rl.envs.env_v25 import HexGameEnv as V25HexGameEnv
     from rl.envs.env_v26 import HexGameEnv as V26HexGameEnv
     from rl.envs.env_v27 import HexGameEnv as V27HexGameEnv
+
+# 明细数据默认目录：rl/leaderboard/details/<批次>.jsonl，一局一行。
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_DEFAULT_DETAILS_DIR = _PROJECT_ROOT / "rl" / "leaderboard" / "details"
+_SEATS = ("player_a", "player_b")
 
 
 def parse_args():
@@ -77,6 +86,11 @@ def parse_args():
                         help="每局交换座位。注意 v2.0.0 编码固定 player_a 视角，交换后旧模型会失真")
     parser.add_argument("--stats-file", default=None,
                         help="每局结果追加到该 JSONL 文件，结束时输出与历史运行累计合并的统计（大样本验收用）")
+    parser.add_argument("--details-dir", default=str(_DEFAULT_DETAILS_DIR),
+                        help=f"每局明细（事件流回放/战略曲线/动作日志）写入目录，每批次一个 JSONL 文件（默认 {_DEFAULT_DETAILS_DIR}）")
+    parser.add_argument("--no-details", action="store_true", help="不写每局明细文件")
+    parser.add_argument("--policy-stats", action="store_true",
+                        help="每步额外记录模型内部信号（价值估计/策略熵）；需对每个动作多做一次策略前向，跑批耗时约翻倍")
     parser.add_argument("--verbose", action="store_true", help="打印每个动作")
     parser.add_argument("--seed-prefix", default="cross", help="随机图评估种子前缀；配对换边局共享同一种子")
     return parser.parse_args()
@@ -178,14 +192,17 @@ class EngineWorker:
 class SideController:
     """一个座位的选手：加载模型并使用其训练版本的编码/合法动作逻辑。"""
 
-    def __init__(self, label: str, model_path: str, side: str, device: str):
+    def __init__(self, label: str, model_path: str, side: str, device: str,
+                 record_policy_stats: bool = False):
         self.label = label
         self.model_path = model_path
         self.side = side
         self.opponent = "player_b" if side == "player_a" else "player_a"
+        self.record_policy_stats = record_policy_stats
         self.model = MaskablePPO.load(model_path, device=device)
 
         n_actions = int(getattr(self.model.action_space, "n", -1))
+        self.n_actions = n_actions
         obs_dim = int(self.model.observation_space.shape[0]) if getattr(self.model.observation_space, "shape", ()) else 0
         if n_actions == LEGACY_MAX_ACTIONS:
             helper_cls, self.version = LegacyHexGameEnv, f"v2.0.0 ({n_actions} 动作)"
@@ -224,17 +241,35 @@ class SideController:
         # 清空 v2.1 的稳定槽位记录，使其与新对局的部署状态一致。
         self.helper.unit_slots = {"player_a": {}, "player_b": {}}
 
-    def act(self, state: dict[str, Any], stochastic: bool) -> tuple[str, dict[str, Any]]:
+    def act_with_info(self, state: dict[str, Any], stochastic: bool) -> tuple[str, dict[str, Any], dict[str, Any]]:
+        """与 act 相同的决策，额外返回本步诊断信息（供明细动作日志使用）。"""
         actions = self.helper._legal_actions(state, self.side)
         if not any(action[0] for action in actions):
-            return "end_turn", {}
+            return "end_turn", {}, {"forced": True, "legalActions": 0}
         observation = self.helper._encode_state(state)
         mask = np.asarray([bool(action[0]) for action in actions], dtype=bool)
         action_index, _ = self.model.predict(observation, deterministic=not stochastic, action_masks=mask)
         index = int(action_index)
         if index >= len(actions) or not actions[index][0]:
-            return "end_turn", {}
-        return actions[index]
+            return "end_turn", {}, {"forced": True, "legalActions": len(actions), "actionIndex": index}
+        info: dict[str, Any] = {"forced": False, "legalActions": len(actions), "actionIndex": index}
+        if self.n_actions == CURRENT_MAX_ACTIONS:
+            # v3.0 专属：候选序号是 155 动作空间的新决策维度，记录其选用情况。
+            intent, candidate = classify_current_action(index)
+            info["intent"] = intent
+            info["candidate"] = candidate
+        if self.record_policy_stats:
+            obs_tensor = self.model.policy.obs_to_tensor(np.asarray(observation)[None])[0]
+            with torch.no_grad():
+                value = self.model.policy.predict_values(obs_tensor)
+                dist = self.model.policy.get_distribution(obs_tensor, action_masks=mask)
+                info["value"] = float(value.detach().cpu().reshape(-1)[0])
+                info["entropy"] = float(dist.entropy().detach().cpu().reshape(-1)[0])
+        return actions[index][0], actions[index][1], info
+
+    def act(self, state: dict[str, Any], stochastic: bool) -> tuple[str, dict[str, Any]]:
+        action_type, payload, _ = self.act_with_info(state, stochastic)
+        return action_type, payload
 
     @property
     def short(self) -> str:
@@ -250,24 +285,358 @@ def reset_command(args, game_index: int) -> dict[str, Any]:
     return command
 
 
-def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], args, game_index: int) -> tuple[str | None, int, int]:
-    state = worker.call(reset_command(args, game_index))
+class EventCollector:
+    """按 seq 增量合并 worker 快照的事件尾巴，拼出完整事件流。
+
+    worker 快照默认只携带最近 80 条事件（编码只需最近一回合），但事件带
+    单调递增的 seq——每次响应里 seq 大于已见最大值的部分即为本步新增。
+    逐步合并即可在零协议改动、近零开销下拿到全量回放。
+
+    尾巴装不下单步全部新增事件时，窗口外的事件已永久丢失。引擎 seq 严格
+    连续（src/engine/events.ts：events.length + 1），因此以 seq 断档检测
+    窗口滑落：gaps 记录缺失区间，非空即 events 拼不出全量回放，调用方
+    应在明细中标记 eventsIncomplete，而不是静默输出残缺数据。
+
+    注意：worker 的 reset 不触发 game_start/round_start 事件（首条动作事件
+    seq 即为 1），初始单位与 HQ 的归属从 reset 状态快照播种（seed_ownership）。
+    """
+
+    def __init__(self) -> None:
+        self.events: list[dict[str, Any]] = []
+        self._max_seq = 0
+        self.gaps: list[tuple[int, int]] = []
+        self.unit_owner: dict[str, str] = {}
+        self.hq_owner: dict[str, str] = {}
+
+    def seed_ownership(self, state: dict[str, Any]) -> None:
+        for unit in state.get("units") or []:
+            if unit.get("id"):
+                self.unit_owner[unit["id"]] = unit.get("owner")
+        for seat, hq in (state.get("headquarters") or {}).items():
+            if isinstance(hq, dict) and hq.get("id"):
+                self.hq_owner[hq["id"]] = seat
+
+    def absorb(self, state: dict[str, Any]) -> None:
+        new_events = sorted(
+            (event for event in state.get("events") or []
+             if isinstance(event.get("seq"), int) and event["seq"] > self._max_seq),
+            key=lambda event: event["seq"],
+        )
+        if not new_events:
+            return
+        prev = self._max_seq
+        for event in new_events:
+            seq = event["seq"]
+            if seq != prev + 1:
+                self.gaps.append((prev + 1, seq - 1))
+            self.events.append(event)
+            prev = seq
+        self._max_seq = prev
+
+
+def _round_by_seq(events: list[dict[str, Any]]) -> dict[int, int]:
+    """事件 seq → 回合号。
+
+    标准模式的回合并无 round_start 事件，玩家切换时每步都会发 turn_end
+    （roundNumber = 发出时的当前回合），是唯一可靠的回合推进标记；
+    同时结算模式的 round_start（roundNumber = 新回合）优先采用。
+    终局事件跟随最后一个 turn_end 归入结束时的回合，不会被多记一轮。
+    """
+    rounds: dict[int, int] = {}
+    current = 1
+    for event in events:
+        seq = event.get("seq")
+        if isinstance(seq, int):
+            rounds[seq] = current
+        event_type = event.get("type")
+        round_number = (event.get("payload") or {}).get("roundNumber")
+        if not isinstance(round_number, int) or round_number <= 0:
+            continue
+        if event_type == "round_start":
+            current = round_number
+        elif event_type == "turn_end":
+            current = round_number
+    return rounds
+
+
+def _tally_add(tally: dict[str, int], key: Any, amount: int = 1) -> None:
+    name = str(key if key is not None else "?")
+    tally[name] = tally.get(name, 0) + amount
+
+
+def _score_view(state: dict[str, Any], seat: str) -> dict[str, Any]:
+    return (state.get("adjudication") or {}).get("scores", {}).get(seat) or {}
+
+
+def _hq_status(state: dict[str, Any], seat: str) -> dict[str, Any]:
+    hq = (state.get("headquarters") or {}).get(seat) or {}
+    return {"hp": hq.get("hp"), "maxHp": hq.get("maxHp"), "alive": hq.get("alive")}
+
+
+def _alive_units(state: dict[str, Any]) -> dict[str, dict[str, int]]:
+    alive: dict[str, dict[str, int]] = {seat: {} for seat in _SEATS}
+    for unit in state.get("units") or []:
+        owner = unit.get("owner")
+        if unit.get("alive") and owner in alive:
+            _tally_add(alive[owner], unit.get("type"))
+    return alive
+
+
+def _owned_control_points(state: dict[str, Any]) -> dict[str, int]:
+    counts: dict[str, int] = {seat: 0 for seat in _SEATS}
+    for point in state.get("controlPoints") or []:
+        if point.get("owner") in counts:
+            counts[point["owner"]] += 1
+    return counts
+
+
+def _state_snapshot(state: dict[str, Any]) -> dict[str, Any]:
+    """一帧战略快照：双方裁决分 7 分项、补给、HQ、控制点、存活单位构成。"""
+    return {
+        "round": (state.get("turn") or {}).get("roundNumber"),
+        "scores": {seat: _score_view(state, seat) for seat in _SEATS},
+        "supplies": {seat: ((state.get("resources") or {}).get(seat) or {}).get("supplies")
+                     for seat in _SEATS},
+        "headquarters": {seat: _hq_status(state, seat) for seat in _SEATS},
+        "controlPoints": _owned_control_points(state),
+        "aliveUnits": _alive_units(state),
+    }
+
+
+def _final_summary(state: dict[str, Any]) -> dict[str, Any]:
+    """终局完整摘要：引擎结算结果 + 引擎记分板 + 阵亡元信息。"""
+    players: dict[str, Any] = {}
+    for seat in _SEATS:
+        raw = (state.get("players") or {}).get(seat) or {}
+        players[seat] = {
+            "status": raw.get("status"),
+            "eliminatedAt": raw.get("eliminatedAt"),
+            "eliminatedBy": raw.get("eliminatedBy"),
+            "stats": raw.get("stats") or {},
+            "adjudicationScore": raw.get("adjudicationScore"),
+        }
+    snapshot = _state_snapshot(state)
+    return {
+        "winner": state.get("winner"),
+        "roundNumber": snapshot["round"],
+        "result": state.get("result"),
+        "players": players,
+        "scores": snapshot["scores"],
+        "supplies": snapshot["supplies"],
+        "headquarters": snapshot["headquarters"],
+        "controlPoints": snapshot["controlPoints"],
+        "aliveUnits": snapshot["aliveUnits"],
+    }
+
+
+def _empty_side_stats() -> dict[str, Any]:
+    return {
+        "deploysByType": {}, "deployCost": 0,
+        "lossesByType": {}, "killsByType": {},
+        "damageDealt": 0, "damageDealtToHq": 0, "damageTaken": 0,
+        "incomeTotal": 0, "incomeControlTotal": 0,
+        "captures": 0, "steals": 0, "firstCaptureRound": None,
+        "comebackSupplies": 0,
+    }
+
+
+def _derive_event_stats(collector: EventCollector) -> dict[str, Any]:
+    """从完整事件流聚合双方战术统计。
+
+    unit_death 事件只带阵亡方归属不带击杀方，故 killsByType 取对手
+    lossesByType（战斗击杀恒来自对手；炮击死亡不含在内，由 damageTaken 体现）。
+    受击方归属靠 unitId/HQ id → 座位 的映射（reset 快照播种，deploy/game_start 补充）。
+    """
+    events = collector.events
+    stats = {seat: _empty_side_stats() for seat in _SEATS}
+    unit_owner = collector.unit_owner
+    hq_owner = collector.hq_owner
+    round_by_seq = _round_by_seq(events)
+    for event in events:
+        event_type = event.get("type")
+        payload = event.get("payload") or {}
+        if event_type == "game_start":
+            # game_start 嵌入完整开局回放；worker 对局不会触发，仅作兼容兜底。
+            for unit in payload.get("units") or []:
+                if unit.get("id"):
+                    unit_owner[unit["id"]] = unit.get("owner")
+            for seat, hq in (payload.get("headquarters") or {}).items():
+                if isinstance(hq, dict) and hq.get("id"):
+                    hq_owner[hq["id"]] = seat
+        elif event_type == "deploy":
+            owner = payload.get("owner")
+            if owner in stats:
+                _tally_add(stats[owner]["deploysByType"], payload.get("unitType"))
+                stats[owner]["deployCost"] += payload.get("cost") or 0
+            if payload.get("unitId"):
+                unit_owner[payload["unitId"]] = owner
+        elif event_type == "attack":
+            owner = payload.get("owner")
+            actual = payload.get("actualDamage") or 0
+            if owner in stats:
+                stats[owner]["damageDealt"] += actual
+                if payload.get("targetKind") == "headquarters":
+                    stats[owner]["damageDealtToHq"] += actual
+            target_id = payload.get("targetId")
+            if payload.get("targetKind") == "headquarters":
+                target_owner = hq_owner.get(target_id)
+            else:
+                target_owner = unit_owner.get(target_id)
+            if target_owner in stats:
+                stats[target_owner]["damageTaken"] += actual
+        elif event_type == "artillery_damage":
+            victim = payload.get("owner")
+            if victim in stats:
+                stats[victim]["damageTaken"] += payload.get("damage") or 0
+        elif event_type == "unit_death":
+            victim = payload.get("owner")
+            if victim in stats:
+                _tally_add(stats[victim]["lossesByType"], payload.get("type"))
+            unit_owner.pop(payload.get("unitId"), None)
+        elif event_type == "control_point_captured":
+            owner = payload.get("owner")
+            if owner in stats:
+                stats[owner]["captures"] += 1
+                previous = payload.get("previousOwner")
+                if previous and previous != owner:
+                    stats[owner]["steals"] += 1
+                if stats[owner]["firstCaptureRound"] is None:
+                    stats[owner]["firstCaptureRound"] = round_by_seq.get(event.get("seq"))
+        elif event_type == "income":
+            owner = payload.get("owner")
+            if owner in stats:
+                stats[owner]["incomeTotal"] += payload.get("amount") or 0
+                stats[owner]["incomeControlTotal"] += payload.get("control") or 0
+        elif event_type == "comeback_supply":
+            owner = payload.get("owner")
+            if owner in stats:
+                stats[owner]["comebackSupplies"] += payload.get("amount") or 0
+    other = {"player_a": "player_b", "player_b": "player_a"}
+    for seat, seat_stats in stats.items():
+        seat_stats["killsByType"] = dict(stats[other[seat]]["lossesByType"])
+    return stats
+
+
+class DetailWriter:
+    """每批次一个明细 JSONL；每局结束立即落盘，跑批中断时已完成对局不丢。"""
+
+    def __init__(self, details_dir: Path | None, batch_id: str):
+        self.path = details_dir / f"{batch_id}.jsonl" if details_dir else None
+        if self.path:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def append(self, record: dict[str, Any]) -> None:
+        if not self.path:
+            return
+        with self.path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    def display_path(self) -> str | None:
+        """供 matches.jsonl 摘要引用：项目根内用相对路径，否则绝对路径（posix 风格）。"""
+        if not self.path:
+            return None
+        resolved = self.path.resolve()
+        try:
+            return resolved.relative_to(_PROJECT_ROOT).as_posix()
+        except ValueError:
+            return resolved.as_posix()
+
+
+def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], args,
+                  game_index: int) -> tuple[str | None, int, int, dict[str, Any]]:
+    """跑完一局，返回 (winner, acted, rounds, detail)；detail 为该局完整明细。"""
+    started_at = time.perf_counter()
+    command = reset_command(args, game_index)
+    map_seed = (command.get("random") or {}).get("seed")
+    collector = EventCollector()
+    state = worker.call(command)
+    collector.seed_ownership(state)
+    collector.absorb(state)
+
+    timeline_by_round: dict[int, dict[str, Any]] = {}
+    action_log: list[dict[str, Any]] = []
     acted = 0
+    rounds_timeout = False
     while acted < args.max_actions:
         if state.get("phase") == "game_over":
             break
-        if int(state.get("turn", {}).get("roundNumber", 1)) > args.max_rounds:
-            return None, acted, int(state.get("turn", {}).get("roundNumber", 1))
+        round_number = int(state.get("turn", {}).get("roundNumber", 1))
+        if round_number > args.max_rounds:
+            rounds_timeout = True
+            break
+        # 同一回合的快照互相覆盖，保留的是该回合最后一次动作后的状态。
+        timeline_by_round[round_number] = _state_snapshot(state)
         side = state.get("turn", {}).get("currentPlayerId")
         controller = seat_map.get(side)
         if controller is None:
             raise RuntimeError(f"unknown current player: {side!r}")
-        action_type, payload = controller.act(state, args.stochastic)
+        action_type, payload, info = controller.act_with_info(state, args.stochastic)
         if args.verbose:
-            print(f"  r{state.get('turn', {}).get('roundNumber', '?')} {controller.short}: {action_type} {payload}")
+            print(f"  r{round_number} {controller.short}: {action_type} {payload}")
+        action_log.append({
+            "seat": side,
+            "round": round_number,
+            "action": {"type": action_type, **payload},
+            **info,
+        })
         state = worker.apply(side, action_type, payload)
+        collector.absorb(state)
         acted += 1
-    return state.get("winner"), acted, int(state.get("turn", {}).get("roundNumber", 1))
+    timeline_by_round[int(state.get("turn", {}).get("roundNumber", 1))] = _state_snapshot(state)
+
+    duration = time.perf_counter() - started_at
+    if state.get("phase") == "game_over":
+        result = state.get("result") or {}
+        end_reason = result.get("reason") or "unknown"
+    elif rounds_timeout:
+        end_reason = "max_rounds_exceeded"
+    else:
+        end_reason = "max_actions_exceeded"
+
+    if collector.gaps:
+        # 单步新增超过快照尾巴（80 条）才会发生；derived 同样取自事件流，一并失真。
+        missing = sum(end - start + 1 for start, end in collector.gaps)
+        ranges = "、".join(f"{start}-{end}" if start != end else str(start)
+                           for start, end in collector.gaps)
+        print(f"  警告：事件流缺失 {missing} 条（seq {ranges}），该局明细 events/derived 不完整"
+              f"（timeline/final 不受影响）")
+
+    detail = {
+        "schema": 1,
+        "meta": {
+            "gameIndex": game_index,
+            "map": args.map_id,
+            "mapSeed": map_seed,
+            "models": {seat: {"name": controller.label, "version": controller.version,
+                              "path": controller.model_path}
+                       for seat, controller in seat_map.items()},
+            "params": {
+                "swapSides": bool(args.swap_sides),
+                "stochastic": bool(args.stochastic),
+                "maxRounds": args.max_rounds,
+                "maxActions": args.max_actions,
+                "device": args.device,
+                "seedPrefix": args.seed_prefix,
+                "policyStats": bool(args.policy_stats),
+            },
+            "durationSec": round(duration, 3),
+            "eventsIncomplete": bool(collector.gaps),
+            "eventGaps": collector.gaps,
+        },
+        "summary": {
+            "winnerSeat": state.get("winner"),
+            "endReason": end_reason,
+            "rounds": int(state.get("turn", {}).get("roundNumber", 1)),
+            "actions": {seat: sum(1 for entry in action_log if entry["seat"] == seat)
+                        for seat in _SEATS},
+        },
+        "final": _final_summary(state),
+        "derived": _derive_event_stats(collector),
+        "timeline": [timeline_by_round[round_number] for round_number in sorted(timeline_by_round)],
+        "actions": action_log,
+        "events": collector.events,
+    }
+    return state.get("winner"), acted, detail["summary"]["rounds"], detail
 
 
 def main():
@@ -280,10 +649,18 @@ def main():
     name_b = args.name_b or Path(args.model_b).name
     names = {"player_a": name_a, "player_b": name_b}
 
+    details_dir = None if args.no_details else Path(args.details_dir)
+    batch_id = f"{args.seed_prefix}-{time.strftime('%Y%m%d_%H%M%S')}-{os.getpid()}"
+    writer = DetailWriter(details_dir, batch_id)
+    detail_path = writer.display_path()
+    if detail_path:
+        print(f"明细输出：{detail_path}")
+
     workers = [EngineWorker()]
     try:
         controllers = {
-            side: SideController(names[side], path, side, args.device)
+            side: SideController(names[side], path, side, args.device,
+                                 record_policy_stats=args.policy_stats)
             for side, path in (("player_a", args.model_a), ("player_b", args.model_b))
         }
         tally: dict[str, int] = {name_a: 0, name_b: 0, "draw": 0}
@@ -297,8 +674,10 @@ def main():
                 # 第 3 局起座位反复失效（v2.5.0 验收时踩到）。
                 current = {seat: (controller.label, controller.model_path) for seat, controller in controllers.items()}
                 controllers = {
-                    "player_a": SideController(current["player_b"][0], current["player_b"][1], "player_a", args.device),
-                    "player_b": SideController(current["player_a"][0], current["player_a"][1], "player_b", args.device),
+                    "player_a": SideController(current["player_b"][0], current["player_b"][1], "player_a", args.device,
+                                               record_policy_stats=args.policy_stats),
+                    "player_b": SideController(current["player_a"][0], current["player_a"][1], "player_b", args.device,
+                                               record_policy_stats=args.policy_stats),
                 }
                 names = {"player_a": current["player_b"][0], "player_b": current["player_a"][0]}
             for controller in controllers.values():
@@ -306,8 +685,12 @@ def main():
 
             print(f"— 第 {game_index}/{args.games} 局（{controllers['player_a'].short}"
                   f" vs {controllers['player_b'].short}）")
-            winner, acted, rounds = play_one_game(workers[0], controllers, args, game_index)
+            winner, acted, rounds, detail = play_one_game(workers[0], controllers, args, game_index)
             seats = {seat: controller.label for seat, controller in controllers.items()}
+            writer.append(detail)
+            end_reason = detail["summary"]["endReason"]
+            final_scores = {seat: (detail["final"]["scores"].get(seat) or {}).get("total")
+                            for seat in _SEATS}
             if winner in (None, "draw"):
                 tally["draw"] += 1
                 winner_label = "draw"
@@ -323,8 +706,14 @@ def main():
                 "players": seats,
                 "winner": winner_label,
                 "rounds": rounds,
+                "endReason": end_reason,
+                "scores": final_scores,
+                "actions": detail["summary"]["actions"],
+                "durationSec": detail["meta"]["durationSec"],
+                "seed": detail["meta"]["mapSeed"],
+                "detailFile": detail_path,
             })
-            print(f"  结果：{result}（{rounds} 回合 / {acted} 动作）")
+            print(f"  结果：{result}（{rounds} 回合 / {acted} 动作 / {end_reason}）")
 
         print("\n===== 总结（本次运行）=====")
         for name in (name_a, name_b, "draw"):

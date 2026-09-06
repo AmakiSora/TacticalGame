@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.4.2`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.4.3`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 Do **not** run `node skill/ai-player.mjs` (or the copy under this skill directory) to delegate turns. That script is for tests/demos only. `skill/wait-turn.mjs` is the only script you should run during a game, and only for waiting between turns.
 

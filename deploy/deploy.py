@@ -55,7 +55,7 @@ EXCLUDE_PATTERNS = [
     r'records/', r'records$', r'deploy/', r'deploy$',
     # RL 训练产物与 Windows 本地环境体积大且服务器用不上（镜像内重建）
     r'^rl/\.venv', r'^rl/checkpoints', r'^rl/tb', r'^rl/distill',
-    r'^rl/test-output', r'^rl/selfplay', r'__pycache__',
+    r'^rl/models/deprecated', r'^rl/test-output', r'^rl/selfplay', r'__pycache__',
 ]
 
 

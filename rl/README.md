@@ -15,7 +15,7 @@ Transformer 棋盘编码器、混合地图、后台配对评估和蒸馏冷启�
 | `rl/training/` | 训练与数据管线：`train.py`（PPO 主循环）、`distill.py`（老师采样/蒸馏冷启动）、`local_env.py` + `local-worker.ts`（进程内调用 TS 引擎）、`extractors.py`（网络结构）、`eval_worker.py`（后台配对评估） |
 | `rl/evaluation/` | 离线评估：`evaluate_cross.py`（跨版本对战）、`round_robin.py`（循环赛） |
 | `rl/docs/` | `RELEASE_NOTES.md`（改动记录，必读）、`MODELS_NOTES.md`（模型档案） |
-| `rl/models/`、`rl/checkpoints/`、`rl/tb/`、`rl/selfplay/`、`rl/distill/`、`rl/leaderboard/` | 训练产物（模型 zip、断点、TensorBoard 日志、自对弈快照、蒸馏数据、榜单），均已 gitignore |
+| `rl/models/`、`rl/checkpoints/`、`rl/tb/`、`rl/selfplay/`、`rl/distill/`、`rl/leaderboard/` | 训练产物（模型 zip、断点、TensorBoard 日志、自对弈快照、蒸馏数据、榜单），均已 gitignore；作废模型归档在 `rl/models/deprecated/`、`rl/checkpoints/deprecated/`，档案在 `rl/docs/models/deprecated/`（见 `rl/docs/MODELS_NOTES.md`「已作废模型」） |
 | `rl/test-output/` | 本地实验区：`scripts/`（一次性诊断与评估脚本）、`launchers/`（.bat 训练配方）、`logs/`、`stats/`、`models/`、`checkpoints/`，已 gitignore |
 
 根目录只保留 `README.md` 与 `requirements.txt`。

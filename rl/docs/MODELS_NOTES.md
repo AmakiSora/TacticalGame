@@ -39,13 +39,20 @@ v3.0.2（合法集内标签平滑 + `RL_ENT_COEF` 死变量修复 + 探索监控
 | `hex_ppo_v2.1.3_20260826_default_rule_defensive_800000.zip` | [v2.1.3](models/v2.1.3.md) | 历史 | 单一 defensive 对手 + 独特超参（lr 1e-4/gamma 0.995）；弱于 v2.0.0、强于 v2.1.4–v2.1.8 |
 | `hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip` | [v2.1.1](models/v2.1.1.md) | 历史 | 早期 v2.1 模型（相对视角 + 12 稳定槽首批），跨版本评估中弱于 v2.0.0 |
 | `hex_ppo_v2.0.0_20260824_default_rule_500000.zip` | [v2.0.0](models/v2.0.0.md) | 基准/历史 | 规则对手 + 固定意图槽（38 动作）；唯一能在主场满血出战的旧模型，v2.1.x 的模型对手与验收基准都是它 |
-| `hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip` | [v2.1.8](models/v2.1.8.md) | **作废** | 在回合交替损坏的环境下训练（从 v2.1.7 崩溃的 12 万步断点续训），自评 100% 胜率为虚假数据 |
-| `hex_ppo_v2.1.6_20260827_default_modelmix_800000.zip` | [v2.1.6](models/v2.1.6.md) | **作废** | 训练环境仍丢失占点奖励信号，互打全败 |
-| `hex_ppo_v2.1.5_20260827_default_modelmix_600000.zip` | [v2.1.5](models/v2.1.5.md) | **作废** | 移动只走一格 + 无占点信号环境下训练，互打全败 |
-| `hex_ppo_v2.1.4_20260826_default_modelmix_800000.zip` | [v2.1.4](models/v2.1.4.md) | **作废** | 模型对手动作映射错位，训练对手实为噪声 |
 | `hex_ppo_v1.0.0_20260824_default_random_opponent_120000.zip` | [v1.0.0](models/v1.0.0.md) | 历史 | 512 动作随机对手基线，仅由 `run_model_v100.py` 路由；v1.0.0 唯一保留的模型文件（早期实验版 100096 已作为冗余删除，详见档案） |
 
-注意：不存在 v2.1.7 模型文件（该版本训练在约 13 万步处因对手回合规避崩溃而中断，其续训产物即上表的 v2.1.8 文件，同样作废）。v2.1.2/v2.1.9/v2.2.1/v2.3.0 等只改工具/环境、无独立交付模型的版本，见下方「版本演进与路由规则」及相关档案。
+### 已作废模型（归档留底，勿部署、勿纳入评估）
+
+作废模型不进上面的主列表：模型 zip 统一移入 `rl/models/deprecated/`，对应训练断点移入 `rl/checkpoints/deprecated/`，档案移入 `rl/docs/models/deprecated/`。文件全部保留仅供追溯；服务端「添加 AI」模型列表与 `round_robin` 自动发现都只扫描 `rl/models/` 顶层，不会读到这些目录。
+
+| 模型文件（已归档） | 档案 | 作废原因 |
+|---|---|---|
+| `rl/models/deprecated/hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip` | [v2.1.8](models/deprecated/v2.1.8.md) | 在回合交替损坏的环境下训练（从 v2.1.7 崩溃的 12 万步断点续训），自评 100% 胜率为虚假数据 |
+| `rl/models/deprecated/hex_ppo_v2.1.6_20260827_default_modelmix_800000.zip` | [v2.1.6](models/deprecated/v2.1.6.md) | 训练环境仍丢失占点奖励信号，互打全败 |
+| `rl/models/deprecated/hex_ppo_v2.1.5_20260827_default_modelmix_600000.zip` | [v2.1.5](models/deprecated/v2.1.5.md) | 移动只走一格 + 无占点信号环境下训练，互打全败 |
+| `rl/models/deprecated/hex_ppo_v2.1.4_20260826_default_modelmix_800000.zip` | [v2.1.4](models/deprecated/v2.1.4.md) | 模型对手动作映射错位，训练对手实为噪声 |
+
+注意：不存在 v2.1.7 模型文件（该版本训练在约 13 万步处因对手回合规避崩溃而中断，其续训产物即上方归档表中的 v2.1.8 文件，同样作废）。v2.1.2/v2.1.9/v2.2.1/v2.3.0 等只改工具/环境、无独立交付模型的版本，见下方「版本演进与路由规则」及相关档案。
 
 ## 模型检查点与测试快照
 
@@ -54,10 +61,10 @@ v3.0.2（合法集内标签平滑 + `RL_ENT_COEF` 死变量修复 + 探索监控
 - `rl/checkpoints/default/20260824-034840/`：v2.0.0，20,000–500,000 步，`best/` 为 500,000 步版本。
 - `rl/checkpoints/default/20260825-053124/`：v2.1.1，20,000–500,000 步，`best/` 对应 480,000 步。
 - `rl/checkpoints/default/20260826-050439/`：v2.1.3（defensive 对手），至 800,000 步。
-- `rl/checkpoints/default/20260826-151230/`：v2.1.4，至 800,000 步。
-- `rl/checkpoints/default/20260827-010723/`：v2.1.5，至 600,000 步。
-- `rl/checkpoints/default/20260827-044352/`：v2.1.6，至 800,000 步。
-- `rl/checkpoints/default/20260827-124430/`：v2.1.7→v2.1.8 续训运行（首次运行在约 13 万步处崩溃），至 920,000 步。
+- `rl/checkpoints/deprecated/20260826-151230/`：v2.1.4（作废），至 800,000 步。
+- `rl/checkpoints/deprecated/20260827-010723/`：v2.1.5（作废），至 600,000 步。
+- `rl/checkpoints/deprecated/20260827-044352/`：v2.1.6（作废），至 800,000 步。
+- `rl/checkpoints/deprecated/20260827-124430/`：v2.1.7→v2.1.8 续训运行（作废；首次运行在约 13 万步处崩溃），至 920,000 步。
 - `rl/checkpoints/default/20260827-182746/`：v2.2.0，至 800,000 步；`best/best_model.zip`（12 万步）即交付模型来源。
 - `rl/checkpoints/default/`：v1 随机对手的 20,000–120,000 步 checkpoint 和 best 文件。
 - `rl/checkpoints/random/20260829-055121/`：v2.3.1（随机图 + 并行），`best/` 为约 7 万步评估 best。
@@ -114,6 +121,8 @@ v3.0.2（合法集内标签平滑 + `RL_ENT_COEF` 死变量修复 + 探索监控
 ## 新增模型时的固定模板
 
 以后新增模型请在 `rl/docs/models/` 下新建 `<版本号>.md`（**一个模型一个文件**），复制下面的结构；并在本页「模型状态总表」加一行（版本列链接到新档案）、在「版本演进与路由规则」补一行。不要只在总表里追加一行。
+
+模型一旦作废：zip 移入 `rl/models/deprecated/`、训练断点移入 `rl/checkpoints/deprecated/`、档案移入 `rl/docs/models/deprecated/`（档案内「文件」路径同步改），并把总表行从主表挪到「已作废模型」归档表。
 
 ```markdown
 # <版本号> — <一句话定位>（<动作空间 / 观测维度>）

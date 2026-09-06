@@ -540,6 +540,9 @@
       evalEl['eval-status-pill'].textContent = unauthorized ? '无权限' : '离线';
       evalEl['eval-status-pill'].classList.remove('ok');
       evalEl['eval-status-pill'].classList.add('err');
+      // 断连时不能保留上一次成功轮询的"运行中"画面；恢复轮询后若仍在跑会自动重新出现。
+      evalEl['eval-tab-btn'].classList.remove('has-run');
+      evalEl['eval-mini-strip'].hidden = true;
       evalMsg(unauthorized
         ? '状态获取被拒绝：已配置 AUTO_CONTROL_TOKEN 或非本机访问，请在对局/观战页设置中保存控制令牌'
         : `状态获取失败：${err.message}`, 'err');

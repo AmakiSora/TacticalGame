@@ -27,6 +27,8 @@ WORKDIR /app
 # 需要 python 虚拟环境与训练模型（CPU 版 torch）。
 # 部署目标为国内 VPS，apt/pip 使用阿里云镜像加速；
 # torch 从阿里云 pytorch-wheels 的 cpu 目录取 CPU-only 轮子，避免引入 CUDA 依赖。
+# 必须钉住 +cpu 版本：cpu 镜像站同步滞后于 PyPI，不钉版本时 pip 会解析到
+# 更高版本的 CUDA 版 torch（连带数 GB 的 nvidia 依赖），2GB 内存的 VPS 直接 OOM。
 RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
   && apt-get update \
   && apt-get install -y --no-install-recommends python3 python3-venv \
@@ -36,7 +38,7 @@ RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debia
 COPY rl/requirements.txt /tmp/rl-requirements.txt
 RUN /opt/rl-venv/bin/pip install --no-cache-dir \
       --find-links https://mirrors.aliyun.com/pytorch-wheels/cpu/ \
-      --index-url https://mirrors.aliyun.com/pypi/simple/ torch \
+      --index-url https://mirrors.aliyun.com/pypi/simple/ torch==2.13.0+cpu \
   && /opt/rl-venv/bin/pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r /tmp/rl-requirements.txt \
   && rm /tmp/rl-requirements.txt
 

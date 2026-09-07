@@ -30,6 +30,8 @@
     .eval-mini-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; background: #16301f; border: 1px solid #2f7d54; border-radius: 6px; padding: 8px 14px; margin-bottom: 14px; font-size: 13px; color: #cdd; }
     .eval-mini-strip .dot { width: 9px; height: 9px; border-radius: 50%; background: #3f9b6c; animation: eval-pulse 1.6s ease-in-out infinite; flex: none; }
     .eval-mini-strip button { padding: 4px 12px; font-size: 12px; }
+    /* display:flex 的优先级会压过 hidden 属性的 UA 默认 display:none，必须显式声明隐藏态。 */
+    .eval-mini-strip[hidden] { display: none; }
     /* 评估控制台 */
     .eval-form { display: grid; gap: 14px; }
     .eval-label { display: block; font-size: 12px; color: #9ab; margin-bottom: 6px; }

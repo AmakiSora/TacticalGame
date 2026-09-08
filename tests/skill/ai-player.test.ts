@@ -165,7 +165,7 @@ describe('AI player skill documentation', () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 
     expect(skill).toContain('## Manual Turn Loop');
-    expect(skill).toContain('Do **not** run `node skill/ai-player.mjs`');
+    expect(skill).toContain('Do **not** run `ai-player.mjs`');
     expect(skill).toContain('run that mode\'s checklist, pick one legal action');
     expect(skill).toContain('Brief rationale, then the matching endpoint');
     expect(skill).toContain('Refresh state after every success and reason again');

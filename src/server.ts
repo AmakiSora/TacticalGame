@@ -9,6 +9,7 @@ import { rlEvalRoutes } from './api/rlEval.js';
 import { actionsRoutes } from './api/actions.js';
 import { closeSseConnections, eventsRoutes } from './api/events.js';
 import { mapsRoutes } from './api/maps.js';
+import { skillRoutes } from './api/skill.js';
 import { globalStore } from './state/store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -110,6 +111,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(rlEvalRoutes);
   await app.register(actionsRoutes);
   await app.register(eventsRoutes);
+  await app.register(skillRoutes);
   await app.register(fastifyStatic, { root: PUBLIC_DIR, prefix: '/' });
   ready = true;
   return app;

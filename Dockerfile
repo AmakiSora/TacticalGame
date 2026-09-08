@@ -50,6 +50,8 @@ COPY --from=build /app/dist ./dist
 COPY public ./public
 COPY maps ./maps
 COPY rl ./rl
+# agent 通过 /api/skill* 接口拉取最新 skill，镜像需携带权威 skill 目录。
+COPY skill ./skill
 
 RUN groupadd --system tactical && useradd --system --gid tactical --home-dir /app tactical \
   && mkdir /app/runtime \

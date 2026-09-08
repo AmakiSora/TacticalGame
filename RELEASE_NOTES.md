@@ -2,6 +2,13 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.4.4
+
+- **Skill 改由游戏服务器 API 分发**：解决 agent 各自持有 skill 本地拷贝、忘记同步导致加载旧版本的问题（`.zcode` 拷贝曾落后一个版本）。新增只读路由 `src/api/skill.ts`：`GET /api/skill`（SKILL.md 全文，裸 agent 的最短引导路径）、`GET /api/skill/manifest`（`appVersion` + 每文件 `bytes`/`sha256`）、`GET /api/skill/files/:name`（单文件下载，启动时扫描出的文件名白名单、天然免疫路径穿越，带 `ETag`/`If-None-Match` 304 与 `Cache-Control: no-cache`）。启动时一次性读入内存（deploy 重建重启即生效，无需文件监听）；无鉴权（agent 入局前就需要它）、不计入 POST 速率限制；skill 目录缺失时仅该组接口降级 503，不影响游戏。
+- **SKILL.md 自愈式刷新**：顶部新增 Freshness 声明与「Canonical fetch (mandatory)」一节——无论从哪个来源读到本文件（包括旧的本地安装拷贝），都被引导先与服务器版本对齐；模式文件（standard/annihilation/simultaneous）改经 `GET /api/skill/files/<name>` 拉取，`wait-turn.mjs` 改为 `curl` 下载后用 `node` 执行（可按 manifest 校验 sha256），本地副本降级为离线 fallback。裸 agent 无需安装 skill，prompt 给一个 `http://<IP>:3123/api/skill` 即可开局。
+- **部署配套**：Dockerfile 增加 `COPY skill ./skill`（此前镜像内无 skill 目录）；`deploy/deploy.py` 本就不排除 `skill/`，无需改动。本地 `.zcode`/`.qoder` 拷贝已做最后一次手动同步（带入 Canonical fetch 指令后即转为非权威 fallback）。
+- 测试：新增 `tests/api/skill.test.ts` 5 例（manifest 哈希与磁盘一致、ETag 304、单文件 content-type、未知文件与 `..%2F` 路径穿越 404）；`tests/skill/ai-player.test.ts` 一处断言适配 SKILL.md 新措辞。全量 400 例通过。
+
 ## 3.4.3
 
 - **排行榜页新增 RL 评估控制台**：把 3.4.2 的 round_robin 跑批从命令行搬进网页——在 `/leaderboard.html` 即可启动/监控/停止批量对战，结束后自动重算榜单，形成「网页编排 → 跑批 → 榜单更新」闭环。不改观测/动作/奖励语义，`rl/evaluation/round_robin.py` 本身零改动，只是加了一层 Web 管控；依赖本机 `rl/.venv`，Docker 容器内不可用（面板明示）。

@@ -5,19 +5,22 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.4.3`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.4.4`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
-Do **not** run `node skill/ai-player.mjs` (or the copy under this skill directory) to delegate turns. That script is for tests/demos only. `skill/wait-turn.mjs` is the only script you should run during a game, and only for waiting between turns.
+**Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`.
+
+Do **not** run `ai-player.mjs` (fetched or local) to delegate turns. That script is for tests/demos only. `wait-turn.mjs` is the only script you should run during a game, and only for waiting between turns.
 
 ## Mode routing (mandatory)
 
 After the first successful `GET ${BASE_URL}/api/games/:id` in an active game:
 
 1. Read `game.config.mode`.
-2. **Immediately** load exactly one mode file with the `read` tool (paths relative to this skill directory):
-   - `standard` → read [`standard.md`](standard.md)
-   - `annihilation` → read [`annihilation.md`](annihilation.md)
-   - `simultaneous` → read [`simultaneous.md`](simultaneous.md)
+2. **Immediately** fetch exactly one mode file from the server (see Canonical fetch):
+   - `standard` → `GET ${BASE_URL}/api/skill/files/standard.md`
+   - `annihilation` → `GET ${BASE_URL}/api/skill/files/annihilation.md`
+   - `simultaneous` → `GET ${BASE_URL}/api/skill/files/simultaneous.md`
+   Offline fallback only: read the same file from a local skill install ([`standard.md`](standard.md), [`annihilation.md`](annihilation.md), [`simultaneous.md`](simultaneous.md)).
 3. Follow **only** that mode file for turn checklists, deploy origins, win conditions, scoring priorities, and the decision order.
 4. If mode is missing or unknown, stop and report it. Do not guess HQ rules on annihilation maps.
 
@@ -42,6 +45,20 @@ Before any API call, read the cloud server address from the user prompt and buil
 
 Keep player/host tokens in headers only. Never put tokens in URLs or print them.
 
+## Canonical fetch (mandatory)
+
+The server serves this skill at `${BASE_URL}/api/skill*` — unauthenticated, read-only. All skill files come from there, not from local copies:
+
+- If you reached this file by fetching `${BASE_URL}/api/skill` yourself, you already hold the canonical entry — continue.
+- Otherwise (local install, bundled copy, anywhere else) — re-fetch `curl -fsS ${BASE_URL}/api/skill` now and follow the **fetched** text from this point on; your local copy may be an older version.
+
+Then fetch every other skill file you need from the server instead of reading local copies:
+
+- `GET ${BASE_URL}/api/skill/manifest` → `{ appVersion, files: [{ name, bytes, sha256 }] }` — use it to check freshness or verify downloads.
+- `GET ${BASE_URL}/api/skill/files/<name>` → one file, e.g. `curl -fsS ${BASE_URL}/api/skill/files/standard.md`.
+
+Local copies are only an offline fallback when the server is unreachable, and you must say so in your report when you use one.
+
 ## Polling decision (mandatory)
 
 Before playing, classify the user prompt **once** and follow it for the whole game. This decides whether you keep polling after every `/end-turn`:
@@ -50,11 +67,14 @@ Before playing, classify the user prompt **once** and follow it for the whole ga
 - **Single-turn intent** — e.g. 只打一回合、走一步看看、play one turn、this turn only → stop and report right after `/end-turn`.
 - **Ambiguous** — default to full-game behavior and keep polling; not polling is the known failure mode. You may state this assumption in your report.
 
-Use [`wait-turn.mjs`](wait-turn.mjs) for the wait; do not hand-roll GET loops:
+Use `wait-turn.mjs` for the wait; do not hand-roll GET loops. Fetch it once per game, then run it with node (see Canonical fetch; optionally verify the download's sha256 against the manifest):
 
 ```bash
-node skill/wait-turn.mjs --url ${BASE_URL} --game <gameId> --player <yourSeat> --token <playerToken> [--interval-s 3] [--timeout-s 1800]
+curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o wait-turn.mjs
+node wait-turn.mjs --url ${BASE_URL} --game <gameId> --player <yourSeat> --token <playerToken> [--interval-s 3] [--timeout-s 1800]
 ```
+
+Offline fallback only: run the copy bundled with a local skill install (`node skill/wait-turn.mjs ...`).
 
 Run it in the **foreground as a blocking command** immediately after `/end-turn` (or whenever it is not your turn): wait for it to exit and read its exit code before doing anything else. **Never** send it to the background — no `&`, no `nohup`, no "run in background" mode, no detached shell. A backgrounded wait is a known failure mode: the agent loses track of the game and stops responding. If your harness imposes a foreground command timeout shorter than `--timeout-s`, lower `--timeout-s` to fit and rerun the script on exit code `4` instead of backgrounding it. The token stays in the header only. Interpret the exit code:
 

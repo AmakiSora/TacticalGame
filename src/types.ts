@@ -9,6 +9,9 @@ export const PLAYER_IDS = [
 export type PlayerId = typeof PLAYER_IDS[number];
 export type PlayerRecord<T> = Partial<Record<PlayerId, T>>;
 
+/** 玩家名称最大长度；后端入口与前端输入框（public/*.html 的 maxlength）统一使用。 */
+export const MAX_PLAYER_NAME_LEN = 50;
+
 export function isPlayerId(value: unknown): value is PlayerId {
   return typeof value === 'string' && (PLAYER_IDS as readonly string[]).includes(value);
 }

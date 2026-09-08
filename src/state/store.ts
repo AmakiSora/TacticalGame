@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type {
   GameState, Headquarters, MapCell, PlayerId, PlayerState, Unit, UnitType,
 } from '../types.js';
-import { isPlayerId, PLAYER_IDS } from '../types.js';
+import { isPlayerId, MAX_PLAYER_NAME_LEN, PLAYER_IDS } from '../types.js';
 import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
 import { createMapCells } from '../config/geometry.js';
@@ -43,9 +43,6 @@ function defaultPersistenceFile(): string | null {
 export function generateToken(): string {
   return randomBytes(16).toString('hex');
 }
-
-/** 玩家名称最大长度，后端入口与前端输入框统一引用此常量。 */
-export const MAX_PLAYER_NAME_LEN = 30;
 
 
 export function createPlayer(id: PlayerId, name?: string): PlayerState {

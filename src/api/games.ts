@@ -1,7 +1,7 @@
 // src/api/games.ts
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer, MAX_PLAYER_NAME_LEN } from '../state/store.js';
+import { globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
@@ -12,7 +12,7 @@ import {
 import { authorizeControlRequest } from './controlAuth.js';
 import { listMaps } from '../config/loader.js';
 import { generateRandomMapConfig, sanitizeRandomOptions } from '../config/randomMap.js';
-import { isPlayerId } from '../types.js';
+import { isPlayerId, MAX_PLAYER_NAME_LEN } from '../types.js';
 import type { GameState, PlayerId } from '../types.js';
 import { launchBotsForGame, removeBotRecord, clearBotsForGame } from './bots.js';
 

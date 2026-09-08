@@ -18,7 +18,8 @@
   detailFile 分组**位置匹配**（同批次第 k 行摘要 ↔ 第 k 行明细——静态图整批 seed=None、
   配对换座同 seed 两局，按键匹配会错位）把 637 个批次明细的 derived 合并进 17640 行摘要，
   全部命中，抽验 derived/座位/seed 逐字段一致。
-- `.gitignore` 新增 `rl/leaderboard/details/`；README「每局明细数据」同步存储策略与字段说明。
+- `.gitignore` 新增 `rl/leaderboard/details/`；README「每局明细数据」同步存储策略与字段说明；
+  `deploy/deploy.py` 排除项同步新增 `^rl/leaderboard/details`，明细不上服务器。
 - 以后每轮跑批结束，总结统计自动随 matches.jsonl 落库；明细文件只在本机，需要历史轮次
   深挖事件流时自行解压/保留，不再进入版本库。
 

@@ -56,6 +56,8 @@ EXCLUDE_PATTERNS = [
     # RL 训练产物与 Windows 本地环境体积大且服务器用不上（镜像内重建）
     r'^rl/\.venv', r'^rl/checkpoints', r'^rl/tb', r'^rl/distill',
     r'^rl/models/deprecated', r'^rl/test-output', r'^rl/selfplay', r'__pycache__',
+    # 每局明细约 2GB/轮，仅本地弱点分析用（2026-09-08 起移出 git 也不上服务器）
+    r'^rl/leaderboard/details',
 ]
 
 

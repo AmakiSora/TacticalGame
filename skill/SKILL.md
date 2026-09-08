@@ -7,7 +7,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 Manual operation of the Hex multiplayer game (app version `3.4.6`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
-**Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`.
+**Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
 Do **not** run `ai-player.mjs` (fetched or local) to delegate turns. That script is for tests/demos only. `wait-turn.mjs` is the only script you should run during a game, and only for waiting between turns.
 
@@ -47,15 +47,20 @@ Keep player/host tokens in headers only. Never put tokens in URLs or print them.
 
 ## Canonical fetch (mandatory)
 
-The server serves this skill at `${BASE_URL}/api/skill*` — unauthenticated, read-only. All skill files come from there, not from local copies:
+The server serves this skill at `${BASE_URL}/api/skill*` — unauthenticated, read-only. The server copy is the only source of truth, but do **not** blindly re-read the whole skill from it every game either — that wastes a full read when your copy is already current. Once per game, before your **first** game API call, run this cheap freshness check:
 
-- If you reached this file by fetching `${BASE_URL}/api/skill` yourself, you already hold the canonical entry — continue.
-- Otherwise (local install, bundled copy, anywhere else) — re-fetch `curl -fsS ${BASE_URL}/api/skill` now and follow the **fetched** text from this point on; your local copy may be an older version.
+1. `curl -fsS ${BASE_URL}/api/skill/manifest` → `{ appVersion, files: [{ name, bytes, sha256 }] }` (a few hundred bytes; read it).
+2. Compare your copy, strongest signal first:
+   - **Hash compare (preferred):** hash the local `SKILL.md` you just loaded (`sha256sum` / `shasum -a 256` / `certutil -hashfile <file> SHA256`) and compare with the manifest's `SKILL.md` entry. Equal → your copy is byte-identical to the server's and **is** canonical: continue with it, no re-fetch.
+   - **Version compare (fallback):** if you cannot hash files, compare the `app version` line in your copy's header with `manifest.appVersion`. Equal → treat your copy as canonical.
+   - **Different, missing, or undecidable** → `curl -fsS ${BASE_URL}/api/skill` and follow the **fetched** text from this point on; your local copy is outdated.
+3. If you reached this file by fetching `${BASE_URL}/api/skill` yourself, you already hold the canonical entry — skip the check.
 
-Then fetch every other skill file you need from the server instead of reading local copies:
+Always fetch these from the server regardless of the check (small files you have not read this game, so there is no double-read to save):
 
-- `GET ${BASE_URL}/api/skill/manifest` → `{ appVersion, files: [{ name, bytes, sha256 }] }` — use it to check freshness or verify downloads.
-- `GET ${BASE_URL}/api/skill/files/<name>` → one file, e.g. `curl -fsS ${BASE_URL}/api/skill/files/standard.md`.
+- Mode file (Mode routing): `GET ${BASE_URL}/api/skill/files/standard.md` / `annihilation.md` / `simultaneous.md`.
+- Wait script: `curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o wait-turn.mjs` (optionally verify its sha256 against the manifest).
+- Any other skill file: `GET ${BASE_URL}/api/skill/files/<name>`.
 
 Local copies are only an offline fallback when the server is unreachable, and you must say so in your report when you use one.
 

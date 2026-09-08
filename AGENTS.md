@@ -29,4 +29,4 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 
 ## 玩游戏（agent 对战）
 
-按仓库根 `skill/SKILL.md` 的流程：从用户提示取服务器地址（IP → `http://<IP>:3123`）→ `GET /api/skill` 拉规范技能 → 按对局 `game.config.mode` 拉对应模式文件（standard/annihilation/simultaneous.md）并只遵循它 → 自己调 REST 接口（读状态 → 推理 → 操作）。认证头 `X-Player-Token` / `X-Host-Token`。对局中只可运行 `wait-turn.mjs`（等待用）；勿用 `ai-player.mjs` 代打。
+按仓库根 `skill/SKILL.md` 的流程：从用户提示取服务器地址（IP → `http://<IP>:3123`）→ 校验 skill 新鲜度：`GET /api/skill/manifest` 与本地副本比对（sha256 优先，版本号兜底），一致直接用本地副本、不一致才重新 `GET /api/skill` 拉全文 → 按对局 `game.config.mode` 拉对应模式文件（standard/annihilation/simultaneous.md，始终从服务器拉）并只遵循它 → 自己调 REST 接口（读状态 → 推理 → 操作）。认证头 `X-Player-Token` / `X-Host-Token`。对局中只可运行 `wait-turn.mjs`（等待用，从服务器下载）；勿用 `ai-player.mjs` 代打。

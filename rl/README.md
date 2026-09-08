@@ -437,12 +437,12 @@ evaluate_cross 默认为每个批次在 `rl/leaderboard/details/<批次>.jsonl` 
 
 `matches.jsonl` 摘要行向后兼容扩展：`endReason`（`headquarters_destroyed`/`turn_limit_score`/
 `forced_adjudication_score` 等，Python 侧超时记 `max_rounds_exceeded`/`max_actions_exceeded`）、
-`scores`（终局双方总分）、`actions`、`durationSec`、`seed`（随机图种子）、`detailFile`；
-旧读取方（round_robin 计数、榜单生成、评估控制台）对新增字段均容忍。
+`scores`（终局双方总分）、`actions`、`derived`（双方部署/伤害/占点等 13 项统计，2026-09-08 起）、
+`durationSec`、`seed`（随机图种子）、`detailFile`；旧读取方（round_robin 计数、榜单生成、评估控制台）对新增字段均容忍。
 
 `--policy-stats` 开关为每步动作额外做一次策略前向，记录价值估计 `value` 与策略熵 `entropy`
 （跑批耗时约翻倍，默认关；round_robin 同名开关透传）。注意引擎战斗伤害带随机浮动，
-即使同种子每局也不完全可复现；明细数据体积约 100-300KB/局，已纳入 git 管理。
+即使同种子每局也不完全可复现；明细数据体积约 100-300KB/局（一轮全量约 2GB+），**gitignored 仅本地留存**（2026-09-08 起移出 git，磁盘占用自行管理，历史轮次可手动压缩/删除）。摘要行自带双方 `derived` 统计（部署构成/费用、击杀/损失、伤害/HQ 伤害、收入、占点/偷点、首占回合等），常规弱点分析直接读 `matches.jsonl` 即可，无需打开原始明细。
 
 ## 批量对战与排行榜
 

@@ -709,6 +709,9 @@ def main():
                 "endReason": end_reason,
                 "scores": final_scores,
                 "actions": detail["summary"]["actions"],
+                # 摘要行自带双方 derived 统计（部署/伤害/占点等），弱点分析不必打开原始明细；
+                # 明细文件本身 gitignored，仅本地留存（2026-09-08）。
+                "derived": detail["derived"],
                 "durationSec": detail["meta"]["durationSec"],
                 "seed": detail["meta"]["mapSeed"],
                 "detailFile": detail_path,

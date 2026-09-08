@@ -2,6 +2,10 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.4.6
+
+- **Agent 工作指引**：新增仓库根 `AGENTS.md`——面向 AI agent 的精简工作说明：常用命令、目录结构速览、硬红线（单副本架构、`skill/` 为规范源由 `/api/skill/*` 分发、gitignored 清单）、版本号随分支规则（`release/x.y.z` 分支版本必须等于 `x.y.z`，经 `npm run version` 对齐全部引用处）、agent 经 REST API 对战的规范流程（按对局模式从服务器拉取对应模式文件，勿用 `ai-player.mjs` 代打）。
+
 ## 3.4.5
 
 - **部署脚本增量化传输**：`deploy/deploy.py` 此前每次全量 SFTP 重传约 240MB（其中 `rl/models` 约 227MB 且日常不变），现传前 `stat` 对比远端 size+mtime 只传变更文件，put 后 `utime` 回写时间戳（SFTP put 不保留 mtime，回写是增量判定的前提），日常部署传输量降至 MB 级；改造后首次部署会全量重传一次建立时间戳基线。

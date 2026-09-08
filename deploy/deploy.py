@@ -438,6 +438,7 @@ def run_deploy(log):
     for route in ("/healthz", "/readyz"):
         _, out, _ = run_cmd(
             client,
+            log,
             f"curl -s -o /dev/null -w '%{{http_code}}' http://127.0.0.1:{HEALTH_PORT}{route}",
             check=False,
         )

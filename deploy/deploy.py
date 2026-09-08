@@ -32,6 +32,9 @@ LOG_KEEP = 30
 
 # 与 compose.yml 发布端口一致，健康检查走容器内回环
 HEALTH_PORT = 3123
+# 容器启动到 Node 完成监听需要数秒，健康检查轮询直到通过或超时
+HEALTH_TIMEOUT = 90
+HEALTH_INTERVAL = 3
 
 
 def load_env():
@@ -434,18 +437,35 @@ def run_deploy(log):
 
     log.stage("健康检查")
     run_cmd(client, log, f"cd {q(REMOTE_BASE)} && docker compose ps", check=False)
-    codes = {}
-    for route in ("/healthz", "/readyz"):
-        _, out, _ = run_cmd(
-            client,
-            log,
-            f"curl -s -o /dev/null -w '%{{http_code}}' http://127.0.0.1:{HEALTH_PORT}{route}",
-            check=False,
-        )
-        codes[route] = out.strip() or "(无响应)"
-        log.line(f"  {route} -> {codes[route]}")
+
+    def probe():
+        codes = {}
+        for route in ("/healthz", "/readyz"):
+            _, out, _ = run_cmd(
+                client,
+                log,
+                f"curl -s -o /dev/null -w '%{{http_code}}' http://127.0.0.1:{HEALTH_PORT}{route}",
+                check=False,
+            )
+            codes[route] = out.strip() or "(无响应)"
+        return codes
+
+    deadline = time.monotonic() + HEALTH_TIMEOUT
+    codes = probe()
+    attempt = 1
+    while any(code != "200" for code in codes.values()):
+        if time.monotonic() >= deadline:
+            break
+        log.line(f"  第 {attempt} 次探测未通过 "
+                 f"({' '.join(f'{k} {v}' for k, v in codes.items())})，{HEALTH_INTERVAL}s 后重试...")
+        time.sleep(HEALTH_INTERVAL)
+        attempt += 1
+        codes = probe()
+    log.line(f"  第 {attempt} 次探测: "
+             f"{' '.join(f'{k} {v}' for k, v in codes.items())}")
     if any(code != "200" for code in codes.values()):
-        fail(f"健康检查未通过 {codes}，服务器上执行 docker compose logs app 查看原因")
+        fail(f"健康检查在 {HEALTH_TIMEOUT}s 内未通过 {codes}，"
+             f"服务器上执行 docker compose logs app 查看原因")
     log.stage_done(" ".join(f"{k} {v}" for k, v in codes.items()))
 
     client.close()

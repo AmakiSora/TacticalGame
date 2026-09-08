@@ -135,14 +135,25 @@ def evaluate(model_path: str, map_id: str, opponent_style: str, anchor_model: st
     for name, kwargs in build_scenarios(map_id, opponent_style, anchor_model).items():
         env = LocalHexGameEnv(**kwargs)
         try:
-            results["scenarios"][name] = play_scenario(model, env, episodes, seed_prefix)
+            entry = play_scenario(model, env, episodes, seed_prefix)
+            # 场景实际使用的地图：selection_score 用它区分分布内/分布外场景。
+            entry["map"] = kwargs["map_id"]
+            results["scenarios"][name] = entry
         finally:
             env.close()
     return results
 
 
-def selection_score(results: dict[str, Any]) -> tuple[float, float, float, float, float]:
-    """Lexicographic best-checkpoint key: weakest scenario, then second-seat LB.
+def selection_score(results: dict[str, Any], train_map: str = "random") -> tuple[float, float, float, float, float]:
+    """Lexicographic best-checkpoint key over **in-distribution** scenarios.
+
+    五元组：(分布内最弱场景下界, 分布内后手座合并下界, 分布内平均下界, 占点, 回报)。
+
+    v3.0.3 起分布外静态图场景（如 default_champion）只记录、不参与选择：
+    v3.0.2 的教训——评估场景含训练分布外（default）时，min_wilson_lb 会被 OOD
+    崩塌主导，系统性偏向训练早期断点（训练期 best 挑中 10 万步断点、96 局验收仅
+    53:43，而同次训练的 1.4M 断点累计 123:69）。分布外的表现照常写入 TB 与日志，
+    供人工观察，但不再影响 best 选择。
 
     后手座下界进第二位是因为 v3.0.1 的实测反例：350k 与 480k 两个断点对 v2.7.0
     总分 49:47 vs 50:46（噪声内相同），但后手座 39.6% vs **50.0%** 差 10pt。
@@ -152,15 +163,19 @@ def selection_score(results: dict[str, Any]) -> tuple[float, float, float, float
     scenarios = list(results.get("scenarios", {}).values())
     if not scenarios:
         return (-1.0, -1.0, -1.0, -float("inf"), -float("inf"))
-    lbs = [float(s["wilson_lb"]) for s in scenarios]
-    second_wins = sum(int(s.get("seat_second", {}).get("wins", 0)) for s in scenarios)
-    second_games = sum(int(s.get("seat_second", {}).get("games", 0)) for s in scenarios)
+    in_dist = [s for s in scenarios if s.get("map", train_map) == train_map]
+    if not in_dist:
+        # 全部场景都是分布外（如以静态图为主训）时退回旧行为：全场景参与选择。
+        in_dist = scenarios
+    lbs = [float(s["wilson_lb"]) for s in in_dist]
+    second_wins = sum(int(s.get("seat_second", {}).get("wins", 0)) for s in in_dist)
+    second_games = sum(int(s.get("seat_second", {}).get("games", 0)) for s in in_dist)
     return (
         min(lbs),
         wilson_lower_bound(second_wins, second_games),
         float(np.mean(lbs)),
-        float(np.mean([s["cp_mean"] for s in scenarios])),
-        float(np.mean([s["mean_reward"] for s in scenarios])),
+        float(np.mean([s["cp_mean"] for s in in_dist])),
+        float(np.mean([s["mean_reward"] for s in in_dist])),
     )
 
 

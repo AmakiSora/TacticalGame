@@ -250,8 +250,11 @@ class AsyncEvalCallback(BaseCallback):
     scenarios while rollouts keep running.  At most one evaluation is in flight;
     if the previous one has not finished the new trigger is skipped (logged),
     so evaluation cost never blocks training.  Best-checkpoint selection uses
-    the weakest scenario's Wilson lower bound instead of the raw win rate,
-    which stops single lucky 40-game samples from overwriting the best model.
+    the weakest **in-distribution** scenario's Wilson lower bound instead of the
+    raw win rate, which stops single lucky samples from overwriting the best
+    model.  v3.0.3: out-of-distribution static-map scenarios (default_champion)
+    are logged but excluded from the key — v3.0.2's key was dominated by the
+    default OOD collapse and picked the weak 100k checkpoint over 1.4M.
     """
 
     def __init__(self, *, map_id: str, opponent_style: str, anchor_model: str, eval_freq: int, n_eval_episodes: int, best_model_save_path: str, eval_dir: str, seed_prefix: int = 27_000, wait_at_end: bool = True):
@@ -336,6 +339,14 @@ class AsyncEvalCallback(BaseCallback):
             )
         if not scenarios:
             return
+        # v3.0.3：分布外静态图场景（如 default_champion）不进选择键，只记录。
+        # v3.0.2 的 min_wilson_lb 被 default OOD 崩塌主导，best 挑中了 10 万步弱断点。
+        ood = [s for s in scenarios.values() if s.get("map", self.map_id) != self.map_id]
+        ood_note = ""
+        if ood:
+            ood_lb = min(float(s["wilson_lb"]) for s in ood)
+            self.logger.record("eval/ood_min_wilson_lb", ood_lb)
+            ood_note = f" ood_lb={ood_lb:.0%}(recorded only)"
         score = selection_score(results)
         is_best = score > self.best_score
         if is_best:
@@ -355,7 +366,7 @@ class AsyncEvalCallback(BaseCallback):
         print(
             f"[eval] step={step:>8d} min_wilson_lb={score[0]:.0%} second_seat_lb={score[1]:.0%} "
             f"mean_wilson_lb={score[2]:.0%} mean_win_rate={mean_win_rate:.0%} cp={score[3]:.2f} "
-            f"mean_reward={score[4]:+.3f}{' <- new best' if is_best else ''}",
+            f"mean_reward={score[4]:+.3f}{ood_note}{' <- new best' if is_best else ''}",
             flush=True,
         )
 

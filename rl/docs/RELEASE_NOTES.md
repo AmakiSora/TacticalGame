@@ -1,7 +1,104 @@
 # 强化学习版本说明
 
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
-条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加一条记录。
+条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
+
+## 2026-09-08 · v3.0.3 验收与 champion 替换：480 局 352:127 战胜 v3.0.2，danger-close 96:0
+
+训练 356 万帧完整跑完（02:58-11:17，约 8.3 小时 @97-119 fps，无中断），全程健康：
+`explore/new_candidate_rate` 稳定 1.2%-1.5%、`explained_variance` 0.76-0.82、target_kl 未触发。
+训练期评估单调走强，**末次（500 万步）即全程 best**（分布内最弱下界 50%、后手座下界 61%），
+已按 best 交付并 sanitize（`rl/models/hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip`）。
+配方改动的核心目标在训练曲线直接兑现：`default_champion` 场景（对 v3.0.0）从早期 8-21% 修复到
+**75%（下界 65%）**——三张静态图进分布后 OOD 崩塌消失。
+
+**验收协议（本版起升级为全图）**：`evaluate_cross.py --swap-sides --seed-prefix 31337`
+（三路共用同一批随机图），random/danger-close/default 各 96 局、其余 4 图各 48 局，480 局/对手；
+先做交付断点初筛互打，再对 champion v3.0.2 与上代 v2.7.0 全图验收。逐局 stats 与日志在
+`rl/test-output/stats_v303_*.jsonl`、`rl/test-output/logs/accept_v303_*.log`，汇总脚本
+`rl/test-output/scripts/summarize_accept.py`。
+
+| 对局 | 结果 | 关键图 |
+|---|---|---|
+| 初筛：vs 4.96M 断点 | 109:83（56.8%） | 末期三断点同水平，best 选择无异常 |
+| 初筛：vs 4.88M 断点 | 88:104（45.8%，噪声内平手） | |
+| **vs v3.0.2-1.4M（480 局）** | **352:127:1（73.3%，Wilson 下界 69.2%）** | danger-close **96:0**（双座 100%）、forge 48:0、dual-lanes 46:2、default 73:23（先手 54%/后手 98%）、random 50:46、desert 22:26（46%）、breach 17:30（35%） |
+| **vs v2.7.0（480 局）** | **277:202:1（57.7%，下界 53.2%）** | forge 44:4、danger-close 68:28（先手 92%/后手 50%）、random 52:43、dual-lanes 28:20、breach 25:23、default 42:54（先手 42%/后手 46%）、desert 18:30（38%） |
+
+**决策**：总分下界 69.2% 为历代最强晋级证据（v2.7.0 晋级 58.9%、v3.0.2 晋级 57.1%）；
+门禁图 danger-close 双座 100%、default 双座（对 v3.0.2）点估计 54%/98% 全部过线。
+**v3.0.3-5M 替换 v3.0.2-1.4M 成为生产 champion**，档案见 `rl/docs/models/v3.0.3.md`；
+v3.0.2 降级为上一代 champion。
+
+**记录在案的退化（下一版观察项）**：breach（对 v3.0.2 仅 35%）与 desert（46%）弱于 v3.0.2——
+两图 8.3% 的混合权重可能不足；random 图优势让掉（77%→对 v3.0.2 52%），是保静态图的预期代价；
+对 v2.7.0 的 default 先手座 42% 仍未过线（v2.7.0 是 default 历史最强模型，已非 champion，仅作对照）。
+全图 round_robin 榜单重算（含 v3.0.3）待下一次批量评估后更新。
+
+## 2026-09-08 · v3.0.3 启动：best 选择键拆分 + 全 7 图训练混合 + 锚点换血
+
+不改观测/动作/奖励语义（无需新 env 快照，`bots.ts` 路由不变），只改训练配方与 best 断点选择。
+
+### 起因：round_robin 全图评分与 champion 头衔脱节
+
+2026-09-07 全量 round_robin（15288 局，Bradley-Terry）显示 **v3.0.2-1.4M 总榜仅第 6（1563）**：
+random 图第 1（评分 1717、胜率 77%，与 96 局验收 123:69 一致），但 **danger-close 全场垫底**
+（评分 1343、胜率 28%、先手座 8%，对 v2.1.3/v2.3.3/v2.5.0/v2.6.0 全部 0:24），default 先手座 33%。
+全图最强反而是蒸馏+5 万步 PPO 的 v3.0.0（1661）与 38 动作规则模型 v2.0.0（1638）；
+v3.0.2 验收击败的 v2.7.0（1608）在 round_robin 中以 55% 反压 v3.0.2——克制关系呈循环，
+本质是 v3.0.2 的 PPO 在 random:0.7 的训练分布上漂移出静态图。
+
+用新增的每局明细（`rl/leaderboard/details/`，637 批次）定位 danger-close 败因
+（脚本 `rl/test-output/scripts/analyze_details_v302.py`）：
+
+- **部署饥饿**：v3.0.2 负局平均部署费 81（约 1 个步兵），胜局 284（6 个步兵），
+  而该图强手 v2.0.0 部署费 355。该图 1 行动/回合、HQ 仅 120 血、裁决重 HQ 伤害（权重 20）
+  与军队价值，不爆兵既守不住 rush 也输裁决分；
+- 两种败局：11-15 回合被歼灭（HQ 归零）；或撑到 30 回合上限，先摸到 HQ 伤害仍被
+  更厚的部队按裁决分反超（实测一局 r27 领先 815:440，r30 被反超 763:960）；
+- 根因：`RL_TRAIN_MAP_MIX` 默认 `random:0.7,default:0.15,dual-lanes:0.075,forge:0.075`
+  —— **breach / danger-close / desert 三张图从未进过训练分布**。
+
+### best 选择键拆分（`eval_worker.selection_score`）
+
+兑现 2026-09-05 条目承诺的改进方向：评估结果每场景新增 `map` 字段，选择键改为
+**(分布内最弱场景下界, 分布内后手座合并下界, 分布内平均下界, 占点, 回报)**——
+分布外静态图场景（`default_champion`）照常写 TB 与控制台（新增 `eval/ood_min_wilson_lb` 与
+`ood_lb=` 日志字段），但**不参与 best 选择**。v3.0.2 的 `min_wilson_lb` 被 default OOD 崩塌主导，
+训练期 best 挑中 10 万步断点（96 局 53:43）而非 1.4M 断点（累计 123:69）。
+兼容性：旧结果 JSON 场景无 `map` 字段时全部按分布内处理；`train_map` 参数可切换分布视角
+（静态图为主训时传 map_id）。全部场景都是分布外时退回旧行为。
+新增 `tests/rl/test_v303_selection.py` 5 例锁定（含「default 下界 0% 不拖累选择键」的
+v3.0.2 教训形式化）；`npm run test:rl` 28 项通过。
+
+### 训练配方（启动器 `rl/test-output/launchers/run_train_v303.bat`）
+
+- **起点**：v3.0.2 的 1.4M 断点（`rl/checkpoints/random/20260905-011908/..._1440000_steps.zip`）
+  直接续训，**不再蒸馏**——「蒸馏冷启动 + 少量 PPO」的上限结论是探索死锁未修复时得出的，
+  v3.0.2 打破死锁后的持续 PPO 尚未试过，且 1.4M 断点后对锚点胜率仍在 60-70% 走强。
+  注意 sb3 resume 语义：`RL_TIMESTEPS` 是**新增**帧数（`learn` 时
+  `total_timesteps += 断点 num_timesteps`，v2.8.0 即 400 万断点 + 200 万 → 600 万）。
+- **地图混合补全**：`RL_TRAIN_MAP_MIX=random:0.5,breach:0.083,danger-close:0.083,
+  default:0.083,desert:0.083,dual-lanes:0.083,forge:0.083`——随机图保持过半以守住
+  random 第 1 的基本盘，6 张静态图全部入分布（`local_env` 按权重归一化，逐局抽取）。
+  v2.7 的经验（混合训练 + 随机图为主）与 v2.6 的反例（纯随机图分布 → default 0:24
+  灾难性遗忘）都支持这个方向。
+- **锚点换血**：v2.7.0（固定 40% 出场）→ **v3.0.0**（全图 BT 第一、与 v3.0.2 同 155 动作
+  空间，无需 54 动作映射），`RL_ANCHOR_PROB=0.20`——v3.0.1 已诊断「锚点固定出场且不参与
+  PFSP 会把对锚点胜率钉死在 52%」，而 v2.7.0 早已被打穿（v3.0.2 验收 64%）。
+- **超参沿用 v3.0.2 已验证值**：`RL_ENT_COEF=0.03`、lr 5e-5→1e-5 线性衰减（resume 时按
+  本次进度起点约 3.9e-5）、target_kl 0.02、8 环境、评估 10 万步 × 96 局配对换座。
+- **断点加密**：`RL_SAVE_FREQ` 20000→10000 次调用（8 环境 = 每 8 万帧一存，约 9 分钟），
+  防 nvlddmkm 级驱动错误再吞掉几小时进度（v3.0.1 在 75 万步处被打断过）。
+- **快照阶梯**：新目录 `rl/selfplay/random/v3.0.3`（按版本隔离；空阶梯初期自对弈局自动
+  回退规则对手，首个快照在 4 万帧时落地）。锚点不参与 PFSP 优先级的机制不变。
+- 预算：新增 356 万帧 ≈ 6.2 小时 @159 fps。
+- **止损判据**：`explore/new_candidate_rate` 回落至 0.000%（死锁复发）或
+  `explained_variance` 趋势性跌破 0.3 立即停跑。
+- **交付判据（升级）**：训练期 best 只做初筛；交付断点取 best 与最后两个断点互打
+  （`evaluate_cross` 随机图 96 局配对换座 + danger-close/default 各 48 局），再对
+  champion v3.0.2 与 v2.7.0 做全 7 图 round_robin 验收——**danger-close 与 default
+  分座位过 50% 才接替 champion**，避免再出现「random 图验收上位、全图榜单垫底」。
 
 ## 2026-09-07 · 作废模型归档：zip/断点/档案移入 deprecated/ 子目录
 

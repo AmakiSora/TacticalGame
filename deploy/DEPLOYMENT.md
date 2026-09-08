@@ -58,6 +58,16 @@ The script:
 
 With `DEPLOY_PRUNE=1`, files left on the server by previous deploys (renamed sources, removed artifacts) are deleted; `.env` and `backups/` are always protected.
 
+## Deploy Logs
+
+Every run writes `deploy/logs/deploy-<YYYYMMDD-HHMMSS>.log` (the console output is mirrored there). The log records:
+
+- Stage start/finish lines with timestamps: 连接 / 文件传输 / 写入 .env / 构建启动 / 健康检查.
+- Streamed remote build output, line by line with timestamps — if a deploy hangs, the log tail shows exactly where.
+- A final summary listing each stage's duration, the overall result (成功/失败), and on failure the stage that failed; health check failures include the observed status codes.
+
+The 30 most recent logs are kept; `deploy/logs/` is gitignored and excluded from upload.
+
 ## State, Backups, And Restarts
 
 Game state is written to `/app/runtime/games.json`, backed by the named `tactical-game-runtime` Docker volume. A normal app-container restart restores that file, but immediately disconnects every SSE client. A process crash can lose only changes that have not completed their synchronous file write.

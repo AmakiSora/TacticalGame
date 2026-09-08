@@ -8,6 +8,10 @@ Transfer is incremental: a file is re-uploaded only when its remote size or
 mtime differs (mtime is written back after upload, since SFTP put does not
 preserve it). The very first run after switching to this script uploads
 everything once to establish the timestamp baseline.
+
+Every run writes a timestamped log to deploy/logs/ (console output is
+mirrored there) with per-stage durations and a final SUCCESS/FAILURE summary
+naming the stage that failed. The 30 most recent logs are kept.
 """
 
 import os
@@ -15,11 +19,16 @@ import re
 import shlex
 import stat as stat_module
 import sys
+import time
+import traceback
+from datetime import datetime
 from pathlib import Path
 
 import paramiko
 
 ENV_FILE = Path(__file__).resolve().parent / ".env.deploy"
+LOG_DIR = Path(__file__).resolve().parent / "logs"
+LOG_KEEP = 30
 
 # 与 compose.yml 发布端口一致，健康检查走容器内回环
 HEALTH_PORT = 3123
@@ -103,6 +112,152 @@ def should_exclude(rel_path):
     return False
 
 
+def fmt_dur(seconds):
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}m{secs:02d}s"
+
+
+class DeployError(Exception):
+    """可预期的部署失败（远端命令/健康检查等），main 统一转为失败汇总。"""
+
+
+class DeployLog:
+    """控制台与日志文件双写；按阶段计时，结束时汇总各阶段耗时与结果。"""
+
+    def __init__(self, path):
+        self.path = path
+        self.t0 = time.monotonic()
+        self.stage_name = None
+        self.stage_t0 = None
+        self.durations = {}
+        self.notes = {}
+
+    def _append(self, text):
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(text + "\n")
+
+    def line(self, msg=""):
+        if not msg:
+            print()
+            return
+        stamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{stamp}] {msg}")
+        self._append(f"[{stamp}] {msg}")
+
+    def stream(self, raw_line):
+        """远端命令的逐行输出原样入控制台与日志；卡住时日志尾部即现场。"""
+        text = raw_line.rstrip("\n")
+        if not text.strip():
+            return
+        stamp = datetime.now().strftime("%H:%M:%S")
+        print(f"  [{stamp}] {text}")
+        self._append(f"  [{stamp}] {text}")
+
+    def stage(self, name):
+        self.stage_name = name
+        self.stage_t0 = time.monotonic()
+        self.line(f"== {name} ==")
+
+    def stage_done(self, note=""):
+        name, dur = self._close_stage()
+        if name is None:
+            return
+        if note:
+            self.notes[name] = note
+        suffix = f"（{note}）" if note else ""
+        self.line(f"== {name} 完成，耗时 {fmt_dur(dur)}{suffix}")
+
+    def _close_stage(self):
+        """关闭当前阶段，返回 (阶段名, 耗时)；无打开阶段返回 (None, 0)。"""
+        if self.stage_name is None:
+            return None, 0.0
+        dur = time.monotonic() - self.stage_t0
+        self.durations[self.stage_name] = self.durations.get(self.stage_name, 0.0) + dur
+        name = self.stage_name
+        self.stage_name = None
+        self.stage_t0 = None
+        return name, dur
+
+    def current_stage(self):
+        return self.stage_name or "(阶段外)"
+
+    def summary(self, ok, failure=None):
+        # 中止时把未完成阶段的已耗时计入，失败停在哪个阶段一目了然
+        self._close_stage()
+        self.line()
+        self.line("======== 部署结果 ========")
+        if ok:
+            self.line("结果: 成功")
+        else:
+            self.line(f"结果: 失败  失败阶段: {failure or '未知'}")
+        for name, dur in self.durations.items():
+            note = f"  {self.notes[name]}" if name in self.notes else ""
+            self.line(f"  {name}: {fmt_dur(dur)}{note}")
+        self.line(f"总耗时: {fmt_dur(time.monotonic() - self.t0)}")
+        self.line(f"日志文件: {self.path}")
+
+
+def init_log():
+    LOG_DIR.mkdir(exist_ok=True)
+    log_path = LOG_DIR / f"deploy-{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
+    for old in sorted(LOG_DIR.glob("deploy-*.log"))[:-LOG_KEEP]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    return DeployLog(log_path)
+
+
+def fail(msg):
+    raise DeployError(msg)
+
+
+def connect(log):
+    client = paramiko.SSHClient()
+    client.load_system_host_keys()
+    known_hosts_file = Path.home() / ".ssh" / "known_hosts"
+    try:
+        client.load_host_keys(str(known_hosts_file))
+    except FileNotFoundError:
+        pass
+    client.set_missing_host_key_policy(InteractiveHostKeyPolicy(str(known_hosts_file)))
+    kwargs = dict(
+        hostname=HOST, port=PORT, username=USERNAME, timeout=15,
+        banner_timeout=30, auth_timeout=30,
+        allow_agent=False, look_for_keys=False,
+    )
+    if KEY_PATH:
+        kwargs["key_filename"] = KEY_PATH
+    if PASSWORD:
+        kwargs["password"] = PASSWORD
+    try:
+        client.connect(**kwargs)
+    except Exception as exc:
+        fail(f"could not connect to {HOST}:{PORT} as {USERNAME}: {exc}")
+    # NAT/防火墙下的静默断连会让部署"卡死"无输出，keepalive 让其变成可见错误
+    client.get_transport().set_keepalive(30)
+    return client
+
+
+def run_cmd(client, log, cmd, stream=False, check=True):
+    """Execute a remote command; returns (exit_code, stdout, stderr)."""
+    stdin, stdout, stderr = client.exec_command(cmd)
+    if stream:
+        for line in iter(stdout.readline, ""):
+            log.stream(line)
+    exit_code = stdout.channel.recv_exit_status()
+    out = "" if stream else stdout.read().decode().strip()
+    err = stderr.read().decode().strip()
+    if check and exit_code != 0:
+        log.line(f"ERROR: 远端命令失败 (exit={exit_code}): {cmd}")
+        if err:
+            log.line(err)
+        fail(f"远端命令失败 (exit={exit_code})，详见上方输出")
+    return exit_code, out, err
+
+
 def needs_upload(sftp, remote_path, local_stat):
     try:
         remote_stat = sftp.stat(remote_path)
@@ -132,7 +287,7 @@ def ensure_remote_dir(sftp, remote_dir):
             sftp.mkdir(path)
 
 
-def transfer_files(sftp):
+def transfer_files(sftp, log):
     """Upload changed files; return (uploaded, skipped, bytes_sent, manifest).
 
     manifest 是本地仍存在的全部远端相对路径，供 DEPLOY_PRUNE 清理远端残留。
@@ -173,7 +328,7 @@ def transfer_files(sftp):
                 uploaded += 1
                 bytes_sent += local_stat.st_size
                 if uploaded % 50 == 0:
-                    print(f"  Uploaded {uploaded} files...")
+                    log.line(f"  已上传 {uploaded} 个文件...")
             else:
                 skipped += 1
 
@@ -185,7 +340,7 @@ PRUNE_PROTECTED_FILES = {".env"}
 PRUNE_PROTECTED_PREFIXES = ("backups/",)
 
 
-def prune_remote(sftp, manifest):
+def prune_remote(sftp, log, manifest):
     """Delete remote files under REMOTE_BASE that are no longer present locally."""
     removed = []
 
@@ -208,6 +363,12 @@ def prune_remote(sftp, manifest):
                 removed.append(rel)
 
     walk(REMOTE_BASE)
+    if removed:
+        log.line(f"清理远端残留 {len(removed)} 个文件:")
+        for rel in removed[:20]:
+            log.line(f"  removed {rel}")
+        if len(removed) > 20:
+            log.line(f"  ... and {len(removed) - 20} more")
     return removed
 
 
@@ -238,104 +399,78 @@ class InteractiveHostKeyPolicy(paramiko.MissingHostKeyPolicy):
             print(f"  note: could not persist host key ({exc}); you will be prompted again")
 
 
-def connect():
-    client = paramiko.SSHClient()
-    client.load_system_host_keys()
-    known_hosts_file = Path.home() / ".ssh" / "known_hosts"
-    try:
-        client.load_host_keys(str(known_hosts_file))
-    except FileNotFoundError:
-        pass
-    client.set_missing_host_key_policy(InteractiveHostKeyPolicy(str(known_hosts_file)))
-    kwargs = dict(
-        hostname=HOST, port=PORT, username=USERNAME, timeout=15,
-        banner_timeout=30, auth_timeout=30,
-        allow_agent=False, look_for_keys=False,
-    )
-    if KEY_PATH:
-        kwargs["key_filename"] = KEY_PATH
-    if PASSWORD:
-        kwargs["password"] = PASSWORD
-    try:
-        client.connect(**kwargs)
-    except Exception as exc:
-        print(f"ERROR: could not connect to {HOST}:{PORT} as {USERNAME}: {exc}")
-        sys.exit(1)
-    return client
-
-
-def fail(client, message):
-    print(f"ERROR: {message}")
-    client.close()
-    sys.exit(1)
-
-
-def run_cmd(client, cmd, stream=False, check=True):
-    """Execute a remote command; returns (exit_code, stdout, stderr)."""
-    stdin, stdout, stderr = client.exec_command(cmd)
-    if stream:
-        for line in iter(stdout.readline, ""):
-            print(f"  {line}", end="")
-    exit_code = stdout.channel.recv_exit_status()
-    out = "" if stream else stdout.read().decode().strip()
-    err = stderr.read().decode().strip()
-    if check and exit_code != 0:
-        fail(client, f"command failed (exit={exit_code}): {cmd}\n{err}")
-    return exit_code, out, err
-
-
-def main():
-    print(f"Connecting to {HOST}:{PORT} as {USERNAME}...")
-    client = connect()
+def run_deploy(log):
     q = shlex.quote
 
-    print(f"Creating {REMOTE_BASE}...")
-    run_cmd(client, f"mkdir -p {q(REMOTE_BASE)}")
+    log.stage("连接")
+    log.line(f"{USERNAME}@{HOST}:{PORT}，远端目录 {REMOTE_BASE}")
+    client = connect(log)
+    run_cmd(client, log, f"mkdir -p {q(REMOTE_BASE)}")
+    log.stage_done("keepalive 30s")
 
-    print("Transferring files (unchanged files skipped)...")
+    log.stage("文件传输")
+    log.line("增量模式：未变更文件跳过")
     sftp = client.open_sftp()
-    uploaded, skipped, bytes_sent, manifest = transfer_files(sftp)
-    print(f"Uploaded {uploaded} files ({bytes_sent / 1024 / 1024:.1f} MB), "
-          f"skipped {skipped} unchanged")
-
+    uploaded, skipped, bytes_sent, manifest = transfer_files(sftp, log)
+    note = f"上传 {uploaded} 个 ({bytes_sent / 1048576:.1f} MB)，跳过 {skipped} 个未变更"
     if PRUNE_REMOTE:
-        removed = prune_remote(sftp, manifest)
-        print(f"Pruned {len(removed)} remote files no longer present locally")
-        for rel in removed[:20]:
-            print(f"  removed {rel}")
-        if len(removed) > 20:
-            print(f"  ... and {len(removed) - 20} more")
+        removed_count = len(prune_remote(sftp, log, manifest))
+        note += f"，清理残留 {removed_count} 个"
     sftp.close()
+    log.stage_done(note)
 
+    log.stage("写入 .env")
     # 远端 .env 由部署脚本统一管理：每次部署按 .env.deploy 重写，服务器上手工改动不保留
     env_content = f"AUTO_CONTROL_TOKEN={CONTROL_TOKEN}\nLOG_LEVEL={LOG_LEVEL}\n"
-    run_cmd(client,
+    run_cmd(client, log,
             f"cat > {q(REMOTE_BASE)}/.env << 'ENVEOF'\n{env_content}ENVEOF\n"
             f"chmod 600 {q(REMOTE_BASE)}/.env")
+    log.stage_done()
 
-    print("Building and starting Docker Compose...")
-    run_cmd(client, f"cd {q(REMOTE_BASE)} && docker compose up --build --detach 2>&1",
+    log.stage("构建启动")
+    run_cmd(client, log, f"cd {q(REMOTE_BASE)} && docker compose up --build --detach 2>&1",
             stream=True)
+    log.stage_done()
 
-    print("\nVerifying deployment...")
-    run_cmd(client, f"cd {q(REMOTE_BASE)} && docker compose ps", check=False)
-    healthy = True
+    log.stage("健康检查")
+    run_cmd(client, log, f"cd {q(REMOTE_BASE)} && docker compose ps", check=False)
+    codes = {}
     for route in ("/healthz", "/readyz"):
         _, out, _ = run_cmd(
             client,
             f"curl -s -o /dev/null -w '%{{http_code}}' http://127.0.0.1:{HEALTH_PORT}{route}",
             check=False,
         )
-        code = out.strip()
-        print(f"  {route} -> {code or '(no response)'}")
-        if code != "200":
-            healthy = False
+        codes[route] = out.strip() or "(无响应)"
+        log.line(f"  {route} -> {codes[route]}")
+    if any(code != "200" for code in codes.values()):
+        fail(f"健康检查未通过 {codes}，服务器上执行 docker compose logs app 查看原因")
+    log.stage_done(" ".join(f"{k} {v}" for k, v in codes.items()))
 
     client.close()
-    if not healthy:
-        print("\nERROR: health checks failed — inspect 'docker compose logs app' on the server")
+    log.line(f"服务地址: http://{HOST}:{HEALTH_PORT}")
+
+
+def main():
+    log = init_log()
+    log.line(f"部署开始: {LOCAL_BASE}")
+    log.line(f"日志文件: {log.path}")
+    try:
+        run_deploy(log)
+    except DeployError as exc:
+        log.summary(ok=False, failure=f"{log.current_stage()}：{exc}")
         sys.exit(1)
-    print(f"\nAll done! Server is running at http://{HOST}:{HEALTH_PORT}")
+    except KeyboardInterrupt:
+        log.line("ERROR: 被用户中断 (Ctrl+C)")
+        log.summary(ok=False, failure=f"{log.current_stage()}：被中断")
+        sys.exit(130)
+    except Exception:
+        log.line("ERROR: 未预期异常:")
+        for tb_line in traceback.format_exc().splitlines():
+            log.line(tb_line)
+        log.summary(ok=False, failure=f"{log.current_stage()}：未预期异常")
+        sys.exit(1)
+    log.summary(ok=True)
 
 
 if __name__ == "__main__":

@@ -76,7 +76,8 @@ export function authenticateHost(
 }
 
 export function sanitizeGameForResponse(game: GameState, viewer?: PlayerId): unknown {
-  const { tokens: _tokens, hostToken: _hostToken, ...rest } = game;
+  // rngState 一并剥离：泄露会让客户端预测后续伤害/治疗掷骰。
+  const { tokens: _tokens, hostToken: _hostToken, rngState: _rngState, ...rest } = game;
   const body = structuredClone(rest) as Record<string, unknown>;
   body.adjudication = buildAdjudicationSnapshot(game);
   // simultaneous 模式下，其他玩家的计划队列属于秘密：只保留请求者自己的队列，

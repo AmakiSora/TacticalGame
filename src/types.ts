@@ -264,6 +264,13 @@ export interface GameState {
   winner: PlayerId | null;
   result: GameResult | null;
   artillery: ArtilleryState | null;
+  /**
+   * 战斗伤害/治疗掷骰的 mulberry32 状态（32 位无符号整数，随每次掷骰步进）。
+   * 可 JSON 序列化，重启恢复后掷骰序列延续；对客户端响应必须剥离，
+   * 否则玩家可预测后续掷骰。startGame 时由注入的 random 播种；
+   * 未走 startGame 的旧构造路径按固定种子惰性初始化（见 engine/random.ts）。
+   */
+  rngState?: number;
 }
 
 export interface ApiError {

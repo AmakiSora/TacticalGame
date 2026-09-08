@@ -12,6 +12,7 @@ import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
 import { createMapCells } from '../config/geometry.js';
 import { artilleryStateForRound } from '../engine/artillery.js';
 import { actionMeritForEvent } from '../engine/actionScore.js';
+import { seedGameRandom } from '../engine/random.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -195,6 +196,9 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
   };
   game.plan = simultaneous ? { queues: {}, committed: [] } : null;
   game.artillery = artilleryStateForRound(game, 1);
+  // 战斗/治疗掷骰序列的种子最后取：洗牌与起始玩家仍按原样消费注入的
+  // random，调用方（如传 () => 0 的旧测试）观察到的开局行为不变。
+  seedGameRandom(game, random);
 }
 
 // 旧的引擎测试仍通过该构造器创建一局双人战场。

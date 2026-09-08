@@ -25,6 +25,7 @@ import {
   endGame, grantComebackSupplies, markPlayerEliminated, repairFromControlPoints, resetActions,
 } from './engine.js';
 import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound, coveredCellsFor } from './planning.js';
+import { nextGameRandom } from './random.js';
 import type { ShapeAim } from './planning.js';
 import type { Result, Failure } from './result.js';
 
@@ -92,7 +93,7 @@ function setTerrainPlain(game: GameState, q: number, r: number): void {
 
 function rollHeal(game: GameState, support: Unit): number {
   const base = support.healPower ?? 0;
-  return base + Math.floor(Math.random() * (game.config.balance.healVarianceRange + 1));
+  return base + Math.floor(nextGameRandom(game) * (game.config.balance.healVarianceRange + 1));
 }
 
 export function resolveRound(game: GameState, bus: EventBus): void {

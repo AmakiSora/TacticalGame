@@ -8,18 +8,19 @@ import { appendEvent } from './events.js';
 import { eliminatePlayer } from './engine.js';
 import { isArtilleryDanger } from './artillery.js';
 import { addActionMerit, attackActionMerit, effectActionMerit } from './actionScore.js';
+import { nextGameRandom } from './random.js';
 
 type Target =
   | { kind: 'unit'; entity: Unit }
   | { kind: 'headquarters'; entity: Headquarters };
 
-function rollVariance(range: number): number {
-  return Math.floor(Math.random() * (2 * range + 1)) - range;
+function rollVariance(game: GameState, range: number): number {
+  return Math.floor(nextGameRandom(game) * (2 * range + 1)) - range;
 }
 
 function rollHeal(game: GameState, support: Unit): number {
   const base = support.healPower ?? 0;
-  return base + Math.floor(Math.random() * (game.config.balance.healVarianceRange + 1));
+  return base + Math.floor(nextGameRandom(game) * (game.config.balance.healVarianceRange + 1));
 }
 
 function targetPosition(target: Target): { q: number; r: number } {
@@ -36,7 +37,7 @@ function findTarget(game: GameState, targetId: string): Target | null {
 export function computeDamage(game: GameState, attack: number, defense: number): number {
   return Math.max(
     game.config.balance.minimumDamage,
-    attack - defense + rollVariance(game.config.balance.damageVarianceRange),
+    attack - defense + rollVariance(game, game.config.balance.damageVarianceRange),
   );
 }
 

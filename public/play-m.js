@@ -49,6 +49,9 @@ const els = {
   btnSaveSession: $('btn-save-session'), btnEnterSession: $('btn-enter-session'), btnClearSession: $('btn-clear-session'),
   botDialog: $('bot-dialog'), botDialogBackdrop: $('bot-dialog-backdrop'),
   botName: $('bot-name'), botModel: $('bot-model'), btnBotConfirm: $('btn-bot-confirm'), btnBotCancel: $('btn-bot-cancel'),
+  botPanelBots: $('bot-panel-bots'), botPanelPrompt: $('bot-panel-prompt'),
+  botPromptName: $('bot-prompt-name'), botPromptText: $('bot-prompt-text'), botPromptSkill: $('bot-prompt-skill'),
+  btnBotPromptCopy: $('btn-bot-prompt-copy'), btnBotPromptClose: $('btn-bot-prompt-close'),
 };
 const ctx = els.canvas.getContext('2d');
 let gameConfig = null;
@@ -1801,6 +1804,9 @@ function lobbySummaryMarkup(lobby, canKick = false) {
 
 function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target === els.lobbySummary && Boolean(hostToken)) {
   if (!target || !lobby) return;
+  // 记录大厅元信息，供「对战提示词」页签自动填充地图与人数。
+  if (lobby.mapId) botLobbyMapId = lobby.mapId;
+  if (lobby.maxPlayers) botLobbyMaxPlayers = lobby.maxPlayers;
   target.innerHTML = lobbySummaryMarkup(lobby, canKick);
 }
 
@@ -1924,6 +1930,9 @@ async function kickLobbyPlayer(playerId) {
 
 // —— 强化学习 AI：房主在大厅中一键添加 ——
 let botModelsLoaded = false;
+// 大厅元信息快照（renderLobbySummary 时刷新），供提示词模板自动填充。
+let botLobbyMapId = '';
+let botLobbyMaxPlayers = 0;
 
 async function ensureBotModels() {
   if (botModelsLoaded) return;
@@ -1950,10 +1959,43 @@ function openBotDialog() {
   if (!gameId || !hostToken) return;
   closeBotDialog();
   els.botName.value = '';
+  switchBotTab('bots');
   els.botDialog.classList.remove('hidden');
   els.botDialogBackdrop.classList.remove('hidden');
   ensureBotModels();
+  renderBotPromptText();
   els.botName.focus();
+}
+
+// —— 对战提示词页签：生成可复制的 agent 引导词 ——
+function switchBotTab(tab) {
+  const bots = tab !== 'prompt';
+  els.botPanelBots.classList.toggle('hidden', !bots);
+  els.botPanelPrompt.classList.toggle('hidden', bots);
+  for (const btn of els.botDialog.querySelectorAll('[data-bot-tab]')) {
+    const active = btn.dataset.botTab === tab;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  }
+}
+
+function renderBotPromptText() {
+  if (!window.AgentPromptUI) return;
+  const map = availableMaps.find(item => item.id === botLobbyMapId);
+  els.botPromptText.value = window.AgentPromptUI.buildPrompt({
+    serverUrl: window.location.origin,
+    gameId: gameId || '',
+    players: String(botLobbyMaxPlayers || 2),
+    mapName: map?.name || botLobbyMapId || '对战',
+    mapId: botLobbyMapId || 'default',
+    aiName: els.botPromptName.value.trim() || '<AI名字>',
+    skillInstalled: els.botPromptSkill.checked,
+  });
+}
+
+async function copyBotPrompt() {
+  const ok = await window.AgentPromptUI.copyText(els.botPromptText.value);
+  toast(ok ? '提示词已复制，发给对方 AI 即可' : '复制失败，请在文本框手动全选复制', ok ? 'ok' : 'err');
 }
 
 function closeBotDialog() {
@@ -1989,6 +2031,13 @@ async function confirmAddBot() {
 els.btnBotConfirm.addEventListener('click', confirmAddBot);
 els.btnBotCancel.addEventListener('click', closeBotDialog);
 els.botDialogBackdrop.addEventListener('click', closeBotDialog);
+for (const btn of els.botDialog.querySelectorAll('[data-bot-tab]')) {
+  btn.addEventListener('click', () => switchBotTab(btn.dataset.botTab));
+}
+els.botPromptName.addEventListener('input', renderBotPromptText);
+els.botPromptSkill.addEventListener('change', renderBotPromptText);
+els.btnBotPromptCopy.addEventListener('click', copyBotPrompt);
+els.btnBotPromptClose.addEventListener('click', closeBotDialog);
 
 async function startHostedGame() {
   if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');

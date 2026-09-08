@@ -221,22 +221,47 @@
   </aside>
 </main>
 
-<!-- 添加强化学习 AI 弹框（房主专用） -->
+<!-- 添加 AI 弹框（房主专用）：强化模型一键入队 / 生成对战提示词发给外部 agent -->
 <div id="bot-dialog-backdrop" class="modal-backdrop hidden"></div>
 <div id="bot-dialog" class="bot-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="bot-dialog-title">
-  <h3 id="bot-dialog-title">添加强化学习 AI</h3>
-  <div class="field">
-    <label for="bot-name">AI 名称</label>
-    <input id="bot-name" maxlength="50" placeholder="强化AI" autocomplete="off" />
+  <h3 id="bot-dialog-title">添加 AI</h3>
+  <div class="bot-tabs" role="tablist">
+    <button type="button" class="bot-tab active" data-bot-tab="bots" role="tab" aria-selected="true">强化模型</button>
+    <button type="button" class="bot-tab" data-bot-tab="prompt" role="tab" aria-selected="false">对战提示词</button>
   </div>
-  <div class="field">
-    <label for="bot-model">模型</label>
-    <select id="bot-model"></select>
+  <div id="bot-panel-bots">
+    <div class="field">
+      <label for="bot-name">AI 名称</label>
+      <input id="bot-name" maxlength="50" placeholder="强化AI" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="bot-model">模型</label>
+      <select id="bot-model"></select>
+    </div>
+    <p class="bot-dialog-hint">开始对局后自动运行所选模型（基于 default 地图训练），AI 加载需要数秒。</p>
+    <div class="bot-dialog-actions">
+      <button id="btn-bot-cancel" type="button" class="btn">取消</button>
+      <button id="btn-bot-confirm" type="button" class="btn primary">确定</button>
+    </div>
   </div>
-  <p class="bot-dialog-hint">开始对局后自动运行所选模型（基于 default 地图训练），AI 加载需要数秒。</p>
-  <div class="bot-dialog-actions">
-    <button id="btn-bot-cancel" type="button" class="btn">取消</button>
-    <button id="btn-bot-confirm" type="button" class="btn primary">确定</button>
+  <div id="bot-panel-prompt" class="hidden">
+    <div class="field">
+      <label for="bot-prompt-name">AI 玩家名</label>
+      <input id="bot-prompt-name" maxlength="50" placeholder="如 GLM5.2-ZC" autocomplete="off" />
+    </div>
+    <label class="bot-prompt-option">
+      <input type="checkbox" id="bot-prompt-skill" />
+      <span>对方 AI 本地已安装 play-hex-api-game skill</span>
+    </label>
+    <div class="field">
+      <label for="bot-prompt-text">对战提示词（可编辑）</label>
+      <textarea id="bot-prompt-text" class="bot-prompt-textarea" rows="14" spellcheck="false"></textarea>
+    </div>
+    <p class="bot-dialog-hint">复制后发给对方 AI，它会自己调 /join 加入并等待开局。服务器地址、对局 ID 与地图已按本局自动填充；修改名字或勾选项会重新生成文本。默认按未安装生成（直接拉服务器全文，对方装没装都能玩）；勾选后走本地 manifest 校验，省一次全文拉取。</p>
+    <div class="bot-dialog-actions">
+      <button id="btn-bot-prompt-close" type="button" class="btn">关闭</button>
+      <button id="btn-bot-prompt-copy" type="button" class="btn primary">复制提示词</button>
+    </div>
   </div>
 </div>
 
@@ -247,6 +272,7 @@
 <script src="/board-animation.js?v=3.2.6"></script>
 <script src="/playback.js?v=3.2.6"></script>
 <script src="/random-map-ui.js?v=3.4.6"></script>
+<script src="/agent-prompt.js?v=3.4.6"></script>
 <script src="/play.js?v=3.4.6"></script>
 <script src="/layout-editor.js?v=3.3.5"></script>
 </body>

@@ -4,6 +4,8 @@
 
 ## 3.4.6
 
+- **「添加 AI」弹框新增「对战提示词」页签**：此前该弹框只能添加强化学习模型，现在分「强化模型」「对战提示词」两个页签。提示词页签按当前对局自动填充服务器地址（`location.origin`）、对局 ID、地图名（经 `/api/maps` 中文名解析）与人数，房主输入 AI 玩家名后实时替换模板中的名字；文本可手动编辑（再次改名或改勾选会重新生成），一键复制（`navigator.clipboard` 之外附带 `execCommand` 降级——生产为 http 部署、非安全上下文没有异步剪贴板 API）。「对方 AI 本地已安装 skill」勾选项把【规则获取】拆成两种变体、省掉接收方 agent 的分路判断：默认不勾按未安装生成（直接 `GET /api/skill` 拉全文——对方其实装了 skill 也照样能玩，是安全默认），勾选后走本地 `/api/skill/manifest` 校验、省一次全文重读。模板含禁用 `ai-player.mjs` 代打与 `wait-turn.mjs` 前台轮询守则。桌面（`play`）与移动（`play-m`）两端同构实现，共享逻辑抽在 `public/agent-prompt.js`（`window.AgentPromptUI`，node:vm 可单测）。
+- **Skill 新鲜度检查改为比对优先**：Canonical fetch 从「无条件重新拉取 SKILL.md 全文」改为「先 `GET /api/skill/manifest`（几百字节）比对本地副本——sha256 优先，哈希一致即字节级相同、直接用本地副本，省掉一次全文重复读取；无法哈希时退化为 `appVersion` 比对；不一致才 `GET /api/skill` 拉全文」。以 sha256 为主信号的原因：版本号比对在同版本号改内容时会漏判（本条改动本身就是实例）。模式文件与 `wait-turn.mjs` 本来就是每局现拉、无重复读取问题，维持始终从服务器获取。同步 `.zcode`/`.pi`/`.qoder` 三处 IDE 拷贝（此前 `.zcode` 落后在 3.4.4、`.pi` 落后在 3.3.3，正是版本漂移问题的现役实例）。
 - **Agent 工作指引**：新增仓库根 `AGENTS.md`——面向 AI agent 的精简工作说明：常用命令、目录结构速览、硬红线（单副本架构、`skill/` 为规范源由 `/api/skill/*` 分发、gitignored 清单）、版本号随分支规则（`release/x.y.z` 分支版本必须等于 `x.y.z`，经 `npm run version` 对齐全部引用处）、agent 经 REST API 对战的规范流程（按对局模式从服务器拉取对应模式文件，勿用 `ai-player.mjs` 代打）。
 
 ## 3.4.5

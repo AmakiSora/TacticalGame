@@ -44,18 +44,21 @@ RUN /opt/rl-venv/bin/pip install --no-cache-dir \
 
 ENV RL_PYTHON=/opt/rl-venv/bin/python
 
-COPY --from=production-deps /app/node_modules ./node_modules
-COPY package.json ./
-COPY --from=build /app/dist ./dist
-COPY public ./public
-COPY maps ./maps
-COPY rl ./rl
-# agent 通过 /api/skill* 接口拉取最新 skill，镜像需携带权威 skill 目录。
-COPY skill ./skill
-
+# 先建用户再 COPY，各条 COPY 用 --chown 直接落属主，取代 COPY 后 chown -R
+# （chown -R 会把 node_modules/rl 整体复制进额外镜像层，凭空多出数百 MB）。
+# /app 与 runtime 目录本身必须属 tactical：named volume 首次挂载会继承镜像内目录属主。
 RUN groupadd --system tactical && useradd --system --gid tactical --home-dir /app tactical \
-  && mkdir /app/runtime \
-  && chown -R tactical:tactical /app
+  && mkdir -p /app/runtime \
+  && chown tactical:tactical /app /app/runtime
+
+COPY --from=production-deps --chown=tactical:tactical /app/node_modules ./node_modules
+COPY --chown=tactical:tactical package.json ./
+COPY --from=build --chown=tactical:tactical /app/dist ./dist
+COPY --chown=tactical:tactical public ./public
+COPY --chown=tactical:tactical maps ./maps
+COPY --chown=tactical:tactical rl ./rl
+# agent 通过 /api/skill* 接口拉取最新 skill，镜像需携带权威 skill 目录。
+COPY --chown=tactical:tactical skill ./skill
 
 USER tactical
 

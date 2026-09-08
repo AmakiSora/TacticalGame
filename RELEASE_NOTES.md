@@ -2,6 +2,10 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+## 3.4.5
+
+- **部署脚本增量化与安全加固**：`deploy/deploy.py` 此前每次全量 SFTP 重传约 240MB（其中 `rl/models` 约 227MB 且日常不变），现传前 `stat` 对比远端 size+mtime 只传变更文件，put 后 `utime` 回写时间戳，日常部署传输量降至 MB 级（改造后首次部署会全量重传一次建立时间戳基线）；`CONTROL_TOKEN` 改为必填，不再随部署轮换或明文打印进部署日志，依赖 token 的调用方（脚本/agent）不受重新部署影响；SSH 弃用 `AutoAddPolicy` 改为 known_hosts 校验 + 首连 TOFU 交互确认（非交互环境未知指纹直接中止），新增 `DEPLOY_KEY_PATH` 密钥认证（密码认证保留为 fallback）；部署末尾 `/healthz`、`/readyz` 校验改为断言 200，失败退出码非 0；新增可选 `DEPLOY_PRUNE=1` 清理远端已不在本地的残留文件（保护 `.env` 与 `backups/`）；排除清单补齐 `.pi`/`.zcode`/`.qoder`/`.pytest_cache` 等本地工具状态与 `events.json`/`body.json`/`nul`/`sshpass.exe` 调试残留。配套：Dockerfile 逐条 `COPY --chown` 取代 `chown -R`（消除 node_modules+rl 的整层复制，镜像瘦身数百 MB），compose 增加 `mem_limit: 1536m` 防 RL 子进程拖垮 2GB VPS 宿主、json-file 日志轮转上限，`.dockerignore` 补 `rl/leaderboard/details`（2GB/轮）、`rl/models/deprecated` 等缺口对齐部署排除清单；`sshpass.exe` 移出 git；`DEPLOYMENT.md` 按 SFTP 实际流程重写（增量语义、prune、回滚改为本地切 commit 重部署）。
+
 ## 3.4.4
 
 - **Skill 改由游戏服务器 API 分发**：解决 agent 各自持有 skill 本地拷贝、忘记同步导致加载旧版本的问题（`.zcode` 拷贝曾落后一个版本）。新增只读路由 `src/api/skill.ts`：`GET /api/skill`（SKILL.md 全文，裸 agent 的最短引导路径）、`GET /api/skill/manifest`（`appVersion` + 每文件 `bytes`/`sha256`）、`GET /api/skill/files/:name`（单文件下载，启动时扫描出的文件名白名单、天然免疫路径穿越，带 `ETag`/`If-None-Match` 304 与 `Cache-Control: no-cache`）。启动时一次性读入内存（deploy 重建重启即生效，无需文件监听）；无鉴权（agent 入局前就需要它）、不计入 POST 速率限制；skill 目录缺失时仅该组接口降级 503，不影响游戏。

@@ -77,10 +77,10 @@ describe('random map generator', () => {
         expect(() => validateGeneratedMap(JSON.parse(JSON.stringify(config)))).not.toThrow();
         expect(config.spawnSlots).toHaveLength(playerCount);
         expect(config.layouts[String(playerCount)]).toHaveLength(playerCount);
-        // 每个出生位都有总部与初始单位。
-        for (const slot of config.spawnSlots) {
-          expect(slot.startingUnits.length).toBeGreaterThan(0);
-        }
+        // 每个出生位都有总部；初始单位数量 0-4 且全员一致（公平性，dual-lanes 式 0 单位合法）。
+        const unitCounts = new Set(config.spawnSlots.map(slot => slot.startingUnits.length));
+        expect(unitCounts.size).toBe(1);
+        expect([...unitCounts][0]).toBeLessThanOrEqual(4);
         // 偶数人数对称局：成对出生位的总部与初始单位（含兵种）严格镜像。
         if (playerCount % 2 === 0) {
           for (let i = 0; i < playerCount / 2; i++) {
@@ -135,6 +135,41 @@ describe('random map generator', () => {
     expect(infantry.moveRange).toBeGreaterThanOrEqual(1);
     expect(infantry.canCapture).toBe(true);
     expect(config.units.support.healPower).toBeGreaterThanOrEqual(5);
+  });
+
+  it('default domain covers the static-map extremes (RL 训练分布包线)', () => {
+    // v3.0.2-v3.1.0 三代 whack-a-mole 的根因修复：随机图默认域必须覆盖
+    // danger-close(1 行动点/20 补给/零据点收入)、dual-lanes(0 初始单位/208 补给)、
+    // forge(100 血总部/6 据点) 等静态图极值；裁决权重与据点类型收入也必须可变。
+    const seen = {
+      minAp: 99, maxAp: 0, minSupplies: 9999, maxSupplies: 0,
+      minHq: 9999, maxHq: 0, minCp: 99, maxCp: 0, minCpIncome: 999, maxCpIncome: -1,
+      zeroUnits: 0, fourUnits: 0,
+      adjWeights: new Set<string>(), cpTypeIncome: new Set<string>(),
+    };
+    for (let seed = 0; seed < 300; seed++) {
+      const config = generateRandomMapConfig({ seed: `coverage-${seed}` }, 2);
+      const b = config.balance;
+      seen.minAp = Math.min(seen.minAp, b.actionsPerTurn); seen.maxAp = Math.max(seen.maxAp, b.actionsPerTurn);
+      seen.minSupplies = Math.min(seen.minSupplies, b.startingSupplies); seen.maxSupplies = Math.max(seen.maxSupplies, b.startingSupplies);
+      const hq = config.headquartersSpec.hp;
+      seen.minHq = Math.min(seen.minHq, hq); seen.maxHq = Math.max(seen.maxHq, hq);
+      seen.minCp = Math.min(seen.minCp, config.controlPoints.length); seen.maxCp = Math.max(seen.maxCp, config.controlPoints.length);
+      seen.minCpIncome = Math.min(seen.minCpIncome, b.controlPointIncome); seen.maxCpIncome = Math.max(seen.maxCpIncome, b.controlPointIncome);
+      const units = config.spawnSlots[0].startingUnits.length;
+      if (units === 0) seen.zeroUnits++;
+      if (units === 4) seen.fourUnits++;
+      seen.adjWeights.add(JSON.stringify(b.adjudicationWeights));
+      seen.cpTypeIncome.add(JSON.stringify(b.controlPointTypes));
+    }
+    expect(seen.minAp).toBe(1); expect(seen.maxAp).toBe(8);
+    expect(seen.minSupplies).toBeLessThanOrEqual(40); expect(seen.maxSupplies).toBeGreaterThanOrEqual(200);
+    expect(seen.minHq).toBeLessThanOrEqual(100); expect(seen.maxHq).toBeGreaterThanOrEqual(220);
+    expect(seen.minCp).toBe(2); expect(seen.maxCp).toBe(6);
+    expect(seen.minCpIncome).toBe(0); expect(seen.maxCpIncome).toBeGreaterThanOrEqual(14);
+    expect(seen.zeroUnits).toBeGreaterThan(0); expect(seen.fourUnits).toBeGreaterThan(0);
+    expect(seen.adjWeights.size).toBeGreaterThan(50);
+    expect(seen.cpTypeIncome.size).toBeGreaterThan(50);
   });
 });
 

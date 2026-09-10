@@ -53,18 +53,52 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
 };
 
 const DEFAULT_RANGES: Record<string, [number, number]> = {
-  radius: [6, 10],
+  radius: [5, 10],
   terrainDensity: [0.02, 0.12],
-  controlPointCount: [3, 5],
-  maxTurns: [10, 25],
-  actionsPerTurn: [3, 8],
+  controlPointCount: [2, 6],
+  maxTurns: [10, 30],
+  actionsPerTurn: [1, 8],
   unitStatVariation: [0, 0.25],
-  startingSupplies: [60, 120],
-  baseIncome: [8, 14],
-  controlPointIncome: [8, 16],
-  headquartersHp: [120, 240],
+  startingSupplies: [20, 220],
+  baseIncome: [6, 14],
+  controlPointIncome: [0, 16],
+  headquartersHp: [80, 240],
   headquartersDefense: [3, 10],
 };
+
+// 默认域包线按 6 张静态图的极值校准（danger-close 的 1 行动点/20 补给/零据点收入、
+// dual-lanes 的 0 初始单位/208 补给、forge 的 100 血总部/6 据点等），让随机图
+// 本身就能覆盖全部静态图的规则空间——RL 侧 v3.0.2-v3.1.0 三代的 whack-a-mole
+// （某张静态图整图崩塌）根因即这些维度从未进过训练分布。
+
+/** 裁决权重在静态图包线内随机：danger-close(20/1/30/1/0) ~ default(5/2/90/2/1)。 */
+function sampleAdjudicationWeights(rng: () => number) {
+  return {
+    enemyHqDamage: 3 + Math.floor(rng() * 18),
+    ownHqHp: 1 + Math.floor(rng() * 2),
+    controlPoint: 30 + Math.floor(rng() * 61),
+    armyValue: 1 + Math.floor(rng() * 2),
+    supplies: Math.floor(rng() * 2),
+  };
+}
+
+/** 据点类型收入随机：danger-close(8/0/0) ~ breach(20/8/8)。折扣/维修量保持基准。 */
+function sampleControlPointTypes(rng: () => number) {
+  return {
+    supply: { income: 8 + Math.floor(rng() * 13), deployDiscount: 0, repairAmount: 0 },
+    forward_base: { income: Math.floor(rng() * 9), deployDiscount: 8, repairAmount: 0 },
+    repair: { income: Math.floor(rng() * 9), deployDiscount: 0, repairAmount: 10 },
+  };
+}
+
+/** 初始单位构成抽取池：基础兵种权重高，覆盖 breach(2 heavy) 与 forge(全兵种) 的开局。 */
+const STARTING_UNIT_POOL: UnitType[] = ['infantry', 'infantry', 'scout', 'scout', 'heavy', 'ranger'];
+
+/** 每方初始单位数量 0-4：dual-lanes(0) ~ forge(4)。 */
+function sampleStartingUnits(rng: () => number): UnitType[] {
+  const count = Math.floor(rng() * 5);
+  return Array.from({ length: count }, () => STARTING_UNIT_POOL[Math.floor(rng() * STARTING_UNIT_POOL.length)]);
+}
 
 /** 校验并收敛前端/RL 传入的随机参数；非法结构直接抛错（API 返回 400）。 */
 export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
@@ -242,12 +276,6 @@ const UNIT_BASE: Record<UnitType, UnitSpec> = {
   support: { hp: 82, attack: 10, defense: 5, moveRange: 3, attackRange: 1, cost: 60, canCapture: false, healPower: 22 },
 };
 
-const CONTROL_POINT_TYPES: Record<ControlPointKind, { income: number; deployDiscount: number; repairAmount: number }> = {
-  supply: { income: 12, deployDiscount: 0, repairAmount: 0 },
-  forward_base: { income: 8, deployDiscount: 8, repairAmount: 0 },
-  repair: { income: 8, deployDiscount: 0, repairAmount: 10 },
-};
-
 const KIND_CYCLE: ControlPointKind[] = ['supply', 'forward_base', 'repair'];
 
 const KIND_NAMES: Record<ControlPointKind, string> = {
@@ -312,8 +340,9 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
     density, symmetric, rng, playableCells, playableSet, spawnPositions, controlPoints.map(cp => ({ q: cp.q, r: cp.r })),
   );
 
-  // 出生位配置（总部 + 初始单位）。
-  const spawnSlots = buildSpawnSlots(spawnPositions, playableSet, controlPoints, symmetric);
+  // 出生位配置（总部 + 初始单位）。初始单位数量/构成全局抽一次、全员共享（公平性）。
+  const startingUnits = sampleStartingUnits(rng);
+  const spawnSlots = buildSpawnSlots(spawnPositions, playableSet, controlPoints, symmetric, startingUnits);
 
   const config = {
     mode: 'standard',
@@ -347,12 +376,8 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
       healVarianceRange: 6,
       actionsPerTurn,
       maxTurns,
-      adjudicationWeights: { enemyHqDamage: 5, ownHqHp: 2, controlPoint: 90, armyValue: 2, supplies: 1 },
-      controlPointTypes: {
-        supply: { ...CONTROL_POINT_TYPES.supply },
-        forward_base: { ...CONTROL_POINT_TYPES.forward_base },
-        repair: { ...CONTROL_POINT_TYPES.repair },
-      },
+      adjudicationWeights: sampleAdjudicationWeights(rng),
+      controlPointTypes: sampleControlPointTypes(rng),
     },
   };
 
@@ -399,12 +424,21 @@ function placeControlPoints(
   taken: Set<string>,
 ): GeneratedControlPoint[] {
   const points: GeneratedControlPoint[] = [];
+  const claimable = (pos: Position): boolean =>
+    playableSet.has(hexKey(pos)) && !taken.has(hexKey(pos))
+    && !spawnPositions.some(spawn => hexDistance(spawn, pos) < 3);
   const claim = (pos: Position, kind: ControlPointKind): boolean => {
-    if (!playableSet.has(hexKey(pos)) || taken.has(hexKey(pos))) return false;
-    if (spawnPositions.some(spawn => hexDistance(spawn, pos) < 3)) return false;
+    if (!claimable(pos)) return false;
     taken.add(hexKey(pos));
     const index = points.length;
     points.push({ id: `cp_${index + 1}`, name: `${KIND_NAMES[kind]} ${index + 1}`, kind, q: pos.q, r: pos.r });
+    return true;
+  };
+  // 成对放置必须原子：先放 pos 再放 mirror 的旧写法在 mirror 失败时会留下不对称的单点。
+  const claimPair = (pos: Position, kind: ControlPointKind): boolean => {
+    if (!claimable(pos) || !claimable(mirror(pos))) return false;
+    claim(pos, kind);
+    claim(mirror(pos), kind);
     return true;
   };
 
@@ -423,12 +457,19 @@ function placeControlPoints(
 
   if (symmetric) {
     // 成对放置：半区角度取 ringCount/2 对，类型按对循环，保证镜像一致。
+    // 小半径下可放格子往往集中在远离出生轴的边缘，退避按「距离近→远→更近」×
+    // 「角度扫满半圆」二维搜索，而不是只往近处缩（seed coverage-87 的 0 据点事故）。
     for (let i = 0; i < ringCount / 2; i++) {
       const kind = KIND_CYCLE[i % KIND_CYCLE.length];
       const angle = ringBase + (i * 2 * Math.PI) / ringCount;
-      const pos = axialFromAngle(angle, ringDistance);
-      claim(pos, kind);
-      claim(mirror(pos), kind);
+      outer:
+      for (let ringTry = 0; ringTry < 4; ringTry++) {
+        const distance = Math.min(radius, Math.max(1, ringDistance + [0, 1, -1, 2][ringTry]));
+        for (let sweep = 0; sweep < 12; sweep++) {
+          const pos = axialFromAngle(angle + sweep * (Math.PI / 12), distance);
+          if (claimPair(pos, kind)) break outer;
+        }
+      }
     }
   } else {
     for (let i = 0; i < ringCount; i++) {
@@ -437,6 +478,21 @@ function placeControlPoints(
       const distance = ringDistance + Math.floor(rng() * 3) - 1;
       const pos = axialFromAngle(angle, Math.max(1, distance));
       if (!claim(pos, kind)) claim(axialFromAngle(angle, ringDistance), kind);
+    }
+  }
+  // 保底：极端小半径下环形落点可能全部失败，全局扫描任意可放镜像对；
+  // 连镜像对都放不下（出生位贴中心）时退化为可放单点，至少保证有占点博弈。
+  if (points.length === 0) {
+    let paired = false;
+    for (const key of playableSet) {
+      const [q, r] = key.split(',').map(Number);
+      if (claimPair({ q, r }, 'supply')) { paired = true; break; }
+    }
+    if (!paired) {
+      for (const key of playableSet) {
+        const [q, r] = key.split(',').map(Number);
+        if (claim({ q, r }, 'supply') && points.length >= 2) break;
+      }
     }
   }
   return points;
@@ -528,12 +584,13 @@ function buildSpawnSlots(
   playableSet: Set<string>,
   controlPoints: GeneratedControlPoint[],
   symmetric: boolean,
+  startingUnits: UnitType[],
 ): SpawnSlotConfig[] {
   const occupied = new Set<string>(controlPoints.map(cp => hexKey(cp)));
   const slots: SpawnSlotConfig[] = new Array(spawnPositions.length);
   const placed: boolean[] = new Array(spawnPositions.length).fill(false);
 
-  // 初始单位放在最靠近地图中心的三个邻格：正对中心放侦察兵，两侧放步兵。
+  // 初始单位放在最靠近地图中心的几个邻格：从正对中心起按角度依次取格。
   const unitCellsFor = (hq: Position): Position[] => {
     const hqAngle = pixelAngle(mirror(hq));
     return HEX_OFFSETS
@@ -541,11 +598,11 @@ function buildSpawnSlots(
       .filter(cell => playableSet.has(hexKey(cell)) && !occupied.has(hexKey(cell)))
       .sort((a, b) => angleDiff(pixelAngle({ q: a.q - hq.q, r: a.r - hq.r }), hqAngle)
         - angleDiff(pixelAngle({ q: b.q - hq.q, r: b.r - hq.r }), hqAngle))
-      .slice(0, 3);
+      .slice(0, startingUnits.length);
   };
   const assignUnits = (cells: Position[]) => cells.map((cell, unitIndex) => {
     occupied.add(hexKey(cell));
-    return { type: (unitIndex === 0 ? 'scout' : 'infantry') as UnitType, q: cell.q, r: cell.r };
+    return { type: startingUnits[unitIndex], q: cell.q, r: cell.r };
   });
 
   for (let index = 0; index < spawnPositions.length; index++) {

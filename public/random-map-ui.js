@@ -6,16 +6,16 @@
   const RANDOM_MAP_ID = 'random';
 
   const PARAMS = [
-    { key: 'radius', label: '地图半径', step: 1, defMin: 6, defMax: 10 },
+    { key: 'radius', label: '地图半径', step: 1, defMin: 5, defMax: 10 },
     { key: 'terrainDensity', label: '地形障碍密度', step: 0.01, defMin: 0.02, defMax: 0.12 },
-    { key: 'controlPointCount', label: '据点数量', step: 1, defMin: 3, defMax: 5 },
-    { key: 'maxTurns', label: '最大回合数', step: 1, defMin: 10, defMax: 25 },
-    { key: 'actionsPerTurn', label: '每回合行动点', step: 1, defMin: 3, defMax: 8 },
+    { key: 'controlPointCount', label: '据点数量', step: 1, defMin: 2, defMax: 6 },
+    { key: 'maxTurns', label: '最大回合数', step: 1, defMin: 10, defMax: 30 },
+    { key: 'actionsPerTurn', label: '每回合行动点', step: 1, defMin: 1, defMax: 8 },
     { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, defMin: 0, defMax: 0.25 },
-    { key: 'startingSupplies', label: '初始补给', step: 5, defMin: 60, defMax: 120 },
-    { key: 'baseIncome', label: '基础收入', step: 1, defMin: 8, defMax: 14 },
-    { key: 'controlPointIncome', label: '据点收入', step: 1, defMin: 8, defMax: 16 },
-    { key: 'headquartersHp', label: '总部血量', step: 10, defMin: 120, defMax: 240 },
+    { key: 'startingSupplies', label: '初始补给', step: 5, defMin: 20, defMax: 220 },
+    { key: 'baseIncome', label: '基础收入', step: 1, defMin: 6, defMax: 14 },
+    { key: 'controlPointIncome', label: '据点收入', step: 1, defMin: 0, defMax: 16 },
+    { key: 'headquartersHp', label: '总部血量', step: 10, defMin: 80, defMax: 240 },
     { key: 'headquartersDefense', label: '总部防御', step: 1, defMin: 3, defMax: 10 },
   ];
 

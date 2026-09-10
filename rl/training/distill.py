@@ -51,6 +51,18 @@ import env as E  # noqa: E402
 from local_env import LocalHexGameEnv  # noqa: E402
 
 
+def parse_map_mix(raw: str) -> list[tuple[str, float]]:
+    """与 train.py 同格式："random:0.5,default:0.15"；空串回退到 v3.0 时代的默认混合。"""
+    result: list[tuple[str, float]] = []
+    for entry in raw.split(","):
+        name, separator, weight = entry.strip().partition(":")
+        if name:
+            result.append((name, float(weight) if separator else 1.0))
+    if result:
+        return result
+    return [("random", 0.7), ("default", 0.15), ("dual-lanes", 0.075), ("forge", 0.075)]
+
+
 def smoothed_target(mask: torch.Tensor, actions: torch.Tensor, eps: float) -> torch.Tensor:
     """在合法动作集内构造标签平滑目标分布（v3.0.2）。
 
@@ -84,13 +96,18 @@ def collect(args: argparse.Namespace) -> None:
     torch.set_num_threads(max(1, args.threads))
     teacher = MaskablePPO.load(args.teacher, device="cpu", custom_objects={"learning_rate": 0.0, "lr_schedule": lambda _: 0.0})
     n_teacher_actions = int(teacher.action_space.n)
-    if n_teacher_actions != E.V27_ACTIONS:
-        raise ValueError(f"teacher must be a 54-action v2.7/v2.8 model, got {n_teacher_actions}")
-    map_mix = [("random", 0.7), ("default", 0.15), ("dual-lanes", 0.075), ("forge", 0.075)]
+    map_mix = parse_map_mix(args.map_mix)
     # Opponent: the same teacher (self-play) for `self_play_ratio` of games, rules otherwise.
     env_self = LocalHexGameEnv(map_id="random", opponent_style="mixed", map_mix=map_mix, self_play_probability=1.0, anchor_model_path=args.teacher, anchor_probability=1.0)
     env_rule = LocalHexGameEnv(map_id="random", opponent_style="mixed", map_mix=map_mix)
-    helper = env_self._v27_helper()
+    # v3.1.0：老师不再限于 54 动作 v2.7/v2.8。同空间（155 动作）老师直接在当前观测上
+    # predict、动作直接入 env，无需 v27 编码器与 map_v27_action 映射。
+    if n_teacher_actions == E.V27_ACTIONS:
+        helper = env_self._v27_helper()
+    elif n_teacher_actions == int(env_self.action_space.n):
+        helper = None
+    else:
+        raise ValueError(f"teacher must be a 54-action v2.7/v2.8 model or match the current {int(env_self.action_space.n)}-action space, got {n_teacher_actions}")
     obs_buf: list[np.ndarray] = []
     mask_buf: list[np.ndarray] = []
     act_buf: list[int] = []
@@ -101,7 +118,8 @@ def collect(args: argparse.Namespace) -> None:
     for game in range(args.games):
         env = env_self if rng.random() < args.self_play_ratio else env_rule
         observation, _ = env.reset(seed=args.seed * 100_000 + game)
-        helper.unit_slots = env.unit_slots
+        if helper is not None:
+            helper.unit_slots = env.unit_slots
         episode_obs: list[np.ndarray] = []
         episode_mask: list[np.ndarray] = []
         episode_act: list[int] = []
@@ -109,12 +127,16 @@ def collect(args: argparse.Namespace) -> None:
         done = False
         while not done:
             actions = env.actions
-            v27_mask, _ = env._candidate_action_mask(teacher, actions, env.owner)
-            v27_obs = helper._encode_from_perspective(env.state, env.owner)
             # epsilon-mix: a little stochasticity broadens the state coverage.
             stochastic = rng.random() < args.teacher_stochastic
-            teacher_action, _ = teacher.predict(v27_obs, deterministic=not stochastic, action_masks=v27_mask)
-            action = E.map_v27_action(int(teacher_action))
+            if helper is not None:
+                v27_mask, _ = env._candidate_action_mask(teacher, actions, env.owner)
+                v27_obs = helper._encode_from_perspective(env.state, env.owner)
+                teacher_action, _ = teacher.predict(v27_obs, deterministic=not stochastic, action_masks=v27_mask)
+                action = E.map_v27_action(int(teacher_action))
+            else:
+                teacher_action, _ = teacher.predict(observation, deterministic=not stochastic, action_masks=env.action_masks())
+                action = int(teacher_action)
             if not actions[action][0]:
                 action = 0
             episode_obs.append(observation.astype(np.float32))
@@ -238,12 +260,19 @@ def train(args: argparse.Namespace) -> None:
             scheduler.step()
             tot_ce += float(ce); tot_value += float(value_loss); tot_acc += float(acc); batches += 1
         policy.eval()
+        # 留出集按 batch 分块评估：一次性前向 3k+ 样本的注意力矩阵约 5GiB，
+        # 8GB 显卡上会直接 OOM（v3.1.0 的 3 层 ×128 架构实测）。
+        v_ce = v_value = v_acc = 0.0
+        v_batches = 0
         with torch.no_grad():
-            v_ce, v_value, v_acc = batch_loss(val_idx)
+            for start in range(0, len(val_idx), args.batch_size):
+                idx = val_idx[start:start + args.batch_size]
+                ce_i, value_i, acc_i = batch_loss(idx)
+                v_ce += float(ce_i); v_value += float(value_i); v_acc += float(acc_i); v_batches += 1
         policy.train()
         print(
             f"[train] epoch {epoch + 1}/{args.epochs} ce={tot_ce / batches:.3f} acc={tot_acc / batches:.1%} "
-            f"vloss={tot_value / batches:.3f} | val ce={float(v_ce):.3f} acc={float(v_acc):.1%} vloss={float(v_value):.3f}",
+            f"vloss={tot_value / batches:.3f} | val ce={v_ce / v_batches:.3f} acc={v_acc / v_batches:.1%} vloss={v_value / v_batches:.3f}",
             flush=True,
         )
     policy.eval()
@@ -253,14 +282,17 @@ def train(args: argparse.Namespace) -> None:
     # Sanity gate: report how far the value head is off on the held-out split.
     # If this is large relative to the return std, PPO's first GAE pass will
     # produce wild advantages and wreck the cloned policy.
+    chunks: list[torch.Tensor] = []
     with torch.no_grad():
-        o = obs[val_idx].to(device)
-        features = policy.extract_features(o)
-        if policy.share_features_extractor:
-            _, latent_vf = policy.mlp_extractor(features)
-        else:
-            latent_vf = policy.mlp_extractor.forward_critic(features[1])
-        predicted = policy.value_net(latent_vf).squeeze(-1).cpu()
+        for start in range(0, len(val_idx), args.batch_size):
+            o = obs[val_idx[start:start + args.batch_size]].to(device)
+            features = policy.extract_features(o)
+            if policy.share_features_extractor:
+                _, latent_vf = policy.mlp_extractor(features)
+            else:
+                latent_vf = policy.mlp_extractor.forward_critic(features[1])
+            chunks.append(policy.value_net(latent_vf).squeeze(-1).cpu())
+    predicted = torch.cat(chunks)
     rmse = float(((predicted - ret[val_idx]) ** 2).mean().sqrt())
     env.close()
     print(f"[train] saved distilled v3.0 policy to {out} (extractor={args.extractor})")
@@ -275,6 +307,7 @@ def main() -> None:
     c = sub.add_parser("collect")
     c.add_argument("--teacher", required=True)
     c.add_argument("--games", type=int, default=400)
+    c.add_argument("--map-mix", default="", help="蒸馏数据的地图分布，格式同 RL_TRAIN_MAP_MIX；缺省为 v3.0 时代的 4 图混合")
     c.add_argument("--out", default="rl/distill/v27_teacher.npz")
     c.add_argument("--self-play-ratio", type=float, default=0.7)
     c.add_argument("--teacher-stochastic", type=float, default=0.15, help="fraction of teacher moves sampled instead of argmax")

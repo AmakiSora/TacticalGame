@@ -25,6 +25,7 @@ describe('desktop page navigation', () => {
     const statsNav = navigationOf(read('public/stats.html'));
 
     for (const href of [
+      '/',
       '/play.html',
       '/spectator.html',
       '/spectator2.html',
@@ -33,6 +34,23 @@ describe('desktop page navigation', () => {
     ]) {
       expect(statsNav).toContain(`href="${href}"`);
     }
+  });
+
+  it('links every desktop page back to the homepage, which marks itself active', () => {
+    const pages = [
+      'public/index.html',
+      'public/play.html',
+      'public/spectator.html',
+      'public/stats.html',
+      'public/leaderboard.html',
+      'public/entertainment.html',
+      'public/map-editor.html',
+    ];
+
+    for (const path of pages) {
+      expect(navigationOf(read(path))).toContain('href="/"');
+    }
+    expect(navigationOf(read('public/index.html'))).toContain('href="/" class="active"');
   });
 
   it('uses the same navigation states on all three pages', () => {

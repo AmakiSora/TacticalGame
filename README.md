@@ -24,6 +24,7 @@ npm run dev
 
 | 路径 | 说明 |
 |---|---|
+| `http://localhost:3100/` | 首页：模式介绍、单位速览与功能入口 |
 | `http://localhost:3100/play.html` | 创建/加入并手动操作（窄屏自动进入手机版） |
 | `http://localhost:3100/play-m.html` | 玩家手机版：大厅、触控棋盘与操作抽屉 |
 | `http://localhost:3100/spectator.html` | 观战、导入回放、导出 JSON/HTML（窄屏自动进入手机版） |

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TacticalGame — 首页</title>
+  <link rel="stylesheet" href="/index.css" />
+  <script src="/version.js" defer></script>
+  <script src="/index.js" defer></script>
+</head>
+<body class="home-shell">
+  <header>
+    <div class="brand-block">
+      <h1>TacticalGame <span class="version-badge"></span></h1>
+      <div class="page-subtitle">六角战棋 · 多人回合制策略</div>
+    </div>
+    <nav class="page-nav" aria-label="站点导航">
+      <a href="/" class="active" aria-current="page">首页</a>
+      <a href="/play.html">玩家</a>
+      <a href="/spectator.html">观战</a>
+      <a href="/spectator2.html">全息观战</a>
+      <a href="/map-editor.html">地图编辑</a>
+      <a href="/stats.html">统计</a>
+      <a href="/leaderboard.html">RL 排行榜</a>
+      <a href="/entertainment.html">娱乐数据</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero panel">
+      <div class="hero-copy">
+        <span class="hero-kicker"><span class="live-dot" aria-hidden="true"></span>HEX TACTICS · 2–8 名玩家自由混战</span>
+        <h2>争夺据点，摧毁敌方总部</h2>
+        <p class="hero-desc">
+          尖顶六角格上的回合制多人战棋。部署步兵、侦察、重装、游侠与支援五种单位，
+          在总部与据点之间调配补给，把每回合 5 个行动点花在刀刃上——
+          消灭所有对手，成为最后存活的指挥官。
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/play.html">进入游戏大厅</a>
+          <a class="btn" href="/spectator.html">观战对局</a>
+          <a class="btn btn-ghost" href="/map-editor.html">制作地图</a>
+        </div>
+        <div class="hero-facts" aria-label="游戏特性">
+          <span class="fact-chip">2–8 名玩家</span>
+          <span class="fact-chip">三种游戏模式</span>
+          <span class="fact-chip"><b id="map-count">–</b> 张内置地图</span>
+          <span class="fact-chip">每回合 5 行动点</span>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <svg id="hero-board" role="presentation"></svg>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>游戏模式</h2>
+        <span>创建对局时由地图决定</span>
+      </div>
+      <div class="card-grid">
+        <div class="mode-card">
+          <div class="mode-card-head">
+            <span class="mode-badge mode-std">标准</span>
+            <h3>逐人轮流</h3>
+          </div>
+          <p>
+            经典回合制：每名玩家依次行动。占领据点扩大收入，用补给部署部队，
+            摧毁其他玩家的总部；达到最大轮数时按裁决分判定胜负。
+          </p>
+          <div class="mode-maps"><b>代表地图：</b>六角前线 · 裂谷控制区 · 六方环线 · 双线抉择</div>
+        </div>
+        <div class="mode-card">
+          <div class="mode-card-head">
+            <span class="mode-badge mode-anni">歼灭</span>
+            <h3>炮火收缩圈</h3>
+          </div>
+          <p>
+            没有总部。炮火先预告、再按轮次向地图中心收缩，危险区禁止部署与治疗。
+            最后一个单位死亡即被淘汰，仅剩一名玩家时获胜，排名按行动分计算。
+          </p>
+          <div class="mode-maps"><b>代表地图：</b>炮火禁区（2 / 3 / 6 人）</div>
+        </div>
+        <div class="mode-card">
+          <div class="mode-card-head">
+            <span class="mode-badge mode-simul">同时</span>
+            <h3>秘密计划 · 同时结算</h3>
+          </div>
+          <p>
+            全员在计划阶段秘密下达指令，服务器严格同时结算：无先手优势，多人无需排队。
+            攻击改为瞄准格子与方向，跨玩家指向同一格的移动全部落空。
+          </p>
+          <div class="mode-maps"><b>代表地图：</b>对峙之地（2 / 3 / 6 人）</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>单位速览</h2>
+        <span>总部：HP 180 · 防御 6</span>
+      </div>
+      <div class="unit-grid">
+        <div class="unit-card">
+          <div class="unit-head">
+            <span class="unit-token"><span class="token-icon infantry"></span></span>
+            <div><h3>步兵</h3><div class="unit-role">占点与守点</div></div>
+          </div>
+          <div class="unit-stats">
+            <div class="unit-stat"><span>生命</span><strong>100</strong></div>
+            <div class="unit-stat"><span>攻击</span><strong>30</strong></div>
+            <div class="unit-stat"><span>防御</span><strong>8</strong></div>
+            <div class="unit-stat"><span>移动</span><strong>3</strong></div>
+            <div class="unit-stat"><span>射程</span><strong>1</strong></div>
+            <div class="unit-stat"><span>费用</span><strong>45</strong></div>
+          </div>
+        </div>
+        <div class="unit-card">
+          <div class="unit-head">
+            <span class="unit-token"><span class="token-icon scout"></span></span>
+            <div><h3>侦察</h3><div class="unit-role">快速抢点</div></div>
+          </div>
+          <div class="unit-stats">
+            <div class="unit-stat"><span>生命</span><strong>65</strong></div>
+            <div class="unit-stat"><span>攻击</span><strong>16</strong></div>
+            <div class="unit-stat"><span>防御</span><strong>4</strong></div>
+            <div class="unit-stat"><span>移动</span><strong>5</strong></div>
+            <div class="unit-stat"><span>射程</span><strong>1</strong></div>
+            <div class="unit-stat"><span>费用</span><strong>38</strong></div>
+          </div>
+        </div>
+        <div class="unit-card">
+          <div class="unit-head">
+            <span class="unit-token"><span class="token-icon heavy"></span></span>
+            <div><h3>重装</h3><div class="unit-role">抗线突破 · 可爆破障碍</div></div>
+          </div>
+          <div class="unit-stats">
+            <div class="unit-stat"><span>生命</span><strong>150</strong></div>
+            <div class="unit-stat"><span>攻击</span><strong>38</strong></div>
+            <div class="unit-stat"><span>防御</span><strong>13</strong></div>
+            <div class="unit-stat"><span>移动</span><strong>2</strong></div>
+            <div class="unit-stat"><span>射程</span><strong>1</strong></div>
+            <div class="unit-stat"><span>费用</span><strong>92</strong></div>
+          </div>
+        </div>
+        <div class="unit-card">
+          <div class="unit-head">
+            <span class="unit-token"><span class="token-icon ranger"></span></span>
+            <div><h3>游侠</h3><div class="unit-role">远程输出</div></div>
+          </div>
+          <div class="unit-stats">
+            <div class="unit-stat"><span>生命</span><strong>72</strong></div>
+            <div class="unit-stat"><span>攻击</span><strong>44</strong></div>
+            <div class="unit-stat"><span>防御</span><strong>3</strong></div>
+            <div class="unit-stat"><span>移动</span><strong>2</strong></div>
+            <div class="unit-stat"><span>射程</span><strong>3</strong></div>
+            <div class="unit-stat"><span>费用</span><strong>78</strong></div>
+          </div>
+        </div>
+        <div class="unit-card">
+          <div class="unit-head">
+            <span class="unit-token"><span class="token-icon support"></span></span>
+            <div><h3>支援</h3><div class="unit-role">治疗支援</div></div>
+          </div>
+          <div class="unit-stats">
+            <div class="unit-stat"><span>生命</span><strong>82</strong></div>
+            <div class="unit-stat"><span>攻击</span><strong>10</strong></div>
+            <div class="unit-stat"><span>防御</span><strong>5</strong></div>
+            <div class="unit-stat"><span>移动</span><strong>3</strong></div>
+            <div class="unit-stat"><span>射程</span><strong>1</strong></div>
+            <div class="unit-stat"><span>费用</span><strong>60</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>功能入口</h2>
+        <span>对战、观战与数据看板</span>
+      </div>
+      <div class="card-grid">
+        <a class="entry-card" href="/play.html">
+          <div class="entry-card-head"><h3>玩家控制台</h3><span class="entry-arrow">→</span></div>
+          <p>创建或加入对局，手动指挥部队：部署、移动、攻击、治疗与爆破。</p>
+        </a>
+        <a class="entry-card" href="/spectator.html">
+          <div class="entry-card-head"><h3>观战台</h3><span class="entry-arrow">→</span></div>
+          <p>实时观看进行中的对局，导入回放复盘，导出 JSON 或离线 HTML。</p>
+        </a>
+        <a class="entry-card" href="/spectator2.html">
+          <div class="entry-card-head"><h3>全息观战台</h3><span class="entry-arrow">→</span></div>
+          <p>新版全息观战界面，支持实时观战与回放复盘。</p>
+        </a>
+        <a class="entry-card" href="/map-editor.html">
+          <div class="entry-card-head"><h3>地图编辑器</h3><span class="entry-arrow">→</span></div>
+          <p>本地导入、可视化编辑并导出地图 JSON，设计自己的战场。</p>
+        </a>
+        <a class="entry-card" href="/stats.html">
+          <div class="entry-card-head"><h3>统计看板</h3><span class="entry-arrow">→</span></div>
+          <p>基于回放记录生成：模型排行、对位分析、地图与对局列表。</p>
+        </a>
+        <a class="entry-card" href="/leaderboard.html">
+          <div class="entry-card-head"><h3>RL 排行榜</h3><span class="entry-arrow">→</span></div>
+          <p>强化学习模型批量对战结果与 Bradley-Terry 评分排名。</p>
+        </a>
+        <a class="entry-card" href="/entertainment.html">
+          <div class="entry-card-head"><h3>娱乐数据</h3><span class="entry-arrow">→</span></div>
+          <p>从对局记录里找值得聊的事：行为画像、趣味事实与极限记录。</p>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    源代码与规则文档见仓库 <code>README.md</code> · 部署与接口说明见 <code>deploy/DEPLOYMENT.md</code>
+  </footer>
+</body>
+</html>

@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.4.7`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.4.8`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 

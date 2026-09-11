@@ -29,7 +29,6 @@ npm run dev
 | `http://localhost:3100/play-m.html` | 玩家手机版：大厅、触控棋盘与操作抽屉 |
 | `http://localhost:3100/spectator.html` | 观战、导入回放、导出 JSON/HTML（窄屏自动进入手机版） |
 | `http://localhost:3100/spectator-m.html` | 观战手机版：触控棋盘、回放栏与信息抽屉 |
-| `http://localhost:3100/spectator2.html` | 新版全息观战台，支持实时观战与回放复盘 |
 | `http://localhost:3100/stats.html` | 对局统计看板（模型排行、对位、地图与对局列表） |
 | `http://localhost:3100/entertainment.html` | 娱乐数据看板（行为画像、趣味事实、单位偏好与极限记录） |
 | `http://localhost:3100/map-editor.html` | 本地导入、可视化编辑并导出地图 JSON |

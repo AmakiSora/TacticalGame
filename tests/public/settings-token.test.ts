@@ -22,11 +22,11 @@ describe('settings token input', () => {
   });
 
   it('offers control-token protected forced adjudication on every spectator page', () => {
-    for (const htmlFile of ['public/spectator.html', 'public/spectator-m.html', 'public/spectator2.html']) {
+    for (const htmlFile of ['public/spectator.html', 'public/spectator-m.html']) {
       expect(read(htmlFile)).toContain('id="force-adjudicate"');
       expect(read(htmlFile)).toContain('强制裁决');
     }
-    for (const sourceFile of ['public/app.js', 'public/spectator-m.js', 'public/spectator2.html']) {
+    for (const sourceFile of ['public/app.js', 'public/spectator-m.js']) {
       const source = read(sourceFile);
       expect(source).toContain('/force-adjudicate');
       expect(source).toContain("headers['x-control-token'] = controlToken");

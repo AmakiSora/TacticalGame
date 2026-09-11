@@ -11,9 +11,8 @@ describe('simultaneous mode UI', () => {
     'public/play-m.js',
     'public/app.js',
     'public/spectator-m.js',
-    'public/spectator2.html',
   ];
-  const spectatorClients = ['public/app.js', 'public/spectator-m.js', 'public/spectator2.html'];
+  const spectatorClients = ['public/app.js', 'public/spectator-m.js'];
   const playerClients = ['public/play.js', 'public/play-m.js'];
 
   it('replays plan/round events on every board and labels attack misses', () => {
@@ -95,14 +94,14 @@ describe('simultaneous mode UI', () => {
   });
 
   it('shows colored circular submission indicators on player and spectator turn cards', () => {
-    for (const file of [...playerClients, ...spectatorClients, 'public/spectator2.html']) {
+    for (const file of [...playerClients, ...spectatorClients]) {
       const source = read(file);
       expect(source).toContain('turn-commit-status');
       expect(source).toContain('turn-commit-tag');
       expect(source).toContain('is-committed');
       expect(source).toContain('已提交');
     }
-    for (const file of ['public/style.css', 'public/play.css', 'public/play-m.css', 'public/spectator-m.css', 'public/spectator2.html']) {
+    for (const file of ['public/style.css', 'public/play.css', 'public/play-m.css', 'public/spectator-m.css']) {
       expect(read(file)).toContain('.turn-commit-icon');
     }
   });

@@ -10,13 +10,12 @@ function navigationOf(html: string): string {
 }
 
 describe('desktop page navigation', () => {
-  it('connects the player, spectator and stats pages without redirecting spectator to spectator2', () => {
+  it('connects the player, spectator and stats pages', () => {
     const playNav = navigationOf(read('public/play.html'));
     const spectatorNav = navigationOf(read('public/spectator.html'));
 
     expect(playNav).toContain('href="/spectator.html"');
     expect(playNav).toContain('href="/stats.html"');
-    expect(playNav).not.toContain('href="/spectator2.html"');
     expect(spectatorNav).toContain('href="/play.html"');
     expect(spectatorNav).toContain('href="/stats.html"');
   });
@@ -28,7 +27,6 @@ describe('desktop page navigation', () => {
       '/',
       '/play.html',
       '/spectator.html',
-      '/spectator2.html',
       '/map-editor.html',
       '/stats.html',
     ]) {

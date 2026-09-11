@@ -14,7 +14,6 @@ describe('layout editor', () => {
       expect(html).toContain('/layout-editor.js');
       expect(html).toContain('/layout-editor.css');
     }
-    expect(read('public/spectator2.html')).not.toContain('/layout-editor.js');
   });
 
   it('does not enable layout editing on mobile pages', () => {

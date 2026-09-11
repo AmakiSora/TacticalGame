@@ -11,7 +11,6 @@ describe('annihilation mode UI', () => {
     'public/play-m.js',
     'public/app.js',
     'public/spectator-m.js',
-    'public/spectator2.html',
   ];
 
   it('replays artillery warnings, shrinking, and damage on every board', () => {

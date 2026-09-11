@@ -29,7 +29,7 @@ function makeModelsDir(files: string[]) {
 
 describe('RETIRED_VERSIONS', () => {
   it('派生自 MODEL_STATUS_BY_VERSION 的 retired 条目', () => {
-    expect([...RETIRED_VERSIONS].sort()).toEqual(['v2.1.4', 'v2.1.5', 'v2.1.6', 'v2.1.8']);
+    expect([...RETIRED_VERSIONS].sort()).toEqual(['v2.1.1', 'v2.1.4', 'v2.1.5', 'v2.1.6', 'v2.1.8']);
   });
 });
 

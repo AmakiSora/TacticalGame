@@ -42,7 +42,6 @@ v3.0.3（全 7 图训练混合 + 锚点 v3.0.0 20% + best 选择键拆分，纯�
 | `hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip` | [v2.3.1](models/v2.3.1.md) | 历史 | 首个随机地图模型；随机图对 v2.2.0 7:1、对规则对手 14:6；但被自对弈的 v2.3.2 1:7 压制 |
 | `hex_ppo_v2.2.0_20260827_default_modelmix_best.zip` | [v2.2.0](models/v2.2.0.md) | 历史 | 座位随机化；对 v2.0.0 真身 16:0，对 v2.1.3 累计 16:2；交付 best 为 12 万步断点 |
 | `hex_ppo_v2.1.3_20260826_default_rule_defensive_800000.zip` | [v2.1.3](models/v2.1.3.md) | 历史 | 单一 defensive 对手 + 独特超参（lr 1e-4/gamma 0.995）；弱于 v2.0.0、强于 v2.1.4–v2.1.8 |
-| `hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip` | [v2.1.1](models/v2.1.1.md) | 历史 | 早期 v2.1 模型（相对视角 + 12 稳定槽首批），跨版本评估中弱于 v2.0.0 |
 | `hex_ppo_v2.0.0_20260824_default_rule_500000.zip` | [v2.0.0](models/v2.0.0.md) | 基准/历史 | 规则对手 + 固定意图槽（38 动作）；唯一能在主场满血出战的旧模型，v2.1.x 的模型对手与验收基准都是它 |
 | `hex_ppo_v1.0.0_20260824_default_random_opponent_120000.zip` | [v1.0.0](models/v1.0.0.md) | 历史 | 512 动作随机对手基线，仅由 `run_model_v100.py` 路由；v1.0.0 唯一保留的模型文件（早期实验版 100096 已作为冗余删除，详见档案） |
 
@@ -52,6 +51,7 @@ v3.0.3（全 7 图训练混合 + 锚点 v3.0.0 20% + best 选择键拆分，纯�
 
 | 模型文件（已归档） | 档案 | 作废原因 |
 |---|---|---|
+| `rl/models/deprecated/hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip` | [v2.1.1](models/deprecated/v2.1.1.md) | 训练环境带移动回溯（v2.1.6 修复）与占点奖励丢失（v2.1.7 修复）双重缺陷，权重不具复现价值；round_robin 全榜 12.4%（random 2.7%），家族内最弱配方（500k × mixed 规则对手） |
 | `rl/models/deprecated/hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip` | [v2.1.8](models/deprecated/v2.1.8.md) | 在回合交替损坏的环境下训练（从 v2.1.7 崩溃的 12 万步断点续训），自评 100% 胜率为虚假数据 |
 | `rl/models/deprecated/hex_ppo_v2.1.6_20260827_default_modelmix_800000.zip` | [v2.1.6](models/deprecated/v2.1.6.md) | 训练环境仍丢失占点奖励信号，互打全败 |
 | `rl/models/deprecated/hex_ppo_v2.1.5_20260827_default_modelmix_600000.zip` | [v2.1.5](models/deprecated/v2.1.5.md) | 移动只走一格 + 无占点信号环境下训练，互打全败 |
@@ -64,7 +64,7 @@ v3.0.3（全 7 图训练混合 + 锚点 v3.0.0 20% + best 选择键拆分，纯�
 这些文件是训练时间切片或接口测试文件，不是独立策略；观察、动作和兼容性与其所属模型一致。
 
 - `rl/checkpoints/default/20260824-034840/`：v2.0.0，20,000–500,000 步，`best/` 为 500,000 步版本。
-- `rl/checkpoints/default/20260825-053124/`：v2.1.1，20,000–500,000 步，`best/` 对应 480,000 步。
+- `rl/checkpoints/deprecated/20260825-053124/`：v2.1.1（2026-09-12 随模型作废归档），20,000–500,000 步，`best/` 对应 480,000 步。
 - `rl/checkpoints/default/20260826-050439/`：v2.1.3（defensive 对手），至 800,000 步。
 - `rl/checkpoints/deprecated/20260826-151230/`：v2.1.4（作废），至 800,000 步。
 - `rl/checkpoints/deprecated/20260827-010723/`：v2.1.5（作废），至 600,000 步。

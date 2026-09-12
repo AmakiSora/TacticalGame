@@ -372,16 +372,28 @@
     });
   }
 
-  function renderKpis(overview, sourceOverview) {
+  function fmtDurationCn(sec) {
+    if (sec == null || !Number.isFinite(sec)) return '—';
+    if (sec >= 5400) return `${(sec / 3600).toFixed(1)} 小时`;
+    const m = Math.floor(sec / 60);
+    if (m > 0) return `${m} 分 ${Math.round(sec % 60)} 秒`;
+    return `${Math.round(sec)} 秒`;
+  }
+
+  function renderKpis(overview, sourceOverview, matches) {
+    const durations = (matches || []).map(m => m.durationSec).filter(v => v != null && v > 0);
+    const avgDuration = durations.length
+      ? durations.reduce((s, v) => s + v, 0) / durations.length
+      : null;
     const cards = [
       { label: '筛选局数', value: overview.matchCount, sub: modeSummary(overview.modeDist) },
       { label: '完赛', value: overview.completedCount, sub: `未完赛 ${overview.incompleteCount}` },
       { label: '模型数', value: overview.modelCount, sub: '当前筛选' },
       { label: '平均整轮', value: fmtNum(overview.avgRounds, 2), sub: 'round_end 计数' },
       {
-        label: '全量事件',
-        value: sourceOverview?.totalEvents ?? '—',
-        sub: `V2 ${sourceOverview?.versionDist?.V2 ?? 0} / V3 ${sourceOverview?.versionDist?.V3 ?? 0}`,
+        label: '平均耗时',
+        value: avgDuration != null ? fmtDurationCn(avgDuration) : '—',
+        sub: avgDuration != null ? `${durations.length} 局有墙钟记录` : '无墙钟记录',
       },
       {
         label: '日期跨度',
@@ -597,7 +609,7 @@
     const f = getFilters();
     filteredMatches = (raw.matches || []).filter(m => matchPasses(m, f));
     const agg = recomputeFromMatches(filteredMatches);
-    renderKpis(agg.overview, raw.overview);
+    renderKpis(agg.overview, raw.overview, filteredMatches);
     renderModelTable(agg.modelLeaderboard);
     renderAgentTable(agg.agentLeaderboard);
     renderBars(el.mapBars, agg.overview.mapDist);

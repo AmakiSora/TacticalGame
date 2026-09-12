@@ -70,7 +70,7 @@ main {
   padding: 18px 20px 40px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .panel {
@@ -152,13 +152,18 @@ button.ghost { background: transparent; color: #8aa; }
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 .kpi-card {
   background: linear-gradient(160deg, #18222c, #141c24);
   border: 1px solid #2a3a4a;
   border-radius: 12px;
   padding: 12px 14px;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.kpi-card:hover {
+  border-color: #3a6a7a;
+  transform: translateY(-1px);
 }
 .kpi-card .label { font-size: 11px; color: #7a94a6; font-weight: 600; }
 .kpi-card .value {
@@ -206,6 +211,26 @@ button.ghost { background: transparent; color: #8aa; }
   overflow: auto;
   border: 1px solid #243442;
   border-radius: 10px;
+}
+
+/* 站点内联 SVG 图表（趋势/节奏曲线）统一撑满容器 */
+.chart-box svg { display: block; width: 100%; height: auto; }
+
+/* 细暗色滚动条：表格横滚与长列表共用 */
+.table-wrap, .debut-list {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3a4a transparent;
+}
+.table-wrap::-webkit-scrollbar, .debut-list::-webkit-scrollbar { height: 8px; width: 8px; }
+.table-wrap::-webkit-scrollbar-thumb, .debut-list::-webkit-scrollbar-thumb { background: #2a3a4a; border-radius: 4px; }
+.table-wrap::-webkit-scrollbar-track, .debut-list::-webkit-scrollbar-track { background: transparent; }
+
+.filters select:focus-visible,
+.filters input:focus-visible,
+button:focus-visible,
+.model-picker select:focus-visible {
+  outline: 2px solid rgba(61, 155, 122, .45);
+  outline-offset: 1px;
 }
 
 .data-table {

@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`（对峙之地）地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待。
 
-当前版本：`3.4.8`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
+当前版本：`3.4.9`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
 ## 技术栈
 
@@ -30,7 +30,7 @@ npm run dev
 | `http://localhost:3100/spectator.html` | 观战、导入回放、导出 JSON/HTML（窄屏自动进入手机版） |
 | `http://localhost:3100/spectator-m.html` | 观战手机版：触控棋盘、回放栏与信息抽屉 |
 | `http://localhost:3100/stats.html` | 对局统计看板（模型排行、对位、地图与对局列表） |
-| `http://localhost:3100/entertainment.html` | 娱乐数据看板（行为画像、趣味事实、单位偏好与极限记录） |
+| `http://localhost:3100/entertainment.html` | 娱乐数据看板（回合节奏曲线、战斗群像、势头学、名场面与纪录柜） |
 | `http://localhost:3100/map-editor.html` | 本地导入、可视化编辑并导出地图 JSON |
 
 ### 统计数据

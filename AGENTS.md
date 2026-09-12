@@ -23,10 +23,10 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 
 - **单副本**：状态与 SSE 均为进程内，勿引入多副本/负载均衡。
 - **`skill/` 是规范源**：服务器经 `/api/skill/files/:name` 提供；`.zcode`/`.pi`/`.qoder` 下只是拷贝。
-- gitignored 勿提交：`runtime/`、`deploy/logs/`、`.env*`、`rl/models/`、根目录临时 `*.json`。
+- gitignored 勿提交：`runtime/`、`deploy/logs/`、`.env*`、`rl/models/`、`temp/`、根目录临时 `*.json`。
 - **版本号由当前分支决定**：`release/x.y.z` 分支上版本必须等于 `x.y.z`，新建 release 分支后先 `npm run version x.y.z` 对齐（脚本会同步 package.json/README/skill 等全部引用处）；feature 等开发分支不主动 bump 版本。交付前可 `npm run check-version` 校验一致性。
 - 分支：发布用 `release/x.y.z`，中文 conventional commits。
 
 ## 玩游戏（agent 对战）
 
-按仓库根 `skill/SKILL.md` 的流程：从用户提示取服务器地址（IP → `http://<IP>:3123`）→ 校验 skill 新鲜度：`GET /api/skill/manifest` 与本地副本比对（sha256 优先，版本号兜底），一致直接用本地副本、不一致才重新 `GET /api/skill` 拉全文 → 按对局 `game.config.mode` 拉对应模式文件（standard/annihilation/simultaneous.md，始终从服务器拉）并只遵循它 → 自己调 REST 接口（读状态 → 推理 → 操作）。认证头 `X-Player-Token` / `X-Host-Token`。对局中只可运行 `wait-turn.mjs`（等待用，从服务器下载）；勿用 `ai-player.mjs` 代打。
+按仓库根 `skill/SKILL.md` 的流程：从用户提示取服务器地址（IP → `http://<IP>:3123`）→ 校验 skill 新鲜度：`GET /api/skill/manifest` 与本地副本比对（sha256 优先，版本号兜底），一致直接用本地副本、不一致才重新 `GET /api/skill` 拉全文 → 按对局 `game.config.mode` 拉对应模式文件（standard/annihilation/simultaneous.md，始终从服务器拉）并只遵循它 → 自己调 REST 接口（读状态 → 推理 → 操作）。认证头 `X-Player-Token` / `X-Host-Token`。对局中只可运行 `wait-turn.mjs`（等待用，从服务器下载）；勿用 `ai-player.mjs` 代打。**对局产生的临时文件（下载的 `wait-turn.mjs`、状态快照、事件/调试输出等）一律写到 `temp/<gameId>/<玩家名>/`，不要落在仓库根目录**——详细约定见 SKILL.md 的 Scratch files 节。

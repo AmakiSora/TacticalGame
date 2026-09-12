@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.4.8`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.4.9`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
@@ -33,6 +33,20 @@ players queue actions secretly in a planning phase, then the server resolves the
 once; attacks target cells instead of units, and each unit acts at most once per round.
 `wait-turn.mjs` exit 0 there means "your planning window is open and you have not committed".
 
+## Scratch files (mandatory)
+
+The directory you are running in is the user's workspace, not your scratch space — game debris dumped into its root is a known, recurring mess. Once you know both the game id and your player name (right after create or join), every file you create or download for this game must go under `temp/<gameId>/<playerName>/`, relative to your current working directory:
+
+```bash
+SCRATCH="temp/<gameId>/<playerName>"   # e.g. temp/g_k3f9q2/player_a
+mkdir -p "$SCRATCH"
+```
+
+- `<playerName>` is the name you created or joined the game with; if it contains spaces or other shell-hostile characters, use your seat id (`player_a` …) instead. One game + one player = one directory.
+- Everything you persist during the game belongs there: the downloaded `wait-turn.mjs`, saved mode files, state snapshots, event dumps, notes, plans, transcripts. Never write game files directly into the current directory (repo root), `$HOME`, or any other location.
+- Prefer not saving at all: pipe API responses through `jq`/stdout when you only need to read them.
+- Do not delete the scratch directory mid-game; leaving it behind afterwards is fine (this repo gitignores `temp/`).
+
 ## Remote Server Target
 
 Before any API call, read the cloud server address from the user prompt and build `BASE_URL`:
@@ -59,7 +73,7 @@ The server serves this skill at `${BASE_URL}/api/skill*` — unauthenticated, re
 Always fetch these from the server regardless of the check (small files you have not read this game, so there is no double-read to save):
 
 - Mode file (Mode routing): `GET ${BASE_URL}/api/skill/files/standard.md` / `annihilation.md` / `simultaneous.md`.
-- Wait script: `curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o wait-turn.mjs` (optionally verify its sha256 against the manifest).
+- Wait script: `curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o "$SCRATCH/wait-turn.mjs"` (optionally verify its sha256 against the manifest; `$SCRATCH` is defined in [Scratch files](#scratch-files-mandatory)).
 - Any other skill file: `GET ${BASE_URL}/api/skill/files/<name>`.
 
 Local copies are only an offline fallback when the server is unreachable, and you must say so in your report when you use one.
@@ -75,8 +89,8 @@ Before playing, classify the user prompt **once** and follow it for the whole ga
 Use `wait-turn.mjs` for the wait; do not hand-roll GET loops. Fetch it once per game, then run it with node (see Canonical fetch; optionally verify the download's sha256 against the manifest):
 
 ```bash
-curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o wait-turn.mjs
-node wait-turn.mjs --url ${BASE_URL} --game <gameId> --player <yourSeat> --token <playerToken> [--interval-s 3] [--timeout-s 1800]
+curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o "$SCRATCH/wait-turn.mjs"
+node "$SCRATCH/wait-turn.mjs" --url ${BASE_URL} --game <gameId> --player <yourSeat> --token <playerToken> [--interval-s 3] [--timeout-s 1800]
 ```
 
 Offline fallback only: run the copy bundled with a local skill install (`node skill/wait-turn.mjs ...`).
@@ -174,6 +188,7 @@ Unit numbers are **per map**. Never reuse memorized move/attack/cost values from
 1. Read `game.config.units` for every type you might use (`infantry` / `scout` / `heavy` / `ranger` / `support` — a map may omit or retune any of them).
 2. For each living unit instance, prefer the **instance fields** on `game.units[]` (they are copied from config at spawn): `type`, `hp`, `maxHp`, `attack`, `defense`, `moveRange`, `attackRange`, `cost`, `canCapture`, optional `healPower`, plus turn flags `hasMoved` / `hasActed` / `actionSpent`.
 3. Compute legality from **those** values + hex distance + `game.cells` (and mode rules). Example pitfall: `heavy.moveRange` is often not the slowest body on the board — read it; do not assume "heavies crawl".
+4. **Combat math is stochastic — plan on the low roll.** Attack damage = `max(balance.minimumDamage, attack − defense + uniformInt(−balance.damageVarianceRange, +balance.damageVarianceRange))` (every built-in map: range **±3**, floor **1**); simultaneous strikes resolve with the same formula at round boundary. Kill thresholds: `attack − defense − damageVarianceRange ≥ target.hp` is a **guaranteed** kill; `attack − defense ≥ target.hp` only means the kill fails on rolls below 0 (3/7 at ±3); if `attack − defense < target.hp` the kill needs a positive roll and lands with probability `(damageVarianceRange − needed + 1) / (2·damageVarianceRange + 1)` (needed = `target.hp − (attack − defense)`) — never bank a game-deciding trade on it without a follow-up attacker. Heals roll upward only: `healPower + uniformInt(0, balance.healVarianceRange)`.
 
 **Role rules (capabilities, not numbers):**
 

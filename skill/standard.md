@@ -31,7 +31,7 @@ Every action on your turn, inspect:
 Unless the user asks for a different style:
 
 1. **Attack the weakest nearby enemy HQ** any unit can hit. Prefer nearest low-HP living HQ among opponents.
-2. **Attack killable / low-HP enemy units**; prefer support, ranger, and capturers. Ignore eliminated seats.
+2. **Attack killable / low-HP enemy units** — "killable" = `attack − defense − damageVarianceRange ≥ hp` (combat is stochastic; see Combat math in [`SKILL.md`](SKILL.md) for the variance bands and kill probabilities); prefer support, ranger, and capturers. Ignore eliminated seats.
 3. **Heal** the most damaged friendly with support.
 4. **Demolish** an adjacent blocker with heavy when it opens CPs, deploy space, attack lanes, or a path to an enemy HQ.
 5. **Deploy** before ordinary moves when supplies + AP remain — especially high supplies, army not ahead of the strongest living rival, ≥2 owned CPs, or late game.

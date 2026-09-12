@@ -7,9 +7,12 @@ import {
   buildMapStage,
   buildModelDebut,
   buildModelProfiles,
+  buildMomentum,
   buildMonthlyTrend,
   buildOverview,
+  buildPace,
   buildTimeline,
+  buildUnitStats,
   durationSec,
 } from '../../script/generateFunStats.mjs';
 
@@ -179,5 +182,125 @@ describe('entertainment stats rules', () => {
     const debut = buildModelDebut([late, early]);
     expect(debut[0]).toMatchObject({ model: 'New', debutDate: '2026-06-01', latestDate: '2026-06-01', games: 1 });
     expect(debut[1]).toMatchObject({ model: 'Old', debutDate: '2026-06-01', latestDate: '2026-07-15', games: 2 });
+  });
+
+  it('carries combat fields through model profiles and per-game rates', () => {
+    const profiles = buildModelProfiles([
+      match('tg_fight', 10, [
+        participant('Att', { attacks: 4, damageDealt: 120, damageTaken: 55, kills: 3, healsHp: 40, attackMisses: 1, failedActions: 2 }),
+        participant('Def', { attacks: 1, damageDealt: 20, damageTaken: 120, kills: 0 }),
+      ]),
+    ]);
+
+    const att = profiles.find(p => p.model === 'Att');
+    expect(att).toMatchObject({
+      damageDealt: 120, damageTaken: 55, kills: 3, healsHp: 40, attackMisses: 1, failedActions: 2,
+    });
+    expect(att?.perGame.damageDealt).toBe(120);
+    expect(att?.perGame.kills).toBe(3);
+  });
+
+  it('merges deploy and death tallies per unit type, including garrison-only types', () => {
+    const m = match('tg_units', 10, [participant('A', { deploys: 2, deploysByType: { infantry: 2 } })]);
+    (m as any).eventStats = eventStats({ rounds: 1, deathsByType: { infantry: 1, heavy: 3 } });
+
+    const units = buildUnitStats([m]);
+    const infantry = units.find(u => u.unitType === 'infantry');
+    const heavy = units.find(u => u.unitType === 'heavy');
+    expect(infantry).toMatchObject({ deploys: 2, deaths: 1, share: 1, deathShare: 0.25 });
+    expect(heavy).toMatchObject({ deploys: 0, deaths: 3, deathShare: 0.75 });
+  });
+
+  it('converts first blood and first capture into win rates over decisive games', () => {
+    const mk = (recordId: string, events: unknown[], winnerModel: string) => ({
+      ...match(recordId, 100, [
+        { ...participant('A', {}), playerId: 'player_a', isWinner: winnerModel === 'A', rank: winnerModel === 'A' ? 1 : 2 },
+        { ...participant('B', {}), playerId: 'player_b', isWinner: winnerModel === 'B', rank: winnerModel === 'B' ? 1 : 2 },
+      ]),
+      reason: 'headquarters_destroyed',
+      events,
+    });
+    const killByA = { type: 'attack', timestamp: 31_000, payload: { owner: 'player_a', targetKind: 'unit', damage: 30, targetHp: 0 } };
+    const killByB = { type: 'attack', timestamp: 61_000, payload: { owner: 'player_b', targetKind: 'unit', damage: 30, targetHp: 0 } };
+    const capByA = { type: 'control_point_captured', payload: { owner: 'player_a' } };
+
+    const momentum = buildMomentum([
+      mk('tg_m1', [killByA, capByA], 'A'),
+      mk('tg_m2', [killByB], 'A'),
+      mk('tg_m3', [], 'A'),
+    ]);
+
+    expect(momentum.firstBlood).toMatchObject({ samples: 2, wins: 1, winRate: 0.5 });
+    // tg_m1 一血发生在开局 30 秒处
+    expect(momentum.firstBlood.fastest).toMatchObject({ recordId: 'tg_m1', model: 'A', sec: 30 });
+    expect(momentum.firstCapture).toMatchObject({ samples: 1, wins: 1, winRate: 1 });
+  });
+
+  it('tracks comeback supply recipients and their upset outcomes', () => {
+    const m = {
+      ...match('tg_cb', 100, [
+        { ...participant('A', {}), playerId: 'player_a', isWinner: true, rank: 1 },
+        { ...participant('B', {}), playerId: 'player_b', isWinner: false, rank: 2 },
+      ]),
+      reason: 'turn_limit_score',
+      events: [
+        { type: 'comeback_supply', payload: { owner: 'player_b', amount: 20, scoreGap: 300 } },
+        { type: 'comeback_supply', payload: { owner: 'player_b', amount: 20, scoreGap: 450.55 } },
+      ],
+    };
+
+    const momentum = buildMomentum([m]);
+    expect(momentum.comeback).toMatchObject({ triggers: 1, wins: 0, winRate: 0 });
+    expect(momentum.comeback.maxGap).toMatchObject({ gap: 450.6, recordId: 'tg_cb', model: 'B', won: false });
+    expect(momentum.comeback.byModel).toEqual([{ model: 'B', triggers: 1, wins: 0 }]);
+  });
+
+  it('averages pace per round among matches that reached it and skips anchor-less replays', () => {
+    const anchored = {
+      ...match('tg_pace', 10),
+      events: [
+        { type: 'attack', payload: { damage: 10, targetKind: 'unit', targetHp: 5, roundNumber: 1 } },
+        { type: 'attack', payload: { damage: 20, targetKind: 'unit', targetHp: 0, roundNumber: 2 } },
+        { type: 'deploy', payload: { unitType: 'infantry', roundNumber: 2 } },
+        { type: 'round_end', payload: { roundNumber: 2 } },
+      ],
+    };
+    const noAnchor = {
+      ...match('tg_noanchor', 10),
+      events: [
+        { type: 'attack', payload: { damage: 999, targetKind: 'unit', targetHp: 0 } },
+      ],
+    };
+
+    const pace = buildPace([anchored, noAnchor]);
+    expect(pace.sampled).toBe(1);
+    expect(pace.byRound).toHaveLength(2);
+    expect(pace.byRound[0]).toMatchObject({ round: 1, matches: 1, attacks: 1, damage: 10, kills: 0 });
+    expect(pace.byRound[1]).toMatchObject({ round: 2, matches: 1, attacks: 1, damage: 20, kills: 1, deploys: 1 });
+    expect(pace.attribution.sources.payload).toBeGreaterThan(0);
+  });
+
+  it('finds the biggest single hit and the fastest decisive win', () => {
+    const big = {
+      ...match('tg_big', 10, [
+        { ...participant('A', {}), playerId: 'player_a', isWinner: true, rank: 1 },
+        { ...participant('B', {}), playerId: 'player_b', isWinner: false, rank: 2 },
+      ]),
+      reason: 'headquarters_destroyed',
+      events: [
+        { type: 'attack', payload: { owner: 'player_a', targetKind: 'unit', damage: 46, targetHp: 0 } },
+        { type: 'attack', payload: { owner: 'player_b', targetKind: 'headquarters', damage: 30, targetHp: 90 } },
+      ],
+    };
+    big.eventStats = eventStats({ rounds: 5, damageDealt: 500 });
+    const draw = { ...match('tg_draw', 10), reason: 'turn_limit_draw' };
+    draw.eventStats = eventStats({ rounds: 2 });
+
+    const extremes = buildExtremes([big, draw]);
+    expect(extremes.biggestHit).toMatchObject({ recordId: 'tg_big', value: 46, model: 'A', targetKind: 'unit', killed: true });
+    // 最快分胜负只看决出赢家的局：平局局轮数更少但不入选
+    expect(extremes.fastestWinRounds).toMatchObject({ recordId: 'tg_big', rounds: 5 });
+    expect(extremes.shortestByRounds).toMatchObject({ recordId: 'tg_draw', rounds: 2 });
+    expect(extremes.mostDamage).toMatchObject({ recordId: 'tg_big', value: 500 });
   });
 });

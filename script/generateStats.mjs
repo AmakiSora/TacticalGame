@@ -190,8 +190,16 @@ export function emptyEventStats() {
     deployCost: 0,
     comebackSupply: 0,
     deploysByType: {},
+    deathsByType: {},
     artilleryDamage: 0,
     artilleryHits: 0,
+    damageDealt: 0,
+    damageTaken: 0,
+    damageToHq: 0,
+    kills: 0,
+    attackMisses: 0,
+    healsHp: 0,
+    failedActions: 0,
   };
 }
 
@@ -200,9 +208,20 @@ export function tallyEvent(stats, type, payload) {
     case 'move':
       stats.moves += 1;
       break;
-    case 'attack':
+    case 'attack': {
       stats.attacks += 1;
+      // simultaneous 模式的落空攻击（hit:false）不带伤害字段
+      if (payload?.hit === false) {
+        stats.attackMisses += 1;
+        break;
+      }
+      const dealt = num(payload?.actualDamage) ?? num(payload?.damage) ?? 0;
+      stats.damageDealt += dealt;
+      if (payload?.targetKind === 'headquarters') stats.damageToHq += dealt;
+      // targetHp 为受击后剩余 HP，归零即本次攻击完成击杀
+      if (payload?.targetKind === 'unit' && num(payload?.targetHp) === 0) stats.kills += 1;
       break;
+    }
     case 'deploy':
       stats.deploys += 1;
       if (payload?.unitType) {
@@ -218,6 +237,7 @@ export function tallyEvent(stats, type, payload) {
       break;
     case 'heal':
       stats.heals += 1;
+      stats.healsHp += num(payload?.amount) ?? 0;
       break;
     case 'demolish':
     case 'terrain_demolished':
@@ -228,6 +248,9 @@ export function tallyEvent(stats, type, payload) {
       break;
     case 'unit_death':
       stats.unitDeaths += 1;
+      if (payload?.type) {
+        stats.deathsByType[payload.type] = (stats.deathsByType[payload.type] || 0) + 1;
+      }
       break;
     case 'round_end':
       stats.rounds += 1;
@@ -238,6 +261,9 @@ export function tallyEvent(stats, type, payload) {
     case 'artillery_damage':
       stats.artilleryHits += 1;
       stats.artilleryDamage += num(payload?.damage) ?? 0;
+      break;
+    case 'action_failed':
+      stats.failedActions += 1;
       break;
     default:
       break;
@@ -498,6 +524,14 @@ export function extractMatch(filePath, version, fileName, reviewsByRecord) {
       else if (type !== 'attack') {
         /* global only already counted */
       }
+      // 承伤归属到目标方（仅单位目标；HQ 承伤见比分 headquartersDamage）
+      if (type === 'attack' && payload.hit !== false) {
+        const targetOwner = unitOwner.get(payload.targetId);
+        const dealt = num(payload.actualDamage) ?? num(payload.damage) ?? 0;
+        if (targetOwner && perSeatEvents[targetOwner]) {
+          perSeatEvents[targetOwner].damageTaken += dealt;
+        }
+      }
     } else if (type === 'income' || type === 'comeback_supply') {
       if (payload.owner && perSeatEvents[payload.owner]) {
         tallyEvent(perSeatEvents[payload.owner], type, payload);
@@ -507,6 +541,8 @@ export function extractMatch(filePath, version, fileName, reviewsByRecord) {
     } else if (type === 'unit_death' && payload.owner && perSeatEvents[payload.owner]) {
       tallyEvent(perSeatEvents[payload.owner], type, payload);
     } else if (type === 'artillery_damage' && payload.owner && perSeatEvents[payload.owner]) {
+      tallyEvent(perSeatEvents[payload.owner], type, payload);
+    } else if (type === 'action_failed' && payload.owner && perSeatEvents[payload.owner]) {
       tallyEvent(perSeatEvents[payload.owner], type, payload);
     }
 
@@ -565,6 +601,10 @@ export function extractMatch(filePath, version, fileName, reviewsByRecord) {
       fileName: r.fileName,
     })),
     timestamps: { start: ts0, end: ts1 },
+    // 原始事件流与单位归属索引：仅供娱乐统计等脚本做序列级挖掘（回合归属、
+    // 一血归属等），aggregate() 输出的 stats.json 不含这两个字段。
+    events,
+    unitOwner,
   };
 }
 
@@ -844,6 +884,7 @@ export function aggregate(matches) {
       completed: m.completed,
       eventCount: m.eventCount,
       rounds: m.eventStats?.rounds ?? 0,
+      durationSec: durationSec(m),
       participants: m.participants.map(p => ({
         playerId: p.playerId,
         displayName: p.displayName,

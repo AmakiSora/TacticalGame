@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>TacticalGame - 娱乐数据</title>
+  <title>TacticalGame — 娱乐数据</title>
+  <link rel="stylesheet" href="/stats.css" />
   <link rel="stylesheet" href="/entertainment.css" />
   <link rel="stylesheet" href="/mobile-icons.css" />
   <script src="/version.js" defer></script>
   <script src="/entertainment.js" defer></script>
 </head>
-<body class="entertainment-shell">
+<body class="stats-shell entertainment-shell">
   <header>
     <div class="brand-block">
       <h1>娱乐数据 <span class="version-badge"></span></h1>
-      <div class="page-subtitle">从对局记录里，找值得聊的事</div>
+      <div class="page-subtitle">从对局回放里，挖值得聊的事</div>
     </div>
     <nav class="page-nav" aria-label="站点导航">
       <a href="/">首页</a>
@@ -27,143 +28,166 @@
   </header>
 
   <main>
-    <section class="report-lead" aria-labelledby="report-title">
-      <div class="lead-copy">
-        <div class="report-kicker"><span class="live-dot" aria-hidden="true"></span> 战场观察 / 最新汇总</div>
-        <h2 id="report-title">正在整理战报...</h2>
-        <p id="report-summary" class="report-summary">正在从回放中提取关键趋势。</p>
-        <div class="report-meta" aria-label="数据范围">
-          <span><b id="source-count">-</b> 局回放</span>
-          <span id="date-range">-</span>
-          <span id="generated-at">-</span>
-        </div>
+    <section class="meta-bar panel">
+      <div class="meta-item">
+        <span>数据生成时间</span>
+        <strong id="generated-at">—</strong>
       </div>
-      <div class="lead-actions">
-        <a class="text-link" href="/stats.html">查看完整统计 <span aria-hidden="true">→</span></a>
-        <button id="btn-reload" class="icon-button" type="button" title="重新加载数据" aria-label="重新加载数据">
-          <span class="ui-icon icon-reset" aria-hidden="true"></span>
-        </button>
-        <span id="load-status" class="load-status" role="status">加载中</span>
+      <div class="meta-item">
+        <span>回放局数</span>
+        <strong id="source-count">—</strong>
+      </div>
+      <div class="meta-item">
+        <span>日期范围</span>
+        <strong id="date-range">—</strong>
+      </div>
+      <div class="meta-item status-item">
+        <span>状态</span>
+        <strong id="load-status" class="status-pill">加载中…</strong>
+      </div>
+      <div class="meta-actions">
+        <button id="btn-reload" type="button">重新加载</button>
       </div>
     </section>
 
-    <section class="pulse-section" aria-labelledby="pulse-title">
+    <section class="panel lead-panel" aria-labelledby="lead-title">
+      <div class="lead-kicker"><span class="live-dot" aria-hidden="true"></span> 战场观察 · 数据战报</div>
+      <h2 id="lead-title">正在整理战报…</h2>
+      <p id="lead-summary" class="lead-summary">正在从回放中提取关键趋势。</p>
+      <div id="lead-chips" class="lead-chips"></div>
+    </section>
+
+    <section aria-labelledby="pulse-title">
       <div class="section-heading">
-        <div>
-          <span class="section-index">01</span>
-          <h2 id="pulse-title">战场脉搏</h2>
-        </div>
-        <p>只保留能说明对局节奏的数字</p>
+        <h2 id="pulse-title">战场脉搏</h2>
+        <span>只保留能说明对局节奏的数字</span>
       </div>
-      <div id="pulse-grid" class="pulse-grid"></div>
-      <div class="action-mix-wrap">
-        <div class="mix-title">
-          <span>动作构成</span>
-          <strong id="action-mix-total">-</strong>
+      <div id="kpi-grid" class="kpi-grid"></div>
+      <div class="panel mix-panel">
+        <div class="panel-heading">
+          <h3>动作构成</h3>
+          <span id="action-mix-total">—</span>
         </div>
         <div id="action-mix" class="action-mix" aria-label="动作构成占比"></div>
         <div id="action-legend" class="action-legend"></div>
       </div>
     </section>
 
-    <section class="economy-section" aria-labelledby="economy-title">
-      <div class="section-heading">
-        <div>
-          <span class="section-index">02</span>
-          <h2 id="economy-title">战场经济</h2>
+    <section class="panel" aria-labelledby="pace-title">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2 id="pace-title">回合节奏</h2>
+          <span>每回合场均操作（柱）与伤害（线）· 战斗何时升温</span>
         </div>
-        <p>补给从哪里来，又花到哪里去</p>
       </div>
-      <div id="economy-grid" class="economy-grid"></div>
+      <div id="pace-chart" class="chart-box"></div>
+      <p class="hint" id="pace-note"></p>
+    </section>
+
+    <section aria-labelledby="momentum-title">
+      <div class="section-heading">
+        <h2 id="momentum-title">势头学</h2>
+        <span>一血与首点到底值多少 · 翻盘补给有没有用</span>
+      </div>
+      <div id="momentum-grid" class="momentum-grid"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="combat-title">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2 id="combat-title">战斗群像</h2>
+          <span>按模型的火力与生存 · 点击表头排序</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="combat-table" class="data-table">
+          <thead>
+            <tr>
+              <th data-csort="model" title="参赛的 AI 模型名称">模型</th>
+              <th data-csort="games" class="num" title="该模型参与的对局数">场次</th>
+              <th data-csort="avgDamage" class="num" title="每场对敌方单位造成的平均伤害，由攻击事件逐条累计，落空计 0">场均伤害</th>
+              <th data-csort="avgTaken" class="num" title="每场己方单位平均受到的伤害，仅统计单位目标，不含对 HQ 的伤害">场均承伤</th>
+              <th data-csort="avgKills" class="num" title="每场平均击毁的敌方单位数">场均击杀</th>
+              <th data-csort="avgDeaths" class="num" title="每场平均损失的己方单位数">场均阵亡</th>
+              <th data-csort="kd" class="num" title="击杀 ÷ 阵亡，大于 1 表示火力交换占优">K/D</th>
+              <th data-csort="avgHealsHp" class="num" title="每场通过治疗恢复的平均 HP">场均治疗</th>
+              <th data-csort="missRate" class="num" title="攻击落空的比例，仅同时回合模式产生：目标在结算前移动或阵亡即落空">落空率</th>
+              <th data-csort="failedActions" class="num" title="同时回合模式下提交了但未能生效的动作数：移动/部署撞格冲突、弹药不足、单位阵亡、治疗出界或目标满血等">失误</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="hint">伤害/承伤/击杀来自攻击事件逐条累计（承伤仅含单位目标）；落空仅出现在同时回合模式；失误为同时回合的 action_failed。样本 &lt; 3 场的模型以灰色标记，仅供观察。</p>
+    </section>
+
+    <section class="two-col">
+      <section class="panel" aria-labelledby="units-title">
+        <div class="panel-heading">
+          <h2 id="units-title">兵种选择</h2>
+          <span>部署占比 vs 阵亡占比</span>
+        </div>
+        <div class="unit-key">
+          <span><i class="key-deploy"></i>部署</span>
+          <span><i class="key-death"></i>阵亡</span>
+        </div>
+        <div id="unit-bars" class="unit-bars"></div>
+      </section>
+      <section class="panel" aria-labelledby="facts-title">
+        <div class="panel-heading">
+          <h2 id="facts-title">战地速报</h2>
+          <span>从数据里长出来的事实</span>
+        </div>
+        <ol id="fact-list" class="fact-list"></ol>
+      </section>
+    </section>
+
+    <section class="panel" aria-labelledby="economy-title">
+      <div class="panel-heading">
+        <h2 id="economy-title">战场经济</h2>
+        <span>补给从哪里来，又花到哪里去</span>
+      </div>
+      <div id="economy-grid" class="econ-grid"></div>
       <div class="economy-lab">
         <div class="economy-side">
           <span class="economy-side-label">花钱最狠的模型</span>
           <ol id="spender-list" class="spender-list"></ol>
         </div>
         <div class="economy-side">
-          <span class="economy-side-label">相爱相杀</span>
+          <span class="economy-side-label">相爱相杀 · 互相淘汰</span>
           <ul id="rivalry-list" class="rivalry-list"></ul>
         </div>
       </div>
     </section>
 
-    <section class="trend-section" aria-labelledby="trend-title">
-      <div class="section-heading">
-        <div>
-          <span class="section-index">03</span>
-          <h2 id="trend-title">趋势观察</h2>
-        </div>
-        <p>看时间如何推动战场</p>
-      </div>
-      <div class="trend-block">
-        <div class="trend-block-head">
-          <span class="trend-label">对局增长</span>
-          <span class="trend-sub">每日对局数（柱）· 累计曲线（线）</span>
-        </div>
-        <div id="growth-chart" class="growth-chart"></div>
-      </div>
-      <div class="trend-grid">
-        <div class="trend-block">
-          <div class="trend-block-head">
-            <span class="trend-label">模型登场</span>
-            <span class="trend-sub">谁在何时进入战场，活跃至今？</span>
-          </div>
-          <div id="debut-list" class="debut-list"></div>
-        </div>
-        <div class="trend-block">
-          <div class="trend-block-head">
-            <span class="trend-label">月度节奏</span>
-            <span class="trend-sub">按月汇总</span>
-          </div>
-          <div id="monthly-grid" class="monthly-grid"></div>
-          <div class="trend-block-head version-head">
-            <span class="trend-label">版本演进</span>
-            <span class="trend-sub">回放格式换代</span>
-          </div>
-          <div id="version-list" class="version-list"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="stories-section" aria-labelledby="stories-title">
-      <div class="section-heading">
-        <div>
-          <span class="section-index">04</span>
-          <h2 id="stories-title">本期名场面</h2>
-        </div>
-        <p>不是最高就最好，但这些局值得被记住</p>
+    <section class="panel" aria-labelledby="stories-title">
+      <div class="panel-heading">
+        <h2 id="stories-title">本期名场面</h2>
+        <span>不是最高就最好，但这些局值得被记住</span>
       </div>
       <div id="story-grid" class="story-grid"></div>
     </section>
 
-    <section class="field-grid">
-      <section class="insights-section" aria-labelledby="insights-title">
-        <div class="section-heading compact-heading">
-          <div>
-            <span class="section-index">05</span>
-            <h2 id="insights-title">四条观察</h2>
-          </div>
+    <section class="panel" aria-labelledby="records-title">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2 id="records-title">纪录柜</h2>
+          <span>对局 / 战斗 / 单项三类之最</span>
         </div>
-        <ol id="insight-list" class="insight-list"></ol>
-      </section>
-
-      <section class="arsenal-section" aria-labelledby="arsenal-title">
-        <div class="section-heading compact-heading">
-          <div>
-            <span class="section-index">06</span>
-            <h2 id="arsenal-title">兵种选择</h2>
-          </div>
-          <p>部署占比</p>
+        <div class="record-tabs" role="group" aria-label="纪录分类">
+          <button type="button" class="record-tab active" data-record-view="battle" aria-pressed="true">对局</button>
+          <button type="button" class="record-tab" data-record-view="combat" aria-pressed="false">战斗</button>
+          <button type="button" class="record-tab" data-record-view="action" aria-pressed="false">单项</button>
         </div>
-        <div id="unit-bars" class="unit-bars"></div>
-      </section>
+      </div>
+      <div id="records-list" class="records-list"></div>
     </section>
 
-    <section class="model-lab" aria-labelledby="lab-title">
-      <div class="section-heading lab-heading">
-        <div>
-          <span class="section-index">07</span>
+    <section class="panel" aria-labelledby="lab-title">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
           <h2 id="lab-title">战术档案</h2>
+          <span>单模型的行为偏好对照全场均值</span>
         </div>
         <div class="model-picker">
           <label for="model-select">选择模型</label>
@@ -182,34 +206,54 @@
       </div>
     </section>
 
-    <section class="map-stage-section" aria-labelledby="map-stage-title">
-      <div class="section-heading">
-        <div>
-          <span class="section-index">08</span>
-          <h2 id="map-stage-title">地图舞台</h2>
-        </div>
-        <p>每张地图的登场次数与节奏</p>
+    <section class="panel" aria-labelledby="trend-title">
+      <div class="panel-heading">
+        <h2 id="trend-title">趋势观察</h2>
+        <span>对局增长 · 模型登场 · 月度节奏</span>
       </div>
-      <div id="map-stage" class="map-stage"></div>
+      <div class="trend-block">
+        <div class="trend-block-head">
+          <span class="trend-label">对局增长</span>
+          <span class="trend-sub">每日对局数（柱）· 累计曲线（线）</span>
+        </div>
+        <div id="growth-chart" class="chart-box"></div>
+        <div class="growth-summary" id="growth-summary"></div>
+      </div>
+      <div class="trend-grid">
+        <div class="trend-block">
+          <div class="trend-block-head">
+            <span class="trend-label">模型登场</span>
+            <span class="trend-sub">谁在何时进入战场，活跃至今？</span>
+          </div>
+          <div id="debut-list" class="debut-list"></div>
+        </div>
+        <div class="trend-block">
+          <div class="trend-block-head">
+            <span class="trend-label">月度节奏</span>
+            <span class="trend-sub">按月汇总</span>
+          </div>
+          <div id="monthly-grid" class="monthly-grid"></div>
+          <div class="trend-block-head version-head">
+            <span class="trend-label">回放版本</span>
+            <span class="trend-sub">schema 换代</span>
+          </div>
+          <div id="version-list" class="version-list"></div>
+        </div>
+      </div>
     </section>
 
-    <section class="records-section" aria-labelledby="records-title">
-      <div class="section-heading records-heading">
-        <div>
-          <span class="section-index">09</span>
-          <h2 id="records-title">纪录柜</h2>
-        </div>
-        <div class="record-tabs" role="group" aria-label="纪录分类">
-          <button type="button" class="record-tab active" data-record-view="battle" aria-pressed="true">对局</button>
-          <button type="button" class="record-tab" data-record-view="action" aria-pressed="false">单项</button>
-        </div>
+    <section class="panel" aria-labelledby="map-stage-title">
+      <div class="panel-heading">
+        <h2 id="map-stage-title">地图舞台</h2>
+        <span>每张地图的登场次数与节奏</span>
       </div>
-      <div id="records-list" class="records-list"></div>
+      <div id="map-stage" class="map-stage"></div>
     </section>
   </main>
 
   <footer class="page-footer">
-    数据来自 <code>/data/fun-stats.json</code>，由 records 回放自动生成。
+    数据文件 <code>/data/fun-stats.json</code> · 重新生成：
+    <code>npm run fun-stats</code> 或 <code>node script/generateFunStats.mjs</code>
   </footer>
 </body>
 </html>

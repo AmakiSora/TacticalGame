@@ -15,6 +15,20 @@
     #h2h-table th, #h2h-table td { text-align: center; padding: 4px 6px; font-size: 12px; }
     #h2h-table th.model-col, #h2h-table td.model-col { text-align: left; white-space: nowrap; }
     #h2h-table td.self { color: #556; background: transparent; }
+    /* 模型列固定在左侧，宽矩阵横向滚动时行头始终可见。 */
+    #h2h-table th.model-col { position: sticky; left: 0; z-index: 2; background: #1a2530; }
+    #h2h-table td.model-col { position: sticky; left: 0; z-index: 1; background: #161e26; box-shadow: 1px 0 0 #22303a; }
+    /* 对位矩阵是矩阵不是列表：窄屏不参与 stats.css 的表格卡片化（表头会被隐藏、
+       行会被拆成卡片），保持完整表格 + 横向滚动。 */
+    @media (max-width: 720px) {
+      .h2h-wrap { overflow-x: auto; border: 1px solid #243442; border-radius: 10px; }
+      #h2h-table, #h2h-table tbody { display: table; width: auto; }
+      #h2h-table thead { display: table-header-group; }
+      #h2h-table tbody { display: table-row-group; gap: 0; }
+      #h2h-table tbody tr { display: table-row; grid-template-columns: none; gap: 0; padding: 0; border: 0; background: transparent; }
+      #h2h-table td, #h2h-table td.num { display: table-cell; grid-template-columns: none; gap: 0; padding: 4px 6px; text-align: center; white-space: nowrap; }
+      #h2h-table td::before { content: none; }
+    }
     .detail-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 10px; color: #9ab; font-size: 12px; }
     .detail-meta strong { color: #dce8f0; }
     .detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -156,7 +170,7 @@
           <h2>对位矩阵</h2>
           <span>行模型对列模型的胜率（平局计 0.5）· 悬停查看比分</span>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap h2h-wrap">
           <table id="h2h-table" class="data-table compact">
             <thead><tr id="h2h-head"></tr></thead>
             <tbody id="h2h-body"></tbody>

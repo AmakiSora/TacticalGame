@@ -266,7 +266,9 @@ button.ghost { background: transparent; color: #8aa; }
 
 .two-col {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
+  /* minmax(0, …) 压掉 fr 轨道的 auto 最小尺寸：不设下限时，轨道会被宽表
+     （如 RL 排行榜 14 列对位矩阵）撑到 min-content，把姊妹面板挤成竖排文字。 */
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: 14px;
 }
 @media (max-width: 960px) {

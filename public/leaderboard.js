@@ -112,12 +112,6 @@
     return `<span class="win">${row.wins}</span>-<span class="loss">${row.losses}</span>-${row.draws}`;
   }
 
-  function statusCell(row) {
-    const meta = STATUS_META[row.status] || STATUS_META.legacy;
-    const note = row.statusNote ? ` title="${escapeAttr(row.statusNote)}"` : '';
-    return `<span class="tag ${meta.cls}"${note}>${meta.label}</span>`;
-  }
-
   function renderKpis(ld) {
     const modelCount = ld.models.filter(m => m.games > 0).length;
     const pairs = modelCount * (modelCount - 1) / 2;
@@ -159,7 +153,6 @@
           <td class="num" data-label="先手胜率">${pct(r.firstSeatRate)}<span class="rating-ci">(${r.firstSeat?.games ?? 0})</span></td>
           <td class="num" data-label="后手胜率">${pct(r.secondSeatRate)}<span class="rating-ci">(${r.secondSeat?.games ?? 0})</span></td>
           <td class="num" data-label="平均回合">${r.avgRounds ?? '—'}</td>
-          <td data-label="状态">${statusCell(r)}</td>
         </tr>`;
       })
       .join('');

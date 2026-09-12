@@ -35,6 +35,9 @@
     @media (max-width: 900px) { .detail-cols { grid-template-columns: 1fr; } }
     /* 榜单主区：模型详情与对位矩阵上下堆叠——矩阵占满全宽后 14 列基本无需横向滚动。 */
     .board-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+    /* 页签容器接管 main 的 flex 间距：内容包进 div 后，main 的 gap 不再作用于内部面板，
+       所有 section 会以 0 间距竖向粘连（09-06 加页签时引入的潜伏问题）。 */
+    #tab-board, #tab-console { display: flex; flex-direction: column; gap: 18px; }
     /* 页面卡片间距整体放宽一档（stats.css 默认 14px/10px 偏贴）。 */
     main { gap: 18px; }
     #kpi-grid { gap: 12px; }

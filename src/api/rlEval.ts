@@ -16,6 +16,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const ROUND_ROBIN_SCRIPT = join(PROJECT_ROOT, 'rl', 'evaluation', 'round_robin.py');
 const LEADERBOARD_SCRIPT = join(PROJECT_ROOT, 'script', 'generateRlLeaderboard.mjs');
+const RL_STATS_SCRIPT = join(PROJECT_ROOT, 'script', 'generateRlStats.mjs');
 const DEFAULT_STATS_FILE = join(PROJECT_ROOT, 'rl', 'leaderboard', 'matches.jsonl');
 const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'rl-eval-state.json');
 
@@ -107,6 +108,7 @@ export interface RlEvalDeps {
   stateFile?: string;
   roundRobinScript?: string;
   leaderboardScript?: string;
+  statsScript?: string;
   pythonPath?: string;
   now?: () => Date;
   /** SIGTERM 后升级 SIGKILL 的等待毫秒数；默认 10s，测试可调短。 */
@@ -126,6 +128,7 @@ export class EvalRunner {
   private readonly stateFile: string;
   private readonly roundRobinScript: string;
   private readonly leaderboardScript: string;
+  private readonly statsScript: string;
   private readonly pythonPath: string;
   private readonly now: () => Date;
   private readonly escalateMs: number;
@@ -142,6 +145,7 @@ export class EvalRunner {
     this.stateFile = deps.stateFile ?? DEFAULT_STATE_FILE;
     this.roundRobinScript = deps.roundRobinScript ?? ROUND_ROBIN_SCRIPT;
     this.leaderboardScript = deps.leaderboardScript ?? LEADERBOARD_SCRIPT;
+    this.statsScript = deps.statsScript ?? RL_STATS_SCRIPT;
     this.pythonPath = deps.pythonPath ?? resolvePythonPath();
     this.now = deps.now ?? (() => new Date());
     this.escalateMs = deps.escalateMs ?? 10_000;
@@ -313,29 +317,40 @@ export class EvalRunner {
     return true;
   }
 
-  /** 重算榜单数据；返回退出码与输出尾，供前端提示成功/失败。 */
-  regenLeaderboard(): Promise<{ ok: boolean; code: number | null; output: string[] }> {
+  /** 依次重算榜单与玩法统计数据（先榜单后统计：统计脚本会合并榜单评分）；返回退出码与输出尾。 */
+  async regenLeaderboard(): Promise<{ ok: boolean; code: number | null; output: string[] }> {
+    const output: string[] = [];
+    for (const script of [this.leaderboardScript, this.statsScript]) {
+      const result = await this.runRegenScript(script, output);
+      if (!result.ok) return { ok: false, code: result.code, output: output.slice(-10) };
+    }
+    return { ok: true, code: 0, output: output.slice(-10) };
+  }
+
+  private runRegenScript(script: string, output: string[]): Promise<{ ok: boolean; code: number | null }> {
     return new Promise(resolve => {
-      const child = this.spawner(process.execPath, [this.leaderboardScript], PROJECT_ROOT);
+      const child = this.spawner(process.execPath, [script], PROJECT_ROOT);
       if (!child) {
-        resolve({ ok: false, code: null, output: ['无法启动 node 进程重算榜单'] });
+        output.push('无法启动 node 进程重算数据');
+        resolve({ ok: false, code: null });
         return;
       }
-      const output: string[] = [];
       createInterface({ input: child.stdout! }).on('line', line => output.push(line));
       createInterface({ input: child.stderr! }).on('line', line => output.push(`[stderr] ${line}`));
       const timeout = setTimeout(() => {
         child.kill();
-        resolve({ ok: false, code: null, output: [...output.slice(-10), '[超时] 榜单重算超过 60s，已终止'] });
+        output.push('[超时] 数据重算超过 60s，已终止');
+        resolve({ ok: false, code: null });
       }, 60_000);
       timeout.unref();
       child.on('error', err => {
         clearTimeout(timeout);
-        resolve({ ok: false, code: null, output: [`[错误] ${err.message}`] });
+        output.push(`[错误] ${err.message}`);
+        resolve({ ok: false, code: null });
       });
       child.on('exit', code => {
         clearTimeout(timeout);
-        resolve({ ok: code === 0, code, output: output.slice(-10) });
+        resolve({ ok: code === 0, code });
       });
     });
   }

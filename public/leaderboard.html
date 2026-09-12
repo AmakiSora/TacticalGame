@@ -37,10 +37,10 @@
     .board-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
     /* 页签容器接管 main 的 flex 间距：内容包进 div 后，main 的 gap 不再作用于内部面板，
        所有 section 会以 0 间距竖向粘连（09-06 加页签时引入的潜伏问题）。 */
-    #tab-board, #tab-console { display: flex; flex-direction: column; gap: 18px; }
+    #tab-board, #tab-console, #tab-stats, #tab-models { display: flex; flex-direction: column; gap: 18px; }
     /* display:flex 的 ID 选择器优先级压过 UA 的 [hidden] 规则，必须显式声明隐藏态，
        否则两个页签永远同时显示、无法切换（.eval-mini-strip 同款坑）。 */
-    #tab-board[hidden], #tab-console[hidden] { display: none; }
+    #tab-board[hidden], #tab-console[hidden], #tab-stats[hidden], #tab-models[hidden] { display: none; }
     /* 页面卡片间距整体放宽一档（stats.css 默认 14px/10px 偏贴）。 */
     main { gap: 18px; }
     #kpi-grid { gap: 12px; }
@@ -80,9 +80,28 @@
     .eval-progress-text { margin-top: 6px; font-size: 12px; color: #9ab; }
     #eval-output { max-height: 200px; overflow: auto; background: #0d1216; border: 1px solid #22303a; border-radius: 6px; padding: 8px 10px; font-size: 11px; line-height: 1.55; color: #9ab; white-space: pre-wrap; word-break: break-all; margin: 0; }
     @media (max-width: 700px) { #eval-salt { width: 100%; } }
+    /* 模型档案卡片 */
+    .model-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
+    .model-card { background: #141c22; border: 1px solid #2a3a44; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .model-card .card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .model-card .card-head strong { font-size: 15px; color: #dce8f0; }
+    .model-card .card-rating { margin-left: auto; font-variant-numeric: tabular-nums; color: #8ddda4; font-weight: 700; }
+    .model-card .card-docstatus { font-size: 12px; color: #9ab; }
+    .model-card .card-notes { font-size: 12px; line-height: 1.65; color: #b8c6d0; border-top: 1px dashed #22303a; padding-top: 8px; white-space: pre-wrap; word-break: break-word; }
+    .model-card .card-notes.empty { color: #66788a; }
+    .model-card .card-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: #7a94a6; }
+    .model-card .card-meta b { color: #b8c6d0; font-weight: 600; }
+    .model-card .card-file { font-size: 10px; color: #55676f; word-break: break-all; }
+    .econ-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .econ-item { background: #141c22; border: 1px solid #22303a; border-radius: 8px; padding: 8px 12px; }
+    .econ-item .label { font-size: 11px; color: #7a94a6; }
+    .econ-item .value { font-size: 16px; font-weight: 700; color: #dce8f0; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .econ-item .sub { font-size: 10px; color: #6a8496; margin-top: 2px; }
+    @media (max-width: 480px) { .model-card-grid { grid-template-columns: 1fr; } }
   </style>
   <script src="/version.js" defer></script>
   <script src="/leaderboard.js" defer></script>
+  <script src="/rl-stats.js" defer></script>
 </head>
 <body class="stats-shell">
   <header>
@@ -104,6 +123,8 @@
   <main>
     <div class="tab-bar" role="tablist" aria-label="排行榜视图">
       <button type="button" class="tab active" data-tab="board" role="tab" aria-selected="true">模型榜单</button>
+      <button type="button" class="tab" data-tab="stats" role="tab" aria-selected="false">玩法统计</button>
+      <button type="button" class="tab" data-tab="models" role="tab" aria-selected="false">模型档案</button>
       <button type="button" class="tab" data-tab="console" role="tab" aria-selected="false" id="eval-tab-btn">评估控制台</button>
     </div>
 
@@ -214,6 +235,160 @@
     </section>
     </div>
 
+    <div id="tab-stats" hidden>
+    <section class="meta-bar panel">
+      <div class="meta-item">
+        <span>数据生成时间</span>
+        <strong id="rls-generated-at">—</strong>
+      </div>
+      <div class="meta-item">
+        <span>统计对局</span>
+        <strong id="rls-source-count">—</strong>
+      </div>
+      <div class="meta-item">
+        <span>数据时间范围</span>
+        <strong id="rls-date-range">—</strong>
+      </div>
+      <div class="meta-item status-item">
+        <span>状态</span>
+        <strong id="rls-load-status" class="status-pill">加载中…</strong>
+      </div>
+      <div class="meta-actions">
+        <button id="rls-btn-reload" type="button">重新加载</button>
+      </div>
+    </section>
+
+    <section id="rls-kpi-grid" class="kpi-grid" aria-label="玩法总览指标"></section>
+
+    <section class="two-col">
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>结局原因分布</h2>
+          <span>全部参评对局的终局方式</span>
+        </div>
+        <div id="rls-endreasons" class="empty-block">加载中…</div>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>经济概览</h2>
+          <span>按「模型 × 局」平均（每局双方各计一次）</span>
+        </div>
+        <div id="rls-economy" class="empty-block">加载中…</div>
+      </section>
+    </section>
+
+    <section class="two-col">
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>回合数分布</h2>
+          <span>30 回合上限，打满记最后一桶</span>
+        </div>
+        <div id="rls-rounds-dist" class="empty-block">加载中…</div>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>对局耗时分布</h2>
+          <span>进程内模拟的墙钟时长</span>
+        </div>
+        <div id="rls-duration-dist" class="empty-block">加载中…</div>
+      </section>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>兵种统计</h2>
+        <span>全局部署与阵亡（阵亡含 breach 等图的预置守军，故可超过部署数）</span>
+      </div>
+      <div class="table-wrap">
+        <table id="rls-units-table" class="data-table">
+          <thead>
+            <tr>
+              <th>兵种</th>
+              <th class="num">部署数</th>
+              <th class="num">部署占比</th>
+              <th class="num">阵亡数</th>
+              <th class="num">阵亡占比</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>每模型玩法画像</h2>
+        <span>按「模型 × 局」平均 · 点击列头排序</span>
+      </div>
+      <div class="table-wrap">
+        <table id="rls-model-table" class="data-table">
+          <thead>
+            <tr>
+              <th data-sort="short">模型</th>
+              <th data-sort="games" class="num">局数</th>
+              <th data-sort="winRate" class="num">胜率</th>
+              <th data-sort="avgScore" class="num">场均得分</th>
+              <th data-sort="avgDamageDealt" class="num">场均伤害</th>
+              <th data-sort="avgDamageTaken" class="num">场均承受</th>
+              <th data-sort="avgKills" class="num">场均击杀</th>
+              <th data-sort="avgLosses" class="num">场均损失</th>
+              <th data-sort="avgCaptures" class="num">场均占领</th>
+              <th data-sort="avgSteals" class="num">场均偷点</th>
+              <th data-sort="avgIncome" class="num">场均收入</th>
+              <th data-sort="avgFirstCaptureRound" class="num">首占回合</th>
+              <th>主力兵种</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>分地图概览</h2>
+        <span>各地图的对局节奏与结局倾向</span>
+      </div>
+      <div class="table-wrap">
+        <table id="rls-map-table" class="data-table">
+          <thead>
+            <tr>
+              <th>地图</th>
+              <th class="num">局数</th>
+              <th class="num">平均回合</th>
+              <th class="num">平均耗时</th>
+              <th class="num">歼灭率</th>
+              <th class="num">平局率</th>
+              <th>最常见结局</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+    </div>
+
+    <div id="tab-models" hidden>
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>模型档案</h2>
+          <span>训练配置与版本说明 · 评分降序（未参评排后）· 说明文案来自 rl/docs/MODELS_NOTES.md</span>
+        </div>
+        <strong id="rls-models-status" class="status-pill">加载中…</strong>
+      </div>
+      <div id="rls-model-cards" class="model-card-grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>已作废模型</h2>
+        <span>归档留底（rl/models/deprecated/），勿部署、勿纳入评估</span>
+      </div>
+      <div id="rls-deprecated" class="empty-block">加载中…</div>
+    </section>
+    </div>
+
     <div id="tab-console" hidden>
     <section id="eval-console" class="panel">
       <div class="panel-heading">
@@ -270,7 +445,7 @@
   <footer class="page-footer">
     对局记录 <code>rl/leaderboard/matches.jsonl</code> · 批量对战
     <code>rl/.venv/Scripts/python.exe rl/round_robin.py</code> · 刷新数据
-    <code>npm run rl-leaderboard</code>
+    <code>npm run rl-leaderboard && npm run rl-stats</code>
   </footer>
 </body>
 </html>

@@ -118,11 +118,18 @@ describe('RL eval console API', () => {
     child.emit('exit', 0, null);
     await delay(20);
 
+    // 正常结束后自动依次重算榜单与玩法统计（两个脚本串行 spawn），让它们都退出。
+    spawner.children[1]?.emit('exit', 0, null);
+    await delay(20);
+    spawner.children[2]?.emit('exit', 0, null);
+    await delay(20);
+
     const done = (await app.inject({ method: 'GET', url: '/api/rl/eval/status' })).json();
     expect(done.status).toBe('finished');
     expect(done.exitCode).toBe(0);
     // 正常结束后应自动重算榜单（node script/generateRlLeaderboard.mjs）。
     expect(spawner.calls.some(call => call.cmd === process.execPath && call.args.includes('gen.mjs'))).toBe(true);
+    expect(spawner.calls.some(call => call.cmd === process.execPath && call.args.some(a => String(a).includes('generateRlStats.mjs')))).toBe(true);
   });
 
   it('rejects concurrent starts', async () => {
@@ -222,10 +229,14 @@ describe('RL eval console API', () => {
   it('regenerates leaderboard data on demand', async () => {
     const pending = app.inject({ method: 'POST', url: '/api/rl/leaderboard/regenerate' });
     await delay(10);
+    // 重算串行跑两个脚本：先榜单（gen.mjs），后玩法统计（generateRlStats.mjs）。
     spawner.children[0].emit('exit', 0, null);
+    await delay(10);
+    spawner.children[1].emit('exit', 0, null);
     const res = await pending;
     expect(res.statusCode).toBe(200);
     expect(spawner.calls[0].args.join(' ')).toContain('gen.mjs');
+    expect(spawner.calls[1].args.join(' ')).toContain('generateRlStats.mjs');
   });
 
   it('parses round_robin output lines in their real format', () => {

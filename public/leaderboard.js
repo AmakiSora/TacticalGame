@@ -372,14 +372,17 @@
 
   loadData();
 
-  /* ===== 页内页签：模型榜单（默认）/ 评估控制台（#console 直达） ===== */
+  /* ===== 页内页签：模型榜单（默认）/ 玩法统计 / 模型档案 / 评估控制台（#stats、#models、#console 直达） ===== */
   const tabButtons = document.querySelectorAll('.tab-bar .tab');
   const tabPanes = {
     board: document.getElementById('tab-board'),
+    stats: document.getElementById('tab-stats'),
+    models: document.getElementById('tab-models'),
     console: document.getElementById('tab-console'),
   };
 
   function switchTab(name, updateHash = true) {
+    if (!tabPanes[name]) name = 'board';
     for (const btn of tabButtons) {
       const active = btn.dataset.tab === name;
       btn.classList.toggle('active', active);
@@ -387,12 +390,15 @@
     }
     for (const [paneName, pane] of Object.entries(tabPanes)) pane.hidden = paneName !== name;
     if (updateHash) {
-      history.replaceState(null, '', name === 'console' ? '#console' : window.location.pathname + window.location.search);
+      history.replaceState(null, '', name === 'board' ? window.location.pathname + window.location.search : `#${name}`);
     }
   }
 
   for (const btn of tabButtons) btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  if (window.location.hash === '#console') switchTab('console', false);
+  {
+    const initialTab = window.location.hash.slice(1);
+    if (initialTab && tabPanes[initialTab]) switchTab(initialTab, false);
+  }
 
   /* ===== 评估控制台：网页启动/监控/停止 round_robin.py 跑批 ===== */
   const evalEl = {};

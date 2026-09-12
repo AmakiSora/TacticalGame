@@ -1,0 +1,1146 @@
+{
+  "generatedAt": "2026-09-12T07:08:24.388Z",
+  "source": {
+    "file": "C:\\cosmos\\github\\game\\rl\\leaderboard\\matches.jsonl",
+    "matchCount": 22728,
+    "retiredMatchesDropped": 2352,
+    "oldFormatMatchesDropped": 0,
+    "mapDist": {
+      "breach": 3264,
+      "danger-close": 3264,
+      "default": 3264,
+      "desert": 3264,
+      "dual-lanes": 3264,
+      "forge": 3264,
+      "random": 3144
+    },
+    "dateMin": "2026-09-07 11:13:36",
+    "dateMax": "2026-09-12 07:40:07"
+  },
+  "gameplay": {
+    "overview": {
+      "games": 22728,
+      "draws": 11,
+      "drawRate": 0.0005,
+      "annihilationRate": 0.2657,
+      "avgRounds": 15.24,
+      "avgDurationSec": 1.46,
+      "avgActions": 201
+    },
+    "endReasons": [
+      {
+        "reason": "turn_limit_score",
+        "count": 16679,
+        "pct": 0.7339
+      },
+      {
+        "reason": "last_player_standing",
+        "count": 6038,
+        "pct": 0.2657
+      },
+      {
+        "reason": "turn_limit_draw",
+        "count": 11,
+        "pct": 0.0005
+      }
+    ],
+    "roundsDist": [
+      {
+        "bucket": "≤9",
+        "count": 595,
+        "pct": 0.0282
+      },
+      {
+        "bucket": "10–14",
+        "count": 5224,
+        "pct": 0.2475
+      },
+      {
+        "bucket": "15–19",
+        "count": 12836,
+        "pct": 0.6081
+      },
+      {
+        "bucket": "20–24",
+        "count": 686,
+        "pct": 0.0325
+      },
+      {
+        "bucket": "25–29",
+        "count": 187,
+        "pct": 0.0089
+      },
+      {
+        "bucket": "30（打满）",
+        "count": 1580,
+        "pct": 0.0749
+      }
+    ],
+    "durationDist": [
+      {
+        "bucket": "<1s",
+        "count": 6453,
+        "pct": 0.2839
+      },
+      {
+        "bucket": "1–2s",
+        "count": 12118,
+        "pct": 0.5332
+      },
+      {
+        "bucket": "2–3s",
+        "count": 4017,
+        "pct": 0.1767
+      },
+      {
+        "bucket": "3–5s",
+        "count": 119,
+        "pct": 0.0052
+      },
+      {
+        "bucket": "5–10s",
+        "count": 19,
+        "pct": 0.0008
+      },
+      {
+        "bucket": "≥10s",
+        "count": 2,
+        "pct": 0.0001
+      }
+    ],
+    "units": [
+      {
+        "type": "infantry",
+        "deploys": 397840,
+        "deployShare": 0.8521,
+        "losses": 135387,
+        "lossShare": 0.6739
+      },
+      {
+        "type": "scout",
+        "deploys": 35301,
+        "deployShare": 0.0756,
+        "losses": 48674,
+        "lossShare": 0.2423
+      },
+      {
+        "type": "ranger",
+        "deploys": 31820,
+        "deployShare": 0.0682,
+        "losses": 10075,
+        "lossShare": 0.0502
+      },
+      {
+        "type": "support",
+        "deploys": 1863,
+        "deployShare": 0.004,
+        "losses": 530,
+        "lossShare": 0.0026
+      },
+      {
+        "type": "heavy",
+        "deploys": 55,
+        "deployShare": 0.0001,
+        "losses": 6229,
+        "lossShare": 0.031
+      }
+    ],
+    "economy": {
+      "seatCount": 45456,
+      "avgIncomeTotal": 407,
+      "controlShare": 0.6678,
+      "avgDeployCost": 463,
+      "avgCaptures": 8.51,
+      "avgSteals": 6.15,
+      "avgFirstCaptureRound": 1.49,
+      "comebackRate": 0.0673
+    },
+    "perModel": [
+      {
+        "id": "hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip",
+        "games": 2688,
+        "wins": 530,
+        "losses": 2157,
+        "draws": 1,
+        "winRate": 0.1972,
+        "avgScore": 1110,
+        "avgDamageDealt": 473,
+        "avgDamageTaken": 657,
+        "avgKills": 2.91,
+        "avgLosses": 4.8,
+        "avgCaptures": 7.4,
+        "avgSteals": 5.1,
+        "avgIncome": 350,
+        "avgFirstCaptureRound": 1.48,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 18066
+          },
+          {
+            "type": "scout",
+            "count": 2713
+          },
+          {
+            "type": "support",
+            "count": 1619
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip",
+        "games": 2688,
+        "wins": 919,
+        "losses": 1767,
+        "draws": 2,
+        "winRate": 0.3419,
+        "avgScore": 1243,
+        "avgDamageDealt": 604,
+        "avgDamageTaken": 670,
+        "avgKills": 4.19,
+        "avgLosses": 4.61,
+        "avgCaptures": 8.14,
+        "avgSteals": 5.94,
+        "avgIncome": 397,
+        "avgFirstCaptureRound": 1.67,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 26363
+          },
+          {
+            "type": "scout",
+            "count": 1538
+          },
+          {
+            "type": "support",
+            "count": 67
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.4.0_20260830_random_selfplay_2000000.zip",
+        "games": 2688,
+        "wins": 996,
+        "losses": 1691,
+        "draws": 1,
+        "winRate": 0.3705,
+        "avgScore": 1285,
+        "avgDamageDealt": 603,
+        "avgDamageTaken": 689,
+        "avgKills": 4.11,
+        "avgLosses": 4.92,
+        "avgCaptures": 8.52,
+        "avgSteals": 6.23,
+        "avgIncome": 413,
+        "avgFirstCaptureRound": 1.43,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 27153
+          },
+          {
+            "type": "scout",
+            "count": 3184
+          },
+          {
+            "type": "support",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip",
+        "games": 2688,
+        "wins": 853,
+        "losses": 1834,
+        "draws": 1,
+        "winRate": 0.3173,
+        "avgScore": 1244,
+        "avgDamageDealt": 534,
+        "avgDamageTaken": 673,
+        "avgKills": 3.45,
+        "avgLosses": 4.88,
+        "avgCaptures": 8.32,
+        "avgSteals": 6.06,
+        "avgIncome": 403,
+        "avgFirstCaptureRound": 1.44,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 24441
+          },
+          {
+            "type": "scout",
+            "count": 4511
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip",
+        "games": 2688,
+        "wins": 832,
+        "losses": 1854,
+        "draws": 2,
+        "winRate": 0.3095,
+        "avgScore": 1205,
+        "avgDamageDealt": 519,
+        "avgDamageTaken": 668,
+        "avgKills": 3.36,
+        "avgLosses": 4.69,
+        "avgCaptures": 8.37,
+        "avgSteals": 6.03,
+        "avgIncome": 404,
+        "avgFirstCaptureRound": 1.47,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 25665
+          },
+          {
+            "type": "scout",
+            "count": 1454
+          },
+          {
+            "type": "support",
+            "count": 162
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip",
+        "games": 2688,
+        "wins": 1513,
+        "losses": 1173,
+        "draws": 2,
+        "winRate": 0.5629,
+        "avgScore": 1474,
+        "avgDamageDealt": 675,
+        "avgDamageTaken": 674,
+        "avgKills": 4.95,
+        "avgLosses": 4.54,
+        "avgCaptures": 8.66,
+        "avgSteals": 6.13,
+        "avgIncome": 448,
+        "avgFirstCaptureRound": 1.34,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 30954
+          },
+          {
+            "type": "scout",
+            "count": 1190
+          },
+          {
+            "type": "support",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.8.0_20260903_random_selfplay_6000000.zip",
+        "games": 2688,
+        "wins": 1514,
+        "losses": 1172,
+        "draws": 2,
+        "winRate": 0.5632,
+        "avgScore": 1469,
+        "avgDamageDealt": 632,
+        "avgDamageTaken": 665,
+        "avgKills": 4.63,
+        "avgLosses": 4.45,
+        "avgCaptures": 8.74,
+        "avgSteals": 6.27,
+        "avgIncome": 438,
+        "avgFirstCaptureRound": 1.38,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 30093
+          },
+          {
+            "type": "scout",
+            "count": 1467
+          },
+          {
+            "type": "support",
+            "count": 10
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip",
+        "games": 2688,
+        "wins": 1636,
+        "losses": 1052,
+        "draws": 0,
+        "winRate": 0.6086,
+        "avgScore": 1450,
+        "avgDamageDealt": 704,
+        "avgDamageTaken": 649,
+        "avgKills": 5.5,
+        "avgLosses": 4.09,
+        "avgCaptures": 9.02,
+        "avgSteals": 6.66,
+        "avgIncome": 440,
+        "avgFirstCaptureRound": 1.44,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 31009
+          },
+          {
+            "type": "scout",
+            "count": 249
+          },
+          {
+            "type": "support",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v3.0.2_20260905_random_selfplay_1440000.zip",
+        "games": 2688,
+        "wins": 1362,
+        "losses": 1324,
+        "draws": 2,
+        "winRate": 0.5067,
+        "avgScore": 1381,
+        "avgDamageDealt": 664,
+        "avgDamageTaken": 647,
+        "avgKills": 4.76,
+        "avgLosses": 4.09,
+        "avgCaptures": 9.08,
+        "avgSteals": 6.75,
+        "avgIncome": 417,
+        "avgFirstCaptureRound": 1.46,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 28402
+          },
+          {
+            "type": "scout",
+            "count": 97
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip",
+        "games": 2688,
+        "wins": 1780,
+        "losses": 908,
+        "draws": 0,
+        "winRate": 0.6622,
+        "avgScore": 1767,
+        "avgDamageDealt": 677,
+        "avgDamageTaken": 527,
+        "avgKills": 4.76,
+        "avgLosses": 3.96,
+        "avgCaptures": 8.27,
+        "avgSteals": 5.84,
+        "avgIncome": 381,
+        "avgFirstCaptureRound": 1.56,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 13578
+          },
+          {
+            "type": "ranger",
+            "count": 6966
+          },
+          {
+            "type": "scout",
+            "count": 1097
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.0.0_20260824_default_rule_500000.zip",
+        "games": 2664,
+        "wins": 1558,
+        "losses": 1104,
+        "draws": 2,
+        "winRate": 0.5848,
+        "avgScore": 1437,
+        "avgDamageDealt": 641,
+        "avgDamageTaken": 660,
+        "avgKills": 4.78,
+        "avgLosses": 4.58,
+        "avgCaptures": 8.52,
+        "avgSteals": 6.15,
+        "avgIncome": 440,
+        "avgFirstCaptureRound": 1.48,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 26677
+          },
+          {
+            "type": "scout",
+            "count": 5493
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.1.3_20260826_default_rule_defensive_800000.zip",
+        "games": 2664,
+        "wins": 1144,
+        "losses": 1518,
+        "draws": 2,
+        "winRate": 0.4294,
+        "avgScore": 1329,
+        "avgDamageDealt": 634,
+        "avgDamageTaken": 658,
+        "avgKills": 4.27,
+        "avgLosses": 4.64,
+        "avgCaptures": 9.19,
+        "avgSteals": 6.93,
+        "avgIncome": 401,
+        "avgFirstCaptureRound": 1.47,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 26770
+          },
+          {
+            "type": "scout",
+            "count": 2107
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip",
+        "games": 2664,
+        "wins": 1386,
+        "losses": 1277,
+        "draws": 1,
+        "winRate": 0.5203,
+        "avgScore": 1487,
+        "avgDamageDealt": 622,
+        "avgDamageTaken": 672,
+        "avgKills": 4.41,
+        "avgLosses": 4.79,
+        "avgCaptures": 8.95,
+        "avgSteals": 6.63,
+        "avgIncome": 431,
+        "avgFirstCaptureRound": 1.44,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 26273
+          },
+          {
+            "type": "scout",
+            "count": 4247
+          },
+          {
+            "type": "ranger",
+            "count": 13
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip",
+        "games": 2664,
+        "wins": 1927,
+        "losses": 737,
+        "draws": 0,
+        "winRate": 0.7233,
+        "avgScore": 1848,
+        "avgDamageDealt": 692,
+        "avgDamageTaken": 506,
+        "avgKills": 4.92,
+        "avgLosses": 4.05,
+        "avgCaptures": 8.26,
+        "avgSteals": 5.71,
+        "avgIncome": 388,
+        "avgFirstCaptureRound": 1.62,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 9904
+          },
+          {
+            "type": "ranger",
+            "count": 9098
+          },
+          {
+            "type": "scout",
+            "count": 1562
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v3.1.1_20260911_random_selfplay_10940000.zip",
+        "games": 2664,
+        "wins": 1887,
+        "losses": 777,
+        "draws": 0,
+        "winRate": 0.7083,
+        "avgScore": 1840,
+        "avgDamageDealt": 698,
+        "avgDamageTaken": 493,
+        "avgKills": 4.92,
+        "avgLosses": 3.87,
+        "avgCaptures": 8.01,
+        "avgSteals": 5.46,
+        "avgIncome": 377,
+        "avgFirstCaptureRound": 1.57,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 10013
+          },
+          {
+            "type": "ranger",
+            "count": 8765
+          },
+          {
+            "type": "scout",
+            "count": 1317
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v2.2.0_20260827_default_modelmix_best.zip",
+        "games": 2640,
+        "wins": 1167,
+        "losses": 1469,
+        "draws": 4,
+        "winRate": 0.442,
+        "avgScore": 1358,
+        "avgDamageDealt": 667,
+        "avgDamageTaken": 624,
+        "avgKills": 4.91,
+        "avgLosses": 4.27,
+        "avgCaptures": 8.69,
+        "avgSteals": 6.6,
+        "avgIncome": 390,
+        "avgFirstCaptureRound": 1.51,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 26113
+          },
+          {
+            "type": "scout",
+            "count": 1969
+          }
+        ]
+      },
+      {
+        "id": "hex_ppo_v3.1.0_20260910_random_selfplay_1500000.zip",
+        "games": 2616,
+        "wins": 1713,
+        "losses": 903,
+        "draws": 0,
+        "winRate": 0.6548,
+        "avgScore": 1814,
+        "avgDamageDealt": 644,
+        "avgDamageTaken": 547,
+        "avgKills": 4.33,
+        "avgLosses": 3.89,
+        "avgCaptures": 8.57,
+        "avgSteals": 6.1,
+        "avgIncome": 402,
+        "avgFirstCaptureRound": 1.66,
+        "topDeploys": [
+          {
+            "type": "infantry",
+            "count": 16366
+          },
+          {
+            "type": "ranger",
+            "count": 5918
+          },
+          {
+            "type": "scout",
+            "count": 1106
+          }
+        ]
+      }
+    ],
+    "perMap": [
+      {
+        "map": "breach",
+        "games": 3264,
+        "drawRate": 0.0003,
+        "annihilationRate": 0.1002,
+        "avgRounds": 14.71,
+        "avgDurationSec": 1.82,
+        "topEndReason": "turn_limit_score"
+      },
+      {
+        "map": "danger-close",
+        "games": 3264,
+        "drawRate": 0.0009,
+        "annihilationRate": 0.5224,
+        "avgRounds": 23.05,
+        "avgDurationSec": 0.57,
+        "topEndReason": "last_player_standing"
+      },
+      {
+        "map": "default",
+        "games": 3264,
+        "drawRate": 0.0006,
+        "annihilationRate": 0.1651,
+        "avgRounds": 14.64,
+        "avgDurationSec": 1.83,
+        "topEndReason": "turn_limit_score"
+      },
+      {
+        "map": "desert",
+        "games": 3264,
+        "drawRate": 0.0003,
+        "annihilationRate": 0.0683,
+        "avgRounds": 14.93,
+        "avgDurationSec": 1.77,
+        "topEndReason": "turn_limit_score"
+      },
+      {
+        "map": "dual-lanes",
+        "games": 3264,
+        "drawRate": 0.0003,
+        "annihilationRate": 0.2405,
+        "avgRounds": 14.5,
+        "avgDurationSec": 1.77,
+        "topEndReason": "turn_limit_score"
+      },
+      {
+        "map": "forge",
+        "games": 3264,
+        "drawRate": 0.0009,
+        "annihilationRate": 0.2953,
+        "avgRounds": 9.59,
+        "avgDurationSec": 0.84,
+        "topEndReason": "turn_limit_score"
+      },
+      {
+        "map": "random",
+        "games": 3144,
+        "drawRate": 0,
+        "annihilationRate": 0.4755,
+        "avgRounds": 15.24,
+        "avgDurationSec": 1.63,
+        "topEndReason": "turn_limit_score"
+      }
+    ]
+  },
+  "models": [
+    {
+      "id": "hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip",
+      "short": "v3.0.4@8.4M",
+      "version": "v3.0.4",
+      "trainDate": "20260909",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 8440000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 8.79,
+      "rating": 1670,
+      "ratingLo": 1652,
+      "ratingHi": 1672,
+      "winRate": 0.7233,
+      "games": 2664,
+      "docRef": "RELEASE_NOTES 2026-09-09 v3.0.4 验收条目",
+      "docStatus": "验收未过线（dual-lanes 崩塌，非 champion）",
+      "notes": "v3.0.3-5M 续训 360 万帧（breach/desert 加权 0.10）。交付候选经互打筛选定为 8.44M 断点（对训练期 best 累计 157:131/288 局，2026-09-12 加赛复核后落选文件已删）。对 v3.0.3 全图 480 局总分 273:207（56.9%，下界 52.4%）：breach/desert 双 48:0 修复、random 57:39，但 dual-lanes 0:48 双座全崩（一票否决）；danger-close/default/forge 纯座位锁各平"
+    },
+    {
+      "id": "hex_ppo_v3.1.1_20260911_random_selfplay_10940000.zip",
+      "short": "v3.1.1@10.9M",
+      "version": "v3.1.1",
+      "trainDate": "20260911",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 10940000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 8.85,
+      "rating": 1658,
+      "ratingLo": 1641,
+      "ratingHi": 1661,
+      "winRate": 0.7083,
+      "games": 2664,
+      "docRef": "RELEASE_NOTES 2026-09-11 v3.1.1 验收条目",
+      "docStatus": "验收未过线（forge 崩塌，非 champion）",
+      "notes": "随机域拓宽后第一代：v3.0.4-8.44M 续训 250 万帧（random 0.7 + 静态各 0.05，锚点升级为 v3.0.3）。交付 best 实为 8.8M 断点。对 v3.0.3 总分 312:168（65.0%，历代最高）：dual-lanes 48:0 自愈、default 96:0 破座位锁、breach 48:0 保持，但 forge 0:48 崩塌（连续第二代）、desert 退回座位锁平"
+    },
+    {
+      "id": "hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip",
+      "short": "v3.0.3@5M",
+      "version": "v3.0.3",
+      "trainDate": "20260908",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 5000000,
+      "status": "recommended",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 8.92,
+      "rating": 1621,
+      "ratingLo": 1605,
+      "ratingHi": 1627,
+      "winRate": 0.6622,
+      "games": 2688,
+      "docRef": "models/v3.0.3.md",
+      "docStatus": "当前推荐（全地图 champion）",
+      "notes": "v3.0.2 1.4M 断点续训 356 万帧（全 7 图混合 + 锚点 v3.0.0 20% + best 选择键拆分）。对 v3.0.2 480 局 352:127（73.3%，下界 69.2%），danger-close 96:0（上代 28% 垫底）；对 v2.7.0 277:202（57.7%，下界 53.2%）。交付 5.0M 断点（已 sanitize）；记录在案退化：breach 35% / desert 46% 弱于 v3.0.2"
+    },
+    {
+      "id": "hex_ppo_v3.1.0_20260910_random_selfplay_1500000.zip",
+      "short": "v3.1.0@1.5M",
+      "version": "v3.1.0",
+      "trainDate": "20260910",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 1500000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 14.11,
+      "rating": 1616,
+      "ratingLo": 1601,
+      "ratingHi": 1620,
+      "winRate": 0.6548,
+      "games": 2616,
+      "docRef": null,
+      "docStatus": null,
+      "notes": null
+    },
+    {
+      "id": "hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip",
+      "short": "v3.0.0@3M",
+      "version": "v3.0.0",
+      "trainDate": "20260903",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 3000000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 9.08,
+      "rating": 1580,
+      "ratingLo": 1566,
+      "ratingHi": 1587,
+      "winRate": 0.6086,
+      "games": 2688,
+      "docRef": "models/v3.0.0.md",
+      "docStatus": "与 champion 同水平（观察中）",
+      "notes": "155 分层动作 + 6715 维观测 + hex_transformer；随机图 96 局对 v2.7.0 51:45（53.1%，CI [43.2%, 62.8%]），先手座 28:20、后手座 23:25（v2.8 仅 14:34）。交付断点实为 5 万步（蒸馏冷启动 + 少量 PPO），后续 PPO 因价值头尺度缺陷退化"
+    },
+    {
+      "id": "hex_ppo_v2.0.0_20260824_default_rule_500000.zip",
+      "short": "v2.0.0@500K",
+      "version": "v2.0.0",
+      "trainDate": "20260824",
+      "trainMap": "default",
+      "opponentType": "rule",
+      "steps": 500000,
+      "status": "legacy",
+      "statusNote": "player_b 座位观测失真，成绩仅供参考",
+      "rated": true,
+      "sizeMB": 6.26,
+      "rating": 1561,
+      "ratingLo": 1548,
+      "ratingHi": 1569,
+      "winRate": 0.5848,
+      "games": 2664,
+      "docRef": "models/v2.0.0.md",
+      "docStatus": "基准/历史",
+      "notes": "规则对手 + 固定意图槽（38 动作）；唯一能在主场满血出战的旧模型，v2.1.x 的模型对手与验收基准都是它"
+    },
+    {
+      "id": "hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip",
+      "short": "v2.7.0@4M",
+      "version": "v2.7.0",
+      "trainDate": "20260901",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 4000000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 24.24,
+      "rating": 1547,
+      "ratingLo": 1534,
+      "ratingHi": 1555,
+      "winRate": 0.5629,
+      "games": 2688,
+      "docRef": "models/v2.7.0.md",
+      "docStatus": "上一代 champion（被 v3.0.2-1.4M 取代；v3.0 自对弈锚点）",
+      "notes": "6205 维可观测性修复 + 混合地图 + 配对评估；随机图 96 局胜 v2.4.0 66:30，default 24:0，forge 19:5，dual-lanes 14:10"
+    },
+    {
+      "id": "hex_ppo_v2.8.0_20260903_random_selfplay_6000000.zip",
+      "short": "v2.8.0@6M",
+      "version": "v2.8.0",
+      "trainDate": "20260903",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 6000000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 40.26,
+      "rating": 1547,
+      "ratingLo": 1535,
+      "ratingHi": 1556,
+      "winRate": 0.5632,
+      "games": 2688,
+      "docRef": "models/v2.8.0.md",
+      "docStatus": "历史（不推荐替换）",
+      "notes": "管线版：8 环境 300 fps、后台配对评估、Wilson 选 best、PFSP 自对弈、target_kl 0.02；随机图 96 局对 v2.7.0 43:53（下界 35.2%，先手座 29:19、后手座 14:34），同配方已到平台期"
+    },
+    {
+      "id": "hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip",
+      "short": "v2.3.1@800K",
+      "version": "v2.3.1",
+      "trainDate": "20260829",
+      "trainMap": "random",
+      "opponentType": "modelmix",
+      "steps": 800000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 9.56,
+      "rating": 1515,
+      "ratingLo": 1503,
+      "ratingHi": 1525,
+      "winRate": 0.5203,
+      "games": 2664,
+      "docRef": "models/v2.3.1.md",
+      "docStatus": "历史",
+      "notes": "首个随机地图模型；随机图对 v2.2.0 7:1、对规则对手 14:6；但被自对弈的 v2.3.2 1:7 压制"
+    },
+    {
+      "id": "hex_ppo_v3.0.2_20260905_random_selfplay_1440000.zip",
+      "short": "v3.0.2@1.4M",
+      "version": "v3.0.2",
+      "trainDate": "20260905",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 1440000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 9.08,
+      "rating": 1506,
+      "ratingLo": 1495,
+      "ratingHi": 1516,
+      "winRate": 0.5067,
+      "games": 2688,
+      "docRef": "models/v3.0.2.md",
+      "docStatus": "上一代 champion（被 v3.0.3 取代）",
+      "notes": "1.4M 断点交付（已 sanitize）。对 v2.7.0 两批全新随机图各 96 局累计 123:69（64.1%，Wilson 下界 57.1%），先手座 76.0%（下界 66.6%）、后手座 52.1%（下界 42.2%）；批次一 61:35、批次二 62:34，为五代以来首次战胜 v2.7.0。后经全图 round_robin 复核总榜仅第 6、danger-close 垫底（28%）——「random 图验收上位、全图偏科」教训催生 v3.0.3 的全图混合与全图验收协议"
+    },
+    {
+      "id": "hex_ppo_v2.2.0_20260827_default_modelmix_best.zip",
+      "short": "v2.2.0",
+      "version": "v2.2.0",
+      "trainDate": "20260827",
+      "trainMap": "default",
+      "opponentType": "modelmix",
+      "steps": null,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 6.27,
+      "rating": 1458,
+      "ratingLo": 1450,
+      "ratingHi": 1470,
+      "winRate": 0.442,
+      "games": 2640,
+      "docRef": "models/v2.2.0.md",
+      "docStatus": "历史",
+      "notes": "座位随机化；对 v2.0.0 真身 16:0，对 v2.1.3 累计 16:2；交付 best 为 12 万步断点"
+    },
+    {
+      "id": "hex_ppo_v2.1.3_20260826_default_rule_defensive_800000.zip",
+      "short": "v2.1.3@800K",
+      "version": "v2.1.3",
+      "trainDate": "20260826",
+      "trainMap": "default",
+      "opponentType": "rule_defensive",
+      "steps": 800000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 6.27,
+      "rating": 1450,
+      "ratingLo": 1442,
+      "ratingHi": 1461,
+      "winRate": 0.4294,
+      "games": 2664,
+      "docRef": "models/v2.1.3.md",
+      "docStatus": "历史",
+      "notes": "单一 defensive 对手 + 独特超参（lr 1e-4/gamma 0.995）；弱于 v2.0.0、强于 v2.1.4–v2.1.8"
+    },
+    {
+      "id": "hex_ppo_v2.4.0_20260830_random_selfplay_2000000.zip",
+      "short": "v2.4.0@2M",
+      "version": "v2.4.0",
+      "trainDate": "20260830",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 2000000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 22.77,
+      "rating": 1407,
+      "ratingLo": 1399,
+      "ratingHi": 1422,
+      "winRate": 0.3705,
+      "games": 2688,
+      "docRef": "models/v2.4.0.md",
+      "docStatus": "历史 champion / v2.7 锚点",
+      "notes": "256×256 大网络；曾连续胜 v2.5/v2.6，现被 v2.7 在随机图 96 局以 66:30 超越"
+    },
+    {
+      "id": "hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip",
+      "short": "v2.3.3@2M",
+      "version": "v2.3.3",
+      "trainDate": "20260830",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 2000000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 5.11,
+      "rating": 1385,
+      "ratingLo": 1379,
+      "ratingHi": 1400,
+      "winRate": 0.3419,
+      "games": 2688,
+      "docRef": "models/v2.3.3.md",
+      "docStatus": "历史",
+      "notes": "续训+学习率衰减+锚点；被 256 网络的 v2.4.0 3:5 超越"
+    },
+    {
+      "id": "hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip",
+      "short": "v2.5.0@2M",
+      "version": "v2.5.0",
+      "trainDate": "20260830",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 2000000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 22.96,
+      "rating": 1365,
+      "ratingLo": 1360,
+      "ratingHi": 1382,
+      "winRate": 0.3173,
+      "games": 2688,
+      "docRef": "models/v2.5.0.md",
+      "docStatus": "历史（不推荐）",
+      "notes": "观测加对手上一回合动作历史（5974→6024 维），交付 200 万步终点断点。真换边 24 局复测 9:15 败于 v2.4.0；结论历经「8:0 碾压 → 同档 → 退步」三次反转，催生 --swap-sides 座位 bug 修复与大样本/分座位验收铁律"
+    },
+    {
+      "id": "hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip",
+      "short": "v2.6.0@4M",
+      "version": "v2.6.0",
+      "trainDate": "20260831",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 4000000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 22.56,
+      "rating": 1359,
+      "ratingLo": 1354,
+      "ratingHi": 1376,
+      "winRate": 0.3095,
+      "games": 2688,
+      "docRef": "models/v2.6.0.md",
+      "docStatus": "历史（不推荐）",
+      "notes": "对手生态加压（自对弈 85%/近期加权/锚点 15%）；仍败于 v2.4.0（10:14），且 default 0:24 全崩（后手能力也丢），灾难性遗忘"
+    },
+    {
+      "id": "hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip",
+      "short": "v2.3.2@800K",
+      "version": "v2.3.2",
+      "trainDate": "20260829",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 800000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": 9.56,
+      "rating": 1257,
+      "ratingLo": 1257,
+      "ratingHi": 1281,
+      "winRate": 0.1972,
+      "games": 2688,
+      "docRef": "models/v2.3.2.md",
+      "docStatus": "历史",
+      "notes": "首个任意地图可战模型；被 v2.3.3 3:5 小幅超越"
+    },
+    {
+      "id": "hex_ppo_v1.0.0_20260824_default_random_opponent_120000.zip",
+      "short": "v1.0.0@120K",
+      "version": "v1.0.0",
+      "trainDate": "20260824",
+      "trainMap": "default",
+      "opponentType": "random_opponent",
+      "steps": 120000,
+      "status": "legacy",
+      "statusNote": null,
+      "rated": false,
+      "sizeMB": 6.63,
+      "rating": null,
+      "ratingLo": null,
+      "ratingHi": null,
+      "winRate": null,
+      "games": 0,
+      "docRef": "models/v1.0.0.md",
+      "docStatus": "历史",
+      "notes": "512 动作随机对手基线，仅由 run_model_v100.py 路由；v1.0.0 唯一保留的模型文件（早期实验版 100096 已作为冗余删除，详见档案）"
+    }
+  ],
+  "deprecated": [
+    {
+      "file": "hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip",
+      "version": "v2.1.1",
+      "docRef": "models/deprecated/v2.1.1.md",
+      "reason": "训练环境带移动回溯（v2.1.6 修复）与占点奖励丢失（v2.1.7 修复）双重缺陷，权重不具复现价值；round_robin 全榜 12.4%（random 2.7%），家族内最弱配方（500k × mixed 规则对手）"
+    },
+    {
+      "file": "hex_ppo_v2.1.4_20260826_default_modelmix_800000.zip",
+      "version": "v2.1.4",
+      "docRef": "models/deprecated/v2.1.4.md",
+      "reason": "模型对手动作映射错位，训练对手实为噪声"
+    },
+    {
+      "file": "hex_ppo_v2.1.5_20260827_default_modelmix_600000.zip",
+      "version": "v2.1.5",
+      "docRef": "models/deprecated/v2.1.5.md",
+      "reason": "移动只走一格 + 无占点信号环境下训练，互打全败"
+    },
+    {
+      "file": "hex_ppo_v2.1.6_20260827_default_modelmix_800000.zip",
+      "version": "v2.1.6",
+      "docRef": "models/deprecated/v2.1.6.md",
+      "reason": "训练环境仍丢失占点奖励信号，互打全败"
+    },
+    {
+      "file": "hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip",
+      "version": "v2.1.8",
+      "docRef": "models/deprecated/v2.1.8.md",
+      "reason": "在回合交替损坏的环境下训练（从 v2.1.7 崩溃的 12 万步断点续训），自评 100% 胜率为虚假数据"
+    }
+  ],
+  "warnings": []
+}

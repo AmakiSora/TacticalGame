@@ -38,6 +38,9 @@
     /* 页签容器接管 main 的 flex 间距：内容包进 div 后，main 的 gap 不再作用于内部面板，
        所有 section 会以 0 间距竖向粘连（09-06 加页签时引入的潜伏问题）。 */
     #tab-board, #tab-console { display: flex; flex-direction: column; gap: 18px; }
+    /* display:flex 的 ID 选择器优先级压过 UA 的 [hidden] 规则，必须显式声明隐藏态，
+       否则两个页签永远同时显示、无法切换（.eval-mini-strip 同款坑）。 */
+    #tab-board[hidden], #tab-console[hidden] { display: none; }
     /* 页面卡片间距整体放宽一档（stats.css 默认 14px/10px 偏贴）。 */
     main { gap: 18px; }
     #kpi-grid { gap: 12px; }

@@ -32,7 +32,7 @@ export const EXCLUDED_VERSIONS = new Set(['v1.0.0']);
 
 /** 镜像 rl/MODELS_NOTES.md「模型状态总表」，两处需人工同步维护。 */
 export const MODEL_STATUS_BY_VERSION = {
-  'v2.7.0': 'recommended',
+  'v3.0.3': 'recommended',
   'v2.1.1': 'retired',
   'v2.1.4': 'retired',
   'v2.1.5': 'retired',

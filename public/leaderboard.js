@@ -182,8 +182,19 @@
   function renderMatrix(ld) {
     const rows = buildRows(ld).filter(m => m.games > 0);
     const cols = rows.slice();
+    // 列头用纯版本号（v3.0.4 而非 v3.0.4@8.4M）：16 列矩阵的全名表头会把表格
+    // 撑出横向滚动条；完整文件 id 保留在悬停提示里。版本号撞车时回退全名。
+    const versionCount = new Map();
+    for (const c of cols) {
+      const v = c.short.split('@')[0];
+      versionCount.set(v, (versionCount.get(v) || 0) + 1);
+    }
+    const headerLabel = c => {
+      const v = c.short.split('@')[0];
+      return versionCount.get(v) > 1 ? c.short : v;
+    };
     el.h2hHead.innerHTML = '<th class="model-col">模型 \\ 对手</th>' +
-      cols.map(c => `<th title="${escapeAttr(c.id)}">${escapeHtml(c.short)}</th>`).join('');
+      cols.map(c => `<th title="${escapeAttr(c.id)}">${escapeHtml(headerLabel(c))}</th>`).join('');
     el.h2hBody.innerHTML = rows
       .map(r => {
         const cells = cols.map(c => {

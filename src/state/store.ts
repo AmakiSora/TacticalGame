@@ -13,6 +13,7 @@ import { createMapCells } from '../config/geometry.js';
 import { artilleryStateForRound } from '../engine/artillery.js';
 import { actionMeritForEvent } from '../engine/actionScore.js';
 import { seedGameRandom } from '../engine/random.js';
+import { logger } from '../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -332,7 +333,7 @@ export class GameStore {
       if (parsed.schemaVersion !== PERSISTENCE_SCHEMA_VERSION || !Array.isArray(parsed.games)) {
         const archived = `${file}.schema-${parsed.schemaVersion ?? 'unknown'}-${Date.now()}.bak`;
         renameSync(file, archived);
-        console.warn(`[game:persist] 已归档不兼容状态文件 ${archived}`);
+        logger.warn(`已归档不兼容状态文件 ${archived}`, { tag: 'game:persist' });
         this.games.clear();
         return;
       }
@@ -344,10 +345,10 @@ export class GameStore {
         restoreActionStats(game);
         this.games.set(game.id, game);
       }
-      console.log(`[game:persist] loaded ${this.games.size} games from ${file}`);
+      logger.info(`loaded ${this.games.size} games from ${file}`, { tag: 'game:persist' });
     } catch (err) {
       this.games.clear();
-      console.error(`[game:persist] failed to load ${file}:`, err);
+      logger.error(`failed to load ${file}`, err);
     }
   }
 

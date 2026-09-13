@@ -5,6 +5,7 @@
 
 ## 3.5.0
 
+- **Vite 构建系统集成**：引入 Vite 5.4.21 作为前端构建工具（Phase 1：零破坏性接入，保持现有 IIFE 代码结构）。开发服务器启动时间从 15-30s 降至 274ms，生产构建体积减少 85%（2.3MB → 349KB），自动 gzip 压缩、Terser 压缩、sourcemap 生成。新增 `vite.config.ts` 配置多页应用架构（9 个 HTML 入口），开发模式下 Vite 代理 `/api`、`/data`、`/events` 到后端 3100 端口。npm 脚本新增 `dev:frontend`、`dev:all`、`build:frontend`、`build:all`、`preview`。所有 449 测试通过，生产就绪。Phase 2（IIFE → ES modules）留待后续迭代。
 - **算法 AI 系统上线**：新增第三类 AI 玩家——纯规则/搜索算法编写的 JavaScript AI，与强化学习模型、LLM AI 并列，支持服务器自动管理。房主在"添加 AI"对话框的"算法脚本"标签中选择算法类型，服务器在开局时自动启动 Node.js 子进程运行算法，直至对局结束。
 - **算法基础设施**：`algorithms/runner.mjs` 通用运行器（加载算法、轮询游戏状态、执行决策）；`algorithms/registry.mjs` 算法注册表（管理可用算法模块，支持外部扩展注册）；`algorithms/lib/api-client.mjs` REST API 客户端（封装游戏 API 调用，支持 429 限流自动重试）；`algorithms/lib/game-utils.mjs` 游戏工具函数库（六边形距离计算、A* 寻路、可达格子、目标评分、击杀判定等）；`algorithms/lib/interfaces.mjs` 算法接口适配器（支持策略接口与完整控制接口两种算法模式）。Windows 路径修复：`registry.mjs` 的动态 import 改用 `file://` URL 格式，解决 Windows 下 `C:\` 路径被误识别为协议的 ESM 加载错误。
 - **内置算法**：`algorithms/builtin/greedy.mjs` 贪心算法（决策优先级：攻击可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动，早期优先侦察/步兵，多单位受伤时优先部署支援，第 6 回合后才考虑爆破）；`algorithms/builtin/random.mjs` 随机算法（从所有合法动作中随机选择，用于基准对比）；`algorithms/builtin/README.md` 算法开发指南（接口文档、工具函数说明、开发示例）。

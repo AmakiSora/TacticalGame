@@ -1,5 +1,6 @@
 // src/events/bus.ts
 import type { GameEvent } from '../types.js';
+import { logger } from '../utils/logger.js';
 
 export type EventHandler = (event: GameEvent) => void;
 
@@ -25,7 +26,7 @@ export class EventBus {
       try {
         handler(event);
       } catch (err) {
-        console.error('Event handler error:', err);
+        logger.error('Event handler error', err);
       }
     }
   }

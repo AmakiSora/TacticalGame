@@ -1,5 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
+import fastifyCompress from '@fastify/compress';
+import fastifyCors from '@fastify/cors';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { loadMaps } from './config/loader.js';
@@ -11,6 +13,7 @@ import { closeSseConnections, eventsRoutes } from './api/events.js';
 import { mapsRoutes } from './api/maps.js';
 import { skillRoutes } from './api/skill.js';
 import { globalStore } from './state/store.js';
+import { logger } from './utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
@@ -84,6 +87,20 @@ export async function buildServer(): Promise<FastifyInstance> {
     bodyLimit: 64 * 1024,
   });
 
+  // Enable gzip/brotli compression for all responses (especially large JSON files)
+  await app.register(fastifyCompress, {
+    global: true,
+    threshold: 1024, // Only compress responses > 1KB
+    encodings: ['gzip', 'deflate', 'br'],
+  });
+
+  // Enable CORS for cross-origin requests (configurable via env)
+  const allowedOrigins = process.env.ALLOWED_ORIGINS;
+  await app.register(fastifyCors, {
+    origin: allowedOrigins ? allowedOrigins.split(',') : false,
+    credentials: true,
+  });
+
   app.addHook('onRequest', async (req, reply) => {
     const url = req.url.split('?')[0]!;
     if (!isRateLimitedPath(req.method, url)) return;
@@ -137,5 +154,5 @@ if (isMain) {
       const addr = await app.listen({ port: config.port, host: config.host });
       app.log.info({ addr, host: config.host, port: config.port }, 'Tactical Game server listening');
     })
-    .catch(err => { console.error(err); process.exit(1); });
+    .catch(err => { logger.error('Server startup failed', err); process.exit(1); });
 }

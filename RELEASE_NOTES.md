@@ -3,6 +3,18 @@
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
 
+## 3.5.0
+
+- **算法 AI 系统上线**：新增第三类 AI 玩家——纯规则/搜索算法编写的 JavaScript AI，与强化学习模型、LLM AI 并列，支持服务器自动管理。房主在"添加 AI"对话框的"算法脚本"标签中选择算法类型，服务器在开局时自动启动 Node.js 子进程运行算法，直至对局结束。
+- **算法基础设施**：`algorithms/runner.mjs` 通用运行器（加载算法、轮询游戏状态、执行决策）；`algorithms/registry.mjs` 算法注册表（管理可用算法模块，支持外部扩展注册）；`algorithms/lib/api-client.mjs` REST API 客户端（封装游戏 API 调用，支持 429 限流自动重试）；`algorithms/lib/game-utils.mjs` 游戏工具函数库（六边形距离计算、A* 寻路、可达格子、目标评分、击杀判定等）；`algorithms/lib/interfaces.mjs` 算法接口适配器（支持策略接口与完整控制接口两种算法模式）。Windows 路径修复：`registry.mjs` 的动态 import 改用 `file://` URL 格式，解决 Windows 下 `C:\` 路径被误识别为协议的 ESM 加载错误。
+- **内置算法**：`algorithms/builtin/greedy.mjs` 贪心算法（决策优先级：攻击可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动，早期优先侦察/步兵，多单位受伤时优先部署支援，第 6 回合后才考虑爆破）；`algorithms/builtin/random.mjs` 随机算法（从所有合法动作中随机选择，用于基准对比）；`algorithms/builtin/README.md` 算法开发指南（接口文档、工具函数说明、开发示例）。
+- **服务器集成**：`src/api/bots.ts` 扩展 `POST /api/games/:id/bots/algorithm` 端点（房主通过 `X-Host-Token` 鉴权，请求体 `{ botType: 'algo_greedy' | 'algo_random' }` 指定算法类型）；服务器自动 spawn `node algorithms/runner.mjs` 子进程并传入游戏 ID、玩家 token、算法名称等参数；进程生命周期管理（stdout/stderr 日志转发、错误监控、退出清理、对局删除时终止进程）；算法 bot 注册表与强化学习 bot 并行管理，支持同时运行多种类型 AI。
+- **前端界面**：`public/play.html` 与 `public/play.js` 修改——"添加 AI"对话框从 2 标签页（强化模型 / 对战提示词）扩展为 3 标签页（强化模型 / **算法脚本** / 对战提示词）；算法脚本标签提供下拉框选择算法类型（贪心算法 / 随机算法，未来可扩展极小化极大、MCTS 等），确认后 POST 到算法 bot 端点；标签切换逻辑、元素引用、事件监听全部适配；移动端 `play-m.html` 同步。
+- **手动运行支持**：算法 AI 可独立于服务器自动管理手动运行，用于开发调试或自定义场景。命令行参数：`--algorithm <name>`（算法名称）、`--url <url>`（服务器地址）、`--game <id>`（游戏 ID）、`--token <token>`（玩家 token）、`--side <id>`（玩家席位）、`--poll-seconds <n>`（轮询间隔，默认 0.5）、`--max-turns <n>`（最多处理回合数，默认 120）、`--once`（只处理一个回合后退出）、`--quiet`（减少日志输出）。
+- **文档更新**：README.md 新增"算法 AI"章节，与强化学习 AI、LLM AI 并列说明；包含功能介绍、内置算法列表、手动运行示例、完整参数说明、算法开发指南链接；AI 自动对战章节重组为四类 AI 玩家（LLM AI / 强化学习 AI / **算法 AI** / 外部 LLM）。
+- **自动游玩脚本**：新增 `scripts/auto-standard-game.mjs`——标准模式自动游玩演示脚本，可在单进程内同时驱动多个 AI 席位，支持全自动对战（AI vs AI）或与真人玩家混合对战；决策逻辑来自 `skill/standard.md`，内建 rate_limit 退避处理；用于快速演示、回归测试或无头环境批量对局。
+- 端到端验证：创建标准模式 2 人游戏，添加贪心算法和随机算法 AI，游戏自动运行并在 30 秒内结束，贪心算法成功淘汰随机算法（Phase: game_over, Winner: Draw, Players: 贪心算法 (active), 随机算法 (eliminated)）；算法加载、REST API 通信、决策执行、进程管理、前端集成全流程通过。
+
 ## 3.4.9
 
 - **娱乐数据页大改版：视觉并入站点设计体系，数据全部重挖**。视觉上放弃独立的「杂志风」`entertainment.css`，改为复用 `stats.css`（面板/KPI 卡/表格/条形/导航同 stats、leaderboard 页），页面私有样式（战报导语、动作构成条、节奏曲线、势头卡、名场面卡、纪录柜、兵种双条、战术档案、趋势区）收进重写的精简版 `entertainment.css`，`body` 改为 `stats-shell entertainment-shell` 双类。数据上重写 `script/generateFunStats.mjs`，新增三条挖掘线：**combat**（攻击事件逐条累计伤害/击杀/承伤/治疗量/落空/失误，`tallyEvent` 扩出 damageDealt/damageTaken/damageToHq/kills/attackMisses/healsHp/failedActions/deathsByType 八个字段，`extractMatch` 把原始事件流与单位归属索引透传给娱乐脚本做序列分析）；**pace 回合节奏曲线**（3.4.8 铺路的 `roundAttribution.mjs` 正式消费——逐回合聚合操作/伤害/击杀/占领，分母为「到达该回合的对局数」，早期无 `round_end` 锚点的 V2 schema 2.0.0 回放整局剔除防 R1 堆叠，归属来源分布 directShare 随数据产出供页面标注可信度）；**momentum 势头学**（一血转化率 64%（76/119，平均第 5.1 回合、最快 21.4 秒）、首点转化率 54%、翻盘补给 22 次触发仅 5% 胜率与最大分差 1297 未翻盘纪录）。前端 `entertainment.js` 全量重写：战报导语（数据驱动标题——伤害峰值回合）、8 卡 KPI、动作构成条、回合节奏 SVG（柱=场均操作、线=场均伤害、柱透明度=样本量）、势头三卡、可排序战斗群像表（场均伤害/承伤/击杀/阵亡/KD/治疗/落空/失误，<3 场灰显）、兵种部署 vs 阵亡双条、战地速报（funFacts 落页面）、经济+最狠烧钱+相爱相杀、六张名场面、三页签纪录柜（对局/战斗/单项，新增最快胜利/现实最快/最重一击/单人击杀/单场总伤害/节奏最密）、战术档案（基准维度扩至 8 项含伤害与击杀）、趋势区与地图舞台（补常胜模型行）。

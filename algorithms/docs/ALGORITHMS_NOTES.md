@@ -1,0 +1,145 @@
+# 算法 AI 开发笔记
+
+> 本文档记录所有算法 AI 的设计、实现和性能变化。
+
+算法 AI 是基于规则、搜索和启发式的 JavaScript 决策模块，无需训练模型即可运行。与强化学习模型相比，算法 AI 的优势在于开发迅速、可解释性强、无需 GPU，但性能上限受限于人工设计的策略质量。
+
+## 目录结构
+
+```
+algorithms/
+├── builtin/           # 内置算法实现
+│   ├── greedy.mjs    # 贪心算法
+│   ├── random.mjs    # 随机算法
+│   ├── mcts.mjs      # 蒙特卡洛树搜索
+│   └── README.md     # 算法开发指南
+├── lib/              # 共享工具库
+│   ├── api-client.mjs    # REST API 客户端
+│   ├── game-utils.mjs    # 游戏工具函数
+│   └── interfaces.mjs    # 算法接口适配器
+├── docs/             # 算法文档
+│   ├── ALGORITHMS_NOTES.md   # 本文件
+│   ├── RELEASE_NOTES.md      # 版本发布记录
+│   └── algorithms/           # 单算法详细档案
+│       ├── greedy.md
+│       ├── random.md
+│       └── mcts.md
+├── registry.mjs      # 算法注册表
+└── runner.mjs        # 通用运行器
+```
+
+## 算法接口
+
+所有算法必须实现以下两种接口之一：
+
+### 策略接口（推荐）
+
+适合简单算法，每次返回一个动作：
+
+```javascript
+export default {
+  name: 'algorithm_name',
+  description: '算法描述',
+  
+  async decide(gameState, utils) {
+    // gameState: 完整游戏状态
+    // utils: 工具函数集合
+    // 返回 { type: 'attack', payload: {...} } 或 null（结束回合）
+  }
+}
+```
+
+### 完整控制接口
+
+适合需要全局规划的复杂算法：
+
+```javascript
+export default {
+  name: 'algorithm_name',
+  description: '算法描述',
+  
+  async playTurn(gameState, apiClient, utils) {
+    // apiClient: REST API 调用封装
+    // 自己负责整个回合的所有动作
+  }
+}
+```
+
+## 工具函数（utils）
+
+`game-utils.mjs` 提供以下核心函数：
+
+| 函数 | 功能 |
+|---|---|
+| `hexDistance(a, b)` | 六边形距离计算 |
+| `neighbors(pos)` | 相邻六格 |
+| `reachableCells(game, unit)` | 单位可移动范围 |
+| `livingUnits(game, owner)` | 存活单位列表 |
+| `enemyTargets(game, owner)` | 敌方目标（单位 + 总部） |
+| `scoreTarget(target)` | 目标优先级评分 |
+| `bestAttackTarget(game, owner, unit)` | 最佳攻击目标 |
+| `movementGoal(game, owner, unit)` | 移动目标位置 |
+
+## 算法清单
+
+| 算法 | 类型 | 复杂度 | 性能 | 用途 |
+|---|---|---|---|---|
+| **random** | 随机 | O(n) | 极弱 | 基准对照、测试 |
+| **greedy** | 启发式 | O(n²) | 强 | 快速决策、演示 |
+| **mcts** | 搜索 | O(b^d · k) | 偏弱（vs greedy 30 局 8:22） | 战术推演、对战 |
+
+> b = 分支因子（~20），d = 搜索深度（8），k = 模拟次数（100）
+
+## 性能对比
+
+算法对战实测（default 地图，测试环境 Node.js v24）：
+
+| 对局 | 胜率 | 备注 |
+|---|---|---|
+| greedy vs random | 96.9% (31:1)，32 局 | 3.5.0 实测 |
+| mcts vs random | 100% (12:0)，12 局 | 3.5.1 实测 |
+| mcts vs greedy | 26.7% (8:22)，30 局 | 3.5.1 实测；攻击/抢点/部署等宏观指标持平，差距在集火补刀效率 |
+
+> MCTS 对 RL 模型的同口径实测尚未进行。MCTS 决策含随机模拟，胜负方差较大，可靠的算法强度对比需 30+ 局（见未来方向"算法锦标赛"）。
+
+## 算法 vs RL 模型
+
+算法 AI 与强化学习模型在 random 地图对战（各 48 局配对换座）：
+
+| 对局 | 胜率 | 先手/后手 | 备注 |
+|---|---|---|---|
+| greedy vs v2.7.0 | 18.8% (9:39) | 6:18 / 3:21 | RL 模型碾压 |
+
+> 数据来源：`rl/test-output/stats/algo_vs_rl_random.jsonl`
+
+**结论**：算法 AI 与训练良好的 RL 模型仍有显著差距。算法 AI 的价值在于无需训练、可快速迭代、易于调试，适合作为开发期对手和教学演示。MCTS 对 RL 模型的同口径实测尚未进行。
+
+## 历史里程碑
+
+| 时间 | 版本 | 事件 |
+|---|---|---|
+| 2026-09-13 | 3.5.0 | 算法 AI 系统上线：greedy、random |
+| 2026-09-13 | 3.5.1 | 新增 MCTS（目标导向采样、据点占领、入口部署决策）；实测 vs greedy 30 局 8:22 |
+
+## 未来方向
+
+1. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索
+2. **规则增强**：针对特定地图的专家系统
+3. **混合架构**：MCTS + 学习评估函数
+4. **多线程并行**：利用 Worker 加速搜索
+5. **算法锦标赛**：自动化性能评估和排行榜
+
+## 贡献指南
+
+新算法提交清单：
+
+- [ ] 实现文件 `algorithms/builtin/<name>.mjs`
+- [ ] 在 `registry.mjs` 注册
+- [ ] 在 `src/api/bots.ts` 添加 `algo_<name>` 配置
+- [ ] 前端下拉菜单添加选项（`play.html` 和 `play-m.html`）
+- [ ] 编写算法文档 `algorithms/docs/algorithms/<name>.md`
+- [ ] 更新本文档的算法清单
+- [ ] 运行性能测试并记录结果
+- [ ] 提交前通过 `npm test` 和冒烟脚本验证（服务器运行时执行 `node scripts/test-algorithm-bots.mjs algo_<name> algo_random`）
+
+详细开发指南见 `algorithms/builtin/README.md`。

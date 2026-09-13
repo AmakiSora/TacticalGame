@@ -279,3 +279,85 @@ describe('RL bot legacy model support', () => {
     expect(res.statusCode).toBe(200);
   });
 });
+
+describe('Algorithm bot endpoints', () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = await startTestServer();
+  });
+
+  afterEach(async () => {
+    for (const id of globalStore.list()) globalStore.delete(id);
+    if (app) await app.close();
+  });
+
+  it('adds an algorithm bot with a custom name', async () => {
+    const created = await createTwoPlayerLobby(app);
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_greedy', name: '我的贪心' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      ok: boolean;
+      bot: { id: string; name: string; algorithm: string };
+      lobby: { players: Array<{ name: string }> };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.bot.name).toBe('我的贪心');
+    expect(body.bot.algorithm).toBe('greedy');
+    expect(body.lobby.players.some(player => player.name === '我的贪心')).toBe(true);
+  });
+
+  it('defaults the algorithm bot name to the Chinese algorithm name', async () => {
+    const created = await createTwoPlayerLobby(app);
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_mcts' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { bot: { name: string } }).bot.name).toBe('蒙特卡洛树搜索');
+  });
+
+  it('slices overlong bot names to the player name limit', async () => {
+    const created = await createTwoPlayerLobby(app);
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_random', name: '名'.repeat(60) },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { bot: { name: string } };
+    expect(body.bot.name).toBe('名'.repeat(50));
+  });
+
+  it('rejects unknown algorithm bot types', async () => {
+    const created = await createTwoPlayerLobby(app);
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_minimax' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('bot_not_found');
+  });
+
+  it('rejects algorithm bots on non-standard mode maps', async () => {
+    const created = await createTwoPlayerLobby(app, { mapId: 'artillery-zone' });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_greedy' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('bot_not_supported');
+  });
+});

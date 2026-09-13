@@ -50,7 +50,7 @@ const els = {
   botDialog: $('bot-dialog'), botDialogBackdrop: $('bot-dialog-backdrop'),
   botName: $('bot-name'), botModel: $('bot-model'), btnBotConfirm: $('btn-bot-confirm'), btnBotCancel: $('btn-bot-cancel'),
   botPanelBots: $('bot-panel-bots'), botPanelAlgorithm: $('bot-panel-algorithm'), botPanelPrompt: $('bot-panel-prompt'),
-  algorithmType: $('algorithm-type'), btnAlgorithmConfirm: $('btn-algorithm-confirm'), btnAlgorithmCancel: $('btn-algorithm-cancel'),
+  algorithmType: $('algorithm-type'), algorithmName: $('algorithm-name'), btnAlgorithmConfirm: $('btn-algorithm-confirm'), btnAlgorithmCancel: $('btn-algorithm-cancel'),
   botPromptName: $('bot-prompt-name'), botPromptText: $('bot-prompt-text'), botPromptSkill: $('bot-prompt-skill'),
   btnBotPromptCopy: $('btn-bot-prompt-copy'), btnBotPromptClose: $('btn-bot-prompt-close'),
 };
@@ -1680,12 +1680,22 @@ function openBotDialog() {
   if (!gameId || !hostToken) return;
   closeBotDialog();
   els.botName.value = '';
+  resetAlgorithmName();
   switchBotTab('bots');
   els.botDialog.classList.remove('hidden');
   els.botDialogBackdrop.classList.remove('hidden');
   ensureBotModels();
   renderBotPromptText();
   els.botName.focus();
+}
+
+// —— 算法脚本页签：默认名取所选算法的中文名 ——
+function defaultAlgorithmName() {
+  return els.algorithmType.selectedOptions[0]?.dataset.name || '';
+}
+
+function resetAlgorithmName() {
+  els.algorithmName.value = defaultAlgorithmName();
 }
 
 // —— 对战提示词页签：生成可复制的 agent 引导词 ——
@@ -1761,7 +1771,7 @@ async function confirmAddAlgorithm() {
     const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/bots/algorithm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Host-Token': hostToken },
-      body: JSON.stringify({ botType }),
+      body: JSON.stringify({ botType, name: els.algorithmName.value.trim() || undefined }),
     });
     const data = await res.json();
     if (!res.ok) return toast(data.error || '添加算法 AI 失败', 'err');
@@ -1779,6 +1789,7 @@ els.btnBotConfirm.addEventListener('click', confirmAddBot);
 els.btnBotCancel.addEventListener('click', closeBotDialog);
 els.btnAlgorithmConfirm.addEventListener('click', confirmAddAlgorithm);
 els.btnAlgorithmCancel.addEventListener('click', closeBotDialog);
+els.algorithmType.addEventListener('change', resetAlgorithmName);
 els.botDialogBackdrop.addEventListener('click', closeBotDialog);
 for (const btn of els.botDialog.querySelectorAll('[data-bot-tab]')) {
   btn.addEventListener('click', () => switchBotTab(btn.dataset.botTab));

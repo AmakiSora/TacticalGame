@@ -49,7 +49,8 @@ const els = {
   btnSaveSession: $('btn-save-session'), btnEnterSession: $('btn-enter-session'), btnClearSession: $('btn-clear-session'),
   botDialog: $('bot-dialog'), botDialogBackdrop: $('bot-dialog-backdrop'),
   botName: $('bot-name'), botModel: $('bot-model'), btnBotConfirm: $('btn-bot-confirm'), btnBotCancel: $('btn-bot-cancel'),
-  botPanelBots: $('bot-panel-bots'), botPanelPrompt: $('bot-panel-prompt'),
+  botPanelBots: $('bot-panel-bots'), botPanelAlgorithm: $('bot-panel-algorithm'), botPanelPrompt: $('bot-panel-prompt'),
+  algorithmType: $('algorithm-type'), algorithmName: $('algorithm-name'), btnAlgorithmConfirm: $('btn-algorithm-confirm'), btnAlgorithmCancel: $('btn-algorithm-cancel'),
   botPromptName: $('bot-prompt-name'), botPromptText: $('bot-prompt-text'), botPromptSkill: $('bot-prompt-skill'),
   btnBotPromptCopy: $('btn-bot-prompt-copy'), btnBotPromptClose: $('btn-bot-prompt-close'),
 };
@@ -1959,6 +1960,7 @@ function openBotDialog() {
   if (!gameId || !hostToken) return;
   closeBotDialog();
   els.botName.value = '';
+  resetAlgorithmName();
   switchBotTab('bots');
   els.botDialog.classList.remove('hidden');
   els.botDialogBackdrop.classList.remove('hidden');
@@ -1967,11 +1969,23 @@ function openBotDialog() {
   els.botName.focus();
 }
 
+// —— 算法脚本页签：默认名取所选算法的中文名 ——
+function defaultAlgorithmName() {
+  return els.algorithmType.selectedOptions[0]?.dataset.name || '';
+}
+
+function resetAlgorithmName() {
+  els.algorithmName.value = defaultAlgorithmName();
+}
+
 // —— 对战提示词页签：生成可复制的 agent 引导词 ——
 function switchBotTab(tab) {
-  const bots = tab !== 'prompt';
-  els.botPanelBots.classList.toggle('hidden', !bots);
-  els.botPanelPrompt.classList.toggle('hidden', bots);
+  const isBots = tab === 'bots';
+  const isAlgorithm = tab === 'algorithm';
+  const isPrompt = tab === 'prompt';
+  els.botPanelBots.classList.toggle('hidden', !isBots);
+  els.botPanelAlgorithm.classList.toggle('hidden', !isAlgorithm);
+  els.botPanelPrompt.classList.toggle('hidden', !isPrompt);
   for (const btn of els.botDialog.querySelectorAll('[data-bot-tab]')) {
     const active = btn.dataset.botTab === tab;
     btn.classList.toggle('active', active);
@@ -2028,8 +2042,34 @@ async function confirmAddBot() {
   }
 }
 
+async function confirmAddAlgorithm() {
+  if (!gameId || !hostToken) return;
+  const botType = els.algorithmType.value;
+  if (!botType) return toast('请选择算法类型', 'err');
+  els.btnAlgorithmConfirm.disabled = true;
+  try {
+    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/bots/algorithm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Host-Token': hostToken },
+      body: JSON.stringify({ botType, name: els.algorithmName.value.trim() || undefined }),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast(data.error || '添加算法 AI 失败', 'err');
+    closeBotDialog();
+    renderLobbySummary(data.lobby, els.lobbySummary, true);
+    toast('算法 AI 已加入，等待开局', 'ok');
+  } catch {
+    toast('添加算法 AI 失败：无法连接服务器', 'err');
+  } finally {
+    els.btnAlgorithmConfirm.disabled = false;
+  }
+}
+
 els.btnBotConfirm.addEventListener('click', confirmAddBot);
 els.btnBotCancel.addEventListener('click', closeBotDialog);
+els.btnAlgorithmConfirm.addEventListener('click', confirmAddAlgorithm);
+els.btnAlgorithmCancel.addEventListener('click', closeBotDialog);
+els.algorithmType.addEventListener('change', resetAlgorithmName);
 els.botDialogBackdrop.addEventListener('click', closeBotDialog);
 for (const btn of els.botDialog.querySelectorAll('[data-bot-tab]')) {
   btn.addEventListener('click', () => switchBotTab(btn.dataset.botTab));

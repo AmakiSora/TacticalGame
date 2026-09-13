@@ -15,6 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export const ALGORITHMS = {
   greedy: './builtin/greedy.mjs',
   random: './builtin/random.mjs',
+  mcts: './builtin/mcts.mjs',
 };
 
 /**

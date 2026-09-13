@@ -3,6 +3,14 @@
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
 
+## 3.5.1
+
+- **MCTS 算法实现**：新增蒙特卡洛树搜索算法 `algorithms/builtin/mcts.mjs`。核心特性：UCB1 选择策略平衡探索与利用、每个决策 100 次模拟推演、最大深度 8 层、目标导向动作采样（移动取最贴近 `movementGoal` 的可达格，`canCapture` 单位对可达中立/敌方据点生成显式占领动作，采样未覆盖到可动单位时回退贪心移动避免提前结束回合）、部署决策由入口按补给/兵力状况先行判断、手工评估函数综合我方单位价值/据点/总部血量/敌方存活单位价值/敌方总部伤害与阵亡判定。决策耗时 0.5-1 秒，符合实时对战要求。实测对 random 全胜（12 局）、对 greedy 胜率 26.7%（30 局 8:22）：攻击/抢点/部署等宏观指标与 greedy 持平，差距在集火补刀效率，详见 `algorithms/docs/`。
+- **算法冒烟脚本**：新增 `scripts/test-algorithm-bots.mjs`，本地服务器运行时一键验证算法 bot 对局推进（默认 mcts vs random，可传参指定任意两个 `algo_*` 组合）。
+- **算法注册与前端集成**：`algorithms/registry.mjs` 新增 `mcts` 注册；`src/api/bots.ts` 的 `ALGORITHM_BOTS` 新增 `algo_mcts` 配置；`public/play.html` 和 `public/play-m.html` 的"算法脚本"下拉菜单新增"蒙特卡洛树搜索（MCTS）"选项。算法 AI 从 2 个扩展到 3 个（greedy / random / mcts），用户可在前端直接选择。算法 AI 支持自定义玩家名：弹窗新增名称输入框，默认预填所选算法的中文名（类型切换时同步刷新），服务端 `/bots/algorithm` 接受可选 `name`（截断至 50 字符），缺省用算法中文名（`algo_mcts` 默认名为"蒙特卡洛树搜索"）；移动端 `play-m.html` 同步完整支持算法页签（页签切换、名称输入、确认添加）。
+- **算法文档体系**：仿照 RL 文档结构创建完整算法文档 `algorithms/docs/`——`ALGORITHMS_NOTES.md` 算法开发笔记（系统概览、接口设计、工具函数、算法清单、性能对比、历史里程碑）；`RELEASE_NOTES.md` 版本发布记录（3.5.0/3.5.1 完整变更、性能测试、技术要点、已知限制）；`algorithms/greedy.md` / `mcts.md` / `random.md` 单算法详细档案（身份信息、原理详解、实现细节、性能表现、决策时间、使用方式、改进方向、一句话总结）。文档模板与 `rl/docs/models/*.md` 完全对齐，包含详细的性能数据、技术分析和使用指南。
+- **版本号更新**：项目版本从 3.5.0 升级到 3.5.1，所有前端文件（`README.md`、`public/version.js`、`public/*.html` 的脚本版本参数）同步更新。
+
 ## 3.5.0
 
 - **Vite 构建系统集成**：引入 Vite 5.4.21 作为前端构建工具（Phase 1：零破坏性接入，保持现有 IIFE 代码结构）。开发服务器启动时间从 15-30s 降至 274ms，生产构建体积减少 85%（2.3MB → 349KB），自动 gzip 压缩、Terser 压缩、sourcemap 生成。新增 `vite.config.ts` 配置多页应用架构（9 个 HTML 入口），开发模式下 Vite 代理 `/api`、`/data`、`/events` 到后端 3100 端口。npm 脚本新增 `dev:frontend`、`dev:all`、`build:frontend`、`build:all`、`preview`。所有 449 测试通过，生产就绪。Phase 2（IIFE → ES modules）留待后续迭代。
@@ -10,7 +18,7 @@
 - **算法基础设施**：`algorithms/runner.mjs` 通用运行器（加载算法、轮询游戏状态、执行决策）；`algorithms/registry.mjs` 算法注册表（管理可用算法模块，支持外部扩展注册）；`algorithms/lib/api-client.mjs` REST API 客户端（封装游戏 API 调用，支持 429 限流自动重试）；`algorithms/lib/game-utils.mjs` 游戏工具函数库（六边形距离计算、A* 寻路、可达格子、目标评分、击杀判定等）；`algorithms/lib/interfaces.mjs` 算法接口适配器（支持策略接口与完整控制接口两种算法模式）。Windows 路径修复：`registry.mjs` 的动态 import 改用 `file://` URL 格式，解决 Windows 下 `C:\` 路径被误识别为协议的 ESM 加载错误。
 - **内置算法**：`algorithms/builtin/greedy.mjs` 贪心算法（决策优先级：攻击可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动，早期优先侦察/步兵，多单位受伤时优先部署支援，第 6 回合后才考虑爆破）；`algorithms/builtin/random.mjs` 随机算法（从所有合法动作中随机选择，用于基准对比）；`algorithms/builtin/README.md` 算法开发指南（接口文档、工具函数说明、开发示例）。
 - **服务器集成**：`src/api/bots.ts` 扩展 `POST /api/games/:id/bots/algorithm` 端点（房主通过 `X-Host-Token` 鉴权，请求体 `{ botType: 'algo_greedy' | 'algo_random' }` 指定算法类型）；服务器自动 spawn `node algorithms/runner.mjs` 子进程并传入游戏 ID、玩家 token、算法名称等参数；进程生命周期管理（stdout/stderr 日志转发、错误监控、退出清理、对局删除时终止进程）；算法 bot 注册表与强化学习 bot 并行管理，支持同时运行多种类型 AI。
-- **前端界面**：`public/play.html` 与 `public/play.js` 修改——"添加 AI"对话框从 2 标签页（强化模型 / 对战提示词）扩展为 3 标签页（强化模型 / **算法脚本** / 对战提示词）；算法脚本标签提供下拉框选择算法类型（贪心算法 / 随机算法，未来可扩展极小化极大、MCTS 等），确认后 POST 到算法 bot 端点；标签切换逻辑、元素引用、事件监听全部适配；移动端 `play-m.html` 同步。
+- **前端界面**：`public/play.html` 与 `public/play.js` 修改——"添加 AI"对话框从 2 标签页（强化模型 / 对战提示词）扩展为 3 标签页（强化模型 / **算法脚本** / 对战提示词）；算法脚本标签提供下拉框选择算法类型（贪心算法 / 随机算法），确认后 POST 到算法 bot 端点；标签切换逻辑、元素引用、事件监听全部适配；移动端 `play-m.html` 同步。
 - **手动运行支持**：算法 AI 可独立于服务器自动管理手动运行，用于开发调试或自定义场景。命令行参数：`--algorithm <name>`（算法名称）、`--url <url>`（服务器地址）、`--game <id>`（游戏 ID）、`--token <token>`（玩家 token）、`--side <id>`（玩家席位）、`--poll-seconds <n>`（轮询间隔，默认 0.5）、`--max-turns <n>`（最多处理回合数，默认 120）、`--once`（只处理一个回合后退出）、`--quiet`（减少日志输出）。
 - **文档更新**：README.md 新增"算法 AI"章节，与强化学习 AI、LLM AI 并列说明；包含功能介绍、内置算法列表、手动运行示例、完整参数说明、算法开发指南链接；AI 自动对战章节重组为四类 AI 玩家（LLM AI / 强化学习 AI / **算法 AI** / 外部 LLM）。
 - **自动游玩脚本**：新增 `scripts/auto-standard-game.mjs`——标准模式自动游玩演示脚本，可在单进程内同时驱动多个 AI 席位，支持全自动对战（AI vs AI）或与真人玩家混合对战；决策逻辑来自 `skill/standard.md`，内建 rate_limit 退避处理；用于快速演示、回归测试或无头环境批量对局。

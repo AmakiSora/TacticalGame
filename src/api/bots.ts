@@ -142,6 +142,7 @@ let modelsCache: RlModelInfo[] = [];
 const ALGORITHM_BOTS = {
   algo_greedy: { name: '贪心算法', algorithm: 'greedy', description: '攻击 > 治疗 > 爆破 > 部署 > 移动' },
   algo_random: { name: '随机算法', algorithm: 'random', description: '从所有合法动作中随机选择' },
+  algo_mcts: { name: '蒙特卡洛树搜索', algorithm: 'mcts', description: '蒙特卡洛树搜索：模拟推演选择最优动作' },
 } as const;
 
 /** Extract one ordinary ZIP entry without adding a runtime dependency. */
@@ -439,7 +440,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
     },
   );
 
-  app.post<{ Params: { id: string }; Body: { botType?: string } }>(
+  app.post<{ Params: { id: string }; Body: { botType?: string; name?: string } }>(
     '/api/games/:id/bots/algorithm', async (req, reply) => {
       const game = authenticateHost(req, reply);
       if (!game) return;
@@ -460,7 +461,8 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
           code: 'bot_not_found',
         });
       }
-      const joined = addLobbyPlayer(game, config.name);
+      const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || config.name;
+      const joined = addLobbyPlayer(game, name);
       if (!joined) return reply.code(409).send({ error: 'game already full', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
       globalStore.persist(game);
@@ -474,7 +476,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       algorithmBotsByGame.set(game.id, records);
       return {
         ok: true,
-        bot: { id: joined.id, name: config.name, algorithm: config.algorithm },
+        bot: { id: joined.id, name, algorithm: config.algorithm },
         lobby: lobbySummary(game),
       };
     },

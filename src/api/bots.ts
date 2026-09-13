@@ -21,6 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const MODELS_DIR = join(PROJECT_ROOT, 'rl', 'models');
 const RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'runners', 'run_model.py');
+const ALGORITHM_RUNNER = join(PROJECT_ROOT, 'algorithms', 'runner.mjs');
 // 旧版运行器：v2.0.0 模型（38 动作）使用其训练时期的编码快照 rl/envs/env_v200.py。
 const LEGACY_RUNNER_SCRIPT = join(PROJECT_ROOT, 'rl', 'runners', 'run_model_v200.py');
 // 最早的动态动作列表（512 动作）模型使用 v1 环境快照。
@@ -109,6 +110,14 @@ interface BotRecord {
   child?: ChildProcess;
 }
 
+interface AlgorithmBotRecord {
+  gameId: string;
+  playerId: PlayerId;
+  token: string;
+  algorithmName: string;
+  child?: ChildProcess;
+}
+
 interface BotDeps {
   // 测试注入点：默认在 VITEST 环境下不真正拉起 python 进程。
   spawner?: (cmd: string, args: string[], cwd: string) => ChildProcess | null;
@@ -128,6 +137,12 @@ const defaultSpawner: NonNullable<BotDeps['spawner']> = (cmd, args, cwd) => {
 let activeSpawner: NonNullable<BotDeps['spawner']> = defaultSpawner;
 
 let modelsCache: RlModelInfo[] = [];
+
+/** 可用的算法 AI 配置 */
+const ALGORITHM_BOTS = {
+  algo_greedy: { name: '贪心算法', algorithm: 'greedy', description: '攻击 > 治疗 > 爆破 > 部署 > 移动' },
+  algo_random: { name: '随机算法', algorithm: 'random', description: '从所有合法动作中随机选择' },
+} as const;
 
 /** Extract one ordinary ZIP entry without adding a runtime dependency. */
 function readZipEntry(zip: Buffer, wantedName: string): Buffer | null {
@@ -220,26 +235,47 @@ function resolvePython(): string {
 }
 
 const botsByGame = new Map<string, BotRecord[]>();
+const algorithmBotsByGame = new Map<string, AlgorithmBotRecord[]>();
 
 function botsForGame(gameId: string): BotRecord[] {
   return botsByGame.get(gameId) ?? [];
 }
 
+function algorithmBotsForGame(gameId: string): AlgorithmBotRecord[] {
+  return algorithmBotsByGame.get(gameId) ?? [];
+}
+
 /** 踢出玩家时同步清理注册表；非 AI 座位为空操作。 */
 export function removeBotRecord(gameId: string, playerId: PlayerId): boolean {
   const records = botsByGame.get(gameId);
-  if (!records) return false;
-  const index = records.findIndex(record => record.playerId === playerId);
-  if (index < 0) return false;
-  records.splice(index, 1);
-  if (!records.length) botsByGame.delete(gameId);
-  return true;
+  if (records) {
+    const index = records.findIndex(record => record.playerId === playerId);
+    if (index >= 0) {
+      records.splice(index, 1);
+      if (!records.length) botsByGame.delete(gameId);
+      return true;
+    }
+  }
+
+  const algoRecords = algorithmBotsByGame.get(gameId);
+  if (algoRecords) {
+    const index = algoRecords.findIndex(record => record.playerId === playerId);
+    if (index >= 0) {
+      algoRecords.splice(index, 1);
+      if (!algoRecords.length) algorithmBotsByGame.delete(gameId);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** 删除对局时清理并终止其全部 AI 子进程。 */
 export function clearBotsForGame(gameId: string): void {
   for (const record of botsForGame(gameId)) record.child?.kill();
   botsByGame.delete(gameId);
+  for (const record of algorithmBotsForGame(gameId)) record.child?.kill();
+  algorithmBotsByGame.delete(gameId);
 }
 
 function killAllBotProcesses(): void {
@@ -247,45 +283,87 @@ function killAllBotProcesses(): void {
     for (const record of records) record.child?.kill();
   }
   botsByGame.clear();
+  for (const records of algorithmBotsByGame.values()) {
+    for (const record of records) record.child?.kill();
+  }
+  algorithmBotsByGame.clear();
 }
 
 export function launchBotsForGame(baseUrl: string, logger: FastifyBaseLogger, game: GameState): void {
   const records = botsForGame(game.id);
-  if (!records.length) return;
-  const python = resolvePython();
-  for (const record of records) {
-    const runnerScript = record.runnerScript ?? RUNNER_SCRIPT;
-    const args = [
-      runnerScript,
-      '--url', baseUrl,
-      '--game', record.gameId,
-      '--token', record.token,
-      '--side', record.playerId,
-      '--model', join(MODELS_DIR, record.modelFile),
-    ];
-    logger.info({ gameId: game.id, bot: record.playerId, model: record.modelFile }, 'launching RL bot runner');
-    let child: ChildProcess | null = null;
-    try {
-      child = activeSpawner(python, args, PROJECT_ROOT);
-    } catch (err) {
-      logger.error({ gameId: game.id, bot: record.playerId, err }, 'failed to spawn RL bot runner');
-      continue;
+  if (records.length > 0) {
+    const python = resolvePython();
+    for (const record of records) {
+      const runnerScript = record.runnerScript ?? RUNNER_SCRIPT;
+      const args = [
+        runnerScript,
+        '--url', baseUrl,
+        '--game', record.gameId,
+        '--token', record.token,
+        '--side', record.playerId,
+        '--model', join(MODELS_DIR, record.modelFile),
+      ];
+      logger.info({ gameId: game.id, bot: record.playerId, model: record.modelFile }, 'launching RL bot runner');
+      let child: ChildProcess | null = null;
+      try {
+        child = activeSpawner(python, args, PROJECT_ROOT);
+      } catch (err) {
+        logger.error({ gameId: game.id, bot: record.playerId, err }, 'failed to spawn RL bot runner');
+        continue;
+      }
+      if (!child) continue;
+      record.child = child;
+      // 不打印 argv：其中包含该座位的玩家 token。
+      createInterface({ input: child.stdout! }).on('line', line =>
+        logger.info({ gameId: game.id, bot: record.playerId }, line));
+      createInterface({ input: child.stderr! }).on('line', line =>
+        logger.warn({ gameId: game.id, bot: record.playerId }, line));
+      child.on('error', err => {
+        logger.error({ gameId: game.id, bot: record.playerId, err }, 'RL bot runner failed');
+        record.child = undefined;
+      });
+      child.on('exit', code => {
+        logger.warn({ gameId: game.id, bot: record.playerId, code }, 'RL bot runner exited');
+        record.child = undefined;
+      });
     }
-    if (!child) continue;
-    record.child = child;
-    // 不打印 argv：其中包含该座位的玩家 token。
-    createInterface({ input: child.stdout! }).on('line', line =>
-      logger.info({ gameId: game.id, bot: record.playerId }, line));
-    createInterface({ input: child.stderr! }).on('line', line =>
-      logger.warn({ gameId: game.id, bot: record.playerId }, line));
-    child.on('error', err => {
-      logger.error({ gameId: game.id, bot: record.playerId, err }, 'RL bot runner failed');
-      record.child = undefined;
-    });
-    child.on('exit', code => {
-      logger.warn({ gameId: game.id, bot: record.playerId, code }, 'RL bot runner exited');
-      record.child = undefined;
-    });
+  }
+
+  const algoRecords = algorithmBotsForGame(game.id);
+  if (algoRecords.length > 0) {
+    for (const record of algoRecords) {
+      const args = [
+        ALGORITHM_RUNNER,
+        '--algorithm', record.algorithmName,
+        '--url', baseUrl,
+        '--game', record.gameId,
+        '--token', record.token,
+        '--side', record.playerId,
+        '--quiet',
+      ];
+      logger.info({ gameId: game.id, bot: record.playerId, algorithm: record.algorithmName }, 'launching algorithm bot');
+      let child: ChildProcess | null = null;
+      try {
+        child = activeSpawner('node', args, PROJECT_ROOT);
+      } catch (err) {
+        logger.error({ gameId: game.id, bot: record.playerId, err }, 'failed to spawn algorithm bot');
+        continue;
+      }
+      if (!child) continue;
+      record.child = child;
+      createInterface({ input: child.stdout! }).on('line', line =>
+        logger.info({ gameId: game.id, bot: record.playerId }, line));
+      createInterface({ input: child.stderr! }).on('line', line =>
+        logger.warn({ gameId: game.id, bot: record.playerId }, line));
+      child.on('error', err => {
+        logger.error({ gameId: game.id, bot: record.playerId, err }, 'algorithm bot runner failed');
+        record.child = undefined;
+      });
+      child.on('exit', code => {
+        logger.warn({ gameId: game.id, bot: record.playerId, code }, 'algorithm bot runner exited');
+        record.child = undefined;
+      });
+    }
   }
 }
 
@@ -306,6 +384,15 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
     runner: RUNNER_SCRIPT,
     requiredActionSpace: REQUIRED_ACTION_SPACE,
     supportedActionSpaces: SUPPORTED_ACTION_SPACES,
+  }));
+
+  app.get('/api/algorithms', async () => ({
+    algorithms: Object.entries(ALGORITHM_BOTS).map(([key, config]) => ({
+      id: key,
+      name: config.name,
+      algorithm: config.algorithm,
+      description: config.description,
+    })),
   }));
 
   app.post<{ Params: { id: string }; Body: { name?: string; model?: string } }>(
@@ -347,6 +434,47 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       return {
         ok: true,
         bot: { id: joined.id, name, model },
+        lobby: lobbySummary(game),
+      };
+    },
+  );
+
+  app.post<{ Params: { id: string }; Body: { botType?: string } }>(
+    '/api/games/:id/bots/algorithm', async (req, reply) => {
+      const game = authenticateHost(req, reply);
+      if (!game) return;
+      if (game.phase !== 'lobby') {
+        return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
+      }
+      if (game.config.mode !== 'standard') {
+        return reply.code(400).send({
+          error: '算法 AI 目前仅支持标准模式',
+          code: 'bot_not_supported',
+        });
+      }
+      const botType = req.body?.botType?.trim();
+      const config = botType ? ALGORITHM_BOTS[botType as keyof typeof ALGORITHM_BOTS] : undefined;
+      if (!botType || !config) {
+        return reply.code(400).send({
+          error: `unknown algorithm bot type: "${botType ?? ''}"`,
+          code: 'bot_not_found',
+        });
+      }
+      const joined = addLobbyPlayer(game, config.name);
+      if (!joined) return reply.code(409).send({ error: 'game already full', code: 'game_already_full' });
+      appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
+      globalStore.persist(game);
+      const records = algorithmBotsByGame.get(game.id) ?? [];
+      records.push({
+        gameId: game.id,
+        playerId: joined.id,
+        token: joined.token,
+        algorithmName: config.algorithm,
+      });
+      algorithmBotsByGame.set(game.id, records);
+      return {
+        ok: true,
+        bot: { id: joined.id, name: config.name, algorithm: config.algorithm },
         lobby: lobbySummary(game),
       };
     },

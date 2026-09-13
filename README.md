@@ -220,6 +220,10 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 ## AI 自动对战
 
+项目支持四类 AI 玩家：
+
+### 1. LLM AI（通过提示词）
+
 ```bash
 npm run dev
 node skill/ai-player.mjs --side a --name "AI A"
@@ -242,6 +246,76 @@ AI 默认会持续轮询并自动处理后续己方回合，直到游戏结束�
 | `--once` | 只处理当前或下一个己方回合 |
 
 AI 在标准模式中的策略优先级：击毁总部、击杀低血单位、治疗友军、战略部署、抢占据点/推进总部。第 8 回合后或拥有 3 个据点时优先转入总部压力；第 12 回合后按裁决分优化行动。歼灭模式改为优先脱离炮火预警/危险区并向最近敌军推进，不再寻找总部或以占点裁决为主目标。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。
+
+### 2. 强化学习 AI
+
+服务器会自动扫描 `rl/models/` 目录下的 `.zip` 模型文件。在玩家控制台创建对局时，房主可通过"添加 AI"对话框选择强化模型，服务器会在开局时自动启动对应的 Python 运行器。
+
+强化学习 AI 基于 Stable-Baselines3 PPO 算法训练，支持多个版本的动作空间和观测空间。模型文件名应包含版本号（如 `v3.0.0`），服务器会自动选择匹配的运行器。
+
+训练和评估：
+
+```bash
+# 训练新模型
+python rl/train.py --episodes 10000
+
+# 评估模型
+python rl/evaluate.py --model rl/models/model.zip
+```
+
+### 3. 算法 AI
+
+纯规则/搜索算法编写的 JavaScript AI，无需训练模型。房主在"添加 AI"对话框的"算法脚本"标签中选择算法类型，服务器会自动启动 Node.js 运行器。
+
+当前内置算法：
+
+- **贪心算法（Greedy）**：优先攻击可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动
+- **随机算法（Random）**：从所有合法动作中随机选择
+
+手动运行算法 AI：
+
+```bash
+# 启动服务器
+npm run dev
+
+# 在浏览器中创建标准模式游戏，获取 gameId 和 playerToken
+
+# 运行贪心算法
+node algorithms/runner.mjs \
+  --algorithm greedy \
+  --url http://localhost:3100 \
+  --game <gameId> \
+  --token <playerToken> \
+  --side player_a
+
+# 运行随机算法
+node algorithms/runner.mjs \
+  --algorithm random \
+  --url http://localhost:3100 \
+  --game <gameId> \
+  --token <playerToken> \
+  --side player_b
+```
+
+可用参数：
+
+| 参数 | 说明 |
+|---|---|
+| `--algorithm <name>` | 算法名称（greedy, random） |
+| `--url <url>` | API 地址，默认 `http://localhost:3100` |
+| `--game <id>` | 游戏 ID |
+| `--token <token>` | 玩家 token |
+| `--side <id>` | 玩家席位 ID（player_a, player_b, ...） |
+| `--poll-seconds <n>` | 轮询间隔秒数，默认 0.5 |
+| `--max-turns <n>` | 最多处理多少个己方回合，默认 120 |
+| `--once` | 只处理一个回合后退出 |
+| `--quiet` | 减少日志输出 |
+
+算法开发指南见 `algorithms/builtin/README.md`。该目录包含完整的算法接口文档、游戏工具函数和开发示例。
+
+### 4. 外部 LLM（通过提示词）
+
+房主可在"添加 AI"对话框的"对战提示词"标签生成并复制提示词，发送给外部 AI（如 Claude、GPT-4）。提示词包含服务器地址、对局 ID、地图信息和 API 调用指令，AI 会自己调用 `/join` 加入对局并开始游戏。
 
 ## 回放与记录
 

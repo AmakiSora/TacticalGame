@@ -95,9 +95,13 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   // Enable CORS for cross-origin requests (configurable via env)
-  const allowedOrigins = process.env.ALLOWED_ORIGINS;
+  // 逐项 trim 并丢弃空段，避免 "a.com, b.com" 里带空格的源匹配失败。
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
   await app.register(fastifyCors, {
-    origin: allowedOrigins ? allowedOrigins.split(',') : false,
+    origin: allowedOrigins.length > 0 ? allowedOrigins : false,
     credentials: true,
   });
 

@@ -145,6 +145,17 @@ const ALGORITHM_BOTS = {
   algo_mcts: { name: '蒙特卡洛树搜索', algorithm: 'mcts', description: '蒙特卡洛树搜索：模拟推演选择最优动作' },
 } as const;
 
+/** 大厅内出现同名玩家会让踢人/观战难以区分：名称被占用时自动追加序号。 */
+function uniqueLobbyName(game: GameState, name: string): string {
+  const taken = new Set(Object.values(game.playerNames));
+  if (!taken.has(name)) return name;
+  for (let n = 2; ; n++) {
+    const suffix = ` (${n})`;
+    const candidate = name.slice(0, MAX_PLAYER_NAME_LEN - suffix.length) + suffix;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
 /** Extract one ordinary ZIP entry without adding a runtime dependency. */
 function readZipEntry(zip: Buffer, wantedName: string): Buffer | null {
   try {
@@ -424,7 +435,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
           code: 'bot_not_supported',
         });
       }
-      const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || DEFAULT_BOT_NAME;
+      const name = uniqueLobbyName(game, req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || DEFAULT_BOT_NAME);
       const joined = addLobbyPlayer(game, name);
       if (!joined) return reply.code(409).send({ error: 'game already full', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
@@ -461,7 +472,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
           code: 'bot_not_found',
         });
       }
-      const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || config.name;
+      const name = uniqueLobbyName(game, req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || config.name);
       const joined = addLobbyPlayer(game, name);
       if (!joined) return reply.code(409).send({ error: 'game already full', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });

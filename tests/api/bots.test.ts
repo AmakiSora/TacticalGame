@@ -360,4 +360,47 @@ describe('Algorithm bot endpoints', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe('bot_not_supported');
   });
+
+  it('auto-suffixed duplicate bot names stay distinguishable and within the length limit', async () => {
+    const created = await createTwoPlayerLobby(app, { mapId: 'multiplayer-ring', maxPlayers: 6, participate: false });
+
+    const first = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_greedy' },
+    });
+    expect(first.statusCode).toBe(200);
+    expect((first.json() as { bot: { name: string } }).bot.name).toBe('贪心算法');
+
+    const second = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_greedy' },
+    });
+    expect(second.statusCode).toBe(200);
+    expect((second.json() as { bot: { name: string } }).bot.name).toBe('贪心算法 (2)');
+
+    // 顶格长度的基础名与占用名冲突时，序号后不应超过玩家名上限。
+    const longName = '名'.repeat(50);
+    const third = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_random', name: longName },
+    });
+    expect(third.statusCode).toBe(200);
+
+    const fourth = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_random', name: longName },
+    });
+    expect(fourth.statusCode).toBe(200);
+    const name = (fourth.json() as { bot: { name: string } }).bot.name;
+    expect(name.length).toBeLessThanOrEqual(50);
+    expect(name).not.toBe(longName);
+  });
 });

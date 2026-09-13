@@ -10,6 +10,14 @@
 - **算法注册与前端集成**：`algorithms/registry.mjs` 新增 `mcts` 注册；`src/api/bots.ts` 的 `ALGORITHM_BOTS` 新增 `algo_mcts` 配置；`public/play.html` 和 `public/play-m.html` 的"算法脚本"下拉菜单新增"蒙特卡洛树搜索（MCTS）"选项。算法 AI 从 2 个扩展到 3 个（greedy / random / mcts），用户可在前端直接选择。算法 AI 支持自定义玩家名：弹窗新增名称输入框，默认预填所选算法的中文名（类型切换时同步刷新），服务端 `/bots/algorithm` 接受可选 `name`（截断至 50 字符），缺省用算法中文名（`algo_mcts` 默认名为"蒙特卡洛树搜索"）；移动端 `play-m.html` 同步完整支持算法页签（页签切换、名称输入、确认添加）。
 - **算法文档体系**：仿照 RL 文档结构创建完整算法文档 `algorithms/docs/`——`ALGORITHMS_NOTES.md` 算法开发笔记（系统概览、接口设计、工具函数、算法清单、性能对比、历史里程碑）；`RELEASE_NOTES.md` 版本发布记录（3.5.0/3.5.1 完整变更、性能测试、技术要点、已知限制）；`algorithms/greedy.md` / `mcts.md` / `random.md` 单算法详细档案（身份信息、原理详解、实现细节、性能表现、决策时间、使用方式、改进方向、一句话总结）。文档模板与 `rl/docs/models/*.md` 完全对齐，包含详细的性能数据、技术分析和使用指南。
 - **版本号更新**：项目版本从 3.5.0 升级到 3.5.1，所有前端文件（`README.md`、`public/version.js`、`public/*.html` 的脚本版本参数）同步更新。
+- 修复生产 Docker 镜像缺少 `algorithms/` 目录导致算法 AI 无法启动的问题。
+- 修复 deploy 脚本误传 `dist-public/` 构建产物与 `temp/` 本地暂存目录的问题。
+- 修复算法 runner 等待轮询无容错、瞬时网络错误导致进程退出的问题。
+- 修复算法 API 客户端对非 JSON 响应抛裸 SyntaxError、掩盖真实状态码的问题。
+- 修复 `ALLOWED_ORIGINS` 含空格时源匹配失败的问题。
+- 修复非法 `LOG_LEVEL` 静默吞掉全部日志的问题。
+- 修复大厅可加入多个同名 AI 座位、无法区分的问题（重名自动追加序号）。
+- 清理重复文档（根目录 IMPROVEMENTS.md），RL 训练规划迁至 `docs/`；勘误 3.5.0 验证记录（引擎复核确认双人局淘汰必判胜，"Winner: Draw" 为记录失真）。
 
 ## 3.5.0
 

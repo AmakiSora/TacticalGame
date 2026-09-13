@@ -88,10 +88,11 @@ CONTROL_TOKEN = env.get("CONTROL_TOKEN", "").strip() or sys.exit(
 
 EXCLUDE_PATTERNS = [
     r'\.git$', r'\.git/.*', r'node_modules/', r'node_modules$',
-    r'\.env$', r'\.env\..*', r'dist/', r'dist$', r'coverage/', r'coverage$',
+    r'\.env$', r'\.env\..*', r'dist/', r'dist$', r'dist-public/', r'dist-public$',
+    r'coverage/', r'coverage$',
     r'\.idea/', r'\.idea$', r'\.claude/', r'\.claude$', r'\.omp/', r'\.omp$',
     r'\.workbuddy/', r'\.workbuddy$', r'\.github/', r'\.github$',
-    r'runtime/', r'runtime$', r'backups/', r'backups$',
+    r'runtime/', r'runtime$', r'backups/', r'backups$', r'temp/', r'temp$',
     r'\.log$', r'hexstate\.json$', r'state\.json$', r'skill\.zip$',
     r'records/', r'records$', r'deploy/', r'deploy$',
     # RL 训练产物与 Windows 本地环境体积大且服务器用不上（镜像内重建）

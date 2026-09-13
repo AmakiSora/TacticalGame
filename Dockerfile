@@ -56,6 +56,8 @@ COPY --chown=tactical:tactical package.json ./
 COPY --from=build --chown=tactical:tactical /app/dist ./dist
 COPY --chown=tactical:tactical public ./public
 COPY --chown=tactical:tactical maps ./maps
+# 算法 AI：src/api/bots.ts 会以子进程拉起 node algorithms/runner.mjs，镜像必须携带。
+COPY --chown=tactical:tactical algorithms ./algorithms
 COPY --chown=tactical:tactical rl ./rl
 # agent 通过 /api/skill* 接口拉取最新 skill，镜像需携带权威 skill 目录。
 COPY --chown=tactical:tactical skill ./skill

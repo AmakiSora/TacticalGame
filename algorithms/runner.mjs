@@ -95,10 +95,30 @@ function printHelp() {
 
 /**
  * 等待轮到己方回合
+ *
+ * 轮询途中的瞬时错误（网络抖动、5xx 等）不应结束进程：
+ * 连续多次失败才放弃，失败期间按退避间隔重试。
  */
+const MAX_POLL_FAILURES = 10;
+
 async function waitForTurn(apiClient, side, pollSeconds, quiet) {
+  let failures = 0;
   while (true) {
-    const state = await apiClient.getState();
+    let state;
+    try {
+      state = await apiClient.getState();
+      failures = 0;
+    } catch (err) {
+      failures += 1;
+      if (failures >= MAX_POLL_FAILURES) {
+        throw err;
+      }
+      if (!quiet) {
+        console.warn(`Polling failed (${failures}/${MAX_POLL_FAILURES}): ${err.message}`);
+      }
+      await sleep(pollSeconds * 1000 * failures);
+      continue;
+    }
 
     // 游戏结束
     if (state.phase === 'game_over' || state.winner) {
@@ -199,7 +219,7 @@ async function main() {
       // 尝试强制结束回合
       try {
         await apiClient.endTurn();
-        log('[Turn ${turnNo}] Forced end-turn after error');
+        log(`[Turn ${turnNo}] Forced end-turn after error`);
       } catch (endTurnError) {
         console.error(`Failed to end turn: ${endTurnError.message}`);
         throw error; // 无法恢复，退出

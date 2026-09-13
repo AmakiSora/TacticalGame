@@ -45,9 +45,24 @@ export class GameApiClient {
       });
 
       const text = await res.text();
-      const data = text ? JSON.parse(text) : {};
+      // 服务器正常返回 JSON；但代理/网关故障可能回 HTML 错误页，
+      // 此时保留原始文本片段，避免 SyntaxError 掩盖真实状态码。
+      let data;
+      let parseFailed = false;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        parseFailed = true;
+        data = { error: text.slice(0, 200) };
+      }
 
       if (res.ok) {
+        if (parseFailed) {
+          const error = new Error(`${method} ${path} -> ${res.status} returned non-JSON response`);
+          error.status = res.status;
+          error.data = data;
+          throw error;
+        }
         return data;
       }
 

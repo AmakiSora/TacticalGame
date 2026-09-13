@@ -25,6 +25,7 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 - **`skill/` 是规范源**：服务器经 `/api/skill/files/:name` 提供；`.zcode`/`.pi`/`.qoder` 下只是拷贝。
 - gitignored 勿提交：`runtime/`、`deploy/logs/`、`.env*`、`rl/models/`、`temp/`、根目录临时 `*.json`。
 - **版本号由当前分支决定**：`release/x.y.z` 分支上版本必须等于 `x.y.z`，新建 release 分支后先 `npm run version x.y.z` 对齐（脚本会同步 package.json/README/skill 等全部引用处）；feature 等开发分支不主动 bump 版本。交付前可 `npm run check-version` 校验一致性。
+- **发版日志**：`RELEASE_NOTES.md` 按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写（SemVer 分类：新增/变更/修复/移除/测试与验证）；`## x.y.z` 标题格式不可改，bump 脚本依赖它插入占位小节。
 - 分支：发布用 `release/x.y.z`，中文 conventional commits。
 
 ## 玩游戏（agent 对战）

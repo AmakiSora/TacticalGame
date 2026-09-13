@@ -2,14 +2,23 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
+自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
 ## 3.5.1
+
+### 新增
 
 - **MCTS 算法实现**：新增蒙特卡洛树搜索算法 `algorithms/builtin/mcts.mjs`。核心特性：UCB1 选择策略平衡探索与利用、每个决策 100 次模拟推演、最大深度 8 层、目标导向动作采样（移动取最贴近 `movementGoal` 的可达格，`canCapture` 单位对可达中立/敌方据点生成显式占领动作，采样未覆盖到可动单位时回退贪心移动避免提前结束回合）、部署决策由入口按补给/兵力状况先行判断、手工评估函数综合我方单位价值/据点/总部血量/敌方存活单位价值/敌方总部伤害与阵亡判定。决策耗时 0.5-1 秒，符合实时对战要求。实测对 random 全胜（12 局）、对 greedy 胜率 26.7%（30 局 8:22）：攻击/抢点/部署等宏观指标与 greedy 持平，差距在集火补刀效率，详见 `algorithms/docs/`。
 - **算法冒烟脚本**：新增 `scripts/test-algorithm-bots.mjs`，本地服务器运行时一键验证算法 bot 对局推进（默认 mcts vs random，可传参指定任意两个 `algo_*` 组合）。
 - **算法注册与前端集成**：`algorithms/registry.mjs` 新增 `mcts` 注册；`src/api/bots.ts` 的 `ALGORITHM_BOTS` 新增 `algo_mcts` 配置；`public/play.html` 和 `public/play-m.html` 的"算法脚本"下拉菜单新增"蒙特卡洛树搜索（MCTS）"选项。算法 AI 从 2 个扩展到 3 个（greedy / random / mcts），用户可在前端直接选择。算法 AI 支持自定义玩家名：弹窗新增名称输入框，默认预填所选算法的中文名（类型切换时同步刷新），服务端 `/bots/algorithm` 接受可选 `name`（截断至 50 字符），缺省用算法中文名（`algo_mcts` 默认名为"蒙特卡洛树搜索"）；移动端 `play-m.html` 同步完整支持算法页签（页签切换、名称输入、确认添加）。
 - **算法文档体系**：仿照 RL 文档结构创建完整算法文档 `algorithms/docs/`——`ALGORITHMS_NOTES.md` 算法开发笔记（系统概览、接口设计、工具函数、算法清单、性能对比、历史里程碑）；`RELEASE_NOTES.md` 版本发布记录（3.5.0/3.5.1 完整变更、性能测试、技术要点、已知限制）；`algorithms/greedy.md` / `mcts.md` / `random.md` 单算法详细档案（身份信息、原理详解、实现细节、性能表现、决策时间、使用方式、改进方向、一句话总结）。文档模板与 `rl/docs/models/*.md` 完全对齐，包含详细的性能数据、技术分析和使用指南。
-- **版本号更新**：项目版本从 3.5.0 升级到 3.5.1，所有前端文件（`README.md`、`public/version.js`、`public/*.html` 的脚本版本参数）同步更新。
+
+### 变更
+
+- 清理重复文档（根目录 IMPROVEMENTS.md），RL 训练规划迁至 `docs/`；勘误 3.5.0 验证记录（引擎复核确认双人局淘汰必判胜，"Winner: Draw" 为记录失真）。
+
+### 修复
+
 - 修复生产 Docker 镜像缺少 `algorithms/` 目录导致算法 AI 无法启动的问题。
 - 修复 deploy 脚本误传 `dist-public/` 构建产物与 `temp/` 本地暂存目录的问题。
 - 修复算法 runner 等待轮询无容错、瞬时网络错误导致进程退出的问题。
@@ -17,9 +26,10 @@
 - 修复 `ALLOWED_ORIGINS` 含空格时源匹配失败的问题。
 - 修复非法 `LOG_LEVEL` 静默吞掉全部日志的问题。
 - 修复大厅可加入多个同名 AI 座位、无法区分的问题（重名自动追加序号）。
-- 清理重复文档（根目录 IMPROVEMENTS.md），RL 训练规划迁至 `docs/`；勘误 3.5.0 验证记录（引擎复核确认双人局淘汰必判胜，"Winner: Draw" 为记录失真）。
 
 ## 3.5.0
+
+### 新增
 
 - **Vite 构建系统集成**：引入 Vite 5.4.21 作为前端构建工具（Phase 1：零破坏性接入，保持现有 IIFE 代码结构）。开发服务器启动时间从 15-30s 降至 274ms，生产构建体积减少 85%（2.3MB → 349KB），自动 gzip 压缩、Terser 压缩、sourcemap 生成。新增 `vite.config.ts` 配置多页应用架构（9 个 HTML 入口），开发模式下 Vite 代理 `/api`、`/data`、`/events` 到后端 3100 端口。npm 脚本新增 `dev:frontend`、`dev:all`、`build:frontend`、`build:all`、`preview`。所有 449 测试通过，生产就绪。Phase 2（IIFE → ES modules）留待后续迭代。
 - **算法 AI 系统上线**：新增第三类 AI 玩家——纯规则/搜索算法编写的 JavaScript AI，与强化学习模型、LLM AI 并列，支持服务器自动管理。房主在"添加 AI"对话框的"算法脚本"标签中选择算法类型，服务器在开局时自动启动 Node.js 子进程运行算法，直至对局结束。
@@ -30,79 +40,151 @@
 - **手动运行支持**：算法 AI 可独立于服务器自动管理手动运行，用于开发调试或自定义场景。命令行参数：`--algorithm <name>`（算法名称）、`--url <url>`（服务器地址）、`--game <id>`（游戏 ID）、`--token <token>`（玩家 token）、`--side <id>`（玩家席位）、`--poll-seconds <n>`（轮询间隔，默认 0.5）、`--max-turns <n>`（最多处理回合数，默认 120）、`--once`（只处理一个回合后退出）、`--quiet`（减少日志输出）。
 - **文档更新**：README.md 新增"算法 AI"章节，与强化学习 AI、LLM AI 并列说明；包含功能介绍、内置算法列表、手动运行示例、完整参数说明、算法开发指南链接；AI 自动对战章节重组为四类 AI 玩家（LLM AI / 强化学习 AI / **算法 AI** / 外部 LLM）。
 - **自动游玩脚本**：新增 `scripts/auto-standard-game.mjs`——标准模式自动游玩演示脚本，可在单进程内同时驱动多个 AI 席位，支持全自动对战（AI vs AI）或与真人玩家混合对战；决策逻辑来自 `skill/standard.md`，内建 rate_limit 退避处理；用于快速演示、回归测试或无头环境批量对局。
+
+### 测试与验证
+
 - 端到端验证：创建标准模式 2 人游戏，添加贪心算法和随机算法 AI，游戏自动运行并在 30 秒内结束，贪心算法成功淘汰随机算法（Phase: game_over, Winner: Draw, Players: 贪心算法 (active), 随机算法 (eliminated)）；算法加载、REST API 通信、决策执行、进程管理、前端集成全流程通过。
 
 ## 3.4.9
 
-- **娱乐数据页大改版：视觉并入站点设计体系，数据全部重挖**。视觉上放弃独立的「杂志风」`entertainment.css`，改为复用 `stats.css`（面板/KPI 卡/表格/条形/导航同 stats、leaderboard 页），页面私有样式（战报导语、动作构成条、节奏曲线、势头卡、名场面卡、纪录柜、兵种双条、战术档案、趋势区）收进重写的精简版 `entertainment.css`，`body` 改为 `stats-shell entertainment-shell` 双类。数据上重写 `script/generateFunStats.mjs`，新增三条挖掘线：**combat**（攻击事件逐条累计伤害/击杀/承伤/治疗量/落空/失误，`tallyEvent` 扩出 damageDealt/damageTaken/damageToHq/kills/attackMisses/healsHp/failedActions/deathsByType 八个字段，`extractMatch` 把原始事件流与单位归属索引透传给娱乐脚本做序列分析）；**pace 回合节奏曲线**（3.4.8 铺路的 `roundAttribution.mjs` 正式消费——逐回合聚合操作/伤害/击杀/占领，分母为「到达该回合的对局数」，早期无 `round_end` 锚点的 V2 schema 2.0.0 回放整局剔除防 R1 堆叠，归属来源分布 directShare 随数据产出供页面标注可信度）；**momentum 势头学**（一血转化率 64%（76/119，平均第 5.1 回合、最快 21.4 秒）、首点转化率 54%、翻盘补给 22 次触发仅 5% 胜率与最大分差 1297 未翻盘纪录）。前端 `entertainment.js` 全量重写：战报导语（数据驱动标题——伤害峰值回合）、8 卡 KPI、动作构成条、回合节奏 SVG（柱=场均操作、线=场均伤害、柱透明度=样本量）、势头三卡、可排序战斗群像表（场均伤害/承伤/击杀/阵亡/KD/治疗/落空/失误，<3 场灰显）、兵种部署 vs 阵亡双条、战地速报（funFacts 落页面）、经济+最狠烧钱+相爱相杀、六张名场面、三页签纪录柜（对局/战斗/单项，新增最快胜利/现实最快/最重一击/单人击杀/单场总伤害/节奏最密）、战术档案（基准维度扩至 8 项含伤害与击杀）、趋势区与地图舞台（补常胜模型行）。
-- **统计页（stats.html）整修**：`generateStats.mjs` 的对局摘要新增 `durationSec` 字段，KPI 区「全量事件」卡替换为「平均耗时」（筛选内墙钟均值 + 有效样本数，跟随筛选实时重算）。`stats.css` 共享层打磨：main 间距 14→16、KPI 卡 10→12 并加 hover 浮起、表格滚动条细暗化、新增 `.chart-box` 共享样式与 focus-visible 焦点环。
-- 测试：`tests/script/generateFunStats.test.ts` 扩至 15 例（战斗字段过层、兵种部署/阵亡合并且 garrison-only 兵种保留、一血/首点转化率与最快一血、翻盘补给按局×座位计次与最大分差、pace 逐回合场均与无锚点剔除、最重一击/最快分胜负/单场总伤害——平局局不进最快胜利）；新增 `tests/public/entertainment.test.ts` 与 `tests/public/stats-runtime.test.ts`（node:vm 桩 DOM + 真实数据 JSON 执行页面脚本，断言全部区块渲染与榜单表渲染）——前端页面首次获得运行时回归保护。全量 52 文件 / 449 测试通过。
+### 新增
+
 - **skill 新增 Scratch files 强制约定，AI 玩家临时文件一律写 `temp/<gameId>/<玩家名>/`**：此前 agent 对局把下载的 `wait-turn.mjs`、模式文件、状态快照、事件 dump 等直接落在工作目录根，根目录垃圾只能靠 .gitignore 逐条打补丁。现 SKILL.md 新增强制节：create/join 拿到 gameId 与玩家名后先 `mkdir -p "temp/<gameId>/<playerName>"`（玩家名含空格等 shell 敏感字符时改用座位号 `player_a`…），对局全程所有持久化文件只能写进该目录，明确禁止写入当前目录根、`$HOME` 等其他位置；能 pipe/`jq` 直读的响应不落盘。Canonical fetch 与 Polling decision 两处 `wait-turn.mjs` 下载/运行命令同步改为 `$SCRATCH/wait-turn.mjs`。配套：AGENTS.md「玩游戏」节补一句指引、「约束」节 gitignored 列表加 `temp/`，`.gitignore` 新增 `/temp/` 整目录忽略；`.pi`/`.qoder`/`.zcode`（junction→`~/.claude/skills/skill`）三处本地拷贝同步。
 - **skill 补上战斗数学：伤害掷骰公式与击杀阈值**。此前 skill 全套文档从未写明攻击伤害含随机成分（唯一暗示是 simultaneous.md 的 "damage roll" 字眼），照 skill 玩的 agent 只能按 `attack − defense` 期望规划，把"需正骰才够杀"的低概率刀当稳杀——回放取证佐证：150 局中 0 次 HQ 最后一刀依赖骰子，但 2 局裁定险胜局分差小于一次靠正骰完成的击杀价值（tg_0022 分差 12 / tg_0108 分差 63，单杀摇摆均 ~90），且 `tg_0042` 有需满骰杀 15 血 HQ 掷出 −2 的 miss。SKILL.md「Units — read stats every game」新增第 4 条：伤害公式 `max(minimumDamage, attack − defense + uniformInt(−damageVarianceRange, +damageVarianceRange))`（现行全图 ±3、保底 1，同时回合结算同式）、三档击杀判定（`attack − defense − damageVarianceRange ≥ hp` 稳杀；`attack − defense ≥ hp` 在 ±3 下仍有 3/7 概率差口气；需正骰时成功概率 `(range − needed + 1)/(2·range + 1)`，翻盘级交换不许裸押、需留补刀）、治疗只向上浮动 `healPower + uniformInt(0, healVarianceRange)`；standard.md 优先级第 2 条 "Attack killable" 补 killable 定义与回链。`.pi`/`.qoder`/`.zcode` 三处本地拷贝同步。
+
+### 变更
+
+- **娱乐数据页大改版：视觉并入站点设计体系，数据全部重挖**。视觉上放弃独立的「杂志风」`entertainment.css`，改为复用 `stats.css`（面板/KPI 卡/表格/条形/导航同 stats、leaderboard 页），页面私有样式（战报导语、动作构成条、节奏曲线、势头卡、名场面卡、纪录柜、兵种双条、战术档案、趋势区）收进重写的精简版 `entertainment.css`，`body` 改为 `stats-shell entertainment-shell` 双类。数据上重写 `script/generateFunStats.mjs`，新增三条挖掘线：**combat**（攻击事件逐条累计伤害/击杀/承伤/治疗量/落空/失误，`tallyEvent` 扩出 damageDealt/damageTaken/damageToHq/kills/attackMisses/healsHp/failedActions/deathsByType 八个字段，`extractMatch` 把原始事件流与单位归属索引透传给娱乐脚本做序列分析）；**pace 回合节奏曲线**（3.4.8 铺路的 `roundAttribution.mjs` 正式消费——逐回合聚合操作/伤害/击杀/占领，分母为「到达该回合的对局数」，早期无 `round_end` 锚点的 V2 schema 2.0.0 回放整局剔除防 R1 堆叠，归属来源分布 directShare 随数据产出供页面标注可信度）；**momentum 势头学**（一血转化率 64%（76/119，平均第 5.1 回合、最快 21.4 秒）、首点转化率 54%、翻盘补给 22 次触发仅 5% 胜率与最大分差 1297 未翻盘纪录）。前端 `entertainment.js` 全量重写：战报导语（数据驱动标题——伤害峰值回合）、8 卡 KPI、动作构成条、回合节奏 SVG（柱=场均操作、线=场均伤害、柱透明度=样本量）、势头三卡、可排序战斗群像表（场均伤害/承伤/击杀/阵亡/KD/治疗/落空/失误，<3 场灰显）、兵种部署 vs 阵亡双条、战地速报（funFacts 落页面）、经济+最狠烧钱+相爱相杀、六张名场面、三页签纪录柜（对局/战斗/单项，新增最快胜利/现实最快/最重一击/单人击杀/单场总伤害/节奏最密）、战术档案（基准维度扩至 8 项含伤害与击杀）、趋势区与地图舞台（补常胜模型行）。
+- **统计页（stats.html）整修**：`generateStats.mjs` 的对局摘要新增 `durationSec` 字段，KPI 区「全量事件」卡替换为「平均耗时」（筛选内墙钟均值 + 有效样本数，跟随筛选实时重算）。`stats.css` 共享层打磨：main 间距 14→16、KPI 卡 10→12 并加 hover 浮起、表格滚动条细暗化、新增 `.chart-box` 共享样式与 focus-visible 焦点环。
+
+### 移除
+
 - **文档清理**：删除 `docs/superpowers/` 下 14 份历史 plan/spec（2026-06～07 战术棋迭代过程文档，结论已沉淀进代码与 README）。
+
+### 测试与验证
+
+- 测试：`tests/script/generateFunStats.test.ts` 扩至 15 例（战斗字段过层、兵种部署/阵亡合并且 garrison-only 兵种保留、一血/首点转化率与最快一血、翻盘补给按局×座位计次与最大分差、pace 逐回合场均与无锚点剔除、最重一击/最快分胜负/单场总伤害——平局局不进最快胜利）；新增 `tests/public/entertainment.test.ts` 与 `tests/public/stats-runtime.test.ts`（node:vm 桩 DOM + 真实数据 JSON 执行页面脚本，断言全部区块渲染与榜单表渲染）——前端页面首次获得运行时回归保护。全量 52 文件 / 449 测试通过。
 
 ## 3.4.8
 
-- **RL 排行榜页布局与交互整修**：`.two-col` 用 `1.2fr 1fr` 布局，而 `fr` 轨道的自动最小尺寸是内容 min-content——对位矩阵 14+ 列不换行表格（`#h2h-table` min-width 720px，实际 1300px+）把左轨道撑爆，右侧「模型详情」面板被挤成约 40px 宽、标题竖排一字一行，视觉上全部粘连。修复：`stats.css` 的 `.two-col` 改为 `minmax(0, 1.2fr) minmax(0, 1fr)`（0 下限让 `.table-wrap` 的横向滚动接管，统计页同布局一并受益）。**模型详情与对位矩阵改为上下堆叠**（详情在上、矩阵全宽在下，`board-stack` 单列网格），配合矩阵列头从「v3.0.4@8.4M」精简为纯版本号「v3.0.4」（版本号撞车回退全名，完整文件 id 保留在悬停提示），17 列矩阵在 1440 宽下完全放下、无横向滚动条（实测 tableW=wrapW=1324px）。矩阵模型列 `position: sticky; left: 0`（窄屏滚动时行头常驻）；≤720px 窄屏排除 stats.css 对全部 `.data-table` 的卡片化改造（表头隐藏 + 行拆卡片对矩阵是破坏性的）。**面板竖向 0 间距粘连的真凶**是页签容器——内容包进 `#tab-board`/`#tab-console` div 后，`main` 的 flex gap 只作用于 div 本身、不再作用于内部 section（09-06 加页签时引入的潜伏问题），页签容器补 `display:flex; flex-direction:column; gap:18px` 接管间距；同时该 `display:flex` 会压过 UA 的 `[hidden]` 默认隐藏规则（与 `.eval-mini-strip` 同款坑），补 `#tab-board[hidden]/#tab-console[hidden] { display:none }` 修复页签无法切换。页面卡片间距整体放宽（main gap 14→18px、KPI 卡 10→12px）。
-- **评分榜移除「状态」列**：历史/当前推荐徽标与版本列信息重复，表格瘦身一列；状态信息保留在点击模型行后的「模型详情」面板中。
+### 新增
+
+- **RL 排行榜页新增「玩法统计」「模型档案」页签**：把 `matches.jsonl` 的 derived 派生统计与 `MODELS_NOTES.md` 的模型档案搬上前端。新增生成器 `script/generateRlStats.mjs`（`npm run rl-stats`，并入 `stats-all` 链尾，产出 `public/data/rl-stats.json` 约 32KB、0.4s）：复用排行榜的注册表与作废/旧格式过滤口径（参评 22,728 局、作废对局丢弃 2,352 与榜单计数一致），聚合玩法统计（结局原因分布、回合数/耗时直方图、全局兵种部署与阵亡占比、经济体征——场均收入 407 / 控制点收入占 66.8% / 场均占领 8.51 / 翻盘补给触发率 6.7%、每模型 13 列玩法画像、分地图概览）与模型档案（registry 全量含未参评 + 文件大小 + 合并榜单评分/CI/胜率 + 解析 MODELS_NOTES.md 状态总表「说明」列与作废表「作废原因」，未收录文件显示占位提示，表格行解析容错只留 warning 不炸脚本）。前端新增 `public/rl-stats.js` 渲染两个页签：页签栏扩为 模型榜单/玩法统计/模型档案/评估控制台，`#stats`/`#models`/`#console` hash 直达；页签容器的 flex gap 与 `[hidden]` 显式隐藏规则同步扩展到新页签（同 09-06 的潜伏坑）。两个数据语义修正沉淀进口径：`killsByType` 实为对手的 `lossesByType`（unit_death 事件不带击杀方，见 `evaluate_cross.py`），全局聚合后恒等于 losses——全局兵种表只保留部署/阵亡占比，K/D 仅保留在每模型画像（该粒度下语义正确）；heavy 阵亡 6,229 ≫ 部署 55 源于 breach 等图的预置守军而非统计错误，表头加注。直方图桶定档为左闭右开（末桶闭区间兜底），消除 1.0s 同时落在 '<1s' 与 '1–2s' 标签范围的边界歧义。服务端联动：「重算榜单」接口与跑批结束自动重算改为依次执行 榜单+统计 两个脚本（`rlEval.ts` 的 regenLeaderboard 拆出 runRegenScript 串行执行，任一失败即失败）。
+- **新增存量回放回合重建工具 `script/lib/roundAttribution.mjs`**：引擎侧修复只对新对局生效，V2 + V3 已归档的 144 份历史回放仍需重建才能被按回合图表消费。提供三级归属策略：(1) `payload.roundNumber` 显式存在时优先采用；(2) `round_end` / `round_start` 作为锚点校准内部计数器；(3) 其余无 `roundNumber` 的事件顺推当前回合。关键边界：`round_resolved`（simultaneous 模式，携带刚结束的回合号）与 `comeback_supply`（standard 模式，携带触发回合号）都是「旧回合号」，工具对 `currentRound` 施加单调递增约束（`if (rn >= currentRound) currentRound = rn`），防止这类事件把计数器拉回导致后续 income / attack 被错误归属。导出 `attributeRounds`（逐条重建，含 `source: 'payload' | 'anchor' | 'carry' | 'none'` 溯源标记）、`tallyByRound`（按回合聚合计数）、`attributionCoverage`（无法归属事件占比，供页面标注数据可信度）三个纯函数，`docs/superpowers/specs/2026-09-11-stats-entertainment-redesign.md` 中的按回合图表重构可直接消费。
+
+### 变更
+
 - **v2.1.1 作废归档**：round_robin 复盘其全榜胜率仅 12.4%（random 图 2.7%），诊断为训练环境双重缺陷——v2.1.0 引入、v2.1.6 才修复的「移动只走一格」bug（策略按爬行节奏学习）+ v2.1.0 的奖励结算时序 bug（v2.1.7 修复）使占点（裁决分最大项）从未进入奖励信号，叠加家族内最弱配方（500k × mixed 规则对手）。模型 zip/断点/档案移入 `deprecated/`，`generateRlLeaderboard.mjs` 标记 retired，榜单重算后不再展示。同步收敛模型库：v3.0.4 复测收敛为 8.44M 单交付（288 局 157:131 胜训练期 best，落选文件已删）、v3.1.0 蒸馏中间产物按惯例删除。
 - **RL 榜单全量数据刷新**：全 field round_robin 跑批（17 模型 × 7 图 × 24 局，新增 7440 局，5 批失败待补跑），v3.0.4/v3.1.0/v3.1.1 首次获得全 field BT 评分——v3.0.4（1670）与 v3.1.1（1658）分列总榜前二，现役 champion v3.0.3 退居第三（1621），「单图门禁 champion」与「总分最强」出现正面分歧（详见 `rl/docs/RELEASE_NOTES.md` 2026-09-12 条目）。
-- **RL 排行榜页新增「玩法统计」「模型档案」页签**：把 `matches.jsonl` 的 derived 派生统计与 `MODELS_NOTES.md` 的模型档案搬上前端。新增生成器 `script/generateRlStats.mjs`（`npm run rl-stats`，并入 `stats-all` 链尾，产出 `public/data/rl-stats.json` 约 32KB、0.4s）：复用排行榜的注册表与作废/旧格式过滤口径（参评 22,728 局、作废对局丢弃 2,352 与榜单计数一致），聚合玩法统计（结局原因分布、回合数/耗时直方图、全局兵种部署与阵亡占比、经济体征——场均收入 407 / 控制点收入占 66.8% / 场均占领 8.51 / 翻盘补给触发率 6.7%、每模型 13 列玩法画像、分地图概览）与模型档案（registry 全量含未参评 + 文件大小 + 合并榜单评分/CI/胜率 + 解析 MODELS_NOTES.md 状态总表「说明」列与作废表「作废原因」，未收录文件显示占位提示，表格行解析容错只留 warning 不炸脚本）。前端新增 `public/rl-stats.js` 渲染两个页签：页签栏扩为 模型榜单/玩法统计/模型档案/评估控制台，`#stats`/`#models`/`#console` hash 直达；页签容器的 flex gap 与 `[hidden]` 显式隐藏规则同步扩展到新页签（同 09-06 的潜伏坑）。两个数据语义修正沉淀进口径：`killsByType` 实为对手的 `lossesByType`（unit_death 事件不带击杀方，见 `evaluate_cross.py`），全局聚合后恒等于 losses——全局兵种表只保留部署/阵亡占比，K/D 仅保留在每模型画像（该粒度下语义正确）；heavy 阵亡 6,229 ≫ 部署 55 源于 breach 等图的预置守军而非统计错误，表头加注。直方图桶定档为左闭右开（末桶闭区间兜底），消除 1.0s 同时落在 '<1s' 与 '1–2s' 标签范围的边界歧义。服务端联动：「重算榜单」接口与跑批结束自动重算改为依次执行 榜单+统计 两个脚本（`rlEval.ts` 的 regenLeaderboard 拆出 runRegenScript 串行执行，任一失败即失败）。
+
+### 修复
+
+- **RL 排行榜页布局与交互整修**：`.two-col` 用 `1.2fr 1fr` 布局，而 `fr` 轨道的自动最小尺寸是内容 min-content——对位矩阵 14+ 列不换行表格（`#h2h-table` min-width 720px，实际 1300px+）把左轨道撑爆，右侧「模型详情」面板被挤成约 40px 宽、标题竖排一字一行，视觉上全部粘连。修复：`stats.css` 的 `.two-col` 改为 `minmax(0, 1.2fr) minmax(0, 1fr)`（0 下限让 `.table-wrap` 的横向滚动接管，统计页同布局一并受益）。**模型详情与对位矩阵改为上下堆叠**（详情在上、矩阵全宽在下，`board-stack` 单列网格），配合矩阵列头从「v3.0.4@8.4M」精简为纯版本号「v3.0.4」（版本号撞车回退全名，完整文件 id 保留在悬停提示），17 列矩阵在 1440 宽下完全放下、无横向滚动条（实测 tableW=wrapW=1324px）。矩阵模型列 `position: sticky; left: 0`（窄屏滚动时行头常驻）；≤720px 窄屏排除 stats.css 对全部 `.data-table` 的卡片化改造（表头隐藏 + 行拆卡片对矩阵是破坏性的）。**面板竖向 0 间距粘连的真凶**是页签容器——内容包进 `#tab-board`/`#tab-console` div 后，`main` 的 flex gap 只作用于 div 本身、不再作用于内部 section（09-06 加页签时引入的潜伏问题），页签容器补 `display:flex; flex-direction:column; gap:18px` 接管间距；同时该 `display:flex` 会压过 UA 的 `[hidden]` 默认隐藏规则（与 `.eval-mini-strip` 同款坑），补 `#tab-board[hidden]/#tab-console[hidden] { display:none }` 修复页签无法切换。页面卡片间距整体放宽（main gap 14→18px、KPI 卡 10→12px）。
 - **MODEL_STATUS_BY_VERSION 同步 v3.0.3 当前推荐**：榜单脚本的状态表仍标 v2.7.0 为 recommended，而 MODELS_NOTES.md 已明确生产 champion 为 v3.0.3（代码注释本就要求两处人工同步维护），新上线的模型档案页签把矛盾直接摆上页面。修正为 v3.0.3 recommended 后重算榜单，模型榜单详情面板与档案页签的状态徽标统一（v2.7.0 降为历史）。
-- 测试：`tests/script/generateRlStats.test.ts` 新增 11 例（作废/同模型/旧格式三类过滤计数、derived 字段保留、总览/结局/直方图/兵种/经济/每模型/分地图聚合数学含左闭右开边界、空数据除零防护、MODELS_NOTES 两表解析含 basename 匹配与无链接档案列 stripMd 回退、列数不足容错、主表重复行 warning、档案组装评分降序与 v3.0.3 recommended 映射、榜单缺失时档案仍完整）；`tests/api/rl-eval.test.ts` 适配双脚本串行重算（新增统计脚本 spawn 断言与退出事件序列）。全量 50 文件 / 440 测试通过。
 - **修复事件 `roundNumber` schema 不一致导致按回合聚合全部堆到 R0 的 bug**：标准/歼灭模式（`src/engine/combat.ts`）的行动事件（attack / move / deploy / heal / demolish / income / unit_death 等）payload 不写 `roundNumber`，而同时回合模式（`src/engine/simultaneous.ts`）显式写入——同一类型的事件在两种模式下 schema 不一致。下游任何按回合聚合都会把无法归属的事件全部堆到 R0：实测 V2 全量回放共 1827 次 attack 落 R0、R1 仅 1 次、R2 仅 37 次，「伤害曲线 / 节奏拐点 / 每回合行动密度」等按回合趋势图彻底失真。引擎侧根治：`src/engine/events.ts` 的 `appendEvent` 内部对局开始后（`phase !== 'lobby'`）自动为 payload 补齐 `roundNumber = game.turn.roundNumber`（已有则不覆盖，避免破坏 `simultaneous.ts` 原有的显式写入），一处修改覆盖全部事件类型，未来新增事件也自动带上；lobby 阶段（如 `player_joined`）保持不注入，`game_start` 因触发时已进入 active 阶段自然拿到 R1。
-- **新增存量回放回合重建工具 `script/lib/roundAttribution.mjs`**：引擎侧修复只对新对局生效，V2 + V3 已归档的 144 份历史回放仍需重建才能被按回合图表消费。提供三级归属策略：(1) `payload.roundNumber` 显式存在时优先采用；(2) `round_end` / `round_start` 作为锚点校准内部计数器；(3) 其余无 `roundNumber` 的事件顺推当前回合。关键边界：`round_resolved`（simultaneous 模式，携带刚结束的回合号）与 `comeback_supply`（standard 模式，携带触发回合号）都是「旧回合号」，工具对 `currentRound` 施加单调递增约束（`if (rn >= currentRound) currentRound = rn`），防止这类事件把计数器拉回导致后续 income / attack 被错误归属。导出 `attributeRounds`（逐条重建，含 `source: 'payload' | 'anchor' | 'carry' | 'none'` 溯源标记）、`tallyByRound`（按回合聚合计数）、`attributionCoverage`（无法归属事件占比，供页面标注数据可信度）三个纯函数，`docs/superpowers/specs/2026-09-11-stats-entertainment-redesign.md` 中的按回合图表重构可直接消费。
+
+### 移除
+
+- **评分榜移除「状态」列**：历史/当前推荐徽标与版本列信息重复，表格瘦身一列；状态信息保留在点击模型行后的「模型详情」面板中。
+
+### 测试与验证
+
+- 测试：`tests/script/generateRlStats.test.ts` 新增 11 例（作废/同模型/旧格式三类过滤计数、derived 字段保留、总览/结局/直方图/兵种/经济/每模型/分地图聚合数学含左闭右开边界、空数据除零防护、MODELS_NOTES 两表解析含 basename 匹配与无链接档案列 stripMd 回退、列数不足容错、主表重复行 warning、档案组装评分降序与 v3.0.3 recommended 映射、榜单缺失时档案仍完整）；`tests/api/rl-eval.test.ts` 适配双脚本串行重算（新增统计脚本 spawn 断言与退出事件序列）。全量 50 文件 / 440 测试通过。
 - 测试：`tests/engine/events.test.ts` 新增 5 例覆盖自动注入行为（对局中未携带时注入 `game.turn.roundNumber`、显式值不被覆盖、lobby 阶段跳过、`game_start` 注入 R1、跨 `round_end` 递增追踪），并修正原有 1 例严格断言（`toEqual` → `toMatchObject`）以适配 payload 自动补齐；新增 `tests/script/roundAttribution.test.ts` 13 例覆盖三级归属策略（含 simultaneous `round_resolved` 与 standard `comeback_supply` 不回退、pre-anchor 事件归 R1 且 `source='none'`、原始 `seq` 保留与自增补位、C3 场景复现——老 standard 回放攻击事件被正确归入 R1/R2/R3 而非堆积 R0）。全量 49 文件 / 430 测试通过。
 
 ## 3.4.7
 
-- **随机地图默认域大幅拓宽并覆盖全部静态图规则空间**：此前默认域实为「以 default 为模板的小范围抖动」（半径 6-10、行动点 3-8、补给 60-120、总部 120-240、据点 3-5 个且收入 8-16），极端静态图全部在域外——danger-close（1 行动点/20 补给/零据点收入/30 回合）、dual-lanes（0 初始单位/208 补给）、forge（100 血总部/6 据点）等一张都生成不到，RL 侧三代模型的静态图 whack-a-mole（v3.0.2 塌 danger-close → v3.0.3 塌 breach/desert → v3.0.4 塌 dual-lanes → v3.1.0 塌 forge）根因即此。现默认域拓宽为：半径 5-10、行动点 **1-8**、回合 10-30、初始补给 **20-220**、基础收入 6-14、据点收入 **0-16**、据点 **2-6** 个、总部 **80-240**；同时新增三个此前硬编码的随机维度：**裁决权重**（敌 HQ 伤害 3-20 / 己方 HQ 血 1-2 / 据点 30-90 / 军队价值 1-2 / 补给 0-1，覆盖 danger-close 的 20/1/30/1/0 到 default 的 5/2/90/2/1）、**据点类型收入**（supply 8-20 / forward_base 0-8 / repair 0-8，覆盖 danger-close 的 8/0/0 与 breach 的 20/8/8）、**初始单位数量与构成**（每方 0-4 个、按池抽取，全员共享同一构成保证公平，覆盖 dual-lanes 的 0 单位开局与 forge 的 4 单位全兵种开局）。玩家随机图从此可能刷出 1 行动点攻城局、零初始单位爆兵局等极端规则，`RL_RANDOM_OPTIONS` 与前端面板的固定值/区间覆盖不受影响。修复同时顺带改掉两个潜伏缺陷：对称据点放置改为原子 `claimPair`（旧写法 mirror 失败会留下不对称单点）；环形落点退避从「只往近处缩」改为「距离近→远→更近 × 角度扫满半圆」+ 全局扫描兜底（小半径下可放格子集中在远离出生轴的边缘，旧逻辑会产出 0 据点图，实测 seed coverage-87 即触发）。300 种子实测默认域：据点 2-6、行动点 1-8、补给 23-220、总部 81-240、0 单位开局 17%、4 单位开局 21%。前端 `random-map-ui.js` 默认域显示同步更新。
+### 新增
+
 - **新增站点首页 `/`**：此前根路径没有落地页，访客只能从某个功能页直接进入。新增纯静态 `public/index.html`（`@fastify/static` 缺省 index.html 自动服务 `/`），复用统计看板设计体系（背景 `#11161a`、面板 `#161e26`、导航药丸、版本徽标）：英雄区（Slogan + `/version.js` 版本徽标 + 纯 JS 按半径 2 尖顶六角格坐标实时生成的 SVG 装饰棋盘——地形/据点/双方单位配色与游戏内 token 一致）、三种游戏模式卡片（标准/歼灭/同时，色标与统计页 `mode-std`/`mode-anni`/`mode-simul` 同源）、五兵种速览（CSS 复刻游戏内 `token-icon` 图元：十字准星/三角/实心方块/菱形/医疗十字，数值与 README 兵种表同源）、七个功能入口卡片；`/api/maps` 实时回填内置地图计数。自带响应式（≤720px 导航横滑），不做移动版镜像页。全部 8 个既有页面导航（含 `play-m`/`spectator-m` 移动抽屉切换器）前置「首页」链接；`tests/public/page-navigation.test.ts` 扩展两个用例：每个桌面页面导航含 `/` 回链、首页自身 active。README 页面表补入首页行。
+
+### 变更
+
+- **随机地图默认域大幅拓宽并覆盖全部静态图规则空间**：此前默认域实为「以 default 为模板的小范围抖动」（半径 6-10、行动点 3-8、补给 60-120、总部 120-240、据点 3-5 个且收入 8-16），极端静态图全部在域外——danger-close（1 行动点/20 补给/零据点收入/30 回合）、dual-lanes（0 初始单位/208 补给）、forge（100 血总部/6 据点）等一张都生成不到，RL 侧三代模型的静态图 whack-a-mole（v3.0.2 塌 danger-close → v3.0.3 塌 breach/desert → v3.0.4 塌 dual-lanes → v3.1.0 塌 forge）根因即此。现默认域拓宽为：半径 5-10、行动点 **1-8**、回合 10-30、初始补给 **20-220**、基础收入 6-14、据点收入 **0-16**、据点 **2-6** 个、总部 **80-240**；同时新增三个此前硬编码的随机维度：**裁决权重**（敌 HQ 伤害 3-20 / 己方 HQ 血 1-2 / 据点 30-90 / 军队价值 1-2 / 补给 0-1，覆盖 danger-close 的 20/1/30/1/0 到 default 的 5/2/90/2/1）、**据点类型收入**（supply 8-20 / forward_base 0-8 / repair 0-8，覆盖 danger-close 的 8/0/0 与 breach 的 20/8/8）、**初始单位数量与构成**（每方 0-4 个、按池抽取，全员共享同一构成保证公平，覆盖 dual-lanes 的 0 单位开局与 forge 的 4 单位全兵种开局）。玩家随机图从此可能刷出 1 行动点攻城局、零初始单位爆兵局等极端规则，`RL_RANDOM_OPTIONS` 与前端面板的固定值/区间覆盖不受影响。修复同时顺带改掉两个潜伏缺陷：对称据点放置改为原子 `claimPair`（旧写法 mirror 失败会留下不对称单点）；环形落点退避从「只往近处缩」改为「距离近→远→更近 × 角度扫满半圆」+ 全局扫描兜底（小半径下可放格子集中在远离出生轴的边缘，旧逻辑会产出 0 据点图，实测 seed coverage-87 即触发）。300 种子实测默认域：据点 2-6、行动点 1-8、补给 23-220、总部 81-240、0 单位开局 17%、4 单位开局 21%。前端 `random-map-ui.js` 默认域显示同步更新。
+
+### 移除
+
 - **下线全息观战台（`spectator2.html`）**：该页为独立「星云全息」主题的单文件界面，画风与站点其余页面（统计看板设计体系）不一致。删除页面本体及全部入口——5 处桌面导航链接（首页/统计/RL 排行榜/娱乐数据/地图编辑）、首页功能入口卡、README 页面表行；同步清理 5 个测试文件引用（回放客户端清单 `annihilation-mode`/`simultaneous-ui`、强制裁决覆盖页 `settings-token`、布局编辑器反向断言、导航测试放行断言）。实时观战与回放复盘由观战台 `spectator.html` 与移动版 `spectator-m.html` 继续提供；历史 RELEASE_NOTES 中该页面的发布记录按版本史惯例保留。
 
 ## 3.4.6
 
+### 新增
+
 - **「添加 AI」弹框新增「对战提示词」页签**：此前该弹框只能添加强化学习模型，现在分「强化模型」「对战提示词」两个页签。提示词页签按当前对局自动填充服务器地址（`location.origin`）、对局 ID、地图名（经 `/api/maps` 中文名解析）与人数，房主输入 AI 玩家名后实时替换模板中的名字；文本可手动编辑（再次改名或改勾选会重新生成），一键复制（`navigator.clipboard` 之外附带 `execCommand` 降级——生产为 http 部署、非安全上下文没有异步剪贴板 API）。「对方 AI 本地已安装 skill」勾选项把【规则获取】拆成两种变体、省掉接收方 agent 的分路判断：默认不勾按未安装生成（直接 `GET /api/skill` 拉全文——对方其实装了 skill 也照样能玩，是安全默认），勾选后走本地 `/api/skill/manifest` 校验、省一次全文重读。模板含禁用 `ai-player.mjs` 代打与 `wait-turn.mjs` 前台轮询守则。桌面（`play`）与移动（`play-m`）两端同构实现，共享逻辑抽在 `public/agent-prompt.js`（`window.AgentPromptUI`，node:vm 可单测）。
-- **Skill 新鲜度检查改为比对优先**：Canonical fetch 从「无条件重新拉取 SKILL.md 全文」改为「先 `GET /api/skill/manifest`（几百字节）比对本地副本——sha256 优先，哈希一致即字节级相同、直接用本地副本，省掉一次全文重复读取；无法哈希时退化为 `appVersion` 比对；不一致才 `GET /api/skill` 拉全文」。以 sha256 为主信号的原因：版本号比对在同版本号改内容时会漏判（本条改动本身就是实例）。模式文件与 `wait-turn.mjs` 本来就是每局现拉、无重复读取问题，维持始终从服务器获取。同步 `.zcode`/`.pi`/`.qoder` 三处 IDE 拷贝（此前 `.zcode` 落后在 3.4.4、`.pi` 落后在 3.3.3，正是版本漂移问题的现役实例）。
 - **Agent 工作指引**：新增仓库根 `AGENTS.md`——面向 AI agent 的精简工作说明：常用命令、目录结构速览、硬红线（单副本架构、`skill/` 为规范源由 `/api/skill/*` 分发、gitignored 清单）、版本号随分支规则（`release/x.y.z` 分支版本必须等于 `x.y.z`，经 `npm run version` 对齐全部引用处）、agent 经 REST API 对战的规范流程（按对局模式从服务器拉取对应模式文件，勿用 `ai-player.mjs` 代打）。
+
+### 变更
+
+- **Skill 新鲜度检查改为比对优先**：Canonical fetch 从「无条件重新拉取 SKILL.md 全文」改为「先 `GET /api/skill/manifest`（几百字节）比对本地副本——sha256 优先，哈希一致即字节级相同、直接用本地副本，省掉一次全文重复读取；无法哈希时退化为 `appVersion` 比对；不一致才 `GET /api/skill` 拉全文」。以 sha256 为主信号的原因：版本号比对在同版本号改内容时会漏判（本条改动本身就是实例）。模式文件与 `wait-turn.mjs` 本来就是每局现拉、无重复读取问题，维持始终从服务器获取。同步 `.zcode`/`.pi`/`.qoder` 三处 IDE 拷贝（此前 `.zcode` 落后在 3.4.4、`.pi` 落后在 3.3.3，正是版本漂移问题的现役实例）。
 
 ## 3.4.5
 
-- **部署脚本增量化传输**：`deploy/deploy.py` 此前每次全量 SFTP 重传约 240MB（其中 `rl/models` 约 227MB 且日常不变），现传前 `stat` 对比远端 size+mtime 只传变更文件，put 后 `utime` 回写时间戳（SFTP put 不保留 mtime，回写是增量判定的前提），日常部署传输量降至 MB 级；改造后首次部署会全量重传一次建立时间戳基线。
+### 新增
+
 - **部署日志**：每次部署落盘 `deploy/logs/deploy-<时间戳>.log`（控制台双写，保留最近 30 份，gitignored 且不上传）：按阶段（连接/文件传输/写入 .env/构建启动/健康检查）计时；远端构建输出逐行带时间戳，卡住时日志尾部即现场；结尾汇总各阶段耗时与成功/失败结论，失败定位到阶段，Ctrl+C 与未预期异常同样走失败汇总并记录 traceback。SSH keepalive 30s 防 NAT 静默断连导致的假死。
+
+### 变更
+
+- **部署脚本增量化传输**：`deploy/deploy.py` 此前每次全量 SFTP 重传约 240MB（其中 `rl/models` 约 227MB 且日常不变），现传前 `stat` 对比远端 size+mtime 只传变更文件，put 后 `utime` 回写时间戳（SFTP put 不保留 mtime，回写是增量判定的前提），日常部署传输量降至 MB 级；改造后首次部署会全量重传一次建立时间戳基线。
 - **部署脚本安全加固**：`CONTROL_TOKEN` 必填，不再随部署轮换或明文打印进部署日志，依赖 token 的调用方（脚本/agent）不受重新部署影响；SSH 弃用 `AutoAddPolicy` 改为 known_hosts 校验 + 首连 TOFU 交互确认（非交互环境未知指纹直接中止）；新增 `DEPLOY_KEY_PATH` 密钥认证（密码认证保留为 fallback）；部署末尾 `/healthz`、`/readyz` 校验改为断言 200，失败退出码非 0；可选 `DEPLOY_PRUNE=1` 清理远端已不在本地的残留文件（保护 `.env` 与 `backups/`）。
-- **上传排除清单补齐**：补 `.pi`/`.zcode`/`.qoder`/`.pytest_cache` 等本地工具目录（与 .gitignore 对齐）及 `events.json`/`body.json`/`nul`/`sshpass.exe` 调试残留，不再推上服务器；`sshpass.exe` 同时移出 git。
 - **镜像与运行时配套**：Dockerfile 逐条 `COPY --chown` 取代 COPY 后 `chown -R`（消除 node_modules+rl 整层复制，镜像瘦身数百 MB）；compose 增加 `mem_limit: 1536m` 防 RL 子进程拖垮 2GB VPS 宿主、json-file 日志轮转上限；`.dockerignore` 补 `rl/leaderboard/details`（2GB/轮）、`rl/models/deprecated` 等缺口对齐部署排除清单。
 - **文档**：`DEPLOYMENT.md` 按 SFTP 实际流程重写（增量语义、部署日志、prune 用法），原 VPS 上 git clone/checkout 流程与实际不符已删除；回滚改为本地切 commit 重部署。
 
+### 修复
+
+- **上传排除清单补齐**：补 `.pi`/`.zcode`/`.qoder`/`.pytest_cache` 等本地工具目录（与 .gitignore 对齐）及 `events.json`/`body.json`/`nul`/`sshpass.exe` 调试残留，不再推上服务器；`sshpass.exe` 同时移出 git。
+
 ## 3.4.4
+
+### 新增
 
 - **Skill 改由游戏服务器 API 分发**：解决 agent 各自持有 skill 本地拷贝、忘记同步导致加载旧版本的问题（`.zcode` 拷贝曾落后一个版本）。新增只读路由 `src/api/skill.ts`：`GET /api/skill`（SKILL.md 全文，裸 agent 的最短引导路径）、`GET /api/skill/manifest`（`appVersion` + 每文件 `bytes`/`sha256`）、`GET /api/skill/files/:name`（单文件下载，启动时扫描出的文件名白名单、天然免疫路径穿越，带 `ETag`/`If-None-Match` 304 与 `Cache-Control: no-cache`）。启动时一次性读入内存（deploy 重建重启即生效，无需文件监听）；无鉴权（agent 入局前就需要它）、不计入 POST 速率限制；skill 目录缺失时仅该组接口降级 503，不影响游戏。
 - **SKILL.md 自愈式刷新**：顶部新增 Freshness 声明与「Canonical fetch (mandatory)」一节——无论从哪个来源读到本文件（包括旧的本地安装拷贝），都被引导先与服务器版本对齐；模式文件（standard/annihilation/simultaneous）改经 `GET /api/skill/files/<name>` 拉取，`wait-turn.mjs` 改为 `curl` 下载后用 `node` 执行（可按 manifest 校验 sha256），本地副本降级为离线 fallback。裸 agent 无需安装 skill，prompt 给一个 `http://<IP>:3123/api/skill` 即可开局。
 - **部署配套**：Dockerfile 增加 `COPY skill ./skill`（此前镜像内无 skill 目录）；`deploy/deploy.py` 本就不排除 `skill/`，无需改动。本地 `.zcode`/`.qoder` 拷贝已做最后一次手动同步（带入 Canonical fetch 指令后即转为非权威 fallback）。
 - **战斗掷骰接入可注入 RNG，同种子整局逐值可重放**：`startGame(game, bus, random)` 注入的随机源此前只用于开局洗牌/起始玩家，伤害浮动（`combat.ts` `rollVariance`）与治疗量（`combat.ts` 与 `simultaneous.ts` 两处 `rollHeal`）仍直接调 `Math.random()`，注入设计只做了一半。现改为对局状态携带可 JSON 序列化的 mulberry32 状态整数 `GameState.rngState`（新增 `src/engine/random.ts`，`nextGameRandom` 每次掷骰步进状态、`seedGameRandom` 从注入的 random 播种），三处掷骰全部改走它；同种子 + 同动作序列可逐值重放整局，为动作级回放验证器与可复现评估铺路。`rngState` 随 `runtime/games.json` 落盘，服务器重启后掷骰序列无缝延续；旧档案没有该字段时按固定种子惰性初始化（未走 `startGame` 的 `createInitialGame`/`joinGame` 测试构造路径同此，测试从此默认确定性），持久化 schema 版本不变。`sanitizeGameForResponse` 随 tokens 一并剔除 `rngState`，避免玩家预测后续掷骰；开局洗牌与起始玩家抽取仍按原样消费注入的 `random`（播种放在最后），传 `() => 0` 的旧测试观察到的开局行为完全不变；伤害/治疗分布不变，RL 训练与 round-robin 榜单统计等价。
+
+### 变更
+
 - **玩家名称上限加长 30 → 50，常量归位领域层**：`MAX_PLAYER_NAME_LEN` 原先定义在 `src/state/store.ts`（持久化层），属于业务规则而非持久化配置，现移至 `src/types.ts`（与 `PLAYER_IDS` 等领域常量同处，全仓无循环依赖）。长度同步加长到 50：后端截断点（建房/加入 `src/api/games.ts`、添加 AI `src/api/bots.ts`、默认名生成 `store.ts` `createPlayer`）与前端输入框（`public/play.html`/`play-m.html` 各 3 处 `maxlength`）全部对齐；前端为静态 HTML 无法 import TS 常量，该同步点已在常量注释中标注。改名/加名行为不变：仍是 trim 后超长静默截断。
+
+### 测试与验证
+
 - 测试：新增 `tests/api/skill.test.ts` 5 例（manifest 哈希与磁盘一致、ETag 304、单文件 content-type、未知文件与 `..%2F` 路径穿越 404）；`tests/skill/ai-player.test.ts` 一处断言适配 SKILL.md 新措辞；新增 `tests/engine/rng.test.ts` 5 例（RNG 序列确定性与值域、种子分叉、同种子两局 5 次攻击逐值一致、JSON 持久化往返后续掷、客户端响应不含 rngState）。全量 405 例通过。
 
 ## 3.4.3
+
+### 新增
 
 - **排行榜页新增 RL 评估控制台**：把 3.4.2 的 round_robin 跑批从命令行搬进网页——在 `/leaderboard.html` 即可启动/监控/停止批量对战，结束后自动重算榜单，形成「网页编排 → 跑批 → 榜单更新」闭环。不改观测/动作/奖励语义，`rl/evaluation/round_robin.py` 本身零改动，只是加了一层 Web 管控；依赖本机 `rl/.venv`，Docker 容器内不可用（面板明示）。
 - **新增评估 API `src/api/rlEval.ts`**（`server.ts` 注册为 `rlEvalRoutes`）：`GET /api/rl/eval/status`（状态徽标、批次计划、待跑/已完成局数、本次新增局数、输出尾、knownMaps；快照含命令行与本地路径，读接口同样鉴权）；`POST /api/rl/eval/start`（maps/models 子串过滤、每对×每图目标局数、并发数、种子盐、dry-run，参数校验通过后 spawn `rl/.venv` 的 python 运行 `round_robin.py`，已有跑批进行中拒绝重复启动）；`POST /api/rl/eval/stop`（Windows 下 `taskkill /T /F` 终止整棵进程树——round_robin 下挂着 evaluate_cross 子进程与 tsx 引擎进程，必须整树杀灭否则残留）；`POST /api/rl/leaderboard/regenerate`（按需重跑 `script/generateRlLeaderboard.mjs`）。全部接口统一经 `authorizeControlRequest` 鉴权（AUTO_CONTROL_TOKEN 或仅限本机请求），前端状态轮询同样携带令牌头，401 时徽标显示「无权限」。
 - **状态持久化与断点续跑衔接**：跑批状态落盘 `runtime/rl-eval-state.json`，服务器重启后恢复展示，上次仍在运行的批次标记为 interrupted 并提示用同参数重跑断点续跑（固定 `--salt` 才会跳过已有局数）；跑批正常结束或失败后自动重算榜单，无需手动执行 `npm run rl-leaderboard`。
 - **前端「评估控制台」面板**（`public/leaderboard.html` + `leaderboard.js`）：地图池 chip 勾选、参评模型复选列表（全选/清空/已选计数，不勾选 = 全部可对战模型）、目标局数/并发/种子盐输入、dry-run 试跑；3 秒轮询驱动状态徽标、进度条与实时输出尾；「开始跑批 / 停止 / 重算榜单」操作按钮；跑批结束自动刷新页面榜单数据。地图 chip 以服务端 knownMaps 为准且仅在变化时重绘，保留用户已勾选项。
-- 测试：新增 `tests/api/rl-eval.test.ts` 13 例（状态快照与默认地图、参数校验、启动后进度跟踪与结束自动重算榜单、并发启动拒绝、停止置 stopped、重启后 running 标记 interrupted、控制令牌鉴权含状态接口、按需重算榜单、真实格式输出行解析、统计文件变化后的局数重计、进程无法启动时回落 failed 而非幽灵 running、服务器关闭时杀进程树并标记 interrupted；全部注入伪进程，不触发真实跑批）；Python 侧新增 `tests/rl/test_event_collector.py` 锁定事件流合并去重与 seq 空洞检测不变量。
+
+### 变更
+
 - **作废模型归档**：v2.1.4–v2.1.8 四个作废模型的 zip、训练断点与单模型档案移入各自目录的 `deprecated/` 子目录（文件全部保留）。用户可见变化：「+ 添加 AI」下拉不再提供作废模型；round_robin 自动发现 18→14；RL 排行榜重算后不再出现作废模型（评分榜/热力矩阵/单模型详情全量排除，其历史对局不计分，数据仍保留在 `matches.jsonl`）；部署上传排除归档目录，详见 `rl/docs/RELEASE_NOTES.md` 顶部条目。
 
+### 测试与验证
+
+- 测试：新增 `tests/api/rl-eval.test.ts` 13 例（状态快照与默认地图、参数校验、启动后进度跟踪与结束自动重算榜单、并发启动拒绝、停止置 stopped、重启后 running 标记 interrupted、控制令牌鉴权含状态接口、按需重算榜单、真实格式输出行解析、统计文件变化后的局数重计、进程无法启动时回落 failed 而非幽灵 running、服务器关闭时杀进程树并标记 interrupted；全部注入伪进程，不触发真实跑批）；Python 侧新增 `tests/rl/test_event_collector.py` 锁定事件流合并去重与 seq 空洞检测不变量。
+
 ## 3.4.2
+
+### 新增
 
 - **RL 模型批量对战与排行榜系统**：解决多代强化学习模型无法系统性对比实力的问题，新增「编排 → 评分 → 展示」完整闭环。
 - **Round-robin 编排器 `rl/evaluation/round_robin.py`**：自动发现 `rl/models/` 下全部 15 个可对战模型（排除 2 个 v1.0.0 的 512 动作旧格式），两两配对 × 全地图池（`random` + 6 张标准双人图 default/breach/danger-close/desert/dual-lanes/forge）批量对战；底层以既有 `evaluate_cross.py --swap-sides` 子进程运行（配对换座协议不变，跨版本观测/动作路由零侵入复用）。支持断点续跑（启动时按 模型对×地图 统计 `rl/leaderboard/matches.jsonl` 已有局数，`need = 目标 − 已有` 且取偶保证换座对称，同命令重跑全部 skip）、`--jobs N` 并发子进程、`--models` 过滤、`--dry-run` 预演；随机图重跑经新 `--salt`（时间戳+随机 hex）生成全新地图。全量 105 对 × 7 图 × 24 局 ≈ 1.76 万局（单局实测 ~3.5s）。
 - **评分生成器 `script/generateRlLeaderboard.mjs`**（`npm run rl-leaderboard`，已并入 `stats-all` 链尾）：从累积 JSONL 生成 `public/data/rl-leaderboard.json`，纯 Node 无依赖。评分为 **Bradley-Terry MLE（MM 迭代）**：平局记 0.5、每已交手模型对附加 1 局虚拟平局先验（防全败模型发散到 −∞），Elo 映射 `1500 + 400/ln10 × ln p`、几何均值归一化保证顺序无关；95% 置信区间用按（对,图）分层有放回 bootstrap（mulberry32 固定种子，同输入两次输出逐字节一致），小样本另附 Wilson 下界参考列（复用 `generateStats.mjs` 导出）；全局与分图榜单独立计算，先手/后手仅做展示统计不进评分。正确性经三层验证：2 模型解析解精确吻合（9:1 → 评分差 320.65 = 400·log10(9.5/1.5)）、A>B>C>A 循环局势三者精确 1500、不均局数合成数据方向与幅度合理。开发期间发现并修复 MM 迭代公式多乘一项 `p` 导致的评分发散 bug。
 - **排行榜页面 `/leaderboard.html`**（复用 stats.css，无图表库）：KPI 总览（总局数/参评模型/平局率/平均回合/局数覆盖度）、可排序主表（排名/模型/评分±CI/胜-负-平/局数/胜率/Wilson/先手·后手胜率/平均回合/状态标签，未出分显示「—」）、地图筛选下拉（切换整份预计算视图）、对位胜率热力矩阵（红→灰→绿插值，悬停显示 W-L-D）、单模型详情（vs 各对手战绩 + 分地图明细）、方法论说明与未参评模型区；v2.0.0 行标注「player_b 座位观测失真，成绩仅供参考」。玩家/观战/全息观战/地图编辑/统计/娱乐数据六页 page-nav 加入「RL 排行榜」入口。
 - **文档**：`rl/README.md` 新增「批量对战与排行榜」章节（用法、断点续跑、评分协议），`rl/docs/RELEASE_NOTES.md` 顶部追加条目。
+
+### 测试与验证
+
 - 验证：round_robin 冒烟（3 模型 × default × 2 局跑通，JSONL 记录格式与座位逐局交替正确；同命令重跑全部 skip；`--games 4` 只补差值且座位 2/2 均衡）；页面经浏览器实测无控制台报错，排序/筛选/矩阵/详情交互正常。首轮冒烟 12 局真实对局已计入正式数据（v2.7.0 1691±122 > v2.2.0 1569 > v2.4.0 1240，与实测胜负一致），全量跑批按 `--maps random` 先行、静态图逐张补齐。
 
 ## 3.4.1
+
+### 新增
 
 - **随机地图系统**（面向 AI 训练）：服务端新增可播种子的随机地图生成器 `src/config/randomMap.ts`，`POST /api/games` 支持 `mapId: "random"` + `random` 参数字段，按请求现场生成完整地图配置（不写入静态地图表、不进 `/api/maps` 列表，配置随对局状态持久化，重启可恢复）；生成结果必须通过与静态地图完全相同的 `validateMap` 校验（新导出 `validateGeneratedMap`），可玩性硬保证。
 - **参数可随机可固定**：地图半径（默认 6–10）、地形障碍密度（水域/障碍占比，出生区/中心/据点周边设保护区）、据点数量与类型（补给/前哨/维修轮转）、最大回合数（10–25）、每回合行动点（3–8）、兵种数值浮动比例（围绕默认基准）、初始补给/基础收入/据点收入、总部血量/防御，每项支持省略（默认范围随机）/固定数值/`[min, max]` 区间；**公平模式可选**：`symmetric`（默认）时地形/出生位/据点类型/初始单位布局严格中心镜像，关闭则完全随机；支持 2–8 人，多人局自动抬升最小半径。
@@ -110,52 +192,96 @@
 - **地形连通性**：地形抽样后从出生位 BFS 校验**全部可通行格连通**（出生位/据点必为 plain），失败自动重抽并逐步降密度，兜底清空障碍，任何种子都不会生成被地形卡死的地图。
 - **前端双端接入**：桌面/移动玩家页地图选择器首位新增「随机地图」卡片，选中展开参数面板（对称开关、种子框、11 组参数的随机/固定切换与区间/单值输入，留空走服务端默认）；人数下拉对随机图放开 2–8。共享模块 `public/random-map-ui.js`，`store.ts` 新增 `createLobbyWithConfig` 支持运行时配置建局，静态地图创建链路零改动。
 - **地图预览（所见即所得）**：新增 `POST /api/maps/random/preview`（`loader.ts` 提取 `previewForConfig` 与静态地图列表共用），按当前参数现场生成并返回同构预览数据；面板底部预览区复用静态卡片同一套 SVG 渲染，选中随机地图即自动预览、参数/人数变化防抖刷新、「换一张」一键重抽；未填种子时服务端代抽并回填种子框，保证预览图与随后创建的对局完全一致；预览同步刷新选择器卡片缩略图。
+
+### 测试与验证
+
 - 测试：新增 `tests/config/randomMap.test.ts`（种子确定性、镜像对称、固定/区间参数、2–8 人×6 种子校验冒烟、高密度连通性、参数清洗）、`tests/api/random-map.test.ts`（随机图创建/同种子复现/开局可玩/预览即所得/非法参数 400）、`tests/public/random-map-ui.test.ts`（双端接线与模块形状），共 20 个新用例；浏览器端到端实测桌面/移动双端创建与预览流程。
 
 ## 3.4.0
 
+### 新增
+
 - **强化学习 AI 正式上线**：引入 `rl/` 本地 RL 训练全套——PPO 训练脚本与 `standoff` 同时回合环境（`rl/training/train.py`、`rl/envs/env.py` 等）、按版本命名的模型库 `rl/models/`（档案见 `rl/docs/MODELS_NOTES.md`）、按模型版本路由的代打脚本（`run_model.py` 系列，兼容 v1 512 动作空间与 v2.0 旧模型）；训练交付改用评估选出的 best 断点。v2.1.0–v2.2.1 迭代陆续修复回合交替损坏、奖励结算时机、对手动作语义错位等问题，并引入对手模型训练与座位随机化，详见 `rl/docs/RELEASE_NOTES.md`。
 - **一键添加强化学习 AI 玩家**（房主专用）：桌面/移动端玩家页「等待开局」大厅新增「+ 添加 AI」入口，可自定义名称并从下拉框选择 `rl/models/` 中的训练模型；开局后服务器自动拉起 `rl/runners/run_model.py` 子进程代打该座位直至终局（`X-Host-Token` 鉴权，token 仅服务器持有、任何响应不回传）。服务端新增 `src/api/bots.ts`：`GET /api/rl/models` 返回模型列表（含动作空间大小），`POST /api/games/:id/bots` 添加 AI 时校验大厅阶段、双人顺序对局限制与模型动作空间兼容性（非 54 拒选）；踢出 AI 同步清理登记、删除对局终止运行中的 AI 进程。
-- 测试：新增 `tests/api/bots.test.ts` 覆盖模型列表、token 鉴权、兼容性拒选、开局后 409 与注册表清理；桌面/移动双端新增「添加 AI」功能标记一致性断言。
 - 部署：Docker 镜像内置 Python RL 运行时（独立 venv + CPU 版 torch/SB3）与 `rl/models/` 模型库，容器内可直接拉起强化 AI；`deploy/deploy.py` 上传时排除 `.venv`/`checkpoints`/`tb` 等训练产物。
+
+### 测试与验证
+
+- 测试：新增 `tests/api/bots.test.ts` 覆盖模型列表、token 鉴权、兼容性拒选、开局后 409 与注册表清理；桌面/移动双端新增「添加 AI」功能标记一致性断言。
 
 ## 3.3.5
 
+### 新增
+
 - 桌面玩家页与观战页新增**布局自定义**：右上角设置新增「改变布局」入口，进入布局编辑模式后，左右两侧的卡片框（单位状态、资源、分数排行榜、回合、当前操作、事件流；玩家页另有操作说明、本回合计划、快捷操作）可在 左侧 / 右侧 / 底部 三个区域间自由拖放（卡片虚线描边、空区域显示拖放提示框、插入位置随指针实时指示）；拖动地图框右下角新增的手柄可变更地图框整体大小（是框体尺寸变更而非地图缩放，双击手柄重置）。顶部工具栏提供完成 / 重置为默认 / 取消（Esc 也可取消）。布局仅保存在浏览器本地 `localStorage`（`tgLayout.play.v1` / `tgLayout.spectator.v1`），不上传服务器；无保存数据的浏览器页面保持默认布局。实现上新增共享模块 `public/layout-editor.js` + `layout-editor.css`（玩家/观战两端复用，按 `body` 壳类名识别页面），主栅格列由 CSS 变量 `--tg-grid` 驱动、JS 按各分区是否有卡片动态重组列数与卡片落列；底部区域与地图同处一个网格列，卡片与地图同宽并置于地图正下方。`spectator2.html`、移动 `-m` 页面及其他页面不受影响。
+
+### 变更
+
 - 去除玩家页与观战页右侧卡片的独立滚动条：侧栏 `#sidebar` 自身的 `max-height`/`overflow-y` 滚动条（含观战页侧栏的粘性定位）与事件流 `#events` 列表的高度上限全部移除，两页改为仅使用整页统一滚动条，避免自定义布局后出现滚动条嵌套。
+
+### 修复
+
 - 布局编辑器健壮性修复：卡片拖出 `#sidebar` 进入左侧/底部区域后不再丢失卡片框样式（背景/边框/圆角/内边距的选择器由 `#sidebar section` 扩展为同时覆盖 `.tg-zone section`）；单位状态卡片原本固定 200px 宽，现在与同分区其他卡片同宽；拖动地图手柄时同步实时更新网格列宽，修复地图框缩小后因 `max-width:100%` 按旧列宽钳制而再也无法拉大的问题。
+
+### 测试与验证
+
 - 新增 `tests/public/layout-editor.test.ts`：覆盖设置入口与脚本/样式引入、移动端页面不启用、localStorage 持久化与拖拽/缩放要素、卡片独立滚动条移除、`--tg-grid` 栅格变量与卡片框样式不丢失等静态断言。
 
 ## 3.3.4
 
+### 新增
+
+- 同时模式回合卡片新增全端计划提交状态：玩家页与观战页（桌面、移动及全息观战台）展示按玩家阵营着色的圆形状态图标，已提交显示同色勾号、未提交显示空心圆，并显示已提交人数，计划事件回放与新回合状态同步重置；补充前端回归断言。
+
+### 变更
+
 - 经验复盘规范按 `standard`、`annihilation`、`simultaneous` 三种模式拆分为独立文件：标准模式聚焦 HQ 攻防、行动顺序与裁决分；歼灭模式聚焦据点部署、炮火安全区、军力存活和 `army_destroyed`；同时回合模式聚焦秘密计划、预测攻击、目的格冲突、净 HP 与统一结算阶段。每份规范均补齐模式判定、取证顺序、账本模板、文件命名和质量检查，删除旧的混合规范以避免误用。
 - 基于 `tg_0122` 调整 standoff 平衡：初始补给 150→120、基础收入 15→8、外围 supply 收入 12→8、中心 repair 收入 8→6、追赶补给 20→12；军力/补给裁决权重降为 0.35/0.25，有效行动权重升为 6。同时模式攻击命中改为每 10 HP 贡献 1 点行动功勋，部署/治疗等其他效果仍沿用 20 HP 桶，降低屯兵收益并提高主动交战收益。
 - standoff 兵种重新定价并压低耐久：步兵 90 HP/31 攻/7 防/55 费，侦察 60 HP/42 费，重装 140 HP/40 攻/9 防/100 费，游侠 68 HP/38 攻/80 费，支援 76 HP/20 治疗/68 费；同步保留对峙之地已移除的部分障碍物布局。
-- 同时模式回合卡片新增全端计划提交状态：玩家页与观战页（桌面、移动及全息观战台）展示按玩家阵营着色的圆形状态图标，已提交显示同色勾号、未提交显示空心圆，并显示已提交人数，计划事件回放与新回合状态同步重置；补充前端回归断言。
 
 ## 3.3.3
+
+### 变更
 
 - standoff「对峙之地」地形重构（六重对称障碍群）：移除中央区域原有的 6 格环形障碍，中心高地完全开阔、无掩体可依托；在每个出生扇区外侧新增一组 3 格障碍（六重对称共 18 格），遮蔽相邻出生位之间的沿边走廊与直通路线，开局抢点路径随出生方向产生差异；六个出生位的起始单位站位随之微调避开新障碍格（构成不变：每出生位 2 步兵 + 1 侦察）。
 - standoff 控制点类型化：全部 7 个据点标注 `kind` 并新增 `balance.controlPointTypes` 配置——六个外围哨点显式为 `supply`（每点收入 12，与原统一控制点收入一致，兜底字段 `controlPointIncome: 12` 保留）；中央点由「中央高地的争夺焦点」更名为「中心维修站」并设为 `repair` 类型：收入 12→8，回合边界改为修复其相邻一格内**所有受伤友军**各 10 HP（炮火危险区内单位跳过、每单位每回合至多结算一次，同时模式回合边界同样生效），全场占满总收入 84→80，中央据点从纯经济点转为续航点；配置同时预置 `forward_base` 类型（收入 8 + 自该点部署折扣 8）供后续调整使用。
 - standoff 数值微调：侦察兵移动力 4→3——此前侦察是全场唯一 4 移动单位，降速后削弱其开局抢中立点、占点后被锁定仍能轻松拉开距离的能力，与主力梯队（移动力 2）的差距收窄；地图 `balance.adjudicationWeights` 显式写入 `effectiveActions: 2`（与标准模式引擎默认一致），不再依赖隐式默认值。
+
+### 测试与验证
+
 - 测试适配新地图：引擎用例中原硬编码旧 standoff 坐标的断言同步更新——部署上限用例的第三个移动目标改为 `(2,1)`、队列撞格用例的第二单位改取新出生位 `(4,1)`、爆破阻挡格改用新障碍群 `(3,1)→(3,2)`；游侠锁定逃逸用例的逃离点改为移动力 3 内可达且能脱离射程圈的 `(4,-3)`；API 层「排队/撤回」用例改为两轮结构——新版出生布局占满总部全部可部署邻格（首回合无处部署），首回合先挪开步兵腾位并确认结算，次回合再验证 `/deploy` 回显与 `plan/revoke`。
 
 ## 3.3.2
 
+### 新增
+
 - 同时模式兵种改造（反风筝平衡）：攻击/治疗引入**可配置覆盖形状**（地图 `units.<type>.attackShape / healShape`，`single` 单格 / `line` 定向直线 / `arc` 定向相邻三格扇形，`length` 可调，未配置默认单格、旧地图零影响）。对峙之地新配置：步兵沿方向轰击前两格（线上所有敌人各自独立结算伤害）、重装横扫周围三格扇形、支援兵区域治疗三格（`/heal` 请求体改为 `{ supportId, q, r }`，覆盖格内所有受伤友军各自掷量）；远程兵新增**锁定**能力（`attackLock`）：计划时点击格上有敌人则锁定该单位，结算时未逃出射程圈必命中、逃出才落空（`missed` reason `target_escaped`）。同步下调移动力（步/重/游/支 3→2、侦察 5→4）、步兵射程 1→2，多格覆盖 + 锁定让"侧移一格"与射程圈内机动不再能白嫖躲避，纯风筝无法取胜。攻击事件新增 `shape/locked` 字段，`round_resolved` 结果含每次命中的目标明细；前端桌面/移动端攻击与治疗高亮改为形状感知（射线/扇形格），观战端事件兼容；skill 规则书、AI 演示 bot 与 README 同步更新；新增线形双杀、扇形三杀、锁定命中/逃逸、区域群疗、形状校验等引擎用例；地图编辑器导入/导出保留新形状字段，standoff 往返校验不丢失。
-- standoff 短局化与数值平衡（15 回合轻开局）：回合上限 18→15；初始兵精简为每出生位 2 步兵 + 1 侦察，重装/游侠/支援全部转为部署兵种（阵容构成成为经济决策）；伤害侧修复游侠锁定零反制处决（攻 44→36，双游侠集火 65 血单位平均恰好差 1 血存活）、重装对步兵近乎无敌（防 13→10，步兵 3 单位 2-3 轮可解决）、步兵主力微升（攻 30→32）；HQ 血量 180→200 抑制速拆；经济侧控制点收入 10→12 补偿短局总收入并强化占点核心玩法（开局补给 150 与基础收入 15 保持，第 1 回合即可部署重装或双游侠）。
-- 修复三个观战端的同时模式回放：不再虚构当前玩家，按玩家队列位置恢复 AP（含失败动作），并校验导入事件序列与旧版格式；导入后再次导出时保留原回放元数据。
 - 兵种主题战斗特效（结算演出）：共享动画层 `public/board-animation.js` 新增六种特效——步兵**定向突刺**（pierce，弹体沿线飞行逐格炸环）、侦察兵**精确打击**（strike，十字标定）、重装**扇形挥砍**（slash，旋转刀身 + 刀光残影 + 逐格错峰劈痕）、**范围治疗波**（healWave，波纹 + 目标格上升光点）、**受击闪白**（hitFlash）与**伤害/治疗数字**（damageText，带描边上浮）；同时模式攻击事件 payload 补 `aimQ/aimR`（计划时瞄准格，miss 分支同样携带），前端以与服务端 `coveredCellsFor` 逐行等价的镜像推导（`HEX_DIRECTIONS` 顺序一致、不做射程校验——事件已结算直接信任）重建 line/arc 覆盖格，空格落空也播范围演出，旧事件无 `aimQ` 回退用 `q/r`。演出去重与聚合：同攻击者同回合的多目标事件只播第一次形状特效（key `attackerId|roundNumber`，8s TTL），受击特效不去重；同支援兵同回合的多条 heal 聚合为一次治疗波（60ms 收集窗）。旧模式（无 `shape`）按兵种类型缩为单格主题特效；`spectator2.html` 内联同款副本，四个 `BoardAnimation` 调用方（`app.js`/`play.js`/`play-m.js`/`spectator-m.js`）传 `unitSpec` 回调读取形状配置；特效并发上限 24→64，`prefers-reduced-motion` 下特效时长压为 1ms；新增多目标去重、空格扇形、旧模式单格等前端用例与 `aimQ/aimR` 引擎断言。
 - 玩家页**结算按序回放**：新增共享模块 `public/playback.js`（`window.PlaybackQueue`，桌面/移动玩家页共用），SSE 结算爆发不再同一 tick 全量应用（此前单位瞬移、特效齐炸）。**阶段分组**节奏（紧凑）：部署/移动/爆破及其伴随失败同拍齐动（600ms，符合同时模式"移动本就同时"的语义），攻击（480ms）/治疗（340ms）/阵亡（420ms）/HQ 摧毁（520ms）/淘汰（340ms）逐事件播放，占领 260ms，回合边界与经济事件同拍快进（140ms），典型回合 3~5 秒；首批延迟一个宏任务应用，保证爆发完整入队后移动组整拍齐动，顺序模式单事件回合体感不变。回放期间棋盘点击与「确认行动」门控（`canActNow()`）、回合徽标显示"结算回放中…"；桌面侧栏与移动底栏提供**「跳过结算」按钮**——剩余事件静默应用（不补播特效）、视图吸附终态并同步权威计划。顺带修复 SSE 重连重放导致的特效重播（按 seq 入队去重），页面切后台时节拍自动归零防浏览器限流拖慢；新增 10 个 vm 注入式定时器的行为用例（分组节奏/跳过静默/seq 去重/reset）与双客户端接线、脚本加载顺序断言。
 
+### 变更
+
+- standoff 短局化与数值平衡（15 回合轻开局）：回合上限 18→15；初始兵精简为每出生位 2 步兵 + 1 侦察，重装/游侠/支援全部转为部署兵种（阵容构成成为经济决策）；伤害侧修复游侠锁定零反制处决（攻 44→36，双游侠集火 65 血单位平均恰好差 1 血存活）、重装对步兵近乎无敌（防 13→10，步兵 3 单位 2-3 轮可解决）、步兵主力微升（攻 30→32）；HQ 血量 180→200 抑制速拆；经济侧控制点收入 10→12 补偿短局总收入并强化占点核心玩法（开局补给 150 与基础收入 15 保持，第 1 回合即可部署重装或双游侠）。
+
+### 修复
+
+- 修复三个观战端的同时模式回放：不再虚构当前玩家，按玩家队列位置恢复 AP（含失败动作），并校验导入事件序列与旧版格式；导入后再次导出时保留原回放元数据。
+
 ## 3.3.1
 
-- 修复同时模式兼容构造器 `createInitialGame()`：现在正确创建总部、初始化空计划队列，并将当前玩家字段设为空，避免通过该入口创建出混合的顺序/歼灭状态；新增初始化回归测试。
+### 新增
+
 - 地图编辑器支持 `simultaneous` 模式：新增「同时模式」切换项，导入/导出保留模式字段与多人出生布局，standoff 地图可正常往返校验。
 - 统计看板补齐同时模式展示：新增中文模式标签、独立颜色与未知模式兜底，筛选局数 KPI 的模式摘要纳入同时对局。
 - Skill 规则说明补充同时模式的收入时点、AP 统计口径、固定结算阶段、失败动作扣费及强制结算后的状态处理，降低 AI 执行歧义。
 
+### 修复
+
+- 修复同时模式兼容构造器 `createInitialGame()`：现在正确创建总部、初始化空计划队列，并将当前玩家字段设为空，避免通过该入口创建出混合的顺序/歼灭状态；新增初始化回归测试。
+
 ## 3.3.0
+
+### 新增
 
 - 新增**同时回合模式**（`config.mode === "simultaneous"`）与专用地图 `standoff`（对峙之地，2/3/6 人六重对称布局）：解决逐人轮流带来的先手优势与多人等待问题。所有玩家在计划阶段通过既有动作接口（`deploy/move/attack/heal/demolish`）把指令**入队而不执行**，响应回显自己的计划队列；`plan/revoke` 撤回单条、`plan/clear` 清空、`end-turn` 确认锁定；全员确认（或房主 `host/force-resolve` 强制）后由服务器**严格同时结算**。旧行为零改动：顺序模式与歼灭模式的代码路径不变，全部既有测试原样通过。
 - 同时模式核心规则：**每单位每回合仅一个动作**（移动/攻击/治疗/爆破四选一，部署独立计点、每动作 1 行动点）；**攻击改为指定格子**（`{ attackerId, q, r }`，射程内任意格预测性开火，命中移动/部署后格内的敌方单位或总部，友军免伤、落空即浪费）；**目的格冲突全部失败**（跨玩家移动/部署撞格全败不返还，自己队列内重复目标入队即拒）；**净血量同时结算**（先治疗后按序扣伤等价同时，同回合互杀成立、阵亡者炮弹仍落地）；移动按计划时刻棋盘寻路；爆破地形移动后生效；治疗按目标终点复核射程；第 1 回合无收入、第 2 回合起回合边界全员同发收入与维修；结算顺序恒按开局随机 `turnOrder`，确定性可回放。
@@ -167,25 +293,39 @@
 
 ## 3.2.13
 
+### 新增
+
 - 统一版本号变更脚本：应用版本号分散硬编码在 `package.json`、`package-lock.json`（顶层与 `packages['']` 两处）、`public/version.js`、`README.md`、`skill/SKILL.md`、`.qoder/skills/play-hex-api-game/SKILL.md`（skill 的 IDE 拷贝）与 `tests/public/import-export.test.ts` 的版本断言共 7 个位置，发版时手工逐个改极易漏改——`3.2.13` 提升时就漏改了 `README.md`、`package-lock.json` 与测试断言，导致 CI 在 `tests/skill/ai-player.test.ts` 与 `tests/public/import-export.test.ts` 两处版本一致性断言上失败。新增 `script/bump-version.mjs` 统一管理：传版本号一键提升全部位置（同时把 `public/*.html` 中与旧版本一致的脚本缓存参数 `?v=` 提升，并在 `RELEASE_NOTES.md` 插入新版本占位小节）、无参以 `package.json` 为基准同步其余位置（修复漏改）、`--check` 只校验一致性并输出 `OK`/`DRIFT` 清单（不一致退出码 1）；`board-animation.js?v=3.2.6` 这类独立维护的缓存参数不受影响。
 - `package.json` 新增 `sync-version`、`check-version` 脚本，并挂 `version` 生命周期钩子使 `npm version <x>` 自动触发同步；CI（`.github/workflows/ci.yml`）在 `npm test` 之前新增 `npm run check-version` 步骤，版本漂移会在 1 秒内以清晰清单报出，而不是埋在测试失败日志里。以后所有版本变更一律经 `node script/bump-version.mjs <version>` 完成。
+
+### 变更
+
 - Hex API Game Skill 回合等待强制前台执行：多个 AI 使用该 skill 时习惯把 `skill/wait-turn.mjs` 放到后台运行，导致 agent 丢失对局跟踪、结束回合后不再响应。为此 `SKILL.md` 的「Polling decision」小节与脚本 `--help` 文案由原先的 "blocking/background wait" 改为强制**前台阻塞执行**——必须等待脚本退出并读取退出码后再继续；明确禁止 `&`、`nohup`、"后台运行" 模式、分离 shell 等一切后台方式，并将后台化标注为已知故障模式；若 harness 的前台命令超时短于 `--timeout-s`，要求调小 `--timeout-s` 适配并在退出码 `4`（timeout）时重跑脚本，而不是转后台。手动回合循环（Manual Turn Loop）第 5、10 步同步加上「前台执行、禁止后台」字样，覆盖 AI 最常读到的两处操作清单。
 
 ## 3.2.12
+
+### 新增
+
+- Hex API Game Skill 轮询优化：新增专用回合等待脚本 `skill/wait-turn.mjs`，AI 在 `/end-turn` 后以后台阻塞方式轮询对局状态，按退出码契约返回结果（`0` 轮到自己 / `2` 对局结束 / `3` 被淘汰 / `4` 超时），瞬时错误（网络、502/503、429 rate_limit）指数退避后继续轮询，token 仅放请求头不落盘不打印；
+- `SKILL.md` 新增强制的「Polling decision」小节，要求开局前按用户提示词将意图分类为整局/单回合，整局意图下每次结束回合后必须继续等待直至终局或被淘汰，意图模糊时默认按整局继续轮询，Manual Turn Loop 同步改为禁止手写 GET 循环，解决多个 AI 使用该 skill 时结束回合后不自动轮询的问题。
+
+### 变更
 
 - 观战对局选择体验优化：对局列表改为按创建时间倒序排列，最新对局始终显示在顶部，避免对局数量增加后需要滚动到底部；`/api/games` 返回服务端权威的 `createdAt` 并统一排序，桌面端、移动端与全息观战页面同步适配。
 - 观战对局状态标签差异化配色：等待中使用橙色、进行中使用绿色、已结束使用灰色，并同步覆盖桌面端、移动端和全息观战页面，提升状态辨识度。
 - 观战页事件中文化：桌面端（`app.js`）与移动端（`spectator-m.js`）新增全量事件类型中文标签映射（`EVENT_LABELS`），「当前操作」区不再裸显 `reset_actions`、`round_end` 等英文事件名，改为「结束回合」「轮次结束」等中文彩色徽章；`reset_actions`/`player_joined`/`player_left`/`name_rename` 等此前回落为英文原文的事件流摘要补齐中文描述，部署事件的单位类型与对局列表的 `phase`（进行中/等待中/已结束）同步中文化。
 - 「当前操作」详情区重排版：中文徽章 + 序号 + 灰色小字原始类型名 + 一行中文摘要，原始 payload JSON 收入可折叠的「原始数据」区，不再占满屏幕；为新事件类型补齐事件流色条与徽章配色（炮火系列橙红警示色、结束回合青蓝色），观战页脚本缓存版本号同步提升。
-- Hex API Game Skill 轮询优化：新增专用回合等待脚本 `skill/wait-turn.mjs`，AI 在 `/end-turn` 后以后台阻塞方式轮询对局状态，按退出码契约返回结果（`0` 轮到自己 / `2` 对局结束 / `3` 被淘汰 / `4` 超时），瞬时错误（网络、502/503、429 rate_limit）指数退避后继续轮询，token 仅放请求头不落盘不打印；
-- `SKILL.md` 新增强制的「Polling decision」小节，要求开局前按用户提示词将意图分类为整局/单回合，整局意图下每次结束回合后必须继续等待直至终局或被淘汰，意图模糊时默认按整局继续轮询，Manual Turn Loop 同步改为禁止手写 GET 循环，解决多个 AI 使用该 skill 时结束回合后不自动轮询的问题。
 
 ## 3.2.11
+
+### 变更
 
 - 统计模型评分按赛制拆分：双人局仍用胜 1 / 平 0.5 / 负 0 的 Wilson 下限；3 人及以上按名次百分位单独计分（第一名 1、末名 0，中间线性折算），再单独做 Wilson 下限。
 - 统计看板拆成双人/多人两套列：双人场次、胜-负-平、胜率、评分与多人场次、名次分、评分分开展示，默认按双人评分排序，无对应赛制样本显示为 —，不再给出混合总评分。
 
 ## 3.2.10
+
+### 变更
 
 - 放宽玩家名称长度上限：后端创建/加入大厅的名称截断由 20 提升到 30，并抽出 `MAX_PLAYER_NAME_LEN` 常量供 `src/state/store.ts`、`src/api/games.ts` 与桌面/移动端创建/加入表单统一引用，避免前后端阈值脱节。
 - 统计采集层共享化与模型规范化扩充：`script/generateStats.mjs` 
@@ -193,59 +333,106 @@
 
 ## 3.2.9
 
+### 新增
+
+- 统计看板支持游戏模式维度：解析层从 `game_start.payload.mode` 提取模式（旧回放默认 `standard`），每局摘要与总览新增 `mode` / `modeDist`；看板新增「模式」筛选、对局列表模式列与红/蓝模式徽章，移动端排序同步支持模式。按模式筛选后，模型榜均分、均 HQ 伤等指标只反映该模式数据，不再混算标准与歼灭的分值量级。
+- 歼灭模式炮火统计：解析层追踪 `artillery_damage` 事件（命中数 + 累计伤害）并逐席位输出 `artilleryDamage`，模型榜新增场均受炮火伤害聚合，歼灭特色生存压力进入看板。
+
+### 变更
+
 - 地图编辑器区分歼灭模式出生锚点：歼灭地图中出生槽的 `headquarters` 字段仅为出生元数据（运行时 `game.headquarters` 恒为空），编辑器此前沿用总部图标与「总部」称呼，易误解为歼灭模式也有总部。现在歼灭模式下画布改绘旗标出生点图标，工具按钮、选中面板、状态提示与校验错误文案统一改为「出生点」，规则页隐藏无运行时作用的总部 HP/防御字段；普通模式保持总部原样，切换模式时文案与图标随动。
 - 「炮火禁区」地图数据迁移至出生槽（`spawnSlots`）格式并移除原有水域/障碍地形，战场变为全开放平原；同步完成平衡性微调：**重装兵**移动力 3→2、攻击 40→38（修正 2 击秒杀游侠的关键阈值），**游侠**移动力 2→3、成本 78→72（恢复其在开放地形上的风筝能力与性价比，与 four-corners / multiplayer-ring 家族基准对齐）；布局对称性、炮火缩圈覆盖与三阶段经济节奏经引擎源码核验保持公平，未作改动。
 - 同步提升版本号为 3.2.9，并补齐地图编辑器与版本同步回归测试。
 - 战术复盘规范升级至 2.1：以 `game_start.payload.config.mode` 区分标准总部战与歼灭战；歼灭复盘明确无 HQ、最后单位死亡以 `army_destroyed` 淘汰、仅可从己方据点部署，并要求记录炮火预警/收缩/伤害事件和安全区决策。裁决账本由五项补全为含 `actionScore` 的六项，模板、质量检查与反例同步覆盖歼灭模式。
-- 统计看板支持游戏模式维度：解析层从 `game_start.payload.mode` 提取模式（旧回放默认 `standard`），每局摘要与总览新增 `mode` / `modeDist`；看板新增「模式」筛选、对局列表模式列与红/蓝模式徽章，移动端排序同步支持模式。按模式筛选后，模型榜均分、均 HQ 伤等指标只反映该模式数据，不再混算标准与歼灭的分值量级。
-- 歼灭模式炮火统计：解析层追踪 `artillery_damage` 事件（命中数 + 累计伤害）并逐席位输出 `artilleryDamage`，模型榜新增场均受炮火伤害聚合，歼灭特色生存压力进入看板。
+
+### 修复
+
 - 结束原因文案补全：`mutual_annihilation`（同归于尽）、`army_destroyed`（全军覆没）、`artillery_destroyed`（炮火歼灭）、`host_eliminated`（主机淘汰）不再以英文 key 裸显。
 - 统计模型归一化修复：`qwen3.8max` 不再归并到 `Qwen3.8MaxPreview`，正式版 `Qwen3.8Max` 与预览版作为两个独立模型条目分别统计（3.1.6 曾将回放中的 `qwen3.8max` 统一更名为 `Qwen3.8MaxPreview`，正式版发布后两个名字代表不同模型），模型榜不再把最新一局的 `Qwen3.8Max-PI` / `Qwen3.8Max-QD` 混入 `Qwen3.8MaxPreview` 的战绩。
 
 ## 3.2.8
 
+### 新增
+
 - 娱乐数据看板新增三大数据维度：**战场经济**（补给总收入 / 部署总花费 / 转化率与模型花钱榜）、**终结者榜**（`player_eliminated` 击杀、被淘汰与相互淘汰的「宿敌」配对）、**地图舞台**（每张地图登场次数、场均轮数与场均占点强度）。
 - 新增**趋势观察**区块：对局增长曲线（每日对局柱状 + 累计折线，含峰值日摘要）、模型登场时间线（甘特式活跃区间与「新面孔」标记）、月度节奏（按月对局数 / 操作量 / 轮次 / 活跃模型数）与回放版本演进时间线。
 - 统计解析层新增补给账本：回放中的 `income`、`deploy` 实际花费与 `comeback_supply` 逐席位累计，`stats.json` 与 `fun-stats.json` 同步受益；每日时间线补充 `cumulativeMatches` / `cumulativeActions` 累计字段。
 - 娱乐数据页交互增强：战场脉搏新增「每轮操作」卡片（仅统计含整轮记录的对局，避免旧回放轮次缺失稀释均值），名场面新增「最烧钱」卡片；区块编号重排为 01–09，响应式布局同步适配。
+
+### 测试与验证
+
 - 新增统计模块回归测试（经济账本、终结者 / 宿敌、地图舞台、累计时间线、月度分组、模型登场窗口）；脚本测试 13 项全部通过。
 
 ## 3.2.7
 
+### 变更
+
 - 重构 Hex API Game Skill 为「短主文档 + 按模式分册」：`SKILL.md` 只保留远程服务器、API、公共规则与强制 mode 路由；标准总部战写入 `standard.md`，歼灭战写入 `annihilation.md`。
 - 对局进入 `active` 后必须先读 `game.config.mode`，再用 `read` 加载对应模式文件，且仅以当前模式文件为检查清单与决策序权威，避免两套规则在同一上下文里互相覆盖。
-- 修正歼灭模式 skill 串台：此前开头已写明无总部 / 全灭出局，后半仍沿用「打 HQ、从总部部署、按 HQ 伤害抢分」的标准决策，导致 `artillery-zone` 上出现空转找 HQ、错误 `fromId`、终局乱抢据点分等问题。
 - `annihilation.md` 明确硬禁与运行时事实：不创建 HQ、`fromId` 只能是已占领据点、炮火危险区禁止部署/治疗/据点维修；`artillery-zone` 裁决权重下实质分为 `armyValue + actionScore`，终局优先保军力与有效行动而非虚构 HQ/据点分。
 - `standard.md` 保留总部战完整路径：从 HQ 或据点部署、优先打击敌方总部、临近裁决按 HQ 伤害与据点等权重抢分。
 - 补全 Skill 裁决分说明：总分六项为 HQ 伤、己方 HQ、据点、军队、补给与 **`actionScore`**；写明 `actionScore = actionMerit × effectiveActions`（歼灭默认 10、标准默认 2）、merit 来源（部署/拆墙/占点/伤害与治疗折算）以及纯移动不计分，避免终局囤补给或空移动。
 - 歼灭 Skill / 示例 AI 的炮火节奏改为读配置与运行时状态：`config.annihilation.artillery`（`startRound` / `intervalRounds` / `damage` / `minimumSafeRadius`）与 `game.artillery`（`safeRadius` / `dangerCells` / `warningCells` / `nextShrinkRound`）；阶段用 `round < startRound` 推导，不再写死「前 4 回合 / 第 5 回合」。明确 danger 在回合边界结算伤害、warning 仅预告下一圈、危险区禁止部署/治疗/据点维修。
 - Skill 强制每次先读 `game.config.units` 与单位实例字段再算射程/移速/造价/`canCapture`，并写明常见能力坑：仅 infantry/scout 占点、ranger 远距输出、仅 support 可治疗友军、仅 heavy 可拆除邻格 blocker；禁止沿用跨地图记忆数值。
+
+### 修复
+
+- 修正歼灭模式 skill 串台：此前开头已写明无总部 / 全灭出局，后半仍沿用「打 HQ、从总部部署、按 HQ 伤害抢分」的标准决策，导致 `artillery-zone` 上出现空转找 HQ、错误 `fromId`、终局乱抢据点分等问题。
 - 修复统计脚本在 Vitest 下的加载问题：去掉 `generateStats.mjs` / `generateFunStats.mjs` 文件头 shebang，避免作为模块导入时被误解析。
 
 ## 3.2.6
 
-- 移除自动控制体系：删除服务端 `AutoControlController`、`/api/control/*` 路由、自动对战控制台 `control.html`，以及 `script/autoRunPi` 调度脚本与相关测试。
+### 变更
+
 - 保留管理鉴权：删除对局、强制裁决、管理员改名仍由 `AUTO_CONTROL_TOKEN` / 本机访问保护；导航与文档同步去掉自动控制入口。
-- 修复 `src/config/loader.ts` 的 TypeScript `TS18046` 类型错误。
 - 此前所有 deepseekv4flash 以及 deepseekv4pro 统一加上后缀 Preview。
+
+### 修复
+
+- 修复 `src/config/loader.ts` 的 TypeScript `TS18046` 类型错误。
+
+### 移除
+
+- 移除自动控制体系：删除服务端 `AutoControlController`、`/api/control/*` 路由、自动对战控制台 `control.html`，以及 `script/autoRunPi` 调度脚本与相关测试。
 
 ## 3.2.5
 
+### 新增
+
 - 地图编辑器完整支持歼灭地图：可新建或切换玩法模式、编辑炮火开始轮次/收缩间隔/伤害/最小安全半径，并为每个出生槽绑定唯一出生据点；模式切换、地图缩放、据点改名或删除时会同步维护相关配置，前端校验规则与服务端保持一致。
+
+### 变更
+
 - 地图编辑器重构为桌面三栏工作台：左侧集中编辑工具与放置参数，中央画布独立缩放和滚动，右侧通过对象、地图、出生、规则、单位标签切换属性；校验结果固定显示，选中对象和玩法切换会自动进入对应属性页。
 - 地图编辑器视觉风格对齐观战玩家页：头部改为同款品牌标题 + 版本徽章 + 副标题状态行，补齐完整站点导航（玩家 / 观战 / 全息观战 / 控制台 / 地图编辑 / 统计 / 娱乐数据）；卡片、按钮、标签切换统一为观战页设计令牌（深蓝灰底、圆角卡片、绿色激活态、红色危险态），画布配色（地形、棋盘底、网格线、hover 高亮、出生槽阵营色）与实战棋盘完全一致，编辑器中预览即游戏呈现效果。
+
+### 移除
+
 - 移除地图必须至少有 1 个据点的限制：前后端校验均不再强制要求 `controlPoints` 非空，0 据点的地图可以正常导入和加载；歼灭模式出生槽的据点绑定仅在存在据点时才要求填写，允许无据点的纯歼灭地图。
 
 ## 3.2.4
 
-- 修复歼灭模式排行榜因没有总部而无法计算分数的问题，桌面/移动玩家页、普通/移动观战页和全息观战台现在都能正确显示实时及回放排名。
+### 新增
+
 - 裁决分新增有效行动分：纯移动不计分，部署/爆破记 1 点贡献值，实际伤害/治疗每 20 HP 向上折算 1 点，占领据点记 2 点；普通模式每点贡献值默认 2 分、歼灭模式默认 10 分，地图可通过 `balance.adjudicationWeights.effectiveActions` 单独调整，地图编辑器同步支持该权重。
 - 两种模式都会在玩家淘汰、单位与据点清理前冻结完整裁决分，并通过 `player_eliminated.payload.score` 写入事件流，避免未造成总部伤害的玩家淘汰后归零，确保终局和回放能排出稳定的后续名次。
 - 加载旧持久化对局时会从部署、移动、攻击、治疗和爆破事件恢复累计行动点；旧回放缺少新统计字段时仍可兼容重建。
+
+### 变更
+
 - 示例 AI 在歼灭模式前 4 轮会优先争夺安全的中立补给点，第 5 轮起转向最近敌军，并继续优先撤离炮火预警区和危险区。
+
+### 修复
+
+- 修复歼灭模式排行榜因没有总部而无法计算分数的问题，桌面/移动玩家页、普通/移动观战页和全息观战台现在都能正确显示实时及回放排名。
+
+### 测试与验证
+
 - 补充普通/歼灭动作分、免费连续动作、淘汰分数冻结、旧对局恢复、地图权重校验及各前端排行榜回归测试；完整测试为 36 个测试文件共 271 项。
 
 ## 3.2.3
+
+### 变更
 
 - 将现有歼灭模式地图从与玩法同名的「歼灭模式」（`annihilation`）更名为「炮火禁区」（`artillery-zone`），地图身份与 `annihilation` 玩法模式正式分离，便于后续增加更多歼灭模式地图。
 - 「炮火禁区」扩展为 2、3、6 人地图：新增六向旋转对称的出生据点、初始部队和水域/障碍布局；2 人对角出生、3 人隔位出生、6 人全位置出生，4/5 人仍不受支持。
@@ -254,44 +441,78 @@
 
 ## 3.2.2
 
+### 新增
+
 - 新增双人地图「歼灭模式」（`annihilation`）：双方不再拥有总部，开局各自控制一个出生据点，并拥有步兵、侦察兵和重装单位各一支；玩家失去最后一个单位时立即淘汰，最后存活者获胜。
 - 新增地图级玩法类型与炮火配置：地图可声明 `mode: "annihilation"`，并通过 `annihilation.artillery` 配置首次收缩轮次、收缩间隔、伤害和最终安全半径；既有地图默认保持标准总部战规则。
 - 引入缩圈炮火机制：内置歼灭地图第 4 轮预警、第 5 轮首次收缩，此后每两轮收缩一层，最终安全半径为 2；危险区单位在整轮结算时同时受到 24 点无视防御伤害，避免先后手结算偏差。
 - 完善危险区行动限制与终局判定：单位仍可主动进入危险区，但危险区内禁止部署、治疗和据点自动维修；炮火同时消灭所有剩余玩家时以 `mutual_annihilation` 判定同归于尽，20 轮上限继续作为极端僵局的兜底裁决。
 - 桌面/移动玩家页、普通观战页和全息观战台完整支持歼灭模式事件与回放，地图预览不再绘制内部出生锚点为伪总部；炮火预警和危险区覆盖层按地形、炮火、据点、单位的稳定顺序绘制，缩圈后不会被棋盘重绘擦除或遮挡单位标记。
 - 地图加载器、持久化和地图编辑器支持玩法类型、出生据点关联及炮火参数的校验、导入和导出；歼灭局运行态保持 `headquarters: {}`，每个出生槽通过 `controlPointId` 关联默认归属据点。
+
+### 变更
+
 - 更新 Hex API Game Skill 与示例 AI：AI 会识别炮火安全区、避开危险部署和治疗位置，并主动向最近敌军推进，减少守点囤兵和消极拖延。
+
+### 测试与验证
+
 - 新增歼灭规则、炮火结算、同归于尽、地图编辑器和前端回放覆盖测试；完整 TypeScript 构建通过，36 个测试文件共 250 项测试通过。
 
 ## 3.2.1
 
-- 重做娱乐数据看板的信息架构与视觉布局：从传统面板堆叠调整为战报式阅读体验，重新组织战场脉搏、本期名场面、战术观察、兵种选择、模型战术档案和纪录柜，让关键趋势与代表性对局更易浏览。
+### 新增
+
 - 娱乐数据页新增动作构成展示、模型选择与全场均值对照、对局/单项纪录切换，并优化数据范围摘要、加载状态、重新加载入口及桌面和移动端响应式布局；继续复用现有 `fun-stats.json` 数据源。
 - 为桌面玩家页、桌面普通观战页、移动玩家页和移动观战页新增共享 Canvas 棋盘动画，覆盖移动、攻击、治疗、部署、阵亡、总部摧毁、据点占领/中立化及地块拆除等事件。
-- 区分实时事件与完整状态同步：SSE 和逐步回放播放动画，首次加载、刷新、切换对局及回放跳转直接定位，避免历史事件重复播放或刷新时出现错误过渡。
 - 动画层支持单位和总部位置、生命值及透明度插值，沿用既有页面的颜色、棋子造型、缩放和平移逻辑；同时适配 `prefers-reduced-motion`，并在空闲时停止持续重绘以控制 Canvas 开销。
+
+### 变更
+
+- 重做娱乐数据看板的信息架构与视觉布局：从传统面板堆叠调整为战报式阅读体验，重新组织战场脉搏、本期名场面、战术观察、兵种选择、模型战术档案和纪录柜，让关键趋势与代表性对局更易浏览。
+- 区分实时事件与完整状态同步：SSE 和逐步回放播放动画，首次加载、刷新、切换对局及回放跳转直接定位，避免历史事件重复播放或刷新时出现错误过渡。
+
+### 测试与验证
+
 - 新增共享动画层的运行时和页面接入测试，覆盖桌面/移动页面、事件效果、动画状态。
 
 ## 3.2.0
 
+### 新增
+
 - 新增娱乐数据看板 `entertainment.html`：集中展示对局与动作总览、自动生成的趣味事实、模型行为画像、单位部署偏好、极限记录、每日时间线和回放 Schema 演进，并在玩家页、观战页和统计页补充入口。
 - 新增 `script/generateFunStats.mjs`、`npm run fun-stats` 与 `npm run stats-all`：复用主统计脚本的回放解析能力，扫描 `records/V2`、`records/V3` 后生成前端只读的 `public/data/fun-stats.json`，支持单独或一次性刷新两类统计数据。
-- 修复无显式 `owner` 的攻击事件被重复归属到模型的问题；总览与模型画像的移动、攻击、部署、治疗、爆破、占领和阵亡统计现在保持逐项一致。
+
+### 变更
+
 - 加强模型名称规范化：复盘文件中的冗余 Agent 后缀会在统一入口剥离，避免同一模型被拆成多个排行榜条目。
 - 统一对局时长有效性口径：平均时长、时间线与时长极值共同排除超过三天或时间戳无效的异常记录，避免跨日空闲时间成为误导性的极限数据。
 - 调整行为画像标签规则：仅当模型的每局动作率严格高于全体参赛席位均值时生成相应风格标签，不再为全维度低于均值的模型强制贴标签。
+
+### 修复
+
+- 修复无显式 `owner` 的攻击事件被重复归属到模型的问题；总览与模型画像的移动、攻击、部署、治疗、爆破、占领和阵亡统计现在保持逐项一致。
+
+### 测试与验证
+
 - 补充统计生成回归测试，覆盖攻击归属、模型名规范化、风格标签和异常时长规则；重新生成 `stats.json` 与 `fun-stats.json`。
 
 ## 3.1.9
 
+### 新增
+
 - 新增异形地图支持：地图配置新增可选字段 `playableCells`，可显式声明任意连通区域（支持凹形、凸形、带孔洞），未声明时沿用原有 `radius` 完整六边形展开逻辑；移动/部署/爆破/寻路/绘图与前端渲染统一以 `playableCells` 为权威边界，`radius` 仅保留为显示与兼容元数据。
 - 新增四角交锋（`four-corners`）4 人异形地图：半径 9 的矩形战场，四方出生区双轴严格镜像，近端补给点与中央前线基地驱动各方快速向中心集结交战，仅支持 4 人对局。
-- 重构地图加载器：新增 `src/config/geometry.ts` 提供格子展开、连通性校验与地形合成；加载时校验 `playableCells` 非空、去重、连通，并强制所有 HQ、据点、初始单位、出生槽对象必须位于可用格内；多人布局（`layouts`）增加出生点重叠与不可通行地形占位校验。
 - `GET /api/maps` 预览新增 `preview.cells` 字段，返回已解析并带地形的完整可用格列表，前端无需再按 `radius` 自行推断棋盘形状。
 - 地图编辑器升级：新增「添加地块」「移除地块」工具直接编辑 `playableCells`，删除含对象的格子会被阻止；新增「出生布局」面板支持 2–8 个出生槽及多人人数布局的可视化编辑与维护，旧双人图自动转换为 `spawnSlots`/`layouts` 格式。
+
+### 变更
+
+- 重构地图加载器：新增 `src/config/geometry.ts` 提供格子展开、连通性校验与地形合成；加载时校验 `playableCells` 非空、去重、连通，并强制所有 HQ、据点、初始单位、出生槽对象必须位于可用格内；多人布局（`layouts`）增加出生点重叠与不可通行地形占位校验。
 - 引擎边界判定统一：`isInBounds` 与寻路通行判定改为基于 `game.cells`（即加载后展开的可用格列表），不再用半径公式推断；Skill 文档与 `ai-player.mjs` 示例同步更新，要求 AI 在行动前以 `game.cells` 确认目标坐标存在。
 
 ## 3.1.8
+
+### 新增
 
 - 新增受 Control token 保护的强制裁决接口 `POST /api/games/:id/force-adjudicate`，可在对局已明显失去悬念时按当前存活玩家的裁决分立即结束对局。
 - 桌面观战页、手机版观战页和新版全息观战台新增“强制裁决”按钮，提交前显示当前排名并二次确认；对局结束后自动写入 `game_over` 事件并同步回放、持久化状态。
@@ -300,30 +521,47 @@
 
 ## 3.1.7
 
+### 新增
+
+- `/api/maps` 预览字段新增 `actionsPerTurn`（每回合行动点），供前端地图卡片和 tooltip 使用；地图类型定义与后端序列化同步更新。
+
+### 变更
+
 - 重做大厅选图卡片布局：卡片改为 flex 固定高度（桌面 110px / 窄屏 104px），移除不定长描述文字避免参差不齐，hover/focus 时浮出深色 tooltip 面板展示地图名、完整描述和带中文含义的统计项。
 - 地图卡片信息层级重构：中文名（15px 加粗）加灰色英文 ID 副标；标签从「半径 X」「X 据点」中文标签改为紧凑图标前缀 `⊘ ⬡ ⚑ ♟ ⏱`，依次表示地图半径、据点数、玩家数、每回合行动点、最大回合数，统一视觉风格。
 - 新建房间表单重新排版：「你的名称」「最大玩家数」「房主参战」三个控件改为 grid 一行布局（`2fr 1fr auto`），名称输入框占最大宽度，玩家数下拉居中，底部对齐；窄屏（≤720px）和移动端自动堆叠为单列。
 - 「房主参战」从原生 checkbox 替换为深色主题滑动开关：开启时深绿背景配绿色滑块，关闭时深灰背景配灰滑块，带 0.2s 过渡动画；移动端改为行内「文字在左、开关在右」布局，开关尺寸放大到 44×26px 便于触控。
-- `/api/maps` 预览字段新增 `actionsPerTurn`（每回合行动点），供前端地图卡片和 tooltip 使用；地图类型定义与后端序列化同步更新。
 
 ## 3.1.6
+
+### 新增
 
 - 新增移动端玩家页与观战页：桌面端页面检测窄屏后自动跳转至 `/play-m.html` / `/spectator-m.html`，移动版适配触控操作与紧凑布局。
 - 移动端导航与统计 UI 优化：header 和统计入口适配小屏，样式统一深色卡片风格。
 - 大厅新增可加入对局列表：创建/加入页下方展示当前服务器公开大厅，显示地图、人数和状态，支持一键刷新并加入尚未开局的公开对局，替代手动输入 Game ID。
+
+### 变更
+
 - 裁决权重跨地图重平衡：`default` / `desert` 改为 5/2/90/2/1，`breach` 己方总部权重从 5 降至 2，`forge` 改为 7/2/75/2/1，`multiplayer-ring` 据点权重 100→75，`dual-lanes` 与 `danger-close` 维持原配置。
 - 模型名称修正：回放记录中的 `qwen3.8max` 统一更名为 `Qwen3.8MaxPreview`。
 
 ## 3.1.5
 
+### 新增
+
 - 对局状态 API 增加权威 live 裁决计分板：`GET /api/games/:id` 在剥离 token 后附加 `adjudication`（`maxTurns`、`weights`、`scores`、`rankings`、`leaders`、`margin`），由引擎 `buildAdjudicationSnapshot` 统一计算。
+- Hex API Game Skill 说明 AI 应信任服务端 `adjudication` 总分，breakdown 仅用于优先级判断；补充对应文档与 API/前端契约测试。
+
+### 变更
+
 - 玩家页优先展示服务端裁决总分，并在加载完整状态、SSE 事件与操作成功后合并刷新；终局平局时按存活并列 top 填充 `leaders`，避免写成空数组。
 - 观战页继续用事件重建本地计分，终局优先 `result.scores` / `result.rankings`，不额外伪造半残 `adjudication` 快照。
-- Hex API Game Skill 说明 AI 应信任服务端 `adjudication` 总分，breakdown 仅用于优先级判断；补充对应文档与 API/前端契约测试。
 - 重平衡多张地图的 `adjudicationWeights`，让限回合裁决更偏向「压总部 / 推进」而非纯占点囤兵：`default`/`desert` 改为 5/2/90/2/1；`breach` 将 `ownHqHp` 从 5 降到 2；`forge` 改为 7/2/75/2/1；`multiplayer-ring` 据点权重 100→75。`dual-lanes`、`danger-close` 维持原配置。
 - README 裁决说明改为按地图权重计算，不再写死 ×4/×120；示例 JSON 与 default 对齐。历史 `records/` 回放仍保留导出时权重，不批量改写。
 
 ## 3.1.4
+
+### 新增
 
 - 新增离线统计看板 `stats.html`：以模型排行为主体，展示胜率、前三率、均名次、Wilson 评分、对位矩阵、Agent 排行、地图/结束原因分布与对局列表。
 - 新增 `script/generateStats.mjs` 与 `npm run stats`：扫描 `records/V2`、`records/V3` 回放及复盘文件名，生成前端只读的 `public/data/stats.json`，统计数据与运行时 API 解耦。
@@ -332,11 +570,18 @@
 
 ## 3.1.3
 
+### 新增
+
 - 新增双人短局地图「危险距离」(danger-close)：半径5，双方HQ仅隔4格但被空心墙阻断，重装单位必须爆破开路；1行动点/回合的慢节奏攻城对决。
+
+### 修复
+
 - 修复「危险距离」地图补给据点缺失收入配置问题：补充 `controlPointTypes.supply` 定义(收入8)，使其据点正常提供补给。
 - 玩家页复制按钮增加 Toast 反馈：复制成功/失败时弹出提示，不再静默吞掉错误。
 
 ## 3.1.2
+
+### 变更
 
 - 重做双人短局地图「熔炉重铸」：半径扩大至6，总部间距增加到10格，拉长战线减少开局rush。
 - 中央改为十字熔炉墙阻断直通路线，重装爆破战术价值提升；6个据点完全对称分布，消除中央据点先手优势。
@@ -344,62 +589,104 @@
 
 ## 3.1.1
 
+### 新增
+
 - 新增 `spectator2.html` 全息观战台：提供新版棋盘、事件时间轴、实时 SSE 观战、回放导入/导出、据点与排行榜信息展示。
 - 新版观战台支持多玩家、类型化据点、总部与单位状态、事件详情和 Control token 管理操作。
 - 大厅新增房主踢出玩家功能：大厅玩家列表追加踢出按钮（对房主自身隐藏），新增 `DELETE /api/games/:id/players/:playerId` 踢出接口并在开局后拒绝执行；被踢玩家自动退出大厅并收到通知，补充对应 API 与 UI 测试。
 - 新增 `deploy/deploy.py` 远程部署脚本：通过 SFTP + Docker Compose 将项目同步到远程服务器并自动重启。
+
+### 修复
+
 - 服务端启动入口改用 `pathToFileURL` 替代 `'file://' + resolve()` 字符串拼接，修复 Windows 下 `isMain` 判断失败的路径格式问题。
 
 ## 3.1.0
+
+### 新增
 
 - 观战页右上角设置弹层新增 Control token 输入与保存，写入 `localStorage.autoControlToken`，与自动控制台共用，支持删除对局、改名等管理操作。
 - 玩家页右上角新增设置弹层：可保存 Control token，并提供完整会话恢复字段（Game ID、Player token、可选 Host token）。
 - 玩家页支持从设置保存/清除会话、进入游戏；启动时回填本地会话但不自动进局，避免错误凭证刷 401。
 - 新增单机部署栈：`Dockerfile`、`compose.yml`、`.env.example`、`deploy/DEPLOYMENT.md` 与 CI 工作流，应用直接暴露 `0.0.0.0:3123`。
+
+### 变更
+
 - 运行时升级到 Node.js 24：`package.json` engines、`Dockerfile`、CI 与 `@types/node` 同步调整。
 - SSE 事件流加固：25 秒 heartbeat、连接清理、`x-accel-buffering: no` 与 `reply.hijack()`，降低长连接被中间层缓冲或挂起的风险。
 - Hex API / AI 工具改为面向远程部署：要求显式 `--url` 或 `TACTICAL_GAME_URL`，不再默认连接本机 `localhost`。
+
+### 测试与验证
+
 - 补充部署相关服务端、SSE 与 skill 测试覆盖。
 
 ## 3.0.3
 
+### 新增
+
 - 新增地图可选的百分比分差追赶补给 `balance.comebackSupply`，使用 `(最高裁决分 - 玩家裁决分) / 最高裁决分` 判断弱方，避免固定分数阈值无法适配不同地图计分规模。
 - 追赶资格在非终局整轮结束后基于同一份发放前分数快照统一判断；所有达标存活弱方均可获得补给，领先者、并列领先者和已淘汰玩家不参与，终局轮直接裁决不发放。
-- 「六方环线」从第 3 轮起启用 40% 分差阈值与每轮 20 补给，保持 15 回合上限及现有经济、行动点、兵种、计分和地形参数不变。
 - 新增 `comeback_supply` 事件，玩家页和观战回放会同步资源并显示实际分差；旧地图、旧存档和旧回放未配置该机制时保持原有行为。
 - 地图编辑器增加追赶补给启用开关、开始轮次、分差百分比和每轮补给量，完善整数、范围、关闭状态及导入导出校验。
 - Hex API Game Skill 补充触发公式、结算时机、事件字段和追赶补给后的重建策略，并增加对应文档测试。
 
+### 变更
+
+- 「六方环线」从第 3 轮起启用 40% 分差阈值与每轮 20 补给，保持 15 回合上限及现有经济、行动点、兵种、计分和地形参数不变。
+
 ## 3.0.2
+
+### 新增
+
+- 新增多人 `rank01`-`rank08` 与 `draw` 复盘命名方式，同时保留双人 `win/lose` 历史兼容规则。
+
+### 变更
 
 - 地图 `multiplayer-ring` 平衡性改动，削弱堆兵战术，鼓励进攻，减少补给
 - 将战术复盘写作规范升级为面向 V3 多人对局的 2.0 版，覆盖 `player_a`-`player_h` 席位、整轮/席位回合、淘汰制、最终排名和真实平局。
-- 新增多人 `rank01`-`rank08` 与 `draw` 复盘命名方式，同时保留双人 `win/lose` 历史兼容规则。
 - 重写第一名、非第一名和平局模板，要求按 `game_start` 与 `game_over` 事件取证，并从本局配置读取行动点、据点效果和裁决权重，避免沿用 2.x 固定数值。
 - 更新复盘质量检查和反例，强化多人对手区分、补给与五项裁决分账本、淘汰后果、房主管理干预和无法可靠统计时的显式标注。
 
 ## 3.0.1
 
-- 补齐多人前端事件回放：`app.js` 同步 `players`、回合轮转、`round_end` / `turn_skipped`、淘汰与据点中立等事件，排行榜可显示淘汰状态并优先采用服务端排名。
-- 裁决计分对齐服务端：攻击敌方总部时累计 `headquartersDamage`，回放与实时观战分数不再依赖“当前敌方总部缺口”估算。
+### 新增
+
 - 自动对战控制台支持 2-8 席位：配置区按人数动态生成 `player_a`–`player_h` 表单，保留未展示席位配置缓存，手动指令可选多人席位。
 - AI 技能与脚本完善多人流程：`skill/SKILL.md` 与 `skill/ai-player.mjs` 覆盖大厅创建/加入/开局、`a-h` 席位、淘汰停止行动与多人对手策略，示例脚本同步更新。
-- `multiplayer-ring` 更名为「六方环线」：半径缩为 8，仅保留 2/3/6 人对称布局；出生位落在六边形六个顶点，2 人对位、3 人隔位、6 人全开；4/5/7/8 人不再受支持。
 - 创建对局的地图卡片补充「最大回合数」标签；`/api/maps` 预览字段新增 `maxTurns`。
+
+### 变更
+
+- `multiplayer-ring` 更名为「六方环线」：半径缩为 8，仅保留 2/3/6 人对称布局；出生位落在六边形六个顶点，2 人对位、3 人隔位、6 人全开；4/5/7/8 人不再受支持。
 - 玩家页/观战页回合展示改为 `当前/上限` 进度样式，行动玩家名靠右；观战侧栏移除据点 chip 条，资源区更紧凑。
+
+### 修复
+
+- 补齐多人前端事件回放：`app.js` 同步 `players`、回合轮转、`round_end` / `turn_skipped`、淘汰与据点中立等事件，排行榜可显示淘汰状态并优先采用服务端排名。
+- 裁决计分对齐服务端：攻击敌方总部时累计 `headquartersDamage`，回放与实时观战分数不再依赖“当前敌方总部缺口”估算。
+
+### 测试与验证
+
 - 测试覆盖补强：新增/扩展多人 API、引擎淘汰与轮转、控制台 UI、排行榜、回合进度与 AI 席位解析相关测试，降低 3.0.0 多人链路回归风险。
 
 ## 3.0.0
 
+### 新增
+
 - 核心玩法从双人对战升级为 2-8 人多人混战：新增大厅阶段、玩家席位 `player_a` 至 `player_h`、地图支持人数校验、随机/分散出生位分配，以及房主可选择是否参战的创建流程。
-- 胜负规则改为淘汰制：总部归零不再立即结束整局，而是淘汰该玩家、移除其单位、将其据点转为中立并冻结资源；仅剩一名存活玩家时以 `last_player_standing` 结束。
-- 回合与裁决逻辑适配多人：按 `turnOrder` 在存活玩家中轮转，新增整轮结束事件；达到地图最大轮数时只对存活玩家按累计总部伤害、己方总部 HP、据点、军力和补给计分，并输出完整排行榜。
 - 新增多人大厅与房主管理 API：创建对局返回 `hostToken` 与可选玩家 token；新增公开大厅查询、加入、离开、开局、踢出大厅玩家、房主跳过当前回合和房主淘汰玩家等接口，玩家改名改为玩家 token 鉴权。
 - 前端创建/加入流程重做为多人大厅体验：创建时选择地图与人数，进入等待大厅后可复制房主/玩家凭证、查看席位、开始游戏；观战页和对局列表支持多人状态、玩家数量、淘汰和回合轮转事件。
-- 计分展示从双方面板升级为排行榜：玩家页和观战页按存活状态与分数展示多名玩家，结果页包含排名、胜者、淘汰状态和裁决分明细。
 - 地图体系扩展：新增 `multiplayer-ring`（现名「六方环线」，初版为八方环线）作为多人环形战场，新增 `forge`（熔炉之心）作为短局双人地图；移除实验性的 `blitz` 地图。
-- AI 与自动对战工具适配多人席位：`skill/ai-player.mjs` 支持 `a-h` / `player_a-player_h` 席位，控制台和自动控制器适配大厅创建、开局、多人 token 与存活玩家回合循环。
 - 回放与历史记录补充多人事件结构：`game_start` 包含玩家列表、出生分配和行动顺序，新增 `player_joined`、`player_left`、`round_end`、`turn_skipped`、`player_eliminated`、`control_point_neutralized` 等事件。
+
+### 变更
+
+- 胜负规则改为淘汰制：总部归零不再立即结束整局，而是淘汰该玩家、移除其单位、将其据点转为中立并冻结资源；仅剩一名存活玩家时以 `last_player_standing` 结束。
+- 回合与裁决逻辑适配多人：按 `turnOrder` 在存活玩家中轮转，新增整轮结束事件；达到地图最大轮数时只对存活玩家按累计总部伤害、己方总部 HP、据点、军力和补给计分，并输出完整排行榜。
+- 计分展示从双方面板升级为排行榜：玩家页和观战页按存活状态与分数展示多名玩家，结果页包含排名、胜者、淘汰状态和裁决分明细。
+- AI 与自动对战工具适配多人席位：`skill/ai-player.mjs` 支持 `a-h` / `player_a-player_h` 席位，控制台和自动控制器适配大厅创建、开局、多人 token 与存活玩家回合循环。
+
+### 测试与验证
+
 - 测试覆盖同步扩展：补充多人 API、持久化、地图人数校验、回合/淘汰规则、AI 席位解析和排行榜 UI 测试，降低从 2.4.2 迁移到 3.0.0 的回归风险。
 
 ## 2.4.2

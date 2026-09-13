@@ -273,6 +273,7 @@
     <h3 id="bot-dialog-title">添加 AI</h3>
     <div class="bot-tabs" role="tablist">
       <button type="button" class="bot-tab active" data-bot-tab="bots" role="tab" aria-selected="true">强化模型</button>
+      <button type="button" class="bot-tab" data-bot-tab="algorithm" role="tab" aria-selected="false">算法脚本</button>
       <button type="button" class="bot-tab" data-bot-tab="prompt" role="tab" aria-selected="false">对战提示词</button>
     </div>
     <div id="bot-panel-bots">
@@ -288,6 +289,20 @@
       <div class="bot-dialog-actions">
         <button id="btn-bot-cancel" type="button" class="btn">取消</button>
         <button id="btn-bot-confirm" type="button" class="btn primary">确定</button>
+      </div>
+    </div>
+    <div id="bot-panel-algorithm" class="hidden">
+      <div class="field">
+        <label for="algorithm-type">算法类型</label>
+        <select id="algorithm-type">
+          <option value="algo_greedy">贪心算法（Greedy）</option>
+          <option value="algo_random">随机算法（Random）</option>
+        </select>
+      </div>
+      <p class="bot-dialog-hint">算法 AI 基于规则和搜索，无需训练模型。开始对局后自动运行所选算法。</p>
+      <div class="bot-dialog-actions">
+        <button id="btn-algorithm-cancel" type="button" class="btn">取消</button>
+        <button id="btn-algorithm-confirm" type="button" class="btn primary">确定</button>
       </div>
     </div>
     <div id="bot-panel-prompt" class="hidden">

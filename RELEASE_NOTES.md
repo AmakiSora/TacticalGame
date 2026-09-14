@@ -4,6 +4,18 @@
 
 自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.5.2
+
+### 变更
+
+- **修复 agent 对局开局丢失玩家秘钥导致席位作废的问题**（`skill/SKILL.md`）：create/join 响应是服务端唯一一次下发 token 的时机——此后所有读状态接口都剥离 `tokens`/`hostToken`（`src/api/auth.ts` 的 `sanitizeGameForResponse`），开局后重 join 返回 `game_already_started`，lobby 阶段重 join 会新发席位新 token 而非恢复原席位，且无任何找回接口。原 skill 既无强制保存步骤，"Prefer not saving at all" 还在反向劝阻，叠加 shell 变量跨命令不存活，agent 开局经常不保存秘钥、后续操作 401 卡死。现新增 `Player token (mandatory)` 章节：create/join 成功后第一件事将 token 落盘到 `$SCRATCH/token.txt`（参赛 host 同时保存 `host.txt`），给出 jq 提取命令与 node 兜底写法（Windows Git Bash 通常无 jq），并用空文件判定错误响应；`wait-turn.mjs` 与后续所有调用的示例统一改为 `--token "$(cat "$SCRATCH/token.txt")"` 从文件回读；"Prefer not saving at all" 与 "never print tokens" 两条规则均注明 token 落盘豁免。`.pi`/`.qoder` 下的 skill 拷贝已同步（`.pi` 此前停留在 3.4.9，一并以 `skill/` 全量覆盖）。
+- `AGENTS.md` 补充 Windows `/tmp` 路径陷阱约束：Git Bash 的 `/tmp` 实际指向 `AppData\Local\Temp`，而 node 把 `/tmp/x` 解析为 `C:\tmp\x`（旧会话残留处），`curl > /tmp/a.json` 后用 node 读取会拿到陈旧数据、表象是服务端状态交替。要求状态快照用 `curl | node` 管道直读；确需落盘时写 `temp/` 相对路径或 `C:/` 绝对路径，并在读回前校验 gameId。
+
+### 测试与验证
+
+- `npm run build && npm test` 通过（55 个测试文件 / 481 个用例）；`npm run check-version` 校验 3.5.2 全部引用一致。
+- token 提取命令实测：jq 语义复核无误（`.player.token // empty` 对错误响应得空文件）；node 兜底单行在正确响应下提取 token、错误响应下得空文件，`$(cat …)` 剥离尾部换行。
+
 ## 3.5.1
 
 ### 新增

@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.5.1`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.5.2`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
@@ -44,8 +44,37 @@ mkdir -p "$SCRATCH"
 
 - `<playerName>` is the name you created or joined the game with; if it contains spaces or other shell-hostile characters, use your seat id (`player_a` …) instead. One game + one player = one directory.
 - Everything you persist during the game belongs there: the downloaded `wait-turn.mjs`, saved mode files, state snapshots, event dumps, notes, plans, transcripts. Never write game files directly into the current directory (repo root), `$HOME`, or any other location.
-- Prefer not saving at all: pipe API responses through `jq`/stdout when you only need to read them.
+- Prefer not saving at all: pipe API responses through `jq`/stdout when you only need to read them. The one mandatory exception is the token — it cannot be re-fetched later, so it goes to a file first (see [Player token](#player-token-mandatory)).
 - Do not delete the scratch directory mid-game; leaving it behind afterwards is fine (this repo gitignores `temp/`).
+
+## Player token (mandatory)
+
+The create/join response is the **only** time the server ever shows your token. It is stripped from every later `GET /api/games/:id`, there is no recovery endpoint, and re-joining does not restore it: while in lobby it takes a **new** seat with a **new** token (orphaning your old seat), and after start it fails with `game_already_started`. Lose it, lose the seat. So the moment create or join returns, save the token to disk before anything else (`$SCRATCH` as defined in [Scratch files](#scratch-files-mandatory)):
+
+```bash
+# join — the response body's player.token is your seat token:
+curl -fsS -X POST ${BASE_URL}/api/games/:id/join -H 'Content-Type: application/json' \
+  -d '{"name":"Agent B"}' > "$SCRATCH/join.json"
+jq -r '.player.token // empty' "$SCRATCH/join.json" > "$SCRATCH/token.txt"   # empty file ⇒ an error body; read join.json
+
+# create with participate:true — save BOTH tokens from the same response:
+curl -fsS -X POST ${BASE_URL}/api/games -H 'Content-Type: application/json' \
+  -d '{"mapId":"default","maxPlayers":2,"participate":true,"playerName":"Agent A"}' > "$SCRATCH/create.json"
+jq -r '.player.token // empty' "$SCRATCH/create.json" > "$SCRATCH/token.txt"
+jq -r '.hostToken // empty'    "$SCRATCH/create.json" > "$SCRATCH/host.txt"
+```
+
+Shell variables do **not** survive between your commands — every later call must re-read the file:
+
+```bash
+curl -fsS ${BASE_URL}/api/games/:id -H "X-Player-Token: $(cat "$SCRATCH/token.txt")"
+node "$SCRATCH/wait-turn.mjs" --url ${BASE_URL} --game <gameId> --player <yourSeat> --token "$(cat "$SCRATCH/token.txt")"
+```
+
+- No `jq` in your shell (common on Windows Git Bash)? Node is always available — the wait script needs it:
+  `node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).player?.token ?? ""' < "$SCRATCH/join.json" > "$SCRATCH/token.txt"`
+- The nested `player.token` authenticates your seat for game actions; the top-level `hostToken` only drives lobby/host endpoints. A participating host must save **both** — saving only the host token is a known loss.
+- These token files are the one exception to "prefer not saving at all", and keeping them under `$SCRATCH` is what keeps you compliant with "never print tokens".
 
 ## Remote Server Target
 
@@ -57,7 +86,7 @@ Before any API call, read the cloud server address from the user prompt and buil
 - `GET ${BASE_URL}/readyz` must return `200` before create/join/resume
 - No server in the prompt → ask. Never use `localhost`. Never start a local server.
 
-Keep player/host tokens in headers only. Never put tokens in URLs or print them.
+Keep player/host tokens in headers only. Never put tokens in URLs or print them in reports/output; the one required persistence is writing them to the token file under `$SCRATCH` (see [Player token](#player-token-mandatory)).
 
 ## Canonical fetch (mandatory)
 
@@ -90,7 +119,7 @@ Use `wait-turn.mjs` for the wait; do not hand-roll GET loops. Fetch it once per 
 
 ```bash
 curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o "$SCRATCH/wait-turn.mjs"
-node "$SCRATCH/wait-turn.mjs" --url ${BASE_URL} --game <gameId> --player <yourSeat> --token <playerToken> [--interval-s 3] [--timeout-s 1800]
+node "$SCRATCH/wait-turn.mjs" --url ${BASE_URL} --game <gameId> --player <yourSeat> --token "$(cat "$SCRATCH/token.txt")" [--interval-s 3] [--timeout-s 1800]
 ```
 
 Offline fallback only: run the copy bundled with a local skill install (`node skill/wait-turn.mjs ...`).
@@ -115,7 +144,7 @@ Run it in the **foreground as a blocking command** immediately after `/end-turn`
 9. `/end-turn` only when no useful legal action remains
 10. After `/end-turn`: follow the Polling decision — full-game intent means immediately running `wait-turn.mjs` again (foreground, blocking); single-turn intent means stopping with a report
 
-Player actions need a player token (`POST /api/games` with `participate: true`, or `POST /join`). Host token is separate; `participate: false` hosts never get a player token.
+Player actions need a player token (`POST /api/games` with `participate: true`, or `POST /join`). That response is the only time the token is shown — save it to `$SCRATCH/token.txt` immediately (see [Player token](#player-token-mandatory)) and read it back from that file in every later call. Host token is separate; `participate: false` hosts never get a player token.
 
 Transient `502`/`503`: back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>`, no token query param.
 
@@ -124,8 +153,8 @@ Transient `502`/`503`: back off, hit `/readyz`, re-fetch with the **existing** t
 Seats: `player_a` … `player_h` (2–8). Server assigns seats in join order.
 
 1. `GET /api/maps` — pick a map whose `preview.supportedPlayerCounts` includes lobby size
-2. `POST /api/games` — `{ mapId, maxPlayers, participate, playerName }`
-3. `POST /api/games/:id/join` — `{ name }`
+2. `POST /api/games` — `{ mapId, maxPlayers, participate, playerName }` → immediately save `player.token` + `hostToken` (see [Player token](#player-token-mandatory))
+3. `POST /api/games/:id/join` — `{ name }` → immediately save `player.token` (see [Player token](#player-token-mandatory))
 4. Optional: `GET /api/games/:id/lobby`
 5. `POST /api/games/:id/start` with `X-Host-Token` when ≥2 players and the map supports that count
 6. Play until last survivor or max-round adjudication

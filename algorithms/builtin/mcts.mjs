@@ -102,10 +102,13 @@ class MCTS {
     const actions = [];
     const myUnits = this.utils.livingUnits(state, owner);
     const targets = this.utils.enemyTargets(state, owner);
+    // 行动点预算：未激活的单位没有预算就不能产出需耗点的动作（否则引擎回 action_limit_reached）
+    const budget = this.utils.actionsRemaining(state);
+    const affordable = u => u.actionSpent || budget > 0;
 
     // 攻击动作
     for (const unit of myUnits) {
-      if (unit.hasActed) continue;
+      if (unit.hasActed || !affordable(unit)) continue;
       for (const target of targets) {
         const dist = this.utils.hexDistance(unit, target.entity);
         if (dist <= unit.attackRange) {
@@ -120,7 +123,7 @@ class MCTS {
 
     // 治疗动作（治疗距离与引擎一致：优先取 config 的 healRange）
     for (const unit of myUnits) {
-      if (unit.hasActed || unit.type !== 'support') continue;
+      if (unit.hasActed || unit.type !== 'support' || !affordable(unit)) continue;
       const healRange = state.config?.units?.[unit.type]?.healRange ?? unit.attackRange;
       for (const ally of myUnits) {
         if (ally.hp >= ally.maxHp) continue;
@@ -136,7 +139,7 @@ class MCTS {
     }
 
     // 移动动作（目标导向采样：可占领据点优先，其余位置偏向 movementGoal）
-    const moveUnits = myUnits.filter(u => !u.hasMoved && !u.hasActed).slice(0, 3);
+    const moveUnits = myUnits.filter(u => !u.hasMoved && !u.hasActed && affordable(u)).slice(0, 3);
     for (const unit of moveUnits) {
       const reachable = this.utils.reachableCells(state, unit);
       if (reachable.length === 0) continue;
@@ -294,58 +297,9 @@ class MCTS {
 }
 
 /**
- * 部署决策：MCTS 动作空间不含 deploy，由 decide 入口先行判断。
- * 触发条件与 greedy 一致（补给充裕 / 兵力劣势 / 据点足够 / 中后期），
- * 避免部队只减不增、补给空转到回合上限评分落败。
+ * 部署决策：MCTS 的动作空间不含 deploy，由 decide 入口先行判断。
+ * 具体候选走 game-utils 的公共实现（与 threat 共用，避免两份拷贝各自漂移）。
  */
-function tryDeploy(game, owner, utils) {
-  if (utils.actionsRemaining(game) <= 0) return null;
-
-  const ownedCps = (game.controlPoints || []).filter(cp => cp.owner === owner).length;
-  const myUnits = utils.livingUnits(game, owner);
-  const enemyArmy = utils.enemySeats(game, owner)
-    .reduce((sum, id) => sum + utils.livingUnits(game, id).length, 0);
-  const supplies = game.resources?.[owner]?.supplies ?? 0;
-  const turnNo = game.turn?.turnNumber ?? 0;
-
-  if (!(supplies >= 90 || myUnits.length <= enemyArmy || ownedCps >= 2 || turnNo >= 8)) {
-    return null;
-  }
-
-  const origins = utils.deployOrigins(game, owner);
-  if (origins.length === 0) return null;
-  const enemyHq = utils.nearestEnemyHeadquarters(game, owner, origins[0]);
-  const sortedOrigins = enemyHq
-    ? [...origins].sort((a, b) => utils.hexDistance(a, enemyHq) - utils.hexDistance(b, enemyHq))
-    : origins;
-
-  // 优先补齐队伍里稀缺的兵种
-  const counts = {};
-  for (const u of myUnits) counts[u.type] = (counts[u.type] || 0) + 1;
-  const damaged = myUnits.filter(u => u.hp < u.maxHp * 0.65).length;
-  const order = [];
-  if (damaged >= 2 && (counts.support || 0) < 2) order.push('support');
-  if (turnNo <= 3) order.push('scout', 'infantry');
-  order.push('ranger', 'heavy', 'infantry', 'scout', 'support');
-
-  for (const type of order) {
-    if (!game.config.units[type]) continue;
-    for (const origin of sortedOrigins) {
-      const cost = utils.effectiveDeployCost(game, type, origin);
-      if (supplies < cost) continue;
-      for (const pos of utils.neighbors(origin)) {
-        if (!utils.isEmptyPlain(game, pos)) continue;
-        return {
-          type: 'deploy',
-          payload: { unitType: type, fromId: origin.id, q: pos.q, r: pos.r },
-        };
-      }
-    }
-  }
-
-  return null;
-}
-
 /**
  * 回退移动：MCTS 动作采样未覆盖到（如可动单位超出前 3 个名额）时，
  * 用贪心方式移动一个单位，避免还有可动单位却提前结束回合
@@ -354,7 +308,8 @@ function fallbackMove(game, owner, utils) {
   const myUnits = utils.livingUnits(game, owner);
   const occupied = new Set(myUnits.map(u => `${u.q},${u.r}`));
 
-  for (const unit of myUnits.filter(u => !u.hasMoved && !u.hasActed)) {
+  const budget = utils.actionsRemaining(game);
+  for (const unit of myUnits.filter(u => !u.hasMoved && !u.hasActed && (u.actionSpent || budget > 0))) {
     const reachable = utils.reachableCells(game, unit)
       .filter(p => !occupied.has(`${p.q},${p.r}`));
     if (reachable.length === 0) continue;
@@ -388,7 +343,7 @@ export default {
     if (!owner) return null;
 
     // 部署先行：MCTS 动作空间不含 deploy
-    const deploy = tryDeploy(game, owner, utils);
+    const deploy = utils.deployDecision(game, owner);
     if (deploy) return deploy;
 
     // 如果没有可操作单位，结束回合

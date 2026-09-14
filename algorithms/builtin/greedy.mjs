@@ -5,12 +5,15 @@
 
 /**
  * 尝试攻击：优先击杀低血量敌人和敌方总部
+ * 行动点已用尽时只考虑本回合已激活的单位（否则引擎会回 action_limit_reached）。
  */
 function tryAttack(game, owner, utils) {
+  const budget = utils.actionsRemaining(game);
   const myUnits = utils.livingUnits(game, owner);
 
   for (const unit of myUnits) {
     if (unit.hasActed) continue;
+    if (!unit.actionSpent && budget <= 0) continue;
 
     const target = utils.bestAttackTarget(game, owner, unit);
     if (!target) continue;
@@ -31,8 +34,9 @@ function tryAttack(game, owner, utils) {
  * 尝试治疗：支援单位治疗最受伤的友军
  */
 function tryHeal(game, owner, utils) {
+  const budget = utils.actionsRemaining(game);
   const supports = utils.livingUnits(game, owner)
-    .filter(u => u.type === 'support' && !u.hasActed);
+    .filter(u => u.type === 'support' && !u.hasActed && (u.actionSpent || budget > 0));
 
   for (const support of supports) {
     const wounded = utils.livingUnits(game, owner)
@@ -63,9 +67,10 @@ function tryHeal(game, owner, utils) {
 function tryDemolish(game, owner, utils) {
   const turnNo = game.turn?.turnNumber ?? 1;
   if (turnNo < 6) return null; // 早期不爆破
+  const budget = utils.actionsRemaining(game);
 
   const heavies = utils.livingUnits(game, owner)
-    .filter(u => u.type === 'heavy' && !u.hasActed);
+    .filter(u => u.type === 'heavy' && !u.hasActed && (u.actionSpent || budget > 0));
 
   for (const heavy of heavies) {
     const neighbors = utils.neighbors(heavy);

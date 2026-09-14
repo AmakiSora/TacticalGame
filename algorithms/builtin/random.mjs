@@ -10,9 +10,11 @@ function collectAttackActions(game, owner, utils) {
   const actions = [];
   const myUnits = utils.livingUnits(game, owner);
   const targets = utils.enemyTargets(game, owner);
+  // 行动点预算：未激活且无预算的单位不能产出需耗点的动作（否则引擎回 action_limit_reached）
+  const budget = utils.actionsRemaining(game);
 
   for (const unit of myUnits) {
-    if (unit.hasActed) continue;
+    if (unit.hasActed || (!unit.actionSpent && budget <= 0)) continue;
 
     for (const target of targets) {
       const dist = utils.hexDistance(unit, target.entity);
@@ -36,8 +38,9 @@ function collectAttackActions(game, owner, utils) {
  */
 function collectHealActions(game, owner, utils) {
   const actions = [];
+  const healBudget = utils.actionsRemaining(game);
   const supports = utils.livingUnits(game, owner)
-    .filter(u => u.type === 'support' && !u.hasActed);
+    .filter(u => u.type === 'support' && !u.hasActed && (u.actionSpent || healBudget > 0));
   const wounded = utils.livingUnits(game, owner)
     .filter(u => u.hp < u.maxHp);
 

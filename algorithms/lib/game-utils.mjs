@@ -329,3 +329,51 @@ export function actionsRemaining(game) {
   const perTurn = game.config?.balance?.actionsPerTurn ?? 5;
   return Math.max(0, perTurn - (game.turn?.actionsUsed ?? 0));
 }
+
+export function deployDecision(game, owner) {
+  if (actionsRemaining(game) <= 0) return null;
+
+  const ownedCps = (game.controlPoints || []).filter(cp => cp.owner === owner).length;
+  const myUnits = livingUnits(game, owner);
+  const enemyArmy = enemySeats(game, owner)
+    .reduce((sum, id) => sum + livingUnits(game, id).length, 0);
+  const supplies = game.resources?.[owner]?.supplies ?? 0;
+  const turnNo = game.turn?.turnNumber ?? 0;
+
+  if (!(supplies >= 90 || myUnits.length <= enemyArmy || ownedCps >= 2 || turnNo >= 8)) {
+    return null;
+  }
+
+  const origins = deployOrigins(game, owner);
+  if (origins.length === 0) return null;
+  const enemyHq = nearestEnemyHeadquarters(game, owner, origins[0]);
+  const sortedOrigins = enemyHq
+    ? [...origins].sort((a, b) => hexDistance(a, enemyHq) - hexDistance(b, enemyHq))
+    : origins;
+
+  // 优先补齐队伍里稀缺的兵种
+  const counts = {};
+  for (const u of myUnits) counts[u.type] = (counts[u.type] || 0) + 1;
+  const damaged = myUnits.filter(u => u.hp < u.maxHp * 0.65).length;
+  const order = [];
+  if (damaged >= 2 && (counts.support || 0) < 2) order.push('support');
+  if (turnNo <= 3) order.push('scout', 'infantry');
+  order.push('ranger', 'heavy', 'infantry', 'scout', 'support');
+
+  for (const type of order) {
+    if (!game.config.units[type]) continue;
+    for (const origin of sortedOrigins) {
+      const cost = effectiveDeployCost(game, type, origin);
+      if (supplies < cost) continue;
+      for (const pos of neighbors(origin)) {
+        if (!isEmptyPlain(game, pos)) continue;
+        return {
+          type: 'deploy',
+          payload: { unitType: type, fromId: origin.id, q: pos.q, r: pos.r },
+        };
+      }
+    }
+  }
+
+  return null;
+}

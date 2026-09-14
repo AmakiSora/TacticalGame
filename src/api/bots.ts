@@ -143,6 +143,7 @@ const ALGORITHM_BOTS = {
   algo_greedy: { name: '贪心算法', algorithm: 'greedy', description: '攻击 > 治疗 > 爆破 > 部署 > 移动' },
   algo_random: { name: '随机算法', algorithm: 'random', description: '从所有合法动作中随机选择' },
   algo_mcts: { name: '蒙特卡洛树搜索', algorithm: 'mcts', description: '蒙特卡洛树搜索：模拟推演选择最优动作' },
+  algo_threat: { name: '威胁感知算法', algorithm: 'threat', description: '威胁图统一效用评估：集火斩杀、避险走位' },
 } as const;
 
 /** 大厅内出现同名玩家会让踢人/观战难以区分：名称被占用时自动追加序号。 */

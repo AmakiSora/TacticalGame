@@ -25,6 +25,8 @@ node algorithms/runner.mjs \
 
 - **greedy** - 贪心算法：攻击 > 治疗 > 爆破 > 部署 > 移动
 - **random** - 随机算法：从所有合法动作中随机选择
+- **mcts** - 蒙特卡洛树搜索：模拟推演选择最优动作
+- **threat** - 威胁感知算法：威胁图统一效用评估，集火斩杀、避险走位
 
 ## 编写自定义算法
 
@@ -164,6 +166,7 @@ export default {
 
 #### 其他
 - `actionsRemaining(game)` - 剩余行动点
+- `deployDecision(game, owner)` - 部署候选动作（触发条件+稀缺兵种+就近部署源），threat/mcts 共用
 
 ### API 客户端方法
 

@@ -16,6 +16,7 @@ export const ALGORITHMS = {
   greedy: './builtin/greedy.mjs',
   random: './builtin/random.mjs',
   mcts: './builtin/mcts.mjs',
+  threat: './builtin/threat.mjs',
 };
 
 /**

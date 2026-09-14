@@ -271,7 +271,8 @@ python rl/evaluate.py --model rl/models/model.zip
 
 - **贪心算法（Greedy）**：优先攻击可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动
 - **随机算法（Random）**：从所有合法动作中随机选择
-- **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 每决策 100 次模拟推演，移动采样偏向 `movementGoal`，支持据点占领与入口部署决策；实测对 random 全胜（12 局）、对 greedy 胜率 26.7%（30 局 8:22），详细档案见 `algorithms/docs/algorithms/mcts.md`
+- **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 每决策 100 次模拟推演，移动采样偏向 `movementGoal`，支持据点占领与入口部署决策；决策耗时 0.5-1 秒，实测对 greedy 胜率 25%（20 局 5:15），详细档案见 `algorithms/docs/algorithms/mcts.md`
+- **威胁感知算法（Threat）**：效用 AI + 威胁影响图——把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，内置敌方威胁图（落点承伤按敌方行动预算截断），因此集火斩杀、残血避险、走位避炮同时成立；单步决策 p50 0.25ms，实测对 greedy 胜率 70.6%（7 张标准地图 × 40 局）、对 mcts 14:6，为 2 人局最强的内置算法 AI（仅支持标准模式；3-4 人局权重未标定），详细档案见 `algorithms/docs/algorithms/threat.md`
 
 添加算法 AI 时可自定义玩家名，默认预填所选算法的中文名。
 
@@ -304,7 +305,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random） |
+| `--algorithm <name>` | 算法名称（greedy, random, mcts, threat） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |
@@ -315,6 +316,14 @@ node algorithms/runner.mjs \
 | `--quiet` | 减少日志输出 |
 
 算法开发指南见 `algorithms/builtin/README.md`。该目录包含完整的算法接口文档、游戏工具函数和开发示例。
+
+强度标定与合法性回归用 `scripts/algorithm-arena.mjs`（headless 自博弈，直接驱动引擎，不经 HTTP）：
+
+```bash
+npx tsx scripts/algorithm-arena.mjs --a threat --b greedy --games 40 --map default
+npx tsx scripts/algorithm-arena.mjs --a threat --b greedy --games 12 --map multiplayer-ring --players 4
+npx tsx scripts/algorithm-arena.mjs --a threat --b greedy --map random --games 20 --strict   # 有非法动作即退出码 1
+```
 
 ### 4. 外部 LLM（通过提示词）
 

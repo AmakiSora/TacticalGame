@@ -2,16 +2,26 @@
 
 > 本文档记录算法 AI 系统的版本历史、功能变更和性能进展。
 
-## 3.5.1（2026-09-13）— MCTS 算法与文档体系
+## 3.5.1（2026-09-13/14）— MCTS、Threat 算法与文档体系
 
 ### 新增功能
 
 1. **MCTS 算法**：新增蒙特卡洛树搜索 `algorithms/builtin/mcts.mjs`，UCB1 选择（探索常数 1.414）、每决策 100 次模拟、最大深度 8、目标导向动作采样（移动取最贴近 `movementGoal` 的可达格；`canCapture` 单位对可达范围内的中立/敌方据点生成显式占领动作，优先级 1.2；采样未覆盖到可动单位时回退贪心移动）。部署（deploy）不在 MCTS 动作空间内，由 decide 入口按补给/兵力状况先行决策（触发条件与 greedy 一致）。
    - **评估函数**：我方单位价值总和；敌方存活单位价值作负资产扣分（击杀即收益，规模随人数自适应）；我方总部存活按血量 ×2 计分、阵亡 -10000；敌方总部按已受伤害 ×3 计分、阵亡 +10000。
    - **动作优先级**：攻击总部 > 击杀低血单位 > 治疗 > 移动。
-2. **算法注册与前端集成**：`registry.mjs` 注册 `mcts`；`src/api/bots.ts` 新增 `algo_mcts` 配置；`play.html` / `play-m.html` 下拉菜单新增"蒙特卡洛树搜索（MCTS）"选项。算法 AI 从 2 个扩展到 3 个。添加弹窗支持自定义玩家名（默认预填所选算法的中文名，类型切换时刷新；服务端接受可选 `name`，缺省用算法中文名），移动端 `play-m.html` 同步完整支持算法页签。
-3. **算法文档体系**：新建 `algorithms/docs/`（`ALGORITHMS_NOTES.md` 开发笔记、`RELEASE_NOTES.md` 发布记录、`algorithms/*.md` 单算法档案），模板与 `rl/docs/models/*.md` 对齐。
-4. **冒烟测试脚本**：新增 `scripts/test-algorithm-bots.mjs`，本地起服后一键验证算法 bot 对局推进（默认 mcts vs random，可传参指定任意两个 `algo_*` 组合）。
+2. **Threat 威胁感知算法**：新增效用 AI `algorithms/builtin/threat.mjs`。
+   - **威胁图**：每敌军两级格子集合（原地射程环 `immediate` 权重 0.85、机动后覆盖 `future` 权重 0.45），落点潜在承伤按 `actionsPerTurn` 截断求和——只算敌方本回合真能开火的次数，避免火力密度随军队规模线性高估。
+   - **攻击**：期望伤害 + 斩杀奖励（稳杀全额 / 大概率 ×0.6）− 反击风险（稳杀目标从威胁图扣除）。
+   - **移动**：与原地比较取增量，含抢点（收入按据点 kind 取实际值 + 终局裁定分）、走位火力投射、连续化威胁惩罚 `min(0.8×单位价值, 威胁×0.8×(2−hp/maxHp)))、推进项、扎堆扣分、残血贴治疗。
+   - **部署**：与战斗动作同一尺度比较（`DEPLOY_UTILITY` 250），且必须排在"无事可做"判定之前，否则部队被全歼后再也不补员。
+   - 单步决策 p50 0.25ms / p95 2.0ms / p99 3.6ms。实测（`scripts/algorithm-arena.mjs`，逐局交替席位）：vs greedy 7 图 ×40 局 **197:82（70.6%）**、vs 初版 threat 31:9、vs mcts 14:6、vs random 24:0、随机地图 17:15；短板：danger-close（每回合 1 行动点）7:33、3-4 人席位未标定。
+   - 同期修正 greedy / mcts / random 的行动点预算门控（同一个 bug 家族，动作失败会让 runner 作废整回合），修正后三方零非法动作；mcts vs greedy 的历史基线由 8:22 重测为 5:15。
+   - 测试：`tests/algorithms/threat.test.ts`（15 场景，含"行动点耗尽不得返回需耗点动作""只能推进一格不得提前交回合""被全歼后仍要补员"三条回归）与 `tests/algorithms/threat-selfplay.test.ts`（跑完整对局断言零非法动作）。
+   - **初版标定教训**：初版（`THREAT_SCALE=2.2` + 结束回合门槛 4 + 无预算门控）在同口径下只有 41.1%，breach 图 0 胜 40 局；6 局样本的"3:3"结论被 280 局推翻。
+
+3. **算法注册与前端集成**：`registry.mjs` 注册 `mcts`、`threat`；`src/api/bots.ts` 新增 `algo_mcts`、`algo_threat` 配置；`play.html` / `play-m.html` 下拉菜单新增对应选项。算法 AI 从 2 个扩展到 4 个（greedy / random / mcts / threat）。添加弹窗支持自定义玩家名（默认预填所选算法的中文名，类型切换时刷新；服务端接受可选 `name`，缺省用算法中文名），移动端 `play-m.html` 同步完整支持算法页签。
+4. **算法文档体系**：新建 `algorithms/docs/`（`ALGORITHMS_NOTES.md` 开发笔记、`RELEASE_NOTES.md` 发布记录、`algorithms/*.md` 单算法档案），模板与 `rl/docs/models/*.md` 对齐。
+5. **冒烟测试脚本**：新增 `scripts/test-algorithm-bots.mjs`，本地起服后一键验证算法 bot 对局推进（默认 mcts vs random，可传参指定任意两个 `algo_*` 组合）。
 
 ### 性能测试
 
@@ -20,15 +30,18 @@
 | 对局 | 胜率 | 备注 |
 |---|---|---|
 | mcts vs random | 100% (12:0) | 终局评分约 3200 vs 500，评分碾压为主 |
-| mcts vs greedy | 26.7% (8:22) | 攻击/抢点/部署等宏观指标与 greedy 持平，差距在集火补刀效率（greedy 场均攻击约 41 vs 17，单位交换比占优） |
+| mcts vs greedy | 26.7% (8:22) → 修正后 25% (5:15) | 旧值是双方都带行动点预算 bug 时测的；两者修正后重测仍同一量级（mcts 未播种，批次间波动大） |
+| threat vs random | 100% (6:0) | 8-13 回合速胜 |
+| threat vs greedy | 50% (3:3) | 12-15 回合；威胁感知走位 + 稳杀集火，高于 mcts 但样本仅 6 局待扩 |
 
-> 对 RL 模型的同口径实测尚未进行；MCTS 决策含随机模拟，胜负方差较大，可靠的算法强度对比需 30+ 局（见未来方向"算法锦标赛"）。
+> 上表 mcts/threat 的 6 局小样本已被推翻：3.5.1 发布前用新工具 `scripts/algorithm-arena.mjs` 重测（每图 40 局、逐局交替席位、并审计非法动作），完整口径见 `ALGORITHMS_NOTES.md` 与 `algorithms/threat.md`：threat vs greedy **197:82（70.6%）**、vs 初版 31:9、vs mcts 14:6。对 RL 模型的同口径实测仍未做；mcts 的模拟用未播种随机数，批次间会飘。
 
 ### 已知限制
 
 1. MCTS 模拟为单边推演，不建模对手回应；不爆破障碍单位。
-2. 战斗效率低于 greedy（不主动集火），单位交换比吃亏。
-3. 决策含随机模拟，胜负方差大；算法强度对比需 30+ 局的正式锦标赛（见未来方向）。
+2. MCTS 战斗效率低于 greedy（不主动集火），单位交换比吃亏。
+3. MCTS 决策含随机模拟，胜负方差大；算法强度对比需 30+ 局的正式锦标赛（见未来方向）。
+4. Threat 为单步效用贪心，不推演对手回应链；落点承伤已按敌方 `actionsPerTurn` 截断（不再线性高估火力密度），但仍假设每个敌军都选择打我；权重全部在 2 人对局上标定，**3-4 人席位实测不优于 greedy**；`danger-close`（每回合 1 行动点）7:33 是已知短板。
 
 ### 提交记录
 

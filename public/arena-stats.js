@@ -208,7 +208,7 @@
         `<span>训练日期 <b>${escapeHtml(m.trainDate)}</b></span>`,
         `<span>训练地图 <b>${escapeHtml(mapLabel(m.trainMap))}</b></span>`,
         `<span>训练对手 <b>${escapeHtml(m.opponentType)}</b></span>`,
-        `<span>交付步数 <b>${fmtSteps(m.steps)}</b></span>`,
+        `<span>交付步数 <b>${fmtSteps(m.deliveredSteps ?? m.steps)}</b></span>`,
         m.sizeMB != null ? `<span>文件 <b>${m.sizeMB} MB</b></span>` : '',
         m.docRef ? `<span>档案 <b>${escapeHtml(m.docRef)}</b></span>` : '',
       ].filter(Boolean).join('');

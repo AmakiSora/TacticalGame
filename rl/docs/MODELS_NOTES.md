@@ -23,6 +23,7 @@ v3.0.3（全 7 图训练混合 + 锚点 v3.0.0 20% + best 选择键拆分，纯�
 |---|---|---|---|
 | `rl/test-output/models/hex_ppo_v3.0.1_20260904_random_selfplay_350000_best.zip` | [v3.0.1](models/v3.0.1.md) | 与 champion 同水平（**未交付**） | 源自 `rl/checkpoints/random/20260904-143009/best/best_model.zip`（35 万步），已用 `sanitize_delivery_zip` 清掉 lr 闭包。随机图 96 局同图配对对 v2.7.0 **49:47**（51.0%，Wilson 下界 41.2%），先手座 30/48（62.5%）、后手座 19/48（39.6%）。训练在 749,568 步（25%）因 `nvlddmkm` Event 153 GPU 驱动错误中断，交付模型未生成；75 万步内无崩溃（`explained_variance` 0.50-0.89 无趋势性下跌、`ep_rew_mean` 起步 14.0、最低 5.98、收于 10.9、target_kl 未触发），证实 v3.0.1 的价值头尺度修复有效 |
 | `hex_ppo_v3.0.1_20260904_distilled.zip` | [v3.0.1](models/v3.0.1.md) | 中间产物（勿部署，**已删除**） | v3.0.1 蒸馏冷启动断点：价值头改在未缩放回报上训练 + Huber，45220 样本 12 轮、验证集动作准确率 68.3%，std(V)/std(return) 由 0.16 升到 0.85、平均偏差 −2.56 → −0.91 |
+| `rl/models/hex_ppo_v3.1.0_20260910_random_selfplay_1500000.zip` | RELEASE_NOTES 2026-09-10 v3.1.0 验收条目 | 验收未过线（forge 崩塌，**非 champion**） | 容量对照实验：仅把编码器扩为 3 层×128（其余与 v3.0.3 完全一致），whack-a-mole 未停止（forge 0:48 崩塌），容量假设证伪；文件名 1.5M 为训练终点，交付 best 为 10 万步断点（蒸馏克隆体对锚点 52% 即全程 best，之后 PPO 打散再爬回） |
 | `rl/models/hex_ppo_v3.1.1_20260911_random_selfplay_10940000.zip` | RELEASE_NOTES 2026-09-11 v3.1.1 验收条目 | 验收未过线（forge 崩塌，**非 champion**） | 随机域拓宽后第一代：v3.0.4-8.44M 续训 250 万帧（random 0.7 + 静态各 0.05，锚点升级为 v3.0.3）。交付 best 实为 8.8M 断点。对 v3.0.3 总分 **312:168**（65.0%，历代最高）：dual-lanes **48:0 自愈**、default **96:0 破座位锁**、breach 48:0 保持，但 forge 0:48 崩塌（连续第二代）、desert 退回座位锁平 |
 | `rl/models/hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip` | RELEASE_NOTES 2026-09-09 v3.0.4 验收条目 | 验收未过线（dual-lanes 崩塌，**非 champion**） | v3.0.3-5M 续训 360 万帧（breach/desert 加权 0.10）。交付候选经互打筛选定为 8.44M 断点（对训练期 best 累计 **157:131**/288 局，2026-09-12 加赛复核后落选文件已删）。对 v3.0.3 全图 480 局总分 **273:207**（56.9%，下界 52.4%）：breach/desert 双 48:0 修复、random 57:39，但 **dual-lanes 0:48 双座全崩**（一票否决）；danger-close/default/forge 纯座位锁各平 |
 | `rl/models/hex_ppo_v3.0.4_20260909_random_selfplay_8600000.zip` | 同上 | 中间产物（训练期 best，非交付候选） | 训练自动交付的 best（末次 8.6M 评估即全程 best：最弱下界 54%、后手座下界 60%）；互打筛选 87:105 落后于 8.44M 断点——v3.0.2 后第二次「训练期 best ≠ 最强断点」 |
@@ -37,17 +38,32 @@ v3.0.3（全 7 图训练混合 + 锚点 v3.0.0 20% + best 选择键拆分，纯�
 | `hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip` | [v2.6.0](models/v2.6.0.md) | 历史（不推荐） | 对手生态加压（自对弈 85%/近期加权/锚点 15%）；仍败于 v2.4.0（10:14），且 default 0:24 全崩（后手能力也丢），灾难性遗忘 |
 | `hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip` | [v2.5.0](models/v2.5.0.md) | 历史（不推荐） | 观测加对手上一回合动作历史（5974→6024 维），交付 200 万步终点断点。真换边 24 局复测 9:15 败于 v2.4.0；结论历经「8:0 碾压 → 同档 → 退步」三次反转，催生 `--swap-sides` 座位 bug 修复与大样本/分座位验收铁律 |
 | `hex_ppo_v2.4.0_20260830_random_selfplay_2000000.zip` | [v2.4.0](models/v2.4.0.md) | 历史 champion / v2.7 锚点 | 256×256 大网络；曾连续胜 v2.5/v2.6，现被 v2.7 在随机图 96 局以 66:30 超越 |
-| `hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip` | [v2.3.3](models/v2.3.3.md) | 历史 | 续训+学习率衰减+锚点；被 256 网络的 v2.4.0 3:5 超越 |
-| `hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip` | [v2.3.2](models/v2.3.2.md) | 历史 | 首个任意地图可战模型；被 v2.3.3 3:5 小幅超越 |
-| `hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip` | [v2.3.1](models/v2.3.1.md) | 历史 | 首个随机地图模型；随机图对 v2.2.0 7:1、对规则对手 14:6；但被自对弈的 v2.3.2 1:7 压制 |
+| `hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip` | [v2.3.3](models/v2.3.3.md) | 历史 | 续训+学习率衰减+锚点；小样本对 v2.4.0 3:5，竞技场大样本 73:95 仍处下风 |
+| `hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip` | [v2.3.2](models/v2.3.2.md) | 历史 | 首个任意地图可战模型（2026-09-16 复测：仅随机图成立，静态图 11%~24%）；竞技场全榜垫底（17/17，胜率 19.7%），对 v2.3.3 大样本 79:89 持平 |
+| `hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip` | [v2.3.1](models/v2.3.1.md) | 历史 | 首个随机地图模型；随机图对 v2.2.0 7:1、对规则对手 14:6；竞技场大样本对 v2.3.2 149:19（历史「1:7 被压制」系座位 bug 修复前小样本噪声，已推翻） |
 | `hex_ppo_v2.2.0_20260827_default_modelmix_best.zip` | [v2.2.0](models/v2.2.0.md) | 历史 | 座位随机化；对 v2.0.0 真身 16:0，对 v2.1.3 累计 16:2；交付 best 为 12 万步断点 |
 | `hex_ppo_v2.1.3_20260826_default_rule_defensive_800000.zip` | [v2.1.3](models/v2.1.3.md) | 历史 | 单一 defensive 对手 + 独特超参（lr 1e-4/gamma 0.995）；弱于 v2.0.0、强于 v2.1.4–v2.1.8 |
 | `hex_ppo_v2.0.0_20260824_default_rule_500000.zip` | [v2.0.0](models/v2.0.0.md) | 基准/历史 | 规则对手 + 固定意图槽（38 动作）；唯一能在主场满血出战的旧模型，v2.1.x 的模型对手与验收基准都是它 |
 | `hex_ppo_v1.0.0_20260824_default_random_opponent_120000.zip` | [v1.0.0](models/v1.0.0.md) | 历史 | 512 动作随机对手基线，仅由 `run_model_v100.py` 路由；v1.0.0 唯一保留的模型文件（早期实验版 100096 已作为冗余删除，详见档案） |
 
+### 文件名步数与交付断点
+
+模型文件名末段步数是**训练目标/终点**（v2.3.3 档案明文「文件名 2000000 是目标步数」），交付 zip 内实际是评估 best 断点，两者常不一致。下表按 zip 内 `num_timesteps` 记录实际交付断点（仅收录与文件名差 ≥10 万步的模型，其余在 rollout 边界/舍入噪声内）；AI 竞技场排行榜的展示名（`v2.3.2@340K` 等）以此为准，镜像表在 `script/generateArenaLeaderboard.mjs` 的 `MODEL_DELIVERED_STEPS`，两处需人工同步维护。
+
+| 模型文件 | 文件名步数（训练目标/终点） | 交付断点（zip 实测） |
+|---|---|---|
+| `hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip` | 800,000 | 70,000 |
+| `hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip` | 800,000 | 340,000 |
+| `hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip` | 2,000,000 | 770,000 |
+| `hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip` | 4,000,000 | 3,560,000 |
+| `hex_ppo_v2.8.0_20260903_random_selfplay_6000000.zip` | 6,000,000 | 4,650,000 |
+| `hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip` | 3,000,000 | 50,000 |
+| `hex_ppo_v3.1.0_20260910_random_selfplay_1500000.zip` | 1,500,000 | 100,000 |
+| `hex_ppo_v3.1.1_20260911_random_selfplay_10940000.zip` | 10,940,000 | 8,800,000 |
+
 ### 已作废模型（归档留底，勿部署、勿纳入评估）
 
-作废模型不进上面的主列表：模型 zip 统一移入 `rl/models/deprecated/`，对应训练断点移入 `rl/checkpoints/deprecated/`，档案移入 `rl/docs/models/deprecated/`。文件全部保留仅供追溯；服务端「添加 AI」模型列表与 `round_robin` 自动发现都只扫描 `rl/models/` 顶层，不会读到这些目录；`generateRlLeaderboard.mjs` 按版本显式排除作废模型，RL 排行榜不评分、不展示（含「未参评」区）。
+作废模型不进上面的主列表：模型 zip 统一移入 `rl/models/deprecated/`，对应训练断点移入 `rl/checkpoints/deprecated/`，档案移入 `rl/docs/models/deprecated/`。文件全部保留仅供追溯；服务端「添加 AI」模型列表与 `round_robin` 自动发现都只扫描 `rl/models/` 顶层，不会读到这些目录；`generateArenaLeaderboard.mjs` 按版本显式排除作废模型，AI 竞技场排行榜不评分、不展示（含「未参评」区）。
 
 | 模型文件（已归档） | 档案 | 作废原因 |
 |---|---|---|

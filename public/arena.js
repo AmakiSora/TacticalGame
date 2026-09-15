@@ -88,6 +88,7 @@
         trainMap: meta.trainMap || '',
         opponentType: meta.opponentType || '',
         steps: meta.steps,
+        deliveredSteps: meta.deliveredSteps ?? null,
         status: meta.status || 'legacy',
         statusNote: meta.statusNote || null,
         firstSeatRate: m.firstSeat?.winRate ?? null,
@@ -238,7 +239,11 @@
     }
     el.detailTitle.textContent = `${row.short}（${row.id}）`;
     el.detailBody.className = '';
-    const stepText = row.steps == null ? 'best' : row.steps.toLocaleString();
+    const stepText = row.steps == null
+      ? 'best'
+      : row.deliveredSteps != null && row.deliveredSteps !== row.steps
+        ? `${row.deliveredSteps.toLocaleString()}（交付 best；文件名 ${row.steps.toLocaleString()} 为训练目标）`
+        : row.steps.toLocaleString();
     const vsEntries = Object.entries(row.vs).sort((a, b) => b[1].games - a[1].games);
     const vsRows = vsEntries.map(([opp, v]) => {
       const oppShort = raw.registry[opp]?.short || opp;

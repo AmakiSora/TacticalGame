@@ -12,10 +12,16 @@
 - **算法 AI 进程内对战通道**：`rl/training/local-worker.ts` 新增 `{"cmd":"decide","owner","algorithm"}` 命令——经 `algorithms/registry.mjs` 动态加载内置算法，用与线上 REST 状态同形的快照（剥离 tokens/hostToken/rngState）调 `decide(state, utils)`，每次返回一个动作或 `endTurn`（null 语义与 `algorithms/lib/interfaces.mjs` 适配器一致；playTurn 型接口显式拒绝）。worker 快照顺带对齐线上序列化：`rngState` 不再外泄。
 - **混合循环赛**：`rl/evaluation/evaluate_cross.py` 新增 `--player-a/--player-b`（规格 = 模型 zip 路径或 `algo:<注册名>`；`--model-a/--model-b` 保留为模型别名），新增 `AlgorithmController` 与模型控制器同接口；算法动作若被引擎拒绝，按线上 runner 语义"结束该回合并记录 `failed`"，不中断整批。`rl/evaluation/round_robin.py` 覆盖模型×模型、模型×算法、算法×算法三类对：算法清单经 node 动态读 `algorithms/registry.mjs`（不再维护第二份名单），新增 `--algorithms <names|none>`；断点续跑/换座配对/种子盐协议不变（算法参与者 id 为 `algo_<name>`，与既有模型 id 天然不碰撞）；纯算法批次不加载 torch/sb3（`evaluate_cross` 推理栈改为惰性导入），启动与单局耗时显著更低。matches.jsonl 明细 `meta.models[seat]` 新增 `kind`/`algorithm` 字段，摘要行 `players` 字段格式不变。
 - **算法展示元数据单一来源**：`algorithms/registry.mjs` 新增 `ALGORITHM_META`（中文名/描述）、`listAlgorithmInfo()`、`algorithmParticipantId()`，并配 `registry.d.mts` 类型声明供 TS 侧消费；`src/api/bots.ts` 的 `ALGORITHM_BOTS` 改为从注册表生成（消除历史上出过不一致的双份清单）。
+- **排行榜展示名采用交付断点口径**：全量核验 17 个交付 zip 的 `num_timesteps`，发现 8 个模型展示名虚标——文件名末段是训练目标/终点，zip 内实为评估 best 断点（v2.3.1@800K 实为 7 万步、v3.0.0@3M 实为 5 万步等）。`generateArenaLeaderboard.mjs` 新增 `MODEL_DELIVERED_STEPS` 覆盖表（与 `rl/docs/MODELS_NOTES.md`「文件名步数与交付断点」对照表互为镜像，两处人工同步），`shortName` 优先按交付断点生成展示名：v2.3.1@800K→@70K、v2.3.2@800K→@340K、v2.3.3@2M→@770K、v2.6.0@4M→@3.6M、v2.8.0@6M→@4.7M、v3.0.0@3M→@50K、v3.1.0@1.5M→@100K、v3.1.1@10.9M→@8.8M；两份 JSON 参与者条目新增 `deliveredSteps` 字段，`/arena.html` 详情面板区分「交付 best 与文件名训练目标」，`arena-stats.js` 的「交付步数」改按交付断点展示。`STATUS_NOTES` 新增 v2.3.2 条目（交付 34 万步 best、交付期评估早于 `--swap-sides` 座位 bug 修复，历史 7:1 属小样本噪声），档案页可见。
+
+### 变更
+
+- **文档修正（rl/docs，竞技场大样本复核后续）**：`MODELS_NOTES.md` 状态总表修正三行小样本过时结论——v2.3.1 行「被 v2.3.2 1:7 压制」与复核方向相反（竞技场 168 局大样本 v2.3.1 对 v2.3.2 **149:19**），v2.3.2/v2.3.3 行的 8 局互打小样本补注竞技场大样本（对 v2.3.3 79:89 持平、对 v2.4.0 73:95）；新增「文件名步数与交付断点」对照小节；补 v3.1.0 缺失的状态总表行（此前仅 RELEASE_NOTES 有记录，统计页报 without notes）；作废小节中已删除的 `generateRlLeaderboard.mjs` 引用改为现行 `generateArenaLeaderboard.mjs`。v2.3.2 档案新增「竞技场复测（2026-09-16）」节（全榜垫底 17/17、计分胜率 19.7%、静态图 11%~24% vs 随机图 38%、default 对 v2.0.0 0:8 对照实验与模板化开局行为缺陷、三条根因），一句话总结同步修正；v2.3.3 档案一句话总结同步大样本数据。
 
 ### 修复
 
 - 修复镜像构建失败：`src/api/{bots,arenaEval}.ts` 对 `algorithms/registry.mjs` 的构建期 import 依赖 Dockerfile build 阶段携带 `algorithms/`（含类型声明 `registry.d.mts`），此前该目录只在 runtime 阶段 COPY，容器内 `tsc` 报 TS2307 模块解析失败、CI 的 docker build 步骤红灯；已补入 build 阶段，本地隐藏/恢复该目录精确复现并验证。
+- 修复 `generateArenaStats.mjs` 的 `parseModelsNotes` 主表定位：原先按「非作废小节即主表」解析，MODELS_NOTES 新增「文件名步数与交付断点」对照表后，其 3 列行被误判并刷「主表行列数不足」警告；改为按「## 模型状态总表」小节定位主表，其余小节含模型文件名的表格（如交付断点对照表）静默跳过。
 
 ### 移除
 
@@ -26,6 +32,7 @@
 - `npm run build && npm test` 通过（55 个测试文件 / 496 个用例）；`npm run check-version` 校验 3.5.3 全部引用一致。
 - 竞技场链路实测：worker decide 通道单测（threat/greedy/random 整回合动作全部被引擎接受、null→endTurn、未知算法报错）；`round_robin.py --dry-run` 三类配对（模型×模型/模型×算法/算法×算法）齐全；实跑纯算法批 2 局（0.9 局/s，未加载 torch）与模型×算法 2 局（含换座配对，双方各胜一局）；`/api/arena/eval/start` 混合 participants 经 dry-run 正确翻译为 `--models v3.1.1 --algorithms threat,greedy`；`/arena.html` 浏览器验证：算法行徽标与未参评展示、类型筛选、详情面板、控制台算法分组默认勾选、参与者档案算法卡片均正常。
 - 算法 AI 进榜数据待正式跑批：评估控制台勾选模型+算法发起即可（算法×模型 17×4 对、算法×算法 6 对 × 7 图 × 24 局），历史模型数据无需迁移。
+- 展示名修正与文档复核链路：zip `num_timesteps` 与文件名步数全量比对（17 个模型，8 个差 ≥10 万步入覆盖表，其余在 rollout 边界/舍入噪声内）；竞技场 head-to-head 大样本核对（`arena/matches.jsonl` 每对 168 局）；`npm run arena-leaderboard` / `arena-stats` 重新生成两份 JSON 警告清零，抽查 v2.3.2 `short`/`deliveredSteps`/`statusNote` 与 v3.1.0 档案挂接正确；`npm run build && npm test` 通过（55 个测试文件 / 497 个用例，新增「主表外小节表格不参与档案匹配」用例，两个内联夹具补「模型状态总表」标题适配主表定位契约）。
 
 ## 3.5.2
 

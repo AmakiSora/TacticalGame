@@ -51,6 +51,25 @@ export const RETIRED_VERSIONS = new Set(
 /** 评估协议已知限制：v2.0.0 观测固定 player_a 视角，坐 player_b 属分布外。 */
 export const STATUS_NOTES = {
   'v2.0.0': 'player_b 座位观测失真，成绩仅供参考',
+  'v2.3.2': '交付 best 实为 34 万步（文件名为训练目标 80 万步）；交付期评估早于 --swap-sides 座位 bug 修复，历史 7:1 成绩属小样本噪声',
+};
+
+/**
+ * 文件名末段步数是「训练目标/终点」，交付 zip 内实际是评估 best 断点，两者常不一致
+ * （v2.3.3 档案明文「文件名 2000000 是目标步数，实际交付 best 在 77 万步」）。此表按
+ * zip 内 num_timesteps 记录实际交付断点，仅收录与文件名差 ≥10 万步（超出 rollout 边界
+ * 与 M 舍入噪声）的模型；shortName 用它生成展示名，避免「v2.3.2@800K」这类按目标步数
+ * 虚标交付物。镜像 rl/docs/MODELS_NOTES.md「文件名步数与交付断点」表，两处需人工同步维护。
+ */
+export const MODEL_DELIVERED_STEPS = {
+  'hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip': 70000,
+  'hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip': 340000,
+  'hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip': 770000,
+  'hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip': 3560000,
+  'hex_ppo_v2.8.0_20260903_random_selfplay_6000000.zip': 4650000,
+  'hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip': 50000,
+  'hex_ppo_v3.1.0_20260910_random_selfplay_1500000.zip': 100000,
+  'hex_ppo_v3.1.1_20260911_random_selfplay_10940000.zip': 8800000,
 };
 
 export function parseArgs(argv) {
@@ -89,10 +108,11 @@ export function parseModelFile(fileName) {
 
 export function shortName(meta) {
   if (!meta) return null;
-  if (meta.steps == null) return meta.version;
-  return meta.steps >= 1_000_000
-    ? `${meta.version}@${Number((meta.steps / 1_000_000).toFixed(1))}M`
-    : `${meta.version}@${Math.round(meta.steps / 1000)}K`;
+  const steps = meta.deliveredSteps ?? meta.steps;
+  if (steps == null) return meta.version;
+  return steps >= 1_000_000
+    ? `${meta.version}@${Number((steps / 1_000_000).toFixed(1))}M`
+    : `${meta.version}@${Math.round(steps / 1000)}K`;
 }
 
 /**
@@ -116,7 +136,7 @@ export function collectRegistry(modelsDir, algorithms = listAlgorithmInfo()) {
     const meta = parseModelFile(f);
     if (!meta) continue;
     if (RETIRED_VERSIONS.has(meta.version)) continue;
-    registry.set(meta.id, { ...meta, kind: 'model' });
+    registry.set(meta.id, { ...meta, deliveredSteps: MODEL_DELIVERED_STEPS[meta.id] ?? null, kind: 'model' });
     if (EXCLUDED_VERSIONS.has(meta.version)) {
       excluded.push({ id: meta.id, version: meta.version, reason: '512 动作旧格式，评估脚本不支持进程内互打' });
     }
@@ -453,6 +473,7 @@ function main() {
     trainMap: meta.trainMap,
     opponentType: meta.opponentType,
     steps: meta.steps,
+    deliveredSteps: meta.deliveredSteps ?? null,
     status: MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy',
     statusNote: STATUS_NOTES[meta.version] ?? null,
   }]));

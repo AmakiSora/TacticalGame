@@ -394,8 +394,9 @@ function splitTableRow(line) {
 const isSeparatorRow = cells => cells.every(c => /^:?-{2,}:?$/.test(c));
 
 /**
- * 解析 rl/docs/MODELS_NOTES.md 的两张表：
- *   - 主表「| 模型文件 | 档案 | 状态 | 说明 |」→ profiles: Map<文件名, { docRef, docStatus, notes }>
+ * 解析 rl/docs/MODELS_NOTES.md 的两张表（其余含模型文件名的小节表格，如
+ * 「文件名步数与交付断点」对照表，不参与档案匹配）：
+ *   - 「## 模型状态总表」下主表「| 模型文件 | 档案 | 状态 | 说明 |」→ profiles: Map<文件名, { docRef, docStatus, notes }>
  *   - 「### 已作废模型」后的「| 模型文件（已归档） | 档案 | 作废原因 |」→ deprecated: [{ file, docRef, reason }]
  * 表格是手工维护的 markdown，解析容错：列数不对/无 .zip 文件名的行直接跳过并计 warning。
  */
@@ -404,9 +405,11 @@ export function parseModelsNotes(mdText) {
   const deprecated = [];
   const warnings = [];
   let inDeprecated = false;
+  let inMain = false;
   for (const line of String(mdText ?? '').split('\n')) {
     if (/^#{1,4}\s/.test(line.trim())) {
       inDeprecated = /^#{1,4}\s*已作废模型/.test(line.trim());
+      inMain = /^#{1,4}\s*模型状态总表/.test(line.trim());
       continue;
     }
     const cells = splitTableRow(line);
@@ -426,7 +429,7 @@ export function parseModelsNotes(mdText) {
         docRef: linkTarget(cells[1]) ?? stripMd(cells[1]) ?? null,
         reason: stripMd(cells[2]),
       });
-    } else {
+    } else if (inMain) {
       if (cells.length < 4) {
         warnings.push(`notes: 主表行列数不足（${file}）`);
         continue;
@@ -440,6 +443,8 @@ export function parseModelsNotes(mdText) {
         notes: stripMd(cells[3]),
       });
     }
+    // 「模型状态总表」与「已作废模型」之外的小节（如「文件名步数与交付断点」对照表）：
+    // 行虽含模型文件名，但不承载档案信息，静默跳过。
   }
   deprecated.sort((a, b) => a.file.localeCompare(b.file));
   return { profiles, deprecated, warnings };
@@ -494,6 +499,7 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
       trainMap: meta.trainMap,
       opponentType: meta.opponentType,
       steps: meta.steps,
+      deliveredSteps: meta.deliveredSteps ?? null,
       status: MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy',
       statusNote: STATUS_NOTES[meta.version] ?? null,
       rated: !EXCLUDED_VERSIONS.has(meta.version),

@@ -225,7 +225,7 @@ describe('parseModelsNotes 表格解析', () => {
   });
 
   it('列数不足的行记 warning 但不中断', () => {
-    const md = `| 模型文件 | 档案 | 状态 | 说明 |\n|---|---|---|---|\n| \`${A}\` | 只有两列 |\n`;
+    const md = `## 模型状态总表\n\n| 模型文件 | 档案 | 状态 | 说明 |\n|---|---|---|---|\n| \`${A}\` | 只有两列 |\n`;
     const { profiles, warnings } = parseModelsNotes(md);
     expect(profiles.size).toBe(0);
     expect(warnings).toHaveLength(1);
@@ -233,12 +233,21 @@ describe('parseModelsNotes 表格解析', () => {
   });
 
   it('主表重复文件名行记 warning 并采用最后一次', () => {
-    const md = `| 模型文件 | 档案 | 状态 | 说明 |\n|---|---|---|---|\n` +
+    const md = `## 模型状态总表\n\n| 模型文件 | 档案 | 状态 | 说明 |\n|---|---|---|---|\n` +
       `| \`${A}\` | [a](models/a.md) | s1 | n1 |\n| \`${A}\` | [a](models/a.md) | s2 | n2 |\n`;
     const { profiles, warnings } = parseModelsNotes(md);
     expect(profiles.get(A)?.docStatus).toBe('s2');
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('出现多次');
+  });
+
+  it('主表与作废表之外的小节表格（如交付断点对照表）不参与档案匹配', () => {
+    const md = `## 模型状态总表\n\n| 模型文件 | 档案 | 状态 | 说明 |\n|---|---|---|---|\n| \`${A}\` | [a](models/a.md) | s1 | n1 |\n` +
+      `\n### 文件名步数与交付断点\n\n| 模型文件 | 文件名步数（训练目标/终点） | 交付断点（zip 实测） |\n|---|---|---|\n| \`${B}\` | 4,000,000 | 3,950,000 |\n`;
+    const { profiles, warnings } = parseModelsNotes(md);
+    expect(profiles.size).toBe(1);
+    expect(profiles.has(B)).toBe(false);
+    expect(warnings).toEqual([]);
   });
 });
 

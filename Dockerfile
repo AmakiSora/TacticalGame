@@ -8,6 +8,9 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
+# 构建期 tsc 需解析 src/api/{bots,arenaEval}.ts 对 algorithms/registry.mjs 的
+# import（类型声明 registry.d.mts）；运行时依赖算法子进程，见下方 runtime 阶段的 COPY。
+COPY algorithms ./algorithms
 RUN npm run build
 
 # Install the runtime dependency set separately to keep the final image small.

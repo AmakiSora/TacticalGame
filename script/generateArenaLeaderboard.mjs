@@ -1,18 +1,20 @@
 /**
- * Scan rl/leaderboard/matches.jsonl (produced by rl/round_robin.py),
- * compute Bradley-Terry ratings and write public/data/rl-leaderboard.json.
+ * AI 竞技场排行榜评分：扫描 arena/matches.jsonl（由 rl/evaluation/round_robin.py 产出，
+ * 含 RL 模型与内置算法 AI 的混合对战），Bradley-Terry 评分并写 public/data/arena-leaderboard.json。
  *
  * Usage:
- *   node script/generateRlLeaderboard.mjs
- *   node script/generateRlLeaderboard.mjs --stats-file rl/leaderboard/matches.jsonl --out public/data/rl-leaderboard.json
+ *   node script/generateArenaLeaderboard.mjs
+ *   node script/generateArenaLeaderboard.mjs --stats-file arena/matches.jsonl --out public/data/arena-leaderboard.json
  *
  * 评分口径：
+ *   - 参评者两类：RL 模型（id = 模型 zip 文件名）与内置算法 AI（id = algo_<注册名>，
+ *     注册表来自 algorithms/registry.mjs，与线上 bot / 评估控制台同源）；同一 BT 池混排名；
  *   - 作废模型（MODEL_STATUS_BY_VERSION 中 status=retired 的版本）不参评：注册表跳过、
  *     历史对局不计分，跳过局数记入 source.retiredMatchesDropped；
- *   - Bradley-Terry MLE（MM 迭代），平局记 0.5 胜；每对交手过的模型对附加 1 局虚拟
- *     平局作先验，防全败模型评分发散并让稀疏对向均值收缩；
+ *   - Bradley-Terry MLE（MM 迭代），平局记 0.5 胜；每对交手过的参与者对附加 1 局虚拟
+ *     平局作先验，防全败参与者评分发散并让稀疏对向均值收缩；
  *   - rating = 1500 + 400/ln(10) × ln p（Elo 刻度）；
- *   - 95% CI 用按（模型对, 地图）分层的有放回 bootstrap，随机数固定种子，输出可复现；
+ *   - 95% CI 用按（参与者对, 地图）分层的有放回 bootstrap，随机数固定种子，输出可复现；
  *   - 全局评分池化全部地图，另按每张图独立评分（局数少，CI 更宽）；
  *   - 分座位（先手/后手）只做展示统计，不进评分。
  */
@@ -20,12 +22,13 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { wilsonLower, round2, round4 } from './generateStats.mjs';
+import { listAlgorithmInfo, algorithmParticipantId } from '../algorithms/registry.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);
 
-export const DEFAULT_STATS_FILE = join(PROJECT_DIR, 'rl', 'leaderboard', 'matches.jsonl');
-export const DEFAULT_OUT = join(PROJECT_DIR, 'public', 'data', 'rl-leaderboard.json');
+export const DEFAULT_STATS_FILE = join(PROJECT_DIR, 'arena', 'matches.jsonl');
+export const DEFAULT_OUT = join(PROJECT_DIR, 'public', 'data', 'arena-leaderboard.json');
 
 export const MODEL_FILE_RE = /^hex_ppo_(v\d+\.\d+\.\d+)_(\d{8})_([a-z0-9-]+)_(.+)_(\d+|best)\.zip$/i;
 export const EXCLUDED_VERSIONS = new Set(['v1.0.0']);
@@ -68,7 +71,7 @@ export function parseArgs(argv) {
     else if (a === '--bootstrap-per-map') opts.bootstrapPerMap = Number(argv[++i]);
     else if (a === '--seed') opts.bootstrapSeed = Number(argv[++i]);
     else if (a === '--help' || a === '-h') {
-      console.log('Usage: node script/generateRlLeaderboard.mjs [--stats-file f] [--out f] [--target-games n] [--bootstrap n] [--bootstrap-per-map n] [--seed n]');
+      console.log('Usage: node script/generateArenaLeaderboard.mjs [--stats-file f] [--out f] [--target-games n] [--bootstrap n] [--bootstrap-per-map n] [--seed n]');
       process.exit(0);
     }
   }
@@ -93,16 +96,19 @@ export function shortName(meta) {
 }
 
 /**
- * 注册 rl/models/*.zip 作为合法玩家名与"未参评"清单来源。作废版本（RETIRED_VERSIONS）
+ * 注册合法玩家名与"未参评"清单来源：rl/models/*.zip（kind=model）+ 内置算法
+ * （kind=algorithm，来自 algorithms/registry.mjs）。作废版本（RETIRED_VERSIONS）
  * 直接跳过：不注册、不进"未参评"区（排行榜任何区域都不展示），其历史对局由 loadMatches 单独过滤。
  */
-export function collectRegistry(modelsDir) {
+export function collectRegistry(modelsDir, algorithms = listAlgorithmInfo()) {
   const registry = new Map();
   const excluded = [];
   let files = [];
   try {
     files = readdirSync(modelsDir);
   } catch {
+    // 模型目录不可读只是少了模型参与者，算法照常注册（如纯算法环境的开发机）。
+    registryAlgorithms(registry, algorithms);
     return { registry, excluded, warning: `cannot read ${modelsDir}` };
   }
   for (const f of files) {
@@ -110,13 +116,21 @@ export function collectRegistry(modelsDir) {
     const meta = parseModelFile(f);
     if (!meta) continue;
     if (RETIRED_VERSIONS.has(meta.version)) continue;
-    registry.set(meta.id, meta);
+    registry.set(meta.id, { ...meta, kind: 'model' });
     if (EXCLUDED_VERSIONS.has(meta.version)) {
       excluded.push({ id: meta.id, version: meta.version, reason: '512 动作旧格式，评估脚本不支持进程内互打' });
     }
   }
+  registryAlgorithms(registry, algorithms);
   excluded.sort((a, b) => a.id.localeCompare(b.id));
   return { registry, excluded, warning: null };
+}
+
+function registryAlgorithms(registry, algorithms) {
+  for (const info of algorithms) {
+    const id = algorithmParticipantId(info.name);
+    registry.set(id, { id, kind: 'algorithm', name: info.name, displayName: info.displayName, description: info.description });
+  }
 }
 
 /** 读 JSONL，丢弃玩家名不在注册表/格式非法的行；作废模型（已归档）的对局不计分，按 retiredDropped 计数。 */
@@ -157,11 +171,11 @@ export function loadMatches(statsFile, registry) {
       continue;
     }
     if (!registry.has(a) || !registry.has(b)) {
-      warnings.push(`line ${idx + 1}: unknown model name(s): ${[a, b].filter(n => !registry.has(n)).join(', ')}`);
+      warnings.push(`line ${idx + 1}: unknown participant name(s): ${[a, b].filter(n => !registry.has(n)).join(', ')}`);
       continue;
     }
     if (a === b) {
-      warnings.push(`line ${idx + 1}: same model on both seats`);
+      warnings.push(`line ${idx + 1}: same participant on both seats`);
       continue;
     }
     matches.push({
@@ -424,7 +438,15 @@ function main() {
     );
   }
 
-  const registryMeta = Object.fromEntries([...registry.entries()].map(([id, meta]) => [id, {
+  const registryMeta = Object.fromEntries([...registry.entries()].map(([id, meta]) => [id, meta.kind === 'algorithm' ? {
+    kind: 'algorithm',
+    short: meta.displayName,
+    algorithm: meta.name,
+    description: meta.description,
+    status: 'builtin',
+    statusNote: null,
+  } : {
+    kind: 'model',
     short: shortName(meta),
     version: meta.version,
     trainDate: meta.trainDate,
@@ -461,7 +483,7 @@ function main() {
 
   mkdirSync(dirname(opts.out), { recursive: true });
   writeFileSync(opts.out, JSON.stringify(payload, null, 2), 'utf8');
-  console.log(`Wrote ${opts.out} — ${matches.length} matches, ${ids.length} rated models, ${maps.length + 1} league(s)` +
+  console.log(`Wrote ${opts.out} — ${matches.length} matches, ${ids.length} rated participants, ${maps.length + 1} league(s)` +
     (retiredDropped > 0 ? `（另跳过作废模型对局 ${retiredDropped} 局）` : ''));
 
   const rows = leagues.all.models.filter(m => m.games > 0)

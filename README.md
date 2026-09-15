@@ -30,6 +30,7 @@ npm run dev
 | `http://localhost:3100/spectator.html` | 观战、导入回放、导出 JSON/HTML（窄屏自动进入手机版） |
 | `http://localhost:3100/spectator-m.html` | 观战手机版：触控棋盘、回放栏与信息抽屉 |
 | `http://localhost:3100/stats.html` | 对局统计看板（模型排行、对位、地图与对局列表） |
+| `http://localhost:3100/arena.html` | AI 竞技场：RL 模型 × 内置算法混合榜单、对位矩阵、玩法统计与评估控制台 |
 | `http://localhost:3100/entertainment.html` | 娱乐数据看板（回合节奏曲线、战斗群像、势头学、名场面与纪录柜） |
 | `http://localhost:3100/map-editor.html` | 本地导入、可视化编辑并导出地图 JSON |
 
@@ -45,10 +46,12 @@ npm run fun-stats
 # 等价于 node script/generateFunStats.mjs
 
 npm run stats-all
-# 依次刷新两份统计数据
+# 依次刷新回放统计两份 + 竞技场榜单与玩法统计
 ```
 
-新增或更新回放后运行 `npm run stats-all` 即可同时刷新两个看板。
+新增或更新回放后运行 `npm run stats-all` 即可同时刷新两个看板。竞技场数据独立成链：
+对战记录在 `arena/matches.jsonl`（由 `rl/evaluation/round_robin.py` 累积，页面内评估控制台可网页发起跑批），
+榜单与统计由 `npm run arena-leaderboard` / `npm run arena-stats` 生成（详见 `rl/README.md`「AI 竞技场」节）。
 
 远程使用删除对局、强制裁决、管理员改名等管理接口时建议设置：
 

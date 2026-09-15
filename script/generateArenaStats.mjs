@@ -1,18 +1,19 @@
 /**
- * Scan rl/leaderboard/matches.jsonl (produced by rl/round_robin.py),
- * aggregate gameplay stats & model profiles, write public/data/rl-stats.json.
- * 与 generateRlLeaderboard.mjs 配套：榜单管「谁强」，本脚本管「怎么打」。
+ * Scan arena/matches.jsonl (produced by rl/evaluation/round_robin.py),
+ * aggregate gameplay stats & participant profiles, write public/data/arena-stats.json.
+ * 与 generateArenaLeaderboard.mjs 配套：榜单管「谁强」，本脚本管「怎么打」。
  *
  * Usage:
- *   node script/generateRlStats.mjs
- *   node script/generateRlStats.mjs --stats-file rl/leaderboard/matches.jsonl --out public/data/rl-stats.json
+ *   node script/generateArenaStats.mjs
+ *   node script/generateArenaStats.mjs --stats-file arena/matches.jsonl --out public/data/arena-stats.json
  *
  * 口径与排行榜一致：
  *   - 作废模型（RETIRED_VERSIONS）不参与：对局整局丢弃并计数；
  *   - EXCLUDED_VERSIONS（v1.0.0，512 动作旧格式）不进玩法统计，对局按 formatDropped 计数；
- *   - 模型档案的评分/胜率合并自 public/data/rl-leaderboard.json（先跑榜单脚本再跑本脚本）；
- *   - 档案文案解析自 rl/docs/MODELS_NOTES.md 的状态总表与作废表（markdown 表格，格式变化时
- *     只留 warning 不炸脚本，对应模型的说明字段留空）。
+ *   - 参与者档案（RL 模型 + 内置算法）的评分/胜率合并自 public/data/arena-leaderboard.json
+ *     （先跑榜单脚本再跑本脚本）；
+ *   - 模型档案文案解析自 rl/docs/MODELS_NOTES.md 的状态总表与作废表（markdown 表格，格式变化时
+ *     只留 warning 不炸脚本，对应模型的说明字段留空）；算法档案文案来自 algorithms/registry.mjs。
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -25,16 +26,16 @@ import {
   STATUS_NOTES,
   EXCLUDED_VERSIONS,
   RETIRED_VERSIONS,
-} from './generateRlLeaderboard.mjs';
+} from './generateArenaLeaderboard.mjs';
 import { round2, round4 } from './generateStats.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);
 
-export const DEFAULT_STATS_FILE = join(PROJECT_DIR, 'rl', 'leaderboard', 'matches.jsonl');
-export const DEFAULT_OUT = join(PROJECT_DIR, 'public', 'data', 'rl-stats.json');
+export const DEFAULT_STATS_FILE = join(PROJECT_DIR, 'arena', 'matches.jsonl');
+export const DEFAULT_OUT = join(PROJECT_DIR, 'public', 'data', 'arena-stats.json');
 export const DEFAULT_NOTES_FILE = join(PROJECT_DIR, 'rl', 'docs', 'MODELS_NOTES.md');
-export const DEFAULT_LEADERBOARD_FILE = join(PROJECT_DIR, 'public', 'data', 'rl-leaderboard.json');
+export const DEFAULT_LEADERBOARD_FILE = join(PROJECT_DIR, 'public', 'data', 'arena-leaderboard.json');
 
 export function parseArgs(argv) {
   const opts = {
@@ -50,7 +51,7 @@ export function parseArgs(argv) {
     else if (a === '--notes') opts.notesFile = resolve(argv[++i]);
     else if (a === '--leaderboard') opts.leaderboardFile = resolve(argv[++i]);
     else if (a === '--help' || a === '-h') {
-      console.log('Usage: node script/generateRlStats.mjs [--stats-file f] [--out f] [--notes f] [--leaderboard f]');
+      console.log('Usage: node script/generateArenaStats.mjs [--stats-file f] [--out f] [--notes f] [--leaderboard f]');
       process.exit(0);
     }
   }
@@ -59,7 +60,7 @@ export function parseArgs(argv) {
 
 /**
  * 读 JSONL 并保留玩法统计所需字段（derived/scores/actions/durationSec/endReason）。
- * 过滤规则与 generateRlLeaderboard.loadMatches 一致：作废模型整局丢弃（retiredDropped），
+ * 过滤规则与 generateArenaLeaderboard.loadMatches 一致：作废模型整局丢弃（retiredDropped），
  * 玩家不在注册表/同模型对局的行记入 warnings；另把 EXCLUDED_VERSIONS 参与的对局按
  * formatDropped 丢弃（旧格式模型的打法与现役协议不可比）。
  */
@@ -445,22 +446,48 @@ export function parseModelsNotes(mdText) {
 }
 
 /**
- * 组装模型档案列表：registry 元数据 + 文件大小 + 榜单评分（可选）+ MODELS_NOTES 说明。
- * leaderboardJson 为 null 时评分字段留空（榜单未生成也能出档案）。
+ * 组装参与者档案列表：registry 元数据（模型 zip + 内置算法）+ 文件大小 + 榜单评分（可选）
+ * + MODELS_NOTES/注册表说明。leaderboardJson 为 null 时评分字段留空（榜单未生成也能出档案）。
  */
 export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notesProfiles }) {
   const lbModels = new Map(
     (leaderboardJson?.maps?.all?.models ?? []).map(m => [m.id, m]),
   );
   const profiles = [...registry.entries()].map(([id, meta]) => {
+    const lb = lbModels.get(id);
+    if (meta.kind === 'algorithm') {
+      return {
+        id,
+        kind: 'algorithm',
+        short: meta.displayName,
+        version: null,
+        trainDate: null,
+        trainMap: null,
+        opponentType: null,
+        steps: null,
+        algorithm: meta.name,
+        status: 'builtin',
+        statusNote: null,
+        rated: true,
+        sizeMB: null,
+        rating: lb?.rating ?? null,
+        ratingLo: lb?.ratingLo ?? null,
+        ratingHi: lb?.ratingHi ?? null,
+        winRate: lb?.winRate ?? null,
+        games: lb?.games ?? 0,
+        docRef: `algorithms/docs/algorithms/${meta.name}.md`,
+        docStatus: '内置算法',
+        notes: meta.description,
+      };
+    }
     let sizeMB = null;
     try {
       sizeMB = round2(statSync(join(modelsDir, id)).size / 1_000_000);
     } catch { /* 文件可能在扫描后被移动 */ }
-    const lb = lbModels.get(id);
     const notes = notesProfiles?.get(id) ?? null;
     return {
       id,
+      kind: 'model',
       short: shortName(meta),
       version: meta.version,
       trainDate: meta.trainDate,
@@ -537,7 +564,7 @@ function main() {
 
   mkdirSync(dirname(opts.out), { recursive: true });
   writeFileSync(opts.out, JSON.stringify(payload, null, 2), 'utf8');
-  console.log(`Wrote ${opts.out} — ${matches.length} matches, ${models.length} model profiles, ${notesData.deprecated.length} deprecated` +
+  console.log(`Wrote ${opts.out} — ${matches.length} matches, ${models.length} participant profiles, ${notesData.deprecated.length} deprecated` +
     (retiredDropped > 0 ? `（跳过作废对局 ${retiredDropped}）` : '') +
     (formatDropped > 0 ? `（跳过旧格式对局 ${formatDropped}）` : ''));
   console.log(`Units: ${gameplay.units.map(u => `${u.type} ${(u.deployShare * 100).toFixed(0)}%`).join(' / ') || '—'}`);

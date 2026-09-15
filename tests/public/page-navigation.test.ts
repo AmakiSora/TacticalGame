@@ -40,7 +40,7 @@ describe('desktop page navigation', () => {
       'public/play.html',
       'public/spectator.html',
       'public/stats.html',
-      'public/leaderboard.html',
+      'public/arena.html',
       'public/entertainment.html',
       'public/map-editor.html',
     ];

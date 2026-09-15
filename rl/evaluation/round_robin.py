@@ -1,27 +1,29 @@
-"""RL 模型 round-robin 批量对战编排器。
+"""AI 竞技场 round-robin 批量对战编排器（模型 × 模型 / 模型 × 算法 / 算法 × 算法）。
 
-自动发现 rl/models/ 下的可对战模型，两两 × 指定地图批量互打，
-结果累积到单个 JSONL，供 script/generateRlLeaderboard.mjs 评分与排行榜页面使用。
+自动发现 rl/models/ 下的可对战模型与 algorithms/registry.mjs 注册的内置算法，
+两两 × 指定地图批量互打，结果累积到单个 JSONL，
+供 script/generateArenaLeaderboard.mjs 评分与竞技场页面使用。
 
-- 断点续跑：按（模型对, 地图）统计 JSONL 已有局数，只补差额，已跑对局不重复；
+- 断点续跑：按（参与者对, 地图）统计 JSONL 已有局数，只补差额，已跑对局不重复；
 - 每次运行带随机盐 seed-prefix：重跑 random 图必产生新地图（静态图种子不生效，
   但引擎战斗带随机伤害浮动，每局同样不重复）；
 - 复用 rl/evaluation/evaluate_cross.py 子进程，原样保留其跨版本编码路由与配对换座逻辑；
-- 明细数据：每批次在 rl/leaderboard/details/ 落一个 JSONL（事件流回放/战略曲线/
-  动作日志/终局摘要），matches.jsonl 摘要行经 detailFile 字段关联。
+- 算法参与者的名字以 ``algo_`` 前缀写入 matches.jsonl（如 algo_threat），
+  传参规格为 ``algo:<name>``；--algorithms none 可退回纯模型循环赛。
 
 用法示例：
 
-    # 全量（120 对 × 7 图 × 24 局，约 20+ 小时，可分批跑）
+    # 全量（模型+算法两两 × 7 图 × 24 局，可分批跑）
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py
 
-    # 先跑随机图池（约 3 小时）
+    # 先跑随机图池
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random
 
     # 冒烟测试
-    rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --games 2
+    rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default \
+        --models v2.7.0 --algorithms greedy,threat --games 2
 
-完成后运行 ``npm run rl-leaderboard`` 刷新排行榜数据。
+完成后运行 ``npm run arena-leaderboard`` 刷新排行榜数据。
 """
 
 from __future__ import annotations
@@ -42,10 +44,13 @@ MODEL_RE = re.compile(r"^hex_ppo_(v\d+\.\d+\.\d+)_")
 # v1.0.0 为 512 动作旧格式，evaluate_cross.py 无法在进程内互打。
 EXCLUDED_VERSIONS = {"v1.0.0"}
 DEFAULT_MAPS = "random,default,breach,danger-close,desert,dual-lanes,forge"
-DEFAULT_STATS_FILE = Path("rl/leaderboard/matches.jsonl")
-# 每次调用的固定开销（torch 导入 + tsx worker 启动 + 模型加载），用于预估耗时。
-TASK_OVERHEAD_SEC = 15
-SEC_PER_GAME = 3.5
+DEFAULT_STATS_FILE = Path("arena/matches.jsonl")
+# 模型批次的固定开销（torch 导入 + tsx worker 启动 + 模型加载）与单局耗时；
+# 纯算法批次不加载模型，开销与单局都低一档。用于预估耗时。
+TASK_OVERHEAD_SEC_MODEL = 15
+SEC_PER_GAME_MODEL = 3.5
+TASK_OVERHEAD_SEC_ALGO = 6
+SEC_PER_GAME_ALGO = 1.0
 
 
 def parse_args():
@@ -53,7 +58,7 @@ def parse_args():
     parser.add_argument("--maps", default=DEFAULT_MAPS,
                         help=f"逗号分隔地图池（默认 {DEFAULT_MAPS}）")
     parser.add_argument("--games", type=int, default=24,
-                        help="每对模型 × 地图的目标总局数（含已跑局数，默认 24）")
+                        help="每对参与者 × 地图的目标总局数（含已跑局数，默认 24）")
     parser.add_argument("--stats-file", default=None,
                         help=f"累积 JSONL 路径（默认 {DEFAULT_STATS_FILE}）")
     parser.add_argument("--salt", default=None,
@@ -63,6 +68,8 @@ def parse_args():
     parser.add_argument("--device", default="auto", help="torch 设备：auto / cuda / cpu")
     parser.add_argument("--models", default=None,
                         help="逗号分隔的文件名子串过滤，只评测匹配的模型（冒烟测试用）")
+    parser.add_argument("--algorithms", default=None,
+                        help="逗号分隔算法名（缺省=全部注册算法；none=不带算法，纯模型循环赛）")
     parser.add_argument("--policy-stats", action="store_true",
                         help="透传给 evaluate_cross：每步额外记录价值估计/策略熵，跑批耗时约翻倍")
     parser.add_argument("--dry-run", action="store_true", help="只打印任务计划，不实际对战")
@@ -91,8 +98,39 @@ def discover_models(models_dir: Path) -> tuple[list[Path], list[Path]]:
     return included, excluded
 
 
+def discover_algorithms(root: Path) -> list[str]:
+    """读取 algorithms/registry.mjs 的注册算法清单（经 node，避免手工维护第二份名单）。"""
+    registry_url = (root / "algorithms" / "registry.mjs").as_posix()
+    script = f"import('file:///{registry_url}').then(r => console.log(r.listAlgorithms().join(',')))"
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=str(root), capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"node exit {result.returncode}")
+    return [name.strip() for name in result.stdout.strip().split(",") if name.strip()]
+
+
+def resolve_algorithm_names(root: Path, raw: str | None) -> tuple[list[str], str | None]:
+    """把 --algorithms 参数解析成算法名清单；node 不可用时降级为空清单并给出警告。"""
+    if raw is not None and raw.strip().lower() in ("none", "off", ""):
+        return [], None
+    try:
+        registered = discover_algorithms(root)
+    except (OSError, RuntimeError) as exc:
+        return [], f"无法读取算法注册表（node 不可用？）：{exc}；本轮不带算法参与者。"
+    if raw is None:
+        return registered, None
+    needles = [n.strip() for n in raw.split(",") if n.strip()]
+    unknown = [n for n in needles if n not in registered]
+    if unknown:
+        raise ValueError(f"未注册的算法：{', '.join(unknown)}（可选：{', '.join(registered)}）")
+    return [n for n in registered if n in needles], None
+
+
 def count_existing(stats_file: Path) -> dict[tuple[str, str, str], int]:
-    """按（地图, 模型 A, 模型 B）统计 JSONL 中已累积的局数。"""
+    """按（地图, 参与者 A, 参与者 B）统计 JSONL 中已累积的局数。"""
     counts: dict[tuple[str, str, str], int] = {}
     if not stats_file.exists():
         return counts
@@ -114,13 +152,13 @@ def count_existing(stats_file: Path) -> dict[tuple[str, str, str], int]:
     return counts
 
 
-def build_command(python: str, script: Path, model_a: Path, model_b: Path,
+def build_command(python: str, script: Path, spec_a: str, spec_b: str,
                   map_id: str, games: int, stats_file: Path, seed_prefix: str,
                   device: str, policy_stats: bool = False) -> list[str]:
     command = [
         python, str(script),
-        "--model-a", str(model_a),
-        "--model-b", str(model_b),
+        "--player-a", spec_a,
+        "--player-b", spec_b,
         "--games", str(games),
         "--map", map_id,
         "--swap-sides",
@@ -131,6 +169,14 @@ def build_command(python: str, script: Path, model_a: Path, model_b: Path,
     if policy_stats:
         command.append("--policy-stats")
     return command
+
+
+def estimate_batch_seconds(spec_a: str, spec_b: str, games: int) -> float:
+    """按批次构成粗估耗时：纯算法批不加载模型，明显更快。"""
+    pure_algo = spec_a.startswith("algo:") and spec_b.startswith("algo:")
+    if pure_algo:
+        return TASK_OVERHEAD_SEC_ALGO + games * SEC_PER_GAME_ALGO
+    return TASK_OVERHEAD_SEC_MODEL + games * SEC_PER_GAME_MODEL
 
 
 def format_eta(seconds: float) -> str:
@@ -209,10 +255,18 @@ def main():
         needles = [n.strip() for n in args.models.split(",") if n.strip()]
         included = [m for m in included if any(n in m.name for n in needles)]
         excluded = [m for m in excluded if any(n in m.name for n in needles)]
-    if len(included) < 2:
-        print(f"错误：可对战模型不足 2 个（当前 {len(included)} 个），无法组成对战。", file=sys.stderr)
-        for path in included:
-            print(f"  入选：{path.name}", file=sys.stderr)
+
+    try:
+        algorithm_names, algo_warning = resolve_algorithm_names(root, args.algorithms)
+    except ValueError as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        return 1
+
+    # 统一参与者列表：(规格, 显示名)。显示名即 matches.jsonl 中的玩家 id。
+    participants: list[tuple[str, str]] = [(str(path), path.name) for path in included]
+    participants += [(f"algo:{name}", f"algo_{name}") for name in algorithm_names]
+    if len(participants) < 2:
+        print(f"错误：可对战参与者不足 2 个（当前 {len(participants)} 个），无法组成对战。", file=sys.stderr)
         return 1
 
     salt = args.salt or f"{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
@@ -227,17 +281,23 @@ def main():
         print(f"排除 {len(excluded)} 个（{', '.join(sorted(EXCLUDED_VERSIONS))} 不支持进程内互打）：")
         for path in excluded:
             print(f"  - {path.name}")
+    if algorithm_names:
+        print(f"参评算法 {len(algorithm_names)} 个：{', '.join(algorithm_names)}")
+    elif (args.algorithms or "").strip().lower() in ("none", "off", ""):
+        print("参评算法：无（--algorithms none）")
+    if algo_warning:
+        print(f"警告：{algo_warning}")
     print(f"地图池：{', '.join(maps)}")
     print(f"目标：每对 × 每图 {args.games} 局；累积文件：{stats_file}")
     print(f"seed 盐：{salt}（断点续跑时请固定 --salt 以跳过已有局数）")
 
     counts = count_existing(stats_file)
-    ordered = sorted(included, key=lambda p: p.name)
+    ordered = sorted(participants, key=lambda part: part[1])
     tasks: list[dict] = []
     skipped_games = 0
     for map_idx, map_id in enumerate(maps):
         for i, j in itertools.combinations(range(len(ordered)), 2):
-            name_a, name_b = ordered[i].name, ordered[j].name
+            name_a, name_b = ordered[i][1], ordered[j][1]
             have = counts.get((map_id, name_a, name_b), 0)
             need = max(0, args.games - have)
             if need % 2 == 1:
@@ -247,7 +307,8 @@ def main():
                 continue
             seed_prefix = f"rr-{salt}-{map_idx}-{i}-{j}"
             tasks.append({
-                "model_a": ordered[i], "model_b": ordered[j],
+                "spec_a": ordered[i][0], "spec_b": ordered[j][0],
+                "name_a": name_a, "name_b": name_b,
                 "map": map_id, "games": need, "seed_prefix": seed_prefix,
             })
 
@@ -257,21 +318,24 @@ def main():
     if not tasks:
         print("所有目标局数已达成，无需补跑。")
         return 0
-    print(f"预估耗时：约 {format_eta(len(tasks) * TASK_OVERHEAD_SEC + total_games * SEC_PER_GAME / max(1, args.jobs))}"
-          f"（jobs={args.jobs}，单局 ~{SEC_PER_GAME}s + 每批 ~{TASK_OVERHEAD_SEC}s 启动开销）\n")
+    estimated = sum(estimate_batch_seconds(task["spec_a"], task["spec_b"], task["games"])
+                    for task in tasks) / max(1, args.jobs)
+    print(f"预估耗时：约 {format_eta(estimated)}"
+          f"（jobs={args.jobs}，模型批 ~{SEC_PER_GAME_MODEL}s/局+{TASK_OVERHEAD_SEC_MODEL}s 启动，"
+          f"纯算法批 ~{SEC_PER_GAME_ALGO}s/局+{TASK_OVERHEAD_SEC_ALGO}s 启动）\n")
 
     if args.dry_run:
         for task in tasks:
-            print(f"  {task['model_a'].name} vs {task['model_b'].name} "
+            print(f"  {task['name_a']} vs {task['name_b']} "
                   f"@ {task['map']}：补 {task['games']} 局")
         return 0
 
     progress = Progress(len(tasks))
     commands = [
-        (build_command(python, evaluate_script, task["model_a"], task["model_b"],
+        (build_command(python, evaluate_script, task["spec_a"], task["spec_b"],
                        task["map"], task["games"], stats_file,
                        task["seed_prefix"], args.device, args.policy_stats),
-         f"{task['model_a'].name} vs {task['model_b'].name} @ {task['map']}",
+         f"{task['name_a']} vs {task['name_b']} @ {task['map']}",
          task["games"])
         for task in tasks
     ]
@@ -294,7 +358,7 @@ def main():
           f"失败 {progress.failed} 批，总用时 {format_eta(elapsed)}（{rate:.1f} 局/s）。")
     if progress.failed:
         print("存在失败批次：可原样重跑（断点续跑会只补差额），失败原因见上方输出。")
-    print(f"刷新排行榜数据：npm run rl-leaderboard")
+    print(f"刷新排行榜数据：npm run arena-leaderboard")
     return 1 if progress.failed else 0
 
 

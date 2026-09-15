@@ -1,12 +1,17 @@
-/* RL 模型排行榜 — reads /data/rl-leaderboard.json only. */
+/* AI 竞技场排行榜 — reads /data/arena-leaderboard.json only. */
 (() => {
-  const DATA_URL = '/data/rl-leaderboard.json';
+  const DATA_URL = '/data/arena-leaderboard.json';
 
   const MAP_LABELS = { random: '随机图' };
   const STATUS_META = {
     recommended: { label: '当前推荐', cls: 'st-good' },
     legacy: { label: '历史', cls: 'st-muted' },
     retired: { label: '作废', cls: 'st-bad' },
+    builtin: { label: '内置算法', cls: 'st-algo' },
+  };
+  const KIND_BADGE = {
+    model: { label: '模型', cls: 'st-model' },
+    algorithm: { label: '算法', cls: 'st-algo' },
   };
 
   const el = {
@@ -17,6 +22,7 @@
     btnReload: document.getElementById('btn-reload'),
     kpiGrid: document.getElementById('kpi-grid'),
     filterLeague: document.getElementById('filter-league'),
+    filterKind: document.getElementById('filter-kind'),
     modelTable: document.getElementById('model-table'),
     h2hHead: document.getElementById('h2h-head'),
     h2hBody: document.getElementById('h2h-body'),
@@ -29,6 +35,7 @@
   /** @type {any} */
   let raw = null;
   let league = 'all';
+  let kindFilter = 'all';
   let selectedModel = null;
   let sort = { key: 'rating', dir: 'desc' };
 
@@ -63,7 +70,7 @@
     return raw?.maps?.[league] || null;
   }
 
-  /** 每个模型行的展示视图：合并 registry 元数据 + 排名 + 扁平化排序字段。 */
+  /** 每个参与者行的展示视图：合并 registry 元数据 + 排名 + 扁平化排序字段。 */
   function buildRows(ld) {
     const ordered = ld.models.slice().sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
     const rankById = new Map(ordered.map((m, i) => [m.id, m.games > 0 ? i + 1 : null]));
@@ -72,7 +79,10 @@
       return {
         ...m,
         rank: rankById.get(m.id),
+        kind: meta.kind || 'model',
         short: meta.short || m.id,
+        algorithm: meta.algorithm || '',
+        description: meta.description || '',
         version: meta.version || '',
         trainDate: meta.trainDate || '',
         trainMap: meta.trainMap || '',
@@ -84,6 +94,17 @@
         secondSeatRate: m.secondSeat?.winRate ?? null,
       };
     });
+  }
+
+  /** 当前类型筛选下的行（评分表与对位矩阵共用；排名仍是全池排名）。 */
+  function viewRows(ld) {
+    const rows = buildRows(ld);
+    return kindFilter === 'all' ? rows : rows.filter(r => r.kind === kindFilter);
+  }
+
+  function kindBadge(kind) {
+    const b = KIND_BADGE[kind];
+    return b ? `<span class="tag ${b.cls}">${b.label}</span> ` : '';
   }
 
   function sortRows(rows, s) {
@@ -113,14 +134,17 @@
   }
 
   function renderKpis(ld) {
-    const modelCount = ld.models.filter(m => m.games > 0).length;
-    const pairs = modelCount * (modelCount - 1) / 2;
+    const rows = buildRows(ld);
+    const rated = rows.filter(m => m.games > 0);
+    const modelCount = rated.filter(m => m.kind === 'model').length;
+    const algoCount = rated.filter(m => m.kind === 'algorithm').length;
+    const pairs = rated.length * (rated.length - 1) / 2;
     const mapCount = Object.keys(raw.source.mapDist || {}).length || 1;
     const target = pairs * mapCount * (raw.source.targetGamesPerPair || 24);
     const coverage = target > 0 ? Math.min(100, Math.round(ld.overview.games / target * 100)) : 0;
     const cards = [
       { label: '总局数', value: ld.overview.games, sub: `平局 ${ld.overview.draws}（${pct(ld.overview.drawRate)}）` },
-      { label: '参评模型', value: modelCount, sub: `对局对数 ${ld.overview.pairCount}` },
+      { label: '参评者', value: rated.length, sub: `RL 模型 ${modelCount} · 算法 ${algoCount} · 对局对数 ${ld.overview.pairCount}` },
       { label: '平局率', value: pct(ld.overview.drawRate), sub: '达到回合/动作上限' },
       { label: '平均回合', value: ld.overview.avgRounds ?? '—', sub: '单局 rounds 均值' },
       { label: '局数覆盖度', value: `${coverage}%`, sub: `${ld.overview.games} / 目标 ${target}` },
@@ -143,8 +167,8 @@
         const selected = selectedModel === r.id ? 'selected' : '';
         return `<tr data-model="${escapeAttr(r.id)}" class="${selected}"${r.statusNote ? ` title="${escapeAttr(r.statusNote)}"` : ''}>
           <td class="num" data-label="排名">${r.rank ?? '—'}</td>
-          <td class="model-name" data-label="模型" title="${escapeAttr(r.id)}">${escapeHtml(r.short)}</td>
-          <td data-label="版本">${escapeHtml(r.version)}</td>
+          <td class="model-name" data-label="参与者" title="${escapeAttr(r.id)}">${kindBadge(r.kind)}${escapeHtml(r.short)}</td>
+          <td data-label="版本">${escapeHtml(r.version) || '—'}</td>
           <td class="num" data-label="评分">${ratingCell(r)}</td>
           <td class="num" data-label="胜-负-平">${wldCell(r)}</td>
           <td class="num" data-label="局数">${r.games || '—'}</td>
@@ -173,20 +197,20 @@
   }
 
   function renderMatrix(ld) {
-    const rows = buildRows(ld).filter(m => m.games > 0);
+    const rows = viewRows(ld).filter(m => m.games > 0);
     const cols = rows.slice();
-    // 列头用纯版本号（v3.0.4 而非 v3.0.4@8.4M）：16 列矩阵的全名表头会把表格
-    // 撑出横向滚动条；完整文件 id 保留在悬停提示里。版本号撞车时回退全名。
-    const versionCount = new Map();
+    // 列头用短名（v3.0.4 而非 v3.0.4@8.4M；算法取中文名）：宽矩阵的全名表头会把表格
+    // 撑出横向滚动条；完整文件 id 保留在悬停提示里。短名撞车时回退全名。
+    const nameCount = new Map();
     for (const c of cols) {
-      const v = c.short.split('@')[0];
-      versionCount.set(v, (versionCount.get(v) || 0) + 1);
+      const v = c.kind === 'model' ? c.short.split('@')[0] : c.short;
+      nameCount.set(v, (nameCount.get(v) || 0) + 1);
     }
     const headerLabel = c => {
-      const v = c.short.split('@')[0];
-      return versionCount.get(v) > 1 ? c.short : v;
+      const v = c.kind === 'model' ? c.short.split('@')[0] : c.short;
+      return nameCount.get(v) > 1 ? c.short : v;
     };
-    el.h2hHead.innerHTML = '<th class="model-col">模型 \\ 对手</th>' +
+    el.h2hHead.innerHTML = '<th class="model-col">参与者 \\ 对手</th>' +
       cols.map(c => `<th title="${escapeAttr(c.id)}">${escapeHtml(headerLabel(c))}</th>`).join('');
     el.h2hBody.innerHTML = rows
       .map(r => {
@@ -204,12 +228,12 @@
   }
 
   function renderDetail(ld) {
-    const rows = buildRows(ld);
+    const rows = viewRows(ld);
     const row = rows.find(m => m.id === selectedModel);
     if (!row) {
-      el.detailTitle.textContent = '点击评分榜模型行查看';
+      el.detailTitle.textContent = '点击评分榜行查看';
       el.detailBody.className = 'empty-block';
-      el.detailBody.textContent = '未选择模型';
+      el.detailBody.textContent = '未选择参与者';
       return;
     }
     el.detailTitle.textContent = `${row.short}（${row.id}）`;
@@ -236,14 +260,21 @@
         <td class="num" data-label="胜率">${v.winRate == null ? '—' : pct(v.winRate)}</td>
       </tr>`).join('');
     const statusMeta = STATUS_META[row.status] || STATUS_META.legacy;
-    el.detailBody.innerHTML = `
-      <div class="detail-meta">
+    const metaHtml = row.kind === 'algorithm'
+      ? `
+        <span>类型 <strong>内置规则算法</strong></span>
+        <span>注册名 <strong>${escapeHtml(row.algorithm || row.id.replace(/^algo_/, ''))}</strong></span>
+        <span>状态 <strong class="tag ${statusMeta.cls}">${statusMeta.label}</strong></span>
+        <span style="flex-basis:100%">策略 <strong>${escapeHtml(row.description || '—')}</strong></span>`
+      : `
         <span>版本 <strong>${escapeHtml(row.version)}</strong></span>
         <span>训练日期 <strong>${escapeHtml(row.trainDate)}</strong></span>
         <span>训练地图 <strong>${escapeHtml(mapLabel(row.trainMap))}</strong></span>
         <span>训练对手 <strong>${escapeHtml(row.opponentType)}</strong></span>
         <span>步数 <strong>${escapeHtml(stepText)}</strong></span>
-        <span>状态 <strong class="tag ${statusMeta.cls}">${statusMeta.label}</strong>${row.statusNote ? ` · ${escapeHtml(row.statusNote)}` : ''}</span>
+        <span>状态 <strong class="tag ${statusMeta.cls}">${statusMeta.label}</strong>${row.statusNote ? ` · ${escapeHtml(row.statusNote)}` : ''}</span>`;
+    el.detailBody.innerHTML = `
+      <div class="detail-meta">${metaHtml}
       </div>
       <div class="detail-cols">
         <div>
@@ -309,9 +340,8 @@
   function renderAll() {
     const ld = currentLeague();
     if (!ld) return;
-    const rows = buildRows(ld);
     renderKpis(ld);
-    renderTable(rows);
+    renderTable(viewRows(ld));
     renderMatrix(ld);
     renderDetail(ld);
   }
@@ -351,11 +381,16 @@
     selectedModel = null;
     renderAll();
   });
+  el.filterKind.addEventListener('change', () => {
+    kindFilter = el.filterKind.value;
+    selectedModel = null;
+    renderAll();
+  });
   el.modelTable.addEventListener('click', event => {
     const tr = event.target.closest('tr[data-model]');
     if (!tr) return;
     selectedModel = tr.dataset.model;
-    renderTable(buildRows(currentLeague()));
+    renderTable(viewRows(currentLeague()));
     renderDetail(currentLeague());
   });
   el.modelTable.querySelectorAll('th[data-sort]').forEach(th => {
@@ -366,7 +401,7 @@
       } else {
         sort = { key, dir: key === 'short' || key === 'version' ? 'asc' : 'desc' };
       }
-      renderTable(buildRows(currentLeague()));
+      renderTable(viewRows(currentLeague()));
     });
   });
 
@@ -400,9 +435,9 @@
     if (initialTab && tabPanes[initialTab]) switchTab(initialTab, false);
   }
 
-  /* ===== 评估控制台：网页启动/监控/停止 round_robin.py 跑批 ===== */
+  /* ===== 评估控制台：网页启动 round_robin.py 跑批（模型 × 算法混合循环赛） ===== */
   const evalEl = {};
-  for (const id of ['eval-status-pill', 'eval-maps', 'eval-models', 'eval-model-all', 'eval-model-none',
+  for (const id of ['eval-status-pill', 'eval-maps', 'eval-algos', 'eval-models', 'eval-model-all', 'eval-model-none',
     'eval-model-count', 'eval-games', 'eval-jobs', 'eval-salt', 'eval-dry', 'eval-start', 'eval-stop',
     'eval-regen', 'eval-msg', 'eval-progress-wrap', 'eval-progress-fill', 'eval-progress-text', 'eval-output',
     'eval-tab-btn', 'eval-mini-strip', 'eval-mini-text', 'eval-mini-go']) {
@@ -412,6 +447,7 @@
   let evalStatus = null;
   let evalPrevRunning = false;
   let evalModels = [];
+  let evalAlgos = [];
   // status 接口会返回 knownMaps；这里的列表只是首屏兜底，收到 status 后以服务端为准。
   const EVAL_FALLBACK_MAPS = ['random', 'default', 'breach', 'danger-close', 'desert', 'dual-lanes', 'forge'];
   let renderedMapSig = '';
@@ -454,30 +490,42 @@
     return [...evalEl['eval-maps'].querySelectorAll('input:checked')].map(input => input.value);
   }
 
-  function checkedModels() {
-    return [...evalEl['eval-models'].querySelectorAll('input:checked')].map(input => input.value);
+  function checkedParticipants() {
+    const algos = [...evalEl['eval-algos'].querySelectorAll('input:checked')].map(input => input.value);
+    const models = [...evalEl['eval-models'].querySelectorAll('input:checked')].map(input => input.value);
+    return { algos, models };
   }
 
-  async function loadEvalModels() {
+  async function loadEvalParticipants() {
     try {
-      const res = await fetch('/api/rl/models', { cache: 'no-store' });
+      const res = await fetch('/api/arena/participants', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       // round_robin 自身排除 v1.0.0（512 动作旧格式无法进程内互打），这里同步过滤。
-      evalModels = data.models.filter(m => m.supported && !m.file.startsWith('hex_ppo_v1.'));
+      evalModels = (data.models || []).filter(m => m.supported && !m.file.startsWith('hex_ppo_v1.'));
+      evalAlgos = data.algorithms || [];
+      // 算法默认全选：取消勾选即显式排除（不勾选任何参与者 = 全部模型 + 全部算法）。
+      evalEl['eval-algos'].innerHTML = evalAlgos
+        .map(a => `<label title="${escapeAttr(a.description)}"><input type="checkbox" value="algo:${escapeAttr(a.algorithm)}" checked/><span class="tag st-algo">算法</span> ${escapeHtml(a.name)}（${escapeHtml(a.algorithm)}）</label>`)
+        .join('');
       evalEl['eval-models'].innerHTML = evalModels
         .map(m => `<label title="${escapeAttr(m.file)}"><input type="checkbox" value="${escapeAttr(m.file)}"/><span class="ver">${escapeHtml(m.label || '?')}</span> ${escapeHtml(m.file)}</label>`)
         .join('');
-      evalEl['eval-model-count'].textContent = `共 ${evalModels.length} 个可对战模型`;
+      evalEl['eval-algos'].addEventListener('change', updateModelCount);
       evalEl['eval-models'].addEventListener('change', updateModelCount);
+      updateModelCount();
     } catch (err) {
-      evalEl['eval-model-count'].textContent = `模型列表加载失败：${err.message}`;
+      evalEl['eval-model-count'].textContent = `参与者列表加载失败：${err.message}`;
     }
   }
 
   function updateModelCount() {
-    const n = checkedModels().length;
-    evalEl['eval-model-count'].textContent = n ? `已选 ${n} / ${evalModels.length} 个` : `共 ${evalModels.length} 个可对战模型（不选 = 全部）`;
+    const { algos, models } = checkedParticipants();
+    const total = evalModels.length + evalAlgos.length;
+    const selected = algos.length + models.length;
+    evalEl['eval-model-count'].textContent = selected
+      ? `已选 ${selected} / ${total} 个（模型 ${models.length} / ${evalModels.length}，算法 ${algos.length} / ${evalAlgos.length}）`
+      : `共 ${evalModels.length} 个可对战模型 + ${evalAlgos.length} 个算法（不选 = 全部参评）`;
   }
 
   function formatDuration(iso) {
@@ -542,7 +590,7 @@
   async function pollEvalStatus() {
     try {
       // 状态接口与写接口同样受控：带控制令牌（本机无令牌配置时不需要）。
-      const res = await fetch('/api/rl/eval/status', { cache: 'no-store', headers: controlHeaders() });
+      const res = await fetch('/api/arena/eval/status', { cache: 'no-store', headers: controlHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       renderEvalStatus(await res.json());
     } catch (err) {
@@ -565,9 +613,10 @@
       evalMsg('请至少选择一张地图', 'err');
       return;
     }
+    const { algos, models } = checkedParticipants();
     const payload = {
       maps,
-      models: checkedModels().length ? checkedModels() : null,
+      participants: algos.length || models.length ? [...models, ...algos] : null,
       games: Number(evalEl['eval-games'].value) || 24,
       jobs: Number(evalEl['eval-jobs'].value) || 1,
       salt: evalEl['eval-salt'].value.trim() || null,
@@ -575,7 +624,7 @@
     };
     evalEl['eval-start'].disabled = true;
     try {
-      const res = await fetch('/api/rl/eval/start', {
+      const res = await fetch('/api/arena/eval/start', {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...controlHeaders() },
         body: JSON.stringify(payload),
@@ -597,7 +646,7 @@
   evalEl['eval-stop'].addEventListener('click', async () => {
     if (!window.confirm('确定停止当前跑批？已完成的局数已写入 JSONL，同参数重跑可断点续跑。')) return;
     try {
-      const res = await fetch('/api/rl/eval/stop', { method: 'POST', headers: controlHeaders() });
+      const res = await fetch('/api/arena/eval/stop', { method: 'POST', headers: controlHeaders() });
       const data = await res.json().catch(() => ({}));
       evalMsg(res.ok ? '停止指令已发送，等待进程退出…' : `停止失败：${data.error || res.status}`, res.ok ? undefined : 'err');
     } catch (err) {
@@ -609,7 +658,7 @@
     evalEl['eval-regen'].disabled = true;
     evalMsg('正在重算榜单数据…');
     try {
-      const res = await fetch('/api/rl/leaderboard/regenerate', { method: 'POST', headers: controlHeaders() });
+      const res = await fetch('/api/arena/leaderboard/regenerate', { method: 'POST', headers: controlHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         evalMsg(`重算失败：${data.error || res.status}`, 'err');
@@ -635,7 +684,7 @@
 
   renderMapChips(EVAL_FALLBACK_MAPS, ['random']);
   renderedMapSig = EVAL_FALLBACK_MAPS.join('\u0001');
-  loadEvalModels();
+  loadEvalParticipants();
   evalEl['eval-mini-strip'].addEventListener('click', () => switchTab('console'));
   pollEvalStatus();
   setInterval(pollEvalStatus, 3000);

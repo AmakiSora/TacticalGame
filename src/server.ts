@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { loadMaps } from './config/loader.js';
 import { gamesRoutes } from './api/games.js';
 import { botsRoutes } from './api/bots.js';
-import { rlEvalRoutes } from './api/rlEval.js';
+import { arenaEvalRoutes } from './api/arenaEval.js';
 import { actionsRoutes } from './api/actions.js';
 import { closeSseConnections, eventsRoutes } from './api/events.js';
 import { mapsRoutes } from './api/maps.js';
@@ -129,7 +129,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(mapsRoutes);
   await app.register(gamesRoutes);
   await app.register(botsRoutes);
-  await app.register(rlEvalRoutes);
+  await app.register(arenaEvalRoutes);
   await app.register(actionsRoutes);
   await app.register(eventsRoutes);
   await app.register(skillRoutes);

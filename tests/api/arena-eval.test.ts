@@ -1,5 +1,5 @@
-// tests/api/rl-eval.test.ts
-// 评估控制台 API：启动/监控/停止 round_robin 跑批与榜单重算。
+// tests/api/arena-eval.test.ts
+// 竞技场评估控制台 API：启动/监控/停止 round_robin 跑批（模型 × 算法）与榜单重算。
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
@@ -8,8 +8,8 @@ import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
-  parsePlannedBatches, parseProgressLine, parseSummaryLine, rlEvalRoutes,
-} from '../../src/api/rlEval.js';
+  parsePlannedBatches, parseProgressLine, parseSummaryLine, arenaEvalRoutes, buildParticipantArgs,
+} from '../../src/api/arenaEval.js';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -41,7 +41,7 @@ function fakeSpawner() {
   return { spawner, calls, children };
 }
 
-describe('RL eval console API', () => {
+describe('AI 竞技场评估控制台 API', () => {
   let app: FastifyInstance;
   let dir: string;
   let statsFile: string;
@@ -54,7 +54,7 @@ describe('RL eval console API', () => {
     stateFile = join(dir, 'state.json');
     spawner = fakeSpawner();
     app = Fastify();
-    await app.register(rlEvalRoutes, {
+    await app.register(arenaEvalRoutes, {
       spawner: spawner.spawner,
       statsFile,
       stateFile,
@@ -71,7 +71,7 @@ describe('RL eval console API', () => {
   });
 
   it('reports idle status with known maps and defaults', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/rl/eval/status' });
+    const res = await app.inject({ method: 'GET', url: '/api/arena/eval/status' });
     expect(res.statusCode).toBe(200);
     const data = res.json();
     expect(data.status).toBe('idle');
@@ -81,21 +81,79 @@ describe('RL eval console API', () => {
   });
 
   it('rejects invalid maps, games and jobs on start', async () => {
-    const badMap = await app.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['nope'] } });
+    const badMap = await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['nope'] } });
     expect(badMap.statusCode).toBe(400);
     expect(badMap.json().code).toBe('invalid_maps');
 
-    const badGames = await app.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'], games: 1 } });
+    const badGames = await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'], games: 1 } });
     expect(badGames.statusCode).toBe(400);
     expect(badGames.json().code).toBe('invalid_games');
 
-    const badJobs = await app.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'], jobs: 99 } });
+    const badJobs = await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'], jobs: 99 } });
     expect(badJobs.statusCode).toBe(400);
     expect(badJobs.json().code).toBe('invalid_jobs');
   });
 
+  it('translates participants into round_robin filters', async () => {
+    // 混合：模型子串 + 算法名各归各的参数。
+    const mixed = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['default'], participants: ['v3.0', 'algo:threat', 'algo:greedy'] },
+    });
+    expect(mixed.statusCode).toBe(200);
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--models v3.0');
+    expect(args).toContain('--algorithms threat,greedy');
+  });
+
+  it('excludes algorithms when participants are model-only', async () => {
+    const modelsOnly = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['default'], participants: ['v3.0.4'] },
+    });
+    expect(modelsOnly.statusCode).toBe(200);
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--algorithms none');
+    expect(args).toContain('--models v3.0.4');
+  });
+
+  it('omits both filters when participants are unspecified (全部模型+全部算法)', async () => {
+    const all = await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['default'] } });
+    expect(all.statusCode).toBe(200);
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).not.toContain('--models');
+    expect(args).not.toContain('--algorithms');
+  });
+
+  it('rejects unknown algorithm participants', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['default'], participants: ['algo:nope'] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('invalid_participants');
+    expect(res.json().error).toContain('algo:nope');
+  });
+
+  it('buildParticipantArgs handles the null (all) case', () => {
+    expect(buildParticipantArgs({ maps: ['random'], participants: null, games: 24, jobs: 1, salt: null, dryRun: false })).toEqual([]);
+  });
+
+  it('serves the merged participant catalog', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/arena/participants' });
+    expect(res.statusCode).toBe(200);
+    const data = res.json();
+    expect(Array.isArray(data.models)).toBe(true);
+    const ids = data.algorithms.map((a: { id: string }) => a.id);
+    expect(ids).toContain('algo_threat');
+    expect(ids).toContain('algo_greedy');
+    const threat = data.algorithms.find((a: { id: string }) => a.id === 'algo_threat');
+    expect(threat.name).toBe('威胁感知算法');
+    expect(threat.description).toContain('威胁图');
+  });
+
   it('starts a run, tracks progress and auto-regenerates the leaderboard on finish', async () => {
-    const start = await app.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'], games: 4 } });
+    const start = await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'], games: 4 } });
     expect(start.statusCode).toBe(200);
     expect(start.json().status.status).toBe('running');
 
@@ -109,7 +167,7 @@ describe('RL eval console API', () => {
     child.stdout.write('[1/2] OK  a.zip vs b.zip @ random（2 局 / 10s）| 剩余约 20s\n');
     await delay(20);
 
-    const mid = (await app.inject({ method: 'GET', url: '/api/rl/eval/status' })).json();
+    const mid = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
     expect(mid.batchesTotal).toBe(2);
     expect(mid.batchesDone).toBe(1);
     expect(mid.outputTail.some((line: string) => line.includes('[1/2]'))).toBe(true);
@@ -124,32 +182,32 @@ describe('RL eval console API', () => {
     spawner.children[2]?.emit('exit', 0, null);
     await delay(20);
 
-    const done = (await app.inject({ method: 'GET', url: '/api/rl/eval/status' })).json();
+    const done = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
     expect(done.status).toBe('finished');
     expect(done.exitCode).toBe(0);
-    // 正常结束后应自动重算榜单（node script/generateRlLeaderboard.mjs）。
+    // 正常结束后应自动重算榜单（node script/generateArenaLeaderboard.mjs）。
     expect(spawner.calls.some(call => call.cmd === process.execPath && call.args.includes('gen.mjs'))).toBe(true);
-    expect(spawner.calls.some(call => call.cmd === process.execPath && call.args.some(a => String(a).includes('generateRlStats.mjs')))).toBe(true);
+    expect(spawner.calls.some(call => call.cmd === process.execPath && call.args.some(a => String(a).includes('generateArenaStats.mjs')))).toBe(true);
   });
 
   it('rejects concurrent starts', async () => {
-    await app.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] } });
-    const second = await app.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] } });
+    await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
+    const second = await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
     expect(second.statusCode).toBe(409);
     expect(second.json().code).toBe('eval_already_running');
   });
 
   it('stops a running evaluation and reports stopped', async () => {
-    await app.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] } });
-    const stop = await app.inject({ method: 'POST', url: '/api/rl/eval/stop' });
+    await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
+    const stop = await app.inject({ method: 'POST', url: '/api/arena/eval/stop' });
     expect(stop.statusCode).toBe(200);
     spawner.children[0].emit('exit', 1, 'SIGTERM');
     await delay(20);
-    const status = (await app.inject({ method: 'GET', url: '/api/rl/eval/status' })).json();
+    const status = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
     expect(status.status).toBe('stopped');
     expect(status.exitCode).toBe(1);
 
-    const again = await app.inject({ method: 'POST', url: '/api/rl/eval/stop' });
+    const again = await app.inject({ method: 'POST', url: '/api/arena/eval/stop' });
     expect(again.statusCode).toBe(409);
     expect(again.json().code).toBe('eval_not_running');
   });
@@ -159,19 +217,19 @@ describe('RL eval console API', () => {
     const prevPlatform = process.platform;
     Object.defineProperty(process, 'platform', { value: 'linux' });
     const app2 = Fastify();
-    await app2.register(rlEvalRoutes, { spawner: spawner.spawner, statsFile, stateFile, escalateMs: 5 });
+    await app2.register(arenaEvalRoutes, { spawner: spawner.spawner, statsFile, stateFile, escalateMs: 5 });
     try {
-      await app2.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] } });
+      await app2.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
       const firstKills: Array<string | undefined> = [];
       const first = spawner.children[0];
       first.kill = (sig?: string) => { firstKills.push(sig); return true; };
 
-      await app2.inject({ method: 'POST', url: '/api/rl/eval/stop' });
+      await app2.inject({ method: 'POST', url: '/api/arena/eval/stop' });
       expect(firstKills).toContain('SIGTERM');
 
       // 老进程退出后立刻开新一轮：升级定时器只能落到老进程上，不能误杀新跑批。
       first.emit('exit', 0, null);
-      await app2.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] } });
+      await app2.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
       const secondKills: Array<string | undefined> = [];
       spawner.children[1].kill = (sig?: string) => { secondKills.push(sig); return true; };
 
@@ -187,14 +245,14 @@ describe('RL eval console API', () => {
   it('marks a persisted running state as interrupted after restart', async () => {
     writeFileSync(stateFile, JSON.stringify({
       status: 'running',
-      params: { maps: ['random'], models: null, games: 24, jobs: 1, salt: null, dryRun: false },
+      params: { maps: ['random'], participants: null, games: 24, jobs: 1, salt: null, dryRun: false },
       pid: 1, startedAt: '2026-09-06T00:00:00.000Z', finishedAt: null, exitCode: null,
       baselineGames: 0, batchesDone: 0, batchesTotal: null, plannedGames: null,
       outputTail: [], notes: [],
     }));
     const app2 = Fastify();
-    await app2.register(rlEvalRoutes, { spawner: spawner.spawner, statsFile, stateFile });
-    const res = (await app2.inject({ method: 'GET', url: '/api/rl/eval/status' })).json();
+    await app2.register(arenaEvalRoutes, { spawner: spawner.spawner, statsFile, stateFile });
+    const res = (await app2.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
     expect(res.status).toBe('interrupted');
     expect(res.notes.join()).toContain('服务器重启');
     await app2.close();
@@ -204,18 +262,18 @@ describe('RL eval console API', () => {
     const prev = process.env.AUTO_CONTROL_TOKEN;
     process.env.AUTO_CONTROL_TOKEN = 'secret';
     try {
-      const denied = await app.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] } });
+      const denied = await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
       expect(denied.statusCode).toBe(401);
       // 状态快照含命令行与本地路径，读接口同样受控。
-      const statusDenied = await app.inject({ method: 'GET', url: '/api/rl/eval/status' });
+      const statusDenied = await app.inject({ method: 'GET', url: '/api/arena/eval/status' });
       expect(statusDenied.statusCode).toBe(401);
       const allowed = await app.inject({
-        method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] },
+        method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] },
         headers: { 'x-control-token': 'secret' },
       });
       expect(allowed.statusCode).toBe(200);
       const statusAllowed = await app.inject({
-        method: 'GET', url: '/api/rl/eval/status', headers: { 'x-control-token': 'secret' },
+        method: 'GET', url: '/api/arena/eval/status', headers: { 'x-control-token': 'secret' },
       });
       expect(statusAllowed.statusCode).toBe(200);
       // 上一步 start 已让跑批进入 running，读到真实状态才证明不是空的 200。
@@ -227,16 +285,16 @@ describe('RL eval console API', () => {
   });
 
   it('regenerates leaderboard data on demand', async () => {
-    const pending = app.inject({ method: 'POST', url: '/api/rl/leaderboard/regenerate' });
+    const pending = app.inject({ method: 'POST', url: '/api/arena/leaderboard/regenerate' });
     await delay(10);
-    // 重算串行跑两个脚本：先榜单（gen.mjs），后玩法统计（generateRlStats.mjs）。
+    // 重算串行跑两个脚本：先榜单（gen.mjs），后玩法统计（generateArenaStats.mjs）。
     spawner.children[0].emit('exit', 0, null);
     await delay(10);
     spawner.children[1].emit('exit', 0, null);
     const res = await pending;
     expect(res.statusCode).toBe(200);
     expect(spawner.calls[0].args.join(' ')).toContain('gen.mjs');
-    expect(spawner.calls[1].args.join(' ')).toContain('generateRlStats.mjs');
+    expect(spawner.calls[1].args.join(' ')).toContain('generateArenaStats.mjs');
   });
 
   it('parses round_robin output lines in their real format', () => {
@@ -251,20 +309,20 @@ describe('RL eval console API', () => {
   });
 
   it('recounts games when the stats file changes', async () => {
-    const before = (await app.inject({ method: 'GET', url: '/api/rl/eval/status' })).json();
+    const before = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
     expect(before.gamesTotal).toBe(2);
     writeFileSync(statsFile, '{"map":"random"}\n{"map":"random"}\n{"map":"random"}\n');
-    const after = (await app.inject({ method: 'GET', url: '/api/rl/eval/status' })).json();
+    const after = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
     expect(after.gamesTotal).toBe(3);
   });
 
   it('resets to failed state instead of a ghost running state when the process cannot start', async () => {
     const app2 = Fastify();
-    await app2.register(rlEvalRoutes, { spawner: () => null, statsFile, stateFile });
-    const res = await app2.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] } });
+    await app2.register(arenaEvalRoutes, { spawner: () => null, statsFile, stateFile });
+    const res = await app2.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
     expect(res.statusCode).toBe(500);
     expect(res.json().error).toContain('无法启动');
-    const status = (await app2.inject({ method: 'GET', url: '/api/rl/eval/status' })).json();
+    const status = (await app2.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
     expect(status.status).toBe('failed');
     expect(status.notes.join()).toContain('无法启动');
     await app2.close();
@@ -272,8 +330,8 @@ describe('RL eval console API', () => {
 
   it('kills the run process tree and marks interrupted when the server closes', async () => {
     const app2 = Fastify();
-    await app2.register(rlEvalRoutes, { spawner: spawner.spawner, statsFile, stateFile });
-    await app2.inject({ method: 'POST', url: '/api/rl/eval/start', payload: { maps: ['random'] } });
+    await app2.register(arenaEvalRoutes, { spawner: spawner.spawner, statsFile, stateFile });
+    await app2.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
     const child = spawner.children[0];
     let killed = false;
     child.kill = () => { killed = true; return true; };

@@ -17,7 +17,7 @@ export default defineConfig({
         'map-editor': resolve(__dirname, 'public/map-editor.html'),
         stats: resolve(__dirname, 'public/stats.html'),
         entertainment: resolve(__dirname, 'public/entertainment.html'),
-        leaderboard: resolve(__dirname, 'public/leaderboard.html'),
+        arena: resolve(__dirname, 'public/arena.html'),
       },
     },
     minify: 'terser',

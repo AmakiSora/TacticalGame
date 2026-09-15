@@ -1,16 +1,21 @@
-"""跨版本模型对战：让不同观测/动作世代的模型互相对弈。
+"""跨世代参与者对战：模型 × 模型 / 模型 × 算法 / 算法 × 算法。
+
+参与者规格（--player-a/--player-b）：zip 路径（RL 模型）或 ``algo:<name>``
+（algorithms/registry.mjs 注册的内置算法，经 local-worker 的 decide 通道进程内走子）。
+--model-a/--model-b 为等价的模型规格别名。
 
 两个模型的动作空间不同，无法在同一套编码下运行：
 - v2.0.0：8 个单位槽 / 38 动作；观测按固定 player_a 视角编码（当时的实现）。
 - v2.1.x/v2.2：12 个单位槽 / 54 动作；观测按所选座位视角编码。
 - v2.7：54 动作 / 6205 维（槽位和规则特征）；v2.6 及更早版本走冻结快照。
 
-本脚本通过 rl/local-worker.ts 在进程内跑引擎（无需启动游戏服务器），
-对每个座位使用其模型训练时期的编码与合法动作生成逻辑：
+本脚本通过 rl/training/local-worker.ts 在进程内跑引擎（无需启动游戏服务器），
+对每个座位使用其训练版本的编码与合法动作生成逻辑；算法座位复用线上 runner 的
+decide(state, utils) 接口，动作经引擎 apply 校验，非法动作按线上语义结束回合并记录。
 
-    rl/.venv/Scripts/python.exe rl/evaluate_cross.py \
-        --model-a rl/models/hex_ppo_v2.0.0_20260824_default_rule_500000.zip \
-        --model-b rl/models/hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip \
+    rl/.venv/Scripts/python.exe rl/evaluation/evaluate_cross.py \
+        --player-a rl/models/hex_ppo_v2.0.0_20260824_default_rule_500000.zip \
+        --player-b algo:threat \
         --games 4
 
 注意：v2.0.0 的编码固定以 player_a 为己方视角，因此旧模型默认固定坐
@@ -29,9 +34,53 @@ import time
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import torch
-from sb3_contrib import MaskablePPO
+# torch / sb3 与各世代编码 helper 只在真正加载模型时导入（见 _load_ml）：
+# 纯算法对局不碰推理栈，省下每次子进程启动的数秒 import 开销。
+_ML: dict[str, Any] | None = None
+
+
+def _load_ml() -> dict[str, Any]:
+    global _ML
+    if _ML is None:
+        import numpy as np
+        import torch
+        from sb3_contrib import MaskablePPO
+        try:
+            from env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
+            from env import HexGameEnv as CurrentHexGameEnv
+            from env import classify_action as classify_current_action
+            from env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
+            from env_v200 import HexGameEnv as LegacyHexGameEnv
+            from env_v22 import HexGameEnv as V22HexGameEnv
+            from env_v24 import HexGameEnv as V24HexGameEnv
+            from env_v25 import HexGameEnv as V25HexGameEnv
+            from env_v26 import HexGameEnv as V26HexGameEnv
+            from env_v27 import HexGameEnv as V27HexGameEnv
+        except ImportError:  # 兼容 ``python -m rl.evaluation.evaluate_cross`` 等调用方式。
+            from rl.envs.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
+            from rl.envs.env import HexGameEnv as CurrentHexGameEnv
+            from rl.envs.env import classify_action as classify_current_action
+            from rl.envs.env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
+            from rl.envs.env_v200 import HexGameEnv as LegacyHexGameEnv
+            from rl.envs.env_v22 import HexGameEnv as V22HexGameEnv
+            from rl.envs.env_v24 import HexGameEnv as V24HexGameEnv
+            from rl.envs.env_v25 import HexGameEnv as V25HexGameEnv
+            from rl.envs.env_v26 import HexGameEnv as V26HexGameEnv
+            from rl.envs.env_v27 import HexGameEnv as V27HexGameEnv
+        _ML = {
+            "np": np, "torch": torch, "MaskablePPO": MaskablePPO,
+            "CURRENT_MAX_ACTIONS": CURRENT_MAX_ACTIONS,
+            "LEGACY_MAX_ACTIONS": LEGACY_MAX_ACTIONS,
+            "CurrentHexGameEnv": CurrentHexGameEnv,
+            "LegacyHexGameEnv": LegacyHexGameEnv,
+            "V22HexGameEnv": V22HexGameEnv,
+            "V24HexGameEnv": V24HexGameEnv,
+            "V25HexGameEnv": V25HexGameEnv,
+            "V26HexGameEnv": V26HexGameEnv,
+            "V27HexGameEnv": V27HexGameEnv,
+            "classify_current_action": classify_current_action,
+        }
+    return _ML
 
 # rl/ 已重组为 envs/runners/training/evaluation 子目录；把各代码目录挂上 sys.path，
 # 让既有的扁平模块名（如 ``import env``）在脚本模式下继续可用。
@@ -41,41 +90,22 @@ for _sub in ("envs", "runners", "training", "evaluation"):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-try:
-    from env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
-    from env import HexGameEnv as CurrentHexGameEnv
-    from env import classify_action as classify_current_action
-    from env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
-    from env_v200 import HexGameEnv as LegacyHexGameEnv
-    from env_v22 import HexGameEnv as V22HexGameEnv
-    from env_v24 import HexGameEnv as V24HexGameEnv
-    from env_v25 import HexGameEnv as V25HexGameEnv
-    from env_v26 import HexGameEnv as V26HexGameEnv
-    from env_v27 import HexGameEnv as V27HexGameEnv
-except ImportError:  # 兼容 ``python -m rl.evaluation.evaluate_cross`` 等调用方式。
-    from rl.envs.env import MAX_ACTIONS as CURRENT_MAX_ACTIONS
-    from rl.envs.env import HexGameEnv as CurrentHexGameEnv
-    from rl.envs.env import classify_action as classify_current_action
-    from rl.envs.env_v200 import MAX_ACTIONS as LEGACY_MAX_ACTIONS
-    from rl.envs.env_v200 import HexGameEnv as LegacyHexGameEnv
-    from rl.envs.env_v22 import HexGameEnv as V22HexGameEnv
-    from rl.envs.env_v24 import HexGameEnv as V24HexGameEnv
-    from rl.envs.env_v25 import HexGameEnv as V25HexGameEnv
-    from rl.envs.env_v26 import HexGameEnv as V26HexGameEnv
-    from rl.envs.env_v27 import HexGameEnv as V27HexGameEnv
-
-# 明细数据默认目录：rl/leaderboard/details/<批次>.jsonl，一局一行。
+# 明细数据默认目录：arena/details/<批次>.jsonl，一局一行。
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-_DEFAULT_DETAILS_DIR = _PROJECT_ROOT / "rl" / "leaderboard" / "details"
+_DEFAULT_DETAILS_DIR = _PROJECT_ROOT / "arena" / "details"
 _SEATS = ("player_a", "player_b")
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--model-a", required=True, help="坐 player_a 座位的模型 zip 路径")
-    parser.add_argument("--model-b", required=True, help="坐 player_b 座位的模型 zip 路径")
-    parser.add_argument("--name-a", default=None, help="player_a 模型的显示名（默认取文件名）")
-    parser.add_argument("--name-b", default=None, help="player_b 模型的显示名（默认取文件名）")
+    parser.add_argument("--player-a", default=None,
+                        help="player_a 座位参与者规格：模型 zip 路径或 algo:<算法名>")
+    parser.add_argument("--player-b", default=None,
+                        help="player_b 座位参与者规格：模型 zip 路径或 algo:<算法名>")
+    parser.add_argument("--model-a", default=None, help="等价 --player-a（仅模型规格），兼容保留")
+    parser.add_argument("--model-b", default=None, help="等价 --player-b（仅模型规格），兼容保留")
+    parser.add_argument("--name-a", default=None, help="player_a 参与者的显示名（默认：模型取文件名，算法取 algo_<name>）")
+    parser.add_argument("--name-b", default=None, help="player_b 参与者的显示名（默认同上）")
     parser.add_argument("--games", type=int, default=2, help="总对局数（--swap-sides 时按相同种子成对换座）")
     parser.add_argument("--map", dest="map_id", default="default", help="地图 id（默认 default；random 为每局一张对称随机地图）")
     parser.add_argument("--max-rounds", type=int, default=100, help="单局回合数上限，超过记为 draw")
@@ -190,42 +220,46 @@ class EngineWorker:
 
 
 class SideController:
-    """一个座位的选手：加载模型并使用其训练版本的编码/合法动作逻辑。"""
+    """一个座位的模型选手：加载模型并使用其训练版本的编码/合法动作逻辑。"""
+
+    kind = "model"
 
     def __init__(self, label: str, model_path: str, side: str, device: str,
                  record_policy_stats: bool = False):
+        _load_ml()
         self.label = label
+        self.spec = model_path
         self.model_path = model_path
         self.side = side
         self.opponent = "player_b" if side == "player_a" else "player_a"
         self.record_policy_stats = record_policy_stats
-        self.model = MaskablePPO.load(model_path, device=device)
+        self.model = _ML["MaskablePPO"].load(model_path, device=device)
 
         n_actions = int(getattr(self.model.action_space, "n", -1))
         self.n_actions = n_actions
         obs_dim = int(self.model.observation_space.shape[0]) if getattr(self.model.observation_space, "shape", ()) else 0
-        if n_actions == LEGACY_MAX_ACTIONS:
-            helper_cls, self.version = LegacyHexGameEnv, f"v2.0.0 ({n_actions} 动作)"
-        elif n_actions == CURRENT_MAX_ACTIONS:
-            helper_cls, self.version = CurrentHexGameEnv, f"v3.0 ({n_actions} 动作)"
+        if n_actions == _ML["LEGACY_MAX_ACTIONS"]:
+            helper_cls, self.version = _ML["LegacyHexGameEnv"], f"v2.0.0 ({n_actions} 动作)"
+        elif n_actions == _ML["CURRENT_MAX_ACTIONS"]:
+            helper_cls, self.version = _ML["CurrentHexGameEnv"], f"v3.0 ({n_actions} 动作)"
         elif n_actions == 54:
             # 同为 54 动作但观测语义按版本分化：按观测维度选编码器，
             # 6205 维 → 冻结的 v2.7 快照；5974 维 → 冻结的 v2.6 兼容环境；
             # 6024 维 → v2.5 快照；3922 维 → v2.1/v2.2 快照。
             if obs_dim == 6205:
-                helper_cls, self.version = V27HexGameEnv, f"v2.7/v2.8 ({n_actions} 动作)"
+                helper_cls, self.version = _ML["V27HexGameEnv"], f"v2.7/v2.8 ({n_actions} 动作)"
             elif obs_dim == 5974:
-                helper_cls, self.version = V26HexGameEnv, f"v2.3-v2.4/v2.6 ({n_actions} 动作)"
+                helper_cls, self.version = _ML["V26HexGameEnv"], f"v2.3-v2.4/v2.6 ({n_actions} 动作)"
             elif obs_dim == 6024:
-                helper_cls, self.version = V25HexGameEnv, f"v2.5 ({n_actions} 动作)"
+                helper_cls, self.version = _ML["V25HexGameEnv"], f"v2.5 ({n_actions} 动作)"
             elif obs_dim == 3922:
-                helper_cls, self.version = V22HexGameEnv, f"v2.2 ({n_actions} 动作)"
+                helper_cls, self.version = _ML["V22HexGameEnv"], f"v2.2 ({n_actions} 动作)"
             else:
                 raise ValueError(f"{label}: 54 动作模型的观测维度 {obs_dim} 无法识别（支持 6205 / 6024 / 5974 / 3922）")
         else:
             raise ValueError(
                 f"{label}: 动作空间 {n_actions} 无法识别（支持 "
-                f"{LEGACY_MAX_ACTIONS}=v2.0.0、54=v2.1-v2.8 或 {CURRENT_MAX_ACTIONS}=v3.0+）"
+                f"{_ML['LEGACY_MAX_ACTIONS']}=v2.0.0、54=v2.1-v2.8 或 {_ML['CURRENT_MAX_ACTIONS']}=v3.0+）"
             )
         # helper 仅用于纯计算（合法动作/编码），不做任何网络或子进程操作。
         # 注意：v2.2 helper 在随机地图上属分布外（编码只覆盖半径 8 的 217 格、
@@ -233,7 +267,7 @@ class SideController:
         self.helper = helper_cls()
         self.helper.owner = side
         self.helper.opponent = self.opponent
-        if helper_cls is LegacyHexGameEnv and side != "player_a":
+        if helper_cls is _ML["LegacyHexGameEnv"] and side != "player_a":
             print(f"[警告] {label}: v2.0.0 观测按固定 player_a 视角编码，"
                   f"坐在 {side} 时表现为训练分布之外，结果可能失真。")
 
@@ -243,6 +277,7 @@ class SideController:
 
     def act_with_info(self, state: dict[str, Any], stochastic: bool) -> tuple[str, dict[str, Any], dict[str, Any]]:
         """与 act 相同的决策，额外返回本步诊断信息（供明细动作日志使用）。"""
+        np = _ML["np"]
         actions = self.helper._legal_actions(state, self.side)
         if not any(action[0] for action in actions):
             return "end_turn", {}, {"forced": True, "legalActions": 0}
@@ -253,12 +288,13 @@ class SideController:
         if index >= len(actions) or not actions[index][0]:
             return "end_turn", {}, {"forced": True, "legalActions": len(actions), "actionIndex": index}
         info: dict[str, Any] = {"forced": False, "legalActions": len(actions), "actionIndex": index}
-        if self.n_actions == CURRENT_MAX_ACTIONS:
+        if self.n_actions == _ML["CURRENT_MAX_ACTIONS"]:
             # v3.0 专属：候选序号是 155 动作空间的新决策维度，记录其选用情况。
-            intent, candidate = classify_current_action(index)
+            intent, candidate = _ML["classify_current_action"](index)
             info["intent"] = intent
             info["candidate"] = candidate
         if self.record_policy_stats:
+            torch = _ML["torch"]
             obs_tensor = self.model.policy.obs_to_tensor(np.asarray(observation)[None])[0]
             with torch.no_grad():
                 value = self.model.policy.predict_values(obs_tensor)
@@ -274,6 +310,59 @@ class SideController:
     @property
     def short(self) -> str:
         return f"{self.label}[{self.side}, {self.version}]"
+
+
+class AlgorithmController:
+    """一个座位的规则算法选手：决策在 local-worker 进程内完成（decide 通道）。
+
+    与 SideController 同接口；stochastic / record_policy_stats 对算法无意义，忽略。
+    """
+
+    kind = "algorithm"
+
+    def __init__(self, label: str, algorithm_name: str, side: str, worker: "EngineWorker"):
+        self.label = label
+        self.spec = f"algo:{algorithm_name}"
+        self.algorithm = algorithm_name
+        self.side = side
+        self.worker = worker
+        self.version = f"算法 {algorithm_name}"
+
+    def reset_for_game(self):
+        # 算法无跨局状态。
+        pass
+
+    def act_with_info(self, state: dict[str, Any], stochastic: bool) -> tuple[str, dict[str, Any], dict[str, Any]]:
+        result = self.worker.call({"cmd": "decide", "owner": self.side, "algorithm": self.algorithm})
+        if result.get("endTurn"):
+            return "end_turn", {}, {"kind": "algorithm", "decision": "end_turn"}
+        action = result.get("action") or {}
+        action_type = action.get("type")
+        if not isinstance(action_type, str):
+            raise RuntimeError(f"worker decide 返回缺少 type 的动作: {action!r}")
+        payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+        return action_type, payload, {"kind": "algorithm"}
+
+    @property
+    def short(self) -> str:
+        return f"{self.label}[{self.side}, {self.version}]"
+
+
+def default_display_name(spec: str) -> str:
+    """参与者显示名（也是 matches.jsonl 里的玩家 id）：模型取文件名，算法取 algo_<name>。"""
+    if spec.startswith("algo:"):
+        return f"algo_{spec[len('algo:'):]}"
+    return Path(spec).name
+
+
+def make_controller(label: str, spec: str, side: str, args, worker: "EngineWorker"):
+    if spec.startswith("algo:"):
+        name = spec[len("algo:"):].strip()
+        if not name:
+            raise ValueError(f"{side}: 无效的算法规格 {spec!r}")
+        return AlgorithmController(label, name, side, worker)
+    return SideController(label, spec, side, args.device,
+                          record_policy_stats=args.policy_stats)
 
 
 def reset_command(args, game_index: int) -> dict[str, Any]:
@@ -579,7 +668,18 @@ def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], arg
             "action": {"type": action_type, **payload},
             **info,
         })
-        state = worker.apply(side, action_type, payload)
+        try:
+            state = worker.apply(side, action_type, payload)
+        except RuntimeError as exc:
+            if getattr(controller, "kind", "model") != "algorithm":
+                raise
+            # 线上 runner 对算法动作失败的处理是结束整个回合（algorithms/lib/interfaces.mjs），
+            # 进程内评估对齐该语义：记录失败动作并改走 end_turn，不中断整批跑测。
+            print(f"  警告：{controller.short} 动作被引擎拒绝（{exc}），按线上语义结束该回合")
+            action_log.append({"seat": side, "round": round_number,
+                               "action": {"type": "end_turn"}, "kind": "algorithm",
+                               "failed": True, "error": str(exc)})
+            state = worker.apply(side, "end_turn", {})
         collector.absorb(state)
         acted += 1
     timeline_by_round[int(state.get("turn", {}).get("roundNumber", 1))] = _state_snapshot(state)
@@ -607,8 +707,10 @@ def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], arg
             "gameIndex": game_index,
             "map": args.map_id,
             "mapSeed": map_seed,
-            "models": {seat: {"name": controller.label, "version": controller.version,
-                              "path": controller.model_path}
+            "models": {seat: {"name": controller.label, "kind": getattr(controller, "kind", "model"),
+                              "version": controller.version,
+                              "path": getattr(controller, "model_path", None),
+                              "algorithm": getattr(controller, "algorithm", None)}
                        for seat, controller in seat_map.items()},
             "params": {
                 "swapSides": bool(args.swap_sides),
@@ -645,9 +747,20 @@ def main():
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
     args = parse_args()
-    name_a = args.name_a or Path(args.model_a).name
-    name_b = args.name_b or Path(args.model_b).name
+    spec_a = args.player_a or args.model_a
+    spec_b = args.player_b or args.model_b
+    if not spec_a or not spec_b:
+        print("错误：需为两个座位提供参与者："
+              "--player-a/--player-b（zip 路径或 algo:<name>），兼容 --model-a/--model-b。",
+              file=sys.stderr)
+        return 2
+    name_a = args.name_a or default_display_name(spec_a)
+    name_b = args.name_b or default_display_name(spec_b)
+    if name_a == name_b:
+        print(f"错误：两个座位是同一参与者（{name_a}）。", file=sys.stderr)
+        return 2
     names = {"player_a": name_a, "player_b": name_b}
+    specs = {"player_a": spec_a, "player_b": spec_b}
 
     details_dir = None if args.no_details else Path(args.details_dir)
     batch_id = f"{args.seed_prefix}-{time.strftime('%Y%m%d_%H%M%S')}-{os.getpid()}"
@@ -658,26 +771,21 @@ def main():
 
     workers = [EngineWorker()]
     try:
-        controllers = {
-            side: SideController(names[side], path, side, args.device,
-                                 record_policy_stats=args.policy_stats)
-            for side, path in (("player_a", args.model_a), ("player_b", args.model_b))
-        }
+        controllers = {side: make_controller(names[side], specs[side], side, args, workers[0])
+                       for side in _SEATS}
         tally: dict[str, int] = {name_a: 0, name_b: 0, "draw": 0}
         records: list[dict[str, Any]] = []
 
         for game_index in range(1, args.games + 1):
             if args.swap_sides and game_index > 1:
                 # 交换座位：重建控制器以匹配新的 owner 视角。
-                # 注意：必须按当前座位映射取模型路径/名字——上一次重建后控制器
+                # 注意：必须按当前座位映射取显示名/参与者规格——上一次重建后控制器
                 # 的 label 已与初始 names 字典相反，直接取 names[side] 会导致
                 # 第 3 局起座位反复失效（v2.5.0 验收时踩到）。
-                current = {seat: (controller.label, controller.model_path) for seat, controller in controllers.items()}
+                current = {seat: (controller.label, controller.spec) for seat, controller in controllers.items()}
                 controllers = {
-                    "player_a": SideController(current["player_b"][0], current["player_b"][1], "player_a", args.device,
-                                               record_policy_stats=args.policy_stats),
-                    "player_b": SideController(current["player_a"][0], current["player_a"][1], "player_b", args.device,
-                                               record_policy_stats=args.policy_stats),
+                    "player_a": make_controller(current["player_b"][0], current["player_b"][1], "player_a", args, workers[0]),
+                    "player_b": make_controller(current["player_a"][0], current["player_a"][1], "player_b", args, workers[0]),
                 }
                 names = {"player_a": current["player_b"][0], "player_b": current["player_a"][0]}
             for controller in controllers.values():

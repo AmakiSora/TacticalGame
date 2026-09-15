@@ -16,6 +16,8 @@ import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
 import { authenticateHost } from './auth.js';
 import { lobbySummary } from './games.js';
+// 算法展示元数据唯一来源（类型声明见 algorithms/registry.d.mts）。
+import { listAlgorithmInfo, algorithmParticipantId } from '../../algorithms/registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -138,13 +140,20 @@ let activeSpawner: NonNullable<BotDeps['spawner']> = defaultSpawner;
 
 let modelsCache: RlModelInfo[] = [];
 
-/** 可用的算法 AI 配置 */
-const ALGORITHM_BOTS = {
-  algo_greedy: { name: '贪心算法', algorithm: 'greedy', description: '攻击 > 治疗 > 爆破 > 部署 > 移动' },
-  algo_random: { name: '随机算法', algorithm: 'random', description: '从所有合法动作中随机选择' },
-  algo_mcts: { name: '蒙特卡洛树搜索', algorithm: 'mcts', description: '蒙特卡洛树搜索：模拟推演选择最优动作' },
-  algo_threat: { name: '威胁感知算法', algorithm: 'threat', description: '威胁图统一效用评估：集火斩杀、避险走位' },
-} as const;
+/** 可用的算法 AI 配置。由 algorithms/registry.mjs 的展示元数据生成：
+ * 注册表是唯一来源，勿在此另立清单（历史上双份清单出过前后端选项不一致）。 */
+export interface AlgorithmBotConfig {
+  name: string;
+  algorithm: string;
+  description: string;
+}
+export const ALGORITHM_BOTS: Record<string, AlgorithmBotConfig> = Object.fromEntries(
+  listAlgorithmInfo().map(info => [algorithmParticipantId(info.name), {
+    name: info.displayName,
+    algorithm: info.name,
+    description: info.description,
+  }]),
+);
 
 /** 大厅内出现同名玩家会让踢人/观战难以区分：名称被占用时自动追加序号。 */
 function uniqueLobbyName(game: GameState, name: string): string {
@@ -466,7 +475,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
         });
       }
       const botType = req.body?.botType?.trim();
-      const config = botType ? ALGORITHM_BOTS[botType as keyof typeof ALGORITHM_BOTS] : undefined;
+      const config = botType ? ALGORITHM_BOTS[botType] : undefined;
       if (!botType || !config) {
         return reply.code(400).send({
           error: `unknown algorithm bot type: "${botType ?? ''}"`,

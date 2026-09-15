@@ -1,6 +1,6 @@
-/* RL 玩法统计 + 模型档案 — reads /data/rl-stats.json only. */
+/* 竞技场玩法统计 + 参与者档案 — reads /data/arena-stats.json only. */
 (() => {
-  const DATA_URL = '/data/rl-stats.json';
+  const DATA_URL = '/data/arena-stats.json';
 
   const MAP_LABELS = { random: '随机图' };
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
@@ -14,6 +14,7 @@
     recommended: { label: '当前推荐', cls: 'st-good' },
     legacy: { label: '历史', cls: 'st-muted' },
     retired: { label: '作废', cls: 'st-bad' },
+    builtin: { label: '内置算法', cls: 'st-algo' },
   };
 
   const el = {};
@@ -196,7 +197,12 @@
       const statusMeta = STATUS_META[m.status] || STATUS_META.legacy;
       const ratingText = m.rating != null ? `${m.rating}` : '未参评';
       const ratingTitle = m.rating != null && m.ratingLo != null ? `95% CI ${m.ratingLo}–${m.ratingHi}` : '';
-      const metaBits = [
+      const metaBits = m.kind === 'algorithm' ? [
+        m.games ? `<span>对局 <b>${fmtNum(m.games)}</b></span>` : '',
+        m.winRate != null ? `<span>胜率 <b>${pct(m.winRate)}</b></span>` : '',
+        `<span>注册名 <b>${escapeHtml(m.algorithm || '')}</b></span>`,
+        m.docRef ? `<span>文档 <b>${escapeHtml(m.docRef)}</b></span>` : '',
+      ].filter(Boolean).join('') : [
         m.games ? `<span>对局 <b>${fmtNum(m.games)}</b></span>` : '',
         m.winRate != null ? `<span>胜率 <b>${pct(m.winRate)}</b></span>` : '',
         `<span>训练日期 <b>${escapeHtml(m.trainDate)}</b></span>`,

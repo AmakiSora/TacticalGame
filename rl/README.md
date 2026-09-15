@@ -15,7 +15,8 @@ Transformer 棋盘编码器、混合地图、后台配对评估和蒸馏冷启�
 | `rl/training/` | 训练与数据管线：`train.py`（PPO 主循环）、`distill.py`（老师采样/蒸馏冷启动）、`local_env.py` + `local-worker.ts`（进程内调用 TS 引擎）、`extractors.py`（网络结构）、`eval_worker.py`（后台配对评估） |
 | `rl/evaluation/` | 离线评估：`evaluate_cross.py`（跨版本对战）、`round_robin.py`（循环赛） |
 | `rl/docs/` | `RELEASE_NOTES.md`（改动记录，必读）、`MODELS_NOTES.md`（模型档案） |
-| `rl/models/`、`rl/checkpoints/`、`rl/tb/`、`rl/selfplay/`、`rl/distill/`、`rl/leaderboard/` | 训练产物（模型 zip、断点、TensorBoard 日志、自对弈快照、蒸馏数据、榜单），均已 gitignore；作废模型归档在 `rl/models/deprecated/`、`rl/checkpoints/deprecated/`，档案在 `rl/docs/models/deprecated/`（见 `rl/docs/MODELS_NOTES.md`「已作废模型」） |
+| `rl/models/`、`rl/checkpoints/`、`rl/tb/`、`rl/selfplay/`、`rl/distill/` | 训练产物（模型 zip、断点、TensorBoard 日志、自对弈快照、蒸馏数据），均已 gitignore；作废模型归档在 `rl/models/deprecated/`、`rl/checkpoints/deprecated/`，档案在 `rl/docs/models/deprecated/`（见 `rl/docs/MODELS_NOTES.md`「已作废模型」） |
+| `arena/`（仓库根） | AI 竞技场数据：`matches.jsonl`（对战记录，入 git）与 `details/`（每局明细，gitignored、不上服务器） |
 | `rl/test-output/` | 本地实验区：`scripts/`（一次性诊断与评估脚本）、`launchers/`（.bat 训练配方）、`logs/`、`stats/`、`models/`、`checkpoints/`，已 gitignore |
 
 根目录只保留 `README.md` 与 `requirements.txt`。
@@ -395,35 +396,37 @@ python rl/runners/run_model.py --game <gameId> --token <playerToken> --once
 注意：v2.0.0 观测按固定 player_a 视角编码（当时实现），旧模型坐 player_b
 属于训练分布之外，强度会失真但仍可正常对局（运行器会打印警告）。
 
-## 跨版本模型对战（离线评估）
+## 竞技场对战（离线评估）
 
-`rl/evaluation/evaluate_cross.py` 让两代模型在进程内引擎上互打（无需游戏服务器），
-每个座位使用其训练时期的编码与合法动作逻辑：
+`rl/evaluation/evaluate_cross.py` 让两类参与者在进程内引擎上互打（无需游戏服务器）：
+RL 模型（`zip 路径`，每座使用其训练时期的编码与合法动作逻辑）与内置算法 AI
+（`algo:<name>`，经 local-worker 的 decide 通道进程内走子，规格来自 `algorithms/registry.mjs`）：
 
 ```powershell
 rl/.venv/Scripts/python.exe rl/evaluation/evaluate_cross.py `
-  --model-a rl/models/hex_ppo_v2.0.0_20260824_default_rule_500000.zip `
-  --model-b rl/models/hex_ppo_v2.1.1_20260825_default_rule_mixed_500000.zip `
+  --player-a rl/models/hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip `
+  --player-b algo:threat `
   --games 4
 ```
 
-常用参数：`--games` 对局数；`--stochastic` 按策略采样（默认确定性）；`--max-rounds`
+常用参数：`--player-a/--player-b` 参与者规格（`--model-a/--model-b` 为等价的模型别名）；
+`--games` 对局数；`--stochastic` 按策略采样（默认确定性；对算法无意义）；`--max-rounds`
 单局回合上限（超过记平局）；`--verbose` 打印每步动作；`--stats-file <路径>` 把每局结果追加到
-JSONL 并输出跨运行累计的分座位统计（同一模型对与地图的记录自动合并，验收用）；
-`--details-dir <目录>`（默认 `rl/leaderboard/details`）与 `--no-details` 控制每局明细落盘。
+JSONL 并输出跨运行累计的分座位统计（同一参与者对与地图的记录自动合并，验收用）；
+`--details-dir <目录>`（默认 `arena/details`）与 `--no-details` 控制每局明细落盘。
 
 注意：v2.0.0 的观测按固定 player_a 视角编码，因此旧模型固定坐 player_a；
 `--swap-sides` 每局交换座位，但交换后旧模型处于训练分布之外，结果会失真。
 
 ### 每局明细数据（评估改进用）
 
-evaluate_cross 默认为每个批次在 `rl/leaderboard/details/<批次>.jsonl` 落盘一行一局的完整明细
+evaluate_cross 默认为每个批次在 `arena/details/<批次>.jsonl` 落盘一行一局的完整明细
 （批次名 = seed_prefix-时间戳-pid；每局结束立即追加，跑批中断时已完成对局不丢），
 `matches.jsonl` 摘要行新增的 `detailFile` 字段指向所属明细文件。明细记录结构：
 
 | 字段 | 内容 |
 |---|---|
-| `meta` | 局号、地图与随机图种子、双方模型名/编码器版本/zip 路径、参数（换座/采样/上限/设备/盐）、耗时、事件流完整性（`eventsIncomplete`/`eventGaps`） |
+| `meta` | 局号、地图与随机图种子、双方参与者名/类型（kind=model/algorithm）/编码器版本或算法名/zip 路径、参数（换座/采样/上限/设备/盐）、耗时、事件流完整性（`eventsIncomplete`/`eventGaps`） |
 | `summary` | 胜方座位、终局原因 `endReason`、回合数、双方动作数 |
 | `final` | 终局快照：引擎 `result`（reason/7 分项评分/排名）、双方引擎记分板（`headquartersDamage`/`unitsDestroyed`/`playersEliminated`/`actionPointsUsed`/`actionMerit`）、阵亡元信息、HQ 血量、补给、控制点、存活单位构成 |
 | `derived` | 从事件流聚合的战术统计：双方部署构成与花费、击杀/损失（按兵种）、输出/承受伤害（含对 HQ）、经济收入、占领/偷取数、首次占领回合、CCS 补给 |
@@ -446,33 +449,40 @@ evaluate_cross 默认为每个批次在 `rl/leaderboard/details/<批次>.jsonl` 
 （跑批耗时约翻倍，默认关；round_robin 同名开关透传）。注意引擎战斗伤害带随机浮动，
 即使同种子每局也不完全可复现；明细数据体积约 100-300KB/局（一轮全量约 2GB+），**gitignored 仅本地留存**（2026-09-08 起移出 git，磁盘占用自行管理，历史轮次可手动压缩/删除）。摘要行自带双方 `derived` 统计（部署构成/费用、击杀/损失、伤害/HQ 伤害、收入、占点/偷点、首占回合等），常规弱点分析直接读 `matches.jsonl` 即可，无需打开原始明细。
 
-## 批量对战与排行榜
+## AI 竞技场：批量对战与排行榜
 
-`rl/evaluation/round_robin.py` 自动发现 `rl/models/` 下全部可对战模型（排除 v1.0.0 的 512 动作格式），
-两两 × 全地图批量对战，结果累积写入 `rl/leaderboard/matches.jsonl`：
+`rl/evaluation/round_robin.py` 自动发现 `rl/models/` 下全部可对战模型（排除 v1.0.0 的 512 动作格式）
+与 `algorithms/registry.mjs` 注册的全部内置算法，两两混合 × 全地图批量对战，
+结果累积写入 `arena/matches.jsonl`（算法参与者名字为 `algo_<注册名>`）：
 
 ```powershell
-# 先小规模冒烟（只跑 default 图、3 个模型、每对 2 局）
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --games 2
+# 先小规模冒烟（只跑 default 图、3 个模型、2 个算法、每对 2 局）
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --algorithms greedy,threat --games 2
 
-# 全量跑批（120 对 × 7 图 × 24 局 ≈ 2 万局，建议先跑随机图约 3 小时出第一版榜单）
+# 全量跑批（模型+算法两两 × 7 图 × 24 局，建议先跑随机图出第一版榜单）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default,breach,danger-close,desert,dual-lanes,forge
+
+# 纯模型循环赛（不带算法，如复现旧口径）
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --algorithms none
 ```
 
 要点：
 
 - **断点续跑**：启动时统计 JSONL 里已有局数，`need = 目标 − 已有`（取偶保证换座对称），
   已跑对局不重复浪费；同命令重跑全部 skip。随机图重跑会通过新 `--salt` 生成全新地图。
-- **明细数据**：每个 evaluate_cross 批次在 `rl/leaderboard/details/` 落一个 JSONL
+- **明细数据**：每个 evaluate_cross 批次在 `arena/details/` 落一个 JSONL
   （事件流回放/战略曲线/动作日志/终局摘要），摘要行经 `detailFile` 关联；
   `--policy-stats` 可透传开启策略内部量记录（详见上节）。
-- **并行**：`--jobs N` 并发多个 evaluate_cross 子进程（每个独立加载模型，显存/内存有限时保持 1）。
-- **评分**：跑完执行 `npm run rl-leaderboard`（已并入 `stats-all`），
-  从 JSONL 生成 `public/data/rl-leaderboard.json`，页面 `/leaderboard.html` 展示。
-  也可以直接在 `/leaderboard.html` 的「评估控制台」页签（`#console` 直达）里网页启动/监控/停止跑批，
+- **并行**：`--jobs N` 并发多个 evaluate_cross 子进程（每个独立加载模型，显存/内存有限时保持 1）；
+  纯算法批次不加载模型，启动与单局耗时都低一档。
+- **评分**：跑完执行 `npm run arena-leaderboard`（已并入 `stats-all`），
+  从 JSONL 生成 `public/data/arena-leaderboard.json`，页面 `/arena.html` 展示。
+  也可以直接在 `/arena.html` 的「评估控制台」页签（`#console` 直达）里网页启动/监控/停止跑批，
   结束后自动重算榜单（需要本机 `rl/.venv`；Docker 容器内不可用）。
 - **评分协议**：Bradley-Terry MLE（MM 迭代，平局记 0.5，已交手对附加 1 局虚拟平局先验防发散），
   Elo 映射 `1500 + 400/ln10 × ln p`；95% CI 为按（对,图）分层 bootstrap（固定种子可复现）；
   小样本另附 Wilson 下界参考列。先手/后手只做展示统计，不进评分。
   各地图独立出分图榜单（局数少，CI 更宽）。
+- **混池语义**：RL 模型与规则算法在同一池评分，可直接跨类型比较强弱；
+  榜单/统计/档案按 `kind`（model/algorithm）区分展示。

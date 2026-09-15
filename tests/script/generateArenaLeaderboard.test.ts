@@ -6,7 +6,7 @@ import {
   collectRegistry,
   loadMatches,
   RETIRED_VERSIONS,
-} from '../../script/generateRlLeaderboard.mjs';
+} from '../../script/generateArenaLeaderboard.mjs';
 
 const VALID = 'hex_ppo_v2.2.0_20260827_default_modelmix_best.zip';
 const RETIRED = 'hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip';
@@ -35,7 +35,7 @@ describe('RETIRED_VERSIONS', () => {
 
 describe('collectRegistry 跳过作废模型', () => {
   it('作废版本不注册、也不进未参评区；v1.0.0 仍进未参评区', () => {
-    const { registry, excluded } = collectRegistry(makeModelsDir([VALID, RETIRED, V1]));
+    const { registry, excluded } = collectRegistry(makeModelsDir([VALID, RETIRED, V1]), []);
     expect(registry.has(VALID)).toBe(true);
     expect(registry.has(RETIRED)).toBe(false);
     expect(excluded.map(x => x.id)).toEqual([V1]);
@@ -53,12 +53,37 @@ describe('loadMatches 过滤作废模型对局', () => {
       line(RETIRED, VALID, RETIRED) +
       line(VALID, V1, VALID));
 
-    const registry = collectRegistry(dir).registry;
+    const registry = collectRegistry(dir, []).registry;
     const { matches, warnings, retiredDropped } = loadMatches(stats, registry);
     expect(matches).toHaveLength(1);
     expect(matches[0].playerA).toBe(VALID);
     expect(matches[0].playerB).toBe(V1);
     expect(retiredDropped).toBe(2);
     expect(warnings).toHaveLength(0);
+  });
+});
+
+describe('collectRegistry 内置算法混池注册', () => {
+  it('缺省注册全部算法为 algo_<name>，与模型同池且带展示元数据', () => {
+    const { registry } = collectRegistry(makeModelsDir([VALID]));
+    const threat = registry.get('algo_threat');
+    expect(threat).toMatchObject({ kind: 'algorithm', name: 'threat', displayName: '威胁感知算法' });
+    expect(registry.get('algo_greedy')).toBeTruthy();
+    expect(registry.get(VALID).kind).toBe('model');
+  });
+
+  it('loadMatches 接受算法与算法/算法对局并按参与者校验', () => {
+    const dir = makeModelsDir([VALID]);
+    const stats = join(dir, 'matches.jsonl');
+    const { registry } = collectRegistry(dir);
+    const line = (a: string, b: string, winner: string) =>
+      JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
+    writeFileSync(stats,
+      line('algo_threat', 'algo_greedy', 'algo_threat') +
+      line(VALID, 'algo_threat', 'algo_threat'));
+    const { matches, warnings } = loadMatches(stats, registry);
+    expect(matches).toHaveLength(2);
+    expect(warnings).toHaveLength(0);
+    expect(matches[1].winner).toBe('algo_threat');
   });
 });

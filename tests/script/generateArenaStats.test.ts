@@ -2,14 +2,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { collectRegistry } from '../../script/generateRlLeaderboard.mjs';
+import { collectRegistry } from '../../script/generateArenaLeaderboard.mjs';
 import {
   aggregateGameplay,
   buildModelProfiles,
   loadMatchDetails,
   parseModelsNotes,
   stripMd,
-} from '../../script/generateRlStats.mjs';
+} from '../../script/generateArenaStats.mjs';
 
 const A = 'hex_ppo_v2.2.0_20260827_default_modelmix_best.zip';
 const B = 'hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip';
@@ -87,7 +87,7 @@ function makeStatsFile(dir: string) {
 function loadFixture() {
   const dir = makeModelsDir([A, B, V1]);
   const statsFile = makeStatsFile(dir);
-  const { registry } = collectRegistry(dir);
+  const { registry } = collectRegistry(dir, []);
   const result = loadMatchDetails(statsFile, registry);
   return { dir, registry, ...result };
 }
@@ -251,7 +251,7 @@ describe('stripMd', () => {
 describe('buildModelProfiles 档案组装', () => {
   it('合并榜单评分与 notes，评分降序、未参评排后', () => {
     const dir = makeModelsDir([A, B, V1]);
-    const { registry } = collectRegistry(dir);
+    const { registry } = collectRegistry(dir, []);
     const { profiles: notesProfiles } = parseModelsNotes(NOTES_MD);
     const leaderboardJson = {
       maps: {
@@ -283,18 +283,38 @@ describe('buildModelProfiles 档案组装', () => {
   it('v3.0.3 映射为 recommended（与 MODELS_NOTES.md 同步）', () => {
     const champ = 'hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip';
     const dir = makeModelsDir([champ]);
-    const { registry } = collectRegistry(dir);
+    const { registry } = collectRegistry(dir, []);
     const models = buildModelProfiles({ registry, modelsDir: dir, leaderboardJson: null, notesProfiles: new Map() });
     expect(models[0].status).toBe('recommended');
   });
 
   it('榜单文件缺失时评分留空、档案仍完整', () => {
     const dir = makeModelsDir([A]);
-    const { registry } = collectRegistry(dir);
+    const { registry } = collectRegistry(dir, []);
     const models = buildModelProfiles({ registry, modelsDir: dir, leaderboardJson: null, notesProfiles: new Map() });
     expect(models).toHaveLength(1);
     expect(models[0].rating).toBeNull();
     expect(models[0].games).toBe(0);
     expect(models[0].short).toBe('v2.2.0');
+  });
+
+  it('算法参与者档案带 kind/注册名/文档路径与策略说明', () => {
+    const dir = makeModelsDir([A]);
+    const { registry } = collectRegistry(dir);
+    const models = buildModelProfiles({ registry, modelsDir: dir, leaderboardJson: null, notesProfiles: new Map() });
+    const threat = models.find(m => m.id === 'algo_threat');
+    expect(threat).toMatchObject({
+      kind: 'algorithm',
+      short: '威胁感知算法',
+      algorithm: 'threat',
+      status: 'builtin',
+      rated: true,
+      sizeMB: null,
+      docRef: 'algorithms/docs/algorithms/threat.md',
+    });
+    expect(threat.games).toBe(0);
+    // 模型条目同样带 kind，供前端筛选。
+    const model = models.find(m => m.id === A);
+    expect(model.kind).toBe('model');
   });
 });

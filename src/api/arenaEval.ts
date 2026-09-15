@@ -1,7 +1,8 @@
-// src/api/rlEval.ts
+// src/api/arenaEval.ts
 //
-// RL 评估控制台后端：让排行榜页面可以直接网页启动/监控/停止
-// rl/evaluation/round_robin.py 跑批，结束后自动重算榜单数据。
+// AI 竞技场评估控制台后端：让排行榜页面可以直接网页启动/监控/停止
+// rl/evaluation/round_robin.py 跑批（RL 模型 × 内置算法混合循环赛），
+// 结束后自动重算榜单数据。
 // 跑批依赖 rl/.venv 的 Python 与本地 rl/models 模型，属于本地开发功能；
 // Docker 容器内没有 Python 虚拟环境，启动接口会报错而不是留下坏进程。
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -11,14 +12,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { authorizeControlRequest } from './controlAuth.js';
+import { ALGORITHM_BOTS, refreshRlModels } from './bots.js';
+import { algorithmParticipantId } from '../../algorithms/registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const ROUND_ROBIN_SCRIPT = join(PROJECT_ROOT, 'rl', 'evaluation', 'round_robin.py');
-const LEADERBOARD_SCRIPT = join(PROJECT_ROOT, 'script', 'generateRlLeaderboard.mjs');
-const RL_STATS_SCRIPT = join(PROJECT_ROOT, 'script', 'generateRlStats.mjs');
-const DEFAULT_STATS_FILE = join(PROJECT_ROOT, 'rl', 'leaderboard', 'matches.jsonl');
-const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'rl-eval-state.json');
+const LEADERBOARD_SCRIPT = join(PROJECT_ROOT, 'script', 'generateArenaLeaderboard.mjs');
+const ARENA_STATS_SCRIPT = join(PROJECT_ROOT, 'script', 'generateArenaStats.mjs');
+const DEFAULT_STATS_FILE = join(PROJECT_ROOT, 'arena', 'matches.jsonl');
+const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json');
 
 // 与 rl/evaluation/round_robin.py 的 DEFAULT_MAPS 保持一致。
 export const KNOWN_MAPS = ['random', 'default', 'breach', 'danger-close', 'desert', 'dual-lanes', 'forge'] as const;
@@ -27,12 +30,31 @@ export type EvalRunStatus = 'idle' | 'running' | 'finished' | 'failed' | 'stoppe
 
 export interface EvalRunParams {
   maps: string[];
-  /** round_robin --models 的文件名子串过滤；null 表示全部可对战模型。 */
-  models: string[] | null;
+  /**
+   * 参评者过滤：null = 全部可对战模型 + 全部注册算法（round_robin 缺省行为）。
+   * 列表项两种写法：`algo:<注册名>` 精确纳入算法；其余按模型文件名子串过滤。
+   * 指定列表时未列出的算法不参与。
+   */
+  participants: string[] | null;
   games: number;
   jobs: number;
   salt: string | null;
   dryRun: boolean;
+}
+
+/** 把 participants 过滤列表翻译成 round_robin 的 --models / --algorithms 参数。 */
+export function buildParticipantArgs(params: EvalRunParams): string[] {
+  if (!params.participants) return [];
+  const modelFilters: string[] = [];
+  const algoNames: string[] = [];
+  for (const item of params.participants) {
+    if (item.startsWith('algo:')) algoNames.push(item.slice('algo:'.length));
+    else modelFilters.push(item);
+  }
+  const args: string[] = [];
+  if (modelFilters.length) args.push('--models', modelFilters.join(','));
+  args.push('--algorithms', algoNames.length ? algoNames.join(',') : 'none');
+  return args;
 }
 
 interface EvalRunState {
@@ -101,7 +123,7 @@ function resolvePythonPath(): string {
 
 type Spawner = (cmd: string, args: string[], cwd: string) => ChildProcess | null;
 
-export interface RlEvalDeps {
+export interface ArenaEvalDeps {
   /** 测试注入点：覆盖进程启动。 */
   spawner?: Spawner;
   statsFile?: string;
@@ -139,13 +161,13 @@ export class EvalRunner {
   private disposing = false;
   private gamesCache: { mtimeMs: number; size: number; count: number } | null = null;
 
-  constructor(deps: RlEvalDeps = {}) {
+  constructor(deps: ArenaEvalDeps = {}) {
     this.spawner = deps.spawner ?? defaultSpawner;
     this.statsFile = deps.statsFile ?? DEFAULT_STATS_FILE;
     this.stateFile = deps.stateFile ?? DEFAULT_STATE_FILE;
     this.roundRobinScript = deps.roundRobinScript ?? ROUND_ROBIN_SCRIPT;
     this.leaderboardScript = deps.leaderboardScript ?? LEADERBOARD_SCRIPT;
-    this.statsScript = deps.statsScript ?? RL_STATS_SCRIPT;
+    this.statsScript = deps.statsScript ?? ARENA_STATS_SCRIPT;
     this.pythonPath = deps.pythonPath ?? resolvePythonPath();
     this.now = deps.now ?? (() => new Date());
     this.escalateMs = deps.escalateMs ?? 10_000;
@@ -215,7 +237,7 @@ export class EvalRunner {
       '--games', String(params.games),
       '--jobs', String(params.jobs),
     ];
-    if (params.models?.length) args.push('--models', params.models.join(','));
+    if (params.participants?.length) args.push(...buildParticipantArgs(params));
     if (params.salt) args.push('--salt', params.salt);
     if (params.dryRun) args.push('--dry-run');
 
@@ -391,19 +413,31 @@ export class EvalRunner {
   }
 }
 
-export async function rlEvalRoutes(app: FastifyInstance, deps: RlEvalDeps = {}): Promise<void> {
+export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps = {}): Promise<void> {
   const runner = new EvalRunner(deps);
   runner.restoreFromDisk();
   app.addHook('onClose', async () => runner.dispose());
 
+  // 参评者清单（模型 + 内置算法）：评估控制台的勾选数据源，与 /api/rl/models、
+  // /api/algorithms 同源，前端一个请求即可拿全。
+  app.get('/api/arena/participants', async () => ({
+    models: refreshRlModels(),
+    algorithms: Object.entries(ALGORITHM_BOTS).map(([id, config]) => ({
+      id,
+      name: config.name,
+      algorithm: config.algorithm,
+      description: config.description,
+    })),
+  }));
+
   // 状态快照含完整命令行、本地文件路径与输出尾，与写接口同样受控，
   // 不给未鉴权访问留下只读窥探口。
-  app.get('/api/rl/eval/status', async (req, reply) => {
+  app.get('/api/arena/eval/status', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     return runner.statusSnapshot();
   });
 
-  app.post<{ Body: Partial<EvalRunParams> }>('/api/rl/eval/start', async (req, reply) => {
+  app.post<{ Body: Partial<EvalRunParams> }>('/api/arena/eval/start', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     if (runner.isRunning) {
       return reply.code(409).send({ error: '已有跑批在进行中', code: 'eval_already_running' });
@@ -424,15 +458,24 @@ export async function rlEvalRoutes(app: FastifyInstance, deps: RlEvalDeps = {}):
     if (!Number.isInteger(jobs) || jobs < 1 || jobs > 8) {
       return reply.code(400).send({ error: 'jobs 必须是 1-8 的整数', code: 'invalid_jobs' });
     }
-    let models: string[] | null = null;
-    if (Array.isArray(body.models) && body.models.length) {
-      models = body.models.map(m => String(m).trim()).filter(Boolean);
-      if (models.length > 32 || models.some(m => m.length > 200)) {
-        return reply.code(400).send({ error: 'models 过滤项过多或过长', code: 'invalid_models' });
+    let participants: string[] | null = null;
+    if (Array.isArray(body.participants) && body.participants.length) {
+      participants = body.participants.map(m => String(m).trim()).filter(Boolean);
+      if (participants.length > 32 || participants.some(m => m.length > 200)) {
+        return reply.code(400).send({ error: 'participants 过滤项过多或过长', code: 'invalid_participants' });
+      }
+      const unknownAlgo = participants
+        .filter(m => m.startsWith('algo:'))
+        .filter(m => !(algorithmParticipantId(m.slice('algo:'.length)) in ALGORITHM_BOTS));
+      if (unknownAlgo.length) {
+        return reply.code(400).send({
+          error: `未注册的算法参与者：${unknownAlgo.join(', ')}`,
+          code: 'invalid_participants',
+        });
       }
     }
     const salt = body.salt ? String(body.salt).slice(0, 64) : null;
-    const params: EvalRunParams = { maps, models, games, jobs, salt, dryRun: Boolean(body.dryRun) };
+    const params: EvalRunParams = { maps, participants, games, jobs, salt, dryRun: Boolean(body.dryRun) };
     try {
       runner.start(params);
     } catch (err) {
@@ -441,7 +484,7 @@ export async function rlEvalRoutes(app: FastifyInstance, deps: RlEvalDeps = {}):
     return { ok: true, status: runner.statusSnapshot() };
   });
 
-  app.post('/api/rl/eval/stop', async (req, reply) => {
+  app.post('/api/arena/eval/stop', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     if (!runner.stop()) {
       return reply.code(409).send({ error: '当前没有进行中的跑批', code: 'eval_not_running' });
@@ -449,7 +492,7 @@ export async function rlEvalRoutes(app: FastifyInstance, deps: RlEvalDeps = {}):
     return { ok: true };
   });
 
-  app.post('/api/rl/leaderboard/regenerate', async (req, reply) => {
+  app.post('/api/arena/leaderboard/regenerate', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     const result = await runner.regenLeaderboard();
     if (!result.ok) {

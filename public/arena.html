@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>TacticalGame — RL 模型排行榜</title>
+  <title>TacticalGame — AI 竞技场</title>
   <link rel="stylesheet" href="/stats.css" />
   <link rel="stylesheet" href="/mobile-icons.css" />
   <style>
     .tag.st-good { background: #1a4a2a; color: #8ddda4; }
     .tag.st-bad { background: #4a1a1a; color: #f0a0a0; }
     .tag.st-muted { background: #2a3a44; color: #9ab; }
+    .tag.st-algo { background: #27424f; color: #9ad3e8; }
+    .tag.st-model { background: #16301f; color: #8ddda4; }
     .rating-ci { color: #6a8496; font-size: 11px; margin-left: 4px; }
     #h2h-table { min-width: 720px; }
     #h2h-table th, #h2h-table td { text-align: center; padding: 4px 6px; font-size: 12px; }
@@ -100,14 +102,14 @@
     @media (max-width: 480px) { .model-card-grid { grid-template-columns: 1fr; } }
   </style>
   <script src="/version.js" defer></script>
-  <script src="/leaderboard.js" defer></script>
-  <script src="/rl-stats.js" defer></script>
+  <script src="/arena.js" defer></script>
+  <script src="/arena-stats.js" defer></script>
 </head>
 <body class="stats-shell">
   <header>
     <div class="brand-block">
-      <h1>RL 模型排行榜 <span class="version-badge"></span></h1>
-      <div class="page-subtitle">rl/round_robin.py 批量对战 · Bradley-Terry 评分</div>
+      <h1>AI 竞技场 <span class="version-badge"></span></h1>
+      <div class="page-subtitle">RL 模型 × 内置算法循环赛 · Bradley-Terry 评分</div>
     </div>
     <nav class="page-nav" aria-label="站点导航">
       <a href="/">首页</a>
@@ -115,16 +117,16 @@
       <a href="/spectator.html">观战</a>
       <a href="/map-editor.html">地图编辑</a>
       <a href="/stats.html">统计</a>
-      <a href="/leaderboard.html" class="active">RL 排行榜</a>
+      <a href="/arena.html" class="active">AI 竞技场</a>
       <a href="/entertainment.html">娱乐数据</a>
     </nav>
   </header>
 
   <main>
-    <div class="tab-bar" role="tablist" aria-label="排行榜视图">
-      <button type="button" class="tab active" data-tab="board" role="tab" aria-selected="true">模型榜单</button>
+    <div class="tab-bar" role="tablist" aria-label="竞技场视图">
+      <button type="button" class="tab active" data-tab="board" role="tab" aria-selected="true">排行榜</button>
       <button type="button" class="tab" data-tab="stats" role="tab" aria-selected="false">玩法统计</button>
-      <button type="button" class="tab" data-tab="models" role="tab" aria-selected="false">模型档案</button>
+      <button type="button" class="tab" data-tab="models" role="tab" aria-selected="false">参与者档案</button>
       <button type="button" class="tab" data-tab="console" role="tab" aria-selected="false" id="eval-tab-btn">评估控制台</button>
     </div>
 
@@ -162,10 +164,18 @@
     <section class="panel">
       <div class="panel-heading">
         <div class="panel-heading-copy">
-          <h2>模型评分榜</h2>
+          <h2>综合评分榜</h2>
           <span>Bradley-Terry MLE · 平局记 0.5 · 默认按评分排序，排名列固定为全局排名</span>
         </div>
         <div class="filters" style="border: none; padding: 0;">
+          <label>
+            <span>类型</span>
+            <select id="filter-kind">
+              <option value="all">全部</option>
+              <option value="model">RL 模型</option>
+              <option value="algorithm">规则算法</option>
+            </select>
+          </label>
           <label>
             <span>地图池</span>
             <select id="filter-league"></select>
@@ -177,7 +187,7 @@
           <thead>
             <tr>
               <th data-sort="rank">#</th>
-              <th data-sort="short">模型</th>
+              <th data-sort="short">参与者</th>
               <th data-sort="version">版本</th>
               <th data-sort="rating" class="num">评分</th>
               <th class="num">胜-负-平</th>
@@ -192,21 +202,21 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="hint">评分基于全部参评对局的 Bradley-Terry 最大似然估计（每对附加 1 局虚拟平局先验），映射到 Elo 刻度（均值 1500）；±值为分层 bootstrap 95% 置信区间半径。Wilson 下界 = (胜 + 0.5·平) 的 95% 置信下限，供小样本参考。点击模型行查看对位明细。</p>
+      <p class="hint">评分基于全部参评对局的 Bradley-Terry 最大似然估计（每对附加 1 局虚拟平局先验），映射到 Elo 刻度（均值 1500）；±值为分层 bootstrap 95% 置信区间半径。Wilson 下界 = (胜 + 0.5·平) 的 95% 置信下限，供小样本参考。RL 模型与规则算法在同一池内互打评分，可直接跨类型比较。点击参与者行查看对位明细。</p>
     </section>
 
     <section class="board-stack">
       <section class="panel">
         <div class="panel-heading">
-          <h2>模型详情</h2>
-          <span id="detail-title">点击评分榜模型行查看</span>
+          <h2>参与者详情</h2>
+          <span id="detail-title">点击评分榜行查看</span>
         </div>
-        <div id="detail-body" class="empty-block">未选择模型</div>
+        <div id="detail-body" class="empty-block">未选择参与者</div>
       </section>
       <section class="panel">
         <div class="panel-heading">
           <h2>对位矩阵</h2>
-          <span>行模型对列模型的胜率（平局计 0.5）· 悬停查看比分</span>
+          <span>行参与者对列参与者的胜率（平局计 0.5）· 悬停查看比分</span>
         </div>
         <div class="table-wrap h2h-wrap">
           <table id="h2h-table" class="data-table compact">
@@ -372,8 +382,8 @@
     <section class="panel">
       <div class="panel-heading">
         <div class="panel-heading-copy">
-          <h2>模型档案</h2>
-          <span>训练配置与版本说明 · 评分降序（未参评排后）· 说明文案来自 rl/docs/MODELS_NOTES.md</span>
+          <h2>参与者档案</h2>
+          <span>训练配置与版本说明 · 评分降序（未参评排后）· 模型说明来自 rl/docs/MODELS_NOTES.md，算法说明来自 algorithms/registry.mjs</span>
         </div>
         <strong id="rls-models-status" class="status-pill">加载中…</strong>
       </div>
@@ -402,6 +412,10 @@
         <div class="eval-field">
           <span class="eval-label">地图池</span>
           <div id="eval-maps" class="eval-chip-list"></div>
+        </div>
+        <div class="eval-field">
+          <span class="eval-label">参评内置算法（默认全选；取消勾选即从本轮评估中排除）</span>
+          <div id="eval-algos" class="eval-chip-list"></div>
         </div>
         <div class="eval-field">
           <span class="eval-label">参评模型（不勾选 = 全部可对战模型）</span>
@@ -443,9 +457,9 @@
   </main>
 
   <footer class="page-footer">
-    对局记录 <code>rl/leaderboard/matches.jsonl</code> · 批量对战
-    <code>rl/.venv/Scripts/python.exe rl/round_robin.py</code> · 刷新数据
-    <code>npm run rl-leaderboard && npm run rl-stats</code>
+    对局记录 <code>arena/matches.jsonl</code> · 批量对战
+    <code>rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py</code> · 刷新数据
+    <code>npm run arena-leaderboard && npm run arena-stats</code>
   </footer>
 </body>
 </html>

@@ -64,26 +64,33 @@ describe('loadMatches 过滤作废模型对局', () => {
 });
 
 describe('collectRegistry 内置算法混池注册', () => {
-  it('缺省注册全部算法为 algo_<name>，与模型同池且带展示元数据', () => {
+  it('缺省注册全部算法为 algo_<name>@<版本>，与模型同池且带展示元数据', () => {
     const { registry } = collectRegistry(makeModelsDir([VALID]));
-    const threat = registry.get('algo_threat');
-    expect(threat).toMatchObject({ kind: 'algorithm', name: 'threat', displayName: '威胁感知算法' });
-    expect(registry.get('algo_greedy')).toBeTruthy();
+    const threat = registry.get('algo_threat@v1');
+    expect(threat).toMatchObject({
+      kind: 'algorithm', name: 'threat', displayName: '威胁感知算法', version: 'v1',
+    });
+    expect(registry.get('algo_greedy@v1')).toBeTruthy();
     expect(registry.get(VALID).kind).toBe('model');
   });
 
-  it('loadMatches 接受算法与算法/算法对局并按参与者校验', () => {
+  it('loadMatches 接受带版本 id 的模型×算法/算法×算法对局并按参与者校验', () => {
     const dir = makeModelsDir([VALID]);
     const stats = join(dir, 'matches.jsonl');
     const { registry } = collectRegistry(dir);
     const line = (a: string, b: string, winner: string) =>
       JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
     writeFileSync(stats,
-      line('algo_threat', 'algo_greedy', 'algo_threat') +
-      line(VALID, 'algo_threat', 'algo_threat'));
+      line('algo_threat@v1', 'algo_greedy@v1', 'algo_threat@v1') +
+      line(VALID, 'algo_threat@v1', 'algo_threat@v1'));
     const { matches, warnings } = loadMatches(stats, registry);
     expect(matches).toHaveLength(2);
     expect(warnings).toHaveLength(0);
-    expect(matches[1].winner).toBe('algo_threat');
+    expect(matches[1].winner).toBe('algo_threat@v1');
+  });
+
+  it('不带版本的旧式算法 id（algo_<name>）不在注册表中', () => {
+    const { registry } = collectRegistry(makeModelsDir([VALID]));
+    expect(registry.has('algo_threat')).toBe(false);
   });
 });

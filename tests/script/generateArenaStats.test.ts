@@ -307,15 +307,16 @@ describe('buildModelProfiles 档案组装', () => {
     expect(models[0].short).toBe('v2.2.0');
   });
 
-  it('算法参与者档案带 kind/注册名/文档路径与策略说明', () => {
+  it('算法参与者档案带 kind/注册名/版本/文档路径与策略说明', () => {
     const dir = makeModelsDir([A]);
     const { registry } = collectRegistry(dir);
     const models = buildModelProfiles({ registry, modelsDir: dir, leaderboardJson: null, notesProfiles: new Map() });
-    const threat = models.find(m => m.id === 'algo_threat');
+    const threat = models.find(m => m.id === 'algo_threat@v1');
     expect(threat).toMatchObject({
       kind: 'algorithm',
       short: '威胁感知算法',
       algorithm: 'threat',
+      version: 'v1',
       status: 'builtin',
       rated: true,
       sizeMB: null,

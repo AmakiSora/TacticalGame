@@ -1,8 +1,10 @@
 """跨世代参与者对战：模型 × 模型 / 模型 × 算法 / 算法 × 算法。
 
-参与者规格（--player-a/--player-b）：zip 路径（RL 模型）或 ``algo:<name>``
-（algorithms/registry.mjs 注册的内置算法，经 local-worker 的 decide 通道进程内走子）。
---model-a/--model-b 为等价的模型规格别名。
+参与者规格（--player-a/--player-b）：zip 路径（RL 模型）或 ``algo:<name>[@<version>]``
+（algorithms/registry.mjs 注册的内置算法，经 local-worker 的 decide 通道进程内走子；
+带 @版本时该版本进入参与者 id 与对局明细，round_robin 编排器总是带版本，如
+``algo:threat@v1``——算法升版后历史对局仍归属旧版本 id）。--model-a/--model-b 为
+等价的模型规格别名。
 
 两个模型的动作空间不同，无法在同一套编码下运行：
 - v2.0.0：8 个单位槽 / 38 动作；观测按固定 player_a 视角编码（当时的实现）。
@@ -15,7 +17,7 @@ decide(state, utils) 接口，动作经引擎 apply 校验，非法动作按线�
 
     rl/.venv/Scripts/python.exe rl/evaluation/evaluate_cross.py \
         --player-a rl/models/hex_ppo_v2.0.0_20260824_default_rule_500000.zip \
-        --player-b algo:threat \
+        --player-b algo:threat@v1 \
         --games 4
 
 注意：v2.0.0 的编码固定以 player_a 为己方视角，因此旧模型默认固定坐
@@ -99,12 +101,13 @@ _SEATS = ("player_a", "player_b")
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--player-a", default=None,
-                        help="player_a 座位参与者规格：模型 zip 路径或 algo:<算法名>")
+                        help="player_a 座位参与者规格：模型 zip 路径或 algo:<算法名>[@<版本>]")
     parser.add_argument("--player-b", default=None,
-                        help="player_b 座位参与者规格：模型 zip 路径或 algo:<算法名>")
+                        help="player_b 座位参与者规格：模型 zip 路径或 algo:<算法名>[@<版本>]")
     parser.add_argument("--model-a", default=None, help="等价 --player-a（仅模型规格），兼容保留")
     parser.add_argument("--model-b", default=None, help="等价 --player-b（仅模型规格），兼容保留")
-    parser.add_argument("--name-a", default=None, help="player_a 参与者的显示名（默认：模型取文件名，算法取 algo_<name>）")
+    parser.add_argument("--name-a", default=None,
+                        help="player_a 参与者的显示名（默认：模型取文件名，算法取 algo_<name>[@<版本>]）")
     parser.add_argument("--name-b", default=None, help="player_b 参与者的显示名（默认同上）")
     parser.add_argument("--games", type=int, default=2, help="总对局数（--swap-sides 时按相同种子成对换座）")
     parser.add_argument("--map", dest="map_id", default="default", help="地图 id（默认 default；random 为每局一张对称随机地图）")
@@ -320,13 +323,16 @@ class AlgorithmController:
 
     kind = "algorithm"
 
-    def __init__(self, label: str, algorithm_name: str, side: str, worker: "EngineWorker"):
+    def __init__(self, label: str, algorithm_name: str, version: str | None,
+                 side: str, worker: "EngineWorker"):
         self.label = label
-        self.spec = f"algo:{algorithm_name}"
+        self.spec = f"algo:{algorithm_name}" + (f"@{version}" if version else "")
         self.algorithm = algorithm_name
         self.side = side
         self.worker = worker
-        self.version = f"算法 {algorithm_name}"
+        # 版本随规格传入（round_robin 从 registry.mjs 读当前版本后拼进规格）；
+        # 裸 algo:<name> 规格不带版本，明细里如实记"未标版本"。
+        self.version = f"算法 {algorithm_name}" + (f"@{version}" if version else "（未标版本）")
 
     def reset_for_game(self):
         # 算法无跨局状态。
@@ -349,7 +355,7 @@ class AlgorithmController:
 
 
 def default_display_name(spec: str) -> str:
-    """参与者显示名（也是 matches.jsonl 里的玩家 id）：模型取文件名，算法取 algo_<name>。"""
+    """参与者显示名（也是 matches.jsonl 里的玩家 id）：模型取文件名，算法取 algo_<name>[@<版本>]。"""
     if spec.startswith("algo:"):
         return f"algo_{spec[len('algo:'):]}"
     return Path(spec).name
@@ -357,10 +363,14 @@ def default_display_name(spec: str) -> str:
 
 def make_controller(label: str, spec: str, side: str, args, worker: "EngineWorker"):
     if spec.startswith("algo:"):
-        name = spec[len("algo:"):].strip()
+        rest = spec[len("algo:"):].strip()
+        # 规格支持 algo:<name>[@<version>]：版本仅用于参与者 id 与展示，
+        # worker 的 decide 通道永远按注册名加载当前实现。
+        name, _, version = rest.partition("@")
+        name = name.strip()
         if not name:
             raise ValueError(f"{side}: 无效的算法规格 {spec!r}")
-        return AlgorithmController(label, name, side, worker)
+        return AlgorithmController(label, name, version.strip() or None, side, worker)
     return SideController(label, spec, side, args.device,
                           record_policy_stats=args.policy_stats)
 

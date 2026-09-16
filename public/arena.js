@@ -268,7 +268,8 @@
     const metaHtml = row.kind === 'algorithm'
       ? `
         <span>类型 <strong>内置规则算法</strong></span>
-        <span>注册名 <strong>${escapeHtml(row.algorithm || row.id.replace(/^algo_/, ''))}</strong></span>
+        <span>注册名 <strong>${escapeHtml(row.algorithm || row.id.replace(/^algo_/, '').replace(/@.*$/, ''))}</strong></span>
+        <span>版本 <strong>${escapeHtml(row.version || '—')}</strong></span>
         <span>状态 <strong class="tag ${statusMeta.cls}">${statusMeta.label}</strong></span>
         <span style="flex-basis:100%">策略 <strong>${escapeHtml(row.description || '—')}</strong></span>`
       : `

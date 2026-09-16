@@ -20,16 +20,22 @@ export const ALGORITHMS = {
 };
 
 /**
- * 算法展示元数据（displayName/description）。
- * 这是算法中文名与描述的**唯一来源**：线上 bot 清单（src/api/bots.ts）、
+ * 算法展示元数据（displayName/description/version）。
+ * 这是算法中文名、描述与**当前版本**的唯一来源：线上 bot 清单（src/api/bots.ts）、
  * 竞技场排行榜与评估控制台（script/generateArenaLeaderboard.mjs、/api/arena/*）
  * 都从这里取，勿再另立清单（历史上双份同步出过前后端选项不一致的问题）。
+ *
+ * version 是算法的"当前版本"标注，进入竞技场参与者 id（algo_<name>@<version>）：
+ * 算法实现被改进后升版时改这里（如 'v1' → 'v2'），此后新对局记在新版本 id 下，
+ * 历史战绩仍归属旧版本 id。注意旧版本 id 必须继续在榜单注册表里可解析——若旧版
+ * 实现不再保留，需像模型退役（RETIRED_VERSIONS）一样显式处理，否则其历史对局会
+ * 因"未知参与者"被 loadMatches 过滤掉。
  */
 export const ALGORITHM_META = {
-  greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动' },
-  random: { displayName: '随机算法', description: '从所有合法动作中随机选择' },
-  mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作' },
-  threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位' },
+  greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动', version: 'v1' },
+  random: { displayName: '随机算法', description: '从所有合法动作中随机选择', version: 'v1' },
+  mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1' },
+  threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1' },
 };
 
 /**
@@ -71,19 +77,29 @@ export function listAlgorithms() {
 
 /**
  * 列出算法及其展示元数据（未配置 meta 的算法回退为注册名）。
- * @returns {Array<{name: string, displayName: string, description: string}>}
+ * @returns {Array<{name: string, displayName: string, description: string, version: string}>}
  */
 export function listAlgorithmInfo() {
   return listAlgorithms().map(name => ({
     name,
     displayName: ALGORITHM_META[name]?.displayName ?? name,
     description: ALGORITHM_META[name]?.description ?? '',
+    version: algorithmVersion(name),
   }));
 }
 
 /**
- * 算法在竞技场评估记录（arena/matches.jsonl）与榜单注册表中的参与者 id。
- * 与 src/api/bots.ts 的 bot type（algo_greedy 等）保持一致。
+ * 算法当前版本（未显式标注 meta 的算法视为 v1）。
+ * @param {string} name - 算法名称
+ * @returns {string}
+ */
+export function algorithmVersion(name) {
+  return ALGORITHM_META[name]?.version ?? 'v1';
+}
+
+/**
+ * 线上算法 bot 的 bot type（algo_greedy 等），永远指向当前实现，不带版本。
+ * 与评估控制台的 `algo:<注册名>` 规格同属"当前版本"空间。
  * @param {string} name - 算法名称
  * @returns {string}
  */
@@ -92,9 +108,21 @@ export function algorithmParticipantId(name) {
 }
 
 /**
+ * 算法在竞技场评估记录（arena/matches.jsonl）、榜单与统计中的参与者 id，
+ * 带版本（algo_greedy@v1）：算法升版后历史对局仍归属旧版本 id，
+ * 与模型"每个 zip 一个版本一个参与者"的口径对齐。
+ * 由 rl/evaluation/round_robin.py 经 discover_algorithms 读取并写入对局记录。
+ * @param {string} name - 算法名称
+ * @returns {string}
+ */
+export function algorithmVersionedId(name) {
+  return `algo_${name}@${algorithmVersion(name)}`;
+}
+
+/**
  * 获取算法的元数据（不加载模块本身）
  * @param {string} name - 算法名称
- * @returns {{name: string, path: string, displayName: string, description: string} | null}
+ * @returns {{name: string, path: string, displayName: string, description: string, version: string} | null}
  */
 export function getAlgorithmMeta(name) {
   const path = ALGORITHMS[name];
@@ -104,6 +132,7 @@ export function getAlgorithmMeta(name) {
     path,
     displayName: ALGORITHM_META[name]?.displayName ?? name,
     description: ALGORITHM_META[name]?.description ?? '',
+    version: algorithmVersion(name),
   };
 }
 

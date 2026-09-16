@@ -201,6 +201,7 @@
         m.games ? `<span>对局 <b>${fmtNum(m.games)}</b></span>` : '',
         m.winRate != null ? `<span>胜率 <b>${pct(m.winRate)}</b></span>` : '',
         `<span>注册名 <b>${escapeHtml(m.algorithm || '')}</b></span>`,
+        `<span>版本 <b>${escapeHtml(m.version || '')}</b></span>`,
         m.docRef ? `<span>文档 <b>${escapeHtml(m.docRef)}</b></span>` : '',
       ].filter(Boolean).join('') : [
         m.games ? `<span>对局 <b>${fmtNum(m.games)}</b></span>` : '',

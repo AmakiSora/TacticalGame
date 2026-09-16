@@ -8,8 +8,9 @@
 - 每次运行带随机盐 seed-prefix：重跑 random 图必产生新地图（静态图种子不生效，
   但引擎战斗带随机伤害浮动，每局同样不重复）；
 - 复用 rl/evaluation/evaluate_cross.py 子进程，原样保留其跨版本编码路由与配对换座逻辑；
-- 算法参与者的名字以 ``algo_`` 前缀写入 matches.jsonl（如 algo_threat），
-  传参规格为 ``algo:<name>``；--algorithms none 可退回纯模型循环赛。
+- 算法参与者的名字以 ``algo_`` 前缀 + 版本写入 matches.jsonl（如 algo_threat@v1），
+  传参规格为 ``algo:<name>@<version>``（版本取 registry.mjs 的当前标注，保证
+  算法升版后历史对局仍归属旧版本 id）；--algorithms none 可退回纯模型循环赛。
 
 用法示例：
 
@@ -98,10 +99,14 @@ def discover_models(models_dir: Path) -> tuple[list[Path], list[Path]]:
     return included, excluded
 
 
-def discover_algorithms(root: Path) -> list[str]:
-    """读取 algorithms/registry.mjs 的注册算法清单（经 node，避免手工维护第二份名单）。"""
+def discover_algorithms(root: Path) -> list[tuple[str, str]]:
+    """读取 algorithms/registry.mjs 的注册算法及当前版本（经 node，避免手工维护第二份名单）。
+
+    返回 (注册名, 版本) 对，两者拼成竞技场参与者 id ``algo_<注册名>@<版本>``。
+    """
     registry_url = (root / "algorithms" / "registry.mjs").as_posix()
-    script = f"import('file:///{registry_url}').then(r => console.log(r.listAlgorithms().join(',')))"
+    script = (f"import('file:///{registry_url}').then(r => console.log("
+              "r.listAlgorithmInfo().map(i => i.name + '@' + i.version).join(',')))")
     result = subprocess.run(
         ["node", "--input-type=module", "-e", script],
         cwd=str(root), capture_output=True, text=True,
@@ -109,11 +114,18 @@ def discover_algorithms(root: Path) -> list[str]:
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"node exit {result.returncode}")
-    return [name.strip() for name in result.stdout.strip().split(",") if name.strip()]
+    pairs: list[tuple[str, str]] = []
+    for token in result.stdout.strip().split(","):
+        token = token.strip()
+        if not token:
+            continue
+        name, _, version = token.partition("@")
+        pairs.append((name, version or "v1"))
+    return pairs
 
 
-def resolve_algorithm_names(root: Path, raw: str | None) -> tuple[list[str], str | None]:
-    """把 --algorithms 参数解析成算法名清单；node 不可用时降级为空清单并给出警告。"""
+def resolve_algorithms(root: Path, raw: str | None) -> tuple[list[tuple[str, str]], str | None]:
+    """把 --algorithms 参数解析成 (注册名, 版本) 清单；node 不可用时降级为空清单并给出警告。"""
     if raw is not None and raw.strip().lower() in ("none", "off", ""):
         return [], None
     try:
@@ -123,10 +135,11 @@ def resolve_algorithm_names(root: Path, raw: str | None) -> tuple[list[str], str
     if raw is None:
         return registered, None
     needles = [n.strip() for n in raw.split(",") if n.strip()]
-    unknown = [n for n in needles if n not in registered]
+    names = [name for name, _ in registered]
+    unknown = [n for n in needles if n not in names]
     if unknown:
-        raise ValueError(f"未注册的算法：{', '.join(unknown)}（可选：{', '.join(registered)}）")
-    return [n for n in registered if n in needles], None
+        raise ValueError(f"未注册的算法：{', '.join(unknown)}（可选：{', '.join(names)}）")
+    return [pair for pair in registered if pair[0] in needles], None
 
 
 def count_existing(stats_file: Path) -> dict[tuple[str, str, str], int]:
@@ -257,14 +270,17 @@ def main():
         excluded = [m for m in excluded if any(n in m.name for n in needles)]
 
     try:
-        algorithm_names, algo_warning = resolve_algorithm_names(root, args.algorithms)
+        algorithm_infos, algo_warning = resolve_algorithms(root, args.algorithms)
     except ValueError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 1
 
     # 统一参与者列表：(规格, 显示名)。显示名即 matches.jsonl 中的玩家 id。
     participants: list[tuple[str, str]] = [(str(path), path.name) for path in included]
-    participants += [(f"algo:{name}", f"algo_{name}") for name in algorithm_names]
+    participants += [
+        (f"algo:{name}@{version}", f"algo_{name}@{version}")
+        for name, version in algorithm_infos
+    ]
     if len(participants) < 2:
         print(f"错误：可对战参与者不足 2 个（当前 {len(participants)} 个），无法组成对战。", file=sys.stderr)
         return 1
@@ -281,8 +297,9 @@ def main():
         print(f"排除 {len(excluded)} 个（{', '.join(sorted(EXCLUDED_VERSIONS))} 不支持进程内互打）：")
         for path in excluded:
             print(f"  - {path.name}")
-    if algorithm_names:
-        print(f"参评算法 {len(algorithm_names)} 个：{', '.join(algorithm_names)}")
+    if algorithm_infos:
+        print(f"参评算法 {len(algorithm_infos)} 个："
+              f"{', '.join(f'{name}@{version}' for name, version in algorithm_infos)}")
     elif (args.algorithms or "").strip().lower() in ("none", "off", ""):
         print("参评算法：无（--algorithms none）")
     if algo_warning:

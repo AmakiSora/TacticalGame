@@ -7,8 +7,9 @@
  *   node script/generateArenaLeaderboard.mjs --stats-file arena/matches.jsonl --out public/data/arena-leaderboard.json
  *
  * 评分口径：
- *   - 参评者两类：RL 模型（id = 模型 zip 文件名）与内置算法 AI（id = algo_<注册名>，
- *     注册表来自 algorithms/registry.mjs，与线上 bot / 评估控制台同源）；同一 BT 池混排名；
+ *   - 参评者两类：RL 模型（id = 模型 zip 文件名，版本内嵌）与内置算法 AI
+ *     （id = algo_<注册名>@<版本>，注册表来自 algorithms/registry.mjs，与线上 bot /
+ *     评估控制台同源，但带版本以便算法升版后历史战绩仍归属旧版本 id）；同一 BT 池混排名；
  *   - 作废模型（MODEL_STATUS_BY_VERSION 中 status=retired 的版本）不参评：注册表跳过、
  *     历史对局不计分，跳过局数记入 source.retiredMatchesDropped；
  *   - Bradley-Terry MLE（MM 迭代），平局记 0.5 胜；每对交手过的参与者对附加 1 局虚拟
@@ -22,7 +23,7 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { wilsonLower, round2, round4 } from './generateStats.mjs';
-import { listAlgorithmInfo, algorithmParticipantId } from '../algorithms/registry.mjs';
+import { listAlgorithmInfo, algorithmVersionedId } from '../algorithms/registry.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);
@@ -148,8 +149,12 @@ export function collectRegistry(modelsDir, algorithms = listAlgorithmInfo()) {
 
 function registryAlgorithms(registry, algorithms) {
   for (const info of algorithms) {
-    const id = algorithmParticipantId(info.name);
-    registry.set(id, { id, kind: 'algorithm', name: info.name, displayName: info.displayName, description: info.description });
+    // 参与者 id 带版本（algo_<name>@<v1>），算法升版后历史对局仍归属旧版本 id。
+    const id = algorithmVersionedId(info.name);
+    registry.set(id, {
+      id, kind: 'algorithm', name: info.name, displayName: info.displayName,
+      description: info.description, version: info.version,
+    });
   }
 }
 
@@ -462,6 +467,7 @@ function main() {
     kind: 'algorithm',
     short: meta.displayName,
     algorithm: meta.name,
+    version: meta.version,
     description: meta.description,
     status: 'builtin',
     statusNote: null,

@@ -465,7 +465,7 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
         id,
         kind: 'algorithm',
         short: meta.displayName,
-        version: null,
+        version: meta.version,
         trainDate: null,
         trainMap: null,
         opponentType: null,

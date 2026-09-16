@@ -12,6 +12,8 @@ algorithms/
 │   ├── greedy.mjs    # 贪心算法
 │   ├── random.mjs    # 随机算法
 │   ├── mcts.mjs      # 蒙特卡洛树搜索
+│   ├── threat.mjs    # 威胁感知算法
+│   ├── field.mjs     # 势场算法
 │   └── README.md     # 算法开发指南
 ├── lib/              # 共享工具库
 │   ├── api-client.mjs    # REST API 客户端
@@ -20,10 +22,12 @@ algorithms/
 ├── docs/             # 算法文档
 │   ├── ALGORITHMS_NOTES.md   # 本文件
 │   ├── RELEASE_NOTES.md      # 版本发布记录
-│   └── algorithms/           # 单算法详细档案
+│   ── algorithms/           # 单算法详细档案
 │       ├── greedy.md
 │       ├── random.md
-│       └── mcts.md
+│       ├── mcts.md
+│       ├── threat.md
+│       └── field.md
 ├── registry.mjs      # 算法注册表
 └── runner.mjs        # 通用运行器
 ```
@@ -87,15 +91,19 @@ export default {
 | **random** | 随机 | O(n) | 极弱 | 基准对照、测试 |
 | **greedy** | 启发式 | O(n²) | 中（作为基准线） | 快速决策、演示 |
 | **mcts** | 搜索 | O(b^d · k) | 弱（vs greedy 20 局 3:17） | 战术推演、对比实验 |
-| **threat** | 效用/影响图 | O(单位×格子) | **2 人局最强**（vs greedy 7 图 280 局 70.6%，vs mcts 14:6）；3-4 人局未标定 | 走位稳健的对战、教学 |
+| **threat** | 效用/影响图 | O(单位×格子) | **2 人局最强内置**（vs greedy 7 图 ×40 局 70.6%，vs mcts 14:6）；3-4 人局未标定 | 走位稳健的对战、教学 |
+| **field** | 势场/梯度下降 | O(单位×格子) | 中上（vs greedy 7 图 ×30 局 **64.3%**）；**低行动点图最强**（danger-close 97%，threat 仅 18%）；高行动点图最弱（multiplayer-ring 7%） | 涌现式走位（风筝/分头抢点）、慢节奏消耗战 |
 
 > b = 分支因子（~20），d = 搜索深度（8），k = 模拟次数（100）
+>
+> threat 与 field 的强度不可直接比大小：两者各有专属短板（threat 输 danger-close，field 输 multiplayer-ring），
+> 同图对拍 30 局 threat 12:8 领先；且 danger-close 上存在三方相克（field > greedy 97%、threat > field 60%、threat < greedy 18%）。
 
 ## 性能对比
 
 实测方法（自 3.5.1 threat 标定起统一）：**headless 自博弈** —— 直接驱动 `src/engine/`，不走 HTTP、不限速，每图 40 局、逐局交替先手，种子固定可复现（参考实现 `temp/threat-bench.mts`）。
 
-### vs greedy（各图 40 局）
+### vs greedy（threat：各图 40 局）
 
 | 地图 | threat | 初版 threat | 备注 |
 |---|---:|---:|---|
@@ -109,6 +117,27 @@ export default {
 | **合计** | **197:82（70.6%）** | 115:165（41.1%） | |
 | random 地图 | 17:15（53%），32 局 | — | 回合数与裁定权重随机生成，优势被摊薄 |
 
+### vs greedy（field：各图 30 局，逐局交替先手）
+
+field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，头less 自博弈），局数取 30（每图 40 局×7 图的成本更高，30 局已足够区分 20 个百分点以上的差异）。
+
+| 地图 | field | threat 同图对照 | 备注 |
+|---|---:|---:|---|
+| default | 18:12（60%） | 95% | 主图 |
+| dual-lanes | 25:5（83%） | 95% | |
+| breach | 17:13（57%） | 88% | 隔墙图，靠波前距离场绕行 |
+| desert | 26:4（87%） | 70% | |
+| forge | 18:12（60%） | 80% | 半径 6 短图；另一套种子 14:16（47%），**短图波动大** |
+| multiplayer-ring | 2:28（7%） | 50% | **每回合 7 行动点，field 已知短板** |
+| danger-close | 29:1（97%） | 18% | **每回合 1 行动点，field 最强项** |
+| **合计** | **135:75（64.3%）** | 197:82（70.6%） | 7 图 |
+| random 地图 | 12:18（40%），30 局 | 53%（32 局） | 权重随机化摊薄优势 |
+
+> field 与 threat 的强度不可直接比大小：threat 的短板正是 field 的强项（danger-close 18% vs 97%），反之亦然（multiplayer-ring 50% vs 7%）。
+> 同图（default）直接对拍 30 局 **threat 18:12 领先**；但 danger-close 上存在三方相克——field 打 greedy 97%、threat 打 field 60%、threat 打 greedy 仅 18%。**单图胜率不可外推。**
+>
+> field 的性能曲线由"行动点预算"决定：每回合 1 行动点（一次走位 = 一整回合）时势场避险最省，7 行动点时"井外"不存在、找不到正收益落点就站住（304 个回合里 280 次带着行动点交回合），把 tempo 让给对手。
+
 ### 其他对局
 
 | 对局 | 胜率 | 备注 |
@@ -116,6 +145,8 @@ export default {
 | threat vs 初版 threat | **78% (31:9)**，40 局 | default；修复的直接效果 |
 | threat vs mcts | 70% (14:6)，20 局 | default。mcts 的模拟用未播种随机数，批次间会飘（另一批 18:2）；要定序需 40 局以上 |
 | threat vs random | 100% (24:0)，24 局 | default |
+| field vs random | 100% (24:0)，24 局 | default |
+| field vs threat | 40% (12:18)，30 局 | default |
 | mcts vs greedy | 25% (5:15)，20 局 | 两个算法都已修正行动点门控；历史记录 26.7%（30 局 8:22）是双方都带 bug 时测的；同样受 mcts 未播种随机影响 |
 | greedy vs random | 100% (24:0)，24 局 | 修正后重测；旧记录 96.9%（31:1），32 局 |
 
@@ -141,6 +172,8 @@ export default {
 | 2026-09-13 | 3.5.1 | 新增 MCTS（目标导向采样、据点占领、入口部署决策）；实测 vs greedy 30 局 8:22 |
 | 2026-09-14 | 3.5.1 | 新增 threat 威胁感知效用算法：初版实测 vs greedy 仅 41.1%（7 图 ×40 局），breach 图 0 胜 |
 | 2026-09-14 | 3.5.1 | threat 标定与修复：行动点预算门控、结束回合门槛（与 PROGRESS_SCALE 碰磁）、威胁惩罚按 `actionsPerTurn` 截断、据点收入按 kind 取实际值、部署参与同尺度比较、拆墙判据放宽 → **vs greedy 70.6%**；greedy 同步修正行动点门控；新增自博弈合法性回归测试 |
+| 2026-09-16 | 3.5.3 | 新增 field 势场算法（人工势场：斥力井 + 引力井 + 波前距离场）。初版 vs greedy 0/30：三处结构性 bug（反击风险用势能与血量比较、机会火力选完落点才补减、孤军 cohesion 为 Infinity 导致不移动）；修复后 64.3%（7 图 ×30 局），并在 threat 的短板 danger-close 上拿到 97% |
+| 2026-09-16 | 3.5.3 | field 标定：尺度自适应档案（小图 1 环/据点井 4 格，大图 2 环/5 格）、同一敌军在斥力井中去重计费、纯波前导航（否决了"直线+绕行"混合场：default +10 但 breach −20） |
 
 ## 未来方向
 
@@ -149,8 +182,11 @@ export default {
 3. **混合架构**：MCTS + 学习评估函数
 4. **多线程并行**：利用 Worker 加速搜索
 5. **算法锦标赛**：已起步为 `scripts/algorithm-arena.mjs`（headless 自博弈、交替席位、非法动作审计、决策耗时分位、`--strict` 可进 CI）；还缺多算法轮转与自动排行落盘
-6. **多席位标定**：现有权重全部在 2 人对局上调出，3-4 人图上 threat 不再优于 greedy（见 `algorithms/threat.md` 已知限制 7）
-6. **部署决策继续收敛**：`threat` 与 `mcts` 的逐字重复拷贝已提到 `game-utils.deployDecision()` 共用；还剩 `greedy`（按距离+费用排序的另一份）与 `scripts/auto-standard-game.mjs` 两份变体未合并
+6. **多席位标定**：现有权重全部在 2 人对局上调出，3-4 人图上 threat 不再优于 greedy（见 `algorithms/threat.md` 已知限制 7），field 同样未标定（斥力井把多席位敌人等价叠加）
+7. **部署决策继续收敛**：`threat` 与 `mcts` 的逐字重复拷贝已提到 `game-utils.deployDecision()` 共用；还剩 `greedy`（按距离+费用排序的另一份）与 `scripts/auto-standard-game.mjs` 两份变体未合并
+8. **tempo 量纲**：两个算法各自的最大短板指向同一个缺失——"什么时候该接受亏损交换"。
+   threat 输 danger-close（每回合 1 行动点，避险换不来 tempo，18%），field 输 multiplayer-ring（7 行动点，井外不存在，7%）。
+   谁先把 tempo 价值做进评估，谁就能补上另一半地图谱。
 
 ## 贡献指南
 

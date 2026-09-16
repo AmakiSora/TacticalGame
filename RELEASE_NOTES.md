@@ -32,9 +32,10 @@
 
 - `npm run build && npm test` 通过（55 个测试文件 / 496 个用例）；`npm run check-version` 校验 3.5.3 全部引用一致。
 - 竞技场链路实测：worker decide 通道单测（threat/greedy/random 整回合动作全部被引擎接受、null→endTurn、未知算法报错）；`round_robin.py --dry-run` 三类配对（模型×模型/模型×算法/算法×算法）齐全；实跑纯算法批 2 局（0.9 局/s，未加载 torch）与模型×算法 2 局（含换座配对，双方各胜一局）；`/api/arena/eval/start` 混合 participants 经 dry-run 正确翻译为 `--models v3.1.1 --algorithms threat,greedy`；`/arena.html` 浏览器验证：算法行徽标与未参评展示、类型筛选、详情面板、控制台算法分组默认勾选、参与者档案算法卡片均正常。
-- 算法 AI 进榜数据待正式跑批：评估控制台勾选模型+算法发起即可（算法×模型 17×4 对、算法×算法 6 对 × 7 图 × 24 局），历史模型数据无需迁移。
+- 算法 AI 进榜跑批已完成：`round_robin.py --jobs 4` 全量 455 批（算法×模型 17×4 对、算法×算法 6 对 × 7 图 × 24 局）新增 10920 局、0 失败批（1h18m，2.3 局/s），断点续跑在两次中断后正确跳过已跑局数；历史模型数据无需迁移。**结果：三个规则算法包揽前三**——威胁感知算法 1860±38（86.1% 胜率）、贪心算法 1833±34、蒙特卡洛树搜索 1704±25，最强的 RL 模型 v3.0.4@8.4M 仅列第 4（1663±22），随机算法如预期垫底（759）；每参与者 3360 局大样本，"规则算法在当前 RL 模型池中仍占优"首次有了量化答案。
 - 展示名修正与文档复核链路：zip `num_timesteps` 与文件名步数全量比对（17 个模型，8 个差 ≥10 万步入覆盖表，其余在 rollout 边界/舍入噪声内）；竞技场 head-to-head 大样本核对（`arena/matches.jsonl` 每对 168 局）；`npm run arena-leaderboard` / `arena-stats` 重新生成两份 JSON 警告清零，抽查 v2.3.2 `short`/`deliveredSteps`/`statusNote` 与 v3.1.0 档案挂接正确；`npm run build && npm test` 通过（55 个测试文件 / 497 个用例，新增「主表外小节表格不参与档案匹配」用例，两个内联夹具补「模型状态总表」标题适配主表定位契约）。
 - 算法版本系统链路：`round_robin.py --dry-run --algorithms threat,greedy` 参评算法显示 `greedy@v1, threat@v1`、35 个批次的配对 id 均带版本；实跑 `evaluate_cross.py --player-a algo:greedy@v1 --player-b algo:threat@v1` 1 局，摘要行 `players` 记 `algo_greedy@v1`/`algo_threat@v1`；`npm run arena-leaderboard` / `arena-stats` 重新生成两份 JSON（算法条目 id 带版本并新增 `version` 字段，模型条目不受影响）；`npm run build && npm test` 通过（55 个测试文件 / 498 个用例，新增「不带版本的旧式算法 id 不在注册表中」用例，算法混池/档案用例改按 `algo_<name>@v1` 断言）。
+- 版本化算法跑批与页面复核：全量跑批 10920 局的对局记录全部以 `algo_<名>@v1` 落盘；两份 JSON 重新生成警告清零（35280 计分局 / 22 档案）；`/arena.html` 浏览器验证排行榜「版本」列、详情面板（标题带 `algo_threat@v1`、注册名无版本后缀）、参与者档案算法卡片（评分 1860 / 胜率 86.1% / 版本 v1）均正确。
 
 ## 3.5.2
 

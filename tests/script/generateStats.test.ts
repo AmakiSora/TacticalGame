@@ -3,11 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  AGENT_NAMES,
   aggregate,
   canonicalizeModel,
   extractMatch,
   isDrawMatch,
   isRankedMatch,
+  KNOWN_AGENTS,
+  parseDisplayName,
   parseReviewFileName,
   placementScore,
   wilsonLower,
@@ -80,6 +83,32 @@ describe('stats aggregation', () => {
     expect(parseReviewFileName('tg_0083_lose_CP@longcat2.0.md')).toMatchObject({
       agent: 'CP',
       model: 'longcat2.0',
+    });
+  });
+
+  it('maps agent shorthand to full names and recognizes newly added agents', () => {
+    expect(AGENT_NAMES.get('TC')).toBe('TraeCode');
+    expect(AGENT_NAMES.get('TW')).toBe('TraeWork');
+    expect(AGENT_NAMES.get('DSH')).toBe('DeepSeek Harness');
+    expect(AGENT_NAMES.get('WB')).toBe('workbuddy');
+    for (const agent of ['TC', 'TW', 'DSH']) expect(KNOWN_AGENTS.has(agent)).toBe(true);
+
+    expect(parseReviewFileName('tg_0155_rank02_TC@Dsv4Pro0813.md')).toMatchObject({
+      agent: 'TC',
+      model: 'dsv4pro0813',
+    });
+    expect(parseDisplayName('Qwen3.8MaxPreview-TW')).toMatchObject({
+      agent: 'TW',
+      model: 'Qwen3.8MaxPreview',
+    });
+  });
+
+  it('exposes the agent full name on the agent leaderboard', () => {
+    const tc = { ...participant('player_a', 'model-a', 1, true), agent: 'TC' };
+    const result = aggregate([match({ participants: [tc] })]);
+
+    expect(result.agentLeaderboard.find(row => row.agent === 'TC')).toMatchObject({
+      agentName: 'TraeCode',
     });
   });
 

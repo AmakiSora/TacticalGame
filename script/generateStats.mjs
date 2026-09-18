@@ -14,7 +14,26 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);
 
-export const KNOWN_AGENTS = new Set(['PI', 'CX', 'CC', 'QW', 'OMP', 'WB', 'ZC', 'SCRIPT', 'QD', 'CP']);
+/**
+ * Agent 简写 → 展示全名。复盘文件名（tg_xxx_rank01_QD@model.md）与对局玩家名
+ * 只写简写，此处是唯一的简写对照表；新增 Agent 时同步补这里。
+ */
+export const AGENT_NAMES = new Map([
+  ['PI', 'pi'],
+  ['OMP', 'oh my pi'],
+  ['DSH', 'DeepSeek Harness'],
+  ['QD', 'qoder'],
+  ['QW', 'QoderWork'],
+  ['TW', 'TraeWork'],
+  ['TC', 'TraeCode'],
+  ['CP', 'CatPaw'],
+  ['WB', 'workbuddy'],
+  ['ZC', 'zcode'],
+  ['CC', 'ClaudeCode'],
+  ['CX', 'codex'],
+]);
+
+export const KNOWN_AGENTS = new Set([...AGENT_NAMES.keys(), 'SCRIPT']);
 
 /** Canonical model keys (lowercase). */
 export const MODEL_ALIASES = new Map([
@@ -848,6 +867,7 @@ export function aggregate(matches) {
   const agentLeaderboard = [...agents.values()]
     .map(a => ({
       agent: a.agent,
+      agentName: AGENT_NAMES.get(a.agent) || a.agent,
       games: a.games,
       wins: a.wins,
       winRate: a.games > 0 ? round4(a.wins / a.games) : 0,
@@ -1034,6 +1054,7 @@ function main() {
     warnings,
     overview: agg.overview,
     modelLeaderboard: agg.modelLeaderboard,
+    agentNames: Object.fromEntries(AGENT_NAMES),
     agentLeaderboard: agg.agentLeaderboard,
     mapStats: agg.mapStats,
     matches: agg.matches,

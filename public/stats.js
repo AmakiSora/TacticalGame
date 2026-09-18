@@ -467,6 +467,7 @@
   }
 
   function renderAgentTable(rows) {
+    const names = (raw && raw.agentNames) || {};
     const body = el.agentTable.querySelector('tbody');
     body.innerHTML = rows
       .map(a => {
@@ -475,8 +476,9 @@
           .slice(0, 4)
           .map(([m, c]) => `<span class="tag">${escapeHtml(m)}×${c}</span>`)
           .join('');
+        const fullName = names[a.agent] && names[a.agent] !== a.agent ? names[a.agent] : '';
         return `<tr>
-          <td data-label="Agent"><strong>${escapeHtml(a.agent)}</strong></td>
+          <td data-label="Agent"><strong>${escapeHtml(a.agent)}</strong>${fullName ? ` <span class="muted">${escapeHtml(fullName)}</span>` : ''}</td>
           <td class="num" data-label="场次">${a.games}</td>
           <td class="num win" data-label="胜">${a.wins}</td>
           <td class="num" data-label="胜率">${pct(a.winRate)}</td>

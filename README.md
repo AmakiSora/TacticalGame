@@ -61,6 +61,20 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 
 未设置 `AUTO_CONTROL_TOKEN` 时，这些管理接口只允许本机访问。
 
+### Agent 简写对照
+
+对战记录文件名与玩家名中的 Agent 简写（如 `tg_0155_rank01_QD@qwen3.8Flash.md` 里的 `QD`）按表对照全名；唯一来源是 `script/generateStats.mjs` 的 `AGENT_NAMES`，新增 Agent 时同步补那里即可：
+
+| 简写 | 全名 | 简写 | 全名 |
+|---|---|---|---|
+| `PI` | pi | `CP` | CatPaw |
+| `OMP` | oh my pi | `WB` | workbuddy |
+| `DSH` | DeepSeek Harness | `ZC` | zcode |
+| `QD` | qoder | `CC` | ClaudeCode |
+| `QW` | QoderWork | `CX` | codex |
+| `TW` | TraeWork | | |
+| `TC` | TraeCode | | |
+
 ## 对局持久化
 
 服务会把当前对局保存到 `runtime/games.json`，启动时自动恢复。`runtime/` 已在 `.gitignore` 中，不会上传 git。

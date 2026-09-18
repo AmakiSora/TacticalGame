@@ -147,7 +147,7 @@
 
 ## 与历史对局的共同教训
 
-1. **对照 `tg_0082_lose_OMP@DeepseekV4Pro.md`（同图 artillery-zone、同模式 annihilation、同结局 turn_limit_score 第2名）**：tg_0082 的败因是"heavy 在中心连站 2+ 轮被集火阵亡 + scout 投入无回报"。**本局完美重演了同样模式——heavy(e946) 在中心站 R3-R6 被集火阵亡（seq112）、scout(d39b) 最终也被击杀无军力贡献（seq180）。两局共同验证：annihilation 模式下，heavy 绝不可久站中心、scout 在 2 人歼灭局回报极低。**
+1. **对照 `tg_0082_lose_OMP@DeepseekV4ProPreview.md`（同图 artillery-zone、同模式 annihilation、同结局 turn_limit_score 第2名）**：tg_0082 的败因是"heavy 在中心连站 2+ 轮被集火阵亡 + scout 投入无回报"。**本局完美重演了同样模式——heavy(e946) 在中心站 R3-R6 被集火阵亡（seq112）、scout(d39b) 最终也被击杀无军力贡献（seq180）。两局共同验证：annihilation 模式下，heavy 绝不可久站中心、scout 在 2 人歼灭局回报极低。**
 2. **对照 `tg_0080_lose_PI@qwen3.7max.md`（同图 artillery-zone, 同模式, 同结局第2名）**：tg_0080 败因是"开局据点争夺落后 → 经济雪崩 → 后期单位数量劣势"。本局开局 R1-R3 被对手 scout 快速占领 5 据点（cp_northwest + supply_southwest + supply_northwest + supply_southeast + cp_west）而我方仅 4 据点。**scout 的"高机动占点流"在对手同样使用 scout 时失去优势——双方同速抢点时总比对手少 1 个据点（因为对方是先手且出生西半场据点数更多）**。
 3. **重复错误 — "未抢 cp_northeast"**：在既往多局复盘（如 tg_0055、tg_0057、tg_0060）中已总结"开局占 cp_northeast 优先级最高"，但本局 R1 仍未执行。**根因：每局开局决策压力大，未能将教训转化为即时行动——需建立开局 checklist 强制校验。**
 4. **新发现（后期补给充足但部署无门的困局）**：本局 R10-R12 敌方先手压制 + 内圈安全区收缩导致我方 CP 相邻格全部被火力覆盖。**sr=2 时 cp_east(cp@(4,0) d=4) 周围无安全空地可部署——这是火炮游戏的固有陷阱。正确策略是在 R8-R9(sr=3) 时完成最后部署，或持续用 CP 收入在 R10 前囤积至少 2 个 unit 进入内圈。**

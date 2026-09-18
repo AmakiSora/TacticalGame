@@ -57,14 +57,14 @@ describe('stats aggregation', () => {
     });
   });
 
-  it('keeps DeepseekV4Pro formal distinct from its preview', () => {
-    expect(canonicalizeModel('DeepseekV4Pro-OMP')).toBe('DeepseekV4Pro');
-    expect(canonicalizeModel('DeepseekV4Pro')).toBe('DeepseekV4Pro');
+  it('merges DeepseekV4Pro into its preview', () => {
+    expect(canonicalizeModel('DeepseekV4Pro-OMP')).toBe('DeepseekV4ProPreview');
+    expect(canonicalizeModel('DeepseekV4Pro')).toBe('DeepseekV4ProPreview');
     expect(canonicalizeModel('DeepseekV4ProPreview-PI')).toBe('DeepseekV4ProPreview');
     expect(canonicalizeModel('DeepseekV4proPreview')).toBe('DeepseekV4ProPreview');
-    expect(parseReviewFileName('tg_0082_lose_OMP@DeepseekV4Pro.md')).toMatchObject({
+    expect(parseReviewFileName('tg_0082_lose_OMP@DeepseekV4ProPreview.md')).toMatchObject({
       agent: 'OMP',
-      model: 'DeepseekV4Pro',
+      model: 'DeepseekV4ProPreview',
     });
   });
 

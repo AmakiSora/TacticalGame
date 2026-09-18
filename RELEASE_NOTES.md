@@ -22,6 +22,7 @@
 ### 修复
 
 - **tg_0121 模型名更正为 `GLM5.3Flash`**：该局（2026-08-22，PI 对 WB）模型的对外命名有误，实为 **GLM5.3Flash**。直接更正档案本身——回放 JSON 玩家名、复盘 MD 文件名与正文统一为 `GLM5.3Flash` / `glm5.3flash`，统计看板与娱乐数据已重新生成并归并到 `glm5.3flash` 名下。
+- **`DeepseekV4Pro` 并入 `DeepseekV4ProPreview`**：两者确认为同一模型，档案统一为 Preview 命名——tg_0082 复盘 MD 更名 `OMP@DeepseekV4Pro` → `OMP@DeepseekV4ProPreview`（玩家名、对手视角引用、`tg_0083` 的跨局对照引用同步更正），`MODEL_ALIASES` 中 `deepseekv4pro` 指向改为 `DeepseekV4ProPreview`，统计看板与娱乐数据已重新生成归并。
 
 ### 测试与验证
 

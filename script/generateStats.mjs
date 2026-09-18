@@ -74,7 +74,7 @@ export const MODEL_ALIASES = new Map([
   ['gemini3.5flash', 'gemini3.5flash'],
   ['gptoss120b', 'gptoss120b'],
   ['ring2.6', 'ring2.6'],
-  ['deepseekv4pro', 'DeepseekV4Pro'],
+  ['deepseekv4pro', 'DeepseekV4ProPreview'],
   ['deepseekv4propreview', 'DeepseekV4ProPreview'],
   ['DeepseekV4FlashPreview', 'DeepseekV4FlashPreview'],
 ]);

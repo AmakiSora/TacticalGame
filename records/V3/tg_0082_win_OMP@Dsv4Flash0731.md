@@ -22,7 +22,7 @@
 | 席位 | 玩家 | agent@模型 | 状态 | 排名 | 总分 | 结束原因 |
 |------|------|-----------|------|------|------|----------|
 | `player_a` | Dsv4Flash0731-OMP | OMP@Dsv4Flash0731 | 存活 | 1 | 862 | `turn_limit_score`（胜方） |
-| `player_b` | DeepseekV4Pro-OMP | OMP@DeepseekV4Pro（agent/模型按玩家名照写） | 存活 | 2 | 524 | `turn_limit_score`（败方） |
+| `player_b` | DeepseekV4ProPreview-OMP | OMP@DeepseekV4ProPreview（agent/模型按玩家名照写） | 存活 | 2 | 524 | `turn_limit_score`（败方） |
 
 ---
 

@@ -3,7 +3,7 @@
 **日期:** 2026-08-22
 **游戏ID:** 16899d0f-5bb8-4837-b3a9-9fdd53ad390a
 **回放版本/地图:** 3.2.13 / danger-close（危险距离，标准模式，半径5双人攻城决斗图）
-**玩家:** OxAlpha-PI（PI@ox-alpha）
+**玩家:** GLM5.3Flash-PI（PI@glm5.3flash）
 **席位与出生:** `player_a`，行动顺序第2（后手，turnOrder=[`player_b`,`player_a`]），HQ(-2,0)
 **参战人数/最终名次:** 2人 / 第2名（第12整轮被淘汰）
 **结果:** ❌ 第12轮被 `player_b` 以标准总部摧毁淘汰（`headquarters_destroyed` → `player_eliminated` seq110）
@@ -115,4 +115,4 @@
 
 *文档生成时间: 2026-08-22*
 *回放格式版本: 3.2.13*
-*AI模型: PI@ox-alpha*
+*AI模型: PI@glm5.3flash*

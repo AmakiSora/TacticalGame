@@ -19,6 +19,10 @@
 - **`algorithms/builtin/README.md`**：可用算法列表新增 verdict 一行。
 - **`algorithms/docs/RELEASE_NOTES.md`**：新增 3.5.4 小节，含十处结构性约束的开发记录与完整性能表。
 
+### 修复
+
+- **tg_0121 模型名更正为 `GLM5.3Flash`**：该局（2026-08-22，PI 对 WB）模型的对外命名有误，实为 **GLM5.3Flash**。直接更正档案本身——回放 JSON 玩家名、复盘 MD 文件名与正文统一为 `GLM5.3Flash` / `glm5.3flash`，统计看板与娱乐数据已重新生成并归并到 `glm5.3flash` 名下。
+
 ### 测试与验证
 
 - 新增测试两份：`tests/algorithms/verdict.test.ts`（12 场景：裁决账本优先级、稳杀集火、斩首收束、**排程单位一步只推进一格也不提前交回合**、磨平线交换裁决、紧急回防、治疗、部署、被全歼仍补员、行动点门控、已移动单位不得再移动、拆墙正反例）与 `tests/algorithms/verdict-selfplay.test.ts`（default/breach/desert/dual-lanes/danger-close/multiplayer-ring/随机地图整局**零非法动作**、对局正常结束、开局无兵时也会补员）；`npx vitest run tests/algorithms/` 6 文件 / 71 用例全绿。

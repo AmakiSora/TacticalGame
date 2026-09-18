@@ -4,6 +4,27 @@
 
 自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.5.4
+
+### 新增
+
+- **Verdict 裁决线算法（内置算法 AI 第 6 个）**：新增 `algorithms/builtin/verdict.mjs`，把前向打分换成**反向规划**——先回答"这局我用哪条线赢"，再从那个终局倒推回本回合每个单位该干什么。三步：①**裁决账本**，引擎终局裁决分（`src/engine/engine.ts` `scorePlayer`）是可解析的，每个动作都折算成"能改变多少裁决分"，攻击/占点/治疗/移动/部署第一次在同一个货币里可比（`default` 图直接读出：游侠一炮打总部 190 分 vs 打步兵 21.6 分，差 9 倍；一个中立据点 90 分 = 击杀一个满血步兵；部署一个步兵净赚 45 分；权重随地图走，`danger-close` 的 20/1/30/1/0 会自动读出另一套结论）；②**三条裁决线**——斩首（总部归零即胜）/ 磨平（打不光就换总分）/ 裁定（守住分差到期末）；③**反向排程**：从"敌方总部归零"逐回合倒推一个微缩攻城战（行动点先供赶路、再给到位单位开火，单发高的先吃行动点），得到攻城回合数 `killRound`，`slack = 剩余回合 − killRound` 就是 tempo 预算，直接决定全军风险姿态（≥3 储备 / 0–2 压上 / 打不光 磨平换分 / 敌方排程 ≤3 回合 全线回防）。同一条排程反过来跑敌方 = **敌人的斩首线**，压力在丢失胜势**之前**就被看见。排程按"路上要穿过几格敌方打击区"折算抵达概率（`STEP_SURVIVAL^危险步数`），不是无条件上界。
+- **tempo 量纲的第一版可用答案**：`ALGORITHMS_NOTES` 的「未来方向」第 8 条点名的共同短板（threat 输 danger-close 18%、field 输 multiplayer-ring 7%）在 verdict 里被拆成两个可算的量——**行动点预算建进攻程排程**（赶路与开火争抢同一份行动点，1 AP/回合的图上排程自己算出"赶路都不够"），**交换阈值不再手工配常数**（"打击分 − 原地承伤 × 姿态系数"，进攻姿态折 0.65、储备姿态折 1.35）。实测两个老短板同时补上：`danger-close` 80%（threat 18%）、`multiplayer-ring` 100%（field 7%）。
+- **定位**：实现日期 2026-09-18；注册链路 `registry.mjs`（`verdict` + `v1` 展示元数据）、前端 `play.html` / `play-m.html` 下拉（`algo_verdict`；后端 `ALGORITHM_BOTS` 由注册表自动生成，未改 `bots.ts`）；档案 `algorithms/docs/algorithms/verdict.md`（含**十个必须守住的约束**与两套种子基的完整性能表）。
+
+### 变更
+
+- **`algorithms/docs/ALGORITHMS_NOTES.md`**：算法清单新增 verdict 行（反向规划/期限排程，对 greedy 95.7%）；性能对比新增「vs greedy（verdict：各图 30 局，两套种子基）」与「vs 其他算法（各 7 图 ×30 局）」两节；三方相克小节从"threat vs field"扩到三家（新增 forge 上 threat 反打 verdict 10:20）；「未来方向」第 8 条 tempo 量纲标注为第一版已落地，并留下未算完的部分（forge 短图需要的是**兑现率**量纲，不是再配一个系数）。
+- **`algorithms/builtin/README.md`**：可用算法列表新增 verdict 一行。
+- **`algorithms/docs/RELEASE_NOTES.md`**：新增 3.5.4 小节，含十处结构性约束的开发记录与完整性能表。
+
+### 测试与验证
+
+- 新增测试两份：`tests/algorithms/verdict.test.ts`（12 场景：裁决账本优先级、稳杀集火、斩首收束、**排程单位一步只推进一格也不提前交回合**、磨平线交换裁决、紧急回防、治疗、部署、被全歼仍补员、行动点门控、已移动单位不得再移动、拆墙正反例）与 `tests/algorithms/verdict-selfplay.test.ts`（default/breach/desert/dual-lanes/danger-close/multiplayer-ring/随机地图整局**零非法动作**、对局正常结束、开局无兵时也会补员）；`npx vitest run tests/algorithms/` 6 文件 / 71 用例全绿。
+- 强度标定（`scripts/algorithm-arena.mjs`，headless 自博弈、逐局交替先手、每图 30 局）：**vs greedy 7 图合计 201:9（95.7%）**，两套种子基（1000 / 3000）给出**完全相同**的合计；vs threat 161:49（76.7%）、vs field 186:24（88.6%）、vs random 24:0；8 张图（含随机地图与 4 人 four-corners）**零非法动作**。`STEP_SURVIVAL` 一维扫描 0.72/0.62/0.55/0.45/0.35 → 89.0/92.4/**95.7**/回落/回落。4 人局 four-corners 20 局仅 2/20 席位局（未标定，见档案已知限制）。
+- 链路验证：`npm run build` 通过；`npm run check-version` 校验 3.5.4 全部引用一致；`GET /api/algorithms` 返回 6 个算法（含 `algo_verdict` 裁决线算法）；冒烟 `node scripts/test-algorithm-bots.mjs algo_verdict algo_random` 实跑 HTTP 对局，10 回合完赛、verdict 席位获胜。
+- **`npm test` 全量未全绿**：13 个失败用例全部来自工作区中未提交的在建文件（`tests/script/deepStats.test.ts`、`tests/public/stats-entertainment-render.test.ts` 依赖的 `script/lib/deepMetrics.mjs` 尚未导出 `buildWeekday`/`buildNemesis` 等），与本次改动无关（改动前后失败数一致，均为 13）；其余 59 个文件 549 个用例通过。
+
 ## 3.5.3
 
 ### 新增

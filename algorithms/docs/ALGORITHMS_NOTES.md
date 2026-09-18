@@ -14,6 +14,7 @@ algorithms/
 │   ├── mcts.mjs      # 蒙特卡洛树搜索
 │   ├── threat.mjs    # 威胁感知算法
 │   ├── field.mjs     # 势场算法
+│   ├── verdict.mjs   # 裁决线算法
 │   └── README.md     # 算法开发指南
 ├── lib/              # 共享工具库
 │   ├── api-client.mjs    # REST API 客户端
@@ -27,7 +28,8 @@ algorithms/
 │       ├── random.md
 │       ├── mcts.md
 │       ├── threat.md
-│       └── field.md
+│       ├── field.md
+│       └── verdict.md
 ├── registry.mjs      # 算法注册表
 └── runner.mjs        # 通用运行器
 ```
@@ -93,11 +95,14 @@ export default {
 | **mcts** | 搜索 | O(b^d · k) | 弱（vs greedy 20 局 3:17） | 战术推演、对比实验 |
 | **threat** | 效用/影响图 | O(单位×格子) | **2 人局最强内置**（vs greedy 7 图 ×40 局 70.6%，vs mcts 14:6）；3-4 人局未标定 | 走位稳健的对战、教学 |
 | **field** | 势场/梯度下降 | O(单位×格子) | 中上（vs greedy 7 图 ×30 局 **64.3%**）；**低行动点图最强**（danger-close 97%，threat 仅 18%）；高行动点图最弱（multiplayer-ring 7%） | 涌现式走位（风筝/分头抢点）、慢节奏消耗战 |
+| **verdict** | 反向规划/期限排程 | O(单位×格子 + 排程回合) | **对 greedy 最强**（7 图 ×30 局 **95.7%**，两套种子一致）；vs threat 76.7%、vs field 88.6%、vs random 24:0；`danger-close` 80%（threat 18%）、`multiplayer-ring` 100%（field 7%） | 全动作按裁决分统一计价、预算内斩首、守成与回防 |
 
 > b = 分支因子（~20），d = 搜索深度（8），k = 模拟次数（100）
 >
-> threat 与 field 的强度不可直接比大小：两者各有专属短板（threat 输 danger-close，field 输 multiplayer-ring），
-> 同图对拍 30 局 threat 12:8 领先；且 danger-close 上存在三方相克（field > greedy 97%、threat > field 60%、threat < greedy 18%）。
+> threat / field / verdict 的强度不可直接比大小：三者各有专属短板，且存在相克。
+> 同图对拍 30 局：threat 12:8 领先 field，verdict 18:12 领先 threat（dual-lanes）
+> 但 10:20 输给 threat（forge）；danger-close 上三方相克（field 97% 打 greedy、
+> threat 60% 打 field、threat 18% 打 greedy，verdict 三家通吃 80%/30:0/30:0）。**单图胜率不可外推。**
 
 ## 性能对比
 
@@ -138,10 +143,46 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，头less 自�
 >
 > field 的性能曲线由"行动点预算"决定：每回合 1 行动点（一次走位 = 一整回合）时势场避险最省，7 行动点时"井外"不存在、找不到正收益落点就站住（304 个回合里 280 次带着行动点交回合），把 tempo 让给对手。
 
+### vs greedy（verdict：各图 30 局，两套种子基）
+
+verdict 的口径与 threat/field 完全一致（`scripts/algorithm-arena.mjs`，headless 自博弈）。
+
+| 地图 | 种子基 1000 | 种子基 3000 | threat | field |
+|---|---:|---:|---:|---:|
+| default | 29:1（97%） | 30:0（100%） | 95% | 60% |
+| breach | 30:0（100%） | 30:0（100%） | 88% | 57% |
+| desert | 30:0（100%） | 30:0（100%） | 70% | 87% |
+| dual-lanes | 28:2（93%） | 30:0（100%） | 95% | 83% |
+| forge | 30:0（100%） | 30:0（100%） | 80% | 60% |
+| danger-close | 24:6（80%） | 21:9（70%） | 18% | 97% |
+| multiplayer-ring | 30:0（100%） | 30:0（100%） | 50% | 7% |
+| **合计** | **201:9（95.7%）** | **201:9（95.7%）** | 197:82（70.6%） | 135:75（64.3%） |
+| random 地图 | 18:12（60%），30 局 | — | 53%（32 局） | 40%（30 局） |
+
+> verdict 是唯一在两套种子基上给出**完全相同合计**的内置算法（逐图仅 ±1~3 局波动）。
+
+### vs 其他算法（verdict：各 7 图 ×30 局）
+
+| 对手 | 战绩 | 逐图（verdict 胜，7 图顺序同上） |
+|---|---:|---|
+| threat | **161:49（76.7%）** | 24 / 30 / 27 / 18 / **10** / 30 / 22 |
+| field | **186:24（88.6%）** | 28 / 30 / 28 / 16 / 30 / 30 / 24 |
+| random | 24:0（100%），24 局 | default |
+
+> verdict 在 threat/field 各自的最大短板上都是碾压：`danger-close` 30:0 打 threat、
+> 30:0 打 field；`multiplayer-ring` 22:8 打 threat、24:6 打 field。
+> 反过来，verdict 的短板是 `forge`（对 threat 仅 10:20）—— 半径 6、10 回合的短图，
+> 双方都要抢 tempo，而排程天然按回合摊销，被 threat 的单步兑现率压住。**相克是双向的。**
+
 ### 其他对局
 
 | 对局 | 胜率 | 备注 |
 |---|---|---|
+| verdict vs greedy | **95.7% (201:9)**，7 图 ×30 局 | 两套种子基一致 |
+| verdict vs threat | 76.7% (161:49)，7 图 ×30 局 | forge 图被相克（10:20） |
+| verdict vs field | 88.6% (186:24)，7 图 ×30 局 | |
+| verdict vs random | 100% (24:0)，24 局 | default |
+| verdict vs greedy（4 人局） | four-corners 2/20 席位局（10%），greedy 每席位 30% | 未标定，见 verdict.md 已知限制 2 |
 | threat vs 初版 threat | **78% (31:9)**，40 局 | default；修复的直接效果 |
 | threat vs mcts | 70% (14:6)，20 局 | default。mcts 的模拟用未播种随机数，批次间会飘（另一批 18:2）；要定序需 40 局以上 |
 | threat vs random | 100% (24:0)，24 局 | default |
@@ -174,6 +215,8 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，头less 自�
 | 2026-09-14 | 3.5.1 | threat 标定与修复：行动点预算门控、结束回合门槛（与 PROGRESS_SCALE 碰磁）、威胁惩罚按 `actionsPerTurn` 截断、据点收入按 kind 取实际值、部署参与同尺度比较、拆墙判据放宽 → **vs greedy 70.6%**；greedy 同步修正行动点门控；新增自博弈合法性回归测试 |
 | 2026-09-16 | 3.5.3 | 新增 field 势场算法（人工势场：斥力井 + 引力井 + 波前距离场）。初版 vs greedy 0/30：三处结构性 bug（反击风险用势能与血量比较、机会火力选完落点才补减、孤军 cohesion 为 Infinity 导致不移动）；修复后 64.3%（7 图 ×30 局），并在 threat 的短板 danger-close 上拿到 97% |
 | 2026-09-16 | 3.5.3 | field 标定：尺度自适应档案（小图 1 环/据点井 4 格，大图 2 环/5 格）、同一敌军在斥力井中去重计费、纯波前导航（否决了"直线+绕行"混合场：default +10 但 breach −20） |
+| 2026-09-18 | 3.5.4 | 新增 verdict 裁决线算法（反向规划：三条裁决线 + 攻城排程 + 全动作按引擎裁决分统一计价）。初版 vs greedy 64.3%（7 图 ×30 局），最大短板是对 threat 的 `forge` 相克 |
+| 2026-09-18 | 3.5.4 | verdict 标定与修复：十处结构性约束（见 `algorithms/verdict.md`），其中四条各值 20 个以上百分点——到位后推进梯度归零（远程兵不再放弃已到手的打击）、打击扣"原地承伤"（dual-lanes 60%→93%）、打击加"暴露下降"差分（集火斩杀）、排程按抵达概率折损（dual-lanes 53%→83%）。`STEP_SURVIVAL` 扫描 0.72/0.62/0.55/0.45/0.35 → 89.0/92.4/**95.7**/回落/回落。最终 **vs greedy 95.7%（201:9）**、两套种子基一致 |
 
 ## 未来方向
 
@@ -185,8 +228,14 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，头less 自�
 6. **多席位标定**：现有权重全部在 2 人对局上调出，3-4 人图上 threat 不再优于 greedy（见 `algorithms/threat.md` 已知限制 7），field 同样未标定（斥力井把多席位敌人等价叠加）
 7. **部署决策继续收敛**：`threat` 与 `mcts` 的逐字重复拷贝已提到 `game-utils.deployDecision()` 共用；还剩 `greedy`（按距离+费用排序的另一份）与 `scripts/auto-standard-game.mjs` 两份变体未合并
 8. **tempo 量纲**：两个算法各自的最大短板指向同一个缺失——"什么时候该接受亏损交换"。
-   threat 输 danger-close（每回合 1 行动点，避险换不来 tempo，18%），field 输 multiplayer-ring（7 行动点，井外不存在，7%）。
-   谁先把 tempo 价值做进评估，谁就能补上另一半地图谱。
+   threat 输 danger-close（每回合 1 行动点，避险换不来 tempo，18%），
+   field 输 multiplayer-ring（7 行动点，井外不存在，7%）。
+   **verdict（3.5.4）给出了第一版可用的答案**：把行动点预算建进攻城排程
+   （赶路与开火争抢同一份行动点），再让"打击分 − 原地承伤 × 姿态系数"自己算出交换阈值——
+   它在 `danger-close` 拿到 80%（threat 18%）、`multiplayer-ring` 拿到 100%（field 7%），
+   两个老短板同时补上。但 tempo 的账没有算完：verdict 在 `forge`（半径 6、10 回合的短图）
+   被 threat 反打 10:20 —— 排程按回合摊销，短图上"每一步都要兑现"的兑现率才是硬通货。
+   下一版需要的是**兑现率**量纲，不是再配一个系数。
 
 ## 贡献指南
 

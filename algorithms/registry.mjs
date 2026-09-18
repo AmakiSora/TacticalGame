@@ -18,6 +18,7 @@ export const ALGORITHMS = {
   mcts: './builtin/mcts.mjs',
   threat: './builtin/threat.mjs',
   field: './builtin/field.mjs',
+  verdict: './builtin/verdict.mjs',
 };
 
 /**
@@ -38,6 +39,7 @@ export const ALGORITHM_META = {
   mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1' },
   threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1' },
   field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1' },
+  verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v1' },
 };
 
 /**

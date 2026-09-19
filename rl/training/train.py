@@ -38,7 +38,18 @@ for _sub in ("envs", "runners", "training", "evaluation"):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from env import ATTACK_CANDIDATES, DEPLOY_CANDIDATES, MOVE_CANDIDATES, classify_action
+from env import (
+    ATTACK_CANDIDATES,
+    DEFAULT_REWARD_HQ_DAMAGE,
+    DEFAULT_REWARD_HQ_PUSH,
+    DEFAULT_REWARD_NEW_UNIT_TYPE,
+    DEPLOY_BASE,
+    DEPLOY_CANDIDATES,
+    MOVE_CANDIDATES,
+    TYPE_INDEX,
+    classify_action,
+    env_reward_float,
+)
 from extractors import build_policy_kwargs
 from local_env import LocalHexGameEnv
 
@@ -47,7 +58,7 @@ def mask_fn(env):
     return env.action_masks()
 
 
-def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str, anchor_probability: float, map_mix: list[tuple[str, float]], opponent_stochastic_probability: float = 0.0):
+def make_train_env(map_id: str, opponent_style: str, model_opponent_probability: float, opponent_model_path: str, self_play_dir: str, self_play_probability: float, anchor_model_path: str, anchor_probability: float, map_mix: list[tuple[str, float]], opponent_stochastic_probability: float = 0.0, algorithm_mix: dict[str, float] | None = None, algorithm_opponent_probability: float = 0.0, algorithm_epsilon: float = 0.0):
     """模块级工厂：返回可被 spawn 子进程 pickle 的 env 构造器。每个环境自带一个引擎 worker。"""
 
     def _init():
@@ -65,6 +76,9 @@ def make_train_env(map_id: str, opponent_style: str, model_opponent_probability:
             anchor_probability=anchor_probability,
             map_mix=map_mix,
             opponent_stochastic_probability=opponent_stochastic_probability,
+            algorithm_mix=algorithm_mix,
+            algorithm_opponent_probability=algorithm_opponent_probability,
+            algorithm_epsilon=algorithm_epsilon,
         )
         return Monitor(env)
 
@@ -109,6 +123,23 @@ def parse_map_mix(raw: str) -> list[tuple[str, float]]:
         result.append((name, float(weight) if separator else 1.0))
     if any(weight <= 0 for _, weight in result):
         raise ValueError("RL_TRAIN_MAP_MIX weights must be positive")
+    return result
+
+
+def parse_algorithm_mix(raw: str) -> dict[str, float]:
+    """``"threat:0.4,field:0.3,greedy:0.3"`` → ``{"threat": 0.4, ...}``。
+
+    权重不必归一（env 侧会归一）；名字是否已注册由 worker 在首次 decide 时校验
+    （注册表在 JS 侧，训练脚本不复制一份，避免双份清单漂移）。
+    """
+    result: dict[str, float] = {}
+    for entry in raw.split(","):
+        name, separator, weight = entry.strip().partition(":")
+        if not name:
+            continue
+        result[name] = float(weight) if separator else 1.0
+    if any(weight <= 0 for weight in result.values()):
+        raise ValueError("RL_ALGO_MIX weights must be positive")
     return result
 
 
@@ -257,17 +288,31 @@ class AsyncEvalCallback(BaseCallback):
     default OOD collapse and picked the weak 100k checkpoint over 1.4M.
     """
 
-    def __init__(self, *, map_id: str, opponent_style: str, anchor_model: str, eval_freq: int, n_eval_episodes: int, best_model_save_path: str, eval_dir: str, seed_prefix: int = 27_000, wait_at_end: bool = True):
+    def __init__(self, *, map_id: str, opponent_style: str, anchor_model: str, eval_freq: int, n_eval_episodes: int, best_model_save_path: str, eval_dir: str, seed_prefix: int = 27_000, wait_at_end: bool = True, algo_scenarios: bool = False, algo_episodes: int = 48, best_warmup_steps: int = 0, seed_stride: int = 1):
         super().__init__()
         self.map_id = map_id
         self.opponent_style = opponent_style
         self.anchor_model = anchor_model
+        # v3.2.0：评估是否加跑算法对手场景（RL_EVAL_ALGO，默认关；阶段 B 再开）。
+        self.algo_scenarios = algo_scenarios
+        self.algo_episodes = max(2, algo_episodes)
         self.eval_freq = max(1, eval_freq)
         self.n_eval_episodes = max(2, n_eval_episodes + n_eval_episodes % 2)
         self.best_model_save_path = best_model_save_path
         self.eval_dir = Path(eval_dir)
         self.seed_prefix = seed_prefix
+        # v3.2.0（评估功效修正）：种子步长。默认 1 = 顺序取种子（历史行为）。
+        # > 1 时让「前 N/2 个种子」散布到整个种子空间，用少量局数换低偏差估计。
+        self.seed_stride = max(1, int(seed_stride))
         self.wait_at_end = wait_at_end
+        # v3.2.0 消融（阶段 A 复盘补）：best 选择键的**热身期**（相对本次续训起点的步数）。
+        # 阶段 A 的 best 被**第一个**评估点（8.9M，仅训入 9.6 万帧）占住，此后 1.2M 帧
+        # 一次都没被超越，交付物因此约等于起点；v3.1.1、v3.0.2 也有同一现象。
+        # 根因是分布漂移期评估读数方差远大于真实改进，选择键于是系统性地把"离起点最近
+        # 的断点"当成 best。热身期内只记录、不更新 best，让基线由漂移稳定后的读数来定。
+        # 0 = 关闭（保持历史行为）。若全程都在热身期内，则不产出 best，交付退回终点模型。
+        self.best_warmup_steps = max(0, int(best_warmup_steps))
+        self._best_suppressed = 0
         # 五元组：(最弱场景下界, 后手座合并下界, 平均下界, 占点, 回报)。
         self.best_score = (-1.0, -1.0, -1.0, -float("inf"), -float("inf"))
         self.best_step = 0
@@ -286,9 +331,12 @@ class AsyncEvalCallback(BaseCallback):
             "--model", model_zip, "--out", result_json,
             "--map", self.map_id, "--opponent-style", self.opponent_style,
             "--episodes", str(self.n_eval_episodes), "--seed-prefix", str(self.seed_prefix),
+            "--seed-stride", str(self.seed_stride),
         ]
         if self.anchor_model:
             command += ["--anchor", self.anchor_model]
+        if self.algo_scenarios:
+            command += ["--algo-scenarios", "--algo-episodes", str(self.algo_episodes)]
         env = {**os.environ, "PYTHONUTF8": "1"}
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", env=env)
         self._pending = (process, model_zip, result_json, step)
@@ -317,6 +365,18 @@ class AsyncEvalCallback(BaseCallback):
                     pass
         return True
 
+    def _within_best_warmup(self, step: int) -> bool:
+        """本次续训是否还处在 best 选择的热身期内（见 ``best_warmup_steps``）。
+
+        起点取自 ``model._num_timesteps_at_start``（sb3 载入断点时记录），所以热身期
+        是"本次续训新增了多少帧"的窗口，而不是绝对步数——续训每次都从几百万步开始，
+        用绝对步数做门槛等于永远不热身。
+        """
+        if self.best_warmup_steps <= 0:
+            return False
+        start = int(getattr(self.model, "_num_timesteps_at_start", 0) or 0)
+        return (step - start) < self.best_warmup_steps
+
     def _record(self, step: int, results: dict[str, Any], model_zip: str) -> None:
         try:
             from eval_worker import selection_score
@@ -331,10 +391,16 @@ class AsyncEvalCallback(BaseCallback):
             second = scenario.get("seat_second", {})
             self.logger.record(f"eval/{name}_first_seat", first.get("win_rate", 0.0))
             self.logger.record(f"eval/{name}_second_seat", second.get("win_rate", 0.0))
+            # v3.2.0 验收门禁读数：HQ 伤害 ≥ 60、侦察兵占比 ≥ 20%（v3.1.1 实测 19.7 / 8%）。
+            self.logger.record(f"eval/{name}_hq_damage", scenario.get("hq_damage_mean", 0.0))
+            self.logger.record(f"eval/{name}_own_hq_hp", scenario.get("own_hq_hp_mean", 0.0))
+            self.logger.record(f"eval/{name}_scout_deploy", scenario.get("scout_deploy_share", 0.0))
             print(
                 f"[eval:{name}] step={step} win_rate={scenario['win_rate']:.0%} wilson_lb={scenario['wilson_lb']:.0%} "
                 f"first={first.get('win_rate', 0.0):.0%} second={second.get('win_rate', 0.0):.0%} "
-                f"cp={scenario['cp_mean']:.2f} mean_reward={scenario['mean_reward']:+.3f} over {scenario['games']} paired games",
+                f"cp={scenario['cp_mean']:.2f} mean_reward={scenario['mean_reward']:+.3f} "
+                f"hq_damage={scenario.get('hq_damage_mean', 0.0):.1f} scout={scenario.get('scout_deploy_share', 0.0):.0%} "
+                f"over {scenario['games']} paired games",
                 flush=True,
             )
         if not scenarios:
@@ -347,14 +413,33 @@ class AsyncEvalCallback(BaseCallback):
             ood_lb = min(float(s["wilson_lb"]) for s in ood)
             self.logger.record("eval/ood_min_wilson_lb", ood_lb)
             ood_note = f" ood_lb={ood_lb:.0%}(recorded only)"
+        # v3.2.0：算法场景（in_selection=False）同样只记录。它们的下界在训练早期必然
+        # 很低，进选择键会系统性偏向"对模型强但对算法弱"的早期断点。
+        excluded = [s for s in scenarios.values() if not s.get("in_selection", True)]
+        algo_note = ""
+        if excluded:
+            algo_lb = min(float(s["wilson_lb"]) for s in excluded)
+            self.logger.record("eval/algo_min_wilson_lb", algo_lb)
+            self.logger.record("eval/algo_mean_win_rate", float(np.mean([s["win_rate"] for s in excluded])))
+            self.logger.record("eval/algo_hq_damage", float(np.mean([s.get("hq_damage_mean", 0.0) for s in excluded])))
+            algo_note = f" algo_lb={algo_lb:.0%}(recorded only)"
         score = selection_score(results)
-        is_best = score > self.best_score
+        warmup = self._within_best_warmup(step)
+        is_best = (not warmup) and score > self.best_score
+        if warmup:
+            self._best_suppressed += 1
+            self.logger.record("eval/best_selection_active", 0.0)
+        else:
+            self.logger.record("eval/best_selection_active", 1.0)
         if is_best:
             self.best_score = score
             self.best_step = step
             os.makedirs(self.best_model_save_path, exist_ok=True)
             shutil.copy(model_zip, os.path.join(self.best_model_save_path, "best_model.zip"))
-        mean_win_rate = float(np.mean([s["win_rate"] for s in scenarios.values()]))
+        # 只对参与选择的场景求均值，否则算法场景（早期低胜率）会把这条读数压低，
+        # 跨版本比较就失去意义。
+        selected = [s for s in scenarios.values() if s.get("in_selection", True)] or list(scenarios.values())
+        mean_win_rate = float(np.mean([s["win_rate"] for s in selected]))
         self.logger.record("eval/win_rate", mean_win_rate)
         self.logger.record("eval/min_wilson_lb", score[0])
         self.logger.record("eval/second_seat_lb", score[1])
@@ -363,10 +448,12 @@ class AsyncEvalCallback(BaseCallback):
         # 结果晚于训练步数到达，随下一次常规 dump 写入 TB；eval/evaluated_step 记录真实评估步数。
         self.logger.record("eval/evaluated_step", step)
         self.history.append({"step": step, "score": score, "scenarios": scenarios})
+        warmup_note = f" [best 选择热身中，已抑制 {self._best_suppressed} 次]" if warmup else ""
         print(
             f"[eval] step={step:>8d} min_wilson_lb={score[0]:.0%} second_seat_lb={score[1]:.0%} "
             f"mean_wilson_lb={score[2]:.0%} mean_win_rate={mean_win_rate:.0%} cp={score[3]:.2f} "
-            f"mean_reward={score[4]:+.3f}{ood_note}{' <- new best' if is_best else ''}",
+            f"mean_reward={score[4]:+.3f}{ood_note}{algo_note}"
+            f"{' <- new best' if is_best else ''}{warmup_note}",
             flush=True,
         )
 
@@ -390,13 +477,15 @@ class AsyncEvalCallback(BaseCallback):
 class MaskableEvalCallback(BaseCallback):
     """Legacy inline evaluation (v2.7).  Kept for RL_EVAL_MODE=inline."""
 
-    def __init__(self, eval_envs: dict[str, Any], eval_freq: int, n_eval_episodes: int, best_model_save_path: str, seed_prefix: int = 27_000):
+    def __init__(self, eval_envs: dict[str, Any], eval_freq: int, n_eval_episodes: int, best_model_save_path: str, seed_prefix: int = 27_000, seed_stride: int = 1):
         super().__init__()
         self.eval_envs = eval_envs
         self.eval_freq = max(1, eval_freq)
         self.n_eval_episodes = max(2, n_eval_episodes + n_eval_episodes % 2)
         self.best_model_save_path = best_model_save_path
         self.seed_prefix = seed_prefix
+        # v3.2.0（评估功效修正）：与 AsyncEvalCallback 同义，默认 1 = 历史行为。
+        self.seed_stride = max(1, int(seed_stride))
         self.best_score = (-1.0, -1.0, -float("inf"), -float("inf"))
 
     def _on_step(self) -> bool:
@@ -413,7 +502,7 @@ class MaskableEvalCallback(BaseCallback):
                     pair_index = episode // 2
                     owner = "player_a" if episode % 2 == 0 else "player_b"
                     observation, _ = eval_env.reset(
-                        seed=self.seed_prefix + pair_index,
+                        seed=self.seed_prefix + pair_index * self.seed_stride,
                         options={"owner": owner},
                     )
                     done = False
@@ -525,6 +614,15 @@ class ActionDiversityCallback(BaseCallback):
         self.log_every = max(1, log_every)
         self._picked: Counter = Counter()
         self._legal: Counter = Counter()
+        # v3.2.0 (A5)：**窗口内**的兵种部署计数（与 _picked 的累计语义不同，这里每窗口
+        # 清零，因为兵种坍缩是"当前策略还有没有多样性"的问题，累计值会被早期窗口稀释）。
+        self._deploy_types: Counter = Counter()
+        # v3.2.0 消融（阶段 A 复盘补）：算法通道累计读数的上次快照，用于取窗口差分。
+        # 初值全 0（而非首次读到的值），这样第一个窗口报的是"自开局累计"，不漏数据。
+        self._last_opponent_totals: dict[str, int] = {
+            "algorithm_episodes": 0, "algorithm_actions": 0, "rejections": 0,
+        }
+        self._stats_unavailable = False
         self._window = 0
         self._total = 0
 
@@ -536,7 +634,12 @@ class ActionDiversityCallback(BaseCallback):
         self._window += len(flat)
         self._total += len(flat)
         for value in flat:
-            self._picked[classify_action(int(value))] += 1
+            index = int(value)
+            self._picked[classify_action(index)] += 1
+            # classify_action 把 deploy 折成候选序号（丢掉了兵种），兵种由下标反推：
+            # DEPLOY_BASE 之后每 DEPLOY_CANDIDATES 个动作对应一个兵种。
+            if index >= DEPLOY_BASE:
+                self._deploy_types[(index - DEPLOY_BASE) // DEPLOY_CANDIDATES] += 1
         masks = self.locals.get("action_masks")
         if masks is not None:
             table = np.asarray(masks)
@@ -548,6 +651,33 @@ class ActionDiversityCallback(BaseCallback):
         if self._window >= self.log_every:
             self._log_window()
         return True
+
+    def _opponent_totals(self) -> dict[str, int] | None:
+        """汇总各并行环境里算法通道的**累计**诊断读数（v3.2.0 消融补）。
+
+        三个计数器（实际抽中算法对手的局数 / 算法产出的动作数 / 被引擎拒绝的次数）
+        此前只存在于 `env.py` 与 `tests/`，训练日志从不打印 —— 结果是 §6 那条
+        「`opponent_rejections` 持续增长 → 停」的止损线在整个阶段 A 里**无法执行**。
+
+        `env_method` 是 sb3 对 `SubprocVecEnv` 的标准跨进程通道（`action_masks`
+        走的就是同一条路），每窗口调用一次、每进程一次同步往返，开销可忽略。
+        环境不支持该方法时只降级一次并打一条告警，不刷屏。
+        """
+        if self._stats_unavailable:
+            return None
+        try:
+            values = self.training_env.env_method("algorithm_stats")
+        except Exception as error:  # noqa: BLE001 — 任何环境不支持都只降级，不影响训练
+            self._stats_unavailable = True
+            print(f"[opponent] 算法通道监控不可用，已关闭该读数: {type(error).__name__}: {error}", flush=True)
+            return None
+        totals = {"algorithm_episodes": 0, "algorithm_actions": 0, "rejections": 0}
+        for value in values:
+            if not isinstance(value, dict):
+                continue
+            for key in totals:
+                totals[key] += int(value.get(key, 0))
+        return totals
 
     def _new_candidate_counts(self, intent: str | None) -> tuple[int, int]:
         """(候选序号 ≥ 1 的被选中次数, 合法次数)；intent=None 表示全部意图。"""
@@ -572,6 +702,39 @@ class ActionDiversityCallback(BaseCallback):
         legal_total = sum(self._legal.values())
         legal_mean = legal_total / self._window if self._window else 0.0
         self.logger.record("explore/legal_actions_mean", legal_mean)
+        # v3.2.0 (A5)：兵种多样性读数。type_entropy 是窗口内部署兵种分布的香农熵
+        # （5 兵种均匀 = ln5 ≈ 1.61 nats，只出同一种 = 0）；scout_share 直接对应
+        # v3.2.0 的验收门禁「侦察兵占比 ≥ 20%」（v3.1.1 实测 8%）。窗口后清空。
+        deploy_total = sum(self._deploy_types.values())
+        if deploy_total:
+            counts = np.asarray(list(self._deploy_types.values()), dtype=np.float64)
+            shares = counts / deploy_total
+            entropy = float(-(shares * np.log(shares)).sum())
+            scout_share = self._deploy_types.get(TYPE_INDEX["scout"], 0) / deploy_total
+            self.logger.record("deploy/type_entropy", entropy)
+            self.logger.record("deploy/scout_share", scout_share)
+            parts.append(f"deploy_entropy {entropy:.2f} scout {scout_share:.1%}")
+        # v3.2.0 消融补：算法通道体检。`algo_ep` 是窗口内实际抽中算法对手的局数，
+        # 除以窗口内局数即实际配比；`rejections` 持续增长说明算法 payload 与引擎
+        # 校验不一致。三者任一异常都应立刻停，而不是等训练跑完再看评估。
+        totals = self._opponent_totals()
+        if totals is not None:
+            previous = self._last_opponent_totals
+            window_episodes = totals["algorithm_episodes"] - previous["algorithm_episodes"]
+            window_actions = totals["algorithm_actions"] - previous["algorithm_actions"]
+            window_rejections = totals["rejections"] - previous["rejections"]
+            self._last_opponent_totals = totals
+            reject_rate = window_rejections / window_actions if window_actions else 0.0
+            self.logger.record("opponent/algorithm_episodes", totals["algorithm_episodes"])
+            self.logger.record("opponent/algorithm_actions", totals["algorithm_actions"])
+            self.logger.record("opponent/rejections", totals["rejections"])
+            self.logger.record("opponent/algorithm_episodes_window", window_episodes)
+            self.logger.record("opponent/rejections_window", window_rejections)
+            self.logger.record("opponent/rejection_rate_window", reject_rate)
+            parts.append(
+                f"algo_episodes +{window_episodes} algo_actions +{window_actions} "
+                f"rejections +{window_rejections} reject_rate {reject_rate:.2%}"
+            )
         print(
             f"[explore] frames={self._total} new_candidate_rate={overall:.3%} "
             f"({' | '.join(parts) if parts else 'no mask data'}) legal_mean={legal_mean:.1f}",
@@ -579,6 +742,7 @@ class ActionDiversityCallback(BaseCallback):
         )
         self._picked.clear()
         self._legal.clear()
+        self._deploy_types.clear()
         self._window = 0
 
 
@@ -604,6 +768,21 @@ def main() -> None:
         raise ValueError("RL_EVAL_MODE must be async or inline")
     eval_freq = env_int("RL_EVAL_FREQ", 100_000 if eval_mode == "async" else 10_000, minimum=0)
     eval_episodes = env_int("RL_EVAL_EPISODES", 96 if eval_mode == "async" else 20, minimum=1)
+    # v3.2.0：是否在评估里加跑 threat/greedy/field 三个算法场景。默认关——算法场景
+    # 只记录、不进 best 选择键（见 eval_worker.selection_score），阶段 B 再开。
+    eval_algo_scenarios = env_int("RL_EVAL_ALGO", 0, minimum=0) > 0
+    # 算法场景局数单独可控。**注意**（v3.2.0 实测修正）：原注释写「算法是确定性策略、
+    # 方差小」，这只对**单局**成立 —— 48 局（24 个顺序种子）的**子集偏差**可达 8pt：
+    # 同一份 v3.1.1，48 局给 46.3%、300 局给 54.3%。给算法场景设判据时应 ≥192 局，
+    # 或配合 RL_EVAL_SEED_STRIDE 用大步长跨越整个种子空间。
+    eval_algo_episodes = env_int("RL_EVAL_ALGO_EPISODES", 48, minimum=2)
+    # v3.2.0（评估功效修正）：评估种子步长。默认 1 = 顺序取种子（历史行为，保持历史可比性）。
+    # > 1 时种子以大步长跨越整个空间，用少量局数换低偏差估计（见 eval_worker.play_scenario）。
+    eval_seed_stride = env_int("RL_EVAL_SEED_STRIDE", 1, minimum=1)
+    # v3.2.0 消融（阶段 A 复盘补）：best 选择键热身期，单位是**本次续训新增的帧数**。
+    # 默认 0 = 关闭，保持历史行为。阶段 A 的交付物之所以约等于起点，就是因为选择键
+    # 让第一个评估点（+9.6 万帧）占住了 best 且再未被超越——见 AsyncEvalCallback 注释。
+    best_warmup_steps = env_int("RL_BEST_WARMUP_STEPS", 0, minimum=0)
     # 随机地图上 v2.0.0 模型对手属于分布外对手，默认只用规则对手；
     # 需要时可用 RL_MODEL_OPPONENT_PROB 显式开启。
     default_model_prob = 0.0 if map_id == "random" else 0.5
@@ -620,6 +799,19 @@ def main() -> None:
     anchor_probability = env_float("RL_ANCHOR_PROB", 0.40)
     # v2.8：模型对手（快照/锚点）有 30% 的局按策略分布采样动作，防止只学会针对一条贪心走法。
     opponent_stochastic_probability = env_float("RL_OPPONENT_STOCHASTIC_PROB", 0.30)
+    # v3.2.0：规则算法对手（threat/field/greedy/mcts）走 local-worker 的 decide 通道。
+    # 该概率是**对局占比**（算法分支在 _choose_opponent_style 里优先级最高，不被
+    # self-play 概率稀释）。mcts 默认不进池：它对最新模型的胜率最低（48-59%）。
+    algorithm_opponent_probability = env_float("RL_ALGO_OPPONENT_PROB", 0.0)
+    algorithm_mix = parse_algorithm_mix(env_str("RL_ALGO_MIX", ""))
+    # 算法是确定性策略，留 10% 随机合法动作打断"确定性走法"的过拟合。
+    algorithm_epsilon = env_float("RL_ALGO_EPSILON", 0.10)
+    if not 0.0 <= algorithm_opponent_probability <= 1.0:
+        raise ValueError("RL_ALGO_OPPONENT_PROB must be between 0 and 1")
+    if not 0.0 <= algorithm_epsilon <= 1.0:
+        raise ValueError("RL_ALGO_EPSILON must be between 0 and 1")
+    if algorithm_opponent_probability > 0 and not algorithm_mix:
+        raise ValueError("RL_ALGO_OPPONENT_PROB > 0 requires RL_ALGO_MIX (e.g. threat:0.4,field:0.3,greedy:0.3)")
     default_map_mix = "random:0.7,default:0.15,dual-lanes:0.075,forge:0.075" if map_id == "random" else ""
     map_mix = parse_map_mix(env_str("RL_TRAIN_MAP_MIX", default_map_mix))
     opponent_kind = "selfplay" if self_play_probability > 0 else "modelmix"
@@ -686,6 +878,12 @@ def main() -> None:
             f"every {snapshot_freq} calls keep={snapshot_keep}（训练初期无快照时自动用规则对手）",
             flush=True,
         )
+    if algorithm_opponent_probability > 0:
+        print(
+            f"[train] algorithm opponents probability={algorithm_opponent_probability:.0%} mix={algorithm_mix} "
+            f"epsilon={algorithm_epsilon:.0%}（进程内 decide 通道；该概率即对局占比，不被 self-play 稀释）",
+            flush=True,
+        )
 
     if load_path in {"auto", "latest"}:
         candidates = [model_path, model_path + ".zip"]
@@ -723,7 +921,16 @@ def main() -> None:
         f"n_steps={n_steps} batch={batch_size} target_kl={target_kl} "
         f"ent_coef={ent_coef} gamma={gamma} clip={clip_range} epochs={n_epochs} "
         f"timesteps={total_timesteps}{'(incremental)' if resume else ''} "
-        f"map_mix={map_mix or [(map_id, 1.0)]} opponent_stochastic={opponent_stochastic_probability:.0%}",
+        f"map_mix={map_mix or [(map_id, 1.0)]} opponent_stochastic={opponent_stochastic_probability:.0%} "
+        f"algo_opponent={algorithm_opponent_probability:.0%}{algorithm_mix or ''} eps={algorithm_epsilon:.0%}",
+        flush=True,
+    )
+    # v3.2.0 奖励项（A4/A5）：打印实际生效值，避免"以为改了其实没生效"。
+    print(
+        f"[train] reward hq_damage={env_reward_float('RL_REWARD_HQ_DAMAGE', DEFAULT_REWARD_HQ_DAMAGE)} "
+        f"hq_push={env_reward_float('RL_REWARD_HQ_PUSH', DEFAULT_REWARD_HQ_PUSH)} "
+        f"new_unit_type={env_reward_float('RL_REWARD_NEW_UNIT_TYPE', DEFAULT_REWARD_NEW_UNIT_TYPE)} "
+        f"shaping_scale={env_reward_float('RL_REWARD_SHAPING_SCALE', 0.5)} win={env_reward_float('RL_REWARD_WIN', 5.0)}",
         flush=True,
     )
 
@@ -736,7 +943,7 @@ def main() -> None:
     # 并行训练环境：每个环境一个独立引擎 worker；sb3 通过 env_method("action_masks")
     # 从各子环境收集动作掩码，无需 ActionMasker 包装。单环境用 DummyVecEnv 保持同构。
     env_fns = [
-        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "", anchor_probability, map_mix, opponent_stochastic_probability)
+        make_train_env(map_id, opponent_style, model_opponent_probability, resolved_opponent_path, snapshot_dir if self_play_probability > 0 else "", self_play_probability, anchor_model if self_play_probability > 0 else "", anchor_probability, map_mix, opponent_stochastic_probability, algorithm_mix, algorithm_opponent_probability, algorithm_epsilon)
         for _ in range(num_envs)
     ]
     env = SubprocVecEnv(env_fns) if num_envs > 1 else DummyVecEnv(env_fns)
@@ -764,10 +971,12 @@ def main() -> None:
             # sb3 的 load 不恢复 verbose；不设则续训日志里没有 rollout/train 表。
             model.verbose = 1
         else:
+            # 与续训路径一致地应用 RL_LR_MODE：此前这里硬编码 lr_schedule，
+            # 导致从零训练时 RL_LR_MODE=constant 被静默忽略（续训路径才是唯一生效的）。
             model = MaskablePPO(
                 "MlpPolicy",
                 env,
-                learning_rate=lr_schedule,
+                learning_rate=learning_rate,
                 policy_kwargs=policy_kwargs,
                 n_steps=n_steps,
                 batch_size=batch_size,
@@ -800,9 +1009,22 @@ def main() -> None:
                 n_eval_episodes=eval_episodes,
                 best_model_save_path=str(best_dir),
                 eval_dir=str(Path(checkpoint_dir) / "eval_tmp"),
+                algo_scenarios=eval_algo_scenarios,
+                algo_episodes=eval_algo_episodes,
+                best_warmup_steps=best_warmup_steps,
+                seed_stride=eval_seed_stride,
             ))
-            print(f"[train] async eval every {eval_freq} steps x {eval_episodes} games per scenario (background subprocess)")
+            print(
+                f"[train] async eval every {eval_freq} steps x {eval_episodes} games per scenario (background subprocess)"
+                f"{' + algo scenarios x ' + str(eval_algo_episodes) if eval_algo_scenarios else ''}"
+                f"{'；best 选择热身期 ' + str(best_warmup_steps) + ' 帧' if best_warmup_steps > 0 else ''}"
+                f"{'；评估种子步长 ' + str(eval_seed_stride) + '（>1 = 低偏差采样）' if eval_seed_stride > 1 else ''}"
+            )
         elif eval_freq > 0:
+            # v3.2.0：inline 模式的环境是手工搭的，没走 build_scenarios，因此不认
+            # RL_EVAL_ALGO。显式告警而不是静默忽略——否则"开了算法评估却没数据"很难查。
+            if eval_algo_scenarios:
+                print("[train] 警告：RL_EVAL_ALGO=1 仅在 RL_EVAL_MODE=async 下生效，当前 inline 模式已忽略")
             eval_envs["random_rule"] = ActionMasker(
                 LocalHexGameEnv(map_id=map_id, opponent_style=opponent_style), mask_fn,
             )
@@ -826,8 +1048,10 @@ def main() -> None:
                 eval_freq=eval_freq,
                 n_eval_episodes=eval_episodes,
                 best_model_save_path=str(best_dir),
+                seed_stride=eval_seed_stride,
             ))
-            print(f"[train] eval every {eval_freq} steps x {eval_episodes} games")
+            print(f"[train] eval every {eval_freq} steps x {eval_episodes} games"
+                  f"{'（种子步长 ' + str(eval_seed_stride) + '）' if eval_seed_stride > 1 else ''}")
 
         model.learn(
             total_timesteps=total_timesteps,

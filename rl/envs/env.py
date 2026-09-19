@@ -138,6 +138,13 @@ def env_reward_float(name: str, default: float) -> float:
     return float(raw) if raw else default
 
 
+# v3.2.0 奖励项默认值。放在模块级是为了让 train.py 的启动打印引用同一份常量，
+# 不必在训练脚本里复制一遍数字（复制出来的默认值迟早会和这里漂移）。
+DEFAULT_REWARD_HQ_DAMAGE = 0.15
+DEFAULT_REWARD_HQ_PUSH = 0.02
+DEFAULT_REWARD_NEW_UNIT_TYPE = 0.05
+
+
 def key(q: int, r: int) -> tuple[int, int]:
     return q, r
 
@@ -156,8 +163,12 @@ class HexGameEnv(gym.Env):
     """One RL player versus a configurable goal-directed rule opponent."""
 
     metadata = {"render_modes": []}
+    # v3.2.0：规则算法对手（threat/field/greedy/mcts）需要进程内引擎 worker，只有
+    # LocalHexGameEnv 具备。基类走 HTTP，置 False 让配置错误在构造时报出，
+    # 而不是训练中途才炸——静默退回规则对手会让"算法进池"悄悄失效。
+    SUPPORTS_ALGORITHM_OPPONENT = False
 
-    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None, anchor_probability: float = 0.15, opponent_stochastic_probability: float = 0.0):
+    def __init__(self, base_url: str = "http://127.0.0.1:3100", max_steps: int = 500, opponent_style: str = "mixed", opponent_model: Any | None = None, model_opponent_probability: float = 0.5, map_id: str = "default", random_options: dict[str, Any] | None = None, opponent_model_path: str | None = None, self_play_dir: str | None = None, self_play_probability: float = 0.0, anchor_model_path: str | None = None, anchor_probability: float = 0.15, opponent_stochastic_probability: float = 0.0, algorithm_opponent: str | None = None, algorithm_opponent_probability: float = 0.0, algorithm_mix: dict[str, float] | None = None, algorithm_epsilon: float = 0.0):
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.max_steps = max_steps
@@ -169,6 +180,39 @@ class HexGameEnv(gym.Env):
             raise ValueError("self_play_probability must be between 0 and 1")
         if not 0.0 <= opponent_stochastic_probability <= 1.0:
             raise ValueError("opponent_stochastic_probability must be between 0 and 1")
+        # v3.2.0：把内置规则算法当对手。算法是解析式效用评估，与规则对手（优先级列表）
+        # 和模型对手（学习策略）并列的第三类策略形态；v3.x 历代"训练分布外就打不过"
+        # 的根因就是把这一类完全排除在对手池之外（见 rl/docs/plans/v3.2.0.md）。
+        if not 0.0 <= algorithm_opponent_probability <= 1.0:
+            raise ValueError("algorithm_opponent_probability must be between 0 and 1")
+        if not 0.0 <= algorithm_epsilon <= 1.0:
+            raise ValueError("algorithm_epsilon must be between 0 and 1")
+        pool = dict(algorithm_mix) if algorithm_mix else ({algorithm_opponent: 1.0} if algorithm_opponent else {})
+        if any(weight <= 0 for weight in pool.values()):
+            raise ValueError("algorithm_mix weights must be positive")
+        if algorithm_opponent_probability > 0 and not pool:
+            raise ValueError("algorithm_opponent_probability > 0 requires algorithm_opponent or algorithm_mix")
+        if pool and not self.SUPPORTS_ALGORITHM_OPPONENT:
+            raise ValueError("algorithm opponents require the in-process local engine worker (LocalHexGameEnv)")
+        total_weight = sum(pool.values())
+        # 配置侧：构造参数，训练全程不变；本局抽中的那一个放 self.active_algorithm。
+        # 两者必须分开命名，否则首局之后配置就被本局结果覆盖了。
+        self.algorithm_opponent_pool: dict[str, float] = {name: weight / total_weight for name, weight in pool.items()}
+        self.algorithm_opponent_probability = algorithm_opponent_probability
+        # 算法是确定性策略：同一状态永远同一动作，模型会过拟合固定走法。
+        # 以此概率改用随机合法动作替换算法决策（A3），打断确定性剥削链。
+        self.algorithm_epsilon = algorithm_epsilon
+        self.active_algorithm = ""
+        # 诊断用：算法座位实际产出的动作数。配置了池却长期为 0 说明通道静默失效。
+        self.algorithm_actions = 0
+        # 诊断用：对手动作被引擎拒绝、降级为 end_turn 的次数。算法对手返回引擎原生
+        # payload，该计数持续增长说明算法视角与引擎校验不一致（合法性回归）。
+        self.opponent_rejections = 0
+        # v3.2.0 消融（阶段 A 复盘补）：实际抽中算法对手的**局数**。`algorithm_actions`
+        # 只能证明"算法出过手"，证明不了"配比生效"——阶段 A 全程没有这条读数，
+        # 20% 的课程是否真的落地无从验证。有了它才能算 实际局占比 =
+        # algorithm_episodes / 总局数，与 RL_ALGO_OPPONENT_PROB 对照。
+        self.algorithm_episodes = 0
         self.opponent_style = opponent_style
         self.opponent_model = opponent_model
         # 子进程（SubprocVecEnv）里模型对象不可序列化，改传路径在子进程内懒加载。
@@ -205,6 +249,22 @@ class HexGameEnv(gym.Env):
         self.reward_shaping_scale = env_reward_float("RL_REWARD_SHAPING_SCALE", 0.5)
         self.reward_deploy_bonus = env_reward_float("RL_REWARD_DEPLOY_BONUS", 0.0)
         self.reward_attack_bonus = env_reward_float("RL_REWARD_ATTACK_BONUS", 0.0)
+        # v3.2.0 (A4)：HQ 相关奖励。诊断依据——模型赢下的局 HQ 伤害 85.7，输掉的局
+        # 只有 6.7，而算法平均 134.5；HQ 在引擎裁决里本来就是权重最大的一项
+        # （headquartersDamage × adjudicationWeights.enemyHqDamage，见 src/engine/engine.ts），
+        # 所以这不是发明新目标，而是把已有终局信号提前显式化，改善信用分配。
+        # 默认值刻意保守（对比 reward_win=5.0 与占点项 0.7），P2a 评估后再调。
+        self.reward_hq_damage = env_reward_float("RL_REWARD_HQ_DAMAGE", DEFAULT_REWARD_HQ_DAMAGE)
+        self.reward_hq_push = env_reward_float("RL_REWARD_HQ_PUSH", DEFAULT_REWARD_HQ_PUSH)
+        # v3.2.0 (A5)：某兵种【首次部署】的一次性小奖励，替代熵奖励。诊断依据——模型
+        # 85% 只出步兵、0% 支援，在"步兵海内战"的自我博弈生态里出脆皮侦察兵会被立刻
+        # 吃掉，策略梯度锁死在局部最优（ent_coef=0.03 不足以跳出）。
+        self.reward_new_unit_type = env_reward_float("RL_REWARD_NEW_UNIT_TYPE", DEFAULT_REWARD_NEW_UNIT_TYPE)
+        # 每局重置。注意有**两处** reset：本文件与 local_env.reset（后者走
+        # super(HexGameEnv, self).reset，跳过基类实现），漏清一处就会跨局累积。
+        self._deployed_types: set[str] = set()
+        # 诊断/验收用：本局各兵种的部署次数（评估侧据此算"侦察兵占比"门禁）。
+        self.deploy_counts: dict[str, int] = {}
 
         self.action_space = spaces.Discrete(MAX_ACTIONS)
         self.observation_space = spaces.Box(
@@ -319,6 +379,12 @@ class HexGameEnv(gym.Env):
         self.steps = 0
         self.unit_slots = {PLAYER: {}, OPPONENT: {}}
         self.action_counts = {}
+        self.algorithm_actions = 0
+        self.opponent_rejections = 0
+        self.algorithm_episodes = 0
+        # v3.2.0：兵种 novelty 与部署统计必须逐局清零（local_env.reset 同处）。
+        self._deployed_types = set()
+        self.deploy_counts = {}
         self.active_opponent_style = self._choose_opponent_style()
         self._play_opponent_until_agent_turn()
         self.actions = self._legal_actions(self.state, self.owner)
@@ -333,6 +399,8 @@ class HexGameEnv(gym.Env):
             return self._encode_state(self.state), -0.05, False, self.steps >= self.max_steps, {"invalid": True}
 
         action_type, payload = self.actions[action_index]
+        # deploy 的 payload 带 unitType（见 _deploy_candidates），是 A5 novelty 的输入。
+        unit_type = str(payload.get("unitType", "")) if isinstance(payload, dict) else ""
         before = self._strategic_snapshot(self.state)
         try:
             self._apply(action_type, payload, self.player_token)
@@ -360,8 +428,11 @@ class HexGameEnv(gym.Env):
 
         current_score = self._score(self.state)
         reward = float(np.clip((current_score - self.previous_score) / 100.0, -1.0, 1.0))
-        reward += self._shaped_reward(before, self._strategic_snapshot(self.state), action_type) * self.reward_shaping_scale
+        reward += self._shaped_reward(before, self._strategic_snapshot(self.state), action_type, unit_type) * self.reward_shaping_scale
         self.action_counts[action_type] = self.action_counts.get(action_type, 0) + 1
+        # 到这里 _apply 已成功，所以统计的是"真正落地的部署"。评估侧据此算兵种占比门禁。
+        if action_type == "deploy" and unit_type:
+            self.deploy_counts[unit_type] = self.deploy_counts.get(unit_type, 0) + 1
         self.previous_score = current_score
 
         terminated = self._game_over()
@@ -371,7 +442,7 @@ class HexGameEnv(gym.Env):
             self._record_self_play_result(won)
         truncated = self.steps >= self.max_steps and not terminated
         self.actions = self._legal_actions(self.state, self.owner) if not terminated else []
-        info = {"action_type": action_type, "action_counts": dict(self.action_counts)}
+        info = {"action_type": action_type, "action_counts": dict(self.action_counts), "deploy_counts": dict(self.deploy_counts)}
         clip = max(2.0, self.reward_win + 1.0)
         return self._encode_state(self.state), float(np.clip(reward, -clip, clip)), terminated, truncated, info
 
@@ -413,19 +484,37 @@ class HexGameEnv(gym.Env):
         capture_units = [u for u in own_units if u.get("canCapture")]
         distances = [distance(unit, point) for unit in capture_units for point in open_points]
         nearest_cp = min(distances) if distances else 0
+        headquarters = state.get("headquarters", {})
+        enemy_hq = headquarters.get(self.opponent) or {}
+        own_hq = headquarters.get(self.owner) or {}
+        enemy_hq_hp = float(enemy_hq.get("hp", 0)) if enemy_hq.get("alive") else 0.0
+        own_hq_hp = float(own_hq.get("hp", 0)) if own_hq.get("alive") else 0.0
         enemy_hp = sum(float(u.get("hp", 0)) for u in enemy_units)
-        enemy_hp += sum(float(h.get("hp", 0)) for h in state.get("headquarters", {}).values() if h.get("owner") == self.opponent)
+        enemy_hp += sum(float(h.get("hp", 0)) for h in headquarters.values() if h.get("owner") == self.opponent)
         own_hp = sum(float(u.get("hp", 0)) for u in own_units)
-        own_hp += sum(float(h.get("hp", 0)) for h in state.get("headquarters", {}).values() if h.get("owner") == self.owner)
+        own_hp += sum(float(h.get("hp", 0)) for h in headquarters.values() if h.get("owner") == self.owner)
+        # v3.2.0 (A4) hq_pressure：己方最靠近敌 HQ 的单位的六角距离。
+        # 「无定义」时（己方单位全灭、或敌 HQ 已毁）hq_pressure 置 0 并令
+        # hq_pressure_valid=0，奖励侧直接跳过该项——否则"单位全灭"会让距离从 3 跳到 0
+        # 而白拿推进奖励，形成"送死→重新部署"的刷分路径（valid 标记就是为了堵这个洞）。
+        target_hq = enemy_hq if enemy_hq.get("alive") else None
+        if own_units and target_hq is not None:
+            hq_pressure = float(min(distance(unit, target_hq) for unit in own_units))
+        else:
+            hq_pressure = 0.0
         return {
             "control_points": float(sum(p.get("owner") == self.owner for p in points)),
             "own_units": float(len(own_units)),
             "enemy_hp": enemy_hp,
             "own_hp": own_hp,
             "nearest_cp": float(nearest_cp),
+            "enemy_hq_hp": enemy_hq_hp,
+            "own_hq_hp": own_hq_hp,
+            "hq_pressure": hq_pressure,
+            "hq_pressure_valid": 1.0 if (own_units and target_hq is not None) else 0.0,
         }
 
-    def _shaped_reward(self, before: dict[str, float], after: dict[str, float], action_type: str) -> float:
+    def _shaped_reward(self, before: dict[str, float], after: dict[str, float], action_type: str, unit_type: str = "") -> float:
         # Small dense signals teach useful direction while adjudication remains
         # the main objective.  Distance shaping is potential-based: moving
         # closer to an unowned CP is positive, moving away is negative.
@@ -435,8 +524,26 @@ class HexGameEnv(gym.Env):
         reward += (before["enemy_hp"] - after["enemy_hp"]) / 100.0
         reward += (after["own_hp"] - before["own_hp"]) / 160.0
         reward += (before["nearest_cp"] - after["nearest_cp"]) * 0.025
+        # v3.2.0 (A4) 敌 HQ 伤害：默认权重 0.15，即每 1 点 HQ 伤害 0.0015（另有
+        # enemy_hp 项本身的 1/100=0.01，这里是有意叠加而非重复计数——HQ 是终局资源）。
+        reward += (before["enemy_hq_hp"] - after["enemy_hq_hp"]) / 100.0 * self.reward_hq_damage
+        # 推进势能：只有【己方单位名册不变】时才计分，才是对固定单位集的严格势能差分。
+        # deploy 让新单位出现在己方 HQ（距离反而变远）、单位阵亡让最近距离跳变，两者
+        # 都不是"撤退"，计分会给出错误梯度，因此名册一变就跳过本项。
+        if (
+            before["hq_pressure_valid"]
+            and after["hq_pressure_valid"]
+            and before["own_units"] == after["own_units"]
+        ):
+            reward += (before["hq_pressure"] - after["hq_pressure"]) * self.reward_hq_push
         if action_type == "deploy":
             reward += self.reward_deploy_bonus
+            # v3.2.0 (A5)：首次部署某兵种的一次性小奖励。即时（信用分配容易）、有界
+            # （每兵种每局一次，上限 5 × 默认 0.05）、且不惩罚"重复出步兵"这个可能本
+            # 就合理的战术——它只填补早期探索空白，不改变最优策略方向。
+            if unit_type and unit_type not in self._deployed_types:
+                self._deployed_types.add(unit_type)
+                reward += self.reward_new_unit_type
         elif action_type == "attack":
             reward += self.reward_attack_bonus
         elif action_type == "end_turn" and before["control_points"] == after["control_points"]:
@@ -512,6 +619,20 @@ class HexGameEnv(gym.Env):
             self.opponent_stochastic_probability > 0
             and float(self.np_random.random()) < self.opponent_stochastic_probability
         )
+        self.active_algorithm = ""
+        # v3.2.0：算法分支放在最前面，让 RL_ALGO_OPPONENT_PROB 直接等于**对局占比**
+        # （放在 self_play 之后会被 0.70 的自对弈概率稀释成 6%，课程式 0.20→0.40 就
+        # 会实际变成 6%→12%，与"给算法对手足够暴露"的训练目标不符）。
+        if (
+            self.algorithm_opponent_pool
+            and self.algorithm_opponent_probability > 0
+            and float(self.np_random.random()) < self.algorithm_opponent_probability
+        ):
+            names = list(self.algorithm_opponent_pool)
+            weights = np.asarray(list(self.algorithm_opponent_pool.values()), dtype=np.float64)
+            self.active_algorithm = str(self.np_random.choice(names, p=weights / weights.sum()))
+            self.algorithm_episodes += 1
+            return "algorithm"
         if self.self_play_probability > 0 and float(self.np_random.random()) < self.self_play_probability:
             snapshots = self._self_play_snapshots()
             if snapshots:
@@ -805,6 +926,8 @@ class HexGameEnv(gym.Env):
                 self_play_move = self._self_play_pick(actions)
             if self_play_move is not None:
                 index, (action_type, payload) = self_play_move
+            elif self.active_opponent_style == "algorithm" and self.active_algorithm:
+                action_type, payload = self._algorithm_pick(valid)
             elif self.active_opponent_style == "model" and self._has_model_opponent():
                 opponent_model = self._ensure_opponent_model()
                 # 旧模型按它训练时的 38 动作语义行动（逐步排序分槽、严格接近移动），
@@ -833,6 +956,7 @@ class HexGameEnv(gym.Env):
             except RuntimeError as error:
                 if "rate_limit" in str(error):
                     raise
+                self.opponent_rejections += 1
                 try:
                     self._apply("end_turn", {}, self.opponent_token)
                 except RuntimeError as fallback_error:
@@ -864,6 +988,40 @@ class HexGameEnv(gym.Env):
             self.active_opponent_style = "mixed"
             self._self_play_path = ""
             return None
+
+    def _algorithm_decide(self) -> dict[str, Any]:
+        """向算法座位要一次决策。子类实现（LocalHexGameEnv 走 worker 的 decide 通道）。
+
+        返回值是**决策对象**（``{"action": {...}}`` 或 ``{"endTurn": True}``），
+        不是游戏快照——与 ``_get_state`` 的返回值语义不同，实现时不要把它赋给
+        ``self.state`` / ``_cached_state``。
+        """
+        raise NotImplementedError("algorithm opponents require the in-process local engine worker")
+
+    def _algorithm_pick(self, valid) -> tuple[str, dict[str, Any]]:
+        """算法对手的一个动作（``(action_type, payload)``）。
+
+        与模型/快照对手不同，算法返回的是**引擎原生 payload**（`algorithms/builtin/*.mjs`
+        直接照着引擎动作签名构造），因此不需要映射回 155 动作表——与
+        `rl/evaluation/evaluate_cross.py` 的 AlgorithmController 完全同构。
+
+        算法无跨调用状态（每次 decide 都从快照重建上下文），所以逐动作调用是正确的用法。
+        算法"无事可做"时 decide 返回 null → worker 归一成 ``{"endTurn": True}``。
+        """
+        if self.algorithm_epsilon > 0 and float(self.np_random.random()) < self.algorithm_epsilon:
+            action_type, payload = valid[int(self.np_random.integers(len(valid)))][1]
+            self.algorithm_actions += 1
+            return action_type, payload
+        decision = self._algorithm_decide()
+        if decision.get("endTurn"):
+            return "end_turn", {}
+        action = decision.get("action") or {}
+        action_type = action.get("type")
+        if not isinstance(action_type, str) or not action_type:
+            raise RuntimeError(f"algorithm decide 返回缺少 type 的动作: {action!r}")
+        payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+        self.algorithm_actions += 1
+        return action_type, payload
 
     def _legal_actions(self, state: dict[str, Any], owner: str, legacy: bool = False):
         """legacy=True 时复现 v2.0.0 的 38 动作语义，供旧模型对手使用。

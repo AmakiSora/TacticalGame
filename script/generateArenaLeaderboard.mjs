@@ -71,6 +71,7 @@ export const MODEL_DELIVERED_STEPS = {
   'hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip': 50000,
   'hex_ppo_v3.1.0_20260910_random_selfplay_1500000.zip': 100000,
   'hex_ppo_v3.1.1_20260911_random_selfplay_10940000.zip': 8800000,
+  'hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip': 9800000,
 };
 
 export function parseArgs(argv) {

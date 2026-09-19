@@ -9,6 +9,8 @@
  *
  * 口径与排行榜一致：
  *   - 作废模型（RETIRED_VERSIONS）不参与：对局整局丢弃并计数；
+ *   - 过期模型（EXPIRED_VERSIONS，见 script/modelStatus.mjs）照常参与：对局保留、
+ *     档案里 status='expired' 并带过期时点与理由，前端默认隐藏；
  *   - EXCLUDED_VERSIONS（v1.0.0，512 动作旧格式）不进玩法统计，对局按 formatDropped 计数；
  *   - 参与者档案（RL 模型 + 内置算法）的评分/胜率合并自 public/data/arena-leaderboard.json
  *     （先跑榜单脚本再跑本脚本）；
@@ -26,6 +28,8 @@ import {
   STATUS_NOTES,
   EXCLUDED_VERSIONS,
   RETIRED_VERSIONS,
+  EXPIRED_VERSIONS,
+  EXPIRED_BY_VERSION,
 } from './generateArenaLeaderboard.mjs';
 import { round2, round4 } from './generateStats.mjs';
 
@@ -500,8 +504,12 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
       opponentType: meta.opponentType,
       steps: meta.steps,
       deliveredSteps: meta.deliveredSteps ?? null,
-      status: MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy',
+      status: EXPIRED_VERSIONS.has(meta.version)
+        ? 'expired'
+        : (MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy'),
       statusNote: STATUS_NOTES[meta.version] ?? null,
+      expiredAt: EXPIRED_BY_VERSION.get(meta.version)?.expiredAt ?? null,
+      expiredReason: EXPIRED_BY_VERSION.get(meta.version)?.reason ?? null,
       rated: !EXCLUDED_VERSIONS.has(meta.version),
       sizeMB,
       rating: lb?.rating ?? null,
@@ -570,9 +578,14 @@ function main() {
 
   mkdirSync(dirname(opts.out), { recursive: true });
   writeFileSync(opts.out, JSON.stringify(payload, null, 2), 'utf8');
+  const expiredProfiles = models.filter(m => m.status === 'expired');
   console.log(`Wrote ${opts.out} — ${matches.length} matches, ${models.length} participant profiles, ${notesData.deprecated.length} deprecated` +
     (retiredDropped > 0 ? `（跳过作废对局 ${retiredDropped}）` : '') +
     (formatDropped > 0 ? `（跳过旧格式对局 ${formatDropped}）` : ''));
+  if (expiredProfiles.length) {
+    console.log(`过期模型 ${expiredProfiles.length} 个（照常统计、前端默认隐藏）：` +
+      `${expiredProfiles.map(m => `${m.short}@${m.expiredAt}`).join(', ')}`);
+  }
   console.log(`Units: ${gameplay.units.map(u => `${u.type} ${(u.deployShare * 100).toFixed(0)}%`).join(' / ') || '—'}`);
   console.log(`EndReasons: ${gameplay.endReasons.map(e => `${e.reason} ${e.count}`).join(' / ') || '—'}`);
   const noNotes = models.filter(m => !m.notes);

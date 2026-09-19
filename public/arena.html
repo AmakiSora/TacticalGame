@@ -12,6 +12,15 @@
     .tag.st-muted { background: #2a3a44; color: #9ab; }
     .tag.st-algo { background: #27424f; color: #9ad3e8; }
     .tag.st-model { background: #16301f; color: #8ddda4; }
+    /* 过期（expired）用琥珀色，与作废（st-bad 红）区分：模型本身没问题，只是退役归档。 */
+    .tag.st-expired { background: #4a3a12; color: #e8c46a; }
+    /* 「显示已过期模型」开关：.filters 的 label 是纵向列布局、input 带 34px 高，
+       勾选框必须覆盖掉行内 input 的盒模型，否则会被拉成一个方块。 */
+    .filters label.toggle { justify-content: flex-end; }
+    .filters label.toggle .toggle-line { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #9ab; font-weight: 400; min-height: 34px; cursor: pointer; }
+    .filters label.toggle input[type="checkbox"] { width: auto; min-height: 0; height: 14px; padding: 0; margin: 0; accent-color: #3f9b6c; cursor: pointer; }
+    .panel-heading .expired-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #9ab; cursor: pointer; }
+    .panel-heading .expired-toggle input[type="checkbox"] { accent-color: #3f9b6c; cursor: pointer; margin: 0; }
     .rating-ci { color: #6a8496; font-size: 11px; margin-left: 4px; }
     #h2h-table { min-width: 720px; }
     #h2h-table th, #h2h-table td { text-align: center; padding: 4px 6px; font-size: 12px; }
@@ -180,6 +189,13 @@
             <span>地图池</span>
             <select id="filter-league"></select>
           </label>
+          <label class="toggle">
+            <span>过期模型</span>
+            <span class="toggle-line">
+              <input type="checkbox" id="filter-expired" />
+              显示已过期（<b id="expired-count">0</b>）
+            </span>
+          </label>
         </div>
       </div>
       <div class="table-wrap">
@@ -202,7 +218,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="hint">评分基于全部参评对局的 Bradley-Terry 最大似然估计（每对附加 1 局虚拟平局先验），映射到 Elo 刻度（均值 1500）；±值为分层 bootstrap 95% 置信区间半径。Wilson 下界 = (胜 + 0.5·平) 的 95% 置信下限，供小样本参考。RL 模型与规则算法在同一池内互打评分，可直接跨类型比较。点击参与者行查看对位明细。</p>
+      <p class="hint">评分基于全部参评对局的 Bradley-Terry 最大似然估计（每对附加 1 局虚拟平局先验），映射到 Elo 刻度（均值 1500）；±值为分层 bootstrap 95% 置信区间半径。Wilson 下界 = (胜 + 0.5·平) 的 95% 置信下限，供小样本参考。RL 模型与规则算法在同一池内互打评分，可直接跨类型比较。点击参与者行查看对位明细。<b>已过期模型</b>默认隐藏：它们的历史对局仍留在评分池里照常计分（所以分数会随池子一起漂移，不是冻结值），只是不再参与新一轮评估。<span id="expired-hint"></span></p>
     </section>
 
     <section class="board-stack">
@@ -329,6 +345,10 @@
       <div class="panel-heading">
         <h2>每模型玩法画像</h2>
         <span>按「模型 × 局」平均 · 点击列头排序</span>
+        <label class="expired-toggle" title="过期模型的历史对局仍在统计里，默认只是不展示">
+          <input type="checkbox" id="rls-expired-toggle-stats" />
+          显示已过期（<b id="rls-expired-count-stats">0</b>）
+        </label>
       </div>
       <div class="table-wrap">
         <table id="rls-model-table" class="data-table">
@@ -385,9 +405,21 @@
           <h2>参与者档案</h2>
           <span>训练配置与版本说明 · 评分降序（未参评排后）· 模型说明来自 rl/docs/MODELS_NOTES.md，算法说明来自 algorithms/registry.mjs</span>
         </div>
+        <label class="expired-toggle" title="过期模型仍照常参与评分，默认只是不展示">
+          <input type="checkbox" id="rls-expired-toggle-cards" />
+          显示已过期（<b id="rls-expired-count-cards">0</b>）
+        </label>
         <strong id="rls-models-status" class="status-pill">加载中…</strong>
       </div>
       <div id="rls-model-cards" class="model-card-grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <h2>已过期模型</h2>
+        <span>隐藏在榜单外但仍照常评分归档 · zip 留在 rl/models/，登记见 arena/model-status.json</span>
+      </div>
+      <div id="rls-expired" class="empty-block">加载中…</div>
     </section>
 
     <section class="panel">

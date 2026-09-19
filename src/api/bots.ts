@@ -18,6 +18,8 @@ import { authenticateHost } from './auth.js';
 import { lobbySummary } from './games.js';
 // 算法展示元数据唯一来源（类型声明见 algorithms/registry.d.mts）。
 import { listAlgorithmInfo, algorithmParticipantId } from '../../algorithms/registry.mjs';
+// 过期模型名单唯一来源（类型声明见 script/modelStatus.d.mts）。
+import { loadModelStatus, versionOfModelFile } from '../../script/modelStatus.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -224,12 +226,31 @@ function readActionSpace(modelPath: string): number | null {
   }
 }
 
+/** 读取 arena/model-status.json 的过期模型版本集合（语义见 script/modelStatus.mjs）。 */
+function expiredVersionSet(): Set<string> {
+  try {
+    return new Set(loadModelStatus().entries.map(entry => entry.version));
+  } catch (err) {
+    // 登记表坏了不阻断对局：降级为「无过期模型」但必须留下可见告警，
+    // 否则过期模型会悄悄回到「添加 AI」列表与评估控制台。
+    console.warn(`[bots] 无法读取过期模型登记表：${(err as Error).message}；本次不排除任何过期模型。`);
+    return new Set();
+  }
+}
+
 /** 扫描 rl/models 目录下的 .zip 模型文件（新者优先）。目录不存在时返回空列表。 */
 export function refreshRlModels(): RlModelInfo[] {
   modelsCache = [];
+  const expired = expiredVersionSet();
   try {
     modelsCache = readdirSync(MODELS_DIR)
       .filter(file => file.toLowerCase().endsWith('.zip'))
+      // 过期模型从「可添加的 AI」列表里隐去：大厅「添加 AI」与竞技场评估控制台都由本函数
+      // 供数，过滤在这里做一次即可覆盖两处前端（模型文件本身仍在 rl/models/，不物理归档）。
+      .filter(file => {
+        const version = versionOfModelFile(file);
+        return version === null || !expired.has(version);
+      })
       .map(file => ({ file, mtimeMs: statSync(join(MODELS_DIR, file)).mtimeMs }))
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
       .map(info => {

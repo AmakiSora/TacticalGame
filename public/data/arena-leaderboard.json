@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-18T19:36:14.106Z",
+  "generatedAt": "2026-09-19T09:46:44.612Z",
   "ratingMethod": {
     "model": "Bradley-Terry MLE (MM iteration), draw = 0.5 win",
     "prior": "1 virtual draw per played pair",
@@ -10,6 +10,8 @@
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
     "matchCount": 39336,
     "retiredMatchesDropped": 2352,
+    "expiredMatchesKept": 10296,
+    "expiredModelCount": 3,
     "mapDist": {
       "breach": 5544,
       "danger-close": 5544,
@@ -34,7 +36,9 @@
       "steps": 120000,
       "deliveredSteps": null,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v2.0.0_20260824_default_rule_500000.zip": {
       "kind": "model",
@@ -46,7 +50,9 @@
       "steps": 500000,
       "deliveredSteps": null,
       "status": "legacy",
-      "statusNote": "player_b 座位观测失真，成绩仅供参考"
+      "statusNote": "player_b 座位观测失真，成绩仅供参考",
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v2.1.3_20260826_default_rule_defensive_800000.zip": {
       "kind": "model",
@@ -58,7 +64,9 @@
       "steps": 800000,
       "deliveredSteps": null,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v2.2.0_20260827_default_modelmix_best.zip": {
       "kind": "model",
@@ -70,7 +78,9 @@
       "steps": null,
       "deliveredSteps": null,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip": {
       "kind": "model",
@@ -82,7 +92,9 @@
       "steps": 800000,
       "deliveredSteps": 70000,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip": {
       "kind": "model",
@@ -93,8 +105,10 @@
       "opponentType": "selfplay",
       "steps": 800000,
       "deliveredSteps": 340000,
-      "status": "legacy",
-      "statusNote": "交付 best 实为 34 万步（文件名为训练目标 80 万步）；交付期评估早于 --swap-sides 座位 bug 修复，历史 7:1 成绩属小样本噪声"
+      "status": "expired",
+      "statusNote": "交付 best 实为 34 万步（文件名为训练目标 80 万步）；交付期评估早于 --swap-sides 座位 bug 修复，历史 7:1 成绩属小样本噪声",
+      "expiredAt": "2026-09-19",
+      "expiredReason": "全图沉底：7 张图名次 21/15/21/21/21/19/21（共 22 名参与者），全局评分 1237 全场最低，没有任何一张图表现突出。档案里已记录「仅随机图可战、静态图 11%~24%」，属于最早的随机图模型，继续陪跑只拉长新模型评估时长。"
     },
     "hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip": {
       "kind": "model",
@@ -106,7 +120,9 @@
       "steps": 2000000,
       "deliveredSteps": 770000,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v2.4.0_20260830_random_selfplay_2000000.zip": {
       "kind": "model",
@@ -118,7 +134,9 @@
       "steps": 2000000,
       "deliveredSteps": null,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip": {
       "kind": "model",
@@ -129,8 +147,10 @@
       "opponentType": "selfplay",
       "steps": 2000000,
       "deliveredSteps": null,
-      "status": "legacy",
-      "statusNote": null
+      "status": "expired",
+      "statusNote": null,
+      "expiredAt": "2026-09-19",
+      "expiredReason": "全图沉底：7 张图名次 18/18/20/12/20/20/20，全局评分 1328，唯一高于中位的一张（desert 12/22）也只是中游，不构成「某张图特别优秀」。档案记录其观测维度（6024）早已被 v2.6 回退，是条死支。"
     },
     "hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip": {
       "kind": "model",
@@ -141,8 +161,10 @@
       "opponentType": "selfplay",
       "steps": 4000000,
       "deliveredSteps": 3560000,
-      "status": "legacy",
-      "statusNote": null
+      "status": "expired",
+      "statusNote": null,
+      "expiredAt": "2026-09-19",
+      "expiredReason": "全图沉底：7 张图名次 20/20/19/18/19/21/18，全局评分 1318，最好成绩也只有 18 名，无任何突出图。档案记录「default 0:24 全崩、灾难性遗忘」，是唯一一个连续两代被判定为退步的配方。"
     },
     "hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip": {
       "kind": "model",
@@ -154,7 +176,9 @@
       "steps": 4000000,
       "deliveredSteps": null,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v2.8.0_20260903_random_selfplay_6000000.zip": {
       "kind": "model",
@@ -166,7 +190,9 @@
       "steps": 6000000,
       "deliveredSteps": 4650000,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip": {
       "kind": "model",
@@ -178,7 +204,9 @@
       "steps": 3000000,
       "deliveredSteps": 50000,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v3.0.2_20260905_random_selfplay_1440000.zip": {
       "kind": "model",
@@ -190,7 +218,9 @@
       "steps": 1440000,
       "deliveredSteps": null,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip": {
       "kind": "model",
@@ -202,7 +232,9 @@
       "steps": 5000000,
       "deliveredSteps": null,
       "status": "recommended",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip": {
       "kind": "model",
@@ -214,7 +246,9 @@
       "steps": 8440000,
       "deliveredSteps": null,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v3.1.0_20260910_random_selfplay_1500000.zip": {
       "kind": "model",
@@ -226,7 +260,9 @@
       "steps": 1500000,
       "deliveredSteps": 100000,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "hex_ppo_v3.1.1_20260911_random_selfplay_10940000.zip": {
       "kind": "model",
@@ -238,7 +274,23 @@
       "steps": 10940000,
       "deliveredSteps": 8800000,
       "status": "legacy",
-      "statusNote": null
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
+    },
+    "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip": {
+      "kind": "model",
+      "short": "v3.2.0@9.8M",
+      "version": "v3.2.0",
+      "trainDate": "20260918",
+      "trainMap": "random",
+      "opponentType": "selfplay",
+      "steps": 10000000,
+      "deliveredSteps": 9800000,
+      "status": "legacy",
+      "statusNote": null,
+      "expiredAt": null,
+      "expiredReason": null
     },
     "algo_greedy@v1": {
       "kind": "algorithm",
@@ -4845,6 +4897,29 @@
               "winRate": 0.6885
             }
           }
+        },
+        {
+          "id": "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+          "rating": null,
+          "ratingLo": null,
+          "ratingHi": null,
+          "wilson": null,
+          "games": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "winRate": null,
+          "firstSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "secondSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "avgRounds": null,
+          "vs": {},
+          "perMap": {}
         }
       ],
       "h2h": [
@@ -10359,6 +10434,29 @@
               "winRate": 0.5714
             }
           }
+        },
+        {
+          "id": "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+          "rating": null,
+          "ratingLo": null,
+          "ratingHi": null,
+          "wilson": null,
+          "games": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "winRate": null,
+          "firstSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "secondSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "avgRounds": null,
+          "vs": {},
+          "perMap": {}
         }
       ],
       "h2h": [
@@ -15697,6 +15795,29 @@
               "winRate": 0.8095
             }
           }
+        },
+        {
+          "id": "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+          "rating": null,
+          "ratingLo": null,
+          "ratingHi": null,
+          "wilson": null,
+          "games": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "winRate": null,
+          "firstSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "secondSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "avgRounds": null,
+          "vs": {},
+          "perMap": {}
         }
       ],
       "h2h": [
@@ -21035,6 +21156,29 @@
               "winRate": 0.6389
             }
           }
+        },
+        {
+          "id": "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+          "rating": null,
+          "ratingLo": null,
+          "ratingHi": null,
+          "wilson": null,
+          "games": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "winRate": null,
+          "firstSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "secondSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "avgRounds": null,
+          "vs": {},
+          "perMap": {}
         }
       ],
       "h2h": [
@@ -26373,6 +26517,29 @@
               "winRate": 0.3571
             }
           }
+        },
+        {
+          "id": "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+          "rating": null,
+          "ratingLo": null,
+          "ratingHi": null,
+          "wilson": null,
+          "games": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "winRate": null,
+          "firstSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "secondSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "avgRounds": null,
+          "vs": {},
+          "perMap": {}
         }
       ],
       "h2h": [
@@ -31711,6 +31878,29 @@
               "winRate": 0.7698
             }
           }
+        },
+        {
+          "id": "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+          "rating": null,
+          "ratingLo": null,
+          "ratingHi": null,
+          "wilson": null,
+          "games": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "winRate": null,
+          "firstSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "secondSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "avgRounds": null,
+          "vs": {},
+          "perMap": {}
         }
       ],
       "h2h": [
@@ -37049,6 +37239,29 @@
               "winRate": 0.6885
             }
           }
+        },
+        {
+          "id": "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+          "rating": null,
+          "ratingLo": null,
+          "ratingHi": null,
+          "wilson": null,
+          "games": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "winRate": null,
+          "firstSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "secondSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "avgRounds": null,
+          "vs": {},
+          "perMap": {}
         }
       ],
       "h2h": [
@@ -42659,6 +42872,29 @@
               "winRate": 0.6932
             }
           }
+        },
+        {
+          "id": "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+          "rating": null,
+          "ratingLo": null,
+          "ratingHi": null,
+          "wilson": null,
+          "games": 0,
+          "wins": 0,
+          "losses": 0,
+          "draws": 0,
+          "winRate": null,
+          "firstSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "secondSeat": {
+            "games": 0,
+            "winRate": null
+          },
+          "avgRounds": null,
+          "vs": {},
+          "perMap": {}
         }
       ],
       "h2h": [
@@ -44689,6 +44925,50 @@
       ]
     }
   },
+  "expired": [
+    {
+      "version": "v2.3.2",
+      "file": "hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip",
+      "expiredAt": "2026-09-19",
+      "reason": "全图沉底：7 张图名次 21/15/21/21/21/19/21（共 22 名参与者），全局评分 1237 全场最低，没有任何一张图表现突出。档案里已记录「仅随机图可战、静态图 11%~24%」，属于最早的随机图模型，继续陪跑只拉长新模型评估时长。",
+      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史」行：竞技场全榜垫底 17/17、胜率 19.7%",
+      "id": "hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip",
+      "found": true,
+      "rating": 1237,
+      "rank": 22,
+      "games": 3552,
+      "winRate": 0.2137,
+      "keptMatches": 3552
+    },
+    {
+      "version": "v2.6.0",
+      "file": "hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip",
+      "expiredAt": "2026-09-19",
+      "reason": "全图沉底：7 张图名次 20/20/19/18/19/21/18，全局评分 1318，最好成绩也只有 18 名，无任何突出图。档案记录「default 0:24 全崩、灾难性遗忘」，是唯一一个连续两代被判定为退步的配方。",
+      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史（不推荐）」行：default 0:24 全崩",
+      "id": "hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip",
+      "found": true,
+      "rating": 1318,
+      "rank": 21,
+      "games": 3552,
+      "winRate": 0.2877,
+      "keptMatches": 3552
+    },
+    {
+      "version": "v2.5.0",
+      "file": "hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip",
+      "expiredAt": "2026-09-19",
+      "reason": "全图沉底：7 张图名次 18/18/20/12/20/20/20，全局评分 1328，唯一高于中位的一张（desert 12/22）也只是中游，不构成「某张图特别优秀」。档案记录其观测维度（6024）早已被 v2.6 回退，是条死支。",
+      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史（不推荐）」行：真换边 24 局 9:15 败于 v2.4.0",
+      "id": "hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip",
+      "found": true,
+      "rating": 1328,
+      "rank": 20,
+      "games": 3552,
+      "winRate": 0.2976,
+      "keptMatches": 3552
+    }
+  ],
   "excluded": [
     {
       "id": "hex_ppo_v1.0.0_20260824_default_random_opponent_120000.zip",

@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  EXPIRED_MODELS,
+  EXPIRED_VERSIONS,
   collectRegistry,
   loadMatches,
   RETIRED_VERSIONS,
@@ -59,6 +61,41 @@ describe('loadMatches 过滤作废模型对局', () => {
     expect(matches[0].playerA).toBe(VALID);
     expect(matches[0].playerB).toBe(V1);
     expect(retiredDropped).toBe(2);
+    expect(warnings).toHaveLength(0);
+  });
+});
+
+describe('过期模型（expired）与作废（retired）的区别', () => {
+  it('过期名单与 arena/model-status.json 一致，且与作废名单互不重叠', () => {
+    const doc = JSON.parse(readFileSync(join(process.cwd(), 'arena', 'model-status.json'), 'utf8'));
+    expect([...EXPIRED_VERSIONS].sort()).toEqual(doc.expired.map((e: { version: string }) => e.version).sort());
+    expect(EXPIRED_MODELS).toHaveLength(doc.expired.length);
+    for (const version of EXPIRED_VERSIONS) expect(RETIRED_VERSIONS.has(version)).toBe(false);
+  });
+
+  const sample = EXPIRED_MODELS[0];
+  it.skipIf(!sample)('过期模型照常注册（作废模型被跳过，两者相反）', () => {
+    const { registry, excluded } = collectRegistry(makeModelsDir([VALID, sample.file, RETIRED]), []);
+    expect(registry.has(sample.file)).toBe(true);
+    expect(registry.has(VALID)).toBe(true);
+    expect(registry.has(RETIRED)).toBe(false);
+    expect(excluded).toHaveLength(0);
+  });
+
+  it.skipIf(!sample)('loadMatches 保留过期模型对局并单独计数，不作废丢局', () => {
+    const dir = makeModelsDir([VALID, sample.file]);
+    const stats = join(dir, 'matches.jsonl');
+    const line = (a: string, b: string, winner: string) =>
+      JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
+    writeFileSync(stats,
+      line(VALID, sample.file, VALID) +
+      line(sample.file, VALID, sample.file));
+
+    const registry = collectRegistry(dir, []).registry;
+    const { matches, warnings, retiredDropped, expiredKept } = loadMatches(stats, registry);
+    expect(matches).toHaveLength(2);
+    expect(retiredDropped).toBe(0);
+    expect(expiredKept).toBe(2);
     expect(warnings).toHaveLength(0);
   });
 });

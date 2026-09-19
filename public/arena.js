@@ -7,6 +7,7 @@
     recommended: { label: '当前推荐', cls: 'st-good' },
     legacy: { label: '历史', cls: 'st-muted' },
     retired: { label: '作废', cls: 'st-bad' },
+    expired: { label: '已过期', cls: 'st-expired' },
     builtin: { label: '内置算法', cls: 'st-algo' },
   };
   const KIND_BADGE = {
@@ -30,6 +31,9 @@
     detailBody: document.getElementById('detail-body'),
     methodBody: document.getElementById('method-body'),
     excludedBody: document.getElementById('excluded-body'),
+    filterExpired: document.getElementById('filter-expired'),
+    expiredCount: document.getElementById('expired-count'),
+    expiredHint: document.getElementById('expired-hint'),
   };
 
   /** @type {any} */
@@ -37,6 +41,8 @@
   let league = 'all';
   let kindFilter = 'all';
   let selectedModel = null;
+  /** 过期模型默认隐藏（数据仍在榜单 JSON 里照常评分，只是前端不展示）。 */
+  let showExpired = false;
   let sort = { key: 'rating', dir: 'desc' };
 
   function setStatus(text, kind) {
@@ -91,16 +97,40 @@
         deliveredSteps: meta.deliveredSteps ?? null,
         status: meta.status || 'legacy',
         statusNote: meta.statusNote || null,
+        expiredAt: meta.expiredAt || null,
+        expiredReason: meta.expiredReason || null,
         firstSeatRate: m.firstSeat?.winRate ?? null,
         secondSeatRate: m.secondSeat?.winRate ?? null,
       };
     });
   }
 
-  /** 当前类型筛选下的行（评分表与对位矩阵共用；排名仍是全池排名）。 */
+  /**
+   * 当前类型筛选下的行（评分表与对位矩阵共用；排名仍是全池排名）。
+   * 过期模型默认隐藏——它们照常进评分池（所以这里的 rank 对在役模型没有偏移），
+   * 只是不再打新对局，前端默认折叠。
+   */
   function viewRows(ld) {
     const rows = buildRows(ld);
-    return kindFilter === 'all' ? rows : rows.filter(r => r.kind === kindFilter);
+    const byKind = kindFilter === 'all' ? rows : rows.filter(r => r.kind === kindFilter);
+    return showExpired ? byKind : byKind.filter(r => r.status !== 'expired');
+  }
+
+  /** 过期模型清单：优先用 payload.expired，旧数据缺该字段时按 registry.status 反推。 */
+  function expiredList() {
+    if (Array.isArray(raw?.expired) && raw.expired.length) return raw.expired;
+    return Object.entries(raw?.registry || {})
+      .filter(([, meta]) => meta.status === 'expired')
+      .map(([id, meta]) => ({ id, version: meta.version, file: id, expiredAt: meta.expiredAt, reason: meta.expiredReason }));
+  }
+
+  function renderExpiredNote() {
+    const list = expiredList();
+    el.expiredCount.textContent = String(list.length);
+    el.filterExpired.disabled = list.length === 0;
+    el.expiredHint.textContent = list.length
+      ? `当前有 ${list.length} 个：${list.map(e => e.version).join('、')}。`
+      : '';
   }
 
   function kindBadge(kind) {
@@ -140,12 +170,19 @@
     const modelCount = rated.filter(m => m.kind === 'model').length;
     const algoCount = rated.filter(m => m.kind === 'algorithm').length;
     const pairs = rated.length * (rated.length - 1) / 2;
+    const expiredCount = rated.filter(m => m.status === 'expired').length;
+    const hidden = showExpired ? 0 : expiredCount;
     const mapCount = Object.keys(raw.source.mapDist || {}).length || 1;
     const target = pairs * mapCount * (raw.source.targetGamesPerPair || 24);
     const coverage = target > 0 ? Math.min(100, Math.round(ld.overview.games / target * 100)) : 0;
     const cards = [
       { label: '总局数', value: ld.overview.games, sub: `平局 ${ld.overview.draws}（${pct(ld.overview.drawRate)}）` },
-      { label: '参评者', value: rated.length, sub: `RL 模型 ${modelCount} · 算法 ${algoCount} · 对局对数 ${ld.overview.pairCount}` },
+      {
+        label: '参评者',
+        value: rated.length - hidden,
+        sub: `RL 模型 ${modelCount} · 算法 ${algoCount} · 对局对数 ${ld.overview.pairCount}`
+          + (expiredCount ? ` · ${showExpired ? '含' : '隐藏'} ${expiredCount} 个已过期` : ''),
+      },
       { label: '平局率', value: pct(ld.overview.drawRate), sub: '达到回合/动作上限' },
       { label: '平均回合', value: ld.overview.avgRounds ?? '—', sub: '单局 rounds 均值' },
       { label: '局数覆盖度', value: `${coverage}%`, sub: `${ld.overview.games} / 目标 ${target}` },
@@ -168,7 +205,7 @@
         const selected = selectedModel === r.id ? 'selected' : '';
         return `<tr data-model="${escapeAttr(r.id)}" class="${selected}"${r.statusNote ? ` title="${escapeAttr(r.statusNote)}"` : ''}>
           <td class="num" data-label="排名">${r.rank ?? '—'}</td>
-          <td class="model-name" data-label="参与者" title="${escapeAttr(r.id)}">${kindBadge(r.kind)}${escapeHtml(r.short)}</td>
+          <td class="model-name" data-label="参与者" title="${escapeAttr(r.id)}">${kindBadge(r.kind)}${escapeHtml(r.short)}${r.status === 'expired' ? ' <span class="tag st-expired">已过期</span>' : ''}</td>
           <td data-label="版本">${escapeHtml(r.version) || '—'}</td>
           <td class="num" data-label="评分">${ratingCell(r)}</td>
           <td class="num" data-label="胜-负-平">${wldCell(r)}</td>
@@ -265,6 +302,9 @@
         <td class="num" data-label="胜率">${v.winRate == null ? '—' : pct(v.winRate)}</td>
       </tr>`).join('');
     const statusMeta = STATUS_META[row.status] || STATUS_META.legacy;
+    const expiredSpan = row.status === 'expired'
+      ? `<span style="flex-basis:100%">过期 <strong>${escapeHtml(row.expiredAt || '—')}</strong>${row.expiredReason ? ` · ${escapeHtml(row.expiredReason)}` : ''}</span>`
+      : '';
     const metaHtml = row.kind === 'algorithm'
       ? `
         <span>类型 <strong>内置规则算法</strong></span>
@@ -278,7 +318,7 @@
         <span>训练地图 <strong>${escapeHtml(mapLabel(row.trainMap))}</strong></span>
         <span>训练对手 <strong>${escapeHtml(row.opponentType)}</strong></span>
         <span>步数 <strong>${escapeHtml(stepText)}</strong></span>
-        <span>状态 <strong class="tag ${statusMeta.cls}">${statusMeta.label}</strong>${row.statusNote ? ` · ${escapeHtml(row.statusNote)}` : ''}</span>`;
+        <span>状态 <strong class="tag ${statusMeta.cls}">${statusMeta.label}</strong>${row.statusNote ? ` · ${escapeHtml(row.statusNote)}` : ''}</span>${expiredSpan}`;
     el.detailBody.innerHTML = `
       <div class="detail-meta">${metaHtml}
       </div>
@@ -364,6 +404,7 @@
         ? `${raw.source.dateMin} → ${raw.source.dateMax ?? ''}`
         : '—';
       populateLeagueSelect();
+      renderExpiredNote();
       renderAll();
       renderMethod();
       renderExcluded();
@@ -381,6 +422,12 @@
   }
 
   el.btnReload.addEventListener('click', loadData);
+  el.filterExpired.addEventListener('change', () => {
+    showExpired = el.filterExpired.checked;
+    // 已选模型可能在切换时被折叠掉，清掉选中态避免详情区停在一个不可见的行上。
+    selectedModel = null;
+    renderAll();
+  });
   el.filterLeague.addEventListener('change', () => {
     league = el.filterLeague.value;
     if (!raw.maps[league]) league = 'all';

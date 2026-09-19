@@ -1,0 +1,26 @@
+{
+  "note": "AI 竞技场「已过期模型」登记表 —— 过期名单的唯一事实来源。过期 = 模型仍留在 rl/models/（不物理归档）、历史对局继续进 Bradley-Terry 评分池（分数随池子漂移，不是冻结）、但不再参与新一轮评估且前端默认隐藏；作废（retired）另见 rl/docs/MODELS_NOTES.md 的「已作废模型」表，两者互不覆盖。过期流程：node script/expireArenaModels.mjs --analyze 选模型 → --expire 登记 → npm run arena-leaderboard && npm run arena-stats 重算 → 回填 rl/docs/MODELS_NOTES.md。",
+  "expired": [
+    {
+      "version": "v2.3.2",
+      "file": "hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip",
+      "expiredAt": "2026-09-19",
+      "reason": "全图沉底：7 张图名次 21/15/21/21/21/19/21（共 22 名参与者），全局评分 1237 全场最低，没有任何一张图表现突出。档案里已记录「仅随机图可战、静态图 11%~24%」，属于最早的随机图模型，继续陪跑只拉长新模型评估时长。",
+      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史」行：竞技场全榜垫底 17/17、胜率 19.7%"
+    },
+    {
+      "version": "v2.6.0",
+      "file": "hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip",
+      "expiredAt": "2026-09-19",
+      "reason": "全图沉底：7 张图名次 20/20/19/18/19/21/18，全局评分 1318，最好成绩也只有 18 名，无任何突出图。档案记录「default 0:24 全崩、灾难性遗忘」，是唯一一个连续两代被判定为退步的配方。",
+      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史（不推荐）」行：default 0:24 全崩"
+    },
+    {
+      "version": "v2.5.0",
+      "file": "hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip",
+      "expiredAt": "2026-09-19",
+      "reason": "全图沉底：7 张图名次 18/18/20/12/20/20/20，全局评分 1328，唯一高于中位的一张（desert 12/22）也只是中游，不构成「某张图特别优秀」。档案记录其观测维度（6024）早已被 v2.6 回退，是条死支。",
+      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史（不推荐）」行：真换边 24 局 9:15 败于 v2.4.0"
+    }
+  ]
+}

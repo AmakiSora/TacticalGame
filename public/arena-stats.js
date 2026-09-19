@@ -14,6 +14,7 @@
     recommended: { label: '当前推荐', cls: 'st-good' },
     legacy: { label: '历史', cls: 'st-muted' },
     retired: { label: '作废', cls: 'st-bad' },
+    expired: { label: '已过期', cls: 'st-expired' },
     builtin: { label: '内置算法', cls: 'st-algo' },
   };
 
@@ -21,13 +22,17 @@
   for (const id of ['rls-generated-at', 'rls-source-count', 'rls-date-range', 'rls-load-status', 'rls-btn-reload',
     'rls-kpi-grid', 'rls-endreasons', 'rls-economy', 'rls-rounds-dist', 'rls-duration-dist',
     'rls-units-table', 'rls-model-table', 'rls-map-table',
-    'rls-models-status', 'rls-model-cards', 'rls-deprecated']) {
+    'rls-models-status', 'rls-model-cards', 'rls-deprecated', 'rls-expired',
+    'rls-expired-toggle-stats', 'rls-expired-toggle-cards',
+    'rls-expired-count-stats', 'rls-expired-count-cards']) {
     el[id] = document.getElementById(id);
   }
 
   /** @type {any} */
   let raw = null;
   let modelSort = { key: 'winRate', dir: 'desc' };
+  /** 过期模型默认隐藏：数据照常在统计里，只是不展示（与榜单页签的开关同步）。 */
+  let showExpired = false;
 
   function setStatus(text, kind) {
     el['rls-load-status'].textContent = text;
@@ -144,13 +149,15 @@
   }
 
   function renderModelTable(gp) {
-    const shortById = new Map((raw.models || []).map(m => [m.id, m.short]));
-    const rows = gp.perModel.map(m => ({ ...m, short: shortById.get(m.id) || m.id }));
+    const profileById = new Map((raw.models || []).map(m => [m.id, m]));
+    const rows = gp.perModel
+      .filter(m => showExpired || profileById.get(m.id)?.status !== 'expired')
+      .map(m => ({ ...m, short: profileById.get(m.id)?.short || m.id, expired: profileById.get(m.id)?.status === 'expired' }));
     const body = el['rls-model-table'].querySelector('tbody');
     body.innerHTML = sortedModels(rows).map(m => {
       const topDeploys = (m.topDeploys || []).map(t => `${unitLabel(t.type)} ${fmtNum(t.count)}`).join(' / ');
       return `<tr>
-        <td class="model-name" data-label="模型" title="${escapeAttr(m.id)}">${escapeHtml(m.short)}</td>
+        <td class="model-name" data-label="模型" title="${escapeAttr(m.id)}">${escapeHtml(m.short)}${m.expired ? ' <span class="tag st-expired">已过期</span>' : ''}</td>
         <td class="num" data-label="局数">${fmtNum(m.games)}</td>
         <td class="num" data-label="胜率">${m.winRate == null ? '—' : `<span class="pill-rate">${pct(m.winRate)}</span>`}</td>
         <td class="num" data-label="场均得分">${fmtNum(m.avgScore)}</td>
@@ -188,7 +195,8 @@
     return steps >= 1_000_000 ? `${(steps / 1_000_000).toFixed(1)}M 步` : `${Math.round(steps / 1000)}K 步`;
   }
 
-  function renderModelCards(models) {
+  function renderModelCards(allModels) {
+    const models = showExpired ? allModels : allModels.filter(m => m.status !== 'expired');
     if (!models.length) {
       el['rls-model-cards'].innerHTML = '<div class="empty-block">无模型档案</div>';
       return;
@@ -214,8 +222,13 @@
         m.docRef ? `<span>档案 <b>${escapeHtml(m.docRef)}</b></span>` : '',
       ].filter(Boolean).join('');
       const noteParts = [];
-      if (m.docStatus) noteParts.push(m.docStatus);
+      // 过期模型用结构化字段渲染「已过期（日期）：原因」，档案里的状态列（含同样的过期标注）
+      // 就不再重复展示，避免卡片说明里出现两行相同信息。
+      if (m.docStatus && m.status !== 'expired') noteParts.push(m.docStatus);
       if (m.statusNote) noteParts.push(`评估协议限制：${m.statusNote}`);
+      if (m.status === 'expired') {
+        noteParts.unshift(`已过期（${m.expiredAt || '—'}）：${m.expiredReason || '名次沉底，不再参与新一轮评估'}`);
+      }
       if (m.notes) noteParts.push(m.notes);
       const notesHtml = noteParts.length
         ? `<div class="card-notes">${escapeHtml(noteParts.join('\n'))}</div>`
@@ -231,6 +244,26 @@
         <div class="card-file">${escapeHtml(m.id)}</div>
       </article>`;
     }).join('');
+  }
+
+  /** 已过期模型登记表（登记源 arena/model-status.json，档案里 status='expired'）。 */
+  function renderExpired(list) {
+    if (!list.length) {
+      el['rls-expired'].className = 'empty-block';
+      el['rls-expired'].textContent = '无';
+      return;
+    }
+    el['rls-expired'].className = '';
+    el['rls-expired'].innerHTML = `<div class="table-wrap"><table class="data-table compact">
+      <thead><tr><th>模型文件</th><th>版本</th><th>过期日期</th><th class="num">当前评分</th><th class="num">留存对局</th><th>过期原因</th></tr></thead>
+      <tbody>${list.map(x => `<tr>
+        <td class="model-name" title="${escapeAttr(x.id)}">${escapeHtml(x.id)}</td>
+        <td>${escapeHtml(x.version)}</td>
+        <td>${escapeHtml(x.expiredAt || '—')}</td>
+        <td class="num">${x.rating == null ? '—' : x.rating}</td>
+        <td class="num">${fmtNum(x.games)}</td>
+        <td class="muted">${escapeHtml(x.expiredReason || '')}</td>
+      </tr>`).join('')}</tbody></table></div>`;
   }
 
   function renderDeprecated(list) {
@@ -260,7 +293,27 @@
     renderModelTable(gp);
     renderMapTable(gp);
     renderModelCards(raw.models || []);
+    renderExpired((raw.models || []).filter(m => m.status === 'expired'));
     renderDeprecated(raw.deprecated || []);
+  }
+
+  /** 两个开关（玩法统计 / 参与者档案）共享同一个「过期模型可见性」状态。 */
+  function setShowExpired(value) {
+    showExpired = Boolean(value);
+    for (const id of ['rls-expired-toggle-stats', 'rls-expired-toggle-cards']) {
+      if (el[id]) el[id].checked = showExpired;
+    }
+    if (raw) renderAll();
+  }
+
+  function renderExpiredCounts() {
+    const count = (raw.models || []).filter(m => m.status === 'expired').length;
+    for (const id of ['rls-expired-count-stats', 'rls-expired-count-cards']) {
+      if (el[id]) el[id].textContent = String(count);
+    }
+    for (const id of ['rls-expired-toggle-stats', 'rls-expired-toggle-cards']) {
+      if (el[id]) el[id].disabled = count === 0;
+    }
   }
 
   async function loadData() {
@@ -274,6 +327,7 @@
       el['rls-date-range'].textContent = raw.source?.dateMin
         ? `${raw.source.dateMin} → ${raw.source.dateMax ?? ''}`
         : '—';
+      renderExpiredCounts();
       renderAll();
       const warnings = raw.warnings || [];
       if (!raw.source?.matchCount) {
@@ -289,6 +343,9 @@
   }
 
   el['rls-btn-reload'].addEventListener('click', loadData);
+  for (const id of ['rls-expired-toggle-stats', 'rls-expired-toggle-cards']) {
+    if (el[id]) el[id].addEventListener('change', event => setShowExpired(event.target.checked));
+  }
   el['rls-model-table'].querySelectorAll('th[data-sort]').forEach(th => {
     th.addEventListener('click', () => {
       const key = th.dataset.sort;

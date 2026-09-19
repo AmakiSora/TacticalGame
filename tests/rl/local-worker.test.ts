@@ -122,7 +122,7 @@ describe('local engine worker algorithm decide channel', () => {
     throw new Error(`${algorithm} did not end its turn within ${cap} actions`);
   }
 
-  for (const algorithm of ['threat', 'greedy', 'random']) {
+  for (const algorithm of ['threat', 'greedy', 'random', 'field', 'mcts']) {
     it(`${algorithm} plays a legal opening turn on a static map`, async () => {
       await handleCommand({ cmd: 'reset', mapId: 'default' });
       const acted = await playTurnWithAlgorithm(algorithm, 'player_a');

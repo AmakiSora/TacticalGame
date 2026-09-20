@@ -107,9 +107,9 @@ MODEL_STATUS_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\Z")
 def parse_expired_entries(raw, source: Path) -> dict[str, dict]:
     """校验登记表结构并返回 {版本: 条目}；非法一律抛 ValueError。
 
-    校验口径与 script/modelStatus.mjs 的 parseModelStatus 逐条对齐（版本格式、
-    file 版本段一致性、重复登记、expiredAt、reason 非空），由跨语言契约测试
-    tests/rl/test_model_status_contract.py 钉死「两侧接受/拒绝同一份登记表」。
+    校验口径与 script/modelStatus.mjs 的 parseModelStatus 逐条对齐（字符串字段严格
+    类型、版本格式、file 版本段一致性、重复登记、expiredAt、reason 非空），由跨语言
+    契约测试 tests/rl/test_model_status_contract.py 钉死「两侧接受/拒绝同一份登记表」。
     """
     if not isinstance(raw, dict) or not isinstance(raw.get("expired"), list):
         raise ValueError(f"{source}: 缺少顶层 expired 数组")
@@ -118,11 +118,17 @@ def parse_expired_entries(raw, source: Path) -> dict[str, dict]:
         at = f"{source} expired[{idx}]"
         if not isinstance(item, dict):
             raise ValueError(f"{at}: 必须是对象")
+        # 字段一律要求 JSON 字符串、不做 str() 归一——归一会把数字/数组悄悄变成
+        # 「看似合法」的内容，且与 JS 侧 parseModelStatus 的 typeof 口径分叉。
         version = item.get("version")
-        if not isinstance(version, str) or not MODEL_STATUS_VERSION_RE.match(version):
+        if not isinstance(version, str):
+            raise ValueError(f"{at}: version 需是字符串，实际 {version!r}")
+        if not MODEL_STATUS_VERSION_RE.match(version):
             raise ValueError(f"{at}: version 需形如 v3.0.3，实际 {version!r}")
         file = item.get("file")
-        if not isinstance(file, str) or not file.endswith(".zip"):
+        if not isinstance(file, str):
+            raise ValueError(f"{at}: file 需是字符串，实际 {file!r}")
+        if not file.endswith(".zip"):
             raise ValueError(f"{at}: file 需是 .zip 文件名，实际 {file!r}")
         match = MODEL_RE.match(file)
         if not match or match.group(1) != version:
@@ -131,9 +137,10 @@ def parse_expired_entries(raw, source: Path) -> dict[str, dict]:
             raise ValueError(f"{at}: 版本 {version} 重复登记")
         expired_at = item.get("expiredAt")
         if not isinstance(expired_at, str) or not MODEL_STATUS_DATE_RE.match(expired_at):
-            raise ValueError(f"{at}: expiredAt 需形如 2026-09-19")
-        if not str(item.get("reason") or "").strip():
-            raise ValueError(f"{at}: reason 不能为空")
+            raise ValueError(f"{at}: expiredAt 需是形如 2026-09-19 的日期字符串，实际 {expired_at!r}")
+        reason = item.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"{at}: reason 需是非空字符串，实际 {reason!r}")
         result[version] = item
     return result
 

@@ -30,7 +30,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { wilsonLower, round2, round4 } from './generateStats.mjs';
 import { listAlgorithmInfo, algorithmVersionedId } from '../algorithms/registry.mjs';
-import { loadModelStatus } from './modelStatus.mjs';
+import { loadModelStatus, RETIRED_VERSIONS, assertExpiredRetiredDisjoint } from './modelStatus.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);
@@ -41,21 +41,8 @@ export const DEFAULT_OUT = join(PROJECT_DIR, 'public', 'data', 'arena-leaderboar
 export const MODEL_FILE_RE = /^hex_ppo_(v\d+\.\d+\.\d+)_(\d{8})_([a-z0-9-]+)_(.+)_(\d+|best)\.zip$/i;
 export const EXCLUDED_VERSIONS = new Set(['v1.0.0']);
 
-/** 镜像 rl/MODELS_NOTES.md「模型状态总表」，两处需人工同步维护。 */
-export const MODEL_STATUS_BY_VERSION = {
-  'v3.0.3': 'recommended',
-  'v2.1.1': 'retired',
-  'v2.1.4': 'retired',
-  'v2.1.5': 'retired',
-  'v2.1.6': 'retired',
-  'v2.1.8': 'retired',
-};
-/** 作废模型不进排行榜：注册表跳过（也不进「未参评」区），历史对局不计分，只按计数留痕。 */
-export const RETIRED_VERSIONS = new Set(
-  Object.entries(MODEL_STATUS_BY_VERSION)
-    .filter(([, status]) => status === 'retired')
-    .map(([version]) => version),
-);
+// 作废（retired）名单 MODEL_STATUS_BY_VERSION / RETIRED_VERSIONS 在 script/modelStatus.mjs
+// （与过期登记表同住唯一事实来源）；本文件只消费，并在启动时做两态互斥断言。
 
 /**
  * 过期模型（expired）：名单来自 arena/model-status.json —— 过期名单的唯一事实来源
@@ -69,17 +56,8 @@ export const EXPIRED_MODELS = loadModelStatus().entries;
 export const EXPIRED_VERSIONS = new Set(EXPIRED_MODELS.map(entry => entry.version));
 export const EXPIRED_BY_VERSION = new Map(EXPIRED_MODELS.map(entry => [entry.version, entry]));
 
-/**
- * 过期与作废互斥：同一版本出现在两份名单时，status 三元会偏向 expired（照常参评），
- * 而 loadMatches 又会按 retired 把它的对局整局丢弃——两种语义互相抵消，必须拒绝。
- * 源头拦截在 expireArenaModels 的 --expire；本断言兜底手工编辑过的登记表。
- */
-export function assertExpiredRetiredDisjoint(expiredVersions, retiredVersions) {
-  const clash = [...expiredVersions].filter(version => retiredVersions.has(version));
-  if (clash.length) {
-    throw new Error(`arena/model-status.json：版本 ${clash.join(', ')} 同时登记为过期与作废（互斥，先 --restore 撤销其一）`);
-  }
-}
+// 过期与作废互斥（语义见 modelStatus.mjs 的 assertExpiredRetiredDisjoint）：
+// 兜底手工编辑过的登记表。断言只在榜单脚本启动时执行，不放进 modelStatus 模块加载期。
 assertExpiredRetiredDisjoint(EXPIRED_VERSIONS, RETIRED_VERSIONS);
 
 /** 评估协议已知限制：v2.0.0 观测固定 player_a 视角，坐 player_b 属分布外。 */

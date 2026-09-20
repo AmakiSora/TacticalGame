@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { findCandidates, rankPerMap, resolveModelFile } from '../../script/expireArenaModels.mjs';
-import { assertExpiredRetiredDisjoint, RETIRED_VERSIONS } from '../../script/generateArenaLeaderboard.mjs';
+import { assertExpiredRetiredDisjoint, RETIRED_VERSIONS } from '../../script/modelStatus.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -116,7 +116,7 @@ describe('过期与作废互斥', () => {
   );
 
   it('--expire 拒绝登记已作废版本（两态语义互相抵消）', () => {
-    const retired = [...RETIRED_VERSIONS][0]; // v2.1.4：zip 已移入 deprecated/，源头上直接拒
+    const retired = [...RETIRED_VERSIONS][0]; // 首个 retired 版本（保持 MODEL_STATUS_BY_VERSION 键序）：zip 已移入 deprecated/，源头上直接拒
     const result = runExpire(retired);
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/已作废.*不能再登记过期.*互斥/);

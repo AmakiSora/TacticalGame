@@ -24,13 +24,12 @@ import {
   collectRegistry,
   parseModelFile,
   shortName,
-  MODEL_STATUS_BY_VERSION,
   STATUS_NOTES,
   EXCLUDED_VERSIONS,
-  RETIRED_VERSIONS,
   EXPIRED_VERSIONS,
   EXPIRED_BY_VERSION,
 } from './generateArenaLeaderboard.mjs';
+import { MODEL_STATUS_BY_VERSION, RETIRED_VERSIONS } from './modelStatus.mjs';
 import { round2, round4 } from './generateStats.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));

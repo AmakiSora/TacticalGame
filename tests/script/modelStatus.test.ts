@@ -53,8 +53,11 @@ describe('parseModelStatus', () => {
     expect(() => parseModelStatus(doc({ version: '2.3.2' }))).toThrow(/version 需形如/);
     expect(() => parseModelStatus(doc({ file: 'hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip' })))
       .toThrow(/file 的版本段与 version 不一致/);
-    expect(() => parseModelStatus(doc({ expiredAt: '2026/09/19' }))).toThrow(/expiredAt 需形如/);
-    expect(() => parseModelStatus(doc({ reason: '  ' }))).toThrow(/reason 不能为空/);
+    expect(() => parseModelStatus(doc({ expiredAt: '2026/09/19' }))).toThrow(/expiredAt 需是形如/);
+    expect(() => parseModelStatus(doc({ reason: '  ' }))).toThrow(/reason 需是非空字符串/);
+    // 字符串字段严格类型：非字符串不做 String() 归一，直接拒绝（与 round_robin.py 同口径）。
+    expect(() => parseModelStatus(doc({ version: 2.32 }))).toThrow(/version 需是字符串/);
+    expect(() => parseModelStatus(doc({ reason: 0 }))).toThrow(/reason 需是非空字符串/);
   });
 
   it('同一版本重复登记要报错', () => {

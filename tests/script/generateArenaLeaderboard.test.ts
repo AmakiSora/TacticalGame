@@ -7,8 +7,8 @@ import {
   EXPIRED_VERSIONS,
   collectRegistry,
   loadMatches,
-  RETIRED_VERSIONS,
 } from '../../script/generateArenaLeaderboard.mjs';
+import { RETIRED_VERSIONS } from '../../script/modelStatus.mjs';
 
 const VALID = 'hex_ppo_v2.2.0_20260827_default_modelmix_best.zip';
 const RETIRED = 'hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip';

@@ -158,6 +158,16 @@ BAD_REGISTRIES = [
         {"version": "v2.3.2", "file": VALID_FILE_A, "expiredAt": "2026-09-19", "reason": "x"},
         {"version": "v2.3.2", "file": VALID_FILE_A, "expiredAt": "2026-09-20", "reason": "y"},
     ]}), id="同一版本重复登记"),
+    # 字符串字段严格类型：两侧都拒绝非字符串（JS 侧不做 String() 归一，Python 不做 str() 归一）。
+    pytest.param(json.dumps({"expired": [{
+        "version": 2.32, "file": VALID_FILE_A, "expiredAt": "2026-09-19", "reason": "x"}]}),
+        id="version 不是字符串"),
+    pytest.param(json.dumps({"expired": [{
+        "version": "v2.3.2", "file": VALID_FILE_A, "expiredAt": "2026-09-19", "reason": 0}]}),
+        id="reason 不是字符串（数字）"),
+    pytest.param(json.dumps({"expired": [{
+        "version": "v2.3.2", "file": VALID_FILE_A, "expiredAt": "2026-09-19", "reason": []}]}),
+        id="reason 不是字符串（数组）"),
 ]
 
 

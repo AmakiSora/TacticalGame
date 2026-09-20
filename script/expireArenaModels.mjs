@@ -34,8 +34,7 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { PROJECT_DIR, DEFAULT_STATUS_FILE, loadModelStatus, versionOfModelFile } from './modelStatus.mjs';
-import { RETIRED_VERSIONS } from './generateArenaLeaderboard.mjs';
+import { PROJECT_DIR, DEFAULT_STATUS_FILE, loadModelStatus, versionOfModelFile, RETIRED_VERSIONS } from './modelStatus.mjs';
 
 export const DEFAULT_LEADERBOARD_FILE = join(PROJECT_DIR, 'public', 'data', 'arena-leaderboard.json');
 export const DEFAULT_MODELS_DIR = join(PROJECT_DIR, 'rl', 'models');

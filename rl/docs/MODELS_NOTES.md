@@ -91,7 +91,9 @@ v3.2.0（算法对手接入对手池 + 奖励补 HQ 项 + 评估场景与 best �
 
 过期**不等于冻结分数**：过期模型与它在役对手之间的历史对局（每对约 168 局）仍留在评分池里把相对强弱钉死，新模型加入只会让两边同时下移，所以过期 3 个模型不会让其余参与者的评分发生跳变（连续加入 3 代新模型的模拟：两者差距稳定在 22~32 分，不倒挂）。
 
-单一事实来源是 `arena/model-status.json`（按版本登记 `expiredAt` / `reason` / `evidence`），由 `script/modelStatus.mjs` 读取，JS 脚本（榜单/统计）、服务端 TS（`src/api/bots.ts`）与 Python 编排器（`rl/evaluation/round_robin.py`）共用；结构非法一律抛错，不静默降级。判定与登记用 `npm run arena-expire -- --analyze` / `--expire <版本列表> --reason "…"`（`--restore` 回滚、`--list` 查看）。
+单一事实来源是 `arena/model-status.json`（按版本登记 `expiredAt` / `reason` / `evidence`），由 `script/modelStatus.mjs` 读取，JS 脚本（榜单/统计）、服务端 TS（`src/api/bots.ts`）与 Python 编排器（`rl/evaluation/round_robin.py`）共用。错误处理分两种立场：JS 脚本与 `round_robin.py` 对结构非法**一律抛错中止**（带着坏名单跑评估会把过期模型悄悄拉回对手池）；`bots.ts` 是唯一允许降级的消费端（坏登记表不阻断线上对局，退化为「无过期」并打告警）。登记表**缺失**在所有消费端都按「无过期」处理。Python 侧镜像校验由 `tests/rl/test_model_status_contract.py` 钉死与 JS 一致。判定与登记用 `npm run arena-expire -- --analyze` / `--expire <版本列表> --reason "…"`（`--restore` 回滚、`--list` 查看）。
+
+过期与作废**互斥**：同一版本不得同时出现在两份名单（`--expire` 拒绝登记已作废版本，`generateArenaLeaderboard` 启动时再做一致性断言兜底）——否则状态展示为「已过期」但对局被按作废整局丢弃，语义互相抵消。
 
 判定规则：**必须每张地图都排在该图池子后半段，且没有任何一张图挤进该图前 25%**。某一两张图特别优秀、其余图垫底的**偏科模型不算过期**——那类模型对新模型仍有对手价值（`--analyze` 会列出淘汰原因）。已过期模型不再进入候选，避免重复登记。
 

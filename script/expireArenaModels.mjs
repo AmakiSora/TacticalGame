@@ -6,6 +6,8 @@
  *     不是冻结值），只是不再参与新一轮评估、前端默认隐藏 —— 相当于「退役归档」；
  *   - 作废：zip 移入 rl/models/deprecated/，历史对局整局丢弃，任何区域都不展示。
  * 过期原因只有一条：名次已经沉底，继续陪练只会拉长新模型的评估时长。
+ * 两态**互斥**：--expire 拒绝登记 MODEL_STATUS_BY_VERSION 里的作废版本
+ * （generateArenaLeaderboard 启动断言兜底手工编辑的登记表）。
  *
  * 过期条件（`--analyze` 的判定口径）：
  *   对每张地图独立评分排名，一个模型算「全图倒数」需同时满足
@@ -33,6 +35,7 @@ import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PROJECT_DIR, DEFAULT_STATUS_FILE, loadModelStatus, versionOfModelFile } from './modelStatus.mjs';
+import { RETIRED_VERSIONS } from './generateArenaLeaderboard.mjs';
 
 export const DEFAULT_LEADERBOARD_FILE = join(PROJECT_DIR, 'public', 'data', 'arena-leaderboard.json');
 export const DEFAULT_MODELS_DIR = join(PROJECT_DIR, 'rl', 'models');
@@ -282,6 +285,9 @@ function applyExpire(opts) {
   const stamp = todayStamp(opts.date);
   for (const version of versions) {
     if (!/^v\d+\.\d+\.\d+$/.test(version)) throw new Error(`版本号格式不对：${version}`);
+    if (RETIRED_VERSIONS.has(version)) {
+      throw new Error(`${version} 已作废（zip 在 rl/models/deprecated/、对局整局丢弃），不能再登记过期——过期与作废互斥`);
+    }
     if (byVersion.has(version)) throw new Error(`${version} 已在过期名单里（要重新登记先 --restore ${version}）`);
     const file = resolveModelFile(opts.modelsDir, version);
     byVersion.set(version, {

@@ -16,6 +16,9 @@
 它们的 zip 仍在 rl/models/ 下、历史对局也仍在评分池里（与「作废」不同），只是不再
 参与新一轮评估——过期原因只有一个：名次已沉底，继续陪跑只拉长新模型的评估时长。
 要临时让过期模型陪打，用 ``--models`` 显式点名即可（点名优先于过期排除）。
+登记表只在**文件不存在**（纯算法开发机）时按「无过期」处理；存在但损坏则报错退出，
+不降级为「无过期」——那会把过期模型重新拉回对手池陪跑，正是本机制要省掉的开销
+（唯一允许降级的消费端是线上服务 ``src/api/bots.ts``，口径见 ``script/modelStatus.mjs`` 头注）。
 
 用法示例：
 
@@ -94,13 +97,52 @@ def resolve_python(root: Path) -> str:
     return sys.executable
 
 
+MODEL_STATUS_VERSION_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+MODEL_STATUS_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def parse_expired_entries(raw, source: Path) -> dict[str, dict]:
+    """校验登记表结构并返回 {版本: 条目}；非法一律抛 ValueError。
+
+    校验口径与 script/modelStatus.mjs 的 parseModelStatus 逐条对齐（版本格式、
+    file 版本段一致性、重复登记、expiredAt、reason 非空），由跨语言契约测试
+    tests/rl/test_model_status_contract.py 钉死「两侧接受/拒绝同一份登记表」。
+    """
+    if not isinstance(raw, dict) or not isinstance(raw.get("expired"), list):
+        raise ValueError(f"{source}: 缺少顶层 expired 数组")
+    result: dict[str, dict] = {}
+    for idx, item in enumerate(raw["expired"]):
+        at = f"{source} expired[{idx}]"
+        if not isinstance(item, dict):
+            raise ValueError(f"{at}: 必须是对象")
+        version = item.get("version")
+        if not isinstance(version, str) or not MODEL_STATUS_VERSION_RE.match(version):
+            raise ValueError(f"{at}: version 需形如 v3.0.3，实际 {version!r}")
+        file = item.get("file")
+        if not isinstance(file, str) or not file.endswith(".zip"):
+            raise ValueError(f"{at}: file 需是 .zip 文件名，实际 {file!r}")
+        match = MODEL_RE.match(file)
+        if not match or match.group(1) != version:
+            raise ValueError(f"{at}: file 的版本段与 version 不一致（{file} vs {version}）")
+        if version in result:
+            raise ValueError(f"{at}: 版本 {version} 重复登记")
+        expired_at = item.get("expiredAt")
+        if not isinstance(expired_at, str) or not MODEL_STATUS_DATE_RE.match(expired_at):
+            raise ValueError(f"{at}: expiredAt 需形如 2026-09-19")
+        if not str(item.get("reason") or "").strip():
+            raise ValueError(f"{at}: reason 不能为空")
+        result[version] = item
+    return result
+
+
 def load_expired_versions(root: Path) -> dict[str, dict]:
     """读取 arena/model-status.json 的过期登记，返回 {版本: 条目}。
 
     过期 ≠ 作废：过期模型的 zip 仍在 rl/models/、历史对局仍留在竞技场评分池里，
     只是不再参与新一轮评估。登记表是唯一事实来源（JS/TS 侧见 script/modelStatus.mjs），
     不要在别处再写一份版本名单。文件缺失（纯算法开发机）按「无过期」处理；
-    文件损坏则只警告不中止——评估本身仍可跑，但会把过期模型重新拉进对手池。
+    文件损坏或结构非法抛 ValueError 中止——降级成「无过期」会把过期模型重新
+    拉进对手池陪跑，正是本机制要省掉的开销。
     """
     path = root / MODEL_STATUS_FILE
     try:
@@ -108,17 +150,8 @@ def load_expired_versions(root: Path) -> dict[str, dict]:
     except FileNotFoundError:
         return {}
     except (OSError, ValueError) as exc:
-        print(f"警告：无法解析 {path}（{exc}）；本轮不排除任何过期模型。", file=sys.stderr)
-        return {}
-    entries = raw.get("expired") if isinstance(raw, dict) else None
-    if not isinstance(entries, list):
-        print(f"警告：{path} 缺少 expired 数组；本轮不排除任何过期模型。", file=sys.stderr)
-        return {}
-    return {
-        entry["version"]: entry
-        for entry in entries
-        if isinstance(entry, dict) and isinstance(entry.get("version"), str)
-    }
+        raise ValueError(f"{path}: 读取/解析失败（{exc}）") from exc
+    return parse_expired_entries(raw, path)
 
 
 def discover_models(
@@ -302,7 +335,11 @@ def main():
     stats_file = root / args.stats_file if args.stats_file else root / DEFAULT_STATS_FILE
     maps = [m.strip() for m in args.maps.split(",") if m.strip()]
 
-    expired_versions = load_expired_versions(root)
+    try:
+        expired_versions = load_expired_versions(root)
+    except ValueError as exc:
+        print(f"错误：{exc}；修好登记表（或暂时删除）再跑，不降级为「无过期」。", file=sys.stderr)
+        return 1
     included, excluded, expired = discover_models(models_dir, expired_versions)
     if args.models:
         needles = [n.strip() for n in args.models.split(",") if n.strip()]

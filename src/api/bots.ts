@@ -231,8 +231,9 @@ function expiredVersionSet(): Set<string> {
   try {
     return new Set(loadModelStatus().entries.map(entry => entry.version));
   } catch (err) {
-    // 登记表坏了不阻断对局：降级为「无过期模型」但必须留下可见告警，
-    // 否则过期模型会悄悄回到「添加 AI」列表与评估控制台。
+    // 口径（见 script/modelStatus.mjs 头注）：脚本与评估链路对坏名单 fail-fast，
+    // 服务端是唯一允许降级的消费端——登记表坏了不阻断线上对局，退化为「无过期」
+    // 但必须留下可见告警（代价仅是过期模型临时回到「添加 AI」列表）。
     console.warn(`[bots] 无法读取过期模型登记表：${(err as Error).message}；本次不排除任何过期模型。`);
     return new Set();
   }

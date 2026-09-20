@@ -1,8 +1,13 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { findCandidates, rankPerMap, resolveModelFile } from '../../script/expireArenaModels.mjs';
+import { assertExpiredRetiredDisjoint, RETIRED_VERSIONS } from '../../script/generateArenaLeaderboard.mjs';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 let tempDir: string | null = null;
 
@@ -100,5 +105,32 @@ describe('resolveModelFile', () => {
     writeFileSync(join(tempDir, 'hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip'), 'zip');
     expect(resolveModelFile(tempDir, 'v2.5.0')).toBe('hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip');
     expect(() => resolveModelFile(tempDir, 'v9.9.9')).toThrow(/没有 v9\.9\.9/);
+  });
+});
+
+describe('过期与作废互斥', () => {
+  const runExpire = (version: string) => spawnSync(
+    process.execPath,
+    ['script/expireArenaModels.mjs', '--expire', version, '--reason', 'test', '--dry-run'],
+    { cwd: REPO_ROOT, encoding: 'utf8' },
+  );
+
+  it('--expire 拒绝登记已作废版本（两态语义互相抵消）', () => {
+    const retired = [...RETIRED_VERSIONS][0]; // v2.1.4：zip 已移入 deprecated/，源头上直接拒
+    const result = runExpire(retired);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/已作废.*不能再登记过期.*互斥/);
+  });
+
+  it('--expire 对未作废但缺 zip 的版本仍按原路径报错（互斥检查不吞掉其它校验）', () => {
+    const result = runExpire('v9.9.9');
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/没有 v9\.9\.9/);
+  });
+
+  it('assertExpiredRetiredDisjoint 对交集版本抛错', () => {
+    expect(() => assertExpiredRetiredDisjoint(new Set(['v2.1.4']), RETIRED_VERSIONS))
+      .toThrow(/同时登记为过期与作废/);
+    expect(() => assertExpiredRetiredDisjoint(new Set(['v2.5.0']), RETIRED_VERSIONS)).not.toThrow();
   });
 });

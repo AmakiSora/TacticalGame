@@ -26,6 +26,7 @@
 
 ### 修复
 
+- **过期登记表审查收口（三处）**：① 错误处理口径统一并写实——`rl/evaluation/round_robin.py` 的 `load_expired_versions` 从「损坏只警告、降级为无过期」改为**结构非法报错退出**（损坏名单会把过期模型悄悄拉回对手池陪跑，正是本机制要省掉的开销；文件缺失仍按「无过期」），并把「JS 脚本与评估 fail-fast、仅 `src/api/bots.ts` 允许降级+告警」的两种立场写进 `script/modelStatus.mjs` 头注、`arena/model-status.json` note 与 `MODELS_NOTES`（原先「一律抛错不静默降级」的表述与 bots.ts 实际行为矛盾）；② 过期与作废**互斥显式化**——`--expire` 拒绝登记 `MODEL_STATUS_BY_VERSION` 里的已作废版本（原先仅靠「作废 zip 不在 rl/models/ 下」巧合兜底），`generateArenaLeaderboard.mjs` 新增导出断言 `assertExpiredRetiredDisjoint` 启动时兜底手工编辑的登记表（此前同一版本双登记会显示「已过期」但对局被按作废整局丢弃，语义互相抵消）；③ Python 侧校验逐条对齐 JS `parseModelStatus`（版本格式、file 版本段一致、重复登记、`expiredAt`、`reason` 非空），新增跨语言契约测试 `tests/rl/test_model_status_contract.py`（14 用例：同一份 fixture 钉死两侧接受/拒绝一致、缺失=无过期、版本正则口径一致、仓库真实登记表双侧一致）。验证：`npm run build` 通过、`npm test` 全量 61 文件 / 566 用例全绿（JS 侧新增 4 用例：`--expire` 拒登作废版本、缺 zip 仍按原路径报错、互斥断言、缺失登记表返回空名单）、`pytest tests/rl/test_model_status_contract.py` 14 passed、`round_robin.py --dry-run` 冒烟正常（过期 3 个照常剔除）。
 - **tg_0121 模型名更正为 `GLM5.3Flash`**：该局（2026-08-22，PI 对 WB）模型的对外命名有误，实为 **GLM5.3Flash**。直接更正档案本身——回放 JSON 玩家名、复盘 MD 文件名与正文统一为 `GLM5.3Flash` / `glm5.3flash`，统计看板与娱乐数据已重新生成并归并到 `glm5.3flash` 名下。
 - **`DeepseekV4Pro` 并入 `DeepseekV4ProPreview`**：两者确认为同一模型，档案统一为 Preview 命名——tg_0082 复盘 MD 更名 `OMP@DeepseekV4Pro` → `OMP@DeepseekV4ProPreview`（玩家名、对手视角引用、`tg_0083` 的跨局对照引用同步更正），`MODEL_ALIASES` 中 `deepseekv4pro` 指向改为 `DeepseekV4ProPreview`，统计看板与娱乐数据已重新生成归并。
 

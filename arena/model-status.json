@@ -1,5 +1,5 @@
 {
-  "note": "AI 竞技场「已过期模型」登记表 —— 过期名单的唯一事实来源。过期 = 模型仍留在 rl/models/（不物理归档）、历史对局继续进 Bradley-Terry 评分池（分数随池子漂移，不是冻结）、但不再参与新一轮评估且前端默认隐藏；作废（retired）另见 rl/docs/MODELS_NOTES.md 的「已作废模型」表，两者互不覆盖。过期流程：node script/expireArenaModels.mjs --analyze 选模型 → --expire 登记 → npm run arena-leaderboard && npm run arena-stats 重算 → 回填 rl/docs/MODELS_NOTES.md。",
+  "note": "AI 竞技场「已过期模型」登记表 —— 过期名单的唯一事实来源。过期 = 模型仍留在 rl/models/（不物理归档）、历史对局继续进 Bradley-Terry 评分池（分数随池子漂移，不是冻结）、但不再参与新一轮评估且前端默认隐藏；作废（retired）另见 rl/docs/MODELS_NOTES.md 的「已作废模型」表，两态互斥（同一版本不得同时登记，--expire 与榜单脚本断言双重拦截）。错误口径：JS 脚本与 round_robin.py 对非法结构 fail-fast，仅 src/api/bots.ts 降级为「无过期」并告警（见 script/modelStatus.mjs 头注）。过期流程：node script/expireArenaModels.mjs --analyze 选模型 → --expire 登记 → npm run arena-leaderboard && npm run arena-stats 重算 → 回填 rl/docs/MODELS_NOTES.md。",
   "expired": [
     {
       "version": "v2.3.2",

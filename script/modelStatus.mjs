@@ -11,7 +11,17 @@
  *
  * 本文件是过期名单的唯一事实来源，JS 脚本 / 服务端 TS / Python 编排器都读这一份，
  * 任何地方都不要另外写死版本名单（作废名单仍是 generateArenaLeaderboard 的
- * MODEL_STATUS_BY_VERSION，两者互不覆盖）。人读的说明在 rl/docs/MODELS_NOTES.md。
+ * MODEL_STATUS_BY_VERSION，两态互斥：同一版本不得同时登记过期与作废，
+ * --expire 与 generateArenaLeaderboard 启动断言双重拦截）。人读的说明在
+ * rl/docs/MODELS_NOTES.md。
+ *
+ * 错误处理口径（三个消费端、两种立场，勿再发散）：
+ *   - JS 脚本（榜单/统计/expireArenaModels）与 Python 评估（round_robin.py）：
+ *     解析失败一律抛错中止——带着一份坏名单跑评估比不跑更贵（过期模型会悄悄回到对手池）；
+ *   - 服务端 src/api/bots.ts：唯一允许降级的消费端——登记表坏了不阻断线上对局，
+ *     退化为「无过期」并打可见告警（代价仅是过期模型临时回到「添加 AI」列表）。
+ *   文件**缺失**在所有消费端都按「无过期」处理（新环境/纯算法环境的正常状态）。
+ *   Python 侧的镜像实现由 tests/rl/test_model_status_contract.py 钉死与 JS 行为一致。
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -34,7 +44,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * 解析登记表文本。结构非法直接抛错——这是手工维护的名单，静默降级会让过期模型
- * 悄悄重新回到评估池，比启动失败更糟。
+ * 悄悄重新回到评估池，比启动失败更糟（各消费端如何处置这个错，见文件头注的口径）。
  */
 export function parseModelStatus(text, source = 'model-status.json') {
   let raw;

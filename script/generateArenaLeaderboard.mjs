@@ -16,7 +16,8 @@
  *     历史对局全部留在池里，只是不再打新对局，registry 里 status='expired'。
  *     它的评分因此跟着池子一起漂移，而不是冻结在过期那一刻；涉及它的对局数记入
  *     source.expiredMatchesKept，评分/名次汇总进 payload.expired 供归档展示。
- *     前端按 status 默认隐藏（「显示已过期模型」开关可展开）；作废与过期互不覆盖；
+ *     前端按 status 默认隐藏（「显示已过期模型」开关可展开）；作废与过期互斥，
+ *     同一版本不得同时登记（assertExpiredRetiredDisjoint 启动断言兜底）；
  *   - Bradley-Terry MLE（MM 迭代），平局记 0.5 胜；每对交手过的参与者对附加 1 局虚拟
  *     平局作先验，防全败参与者评分发散并让稀疏对向均值收缩；
  *   - rating = 1500 + 400/ln(10) × ln p（Elo 刻度）；
@@ -67,6 +68,20 @@ export const RETIRED_VERSIONS = new Set(
 export const EXPIRED_MODELS = loadModelStatus().entries;
 export const EXPIRED_VERSIONS = new Set(EXPIRED_MODELS.map(entry => entry.version));
 export const EXPIRED_BY_VERSION = new Map(EXPIRED_MODELS.map(entry => [entry.version, entry]));
+
+/**
+ * 过期与作废互斥：同一版本出现在两份名单时，status 三元会偏向 expired（照常参评），
+ * 而 loadMatches 又会按 retired 把它的对局整局丢弃——两种语义互相抵消，必须拒绝。
+ * 源头拦截在 expireArenaModels 的 --expire；本断言兜底手工编辑过的登记表。
+ */
+export function assertExpiredRetiredDisjoint(expiredVersions, retiredVersions) {
+  const clash = [...expiredVersions].filter(version => retiredVersions.has(version));
+  if (clash.length) {
+    throw new Error(`arena/model-status.json：版本 ${clash.join(', ')} 同时登记为过期与作废（互斥，先 --restore 撤销其一）`);
+  }
+}
+assertExpiredRetiredDisjoint(EXPIRED_VERSIONS, RETIRED_VERSIONS);
+
 /** 评估协议已知限制：v2.0.0 观测固定 player_a 视角，坐 player_b 属分布外。 */
 export const STATUS_NOTES = {
   'v2.0.0': 'player_b 座位观测失真，成绩仅供参考',

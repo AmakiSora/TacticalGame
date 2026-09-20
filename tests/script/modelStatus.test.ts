@@ -1,5 +1,7 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { isExpiredModel, parseModelStatus, versionOfModelFile } from '../../script/modelStatus.mjs';
+import { isExpiredModel, loadModelStatus, parseModelStatus, versionOfModelFile } from '../../script/modelStatus.mjs';
 
 const EXPIRED_FILE = 'hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip';
 
@@ -58,6 +60,13 @@ describe('parseModelStatus', () => {
   it('同一版本重复登记要报错', () => {
     const dup = JSON.stringify({ expired: [validEntry, { ...validEntry, reason: '再来一次' }] });
     expect(() => parseModelStatus(dup)).toThrow(/重复登记/);
+  });
+});
+
+describe('loadModelStatus', () => {
+  it('文件不存在时按「无过期模型」返回空名单而不是抛错（与 round_robin.py 的契约，见 tests/rl/test_model_status_contract.py）', () => {
+    const { entries } = loadModelStatus(join(tmpdir(), 'rl-model-status-definitely-not-here', 'model-status.json'));
+    expect(entries).toEqual([]);
   });
 });
 

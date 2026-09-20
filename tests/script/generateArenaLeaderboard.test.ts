@@ -1,6 +1,8 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   EXPIRED_MODELS,
@@ -9,6 +11,8 @@ import {
   loadMatches,
 } from '../../script/generateArenaLeaderboard.mjs';
 import { RETIRED_VERSIONS } from '../../script/modelStatus.mjs';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const VALID = 'hex_ppo_v2.2.0_20260827_default_modelmix_best.zip';
 const RETIRED = 'hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip';
@@ -129,5 +133,33 @@ describe('collectRegistry 内置算法混池注册', () => {
   it('不带版本的旧式算法 id（algo_<name>）不在注册表中', () => {
     const { registry } = collectRegistry(makeModelsDir([VALID]));
     expect(registry.has('algo_threat')).toBe(false);
+  });
+});
+
+describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
+  const line = (a: string, b: string, winner: string) =>
+    JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
+  const EXPIRED_ZIP = 'hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip';
+
+  it('main() 全链路出榜，status 三分支都走到（registry 组装仅 main 里有，曾因常量迁移漏 import 裸引用）', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-smoke-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    // 参与者用 rl/models/ 真实存在的 zip + 注册算法：v2.2.0 走 MODEL_STATUS_BY_VERSION
+    // 查表分支（legacy）、v2.3.2 已过期（expired）、算法（builtin）。
+    writeFileSync(statsFile,
+      line(VALID, EXPIRED_ZIP, EXPIRED_ZIP) +
+      line(VALID, 'algo_threat@v1', VALID));
+
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    expect(payload.registry[VALID].status).toBe('legacy');
+    expect(payload.registry[EXPIRED_ZIP].status).toBe('expired');
+    expect(payload.registry['algo_threat@v1'].status).toBe('builtin');
   });
 });

@@ -1,6 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { collectRegistry } from '../../script/generateArenaLeaderboard.mjs';
 import {
@@ -10,6 +12,8 @@ import {
   parseModelsNotes,
   stripMd,
 } from '../../script/generateArenaStats.mjs';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const A = 'hex_ppo_v2.2.0_20260827_default_modelmix_best.zip';
 const B = 'hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip';
@@ -326,5 +330,35 @@ describe('buildModelProfiles 档案组装', () => {
     // 模型条目同样带 kind，供前端筛选。
     const model = models.find(m => m.id === A);
     expect(model.kind).toBe('model');
+  });
+});
+
+describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
+  it('main() 全链路产出参与者档案（profiles 组装仅 main 里有，status 查表曾因常量迁移漏 import）', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-stats-smoke-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'stats.json');
+    const line = (a: string, b: string, winner: string) =>
+      JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
+    // A（v2.2.0，走 MODEL_STATUS_BY_VERSION 查表 legacy 分支）× 已过期的 v2.3.2 × 注册算法。
+    const EXPIRED_ZIP = 'hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip';
+    writeFileSync(statsFile,
+      line(A, EXPIRED_ZIP, EXPIRED_ZIP) +
+      line(A, 'algo_threat@v1', A));
+
+    const result = spawnSync(
+      process.execPath,
+      // --leaderboard 指向不存在的文件：评分/对局数字段留空（榜单未生成也能出档案），
+      // 不合并真实榜单数据——冒烟保持隔离，也不受其它测试重算真实榜单的影响。
+      ['script/generateArenaStats.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--leaderboard', join(tempDir, 'no-leaderboard.json')],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    // status 查表（MODEL_STATUS_BY_VERSION，main 路径）正是本次回归点；对局数字段
+    // 来自榜单合并而非 fixture，不在此断言。
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    const a = payload.models.find((m: { id: string }) => m.id === A);
+    expect(a.status).toBe('legacy');
   });
 });

@@ -30,7 +30,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { wilsonLower, round2, round4 } from './generateStats.mjs';
 import { listAlgorithmInfo, algorithmVersionedId } from '../algorithms/registry.mjs';
-import { loadModelStatus, RETIRED_VERSIONS, assertExpiredRetiredDisjoint } from './modelStatus.mjs';
+import { loadModelStatus, MODEL_STATUS_BY_VERSION, RETIRED_VERSIONS, assertExpiredRetiredDisjoint } from './modelStatus.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);

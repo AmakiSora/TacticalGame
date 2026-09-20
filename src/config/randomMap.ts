@@ -29,6 +29,13 @@ export interface RandomMapOptions {
   controlPointIncome?: RandomParam;
   headquartersHp?: RandomParam;
   headquartersDefense?: RandomParam;
+  /**
+   * 初始单位数量（0-4）。省略=0-4 均匀随机（现行为）。
+   * v4.0.0：RL 随机域联合边角重要性采样（RL_RANDOM_CORNER_BOOST）用它把
+   * 短局×低 HQ×多据点×满编开局的 forge 生态位组合提频——各维边缘分布
+   * 虽已拓宽，联合命中率是边缘概率的乘积 <<1%（v3.1.1 起 forge 连续 0:48）。
+   */
+  startingUnitCount?: RandomParam;
 }
 
 interface ParamBound {
@@ -50,6 +57,7 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   controlPointIncome: { min: 0, max: 999, integer: true },
   headquartersHp: { min: 1, max: 9999, integer: true },
   headquartersDefense: { min: 0, max: 99, integer: true },
+  startingUnitCount: { min: 0, max: 4, integer: true },
 };
 
 const DEFAULT_RANGES: Record<string, [number, number]> = {
@@ -64,6 +72,7 @@ const DEFAULT_RANGES: Record<string, [number, number]> = {
   controlPointIncome: [0, 16],
   headquartersHp: [80, 240],
   headquartersDefense: [3, 10],
+  startingUnitCount: [0, 4],
 };
 
 // 默认域包线按 6 张静态图的极值校准（danger-close 的 1 行动点/20 补给/零据点收入、
@@ -94,9 +103,8 @@ function sampleControlPointTypes(rng: () => number) {
 /** 初始单位构成抽取池：基础兵种权重高，覆盖 breach(2 heavy) 与 forge(全兵种) 的开局。 */
 const STARTING_UNIT_POOL: UnitType[] = ['infantry', 'infantry', 'scout', 'scout', 'heavy', 'ranger'];
 
-/** 每方初始单位数量 0-4：dual-lanes(0) ~ forge(4)。 */
-function sampleStartingUnits(rng: () => number): UnitType[] {
-  const count = Math.floor(rng() * 5);
+/** 每方初始单位数量：默认 0-4 均匀随机（dual-lanes(0) ~ forge(4)）；可用 options.startingUnitCount 收窄/固定。 */
+function sampleStartingUnits(rng: () => number, count: number): UnitType[] {
   return Array.from({ length: count }, () => STARTING_UNIT_POOL[Math.floor(rng() * STARTING_UNIT_POOL.length)]);
 }
 
@@ -341,7 +349,9 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
   );
 
   // 出生位配置（总部 + 初始单位）。初始单位数量/构成全局抽一次、全员共享（公平性）。
-  const startingUnits = sampleStartingUnits(rng);
+  // startingUnitCount 收窄/固定数量（v4.0.0 边角采样用），省略时走默认范围 [0,4] 均匀随机。
+  const startingUnitCount = Math.round(resolveParam(options.startingUnitCount, 'startingUnitCount', rng));
+  const startingUnits = sampleStartingUnits(rng, startingUnitCount);
   const spawnSlots = buildSpawnSlots(spawnPositions, playableSet, controlPoints, symmetric, startingUnits);
 
   const config = {

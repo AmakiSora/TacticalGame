@@ -334,6 +334,14 @@ class HexGameEnv(gym.Env):
 
         种子始终从 np_random 派生，保证 gym seed 下整条训练序列可复现；
         若显式传入了 seed 则作为固定种子使用（所有回合同一张图）。
+
+        v4.0.0：RL_RANDOM_CORNER_BOOST（JSON，如 ``{"p": 0.18}``）对随机域做
+        **联合边角重要性采样**。背景：forge 生态位（短 maxTurns × 低 HQ 血 ×
+        6 据点 × 满编开局）各维边缘分布虽已进随机域（v3.1.1 拓宽），但联合
+        命中率是边缘概率的乘积 <<1%，导致连续两代 forge 0:48 崩塌。以
+        p_corner（默认 0、建议 0.15-0.20）概率把这些维度**联合**压向边角子域，
+        其余 (1-p_corner) 维持现有分布。注意：这是在随机域内部提频「规则组合」
+        而非给 forge 静态图加权——后者是 whack-a-mole 补丁路径（v3.0.4 教训）。
         """
         options: dict[str, Any] = {"symmetric": True}
         raw = os.environ.get("RL_RANDOM_OPTIONS", "").strip()
@@ -343,6 +351,27 @@ class HexGameEnv(gym.Env):
                 raise ValueError("RL_RANDOM_OPTIONS must be a JSON object")
             options.update(parsed)
         options.update(self.random_options)
+        corner_raw = os.environ.get("RL_RANDOM_CORNER_BOOST", "").strip()
+        if corner_raw:
+            corner = json.loads(corner_raw)
+            if not isinstance(corner, dict):
+                raise ValueError("RL_RANDOM_CORNER_BOOST must be a JSON object")
+            p_corner = float(corner.get("p", 0.0))
+            if not 0.0 <= p_corner <= 0.5:
+                raise ValueError("RL_RANDOM_CORNER_BOOST.p must be in [0, 0.5]")
+            if p_corner > 0.0 and "seed" not in options:
+                corner_seed = f"ep-{int(self.np_random.integers(0, 2**31 - 1))}"
+                if float(self.np_random.random()) < p_corner:
+                    # 边角子域：短局 × 低 HQ × 多据点 × 满编开局（forge 生态位组合）。
+                    options.update({
+                        "seed": f"{corner_seed}-corner",
+                        "maxTurns": [10, 13],
+                        "headquartersHp": [80, 120],
+                        "controlPointCount": [5, 6],
+                        "startingUnitCount": 4,
+                    })
+                else:
+                    options["seed"] = corner_seed
         if "seed" not in options:
             options["seed"] = f"ep-{int(self.np_random.integers(0, 2**31 - 1))}"
         return options

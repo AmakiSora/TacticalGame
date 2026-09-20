@@ -63,6 +63,75 @@ def parse_map_mix(raw: str) -> list[tuple[str, float]]:
     return [("random", 0.7), ("default", 0.15), ("dual-lanes", 0.075), ("forge", 0.075)]
 
 
+def parse_teacher_algo(raw: str) -> list[tuple[str, float]]:
+    """算法教师配比："threat:0.4,greedy:0.35,field:0.25"；缺省三算法均分。"""
+    result: list[tuple[str, float]] = []
+    for entry in raw.split(","):
+        name, separator, weight = entry.strip().partition(":")
+        if name:
+            result.append((name, float(weight) if separator else 1.0))
+    return result or [("threat", 1.0 / 3), ("greedy", 1.0 / 3), ("field", 1.0 / 3)]
+
+
+def _action_matches(action_type: str, payload: dict, want_type: str, want: dict) -> bool:
+    """算法 decide 的引擎原生 payload 与 155 动作表条目的匹配判定。
+
+    动作表条目（env._legal_actions 产出）的 payload 与算法返回的引擎 payload
+    同构（move=q/r、attack=attackerId/targetId、deploy=unitType/fromId/q/r、
+    heal/demolish 同理）；逐字段比对关键键即可。end_turn 无 payload。
+
+    deploy 特例：候选表只给「每兵种 2 个落点」（DEPLOY_CANDIDATES），而算法
+    教师可以在任意合法 origin 部署任意兵种，fromId/落点可能完全不在表里——
+    此时只比 unitType 已不够，由调用方在同兵种候选内按距离兜底（见
+    _algo_action_index）。
+    """
+    if action_type != want_type:
+        return False
+    if want_type == "end_turn":
+        return True
+    keys = {
+        "move": ("unitId", "q", "r"),
+        "attack": ("attackerId", "targetId"),
+        "heal": ("supportId", "targetId"),
+        "deploy": ("unitType", "q", "r"),
+        "demolish": ("unitId", "q", "r"),
+    }.get(want_type, ())
+    return all(str(payload.get(k, "")) == str(want.get(k, "")) for k in keys)
+
+
+def _hex_distance(q1: float, r1: float, q2: float, r2: float) -> float:
+    return (abs(q1 - q2) + abs(q1 + r1 - q2 - r2) + abs(r1 - r2)) / 2.0
+
+
+def _algo_action_index(actions, want_type: str, want_payload: dict) -> int | None:
+    """把算法教师的一个引擎动作映射到 155 动作表下标；不在表内时返回 None。
+
+    三级兜底（精确 → 结构化最近 → None）：
+    - move/attack/heal/demolish：精确匹配；move 未中时退到**同单位**离目标落点
+      最近的候选（教师绕路走法与 7 个候选落点不一致时，保住「动哪个单位、
+      往哪个方向」的意图）。
+    - deploy：精确匹配（兵种+落点）；未中时退到**同兵种**离目标落点最近的
+      候选（教师选了表外 origin/落点时，保住「出哪个兵种、落在哪片」）。
+    - 都不中返回 None，由调用方回退 end_turn 并计入 fallback 率。
+    """
+    for index, (action_type, payload) in enumerate(actions):
+        if action_type and _action_matches(want_type, want_payload, action_type, payload):
+            return index
+    if want_type in ("move", "deploy"):
+        key_id = "unitId" if want_type == "move" else "unitType"
+        best_index: int | None = None
+        best_distance: float | None = None
+        for index, (action_type, payload) in enumerate(actions):
+            if action_type != want_type or str(payload.get(key_id, "")) != str(want_payload.get(key_id, "")):
+                continue
+            d = _hex_distance(float(payload.get("q", 0)), float(payload.get("r", 0)),
+                              float(want_payload.get("q", 0)), float(want_payload.get("r", 0)))
+            if best_distance is None or d < best_distance:
+                best_index, best_distance = index, d
+        return best_index
+    return None
+
+
 def smoothed_target(mask: torch.Tensor, actions: torch.Tensor, eps: float) -> torch.Tensor:
     """在合法动作集内构造标签平滑目标分布（v3.0.2）。
 
@@ -88,6 +157,116 @@ def masked_smoothed_ce(logits: torch.Tensor, mask: torch.Tensor, actions: torch.
     target = smoothed_target(mask, actions, eps)
     # 非法位 target=0 而 log_prob≈-1e9，用 where 归零避免 0×(-1e9) 参与求和。
     return -(target * torch.where(mask, log_probs, torch.zeros_like(log_probs))).sum(dim=-1).mean()
+
+
+def collect_algo(args: argparse.Namespace) -> None:
+    """v4.0.0：规则算法教师（threat/greedy/field）蒸馏数据收集，不加载任何历史模型。
+
+    与模型教师 ``collect`` 的差别：教师动作经 worker 的 ``decide`` 通道取
+    （引擎原生 payload），再映射回 155 动作表下标作为克隆标签；算法动作直接
+    apply 进环境驱动对局。两侧座位都是算法（算法互打），每局按
+    ``--teacher-algo`` 配比独立抽双方算法；``--teacher-stochastic`` 比例的动作
+    从合法集均匀采样，拓宽状态覆盖（等价模型教师的 epsilon 采样）。
+
+    价值标签与模型教师路径一致：env step 回报的现场 γ 折现 return-to-go，
+    与 PPO 严格同尺度（v3.0.0 回报缩放教训）。
+    """
+    torch.set_num_threads(max(1, args.threads))
+    teacher_mix = parse_teacher_algo(args.teacher_algo)
+    names = [name for name, _ in teacher_mix]
+    weights = np.asarray([weight for _, weight in teacher_mix], dtype=np.float64)
+    weights = weights / weights.sum()
+    map_mix = parse_map_mix(args.map_mix)
+    # 对局内算法对手通道必须关闭（probability=0）：两侧座位都由本函数显式驱动，
+    # 否则 env 的对手回合循环会自己再调 decide，与本函数的 apply 交错改坏状态。
+    env = LocalHexGameEnv(map_id="random", opponent_style="mixed", map_mix=map_mix, algorithm_opponent_probability=0.0)
+    obs_buf: list[np.ndarray] = []
+    mask_buf: list[np.ndarray] = []
+    act_buf: list[int] = []
+    ret_buf: list[float] = []
+    wins = 0
+    fallbacks = 0
+    started = time.time()
+    rng = np.random.default_rng(args.seed)
+    for game in range(args.games):
+        observation, _ = env.reset(seed=args.seed * 100_000 + game)
+        # 座位在 reset 里随机分派；双方算法独立抽取（同算法互打也是合法组合）。
+        algo_for = {E.PLAYER: str(rng.choice(names, p=weights)), E.OPPONENT: str(rng.choice(names, p=weights))}
+        episode_obs: list[np.ndarray] = []
+        episode_mask: list[np.ndarray] = []
+        episode_act: list[int] = []
+        episode_rew: list[float] = []
+        done = False
+        guard = 0
+        while not done:
+            guard += 1
+            if guard > 4000:
+                raise RuntimeError("algo collect episode did not finish")
+            current = env.state.get("turn", {}).get("currentPlayerId")
+            if env._game_over():
+                break
+            if current != env.owner:
+                # 对手（算法）回合：decide -> apply，直到控制权回到智能体或终局。
+                decision = env.decide(current, algo_for.get(current, names[0]))
+                if decision.get("endTurn"):
+                    env._apply("end_turn", {}, env.opponent_token)
+                else:
+                    raw = decision.get("action") or {}
+                    env._apply(str(raw.get("type")), raw.get("payload") if isinstance(raw.get("payload"), dict) else {}, env.opponent_token)
+                env.state = env._get_state(env.player_token)
+                continue
+            actions = env.actions
+            if rng.random() < args.teacher_stochastic:
+                legal = [index for index, entry in enumerate(actions) if entry[0]]
+                action = legal[int(rng.integers(len(legal)))] if legal else 0
+            else:
+                decision = env.decide(env.owner, algo_for[env.owner])
+                action = 0
+                if not decision.get("endTurn"):
+                    raw = decision.get("action") or {}
+                    want_type = str(raw.get("type", ""))
+                    want_payload = raw.get("payload") if isinstance(raw.get("payload"), dict) else {}
+                    matched = _algo_action_index(actions, want_type, want_payload)
+                    if matched is None:
+                        fallbacks += 1
+                    else:
+                        action = matched
+            if not actions[action][0]:
+                action = 0
+            episode_obs.append(observation.astype(np.float32))
+            episode_mask.append(env.action_masks().copy())
+            episode_act.append(action)
+            observation, reward, terminated, truncated, _ = env.step(action)
+            episode_rew.append(float(reward))
+            done = terminated or truncated
+        if env.state.get("winner") == env.owner:
+            wins += 1
+        running = 0.0
+        returns = np.zeros(len(episode_rew), dtype=np.float32)
+        for index in range(len(episode_rew) - 1, -1, -1):
+            running = episode_rew[index] + args.gamma * running
+            returns[index] = running
+        obs_buf.extend(episode_obs)
+        mask_buf.extend(episode_mask)
+        act_buf.extend(episode_act)
+        ret_buf.extend(returns.tolist())
+        if (game + 1) % 10 == 0:
+            elapsed = time.time() - started
+            print(f"[collect-algo] game {game + 1}/{args.games} samples={len(act_buf)} "
+                  f"seat_a_wins={wins / (game + 1):.0%} label_fallbacks={fallbacks} elapsed={elapsed:.0f}s", flush=True)
+    env.close()
+    if not act_buf:
+        raise RuntimeError("algo collect produced no samples")
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        args.out,
+        obs=np.stack(obs_buf).astype(np.float16),
+        mask=np.stack(mask_buf),
+        act=np.asarray(act_buf, dtype=np.int64),
+        ret=np.asarray(ret_buf, dtype=np.float32),
+    )
+    print(f"[collect-algo] saved {len(act_buf)} samples to {args.out}; "
+          f"label fallback rate {fallbacks / len(act_buf):.2%}（应 <5%，否则算法 payload 与动作表对不上）")
 
 
 def collect(args: argparse.Namespace) -> None:
@@ -315,6 +494,19 @@ def main() -> None:
     c.add_argument("--seed", type=int, default=7)
     c.add_argument("--threads", type=int, default=2)
     c.set_defaults(func=collect)
+
+    ca = sub.add_parser("collect-algo", help="v4.0.0：规则算法教师（threat/greedy/field）收集蒸馏数据，不加载任何历史模型")
+    ca.add_argument("--teacher-algo", default="threat:0.4,greedy:0.35,field:0.25",
+                    help="算法教师配比，格式同 RL_ALGO_MIX；每局双方座位独立抽取")
+    ca.add_argument("--games", type=int, default=400)
+    ca.add_argument("--map-mix", default="", help="蒸馏数据的地图分布，格式同 RL_TRAIN_MAP_MIX")
+    ca.add_argument("--out", default="rl/distill/algo_teacher.npz")
+    ca.add_argument("--teacher-stochastic", type=float, default=0.15,
+                    help="智能体座位动作从合法集均匀采样的比例（拓宽状态覆盖，等价模型教师的 epsilon）")
+    ca.add_argument("--gamma", type=float, default=0.99)
+    ca.add_argument("--seed", type=int, default=7)
+    ca.add_argument("--threads", type=int, default=2)
+    ca.set_defaults(func=collect_algo)
 
     t = sub.add_parser("train")
     t.add_argument("--data", default="rl/distill/v27_teacher.npz")

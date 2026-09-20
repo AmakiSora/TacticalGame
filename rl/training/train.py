@@ -896,7 +896,11 @@ def main() -> None:
         raise FileNotFoundError(f"RL_LOAD_MODEL 指向的模型不存在: {load_path}")
 
     resume = bool(load_path)
-    if self_play_probability > 0 and not anchor_model:
+    # v4.0.0：从零训练世代必须显式关掉自动锚点。否则本分支会把 v2.7/v2.8 历史冠军
+    # 悄悄放进对手池（虽不加载为起点，但违背「不从任何历史版本开始」的约束，
+    # 且 54 动作旧锚点经 map_v27_action 只覆盖候选 0，会拉偏新动作空间的探索）。
+    no_auto_anchor = env_str("RL_NO_AUTO_ANCHOR", "0") == "1"
+    if self_play_probability > 0 and not anchor_model and not no_auto_anchor:
         # v3.0：从蒸馏冷启动断点续训时，锚点必须是真正的上一代冠军而不是断点本身
         # （蒸馏产物只是老师的近似）。RL_ANCHOR_FROM_LOAD=1 恢复“续训锚定自身”的旧行为。
         anchor_from_load = env_str("RL_ANCHOR_FROM_LOAD", "0") == "1"

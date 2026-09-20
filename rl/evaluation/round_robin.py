@@ -97,8 +97,11 @@ def resolve_python(root: Path) -> str:
     return sys.executable
 
 
-MODEL_STATUS_VERSION_RE = re.compile(r"^v\d+\.\d+\.\d+$")
-MODEL_STATUS_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# 用 \Z 不用 $：Python 的 $ 允许尾部换行而 JS 的 $ 不允许，尾部换行的 version
+# 入字典后匹配不上 discover_models 提取的版本段，过期模型会静默回池
+# （契约见 tests/rl/test_model_status_contract.py 的尾部换行 fixture）。
+MODEL_STATUS_VERSION_RE = re.compile(r"^v\d+\.\d+\.\d+\Z")
+MODEL_STATUS_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\Z")
 
 
 def parse_expired_entries(raw, source: Path) -> dict[str, dict]:

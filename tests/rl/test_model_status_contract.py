@@ -146,6 +146,14 @@ BAD_REGISTRIES = [
     pytest.param(json.dumps({"expired": [{
         "version": "v2.3.2", "file": VALID_FILE_A, "expiredAt": "2026-09-19", "reason": "   "}]}),
         id="reason 为空白"),
+    # Python 的 re $ 允许尾部换行而 JS 的 $ 不允许：version 带换行会入字典但
+    # 匹配不上 discover_models 的版本段（过期模型静默回池），必须与 JS 同拒。
+    pytest.param(json.dumps({"expired": [{
+        "version": "v2.3.2\n", "file": VALID_FILE_A, "expiredAt": "2026-09-19", "reason": "x"}]}),
+        id="version 尾部换行"),
+    pytest.param(json.dumps({"expired": [{
+        "version": "v2.3.2", "file": VALID_FILE_A, "expiredAt": "2026-09-19\n", "reason": "x"}]}),
+        id="expiredAt 尾部换行"),
     pytest.param(json.dumps({"expired": [
         {"version": "v2.3.2", "file": VALID_FILE_A, "expiredAt": "2026-09-19", "reason": "x"},
         {"version": "v2.3.2", "file": VALID_FILE_A, "expiredAt": "2026-09-20", "reason": "y"},

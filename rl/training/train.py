@@ -269,8 +269,43 @@ def resolve_device() -> str:
     device = "cuda" if requested == "auto" and available else requested
     if device == "auto":
         device = "cpu"
+    # v4.1.0：TF32 开关（Ampere+ matmul 加速，本地实测 PPO update 阶段 +18%）。
+    # 缺省关闭保持与历代数值一致；CUDA 与 ROCm(HIP) 通用。
+    if device == "cuda" and env_str("PYTORCH_ALLOW_TF32", "0") == "1":
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        print("[train] TF32 enabled (PYTORCH_ALLOW_TF32=1)", flush=True)
     print(f"[train] device={device} torch={torch.__version__} cuda_available={available}", flush=True)
     return device
+
+
+def maybe_compile_policy(model: MaskablePPO) -> None:
+    """v4.1.0：RL_TORCH_COMPILE=1 时对策略网络做 torch.compile（reduce-overhead 走 CUDA Graph）。
+
+    目标是消除 rollout 阶段每帧 batch=1 推理的 Python launch 开销（GPU 空闲大头）。
+    图断裂/数值异常时不要用——Phase 3.5 冒烟实验先验证，缺省关闭不影响既有行为。
+    """
+    if env_str("RL_TORCH_COMPILE", "0") != "1":
+        return
+    if not hasattr(torch, "compile"):
+        print("[train] RL_TORCH_COMPILE=1 但当前 torch 无 compile，忽略", flush=True)
+        return
+    original_policy = model.policy
+    try:
+        # 先探编译可用性：torch.compile 惰性编译且 TritonMissing 在**第二次**前向才抛
+        # （第一次走 inductor 调度失败回退，第二次 create_backend 才 raise），探测结果
+        # 不生效，只为尽早暴露环境缺失。直接调前向（绕过 model.predict，它内部取
+        # self.policy 的时机不受本次赋值影响，探测意义不大）。
+        probe = torch.zeros((1, *model.observation_space.shape), dtype=torch.float32, device=model.device)
+        compiled = torch.compile(original_policy, mode="reduce-overhead")
+        with torch.no_grad():
+            compiled(probe)
+            compiled(probe)
+    except Exception as error:  # 编译环境不可用：静默回退，不终止训练
+        print(f"[train] torch.compile unavailable, fallback to eager: {type(error).__name__}: {error}", flush=True)
+        return
+    model.policy = compiled  # type: ignore[assignment]
+    print("[train] policy compiled with torch.compile(mode=reduce-overhead)", flush=True)
 
 
 class AsyncEvalCallback(BaseCallback):
@@ -746,6 +781,63 @@ class ActionDiversityCallback(BaseCallback):
         self._window = 0
 
 
+class ResourceMonitorCallback(BaseCallback):
+    """v4.1.0：GPU/内存资源监控，回答「GPU 到底闲不闲」。
+
+    PPO 是采样瓶颈算法（rollout 占 ~85% 墙钟），192GB/24GB 显存跑不满是结构性的；
+    但没有时间线数据就分不清「结构性闲置」与「该优化的浪费」。每 RL_EXPLORE_LOG_EVERY
+    帧记录一次（与探索监控同窗，读数天然对齐）：
+
+    - ``resource/gpu_mem_gb``：torch 分配的显存峰值（ROCm 上 CUDA API 兼容 HIP）
+    - ``resource/gpu_util_pct``：GPU 利用率 %（pynvml 可用时；不可用则略过该读数）
+    - ``resource/sys_mem_pct``：系统内存占用 %（psutil 可用时；32GB 服务器的止损线）
+
+    全部读数做 best-effort：任一采集失败只降级该读数、不影响训练。
+    """
+
+    def __init__(self, log_every: int = 20_000):
+        super().__init__()
+        self.log_every = max(1, log_every)
+        self._since = 0
+        self._nvml = None
+        try:
+            import pynvml  # type: ignore
+            pynvml.nvmlInit()
+            self._nvml = pynvml
+        except Exception:
+            self._nvml = None
+        try:
+            import psutil  # type: ignore
+            self._psutil = psutil
+        except Exception:
+            self._psutil = None
+
+    def _on_step(self) -> bool:
+        self._since += 1
+        if self._since < self.log_every:
+            return True
+        self._since = 0
+        parts: list[str] = []
+        if torch.cuda.is_available():
+            mem_gb = torch.cuda.max_memory_allocated() / 1e9
+            self.logger.record("resource/gpu_mem_gb", mem_gb)
+            parts.append(f"gpu_mem {mem_gb:.2f}GB")
+        if self._nvml is not None:
+            try:
+                handle = self._nvml.nvmlDeviceGetHandleByIndex(0)
+                util = self._nvml.nvmlDeviceGetUtilizationRates(handle)
+                self.logger.record("resource/gpu_util_pct", float(util.gpu))
+                parts.append(f"gpu_util {util.gpu}%")
+            except Exception:
+                pass
+        if self._psutil is not None:
+            mem_pct = float(self._psutil.virtual_memory().percent)
+            self.logger.record("resource/sys_mem_pct", mem_pct)
+            parts.append(f"sys_mem {mem_pct:.0f}%")
+        print(f"[resource] frames={self.num_timesteps} {' | '.join(parts)}", flush=True)
+        return True
+
+
 def main() -> None:
     map_id = env_str("RL_MAP_ID", "default")
     opponent_style = env_str("RL_OPPONENT_STYLE", "mixed")
@@ -974,6 +1066,7 @@ def main() -> None:
             model.tensorboard_log = tb_log
             # sb3 的 load 不恢复 verbose；不设则续训日志里没有 rollout/train 表。
             model.verbose = 1
+            maybe_compile_policy(model)
         else:
             # 与续训路径一致地应用 RL_LR_MODE：此前这里硬编码 lr_schedule，
             # 导致从零训练时 RL_LR_MODE=constant 被静默忽略（续训路径才是唯一生效的）。
@@ -993,6 +1086,7 @@ def main() -> None:
                 device=device,
                 verbose=1,
             )
+            maybe_compile_policy(model)
 
         callbacks: list[BaseCallback] = [CheckpointCallback(
             save_freq=save_freq,
@@ -1000,7 +1094,12 @@ def main() -> None:
             name_prefix=Path(model_path).name,
         )]
         # 探索监控：每 2 万帧（8 环境约 2500 次回调）汇报一次新候选选用率。
-        callbacks.append(ActionDiversityCallback(env_int("RL_EXPLORE_LOG_EVERY", 20_000, minimum=1)))
+        explore_log_every = env_int("RL_EXPLORE_LOG_EVERY", 20_000, minimum=1)
+        callbacks.append(ActionDiversityCallback(explore_log_every))
+        # 资源监控（v4.1.0）：同窗记录 GPU 显存/利用率与系统内存，数据留给容量与硬件决策。
+        # 开关默认关闭：v4.0.0 等在途训练恢复时保持与启动时逐字节一致的日志流。
+        if env_str("RL_RESOURCE_MONITOR", "0") == "1":
+            callbacks.append(ResourceMonitorCallback(explore_log_every))
         if self_play_probability > 0:
             # 快照是子进程自对弈对手的唯一来源；原子写入避免读到半截 zip。
             callbacks.append(SnapshotCallback(snapshot_dir, snapshot_freq, snapshot_keep))

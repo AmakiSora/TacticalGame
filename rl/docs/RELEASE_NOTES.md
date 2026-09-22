@@ -3,6 +3,57 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-09-22 · v4.1.0 前置：CUDA 服务器训练设施——TF32/torch.compile 开关 + 资源监控回调（无观测/动作语义变更）
+
+**同日补丁**：`eval_worker.py` 的 `evaluate()` 补 `torch.set_num_threads(1)`——评估 worker 是
+CPU 逐帧串行推理，torch 默认按核数开线程，8 核服务器上实测单评估进程吃 5.3 核，
+与 8 环境 rollout 争抢导致主训练 fps 165→46（A10 实例，96 局评估跑 25+ 分钟）。
+训练 worker 子进程（`train.py` `make_train_env._init`）早已单线程化，评估侧漏了。
+对本地 6 核 Windows 机同样有益（v4.0.0 S2 在跑，恢复时自带此修复，无行为语义变化）。
+
+**同日补丁 2（A10 实测定论）**：`torch.set_num_threads(1)` 修复后 fps 依旧 ~48（非评估期）——
+补查 `top` 发现 **CPU 整机利用率仅 ~35%**、内存充裕、无 D 态进程 ⇒ 不是资源争抢，是
+**Xeon 8369B 单核性能弱于本地 12 代酷睿**（云服务 vCPU 睿频受限，node/tsx 引擎模拟为
+单线程延迟敏感型负载）。结论：该实例「8 核 A10」的 rollout 吞吐约为本地 6 核的 1/3
+（48fps vs 165fps），S1 8M 帧需 ~46h 而非 24h。预算修正：S1 8M + **S2 4M（累计 12M，
+launcher TARGET_TOTAL=12000000）**，总计 ~75h + 蒸馏/验收 ~8h ≈ 83h，余量给重启损耗。
+**v4.2.0 的中央推理服务器/引擎 Rust 化等结构性提速在此之前不划算；选型时应优先看单核频率而非核数/显存。**
+
+为 100 小时 CUDA 服务器（8 核 / 32GB / 24GB 显存）的 v4.1.0 从零训练（3 层×d192 + net_width 512，约 3.4M 参数）
+做的训练设施准备。**观测 6715 维 / `Discrete(155)` 不变，旧断点兼容，`bots.ts` 路由不变。**
+
+- `train.py` 新增 `PYTORCH_ALLOW_TF32=1`：`resolve_device()` 内开启
+  `torch.backends.cuda.matmul/cudnn.allow_tf32`（本地实测 PPO update 阶段 +18%）。缺省关闭，数值与历代一致。
+- `train.py` 新增 `RL_TORCH_COMPILE=1`：对策略网络做 `torch.compile(mode="reduce-overhead")`
+  （CUDA Graph 消除 rollout 每帧 batch=1 推理的 Python launch 开销）。**实验性**：
+  需先经短程冒烟验证 fps 提升 >15% 且 loss/熵无异才可启用；启用前先在进程内做两次
+  探测前向（TritonMissing 在第二次前向才抛），编译环境不可用时打印一条日志并回退
+  eager，不终止训练。注：Windows 原生 torch 无 triton，本开关只对 Linux CUDA/ROCm 有意义。
+- `train.py` 新增 `ResourceMonitorCallback`（`RL_RESOURCE_MONITOR=1` 启用，**缺省关闭**）：
+  每 `RL_EXPLORE_LOG_EVERY` 帧记录 `resource/gpu_mem_gb`（torch 显存峰值）、
+  `resource/gpu_util_pct`（pynvml，可用时）、`resource/sys_mem_pct`（psutil，可用时）到 TB + stdout。
+  全部 best-effort，采集失败只降级该读数。缺省关闭是为保证 v4.0.0 等在途训练恢复后
+  日志流与启动时逐字节一致。
+  动机：32GB 内存服务器需要内存止损线（v4.0.0 S2 曾内存耗尽暴毙）；同时留下 GPU 利用率
+  时间线，用数据回答「PPO 采样瓶颈下 GPU 闲置是结构性还是可优化」。
+- 启动脚本（bash，gitignored 实验区）：`rl/test-output/launchers/run_train_v410_s1.sh`（从零 8M 帧）、
+  `run_train_v410_s2.sh`（续训 +8M 至 16M，LR 降档 1.5e-4→2e-5，对齐 v4.0.0 S2 评估节奏）、
+  `run_train_v410_b_mlp.sh`（对照轨：`RL_EXTRACTOR=mlp RL_NET_WIDTH=1024`，
+  回答「Transformer 结构是否仍是必要项」——v3.1.0 已证伪容量假设，本对照补结构假设）。
+  **S1/S2 均为 6 小时实例重启兜底版**：监督循环检测训练进程死亡后，自动从
+  `rl/checkpoints/random/<run_id>/` 最新断点续跑、`RL_TIMESTEPS` 按剩余帧数重算，
+  直到达到累计目标或连续 5 次无进展才放弃；`RL_SAVE_FREQ=62500`（8 环境下 = 每 50 万帧
+  一个断点，关机最多丢 ~75 分钟）；全部产物落 `/mnt/workspace`（NAS 持久卷）。
+  每次实例重启后只需重新执行 `bash run_train_v410_s1.sh`，无需人工算增量。
+- 服务器要点（Alibaba PAI-DSW A10 实例，实测 2026-09-22）：ubuntu22.04 需 NodeSource 装
+  Node 22（apt 默认 12 跑不动 tsx）；镜像预装 torch 2.13.0+cu130 与驱动 550.54.15
+  （CUDA 12.4）不匹配 ⇒ `torch.cuda.is_available()=False`，需降级
+  `pip install --index-url https://download.pytorch.org/whl/cu128 torch==2.11.0+cu128`
+  （顺带装回 triton，torch.compile 可用）；pip 只装缺省包
+  （gymnasium/sb3/sb3-contrib/tensorboard/psutil）；**只有 `/mnt/workspace` 是持久卷，
+  代码与全部训练产物必须放这里**；scp 需 `-O`（旧协议，sftp 子系统不可用）；
+  28GB 内存实测训练占用 ~10%，暂不加 swap，靠 `resource/sys_mem_pct` 监控。
+
 ## 2026-09-19 · v3.2.0 验收：算法对手通道 + 奖励补 HQ 项，与 v3.1.1 打平未超越，champion 不变
 
 **训练**：从消融 #3（A4，奖励量纲 `hq_damage` 0.15→3.0，内部 9.0M 断点）续训 100 万帧，

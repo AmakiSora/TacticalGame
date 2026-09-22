@@ -111,6 +111,25 @@ python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
 训练的主要瓶颈是 TypeScript 游戏模拟，不是神经网络；GPU 能加速 PPO 更新，但要明显
 提速还需要并行多个训练环境。
 
+### GPU 利用率（v4.1.0）
+
+PPO 是采样瓶颈算法：rollout（CPU 上 TS 引擎模拟 + 每帧 batch=1 推理）占墙钟约 85%，
+GPU 只在 rollout 间隙做 PPO 更新。因此**显存/利用率跑不满是结构性的**，即使把 update
+压到 0，fps 也最多从 ~110 提到 ~130。大显存服务器（24GB+）对本项目没有额外收益——
+瓶颈在 CPU 核数，8 核机器 `RL_NUM_ENVS=8` 已是甜蜜点，超核数开环境 fps 不升反降。
+
+可用的提速手段（均经环境变量开关，缺省关闭）：
+
+- `PYTORCH_ALLOW_TF32=1`：Ampere+ 显卡 matmul 走 TF32，本地实测 update 阶段 +18%，零风险。
+- `RL_TORCH_COMPILE=1`：策略网络 `torch.compile(mode="reduce-overhead")`，消除 rollout
+  每帧 batch=1 的 Python launch 开销（GPU 空闲大头）。**实验性**，需先短程冒烟验证。
+- `RL_BATCH_SIZE`（如 2048）：单次 update kernel 更大；改变梯度噪声尺度，需配 LR 微调，
+  只建议续训阶段做对照。
+
+训练期可用 `ResourceMonitorCallback` 的读数（`RL_RESOURCE_MONITOR=1` 启用，TB 前缀 `resource/`）持续观察：
+`gpu_mem_gb` / `gpu_util_pct` / `sys_mem_pct`。`sys_mem_pct > 85%` 是 32GB 内存
+服务器的止损线（v4.0.0 S2 曾因外部进程耗尽内存暴毙，服务器侧建议配 swap 兜底）。
+
 新环境训练结果默认按以下格式命名：
 
 ```text

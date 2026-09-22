@@ -200,6 +200,12 @@ def play_scenario(model: Any, env: LocalHexGameEnv, episodes: int, seed_prefix: 
 
 def evaluate(model_path: str, map_id: str, opponent_style: str, anchor_model: str, episodes: int, seed_prefix: int, device: str = "cpu", algo_scenarios: bool = False, algo_episodes: int = ALGO_EVAL_EPISODES, seed_stride: int = 1) -> dict[str, Any]:
     from sb3_contrib import MaskablePPO
+    import torch
+
+    # v4.1.0：评估 worker 是 CPU 逐帧推理，torch 默认按核数开线程会在 8 核机上
+    # 与训练 rollout 争抢（实测 eval 进程占 5+ 核、主训练 fps 165→46）。
+    # 单线程足够：逐帧推理是串行依赖，多线程只加调度开销。
+    torch.set_num_threads(1)
 
     # 学习率调度闭包只在续训时有用；评估用常数替代，避免 cloudpickle 反序列化问题。
     model = MaskablePPO.load(

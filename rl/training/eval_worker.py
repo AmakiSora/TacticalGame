@@ -56,12 +56,17 @@ ALGO_EVAL_NAMES = ("threat", "greedy", "field")
 ALGO_EVAL_EPISODES = 48
 
 
-def build_scenarios(map_id: str, opponent_style: str, anchor_model: str, algo_scenarios: bool = False, algo_episodes: int = ALGO_EVAL_EPISODES) -> dict[str, dict[str, Any]]:
+def build_scenarios(map_id: str, opponent_style: str, anchor_model: str, algo_scenarios: bool = False, algo_episodes: int = ALGO_EVAL_EPISODES, algo_in_selection: bool = False) -> dict[str, dict[str, Any]]:
     """Scenario -> LocalHexGameEnv kwargs.  Mirrors the v2.7 validation set.
 
     v3.2.0：``algo_scenarios=True`` 追加三个**内置算法**对手场景（threat/greedy/
     field），它们只记录、初期不参与 best 选择（``_selection: False``，理由见
     ``selection_score``）。
+
+    v4.0.0（S3）：``algo_in_selection=True`` 把算法场景翻进 best 选择键。开启条件
+    是对算法胜率已稳定过 40%（v4.0.0 S2 交付点实测 threat 41%/greedy 49%/
+    field 59%）；在那之前开启会让选择键被"对模型强但对算法弱"的早期断点主导
+    （与 v3.0.2 的 OOD 教训同型）。
 
     注意构造参数口径：算法对手不是 ``opponent_style="algorithm"``——``opponent_style``
     只接受四个规则风格，算法是由 ``algorithm_opponent_probability=1.0`` 决定的
@@ -91,7 +96,7 @@ def build_scenarios(map_id: str, opponent_style: str, anchor_model: str, algo_sc
                 "algorithm_opponent_probability": 1.0,
                 # 评估要量的是算法真身的强度，不做确定性扰动。
                 "algorithm_epsilon": 0.0,
-                "_selection": False,
+                "_selection": algo_in_selection,
                 # 算法场景降为 48 局（champion 场景 96 局），控制评估总开销。
                 "_episodes": algo_episodes,
             }
@@ -198,7 +203,7 @@ def play_scenario(model: Any, env: LocalHexGameEnv, episodes: int, seed_prefix: 
     }
 
 
-def evaluate(model_path: str, map_id: str, opponent_style: str, anchor_model: str, episodes: int, seed_prefix: int, device: str = "cpu", algo_scenarios: bool = False, algo_episodes: int = ALGO_EVAL_EPISODES, seed_stride: int = 1) -> dict[str, Any]:
+def evaluate(model_path: str, map_id: str, opponent_style: str, anchor_model: str, episodes: int, seed_prefix: int, device: str = "cpu", algo_scenarios: bool = False, algo_episodes: int = ALGO_EVAL_EPISODES, seed_stride: int = 1, algo_in_selection: bool = False) -> dict[str, Any]:
     from sb3_contrib import MaskablePPO
     import torch
 
@@ -214,7 +219,7 @@ def evaluate(model_path: str, map_id: str, opponent_style: str, anchor_model: st
         custom_objects={"learning_rate": 0.0, "lr_schedule": lambda _: 0.0},
     )
     results: dict[str, Any] = {"model": model_path, "scenarios": {}}
-    for name, kwargs in build_scenarios(map_id, opponent_style, anchor_model, algo_scenarios, algo_episodes).items():
+    for name, kwargs in build_scenarios(map_id, opponent_style, anchor_model, algo_scenarios, algo_episodes, algo_in_selection).items():
         env_kwargs, in_selection, scenario_episodes = split_scenario(kwargs, episodes)
         env = LocalHexGameEnv(**env_kwargs)
         try:
@@ -289,9 +294,11 @@ def main() -> None:
     # v3.2.0：算法对手评估场景（默认关，阶段 B 由 RL_EVAL_ALGO=1 打开）。
     parser.add_argument("--algo-scenarios", action="store_true")
     parser.add_argument("--algo-episodes", type=int, default=ALGO_EVAL_EPISODES)
+    # v4.0.0（S3）：算法场景是否参与 best 选择键（默认否 = 只记录）。
+    parser.add_argument("--algo-in-selection", action="store_true")
     args = parser.parse_args()
 
-    results = evaluate(args.model, args.map, args.opponent_style, args.anchor, args.episodes, args.seed_prefix, args.device, args.algo_scenarios, args.algo_episodes, args.seed_stride)
+    results = evaluate(args.model, args.map, args.opponent_style, args.anchor, args.episodes, args.seed_prefix, args.device, args.algo_scenarios, args.algo_episodes, args.seed_stride, args.algo_in_selection)
     tmp = args.out + ".tmp"
     with open(tmp, "w", encoding="utf-8") as handle:
         json.dump(results, handle, ensure_ascii=False, indent=2)

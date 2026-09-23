@@ -323,7 +323,7 @@ class AsyncEvalCallback(BaseCallback):
     default OOD collapse and picked the weak 100k checkpoint over 1.4M.
     """
 
-    def __init__(self, *, map_id: str, opponent_style: str, anchor_model: str, eval_freq: int, n_eval_episodes: int, best_model_save_path: str, eval_dir: str, seed_prefix: int = 27_000, wait_at_end: bool = True, algo_scenarios: bool = False, algo_episodes: int = 48, best_warmup_steps: int = 0, seed_stride: int = 1):
+    def __init__(self, *, map_id: str, opponent_style: str, anchor_model: str, eval_freq: int, n_eval_episodes: int, best_model_save_path: str, eval_dir: str, seed_prefix: int = 27_000, wait_at_end: bool = True, algo_scenarios: bool = False, algo_episodes: int = 48, best_warmup_steps: int = 0, seed_stride: int = 1, algo_in_selection: bool = False):
         super().__init__()
         self.map_id = map_id
         self.opponent_style = opponent_style
@@ -331,6 +331,9 @@ class AsyncEvalCallback(BaseCallback):
         # v3.2.0：评估是否加跑算法对手场景（RL_EVAL_ALGO，默认关；阶段 B 再开）。
         self.algo_scenarios = algo_scenarios
         self.algo_episodes = max(2, algo_episodes)
+        # v4.0.0（S3）：算法场景是否参与 best 选择键（RL_EVAL_ALGO_IN_SELECTION）。
+        # 开启条件 = 对算法胜率已稳定过 40%（详见 eval_worker.selection_score）。
+        self.algo_in_selection = algo_in_selection
         self.eval_freq = max(1, eval_freq)
         self.n_eval_episodes = max(2, n_eval_episodes + n_eval_episodes % 2)
         self.best_model_save_path = best_model_save_path
@@ -372,6 +375,8 @@ class AsyncEvalCallback(BaseCallback):
             command += ["--anchor", self.anchor_model]
         if self.algo_scenarios:
             command += ["--algo-scenarios", "--algo-episodes", str(self.algo_episodes)]
+            if self.algo_in_selection:
+                command += ["--algo-in-selection"]
         env = {**os.environ, "PYTHONUTF8": "1"}
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", env=env)
         self._pending = (process, model_zip, result_json, step)
@@ -868,6 +873,10 @@ def main() -> None:
     # 同一份 v3.1.1，48 局给 46.3%、300 局给 54.3%。给算法场景设判据时应 ≥192 局，
     # 或配合 RL_EVAL_SEED_STRIDE 用大步长跨越整个种子空间。
     eval_algo_episodes = env_int("RL_EVAL_ALGO_EPISODES", 48, minimum=2)
+    # v4.0.0（S3）：算法场景是否参与 best 选择键。默认关（历史行为 = 只记录）。
+    # 开启条件：对算法胜率已稳定过 40% —— 在那之前开启会让选择键被"对模型强但对
+    # 算法弱"的早期断点主导（与 v3.0.2 的 OOD 教训同型，见 eval_worker.selection_score）。
+    eval_algo_in_selection = env_int("RL_EVAL_ALGO_IN_SELECTION", 0, minimum=0) > 0
     # v3.2.0（评估功效修正）：评估种子步长。默认 1 = 顺序取种子（历史行为，保持历史可比性）。
     # > 1 时种子以大步长跨越整个空间，用少量局数换低偏差估计（见 eval_worker.play_scenario）。
     eval_seed_stride = env_int("RL_EVAL_SEED_STRIDE", 1, minimum=1)
@@ -1116,10 +1125,12 @@ def main() -> None:
                 algo_episodes=eval_algo_episodes,
                 best_warmup_steps=best_warmup_steps,
                 seed_stride=eval_seed_stride,
+                algo_in_selection=eval_algo_in_selection,
             ))
             print(
                 f"[train] async eval every {eval_freq} steps x {eval_episodes} games per scenario (background subprocess)"
                 f"{' + algo scenarios x ' + str(eval_algo_episodes) if eval_algo_scenarios else ''}"
+                f"{'（算法场景参与 best 选择）' if eval_algo_scenarios and eval_algo_in_selection else ''}"
                 f"{'；best 选择热身期 ' + str(best_warmup_steps) + ' 帧' if best_warmup_steps > 0 else ''}"
                 f"{'；评估种子步长 ' + str(eval_seed_stride) + '（>1 = 低偏差采样）' if eval_seed_stride > 1 else ''}"
             )

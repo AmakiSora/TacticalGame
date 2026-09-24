@@ -347,6 +347,7 @@ export class GameStore {
         const balance = game.config?.balance as { maxTurns?: unknown } | undefined;
         if (balance && balance.maxTurns !== null
           && (typeof balance.maxTurns !== 'number' || !Number.isFinite(balance.maxTurns) || balance.maxTurns < 1)) {
+          logger.warn(`对局 ${game.id} 的 balance.maxTurns 非法（${String(balance.maxTurns)}），回落为有限默认 15`, { tag: 'game:persist' });
           balance.maxTurns = 15;
         }
         restoreActionStats(game);

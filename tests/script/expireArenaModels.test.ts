@@ -51,7 +51,7 @@ function fakeLeaderboard() {
 describe('rankPerMap', () => {
   it('每张图按评分降序给出 rank/n，排除未参评（games=0）的参与者', () => {
     const lb = fakeLeaderboard();
-    lb.maps.m1.models.push({ id: 'hex_ppo_v9.0.4_20260918_random_selfplay_1000000.zip', rating: 9999, games: 0 });
+    lb.maps.m1.models.push({ id: 'hex_ppo_v9.0.4_20260918_1M.zip', rating: 9999, games: 0 });
     const { maps, rankByMap } = rankPerMap(lb);
     expect(maps).toEqual(['m1', 'm2']);
     const d1 = rankByMap.get('m1');
@@ -86,7 +86,7 @@ describe('findCandidates', () => {
   it('有多条候选取「平均名次位置」最差的在前', () => {
     const lb = fakeLeaderboard();
     // 再加一个两张图都垫得更彻底的模型 E（1000），D 与 E 都是候选，E 应排在前面。
-    const E = { id: 'hex_ppo_v9.0.5_20260918_random_selfplay_1000000.zip', rating: 1000, games: 96 };
+    const E = { id: 'hex_ppo_v9.0.5_20260918_1M.zip', rating: 1000, games: 96 };
     lb.registry[E.id] = { kind: 'model', version: 'v9.0.5', short: 'v9.0.5' };
     lb.maps.all.models.push(E);
     for (const map of ['m1', 'm2']) lb.maps[map].models.push(E);
@@ -101,9 +101,9 @@ describe('findCandidates', () => {
 describe('resolveModelFile', () => {
   it('按版本在模型目录里找回交付 zip', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'rl-expire-'));
-    writeFileSync(join(tempDir, 'hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip'), 'zip');
-    writeFileSync(join(tempDir, 'hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip'), 'zip');
-    expect(resolveModelFile(tempDir, 'v2.5.0')).toBe('hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip');
+    writeFileSync(join(tempDir, 'hex_ppo_v2.5.0_20260830_2M.zip'), 'zip');
+    writeFileSync(join(tempDir, 'hex_ppo_v2.6.0_20260831_3.6M.zip'), 'zip');
+    expect(resolveModelFile(tempDir, 'v2.5.0')).toBe('hex_ppo_v2.5.0_20260830_2M.zip');
     expect(() => resolveModelFile(tempDir, 'v9.9.9')).toThrow(/没有 v9\.9\.9/);
   });
 });

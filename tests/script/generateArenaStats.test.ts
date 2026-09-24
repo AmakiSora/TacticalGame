@@ -15,10 +15,10 @@ import {
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const A = 'hex_ppo_v2.2.0_20260827_default_modelmix_best.zip';
-const B = 'hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip';
-const RETIRED = 'hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip';
-const V1 = 'hex_ppo_v1.0.0_20260824_default_random_opponent_120000.zip';
+const A = 'hex_ppo_v2.2.0_20260827_120K.zip';
+const B = 'hex_ppo_v2.7.0_20260901_4M.zip';
+const RETIRED = 'hex_ppo_v2.1.8_20260827_920K.zip';
+const V1 = 'hex_ppo_v1.0.0_20260824_120K.zip';
 
 let tempDir: string | null = null;
 
@@ -190,7 +190,7 @@ const NOTES_MD = `# RL 模型说明（导航页）
 |---|---|---|---|
 | \`rl/models/${A}\` | [v2.2.0](models/v2.2.0.md) | 历史 | 座位随机化；对 v2.0.0 **16:0** |
 | \`${B}\` | [v2.7.0](models/v2.7.0.md) | **当前推荐** | 6205 维可观测性修复 |
-| \`hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip\` | RELEASE_NOTES 2026-09-09 v3.0.4 验收条目 | 验收未过线 | 无链接档案列，走 stripMd 回退 |
+| \`hex_ppo_v3.0.4_20260909_8.4M.zip\` | RELEASE_NOTES 2026-09-09 v3.0.4 验收条目 | 验收未过线 | 无链接档案列，走 stripMd 回退 |
 | \`hex_ppo_v3.0.1_20260904_distilled.zip\` | [v3.0.1](models/v3.0.1.md) | 中间产物 | 不符合交付文件名格式，应静默跳过 |
 
 ### 已作废模型（归档留底，勿部署、勿纳入评估）
@@ -213,7 +213,7 @@ describe('parseModelsNotes 表格解析', () => {
 
     expect(profiles.get(B)?.docStatus).toBe('当前推荐');
     // 无链接档案列回退到 stripMd 纯文本。
-    const p304 = profiles.get('hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip');
+    const p304 = profiles.get('hex_ppo_v3.0.4_20260909_8.4M.zip');
     expect(p304?.docRef).toBe('RELEASE_NOTES 2026-09-09 v3.0.4 验收条目');
     expect(p304?.docStatus).toBe('验收未过线');
     // distilled 中间产物不符合交付文件名格式：不建档、不告警。
@@ -294,7 +294,7 @@ describe('buildModelProfiles 档案组装', () => {
   });
 
   it('v3.0.3 映射为 recommended（与 MODELS_NOTES.md 同步）', () => {
-    const champ = 'hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip';
+    const champ = 'hex_ppo_v3.0.3_20260908_5M.zip';
     const dir = makeModelsDir([champ]);
     const { registry } = collectRegistry(dir, []);
     const models = buildModelProfiles({ registry, modelsDir: dir, leaderboardJson: null, notesProfiles: new Map() });
@@ -308,7 +308,8 @@ describe('buildModelProfiles 档案组装', () => {
     expect(models).toHaveLength(1);
     expect(models[0].rating).toBeNull();
     expect(models[0].games).toBe(0);
-    expect(models[0].short).toBe('v2.2.0');
+    // 三段式命名把步数写进文件名（旧的 `_best` 后缀已停用），展示名恒带 @步数。
+    expect(models[0].short).toBe('v2.2.0@120K');
   });
 
   it('算法参与者档案带 kind/注册名/版本/文档路径与策略说明', () => {
@@ -341,7 +342,7 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
     const line = (a: string, b: string, winner: string) =>
       JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
     // A（v2.2.0，走 MODEL_STATUS_BY_VERSION 查表 legacy 分支）× 已过期的 v2.3.2 × 注册算法。
-    const EXPIRED_ZIP = 'hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip';
+    const EXPIRED_ZIP = 'hex_ppo_v2.3.2_20260829_340K.zip';
     writeFileSync(statsFile,
       line(A, EXPIRED_ZIP, EXPIRED_ZIP) +
       line(A, 'algo_threat@v1', A));

@@ -16,7 +16,7 @@
 decide(state, utils) 接口，动作经引擎 apply 校验，非法动作按线上语义结束回合并记录。
 
     rl/.venv/Scripts/python.exe rl/evaluation/evaluate_cross.py \
-        --player-a rl/models/hex_ppo_v2.0.0_20260824_default_rule_500000.zip \
+        --player-a rl/models/hex_ppo_v2.0.0_20260824_500K.zip \
         --player-b algo:threat@v1 \
         --games 4
 

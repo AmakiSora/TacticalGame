@@ -3,6 +3,36 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-09-24 · 模型命名变更：四段式 → 三段式，步数段改记交付断点
+
+**新规范**：`hex_ppo_<版本>_<日期>_<步数>.zip`（旧：`hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数>`）。
+
+- **步数段 = 交付断点**（取 zip 内 `num_timesteps`，按榜单 `shortName` 公式简写为 `70K`/`8.8M`），
+  不再是训练目标步数。文件名、排行榜展示名、zip 内步数三者恒等 ⇒
+  `MODEL_DELIVERED_STEPS` 镜像表**退休**（不再需要人工同步两份表）。
+- **地图/对手段移除**：它们是按版本恒定的历史事实，改由
+  `script/generateArenaLeaderboard.mjs` 的 `MODEL_META_BY_VERSION` 按版本查表；
+  竞技场详情面板的两行照旧展示。**新增版本时必须补该表**，否则那两行为空。
+
+**影响面（已全部处理）**：
+
+- **模型文件**：`rl/models/` 20 个交付 zip + `deprecated/` 5 个作废 zip 全部重命名
+  （`_archive_*` 只改了 2 个被竞技场历史引用的，其余保持原名——它们承载实验身份）。
+- **历史数据**：`arena/matches.jsonl` **48,648 局**的玩家名（含 `winner` 字段）批量改写为
+  新名，**Bradley-Terry 评分零变化**（逐模型比对：所有在役模型分数完全一致，仅 id 换了名字）。
+- **代码**：`MODEL_FILE_RE` 改为三段式并新增 `parseStepTag`；`parseModelFile` 的地图/对手
+  改查表；`shortName` 逻辑不变（`deliveredSteps` 直接取文件名步数）。8 个 runner 的 glob
+  （`run_model_v100.py` 原先的 `*random_opponent*` 完全失效，已修）、`train.py` 的
+  `latest_model_path`/`opponent_model_path`/`champion_model_path`（后两者改为按版本匹配）。
+- **登记表**：`arena/model-status.json` 三个过期模型的 `file` 字段同步。
+- **测试**：`tests/script/*.ts`、`tests/rl/test_model_status_contract.py` 的模型名常量；
+  一处 `short` 断言从 `v2.2.0` 改为 `v2.2.0@120K`（旧 `_best` 后缀已停用，展示名恒带 @步数）。
+- **文档**：`MODELS_NOTES`（总表/对照表/演进表）、各 `models/*.md`、`plans/*`、
+  `.workbuddy/skills/rl-model-delivery/SKILL.md` 的命名规范段。
+
+**注意**：`round_robin.py` 的 `MODEL_RE` 与 `modelStatus.mjs` 的 `MODEL_VERSION_RE` 是
+宽松前缀正则（`^hex_ppo_(v<数字>.<数字>.<数字>)_`），三段式天然兼容，未改动。
+
 ## 2026-09-24 · v4.0.0 结项：从零训练 + 大容量 + 算法教师蒸馏，静态图三张 0% 未通过验收
 
 **一句话**：三条结构性改动（从零 / 容量 0.87M→1.44M / 算法教师蒸馏）全部工程落地成功
@@ -117,10 +147,10 @@ launcher TARGET_TOTAL=12000000）**，总计 ~75h + 蒸馏/验收 ~8h ≈ 83h，
 
 **训练**：从消融 #3（A4，奖励量纲 `hq_damage` 0.15→3.0，内部 9.0M 断点）续训 100 万帧，
 2026-09-18 15:04 启动、约 1 小时 55 分跑完（fps 138–144、无中断）。交付**训练期 best 9.8M 断点**：
-`rl/models/hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip`（`num_timesteps=9800000`、
+`rl/models/hex_ppo_v3.2.0_20260918_9.8M.zip`（`num_timesteps=9800000`、
 `_total_timesteps=10000000`，已 `sanitize_delivery_zip`；档案 `rl/docs/models/v3.2.0.md`）。
 文件名按 `script/generateArenaLeaderboard.mjs` 的 `MODEL_FILE_RE` 规范——
-`hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数|best>.zip`。
+`hex_ppo_<版本>_<日期>_<步数|best>.zip`（该代用四段式，2026-09-24 起改为三段式，见顶部条目）。
 
 **验收**：192 局配对换座、对手固定为 v3.1.1（`random_champion` 场景，双方确定性策略）。
 两套种子题 **50.0% / 48.4%（均值 49.2%，单题 s.e.≈3.6pt）**，而**零假设（v3.1.1 打自己）
@@ -228,7 +258,7 @@ v3.1.1 又把 forge 权重从 0.083 压到 0.05， exposure 雪上加霜。
 `rl/test-output/launchers/run_train_v311.bat`。这是昨日随机域拓宽（根 `RELEASE_NOTES.md`
 3.4.7 节）后的第一代训练，验证「静态图 = 分布内的点」假设：
 
-- **起点**：v3.0.4-8.44M 断点（`rl/models/hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip`）
+- **起点**：v3.0.4-8.44M 断点（`rl/models/hex_ppo_v3.0.4_20260909_8.4M.zip`）
   ——对 champion 273:207 的全景最强 artifact，其唯一洞穴 dual-lanes 0:48 正是新分布
   （0 初始单位 + 高补给开局已进入随机域）应该自然治好的部分。
 - **地图混合压低静态图**：`random:0.7 + 6 静态各 0.05`（v3.0.3 为 0.5 + 各 0.083）。
@@ -323,7 +353,7 @@ whack-a-mole（v3.0.2 塌 danger-close → v3.0.3 塌 breach/desert → v3.0.4 �
 对 8.52M 平手（49:47），对 8.44M 累计 **131:157 落后**（09-09 两批 40:56、47:49，
 2026-09-12 加赛确认批 44:52，三批点估计同向；累计 288 局 8.44M 胜率 54.5%）
 ——v3.0.2「交付 best ≠ 最强断点」再现。交付候选切换为 8.44M 断点，
-清洗后 `rl/models/hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip`；
+清洗后 `rl/models/hex_ppo_v3.0.4_20260909_8.4M.zip`；
 8.6M 训练期 best 文件已于 2026-09-12 复测确认后删除（stats_v304_screen.jsonl 累计 288 局）。
 
 **全图验收**（v3.0.4-8.44M vs champion v3.0.3，`--seed-prefix 31337` 同批地图，
@@ -360,7 +390,7 @@ default/forge）同理。此类图的「48 局」有效样本是 2，判读时�
 不改观测/动作/奖励语义（无需新 env 快照，`bots.ts` 路由不变），只改训练配方。
 启动器 `rl/test-output/launchers/run_train_v304.bat`，配方与 v3.0.3 最小差异：
 
-- **起点**：现役 champion `rl/models/hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip`
+- **起点**：现役 champion `rl/models/hex_ppo_v3.0.3_20260908_5M.zip`
   直接续训（已 sanitize 的交付 zip，load 时重新注入 lr 调度）。不蒸馏——v3.0.3 已验证
   死锁修复后的持续 PPO 路线，且其训练期评估**末次（500 万步）即全程 best**，未见平台期。
 - **针对记录在案的退化加权**：v3.0.3 对 v3.0.2 的 breach 仅 35%、desert 46%——
@@ -403,7 +433,7 @@ default/forge）同理。此类图的「48 局」有效样本是 2，判读时�
 训练 356 万帧完整跑完（02:58-11:17，约 8.3 小时 @97-119 fps，无中断），全程健康：
 `explore/new_candidate_rate` 稳定 1.2%-1.5%、`explained_variance` 0.76-0.82、target_kl 未触发。
 训练期评估单调走强，**末次（500 万步）即全程 best**（分布内最弱下界 50%、后手座下界 61%），
-已按 best 交付并 sanitize（`rl/models/hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip`）。
+已按 best 交付并 sanitize（`rl/models/hex_ppo_v3.0.3_20260908_5M.zip`）。
 配方改动的核心目标在训练曲线直接兑现：`default_champion` 场景（对 v3.0.0）从早期 8-21% 修复到
 **75%（下界 65%）**——三张静态图进分布后 OOD 崩塌消失。
 
@@ -622,7 +652,7 @@ v3.0.2 教训形式化）；`npm run test:rl` 28 项通过。
 五代以来首次总分 Wilson 下界越过 50%（与 v2.7.0 当年晋级证据 66:30/58.9% 同级）；后手座点估计 52.1% 为历代首次
 不输（v2.8.0 29.2%、v3.0.1 39.6%）；其后手座 96 局下界 42.2% 未过 50%，字面标准下待更大样本确认。
 
-**决策**：交付 1.4M 断点 `rl/models/hex_ppo_v3.0.2_20260905_random_selfplay_1440000.zip`（已 `sanitize_delivery_zip`，
+**决策**：交付 1.4M 断点 `rl/models/hex_ppo_v3.0.2_20260905_1.4M.zip`（已 `sanitize_delivery_zip`，
 常数 lr 1e-5），**v3.0.2-1.4M 替换 v2.7.0 成为生产 champion**；v2.7.0 保留为上一代 champion 与 v3.0 自对弈锚点；
 训练期 best 交付文件（10 万步）降级为中间产物勿部署。同批地图历史对照：v2.8.0 43:53 → v3.0.0 51:45 →
 v3.0.1 49:47 → **v3.0.2-1.4M 61:35**。
@@ -934,7 +964,7 @@ v2.7.1 续训（400 万→494 万步）对锚点 v2.7.0 胜率始终 43% 左右�
   用 `custom_objects` 跳过 lr 反序列化可加载，证明根因即此）。
 - `train.py` 新增 `sanitize_delivery_zip`：交付前把 `learning_rate` 改为常数、移除 `lr_schedule` 字段；
   推理只需策略权重，续训时 `load(learning_rate=schedule)` 会重新注入调度，不影响任何训练能力。
-- 已对 `hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip` 补做清洗并重新部署，服务器加载通过。
+- 已对 `hex_ppo_v2.3.3_20260830_770K.zip` 补做清洗并重新部署，服务器加载通过。
 
 ## 2026-08-29 · v2.3.3
 

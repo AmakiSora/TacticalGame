@@ -265,10 +265,10 @@
 ```bash
 # 启动器模板：从 v3.0.3-5M 在单图微调
 $env:RL_MODEL_VERSION = "v3.0.3-expert-forge"
-$env:RL_LOAD_MODEL = "rl/models/hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip"
+$env:RL_LOAD_MODEL = "rl/models/hex_ppo_v3.0.3_20260908_5M.zip"
 $env:RL_TIMESTEPS = "1000000"  # 新增 100 万帧
 $env:RL_TRAIN_MAP_MIX = "forge:0.9,random:0.1"
-$env:RL_ANCHOR_MODEL = "rl/models/hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip"
+$env:RL_ANCHOR_MODEL = "rl/models/hex_ppo_v3.0.3_20260908_5M.zip"
 $env:RL_ANCHOR_PROB = "0.20"
 $env:RL_LEARNING_RATE = "1e-5"  # 小学习率微调
 $env:RL_LR_END = "5e-6"
@@ -306,7 +306,7 @@ $env:RL_MODEL_VERSION = "v3.2.0"
 $env:RL_LOAD_MODEL = "rl/models/hex_ppo_v3.2.0_20260914_distilled.zip"
 $env:RL_TIMESTEPS = "2000000"  # 新增 200 万帧
 $env:RL_TRAIN_MAP_MIX = "random:0.5,default:0.083,breach:0.083,danger-close:0.083,desert:0.083,dual-lanes:0.083,forge:0.083"
-$env:RL_ANCHOR_MODEL = "rl/models/hex_ppo_v3.0.3_20260908_random_selfplay_5000000.zip"
+$env:RL_ANCHOR_MODEL = "rl/models/hex_ppo_v3.0.3_20260908_5M.zip"
 $env:RL_ANCHOR_PROB = "0.20"
 $env:RL_LEARNING_RATE = "5e-5"
 $env:RL_LR_END = "1e-5"

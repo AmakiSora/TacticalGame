@@ -139,7 +139,7 @@ hex_ppo_<版本号>_<训练日期>_<地图名>_<对手类型>_<步数>.zip
 例如：
 
 ```text
-rl/models/hex_ppo_v2.1.4_20260826_default_modelmix_800000.zip
+rl/models/hex_ppo_v2.1.4_20260826_800K.zip
 ```
 
 版本号具体到三级（如 `v2.0.4`），默认值与 `rl/docs/RELEASE_NOTES.md` 顶部条目一致，
@@ -267,7 +267,7 @@ v3.0 把 v2.x 写死在规则里的“去哪、打谁”交给策略，并换掉
 - **冷启动**：不能加载任何 v2 权重，改用 v2.7.0 老师蒸馏：
 
 ```powershell
-rl/.venv/Scripts/python.exe rl/training/distill.py collect --teacher rl/models/hex_ppo_v2.7.0_20260901_random_selfplay_4000000.zip --games 400
+rl/.venv/Scripts/python.exe rl/training/distill.py collect --teacher rl/models/hex_ppo_v2.7.0_20260901_4M.zip --games 400
 rl/.venv/Scripts/python.exe rl/training/distill.py train --out rl/models/hex_ppo_v3.0.0_<日期>_distilled
 $env:RL_MAP_ID = "random"; $env:RL_LOAD_MODEL = "rl/models/hex_ppo_v3.0.0_<日期>_distilled.zip"; $env:RL_TIMESTEPS = "3000000"
 rl/.venv/Scripts/python.exe rl/training/train.py
@@ -423,7 +423,7 @@ RL 模型（`zip 路径`，每座使用其训练时期的编码与合法动作�
 
 ```powershell
 rl/.venv/Scripts/python.exe rl/evaluation/evaluate_cross.py `
-  --player-a rl/models/hex_ppo_v3.0.4_20260909_random_selfplay_8440000.zip `
+  --player-a rl/models/hex_ppo_v3.0.4_20260909_8.4M.zip `
   --player-b algo:threat `
   --games 4
 ```

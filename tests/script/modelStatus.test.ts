@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isExpiredModel, loadModelStatus, parseModelStatus, versionOfModelFile } from '../../script/modelStatus.mjs';
 
-const EXPIRED_FILE = 'hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip';
+const EXPIRED_FILE = 'hex_ppo_v2.3.2_20260829_340K.zip';
 
 const validEntry = {
   version: 'v2.3.2',
@@ -18,7 +18,7 @@ const doc = (extra: Record<string, unknown> = {}) =>
 describe('versionOfModelFile', () => {
   it('从交付文件名里取出版本段', () => {
     expect(versionOfModelFile(EXPIRED_FILE)).toBe('v2.3.2');
-    expect(versionOfModelFile('hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip')).toBe('v3.2.0');
+    expect(versionOfModelFile('hex_ppo_v3.2.0_20260918_9.8M.zip')).toBe('v3.2.0');
   });
 
   it('不符合交付命名规范的文件返回 null（不发散匹配）', () => {
@@ -51,7 +51,7 @@ describe('parseModelStatus', () => {
     expect(() => parseModelStatus('{ not json')).toThrow(/不是合法 JSON/);
     expect(() => parseModelStatus(JSON.stringify({ expired: null }))).toThrow(/缺少顶层 expired 数组/);
     expect(() => parseModelStatus(doc({ version: '2.3.2' }))).toThrow(/version 需形如/);
-    expect(() => parseModelStatus(doc({ file: 'hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip' })))
+    expect(() => parseModelStatus(doc({ file: 'hex_ppo_v3.0.0_20260903_50K.zip' })))
       .toThrow(/file 的版本段与 version 不一致/);
     expect(() => parseModelStatus(doc({ expiredAt: '2026/09/19' }))).toThrow(/expiredAt 需是形如/);
     expect(() => parseModelStatus(doc({ reason: '  ' }))).toThrow(/reason 需是非空字符串/);
@@ -81,7 +81,7 @@ describe('isExpiredModel', () => {
   it('既接受完整文件名也接受纯版本号', () => {
     expect(isExpiredModel(EXPIRED_FILE, entries)).toBe(true);
     expect(isExpiredModel('v2.3.2', entries)).toBe(true);
-    expect(isExpiredModel('hex_ppo_v2.2.0_20260827_default_modelmix_best.zip', entries)).toBe(false);
+    expect(isExpiredModel('hex_ppo_v2.2.0_20260827_120K.zip', entries)).toBe(false);
     expect(isExpiredModel('random.zip', entries)).toBe(false);
   });
 });

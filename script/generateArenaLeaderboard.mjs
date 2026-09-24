@@ -38,8 +38,53 @@ export const PROJECT_DIR = dirname(SCRIPT_DIR);
 export const DEFAULT_STATS_FILE = join(PROJECT_DIR, 'arena', 'matches.jsonl');
 export const DEFAULT_OUT = join(PROJECT_DIR, 'public', 'data', 'arena-leaderboard.json');
 
-export const MODEL_FILE_RE = /^hex_ppo_(v\d+\.\d+\.\d+)_(\d{8})_([a-z0-9-]+)_(.+)_(\d+|best)\.zip$/i;
+/**
+ * 模型文件名：`hex_ppo_<版本>_<日期>_<步数>.zip`（三段式，2026-09-24 起）。
+ *
+ * 步数段是**简化写法**（`120K` / `8.8M`，与排行榜展示名 `v2.3.2@340K` 同源同格式），
+ * 取自 zip 内 `num_timesteps`（实际交付断点），不是训练目标步数——这样文件名、展示名、
+ * zip 内步数三者恒等，`MODEL_DELIVERED_STEPS` 镜像表随之退休。
+ *
+ * **旧四段式**（`hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数>`）已全面停用；地图/对手两个
+ * 字段改由 `MODEL_META_BY_VERSION` 提供（见下），因为它们是**按版本恒定的历史事实**，
+ * 放进每个文件名只会让重命名牵连历史数据。
+ */
+export const MODEL_FILE_RE = /^hex_ppo_(v\d+\.\d+\.\d+)_(\d{8})_(\d+(?:\.\d+)?[KM])\.zip$/i;
 export const EXCLUDED_VERSIONS = new Set(['v1.0.0']);
+
+/**
+ * 训练地图 / 训练对手：新命名不再携带，改为按版本查表。
+ * 数据来源 = 旧四段式文件名（2026-09-24 重命名前逐个记录），是历史事实不是派生量。
+ * 未登记的版本（未来新增）两个字段为 null，UI 会显示为空而不是崩溃。
+ */
+export const MODEL_META_BY_VERSION = {
+  'v1.0.0': { trainMap: 'default', opponentType: 'random_opponent' },
+  'v2.0.0': { trainMap: 'default', opponentType: 'rule' },
+  'v2.1.1': { trainMap: 'default', opponentType: 'rule_mixed' },
+  'v2.1.3': { trainMap: 'default', opponentType: 'rule_defensive' },
+  'v2.1.4': { trainMap: 'default', opponentType: 'modelmix' },
+  'v2.1.5': { trainMap: 'default', opponentType: 'modelmix' },
+  'v2.1.6': { trainMap: 'default', opponentType: 'modelmix' },
+  'v2.1.8': { trainMap: 'default', opponentType: 'modelmix' },
+  'v2.2.0': { trainMap: 'default', opponentType: 'modelmix' },
+  'v2.3.1': { trainMap: 'random', opponentType: 'modelmix' },
+  'v2.3.2': { trainMap: 'random', opponentType: 'selfplay' },
+  'v2.3.3': { trainMap: 'random', opponentType: 'selfplay' },
+  'v2.4.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v2.5.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v2.6.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v2.7.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v2.8.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.0.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.0.1': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.0.2': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.0.3': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.0.4': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.1.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.1.1': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.2.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v4.0.0': { trainMap: 'random', opponentType: 'selfplay' },
+};
 
 // 作废（retired）名单 MODEL_STATUS_BY_VERSION / RETIRED_VERSIONS 在 script/modelStatus.mjs
 // （与过期登记表同住唯一事实来源）；本文件只消费，并在启动时做两态互斥断言。
@@ -63,27 +108,13 @@ assertExpiredRetiredDisjoint(EXPIRED_VERSIONS, RETIRED_VERSIONS);
 /** 评估协议已知限制：v2.0.0 观测固定 player_a 视角，坐 player_b 属分布外。 */
 export const STATUS_NOTES = {
   'v2.0.0': 'player_b 座位观测失真，成绩仅供参考',
-  'v2.3.2': '交付 best 实为 34 万步（文件名为训练目标 80 万步）；交付期评估早于 --swap-sides 座位 bug 修复，历史 7:1 成绩属小样本噪声',
+  'v2.3.2': '交付期评估早于 --swap-sides 座位 bug 修复，历史 7:1 成绩属小样本噪声',
 };
 
-/**
- * 文件名末段步数是「训练目标/终点」，交付 zip 内实际是评估 best 断点，两者常不一致
- * （v2.3.3 档案明文「文件名 2000000 是目标步数，实际交付 best 在 77 万步」）。此表按
- * zip 内 num_timesteps 记录实际交付断点，仅收录与文件名差 ≥10 万步（超出 rollout 边界
- * 与 M 舍入噪声）的模型；shortName 用它生成展示名，避免「v2.3.2@800K」这类按目标步数
- * 虚标交付物。镜像 rl/docs/MODELS_NOTES.md「文件名步数与交付断点」表，两处需人工同步维护。
- */
-export const MODEL_DELIVERED_STEPS = {
-  'hex_ppo_v2.3.1_20260829_random_modelmix_800000.zip': 70000,
-  'hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip': 340000,
-  'hex_ppo_v2.3.3_20260830_random_selfplay_2000000.zip': 770000,
-  'hex_ppo_v2.6.0_20260831_random_selfplay_4000000.zip': 3560000,
-  'hex_ppo_v2.8.0_20260903_random_selfplay_6000000.zip': 4650000,
-  'hex_ppo_v3.0.0_20260903_random_selfplay_3000000.zip': 50000,
-  'hex_ppo_v3.1.0_20260910_random_selfplay_1500000.zip': 100000,
-  'hex_ppo_v3.1.1_20260911_random_selfplay_10940000.zip': 8800000,
-  'hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip': 9800000,
-};
+// MODEL_DELIVERED_STEPS 已退休（2026-09-24）：文件名步数段改为直接写**交付断点**
+// （取 zip 内 num_timesteps），文件名、展示名、zip 内步数三者恒等，不再需要镜像覆盖表。
+// 历史映射：v2.3.1→70K、v2.3.2→340K、v2.3.3→770K、v2.6.0→3.6M、v2.8.0→4.7M、
+// v3.0.0→50K、v3.1.0→100K、v3.1.1→8.8M、v3.2.0→9.8M（均已写入各自新文件名）。
 
 export function parseArgs(argv) {
   const opts = {
@@ -110,13 +141,33 @@ export function parseArgs(argv) {
   return opts;
 }
 
-/** 解析模型文件名：hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数|best>.zip。地图名用连字符，对手类型可含下划线。 */
+/**
+ * 文件名步数段的**权威解析**（`120K` → 120000、`8.8M` → 8800000）。
+ * 与 `shortName` 的格式化公式互为逆运算，round-trip 由测试钉死。
+ */
+export function parseStepTag(raw) {
+  if (typeof raw !== 'string') return null;
+  const m = raw.match(/^(\d+(?:\.\d+)?)([KM])$/i);
+  if (!m) return null;
+  const value = Number(m[1]);
+  if (!Number.isFinite(value)) return null;
+  return Math.round(value * (m[2].toUpperCase() === 'M' ? 1_000_000 : 1_000));
+}
+
+/** 解析模型文件名：hex_ppo_<版本>_<日期>_<步数>.zip。地图/对手查 MODEL_META_BY_VERSION。 */
 export function parseModelFile(fileName) {
   const m = fileName.match(MODEL_FILE_RE);
   if (!m) return null;
-  const [, version, trainDate, trainMap, opponentType, stepsRaw] = m;
-  const steps = /^\d+$/.test(stepsRaw) ? Number(stepsRaw) : null;
-  return { id: fileName, version, trainDate, trainMap, opponentType, steps };
+  const [, version, trainDate, stepsRaw] = m;
+  const meta = MODEL_META_BY_VERSION[version] ?? { trainMap: null, opponentType: null };
+  return {
+    id: fileName,
+    version,
+    trainDate,
+    trainMap: meta.trainMap,
+    opponentType: meta.opponentType,
+    steps: parseStepTag(stepsRaw),
+  };
 }
 
 export function shortName(meta) {
@@ -151,7 +202,7 @@ export function collectRegistry(modelsDir, algorithms = listAlgorithmInfo()) {
     const meta = parseModelFile(f);
     if (!meta) continue;
     if (RETIRED_VERSIONS.has(meta.version)) continue;
-    registry.set(meta.id, { ...meta, deliveredSteps: MODEL_DELIVERED_STEPS[meta.id] ?? null, kind: 'model' });
+    registry.set(meta.id, { ...meta, deliveredSteps: meta.steps, kind: 'model' });
     if (EXCLUDED_VERSIONS.has(meta.version)) {
       excluded.push({ id: meta.id, version: meta.version, reason: '512 动作旧格式，评估脚本不支持进程内互打' });
     }

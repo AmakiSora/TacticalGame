@@ -67,8 +67,8 @@ JS_VERSION_OF = (
     ")}, err => { console.error(err); process.exit(1); })"
 )
 
-VALID_FILE_A = "hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip"
-VALID_FILE_B = "hex_ppo_v2.5.0_20260830_random_selfplay_2000000.zip"
+VALID_FILE_A = "hex_ppo_v2.3.2_20260829_340K.zip"
+VALID_FILE_B = "hex_ppo_v2.5.0_20260830_2M.zip"
 
 
 def run_node(script: str, **extra_env: str) -> subprocess.CompletedProcess:
@@ -190,7 +190,7 @@ def test_missing_registry_is_no_expired_on_both_sides(tmp_path):
 def test_version_regex_parity():
     files = [
         VALID_FILE_A,
-        "hex_ppo_v3.2.0_20260918_random_selfplay_10000000.zip",
+        "hex_ppo_v3.2.0_20260918_9.8M.zip",
         "hex_ppo_v3.0.1_20260904_distilled.zip",
         "random.zip",
         "hex_ppo_v23.2_20260829_x.zip",

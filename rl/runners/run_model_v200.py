@@ -53,7 +53,7 @@ def main():
     args = parse_args()
     model_path = args.model
     if not model_path:
-        candidates = list(Path("rl/models").glob("hex_ppo_v2.0.*_*_*.zip"))
+        candidates = list(Path("rl/models").glob("hex_ppo_v2.0.*_*.zip"))
         candidates += list(Path("rl/models").glob("hex_ppo_*_v2.0.*_*.zip"))
         if not candidates:
             raise FileNotFoundError("未找到 v2.0 模型，请先通过 --model 指定模型路径")

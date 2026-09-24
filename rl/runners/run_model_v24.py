@@ -46,8 +46,8 @@ def main():
     args = parse_args()
     model_path = args.model
     if not model_path:
-        candidates = list(Path("rl/models").glob("hex_ppo_v2.3.*_*_*.zip"))
-        candidates += list(Path("rl/models").glob("hex_ppo_v2.4.*_*_*.zip"))
+        candidates = list(Path("rl/models").glob("hex_ppo_v2.3.*_*.zip"))
+        candidates += list(Path("rl/models").glob("hex_ppo_v2.4.*_*.zip"))
         candidates += list(Path("rl/models").glob("hex_ppo_*_v2.3.*_*.zip"))
         candidates += list(Path("rl/models").glob("hex_ppo_*_v2.4.*_*.zip"))
         if not candidates:

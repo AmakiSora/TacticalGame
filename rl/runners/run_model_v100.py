@@ -43,7 +43,7 @@ def main():
     args = parse_args()
     model_path = args.model
     if not model_path:
-        candidates = list(Path("rl/models").glob("hex_ppo_*random_opponent*.zip"))
+        candidates = list(Path("rl/models").glob("hex_ppo_v1.0.0_*.zip"))
         if not candidates:
             raise FileNotFoundError("未找到 512 动作 random_opponent 模型")
         model_path = str(max(candidates, key=lambda path: path.stat().st_mtime))

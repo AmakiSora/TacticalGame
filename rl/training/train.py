@@ -152,21 +152,31 @@ def tensorboard_available() -> bool:
 
 
 def latest_model_path(map_id: str) -> str:
-    patterns = (
-        f"hex_ppo_*_*_{map_id}_*.zip",  # 新命名: hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数>
-        f"hex_ppo_{map_id}_rule_*_*_*.zip",  # 兼容旧命名
-        f"hex_ppo_v2_{map_id}_rule_opponent_*.zip",  # 旧时间戳命名
-    )
+    """最近修改的交付模型（`RL_LOAD_MODEL=latest` 用）。
+
+    v4.0.0（2026-09-24 命名变更）：文件名由四段式
+    `hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数>` 改为三段式
+    `hex_ppo_<版本>_<日期>_<步数>`——**地图段已不存在**，因此本函数不再能按 map_id
+    过滤。保持签名兼容（调用方仍传 map_id），改为按 mtime 取全部交付模型里最新的一个；
+    跨地图续训请显式传 `RL_LOAD_MODEL`，不要依赖 auto/latest。
+    """
+    patterns = (f"hex_ppo_*_{map_id}_*.zip", "hex_ppo_v2_*.zip")  # 兼容旧四段式残留
     candidates: list[Path] = []
     for root in ("rl/models", "rl"):
         for pattern in patterns:
             candidates += list(Path(root).glob(pattern))
+    # 新三段式（含 v1/v2/v3/v4 全部交付模型）
+    candidates += list(Path("rl/models").glob("hex_ppo_v[0-9]*_[0-9]*_[0-9]*[KM].zip"))
     if not candidates:
         return ""
     return str(max(candidates, key=lambda path: path.stat().st_mtime))
 
 
 def opponent_model_path(map_id: str) -> str:
+    """v2.0.0 旧模型对手（38 动作）的路径；无则空。
+
+    三段式命名不含地图段，改为**按版本**定位（该角色的语义本就是「那个特定的旧模型」）。
+    """
     configured = env_str("RL_OPPONENT_MODEL", "")
     if configured:
         return configured[:-4] if configured.endswith(".zip") else configured
@@ -174,6 +184,7 @@ def opponent_model_path(map_id: str) -> str:
         f"hex_ppo_{map_id}_rule_v2.0.0_*.zip",
         f"hex_ppo_v2.0.0_*_{map_id}_rule_*.zip",
         f"hex_ppo_v2_{map_id}_rule_opponent_*.zip",
+        "hex_ppo_v2.0.0_*.zip",  # 三段式
     )
     candidates: list[Path] = []
     for root in (Path("rl/models"), Path("rl")):
@@ -188,8 +199,11 @@ def champion_model_path() -> str:
 
     v3.0 translates the 54-action teacher into its own index space via
     ``env.map_v27_action``, so the previous generation can still anchor.
+
+    三段式命名不含地图/对手段，改为**按版本**匹配（本函数的语义本就是「v2.4/v2.7/v2.8
+    这三代 54 动作冠军」，与地图无关）。
     """
-    for pattern in ("hex_ppo_v2.7.*_random_selfplay_*.zip", "hex_ppo_v2.8.*_random_selfplay_*.zip", "hex_ppo_v2.4.*_random_selfplay_*.zip"):
+    for pattern in ("hex_ppo_v2.7.*_*.zip", "hex_ppo_v2.8.*_*.zip", "hex_ppo_v2.4.*_*.zip"):
         candidates = list(Path("rl/models").glob(pattern))
         if candidates:
             return str(max(candidates, key=lambda path: path.stat().st_mtime))

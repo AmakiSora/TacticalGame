@@ -14,9 +14,9 @@ import { RETIRED_VERSIONS } from '../../script/modelStatus.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const VALID = 'hex_ppo_v2.2.0_20260827_default_modelmix_best.zip';
-const RETIRED = 'hex_ppo_v2.1.8_20260827_default_modelmix_920000.zip';
-const V1 = 'hex_ppo_v1.0.0_20260824_default_random_opponent_120000.zip';
+const VALID = 'hex_ppo_v2.2.0_20260827_120K.zip';
+const RETIRED = 'hex_ppo_v2.1.8_20260827_920K.zip';
+const V1 = 'hex_ppo_v1.0.0_20260824_120K.zip';
 
 let tempDir: string | null = null;
 
@@ -139,7 +139,7 @@ describe('collectRegistry 内置算法混池注册', () => {
 describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
   const line = (a: string, b: string, winner: string) =>
     JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
-  const EXPIRED_ZIP = 'hex_ppo_v2.3.2_20260829_random_selfplay_800000.zip';
+  const EXPIRED_ZIP = 'hex_ppo_v2.3.2_20260829_340K.zip';
 
   it('main() 全链路出榜，status 三分支都走到（registry 组装仅 main 里有，曾因常量迁移漏 import 裸引用）', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-smoke-'));

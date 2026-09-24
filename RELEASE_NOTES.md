@@ -6,7 +6,31 @@
 
 ## 3.5.5
 
-- TODO 补充本版本改动
+### 新增
+
+- **RL 从零训练前置（v4.0.0 世代）——算法教师蒸馏通道**：`rl/training/distill.py` 新增 `collect-algo` 子命令，用 `threat` / `greedy` / `field` 三个内置算法经 `decide` 通道当教师采集样本，**不加载任何历史模型**，从零世代因此有了不依赖旧权重的冷启动数据源。算法输出的是引擎动作对象而非动作索引，故新增 `_algo_action_index` 三级匹配把它映射回当前 155 动作表：精确匹配 → 同单位/同兵种的最近落点 → `None` 回退（丢弃该样本）；4 局冒烟 fallback 率 **2.32%**。
+- **`RL_NO_AUTO_ANCHOR=1`（`rl/training/train.py`）**：从零世代不再被 `champion_model_path()` 悄悄塞进 v2.7/v2.8 历史锚点——自动锚点在续训世代是便利，在「证明新配方能从零学会」的世代则是污染源。
+- **随机域联合边角采样 `RL_RANDOM_CORNER_BOOST`（`rl/envs/env.py`，JSON 形如 `{"p":0.18}`）**：连续两代 `forge` 0:48 的根因不是边缘分布太窄，而是**各维边缘已拓宽但联合命中率 << 1%**——`forge` 的生态位是「短局 × 低 HQ × 多据点 × 满编开局」四件事同时发生。现在按 `p` 对随机域内部的这组联合边角做重要性采样，配套在 `src/config/randomMap.ts` 新增 `startingUnitCount` 随机参数（`DEFAULT_RANGES` 为 `[0, 4]`）以支持固定满编开局。2×128 架构冒烟 1.44M 参数、单环境 68fps。
+- **v4.1.0 训练设施开关**（均在 `rl/training/train.py`）：`PYTORCH_ALLOW_TF32=1`（cuda/rocm 通用，update 阶段本地实测 **+18%**）、`RL_TORCH_COMPILE=1`（`reduce-overhead` / cuda graph；启用前做两次探测前向，triton 缺失等环境下回退 eager 而**不终止训练**，Windows 原生 torch 无 triton 故该项只在 linux 有意义）；`RL_RESOURCE_MONITOR=1`（缺省关闭，以保证在途 v4.0.0 恢复后日志逐字节一致）按 `RL_EXPLORE_LOG_EVERY` 帧把 `resource` / `gpu_mem_gb` / `sys_mem_pct` 写 tb + stdout。`rl/training/eval_worker.py` 的 `evaluate()` 补 `torch.set_num_threads(1)`——训练 worker 早已单线程化而评估侧漏了，8 核服务器上评估进程曾吃掉 5.3 核、把 rollout 从 165fps 压到 46fps。
+- **算法场景可进 best 选择键 `RL_EVAL_ALGO_IN_SELECTION`**：`rl/training/eval_worker.py` 的 `build_scenarios` 新增 `algo_in_selection` 参数（命令行 `--algo-in-selection`）决定算法场景是否计入 `_selection`，`rl/training/train.py` 透传并在启动日志显式打印；默认 `False` 保持「只记录、不参与选择」的历史行为。开启门槛是**对算法胜率已稳定过 40%**（v4.0.0 S2 交付点实测 threat 41% / greedy 49% / field 59%），在此之前开启会让选择键被「对模型强、对算法弱」的早期断点主导。
+- **v4.0.0 结项文档**：新增 `rl/docs/plans/v4.0.0_conclusion.md`（结项结论）与 `rl/docs/models/v4.0.0.md`（单模型档案，含 A/B/C 三类踩坑清单）；`rl/docs/MODELS_NOTES.md` 的状态总表、版本演进表、交付断点表各加行，「共同限制与后续方向」补 5 条跨代教训。
+
+### 变更
+
+- **交付模型命名由四段式改三段式**（`refactor(rl)!`）：`hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数>.zip` → **`hex_ppo_<版本>_<日期>_<步数>.zip`**，步数段直接写**交付断点**（`70K` / `8.8M`，与榜单 `shortName` 同一公式），于是「文件名 / 展示名 / zip 内 `num_timesteps`」三者恒等，`MODEL_DELIVERED_STEPS` 镜像表退休；训练地图与对手改由 `MODEL_META_BY_VERSION` 按版本查表，UI 展示不变。解析侧新增 `parseStepTag`，`parseModelFile` 的地图/对手改查表。**影响面**：`rl/models/` 20 个交付 zip + `deprecated/` 5 个作废 zip 全部重命名；`arena/matches.jsonl` 48,648 局历史玩家名批量改写（Bradley-Terry 评分逐版本比对 **24/24 零变化**）；8 个 runner 的 glob 同步（`run_model_v100.py` 原先依赖的 `*random_opponent*` 在改名前就已完全失效，一并修好）；`rl/training/train.py` 的 `latest_model_path` / `opponent_model_path` / `champion_model_path` 后两者改按版本匹配；`arena/model-status.json` 三个过期模型的 `file` 字段；测试里的模型名常量与一处 short 断言（`v2.2.0` → `v2.2.0@120K`，旧 `_best` 后缀停用）。**不改观测/动作/奖励语义，`bots.ts` 路由不变**，但模型文件名是 `POST /api/games/:id/bots/rl` 的 `model` 取值（经 `GET /api/rl/models` 发现），**硬编码旧文件名的调用方需一并更新**；本地 `rl/models/` 与代码/脚本必须同批升级，混用会表现为「模型未发现」。
+- **v4.0.0 中间产物归档**：`hex_ppo_v4.0.0_s1_6000000.zip`（S1 交付，内部 5.7M）与 `hex_ppo_v4.0.0_distilled.zip`（蒸馏冷启动断点）移入 `rl/models/_archive_v4.0.0/`（与 `_archive_v3.2.0` 同构，未删除），顶层只留候选件 `hex_ppo_v4.0.0_s2_14000000.zip`（内部 11.4M）。这两个归档件文件名缺日期段，榜单 `collectRegistry` 按旧格式排除（收录 0 条），符合「未过验收不参评」定位；日后若要参评需改名补日期段。
+
+### 修复
+
+- **Docker 镜像缺 `script/modelStatus.mjs`，容器启动即 `ERR_MODULE_NOT_FOUND`**：`src/api/bots.ts` 对它是**静态 import**（过期模型名单唯一来源），`tsc` 又因仓库无 `allowJs` 需要 `script/modelStatus.d.mts`，而两阶段镜像的 COPY 清单都没带上——3.5.4 引入该 import 时漏改 Dockerfile，此后构建出的镜像 `npm start` 直接起不来（构建期 `npm run build` 与 CI 的 `docker build` 都发现不了）。构建期补 COPY `.mjs` + `.d.mts`，运行期补 COPY `script/modelStatus.mjs`（`dist/api/bots.js` 里保留的是相对路径 `../../script/modelStatus.mjs`）与 `arena/model-status.json`：该模块按自身位置回推项目根读登记表，而镜像缺登记表时 `bots.ts` 按「无过期」降级，会让 v2.3.2 / v2.6.0 / v2.5.0 三个过期模型重新出现在线上「添加 AI」列表（它们的 zip 随 `COPY rl` 进镜像）。
+- **评估控制台在未携带跑批链路的部署上只报一句读不懂的 500**：`/api/arena/eval/start` 与 `/api/arena/leaderboard/regenerate` 会 spawn `rl/evaluation/round_robin.py` 与 `script/generateArenaLeaderboard.mjs` / `generateArenaStats.mjs`，后两者按设计不进镜像（评估跑批是本地开发功能），线上点按钮得到的是 spawn ENOENT 冒成的 500。现在两个写接口在链路缺件时返回 **501 `arena_eval_unavailable`** 并说明原因，只读的 `/api/arena/participants` 不受影响（镜像里仍可列模型与算法）。
+- **构建上下文瘦身**：`.dockerignore` 补 `arena/details` 与 `arena/matches.jsonl`——此前只靠 Dockerfile 的选择性 COPY 排除，2GB+ 的本地分析数据每次构建仍要完整传一遍上下文。
+
+### 测试与验证
+
+- **v4.0.0 结项读数**：对 v3.1.1 46.6%（榜单口径 41.7%）、对 v3.0.3 53.6%（48.6%）、算法三场景 41%/48%/53%，全图 `default` / `breach` / `desert` 三张静态图 **0%**（验收一票否决）、`danger-close` 96/96，能力序 **v3.1.1 > v4.0.0 > v3.0.3**，判定未通过验收并结项。两条硬结论：① arena 榜单上「对算法 16.5%」是 7 图聚合假象——同一把尺子放到随机图，v3.1.1 对同批算法是 41%/45%/64%，静态图（desert 17% / breach 33%）拉低了总数，即「静态图崩塌」与「对算法弱」是同一个病（训练分布覆盖不足）；② S3 消融（算法 40% + lr 8e-05）第四次复现「收敛后继续训练 = 退化」，同步骤对照自 11.6M 起两条轨迹分叉并单调拉开。
+- **服务器实测（pai-dsw a10，8c/28g/24g）**：瓶颈是 Xeon 8369B 的 vcpu 单核性能（整机 CPU 仅 35%），8 环境稳态 48fps；据此修正预算为 s1 8M + s2 4M 累计 12M 帧。
+- **本次收口验证**：`npm run build` 通过；`npm run check-version` 3.5.5 全部引用一致；`npm test` 61 文件 / 568 用例全绿（含新增的评估链路缺件 501 用例）；CI 在 `docker build` 之后新增**容器启动冒烟**（`docker run` + 轮询 `/readyz` 必须返回 `{"status":"ready"}`）——上面那条镜像漏件正是「构建全绿但容器起不来」的形态，只有真把容器起来才能钉住。
 
 ## 3.5.4
 

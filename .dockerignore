@@ -39,3 +39,7 @@ rl/selfplay
 rl/__pycache__
 rl/leaderboard/details
 rl/models/deprecated
+# 竞技场本地分析数据（合计 2GB+）：镜像只带 arena/model-status.json 过期登记表，
+# 显式排除而不是靠 Dockerfile 选择性 COPY——否则整棵 arena/ 每次构建都进上传上下文。
+arena/details
+arena/matches.jsonl

@@ -23,4 +23,21 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: docker build --tag tactical-game:ci .
+      # 构建全绿 ≠ 容器起得来：dist/ 里有两处逃出 dist/ 的相对 import
+      # （../../script/modelStatus.mjs、../../algorithms/registry.mjs），Dockerfile 漏 COPY
+      # 就是启动期 ERR_MODULE_NOT_FOUND，只有真把容器起来才能发现（3.5.4 漏 modelStatus 即此）。
+      - name: Smoke test container startup
+        run: |
+          docker run -d --name smoke -p 3123:3123 \
+            -e PORT=3123 -e HOST=0.0.0.0 -e AUTO_CONTROL_TOKEN=ci-test-token tactical-game:ci
+          ready=''
+          for _ in $(seq 1 30); do
+            ready=$(curl -fsS http://127.0.0.1:3123/readyz || true)
+            if [ -n "$ready" ]; then break; fi
+            sleep 2
+          done
+          echo "readyz -> ${ready:-<no response>}"
+          docker logs smoke
+          docker rm -f smoke > /dev/null
+          test "$ready" = '{"status":"ready"}'
       - run: AUTO_CONTROL_TOKEN=ci-test-token docker compose config --quiet

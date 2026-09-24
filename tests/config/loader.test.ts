@@ -142,6 +142,44 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('accepts null maxTurns as an unlimited-round map', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as Record<string, any>;
+    map.balance.maxTurns = null;
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    loadMaps(dir);
+
+    expect(getMapConfig('default').balance.maxTurns).toBeNull();
+    expect(listMaps().find(item => item.id === 'default')!.preview.maxTurns).toBeNull();
+    resetConfig();
+  });
+
+  it.each([[0], [-3], ['15'], [true]])(
+    'rejects maxTurns %# that is neither a positive number nor null',
+    maxTurns => {
+      const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+      const map = validMap() as Record<string, any>;
+      map.balance.maxTurns = maxTurns;
+      writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+      expect(() => loadMaps(dir)).toThrow('balance.maxTurns must be a number >= 1');
+      resetConfig();
+    },
+  );
+
+  it('ships marathon as an unlimited-round standard map', () => {
+    resetConfig();
+    loadMaps();
+
+    const map = listMaps().find(item => item.id === 'marathon')!;
+
+    expect(map.preview.mode).toBe('standard');
+    expect(map.preview.maxTurns).toBeNull();
+    expect(getMapConfig('marathon').balance.maxTurns).toBeNull();
+    resetConfig();
+  });
+
   it('validates the optional effective action adjudication weight', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as unknown as BrokenMap;

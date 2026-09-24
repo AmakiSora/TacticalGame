@@ -190,7 +190,8 @@ function healOptions(game, owner, utils, ctx) {
 function positionUtility(game, owner, utils, ctx, unit, pos, ownCells) {
   const balance = game.config?.balance ?? {};
   const turnNo = game.turn?.turnNumber ?? 0;
-  const maxTurns = balance.maxTurns ?? 15;
+  // maxTurns 为 null 是「无回合上限」：取 Infinity，收入由 CP_INCOME_TURNS_CAP 截断、终局加成不触发。
+  const maxTurns = balance.maxTurns === null ? Infinity : balance.maxTurns ?? 15;
   let utility = 0;
 
   // 抢占据点：中立/敌方都算，敌方的净收益（+我 −敌）放大 1.5 倍；

@@ -83,7 +83,7 @@ next           = game.artillery.nextShrinkRound   # may be null
 ### Win / score
 
 - Seat dies on **last unit death**; their CPs neutralise.
-- Last survivor wins; else adjudication at max round using the shared formula in `SKILL.md`.
+- Last survivor wins; else adjudication at max round using the shared formula in `SKILL.md`. Annihilation maps ship a finite `maxTurns`; on a `maxTurns: null` map the artillery ring keeps closing past its minimum, so only last-survivor or a host force-adjudicate ends it.
 - When HQ/CP/supply weights are 0: **army value + actionScore are the real race**. Do **not** rush empty "point score", fake HQ damage, **hoard supplies**, or **burn the turn on empty moves** — those do not raise `actionScore`.
 - Raise score by: surviving/high-HP valuable units, real attacks (damage merit), heals, deploys, demolish, captures that enable income/deploy, and denying enemy army value.
 - CPs still matter for **income + deploy pads**, not for end-score farming when `controlPoint` weight is 0.

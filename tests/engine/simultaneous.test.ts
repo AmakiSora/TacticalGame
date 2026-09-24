@@ -473,6 +473,23 @@ describe('simultaneous resolution', () => {
     game.config.balance.maxTurns = 15;
   });
 
+  it('keeps resolving rounds past the old limit when maxTurns is null', () => {
+    const { game, bus } = createStandoffGame();
+    game.config.balance.maxTurns = null;
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+
+    for (let round = 0; round < 16; round++) commitAll(game, bus, [a, b]);
+
+    expect(game.turn.roundNumber).toBe(17);
+    expect(game.phase).toBe('active');
+    expect(events(game, 'game_over')).toHaveLength(0);
+    const resolved = events(game, 'round_resolved');
+    expect(resolved).toHaveLength(16);
+    expect(resolved.every(event => event.payload.gameOver === false)).toBe(true);
+
+    game.config.balance.maxTurns = 15;
+  });
+
   it('force-resolves with only partially committed players', () => {
     const { game, bus } = createStandoffGame();
     const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];

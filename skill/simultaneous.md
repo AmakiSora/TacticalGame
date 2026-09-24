@@ -121,6 +121,8 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
   ranger's lock bubble costs the mover's whole action, so pure kiting cannot win.
 - Win conditions (standard HQ rules): destroy an enemy HQ to eliminate them; last player
   standing wins; at round 15 adjudicate by score. No artillery, no army-wipe elimination.
+  On an unlimited map (`config.balance.maxTurns === null`) `round_resolved.gameOver` stays
+  `false` every round — only elimination or the host's `/force-adjudicate` ends the game.
 
 ## Planning checklist
 

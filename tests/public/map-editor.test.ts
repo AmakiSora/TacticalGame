@@ -330,6 +330,38 @@ describe('map editor page', () => {
     expect(core.formatValidationError(errors[0])).toBe('追赶补给配置的开始轮次不能大于最大回合。');
   });
 
+  it('keeps maxTurns null through import, serialization and validation', () => {
+    const core = loadCore();
+    const marathon = JSON.parse(read('maps/marathon.json'));
+
+    const normalized = core.normalizeImportedMap(marathon);
+    expect(normalized.balance.maxTurns).toBeNull();
+
+    const serialized = core.serializeMapConfig(normalized);
+    expect(serialized.balance.maxTurns).toBeNull();
+    expect(core.validateMapConfig(serialized, 'marathon').filter(error => error.includes('maxTurns'))).toEqual([]);
+  });
+
+  it('still rejects missing or zero maxTurns in the editor', () => {
+    const core = loadCore();
+
+    const missing = core.createDefaultMapConfig();
+    delete missing.balance.maxTurns;
+    expect(core.validateMapConfig(missing, 'broken')).toContain('Map "broken".balance.maxTurns is required');
+
+    const zero = core.createDefaultMapConfig();
+    zero.balance.maxTurns = 0;
+    expect(core.validateMapConfig(zero, 'broken')).toContain('Map "broken".balance.maxTurns must be a number >= 1');
+  });
+
+  it('exposes an unlimited-turns toggle in the balance editor', () => {
+    const source = read('public/map-editor.js');
+
+    expect(source).toContain('unlimited-turns-enabled');
+    expect(source).toContain('无回合上限');
+    expect(source).toContain('maxTurnsDraft');
+  });
+
   it('clamps bound number inputs with min and max', () => {
     const source = read('public/map-editor.js');
     expect(source).toContain('function clampBoundNumber');

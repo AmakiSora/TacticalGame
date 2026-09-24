@@ -117,6 +117,7 @@ function joinedPlayerIds() {
 }
 function maxTurnsLabel() {
   const maxTurns = gameConfig?.balance?.maxTurns;
+  if (maxTurns === null) return '∞ 无上限';
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${maxTurns}回合` : '回合上限';
 }
 function currentTurnNumber() {
@@ -125,6 +126,7 @@ function currentTurnNumber() {
 function turnProgressLabel() {
   const current = currentTurnNumber();
   const maxTurns = gameConfig?.balance?.maxTurns;
+  if (maxTurns === null) return `${current}/∞`;
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
 }
 function statusBadge(text, cls) { els.connStatus.textContent = text; els.connStatus.className = `badge ${cls}`; }
@@ -470,7 +472,7 @@ function renderMapPicker(maps) {
     const isSelected = map.id === selected;
 	    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
 	    const radius = map.preview?.radius ?? '-';
-		    const maxTurns = map.preview?.maxTurns ?? '-';
+		    const maxTurns = map.preview?.maxTurns === null ? '∞' : map.preview?.maxTurns ?? '-';
 		    const actionsPerTurn = map.preview?.actionsPerTurn ?? '-';
 	    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
 	    const modeLabel = map.preview?.mode === 'simultaneous' ? '同时' : map.preview?.mode === 'annihilation' ? '歼灭' : '标准';

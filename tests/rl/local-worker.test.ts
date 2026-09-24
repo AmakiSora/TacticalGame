@@ -9,7 +9,7 @@ interface WorkerState {
     radius: number;
     terrainCells: Array<{ q: number; r: number; terrain: string }>;
     spawnSlots: Array<{ id: string; headquarters: { q: number; r: number }; startingUnits: Array<{ type: string; q: number; r: number }> }>;
-    balance: { maxTurns: number; actionsPerTurn: number };
+    balance: { maxTurns: number | null; actionsPerTurn: number };
     units: Record<string, unknown>;
   };
   units: Array<{ owner: string }>;

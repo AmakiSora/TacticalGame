@@ -62,6 +62,8 @@ interface GameOptions {
   controlPoints?: CpSpec[];
   blockers?: BlockerSpec[];
   cpTypes?: Record<string, { income: number; deployDiscount: number; repairAmount: number }>;
+  maxTurns?: number | null;
+  cpIncome?: number;
 }
 
 function makeGame(units: ReturnType<typeof makeUnit>[], options: GameOptions = {}) {
@@ -98,9 +100,9 @@ function makeGame(units: ReturnType<typeof makeUnit>[], options: GameOptions = {
         damageVarianceRange: 3,
         minimumDamage: 1,
         healVarianceRange: 6,
-        controlPointIncome: 12,
+        controlPointIncome: options.cpIncome ?? 12,
         controlPointTypes: options.cpTypes,
-        maxTurns: 15,
+        maxTurns: options.maxTurns === undefined ? 15 : options.maxTurns,
       },
     },
   };
@@ -331,5 +333,22 @@ describe('threat 威胁图与爆破', () => {
     const action = await threat.decide(game, utils);
 
     expect(action === null || action!.type !== 'demolish').toBe(true);
+  });
+
+  it('把 maxTurns 的 null 读成无上限，而不是悄悄当成 15', async () => {
+    const infantry = makeUnit('player_a', 'infantry', 0, -1);
+    const enemy = makeUnit('player_b', 'scout', 0, 0);
+    const controlPoints = [{ id: 'cp1', q: 3, r: -3, owner: null, kind: 'outpost' }];
+    const decideFor = (maxTurns: number | null) => threat.decide(
+      makeGame([infantry, enemy], { turnNumber: 10, controlPoints, cpIncome: 30, maxTurns }),
+      utils,
+    );
+
+    const unlimited = await decideFor(null);
+
+    // 无限视野 ≡ 极大有限上限；15 回合封顶会掐短据点收入并按假终局加成
+    expect(unlimited).not.toBeNull();
+    expect(unlimited).toEqual(await decideFor(1000));
+    expect(unlimited).not.toEqual(await decideFor(15));
   });
 });

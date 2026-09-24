@@ -342,6 +342,13 @@ export class GameStore {
         if (!game || typeof game.id !== 'string') continue;
         // 旧版本持久化档案没有 plan 字段，统一补默认值。
         if (game.plan === undefined) game.plan = null;
+        // maxTurns 的 null 是合法的「无回合上限」；损坏或降级档案里的非法值回落有限默认，
+        // 否则 `roundNumber < undefined` 恒 false，会在下一个回合边界把对局误裁定。
+        const balance = game.config?.balance as { maxTurns?: unknown } | undefined;
+        if (balance && balance.maxTurns !== null
+          && (typeof balance.maxTurns !== 'number' || !Number.isFinite(balance.maxTurns) || balance.maxTurns < 1)) {
+          balance.maxTurns = 15;
+        }
         restoreActionStats(game);
         this.games.set(game.id, game);
       }

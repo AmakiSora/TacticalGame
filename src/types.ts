@@ -235,7 +235,8 @@ export interface AdjudicationWeights {
 
 /** Live adjudication snapshot attached to GET /api/games/:id responses. */
 export interface AdjudicationSnapshot {
-  maxTurns: number;
+  /** null = 无回合上限，永不按回合裁定。 */
+  maxTurns: number | null;
   weights: AdjudicationWeights;
   scores: PlayerRecord<AdjudicationScore>;
   rankings: GameRanking[];

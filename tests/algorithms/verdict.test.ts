@@ -64,7 +64,8 @@ interface GameOptions {
   controlPoints?: CpSpec[];
   blockers?: BlockerSpec[];
   cells?: Array<{ q: number; r: number; terrain: string }>;
-  maxTurns?: number;
+  maxTurns?: number | null;
+  cpIncome?: number;
   /** 棋盘半径（默认 3）。总部默认放在两角。 */
   radius?: number;
   /** 己方总部血量（默认 100）。 */
@@ -115,8 +116,8 @@ function makeGame(units: ReturnType<typeof makeUnit>[], options: GameOptions = {
         damageVarianceRange: 3,
         minimumDamage: 1,
         healVarianceRange: 6,
-        controlPointIncome: 12,
-        maxTurns: options.maxTurns ?? 15,
+        controlPointIncome: options.cpIncome ?? 12,
+        maxTurns: options.maxTurns === undefined ? 15 : options.maxTurns,
         // 与 maps/default.json 同档：敌总伤 5 / 己总血 2 / 据点 90 / 兵力 2 / 补给 1
         adjudicationWeights: {
           enemyHqDamage: 5, ownHqHp: 2, controlPoint: 90, armyValue: 2, supplies: 1,
@@ -310,5 +311,26 @@ describe('verdict 算法 decide()', () => {
     // 拆的是朝向敌方总部那一侧的墙
     expect(distTo({ q: action.payload.q, r: action.payload.r }, game.headquarters.player_b))
       .toBeLessThan(distTo(heavy, game.headquarters.player_b));
+  });
+
+  it('把 maxTurns 的 null 读成无上限，攻城排程不被假期限掐掉', async () => {
+    const infantry = makeUnit('player_a', 'infantry', 0, -1);
+    const ranger = makeUnit('player_a', 'ranger', 1, -2);
+    const controlPoints = [{ id: 'cp1', q: -3, r: 3, owner: 'player_a', kind: 'outpost' }];
+    const decideFor = (maxTurns: number | null) => verdict.decide(
+      makeGame([infantry, ranger], {
+        radius: 4, turnNumber: 14, controlPoints, maxTurns,
+        enemyHqAt: { q: 2, r: -4 }, enemyHqHp: 60,
+      }),
+      utils,
+    );
+
+    const unlimited = await decideFor(null);
+
+    // 剩余回合被 MAX_SIEGE_ROUNDS 截断：无上限 ≡ 极大有限上限，
+    // 而 15 回合封顶会在第 14 回合把还差两刀才能破的总部判成「来不及」，改去打单位。
+    expect(unlimited).not.toBeNull();
+    expect(unlimited).toEqual(await decideFor(1000));
+    expect(unlimited).not.toEqual(await decideFor(15));
   });
 });

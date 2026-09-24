@@ -255,12 +255,14 @@ function cpBaseDepth(game, utils, cp, owner) {
   const balance = game.config?.balance ?? {};
   const income = utils.cpKindEffect(game, cp)?.income ?? balance.controlPointIncome ?? 12;
   const turnNo = game.turn?.turnNumber ?? 0;
-  const turnsLeft = Math.max(1, (balance.maxTurns ?? 15) - turnNo);
+  // maxTurns 为 null 是「无回合上限」：取 Infinity，收入由 CP_INCOME_CAP 截断、终局加成不触发。
+  const maxTurns = balance.maxTurns === null ? Infinity : balance.maxTurns ?? 15;
+  const turnsLeft = Math.max(1, maxTurns - turnNo);
   let depth = CP_BASE + income * Math.min(turnsLeft, CP_INCOME_CAP);
   if (cp.owner && cp.owner !== owner) depth *= CP_ENEMY_BONUS;
   // 接近回合上限时据点直接决定裁定分（裁定分里据点权重最重）：
   // 最后两回合把井加深，逼单位去抢点而不是继续遛弯。
-  if (turnNo >= (balance.maxTurns ?? 15) - 2) depth += LATE_GAME_BONUS;
+  if (turnNo >= maxTurns - 2) depth += LATE_GAME_BONUS;
   return depth;
 }
 

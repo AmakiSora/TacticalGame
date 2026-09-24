@@ -277,6 +277,8 @@ function nextActiveInOrder(game: GameState, owner: PlayerId, allowed?: Set<Playe
 }
 
 export function adjudicateAtTurnLimit(game: GameState, bus: EventBus): boolean {
+  // maxTurns === null 表示无回合上限：只靠淘汰或房主强制裁决收尾，回合边界永不裁定。
+  if (game.config.balance.maxTurns === null) return false;
   if (game.turn.roundNumber < game.config.balance.maxTurns) return false;
   const scores = buildAdjudicationScores(game);
   const active = activePlayerIds(game);

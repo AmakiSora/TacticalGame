@@ -325,7 +325,12 @@
 
     for (const type of UNIT_TYPES) normalized.units[type] = normalizeUnitSpec(type, cfg.units?.[type]);
     const sourceBalance = cfg.balance && typeof cfg.balance === 'object' ? cfg.balance : {};
-    for (const [key] of BALANCE_KEYS) normalized.balance[key] = numberOrDefault(sourceBalance[key], defaults.balance[key]);
+    for (const [key] of BALANCE_KEYS) {
+      // maxTurns 的 null 是「无回合上限」哨兵，得原样保留，不能被默认值吃掉。
+      normalized.balance[key] = key === 'maxTurns' && sourceBalance[key] === null
+        ? null
+        : numberOrDefault(sourceBalance[key], defaults.balance[key]);
+    }
     normalized.balance.adjudicationWeights = {};
     for (const [key] of WEIGHT_KEYS) {
       const fallback = key === 'effectiveActions' && normalized.mode === 'annihilation'
@@ -363,7 +368,10 @@
   function serializeMapConfig(config) {
     const typed = (config.controlPoints || []).some(point => !!point.kind);
     const balance = {};
-    for (const [key] of BALANCE_KEYS) balance[key] = Number(config.balance?.[key] ?? 0);
+    for (const [key] of BALANCE_KEYS) {
+      const raw = config.balance?.[key];
+      balance[key] = key === 'maxTurns' && raw === null ? null : Number(raw ?? 0);
+    }
     balance.adjudicationWeights = {};
     for (const [key] of WEIGHT_KEYS) balance.adjudicationWeights[key] = Number(config.balance?.adjudicationWeights?.[key] ?? 0);
     if (config.balance?.comebackSupply) {
@@ -555,6 +563,7 @@
     const balance = record(c.balance, `${mapName}.balance`);
     for (const [key, , min] of BALANCE_KEYS) {
       if ((key === 'actionsPerTurn' || key === 'maxTurns') && !(key in balance)) errors.push(`${mapName}.balance.${key} is required`);
+      if (key === 'maxTurns' && balance.maxTurns === null) continue;
       num(balance, key, `${mapName}.balance`, min);
     }
     if (!('adjudicationWeights' in balance)) errors.push(`${mapName}.balance.adjudicationWeights is required`);
@@ -1508,6 +1517,8 @@
 
   // 关闭追赶补给时暂存参数，重新启用时恢复，避免用户只是临时关掉开关就丢配置。
   let comebackSupplyDraft = null;
+  // 无回合上限开关同理：切回有限时还原此前填写的回合数。
+  let maxTurnsDraft = null;
 
   function defaultComebackSupply() {
     return { startRound: 3, scoreGapPercent: 40, amountPerRound: 20 };
@@ -1525,7 +1536,10 @@
     const comeback = config.balance.comebackSupply;
     const draft = comeback || comebackSupplyDraft || defaultComebackSupply();
     els.balanceFields.innerHTML = [
-      ...BALANCE_KEYS.map(([key, label, min]) => fieldHtml(`balance:${key}`, label, config.balance[key], min)),
+      ...BALANCE_KEYS.map(([key, label, min]) => key === 'maxTurns' && config.balance[key] === null
+        ? fieldHtml(`balance:${key}`, label, '', min, null, true)
+        : fieldHtml(`balance:${key}`, label, config.balance[key], min)),
+      `<label class="toggle-field">无回合上限 <input id="unlimited-turns-enabled" type="checkbox"${config.balance.maxTurns === null ? ' checked' : ''} /></label>`,
       ...WEIGHT_KEYS.map(([key, label]) => fieldHtml(`weight:${key}`, `裁决 ${label}`, config.balance.adjudicationWeights[key], 0)),
       // 歼灭模式没有总部，总部规格仅作占位，隐藏避免误导
       ...(config.mode === 'annihilation'
@@ -1559,6 +1573,16 @@
       } else if (config.balance.comebackSupply) {
         comebackSupplyDraft = { ...config.balance.comebackSupply };
         delete config.balance.comebackSupply;
+      }
+      syncAll();
+    });
+    document.getElementById('unlimited-turns-enabled').addEventListener('change', event => {
+      if (event.target.checked) {
+        maxTurnsDraft = typeof config.balance.maxTurns === 'number' ? config.balance.maxTurns : null;
+        config.balance.maxTurns = null;
+      } else {
+        config.balance.maxTurns = maxTurnsDraft ?? defaultBalance().maxTurns;
+        maxTurnsDraft = null;
       }
       syncAll();
     });

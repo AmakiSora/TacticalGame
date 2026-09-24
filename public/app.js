@@ -122,6 +122,7 @@ function playerName(owner) {
 
 function maxTurnsLabel() {
   const maxTurns = gameConfig?.balance?.maxTurns;
+  if (maxTurns === null) return '∞ 无上限';
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${maxTurns}回合` : '回合上限';
 }
 function currentTurnNumber() {
@@ -130,6 +131,7 @@ function currentTurnNumber() {
 function turnProgressLabel() {
   const current = currentTurnNumber();
   const maxTurns = gameConfig?.balance?.maxTurns;
+  if (maxTurns === null) return `${current}/∞`;
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
 }
 

@@ -39,7 +39,7 @@ Unless the user asks for a different style:
    - `fromId` must be HQ id or owned CP id.
 6. **Early:** move infantry/scouts to neutral or enemy CPs. On typed maps: `supply` early, `forward_base` for sustained pressure, `repair` when wounded units can hold nearby.
 7. **Late:** move scouts/rangers/infantry onto best enemy **HQ** attack hexes.
-8. **Near adjudication:** read `adjudication.scores` / `weights` / `leaders` / `margin`. Prioritize non-zero levers: HQ damage, CPs, valuable army survival, **productive action merit** (attacks, heals, deploys, captures, demolish), and convert excess supplies into units when AP/deploy hexes exist. Do **not** end the round on empty shuffles or supply hoarding — they add no `actionScore`. HQ damage already dealt to now-eliminated rivals still counts.
+8. **Near adjudication:** read `adjudication.scores` / `weights` / `leaders` / `margin`. Prioritize non-zero levers: HQ damage, CPs, valuable army survival, **productive action merit** (attacks, heals, deploys, captures, demolish), and convert excess supplies into units when AP/deploy hexes exist. Do **not** end the round on empty shuffles or supply hoarding — they add no `actionScore`. HQ damage already dealt to now-eliminated rivals still counts. On an unlimited map (`config.balance.maxTurns === null`) there is no final round to time: only elimination or the host's `/force-adjudicate` ends it, so keep contesting income CPs instead of banking for a cap.
 9. **No useful action** → `/end-turn`.
 
 ## Pre-action checks

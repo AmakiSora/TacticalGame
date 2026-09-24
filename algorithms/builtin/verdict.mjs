@@ -183,7 +183,8 @@ function adjudicationWeights(game) {
 
 /** 我方还剩几个回合可打（含本回合）。 */
 function remainingRounds(game) {
-  const maxTurns = game.config?.balance?.maxTurns ?? 15;
+  // maxTurns 为 null 是「无回合上限」：取 Infinity，由 MAX_SIEGE_ROUNDS 截断。
+  const maxTurns = game.config?.balance?.maxTurns === null ? Infinity : game.config?.balance?.maxTurns ?? 15;
   const round = game.turn?.roundNumber ?? game.turn?.turnNumber ?? 1;
   return Math.max(1, Math.min(MAX_SIEGE_ROUNDS, maxTurns - round + 1));
 }

@@ -122,7 +122,8 @@ export interface MapConfig {
     minimumDamage: number;
     healVarianceRange: number;
     actionsPerTurn: number;
-    maxTurns: number;
+    /** null = 无回合上限，对局永不因回合数结束。 */
+    maxTurns: number | null;
     adjudicationWeights: {
       enemyHqDamage: number;
       ownHqHp: number;
@@ -154,7 +155,8 @@ export type MapFileConfig = Omit<
 export interface MapPreview {
   mode: GameMode;
   radius: number;
-  maxTurns: number;
+  /** null = 无回合上限。 */
+  maxTurns: number | null;
   actionsPerTurn: number;
   cells: MapCell[];
   terrainCells: TerrainCellConfig[];
@@ -338,7 +340,8 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   if (!('actionsPerTurn' in balance)) throw new Error(`Map "${id}".balance.actionsPerTurn is required`);
   assertNumber(balance, 'actionsPerTurn', `Map "${id}".balance`, 1);
   if (!('maxTurns' in balance)) throw new Error(`Map "${id}".balance.maxTurns is required`);
-  assertNumber(balance, 'maxTurns', `Map "${id}".balance`, 1);
+  // null = 无回合上限；0/NaN/Infinity/字符串仍按原规则拒绝。
+  if (balance.maxTurns !== null) assertNumber(balance, 'maxTurns', `Map "${id}".balance`, 1);
   if (!('adjudicationWeights' in balance)) {
     throw new Error(`Map "${id}".balance.adjudicationWeights is required`);
   }

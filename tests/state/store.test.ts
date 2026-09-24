@@ -109,6 +109,38 @@ describe('GameStore persistence', () => {
     expect(restored.get('simultaneous-reordered-actions')!.players.player_a!.stats.actionPointsUsed).toBe(3);
   });
 
+  it('coerces illegal saved maxTurns while preserving the unlimited sentinel', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    const ids = ['saved-null', 'saved-zero', 'saved-string', 'saved-missing', 'saved-finite'];
+    for (const id of ids) store.save(createInitialGame(id, id === 'saved-null' ? 'marathon' : 'default'));
+
+    const payload = JSON.parse(readFileSync(file, 'utf8')) as { games: Array<{ id: string; config: any }> };
+    const overrides: Record<string, unknown> = {
+      'saved-null': null,
+      'saved-zero': 0,
+      'saved-string': '15',
+      'saved-missing': undefined,
+      'saved-finite': 12,
+    };
+    for (const game of payload.games) {
+      const value = overrides[game.id];
+      if (value === undefined) delete game.config.balance.maxTurns;
+      else game.config.balance.maxTurns = value;
+    }
+    writeFileSync(file, JSON.stringify(payload));
+
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    // null 是合法的「无回合上限」；非法值必须回落成有限默认，否则会在下一个回合边界误裁定。
+    expect(restored.get('saved-null')!.config.balance.maxTurns).toBeNull();
+    expect(restored.get('saved-zero')!.config.balance.maxTurns).toBe(15);
+    expect(restored.get('saved-string')!.config.balance.maxTurns).toBe(15);
+    expect(restored.get('saved-missing')!.config.balance.maxTurns).toBe(15);
+    expect(restored.get('saved-finite')!.config.balance.maxTurns).toBe(12);
+  });
+
   it('keeps the store empty when the persistence file is invalid', () => {
     const file = tempFile();
     writeFileSync(file, '{ bad json');

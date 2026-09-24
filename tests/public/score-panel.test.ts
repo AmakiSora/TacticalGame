@@ -81,11 +81,22 @@ describe('adjudication score panels', () => {
   });
 
   it('uses configured max turns in front-end adjudication labels', () => {
-    for (const file of ['public/app.js', 'public/play.js']) {
+    for (const file of ['public/app.js', 'public/play.js', 'public/play-m.js', 'public/spectator-m.js']) {
       const source = read(file);
       expect(source).toContain('function maxTurnsLabel');
       expect(source).toContain('gameConfig?.balance?.maxTurns');
+      // 无回合上限必须走显式分支，不能退化成「配置未加载」的兜底文案。
+      expect(source).toContain('if (maxTurns === null) return');
       expect(source).not.toContain('15回合裁决');
+    }
+  });
+
+  it('marks unlimited-round maps with an infinity marker on every client', () => {
+    for (const file of ['public/app.js', 'public/play.js', 'public/play-m.js', 'public/spectator-m.js']) {
+      expect(read(file)).toContain('${current}/∞');
+    }
+    for (const file of ['public/play.js', 'public/play-m.js']) {
+      expect(read(file)).toContain("map.preview?.maxTurns === null ? '∞'");
     }
   });
 

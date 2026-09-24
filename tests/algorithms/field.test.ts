@@ -63,7 +63,8 @@ interface GameOptions {
   controlPoints?: CpSpec[];
   blockers?: BlockerSpec[];
   cells?: Array<{ q: number; r: number; terrain: string }>;
-  maxTurns?: number;
+  maxTurns?: number | null;
+  cpIncome?: number;
   /** 棋盘半径（默认 3）。总部默认放在两角，避免测试单位的射程够到敌方总部。 */
   radius?: number;
 }
@@ -106,8 +107,8 @@ function makeGame(units: ReturnType<typeof makeUnit>[], options: GameOptions = {
         damageVarianceRange: 3,
         minimumDamage: 1,
         healVarianceRange: 6,
-        controlPointIncome: 12,
-        maxTurns: options.maxTurns ?? 15,
+        controlPointIncome: options.cpIncome ?? 12,
+        maxTurns: options.maxTurns === undefined ? 15 : options.maxTurns,
       },
     },
   };
@@ -416,5 +417,22 @@ describe('field 斥力场与拆墙', () => {
     const action = await field.decide(game, utils);
 
     expect(action === null || action!.type !== 'demolish').toBe(true);
+  });
+
+  it('把 maxTurns 的 null 读成无上限，而不是悄悄当成 15', async () => {
+    const infantry = makeUnit('player_a', 'infantry', 0, -1);
+    const enemy = makeUnit('player_b', 'heavy', 0, 0);
+    const controlPoints = [{ id: 'cp1', q: 3, r: -3, owner: null, kind: 'outpost' }];
+    const decideFor = (maxTurns: number | null) => field.decide(
+      makeGame([infantry, enemy], { turnNumber: 10, controlPoints, cpIncome: 20, maxTurns }),
+      utils,
+    );
+
+    const unlimited = await decideFor(null);
+
+    // 无限视野 ≡ 极大有限上限；15 回合封顶会掐短据点井的深度并按假终局加深它
+    expect(unlimited).not.toBeNull();
+    expect(unlimited).toEqual(await decideFor(1000));
+    expect(unlimited).not.toEqual(await decideFor(15));
   });
 });

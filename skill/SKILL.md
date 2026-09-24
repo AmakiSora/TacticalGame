@@ -157,7 +157,7 @@ Seats: `player_a` … `player_h` (2–8). Server assigns seats in join order.
 3. `POST /api/games/:id/join` — `{ name }` → immediately save `player.token` (see [Player token](#player-token-mandatory))
 4. Optional: `GET /api/games/:id/lobby`
 5. `POST /api/games/:id/start` with `X-Host-Token` when ≥2 players and the map supports that count
-6. Play until last survivor or max-round adjudication
+6. Play until last survivor, HQ/army destruction, or max-round adjudication. On unlimited maps (`config.balance.maxTurns === null`) rounds never run out — only elimination or the host's `POST /api/games/:id/force-adjudicate` ends the game
 
 Most maps are 2-player only. `multiplayer-ring` and annihilation `artillery-zone` support 2/3/6; `four-corners` is exactly 4; simultaneous `standoff` supports 2/3/6. Unsupported `maxPlayers` → `unsupported_player_count`.
 
@@ -230,6 +230,7 @@ Unit numbers are **per map**. Never reuse memorized move/attack/cost values from
 
 Deploy cost comes from `config.units[type].cost` minus any `forward_base` (or typed) deploy discount on the origin CP. Instance `cost` is what army-value scoring uses.
 - Last survivor wins immediately (`last_player_standing`). Else adjudication at `maxTurns`.
+- When `maxTurns` is `null` the map has **no round cap** and auto-adjudication never fires: read live `adjudication` from `GET /api/games/:id` and plan for a host-forced end instead of running out the clock.
 - Trust live `adjudication` on `GET /api/games/:id`. Always read **weights** and per-player breakdown fields before prioritizing score levers.
 - No V1 concepts: `x/y`, Manhattan, buildings, miners, legacy V1 production queues,
   walls, `/build`, `/produce`, `/sell`.
@@ -260,7 +261,7 @@ Where:
   - heal: `ceil(amount / 20)`
 - `actionScore` is **added as-is** (already multiplied by `effectiveActions`); do not multiply it by another weight key.
 - Eliminated players keep the frozen `adjudicationScore` snapshot from elimination time.
-- **Near max round:** read which weights are non-zero. Empty moves and hoarding supplies do **not** raise `actionScore`. Convert supplies into units/fights when AP allows; take real damage/heals/deploys/captures/demolish instead of idling.
+- **On finite maps, near max round:** read which weights are non-zero. Empty moves and hoarding supplies do **not** raise `actionScore`. Convert supplies into units/fights when AP allows; take real damage/heals/deploys/captures/demolish instead of idling.
 
 ### Action points
 

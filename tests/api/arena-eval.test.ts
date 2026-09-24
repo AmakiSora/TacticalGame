@@ -297,6 +297,23 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(spawner.calls[1].args.join(' ')).toContain('generateArenaStats.mjs');
   });
 
+  it('rejects eval writes with 501 when the batch toolchain is not shipped', async () => {
+    // 镜像按设计只带服务端本体（见 Dockerfile 的 script/ COPY 清单），
+    // 此时写接口要给出读得懂的 501，而不是 spawn ENOENT 冒成 500。
+    const app2 = Fastify();
+    await app2.register(arenaEvalRoutes, {
+      spawner: () => null, statsFile, stateFile, evalToolchainAvailable: false,
+    });
+    const start = await app2.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
+    expect(start.statusCode).toBe(501);
+    expect(start.json().code).toBe('arena_eval_unavailable');
+    const regen = await app2.inject({ method: 'POST', url: '/api/arena/leaderboard/regenerate' });
+    expect(regen.statusCode).toBe(501);
+    // 参评者清单不依赖跑批链路，容器里仍要能列模型与算法。
+    expect((await app2.inject({ method: 'GET', url: '/api/arena/participants' })).statusCode).toBe(200);
+    await app2.close();
+  });
+
   it('parses round_robin output lines in their real format', () => {
     expect(parsePlannedBatches('任务：12 个对战批次，待跑 48 局（已完成 24 局直接跳过）。'))
       .toEqual({ total: 12, games: 48 });

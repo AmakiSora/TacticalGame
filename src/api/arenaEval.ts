@@ -3,8 +3,8 @@
 // AI 竞技场评估控制台后端：让排行榜页面可以直接网页启动/监控/停止
 // rl/evaluation/round_robin.py 跑批（RL 模型 × 内置算法混合循环赛），
 // 结束后自动重算榜单数据。
-// 跑批依赖 rl/.venv 的 Python 与本地 rl/models 模型，属于本地开发功能；
-// Docker 容器内没有 Python 虚拟环境，启动接口会报错而不是留下坏进程。
+// 跑批依赖 rl/.venv 的 Python 与本地 rl/models 模型，属于本地开发功能；镜像按设计只带
+// 服务端本体（见 Dockerfile 的 script/ COPY 清单），缺跑批链路时写接口返回 501。
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -22,6 +22,13 @@ const LEADERBOARD_SCRIPT = join(PROJECT_ROOT, 'script', 'generateArenaLeaderboar
 const ARENA_STATS_SCRIPT = join(PROJECT_ROOT, 'script', 'generateArenaStats.mjs');
 const DEFAULT_STATS_FILE = join(PROJECT_ROOT, 'arena', 'matches.jsonl');
 const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json');
+
+/**
+ * 评估链路三件套：跑批脚本 + 跑批结束后要 spawn 的榜单/统计脚本。
+ * 镜像只带服务端本体，缺件时相关写接口返回 501 说明「本部署不带这套工具」，
+ * 而不是让 spawn ENOENT 冒成一个读不懂的 500。
+ */
+const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRIPT];
 
 // 与 rl/evaluation/round_robin.py 的 DEFAULT_MAPS 保持一致。
 export const KNOWN_MAPS = ['random', 'default', 'breach', 'danger-close', 'desert', 'dual-lanes', 'forge'] as const;
@@ -132,6 +139,8 @@ export interface ArenaEvalDeps {
   leaderboardScript?: string;
   statsScript?: string;
   pythonPath?: string;
+  /** 评估链路是否随本进程携带；默认按 EVAL_TOOLCHAIN 是否齐备判定，测试可注入。 */
+  evalToolchainAvailable?: boolean;
   now?: () => Date;
   /** SIGTERM 后升级 SIGKILL 的等待毫秒数；默认 10s，测试可调短。 */
   escalateMs?: number;
@@ -415,6 +424,11 @@ export class EvalRunner {
 
 export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps = {}): Promise<void> {
   const runner = new EvalRunner(deps);
+  const toolchainAvailable = deps.evalToolchainAvailable ?? EVAL_TOOLCHAIN.every(p => existsSync(p));
+  const evalUnavailable = {
+    error: '本部署未携带评估跑批链路（round_robin.py 与榜单/统计脚本），评估控制台仅在本地仓库可用',
+    code: 'arena_eval_unavailable',
+  } as const;
   runner.restoreFromDisk();
   app.addHook('onClose', async () => runner.dispose());
 
@@ -439,6 +453,7 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
 
   app.post<{ Body: Partial<EvalRunParams> }>('/api/arena/eval/start', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
+    if (!toolchainAvailable) return reply.code(501).send(evalUnavailable);
     if (runner.isRunning) {
       return reply.code(409).send({ error: '已有跑批在进行中', code: 'eval_already_running' });
     }
@@ -494,6 +509,7 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
 
   app.post('/api/arena/leaderboard/regenerate', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
+    if (!toolchainAvailable) return reply.code(501).send(evalUnavailable);
     const result = await runner.regenLeaderboard();
     if (!result.ok) {
       return reply.code(500).send({ error: '榜单重算失败', code: 'regenerate_failed', detail: result });

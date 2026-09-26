@@ -1095,6 +1095,13 @@ function renderSidebar() {
     li.addEventListener('click', () => { pausePlayback(); rebuildToStep(i); });
     eventsEl.appendChild(li);
   });
+  // 事件流是定高滚动区，回放时要让当前步留在框内；不用 scrollIntoView，避免连带滚动整页
+  const activeLi = eventsEl.querySelector('li.active');
+  if (activeLi) {
+    const row = activeLi.getBoundingClientRect(), box = eventsEl.getBoundingClientRect();
+    if (row.top < box.top) eventsEl.scrollTop -= box.top - row.top + 8;
+    else if (row.bottom > box.bottom) eventsEl.scrollTop += row.bottom - box.bottom + 8;
+  }
 }
 
 function committedStatusHtml() {

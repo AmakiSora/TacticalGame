@@ -16,9 +16,17 @@
   - **产物位置**：写入 `records/V3/`（用户指定目录优先），明确豁免 Scratch files 的 `temp/` 暂存规则。
   - **入口引导**：`skill/SKILL.md` 新增 "Post-game review (复盘)" 一节；局后提示词只需一句——拉取 `${BASE_URL}/api/skill/files/review.md` 按它执行，对局顺序号 N。
 
+### 修复
+
+- **桌面端观战页 / 玩家页的事件流卡片随事件条数无限增高**：`#events` 在 `public/style.css`、`public/play.css` 从未限高，一条事件一行地往下堆——观战页渲染整局全部事件（实测一局 156 条），侧栏被拉出数屏高，看最新几条要把整页滚到底。两个移动端的同名列表本就是定高滚动（`play-m.css` 240px、`spectator-m.css` 300px），桌面端是漏网的一处，本版本不改动移动端。现在桌面两处统一 `max-height: 320px; overflow-y: auto`，超出部分在卡片内滚动，并配 `overscroll-behavior: contain`——列表滚到顶/底不再连带滚动整页；滚动条直接复用两文件已有的全局 `::-webkit-scrollbar`（6px）样式，与页面其他滚动区观感一致。这收窄了 3.3.5 立下的「卡片一律不自带滚动条、整页单滚动条」约定（该约定服务于布局编辑器把卡片拖成独立分区）：**事件流是该约定唯一的例外**，侧栏整体仍不限高不滚动，两处 CSS 的说明注释与测试同步改为钉住这个例外。配套两处行为修正：
+  - **观战页回放时高亮的当前步会落在框外**：限高后 `#events` 成了独立滚动区，时间轴逐帧播放时 `li.active` 可能停在可视区之外（框外的高亮等于没有）。`public/app.js` 的 `renderSidebar()` 重建列表后把 active 行保持在可视区内，只调 `eventsEl.scrollTop`；刻意不用 `scrollIntoView`——它会连带滚动祖先容器，把整页一起滚走。
+  - **玩家页「自动滚到最新一条」此前是死代码**：`play.js` 早有 `els.events.scrollTop = els.events.scrollHeight`，但列表不滚动时该赋值被浏览器忽略。限高后自动滚动生效，玩家页始终停在最近一条事件（该页最多渲染最近 60 条）。
+
 ### 测试与验证
 
 - `tests/api/skill.test.ts` 的 manifest 清单补入 `review.md` 与三份模式文件，断言其经 `/api/skill/manifest` 暴露且 `sha256`/`bytes` 与磁盘一致。
+- **事件流限高实测**：观战页打开一局 156 条事件的对局，`#events` 计算样式 `max-height: 320px`、`overflow-y: auto`、`overscroll-behavior: contain` 全部生效，整局事件压在框内滚动；依次跳到第 7 / 80 / 155 / 0 步，active 行四次均落在可视区内且 `window.scrollY` 保持 0（未连带滚动整页）、无 console 报错。玩家页灌入 60 条事件后盒子高度锁在 320px、末条自动进入视野。
+- **例外由测试反向钉住**：`tests/public/layout-editor.test.ts` 原用例断言 `#events` 不得含 `overflow-y`，现改为 `#sidebar` 仍不得有 `overflow-y`/`max-height`，而 `#events` 必须同时有 `max-height`、`overflow-y: auto`、`overscroll-behavior: contain`，两个桌面样式表各过一遍——后续「清理卡片滚动条」不会再顺手抹掉这个例外。
 
 ## 3.5.5
 

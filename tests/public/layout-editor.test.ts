@@ -37,14 +37,16 @@ describe('layout editor', () => {
     expect(source).toContain('tg-zone-left');
   });
 
-  it('removes per-card scrollbars in favor of a single page scrollbar', () => {
+  it('keeps a single page scrollbar with the capped event log as the sole exception', () => {
     for (const css of ['public/play.css', 'public/style.css']) {
       const source = read(css);
       const sidebarBlock = source.split('#sidebar {')[1]?.split('}')[0] ?? '';
       expect(sidebarBlock).not.toContain('overflow-y');
       expect(sidebarBlock).not.toContain('max-height');
       const eventsRule = source.split('#events {')[1]?.split('}')[0] ?? '';
-      expect(eventsRule).not.toContain('overflow-y');
+      expect(eventsRule).toContain('max-height');
+      expect(eventsRule).toContain('overflow-y: auto');
+      expect(eventsRule).toContain('overscroll-behavior: contain');
     }
   });
 

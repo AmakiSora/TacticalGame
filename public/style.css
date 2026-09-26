@@ -813,7 +813,8 @@ main {
   font-weight: 700;
   font-size: 12px;
 }
-#events { list-style: none; padding: 0; margin: 0; font-size: 12px; font-family: "SF Mono", "Consolas", "Cascadia Code", monospace; }
+/* 侧栏不设自身滚动条、整页统一滚动，事件流是唯一例外：一局上百条事件不限高会把整页拉出数屏 */
+#events { list-style: none; padding: 0; margin: 0; font-size: 12px; font-family: "SF Mono", "Consolas", "Cascadia Code", monospace; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
 #events li {
   padding: 4px 8px; margin: 2px 0;
   background: #0f141c; border-left: 3px solid #3a5a7a;

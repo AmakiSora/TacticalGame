@@ -1139,7 +1139,8 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .hint-key { color: #8ab; font-weight: 600; }
 
 /* event log */
-#events { list-style: none; font-size: 12px; font-family: "SF Mono", "Consolas", monospace; }
+/* 侧栏不设自身滚动条、整页统一滚动，事件流是唯一例外：一局上百条事件不限高会把整页拉出数屏 */
+#events { list-style: none; font-size: 12px; font-family: "SF Mono", "Consolas", monospace; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
 #events li {
   padding: 4px 8px;
   margin: 2px 0;

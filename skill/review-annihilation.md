@@ -1,10 +1,12 @@
 # TacticalGame 经验复盘规范：歼灭模式
 
-**版本:** 3.0（V3）  
+**版本:** 3.1（V3）  
 **模式:** `annihilation`（无总部、炮火收缩、军队歼灭制）  
-**最后更新:** 2026-08-25
+**最后更新:** 2026-09-27
 
-本文件只适用于 `game_start.payload.config.mode === "annihilation"`。歼灭模式的第一原则是：**没有 HQ，不能写拆家、守 HQ 或 HQ 伤害。**
+本文件只适用于 `game_start.payload.config.mode === "annihilation"`。歼灭模式的第一原则是：**没有 HQ，不能写拆家、守 HQ 或 HQ 伤害。**  
+本文件由游戏服务器经 `GET ${BASE_URL}/api/skill/files/review-annihilation.md` 提供；复盘流程入口
+（取回放、产物命名）见 [`review.md`](review.md)，本文件只规定写作内容。
 
 ## 一、通用写作规则
 
@@ -12,11 +14,10 @@
 `game_over.payload.rankings` 为准。使用“第 N 轮 / `player_x` 回合”定位顺序模式事件；引用事件类型和
 `seq`，统计不了就明确说明。必须引用历史 `gameId` 或文件名，不能凭印象补数。
 
-### V3 文件命名
+### 产物与命名
 
-复盘放在 `records/V3/`：回放为 `tg_{4位ID}_{YYYYMMDD}.json`；双人局用
-`tg_{4位ID}_{win|lose|draw}_{AGENT}@{模型短名}.md`，多人局用
-`tg_{4位ID}_rank{01-08}_{AGENT}@{模型短名}.md`。`AGENT` 全大写
+回放 JSON 与复盘 MD 的写入目录、文件命名和对局顺序号规则统一见 [`review.md`](review.md)
+（服务器入口 `${BASE_URL}/api/skill/files/review.md`）。
 
 ## 二、歼灭模式判定与复盘重点
 

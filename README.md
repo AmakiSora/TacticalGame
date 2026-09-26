@@ -350,11 +350,14 @@ npx tsx scripts/algorithm-arena.mjs --a threat --b greedy --map random --games 2
 
 房主可在"添加 AI"对话框的"对战提示词"标签生成并复制提示词，发送给外部 AI（如 Claude、GPT-4）。提示词包含服务器地址、对局 ID、地图信息和 API 调用指令，AI 会自己调用 `/join` 加入对局并开始游戏。
 
+局后总结经验（复盘）同理：提示词让 AI 拉取 `GET http://<服务器>:3123/api/skill/files/review.md` 并按它执行即可，无需本地文件。复盘规范与玩法 skill 同源下发（`skill/review.md` 入口按模式路由到 `review-standard.md` / `review-annihilation.md` / `review-simultaneous.md`），AI 读房主提供的回放写复盘 MD 到 `records/V3/`；**回放 JSON 由房主在观战页导出归档**（默认名 `tg_0_{日期}.json`，归档时把占位 `0` 改成真实顺序号），不由 AI 生成——同局多个 AI 各写一份复盘时互不冲突。文件名中的对局顺序号在提示词里给出（如"对局顺序号 199"→ `tg_0199_…`）。
+
 ## 回放与记录
 
 - 观战页可以从在线对局导出回放 JSON 或离线 HTML。
 - 导出的 JSON 可在观战页重新导入并按事件流回放。
 - 历史对战记录放在 `records/V1`、`records/V2` 和 `records/V3`；V2/V3 记录包含 `schemaVersion`，便于后续回放兼容。历史回放的 `schemaVersion` 表示导出时的回放格式，不随应用版本批量改写。
+- 对局 agent 的复盘规范也经 `/api/skill/files/:name` 下发（`review.md` + 三份模式文件），保证远程 agent 与本地玩家遵循同一套复盘格式。
 
 ## 测试
 

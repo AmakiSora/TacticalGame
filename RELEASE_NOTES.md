@@ -4,6 +4,22 @@
 
 自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.5.6
+
+### 新增
+
+- **经验复盘规范 skill 化，局后总结不再依赖本地文件**：此前局后总结提示词引用仓库本地的 `records/tactical-game总结经验规范-*.md`，agent 换个工作区（远程/沙箱）就读不到；现在三份模式复盘规范迁入 `skill/`（原路径不再保留副本），新增入口 `skill/review.md`，与玩法 skill 同源经 `/api/skill/files/:name` 下发、`/api/skill/manifest` 自动收录。
+  - **模式路由**：入口按回放里 `game_start` 事件的 mode 拉取唯一一份模式文件；三份模式文件只保留写作内容（规范版本 3.1），原「V3 文件命名」小节改为指向入口，避免多份拷贝漂移。
+  - **回放由房主提供，agent 只读不写**：回放 JSON 统一由房主从前端观战页导出归档（默认名 `tg_0_{日期}.json`，归档时把占位 `0` 改成真实顺序号），agent 绝不自行组装、下载或覆盖——同局多个 AI 都要写复盘时，争写同一份回放会互相冲突。
+  - **产物与命名**：复盘 MD 是 agent 唯一交付物，双人局 `tg_{顺序号4位}_{win|lose|draw}_{AGENT}@{模型短名}.md`、多人局 `tg_{顺序号4位}_rank{NN}_{AGENT}@{模型短名}.md`（按 `game_over.payload.rankings` 判名次）。
+  - **顺序号来自提示词**：文件名中的 4 位顺序号由用户给出（如"对局顺序号 199"→ `tg_0199_…`）。
+  - **产物位置**：写入 `records/V3/`（用户指定目录优先），明确豁免 Scratch files 的 `temp/` 暂存规则。
+  - **入口引导**：`skill/SKILL.md` 新增 "Post-game review (复盘)" 一节；局后提示词只需一句——拉取 `${BASE_URL}/api/skill/files/review.md` 按它执行，对局顺序号 N。
+
+### 测试与验证
+
+- `tests/api/skill.test.ts` 的 manifest 清单补入 `review.md` 与三份模式文件，断言其经 `/api/skill/manifest` 暴露且 `sha256`/`bytes` 与磁盘一致。
+
 ## 3.5.5
 
 ### 新增

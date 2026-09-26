@@ -1,10 +1,12 @@
 # TacticalGame 经验复盘规范：标准模式
 
-**版本:** 3.0（V3）  
+**版本:** 3.1（V3）  
 **模式:** `standard`（总部制、顺序回合）  
-**最后更新:** 2026-08-25
+**最后更新:** 2026-09-27
 
-本文件只适用于 `game_start.payload.config.mode === "standard"` 的对局。
+本文件只适用于 `game_start.payload.config.mode === "standard"` 的对局。它由游戏服务器经
+`GET ${BASE_URL}/api/skill/files/review-standard.md` 提供；复盘流程入口（取回放、产物命名）
+见 [`review.md`](review.md)，本文件只规定写作内容。
 
 ## 一、所有复盘都必须遵守的规则
 
@@ -16,11 +18,10 @@
 6. 统计不了的内容写“回放未提供/无法可靠统计”，不可编造精确值；必须引用事件类型和 `seq`（有则写）。
 7. 必须引用至少一局历史记录，说明本局是重复、修正还是验证了什么经验。
 
-### V3 文件命名
+### 产物与命名
 
-复盘放在 `records/V3/`：回放为 `tg_{4位ID}_{YYYYMMDD}.json`；双人局用
-`tg_{4位ID}_{win|lose|draw}_{AGENT}@{模型短名}.md`，多人局用
-`tg_{4位ID}_rank{01-08}_{AGENT}@{模型短名}.md`。`AGENT` 全大写
+回放 JSON 与复盘 MD 的写入目录、文件命名和对局顺序号规则统一见 [`review.md`](review.md)
+（服务器入口 `${BASE_URL}/api/skill/files/review.md`）。
 
 ## 二、标准模式的判定与重点
 

@@ -33,3 +33,5 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 ## 玩游戏（agent 对战）
 
 按仓库根 `skill/SKILL.md` 的流程：从用户提示取服务器地址（IP → `http://<IP>:3123`）→ 校验 skill 新鲜度：`GET /api/skill/manifest` 与本地副本比对（sha256 优先，版本号兜底），一致直接用本地副本、不一致才重新 `GET /api/skill` 拉全文 → 按对局 `game.config.mode` 拉对应模式文件（standard/annihilation/simultaneous.md，始终从服务器拉）并只遵循它 → 自己调 REST 接口（读状态 → 推理 → 操作）。认证头 `X-Player-Token` / `X-Host-Token`。对局中只可运行 `wait-turn.mjs`（等待用，从服务器下载）；勿用 `ai-player.mjs` 代打。**对局产生的临时文件（下载的 `wait-turn.mjs`、状态快照、事件/调试输出等）一律写到 `temp/<gameId>/<玩家名>/`，不要落在仓库根目录**——详细约定见 SKILL.md 的 Scratch files 节。
+
+局后总结经验（复盘）走 `skill/review.md`（服务器 `GET /api/skill/files/review.md`）：它按模式路由到 `review-standard/annihilation/simultaneous.md`，并规定复盘 MD 的 `records/V3/` 命名（顺序号由用户提示给出）。**回放 JSON 由房主从前端观战页导出归档，agent 只读不写**（同局多个 agent 都写复盘时避免争写冲突）；复盘 MD 是唯一交付物，不落 `temp/`。

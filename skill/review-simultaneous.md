@@ -1,12 +1,14 @@
 # TacticalGame 经验复盘规范：同时回合模式
 
-**版本:** 3.0（V3）  
+**版本:** 3.1（V3）  
 **模式:** `simultaneous`（秘密计划、全员确认、严格同时结算）  
-**最后更新:** 2026-08-25
+**最后更新:** 2026-09-27
 
 本文件只适用于 `game_start.payload.config.mode === "simultaneous"`（当前专用地图为
 `standoff`，支持人数和布局仍以本局配置为准）。这是 HQ 制，但不是顺序回合：
-`turn.currentPlayerId` 与 `turn.currentOwner` 始终为 `null`。
+`turn.currentPlayerId` 与 `turn.currentOwner` 始终为 `null`。  
+本文件由游戏服务器经 `GET ${BASE_URL}/api/skill/files/review-simultaneous.md` 提供；复盘流程入口
+（取回放、产物命名）见 [`review.md`](review.md)，本文件只规定写作内容。
 
 ## 一、通用写作规则
 
@@ -14,11 +16,10 @@
 `game_over.payload.rankings`，所有数字以本局配置为准。用“第 N 轮 / 计划阶段”描述输入，用
 `round_resolved` 描述统一结算后的结果；不能把队列顺序当成执行优先级。统计不了就明确写无法可靠统计，必须引用历史 `gameId` 或文件名。
 
-### V3 文件命名
+### 产物与命名
 
-复盘放在 `records/V3/`：回放为 `tg_{4位ID}_{YYYYMMDD}.json`；双人局用
-`tg_{4位ID}_{win|lose|draw}_{AGENT}@{模型短名}.md`，多人局用
-`tg_{4位ID}_rank{01-08}_{AGENT}@{模型短名}.md`。`AGENT` 全大写
+回放 JSON 与复盘 MD 的写入目录、文件命名和对局顺序号规则统一见 [`review.md`](review.md)
+（服务器入口 `${BASE_URL}/api/skill/files/review.md`）。
 
 ## 二、同时回合的核心循环
 

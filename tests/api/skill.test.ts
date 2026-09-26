@@ -49,7 +49,7 @@ describe('skill routes', () => {
     expect(body.appVersion).toBe(pkg.version);
 
     const byName = new Map(body.files.map((f: any) => [f.name, f]));
-    for (const name of ['SKILL.md', 'standard.md', 'annihilation.md', 'simultaneous.md', 'wait-turn.mjs', 'ai-player.mjs', 'example-game.sh']) {
+    for (const name of ['SKILL.md', 'standard.md', 'annihilation.md', 'simultaneous.md', 'review.md', 'review-standard.md', 'review-annihilation.md', 'review-simultaneous.md', 'wait-turn.mjs', 'ai-player.mjs', 'example-game.sh']) {
       const entry = byName.get(name) as any;
       expect(entry, `manifest missing ${name}`).toBeDefined();
       expect(entry.sha256).toBe(sha256Of(name));

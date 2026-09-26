@@ -148,6 +148,15 @@ Player actions need a player token (`POST /api/games` with `participate: true`, 
 
 Transient `502`/`503`: back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>`, no token query param.
 
+## Post-game review (复盘)
+
+When a game is over and the user asks for a battle summary / 经验总结 / 复盘, do not invent your own format:
+
+1. Fetch the review skill entry from the server: `GET ${BASE_URL}/api/skill/files/review.md` (Canonical fetch applies when reading a locally installed copy).
+2. Follow it exactly: it routes to the mode-specific review spec (`review-standard.md` / `review-annihilation.md` / `review-simultaneous.md`) and writes the review markdown into `records/V3/` under the user-assigned sequence number.
+
+The replay JSON is exported and archived by the host from the spectator page — **never** generate, download, or overwrite it yourself (several agents may be summarizing the same game; a second writer would collide). Read the replay path the host gives you; the review markdown is your only deliverable and is exempt from the Scratch files rule.
+
 ## Multiplayer Setup
 
 Seats: `player_a` … `player_h` (2–8). Server assigns seats in join order.

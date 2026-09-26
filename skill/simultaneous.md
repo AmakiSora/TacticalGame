@@ -14,6 +14,9 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
 1. `wait-turn.mjs` exits 0 → your planning window is open. `GET /api/games/:id`, study the board.
 2. Queue actions one by one (they do **not** execute): `/deploy`, `/move`, `/attack`, `/heal`, `/demolish`.
    - Every response returns `{ ok, queued, queue }` — `queue` is your current plan (only you can see it).
+   - Deploy origins follow the standard rule: your HQ **or** an owned CP, into an adjacent empty
+     plain cell. A map may set `balance.deployFromHq: false` — the HQ is then **not** legal as
+     `fromId` (plan-time rejection `invalid_deploy`), only owned CPs are.
    - Made a mistake? `POST /api/games/:id/plan/revoke` with `{ "actionId": ... }` removes one queued action;
      `POST /api/games/:id/plan/clear` empties the whole plan. Free until you commit.
 3. `POST /api/games/:id/end-turn` = **commit and lock**. Response `{ committed: true, resolved, roundNumber }`.

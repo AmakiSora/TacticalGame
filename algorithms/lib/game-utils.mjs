@@ -298,14 +298,19 @@ export function movementGoal(game, owner, unit) {
 
 /**
  * 获取部署源（总部和己方据点）
+ * 地图 `balance.deployFromHq === false` 时总部不可作为部署起点，只返回据点。
  * @param {object} game - 游戏状态
  * @param {string} owner - 玩家 ID
  * @returns {Array<object>} 部署源数组
  */
 export function deployOrigins(game, owner) {
-  const ownHq = game.headquarters?.[owner];
-  const cps = (game.controlPoints || []).filter(cp => cp.owner === owner);
-  return [ownHq, ...cps].filter(o => o && o.alive !== false);
+  const origins = [];
+  if (game.config?.balance?.deployFromHq !== false) {
+    const ownHq = game.headquarters?.[owner];
+    if (ownHq && ownHq.alive !== false) origins.push(ownHq);
+  }
+  origins.push(...(game.controlPoints || []).filter(cp => cp.owner === owner));
+  return origins;
 }
 
 /**

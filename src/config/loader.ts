@@ -124,6 +124,8 @@ export interface MapConfig {
     actionsPerTurn: number;
     /** null = 无回合上限，对局永不因回合数结束。 */
     maxTurns: number | null;
+    /** false = 总部不可作为部署起点（只能从己方据点部署）；缺省/true 允许。 */
+    deployFromHq?: boolean;
     adjudicationWeights: {
       enemyHqDamage: number;
       ownHqHp: number;
@@ -342,6 +344,9 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   if (!('maxTurns' in balance)) throw new Error(`Map "${id}".balance.maxTurns is required`);
   // null = 无回合上限；0/NaN/Infinity/字符串仍按原规则拒绝。
   if (balance.maxTurns !== null) assertNumber(balance, 'maxTurns', `Map "${id}".balance`, 1);
+  if ('deployFromHq' in balance && typeof balance.deployFromHq !== 'boolean') {
+    throw new Error(`Map "${id}".balance.deployFromHq must be boolean`);
+  }
   if (!('adjudicationWeights' in balance)) {
     throw new Error(`Map "${id}".balance.adjudicationWeights is required`);
   }

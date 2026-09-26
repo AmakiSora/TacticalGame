@@ -3,19 +3,12 @@ import type { GameState, PlayerId, Position, Unit, UnitType } from '../types.js'
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { hexDistance } from './hex.js';
-import { isDeployable, actionsRemaining } from './validation.js';
+import { isDeployable, actionsRemaining, deployOriginFor } from './validation.js';
 import { appendEvent } from './events.js';
 import { createUnitFromConfig } from '../state/store.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import { isArtilleryDanger } from './artillery.js';
 import { ACTION_MERIT, addActionMerit } from './actionScore.js';
-
-function deployOrigin(game: GameState, owner: PlayerId, fromId: string): Position | null {
-  const hq = game.headquarters[owner];
-  if (hq?.id === fromId && hq.alive) return hq;
-  const point = game.controlPoints.find(p => p.id === fromId && p.owner === owner);
-  return point ?? null;
-}
 
 export function deployUnit(
   game: GameState,
@@ -28,7 +21,7 @@ export function deployUnit(
 ): Result<Unit> {
   const spec = game.config.units[unitType];
   if (!spec) return { ok: false, code: 'invalid_deploy', message: 'unknown unit type' };
-  const origin = deployOrigin(game, owner, fromId);
+  const origin = deployOriginFor(game, owner, fromId);
   if (!origin) return { ok: false, code: 'invalid_deploy', message: 'invalid deploy origin' };
   if (isArtilleryDanger(game, origin) || isArtilleryDanger(game, { q, r })) {
     return { ok: false, code: 'invalid_deploy', message: 'cannot deploy inside the artillery zone' };

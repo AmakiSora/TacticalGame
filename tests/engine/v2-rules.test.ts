@@ -195,6 +195,36 @@ describe('hex V2 rules', () => {
     });
   });
 
+  it('rejects deploying from the HQ when the map disables deployFromHq', () => {
+    const { game, bus } = setup();
+    // config 是 loader 缓存的共享对象，改动前必须克隆，避免污染同文件后续用例。
+    game.config = structuredClone(game.config);
+    game.config.balance.deployFromHq = false;
+
+    const result = deployUnit(game, bus, 'player_a', 'scout', game.headquarters.player_a.id, -8, 1);
+
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ code: 'invalid_deploy' });
+    expect(game.units.filter(u => u.owner === 'player_a')).toHaveLength(3);
+    expect(game.turn.actionsUsed).toBe(0);
+  });
+
+  it('still deploys from an owned control point when the map disables deployFromHq', () => {
+    const game = createInitialGame('g1', 'dual-lanes');
+    const bus = new EventBus();
+    joinGame(game, bus, 'B');
+    game.config = structuredClone(game.config);
+    game.config.balance.deployFromHq = false;
+    const origin = game.controlPoints.find(p => p.id === 'cp_sw')!;
+    origin.owner = 'player_a';
+    game.resources.player_a.supplies = 38;
+
+    const result = deployUnit(game, bus, 'player_a', 'scout', origin.id, -5, 4);
+
+    expect(result.ok).toBe(true);
+    expect(game.events.at(-1)!.type).toBe('deploy');
+  });
+
   it('repairs friendly units near owned repair points at the start of their turn', () => {
     const game = createInitialGame('g1', 'dual-lanes');
     const bus = new EventBus();

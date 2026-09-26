@@ -1,5 +1,5 @@
 // src/engine/validation.ts
-import type { GameState, Position, Unit, Headquarters, TerrainType } from '../types.js';
+import type { GameState, PlayerId, Position, Unit, Headquarters, TerrainType } from '../types.js';
 import type { Result } from './result.js';
 import { hexDistance, hexKey, hexNeighbors } from './hex.js';
 
@@ -59,6 +59,17 @@ export function findReachableCells(game: GameState, unit: Unit): Position[] {
 
 export function findAdjacentDeployCell(game: GameState, origin: Position): Position | null {
   return hexNeighbors(origin).find(pos => isDeployable(game, pos.q, pos.r)) ?? null;
+}
+
+/**
+ * 部署起点：己方存活总部（地图 `balance.deployFromHq: false` 时禁用）或己方据点。
+ * deployment（standard 逐行动）与 planning（simultaneous 计划期）共用同一份判定。
+ */
+export function deployOriginFor(game: GameState, owner: PlayerId, fromId: string): Position | null {
+  const hq = game.headquarters[owner];
+  if (hq?.id === fromId && hq.alive && game.config.balance.deployFromHq !== false) return hq;
+  const point = game.controlPoints.find(p => p.id === fromId && p.owner === owner);
+  return point ?? null;
 }
 
 /**

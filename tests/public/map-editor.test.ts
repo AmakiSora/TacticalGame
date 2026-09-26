@@ -362,6 +362,31 @@ describe('map editor page', () => {
     expect(source).toContain('maxTurnsDraft');
   });
 
+  it('keeps deployFromHq false through serialization, import and validation', () => {
+    const core = loadCore();
+    const config = core.createDefaultMapConfig();
+    config.balance.deployFromHq = false;
+
+    const serialized = core.serializeMapConfig(config);
+    expect(serialized.balance.deployFromHq).toBe(false);
+    expect(core.validateMapConfig(serialized, 'hqlock').filter(error => error.includes('deployFromHq'))).toEqual([]);
+
+    const normalized = core.normalizeImportedMap(serialized);
+    expect(normalized.balance.deployFromHq).toBe(false);
+
+    // 缺省地图不落该键，序列化/导入一圈后仍保持「未配置 = 允许」。
+    const defaultSerialized = core.serializeMapConfig(core.createDefaultMapConfig());
+    expect('deployFromHq' in defaultSerialized.balance).toBe(false);
+    expect(core.normalizeImportedMap(defaultSerialized).balance.deployFromHq).toBeUndefined();
+  });
+
+  it('rejects non-boolean deployFromHq in the editor', () => {
+    const core = loadCore();
+    const config = core.createDefaultMapConfig();
+    config.balance.deployFromHq = 'false';
+    expect(core.validateMapConfig(config, 'broken')).toContain('Map "broken".balance.deployFromHq must be boolean');
+  });
+
   it('clamps bound number inputs with min and max', () => {
     const source = read('public/map-editor.js');
     expect(source).toContain('function clampBoundNumber');

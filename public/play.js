@@ -1018,7 +1018,7 @@ function renderEntityCard(ent) {
       <div class="sel-hp-label"><span>生命</span><strong>${Math.max(0, ent.hp)} / ${ent.maxHp}</strong></div>
       <div class="sel-hp-bar"><span class="sel-hp-fill ${hpClass(ent)}" style="width:${hpPct}%"></span></div>
     </div>
-    ${stats ? `<div class="sel-stat-grid">${stats}</div>` : '<div class="sel-note">部署源</div>'}
+    ${stats ? `<div class="sel-stat-grid">${stats}</div>` : `<div class="sel-note">${deployFromHqEnabled() ? '部署源' : '本图总部不可部署'}</div>`}
     <div class="sel-coord">坐标 (${ent.q}, ${ent.r})</div>
   </div>`;
 }
@@ -1076,6 +1076,7 @@ function renderLoop(now) {
 
 function actionsPerTurn() { return gameConfig?.balance?.actionsPerTurn ?? 0; }
 function isSimultaneous() { return gameConfig?.mode === 'simultaneous'; }
+function deployFromHqEnabled() { return gameConfig?.balance?.deployFromHq !== false; }
 function myPlanQueue() { return state?.plan?.myQueue ?? []; }
 function committedList() { return state?.plan?.committed ?? []; }
 function committedStatusHtml() {
@@ -1484,7 +1485,7 @@ els.canvas.addEventListener('click', async () => {
 
   closePopup(); rangeHighlights = [];
   if (unit) selectUnit(unit);
-  else if (hq && hq.owner === myPlayer) selectDeployOrigin(hq);
+  else if (hq && hq.owner === myPlayer && deployFromHqEnabled()) selectDeployOrigin(hq);
   else if (cp && cp.owner === myPlayer) selectDeployOrigin(cp);
   else { selectedUnitId = null; selectedOriginId = null; renderSelectionInfo(hq || cp); drawBoard(); }
 });

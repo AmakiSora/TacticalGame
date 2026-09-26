@@ -168,6 +168,34 @@ describe('map config loader', () => {
     },
   );
 
+  it.each([[false], [true]])(
+    'accepts deployFromHq %# as an optional map balance flag',
+    deployFromHq => {
+      const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+      const map = validMap() as Record<string, any>;
+      map.balance.deployFromHq = deployFromHq;
+      writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+      loadMaps(dir);
+
+      expect(getMapConfig('default').balance.deployFromHq).toBe(deployFromHq);
+      resetConfig();
+    },
+  );
+
+  it.each([[0], ['false'], [null]])(
+    'rejects deployFromHq %# that is not boolean',
+    deployFromHq => {
+      const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+      const map = validMap() as Record<string, any>;
+      map.balance.deployFromHq = deployFromHq;
+      writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+      expect(() => loadMaps(dir)).toThrow('balance.deployFromHq must be boolean');
+      resetConfig();
+    },
+  );
+
   it('ships marathon as an unlimited-round standard map', () => {
     resetConfig();
     loadMaps();

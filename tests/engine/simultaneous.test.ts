@@ -159,6 +159,23 @@ describe('simultaneous planning phase', () => {
       .toMatchObject({ ok: false, code: 'insufficient_supplies' });
   });
 
+  it('rejects HQ deploy plans when the map disables deployFromHq', () => {
+    const { game } = createStandoffGame();
+    const a = game.turn.turnOrder[0]!;
+    for (const unit of game.units.filter(u => u.owner === a)) place(unit, 1, 3);
+    // config 是 loader 缓存的共享对象，改动前必须克隆，避免污染同文件后续用例。
+    game.config = structuredClone(game.config);
+    game.config.balance.deployFromHq = false;
+    game.controlPoints.find(point => point.id === 'cp_1')!.owner = a;
+    const hq = game.headquarters[a]!;
+
+    // 计划期即拒绝总部起点；据点起点不受影响。
+    expect(queueDeployAction(game, a, 'infantry', hq.id, 4, 0))
+      .toMatchObject({ ok: false, code: 'invalid_deploy' });
+    expect(queueDeployAction(game, a, 'infantry', 'cp_1', 4, 0).ok).toBe(true);
+    expect(game.plan!.queues[a]).toHaveLength(1);
+  });
+
   it('rejects own-queue destination conflicts at queue time', () => {
     const { game } = createStandoffGame();
     const a = game.turn.turnOrder[0]!;

@@ -7,7 +7,7 @@ import type { EventBus } from '../events/bus.js';
 import type { Result, Failure } from './result.js';
 import { appendEvent } from './events.js';
 import { hexDistance, HEX_DIRECTIONS } from './hex.js';
-import { findReachableCells, isDeployable, isInBounds, getCellOccupant, getTerrain } from './validation.js';
+import { findReachableCells, isDeployable, isInBounds, getCellOccupant, getTerrain, deployOriginFor } from './validation.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import { isArtilleryDanger } from './artillery.js';
 import type { UnitSpec } from '../config/loader.js';
@@ -158,13 +158,6 @@ export function coveredCellsFor(
 
 // ---------------------------------------------------------------- deploy
 
-function deployOrigin(game: GameState, owner: PlayerId, fromId: string) {
-  const hq = game.headquarters[owner];
-  if (hq?.id === fromId && hq.alive) return hq;
-  const point = game.controlPoints.find(p => p.id === fromId && p.owner === owner);
-  return point ?? null;
-}
-
 function plannedDeploySpend(game: GameState, owner: PlayerId): number {
   const spec = (action: PendingAction) => game.config.units[action.unitType as UnitType];
   return queueOf(game, owner)
@@ -189,7 +182,7 @@ export function queueDeployAction(
   if (!ready.ok) return ready;
   const unitSpec: UnitSpec | undefined = game.config.units[unitType];
   if (!unitSpec) return { ok: false, code: 'invalid_deploy', message: 'unknown unit type' };
-  const origin = deployOrigin(game, owner, fromId);
+  const origin = deployOriginFor(game, owner, fromId);
   if (!origin) return { ok: false, code: 'invalid_deploy', message: 'invalid deploy origin' };
   if (isArtilleryDanger(game, origin) || isArtilleryDanger(game, { q, r })) {
     return { ok: false, code: 'invalid_deploy', message: 'cannot deploy inside the artillery zone' };

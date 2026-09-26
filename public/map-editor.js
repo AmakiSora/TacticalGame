@@ -331,6 +331,8 @@
         ? null
         : numberOrDefault(sourceBalance[key], defaults.balance[key]);
     }
+    // deployFromHq 只在显式 false（禁用总部部署）时保留；缺省/true 一律回到默认允许。
+    if (sourceBalance.deployFromHq === false) normalized.balance.deployFromHq = false;
     normalized.balance.adjudicationWeights = {};
     for (const [key] of WEIGHT_KEYS) {
       const fallback = key === 'effectiveActions' && normalized.mode === 'annihilation'
@@ -374,6 +376,7 @@
     }
     balance.adjudicationWeights = {};
     for (const [key] of WEIGHT_KEYS) balance.adjudicationWeights[key] = Number(config.balance?.adjudicationWeights?.[key] ?? 0);
+    if (config.balance?.deployFromHq === false) balance.deployFromHq = false;
     if (config.balance?.comebackSupply) {
       balance.comebackSupply = {
         startRound: Number(config.balance.comebackSupply.startRound),
@@ -565,6 +568,9 @@
       if ((key === 'actionsPerTurn' || key === 'maxTurns') && !(key in balance)) errors.push(`${mapName}.balance.${key} is required`);
       if (key === 'maxTurns' && balance.maxTurns === null) continue;
       num(balance, key, `${mapName}.balance`, min);
+    }
+    if ('deployFromHq' in balance && typeof balance.deployFromHq !== 'boolean') {
+      errors.push(`${mapName}.balance.deployFromHq must be boolean`);
     }
     if (!('adjudicationWeights' in balance)) errors.push(`${mapName}.balance.adjudicationWeights is required`);
     const weights = record(balance.adjudicationWeights, `${mapName}.balance.adjudicationWeights`);
@@ -1547,6 +1553,7 @@
         : [
           fieldHtml('hq:hp', '总部 HP', config.headquartersSpec.hp, 1),
           fieldHtml('hq:defense', '总部防御', config.headquartersSpec.defense, 0),
+          `<label class="toggle-field">总部可部署 <input id="hq-deploy-enabled" type="checkbox"${config.balance.deployFromHq !== false ? ' checked' : ''} /></label>`,
         ]),
       `<label class="toggle-field">启用追赶补给 <input id="comeback-enabled" type="checkbox"${comeback ? ' checked' : ''} /></label>`,
       fieldHtml('comeback:startRound', '追赶开始轮次', draft.startRound ?? 3, 1, null, !comeback),
@@ -1584,6 +1591,12 @@
         config.balance.maxTurns = maxTurnsDraft ?? defaultBalance().maxTurns;
         maxTurnsDraft = null;
       }
+      syncAll();
+    });
+    // 缺省即允许总部部署：勾选时删键保持地图 JSON 干净，只有禁用才落 `false`。
+    document.getElementById('hq-deploy-enabled')?.addEventListener('change', event => {
+      if (event.target.checked) delete config.balance.deployFromHq;
+      else config.balance.deployFromHq = false;
       syncAll();
     });
   }

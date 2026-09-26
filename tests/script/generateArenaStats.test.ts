@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -347,12 +347,18 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
       line(A, EXPIRED_ZIP, EXPIRED_ZIP) +
       line(A, 'algo_threat@v1', A));
 
+    // --models-dir 指向自建临时目录：真 rl/models 是 gitignored 的本机产物，CI 检出上没有。
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, A), 'zip');
+    writeFileSync(join(modelsDir, EXPIRED_ZIP), 'zip');
+
     const result = spawnSync(
       process.execPath,
       // --leaderboard 指向不存在的文件：评分/对局数字段留空（榜单未生成也能出档案），
       // 不合并真实榜单数据——冒烟保持隔离，也不受其它测试重算真实榜单的影响。
       ['script/generateArenaStats.mjs', '--stats-file', statsFile, '--out', outFile,
-        '--leaderboard', join(tempDir, 'no-leaderboard.json')],
+        '--leaderboard', join(tempDir, 'no-leaderboard.json'), '--models-dir', modelsDir],
       { cwd: REPO_ROOT, encoding: 'utf8' },
     );
     expect(result.status, result.stderr).toBe(0);

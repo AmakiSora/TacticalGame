@@ -133,8 +133,9 @@ export function parseArgs(argv) {
     else if (a === '--bootstrap') opts.bootstrap = Number(argv[++i]);
     else if (a === '--bootstrap-per-map') opts.bootstrapPerMap = Number(argv[++i]);
     else if (a === '--seed') opts.bootstrapSeed = Number(argv[++i]);
+    else if (a === '--models-dir') opts.modelsDir = resolve(argv[++i]);
     else if (a === '--help' || a === '-h') {
-      console.log('Usage: node script/generateArenaLeaderboard.mjs [--stats-file f] [--out f] [--target-games n] [--bootstrap n] [--bootstrap-per-map n] [--seed n]');
+      console.log('Usage: node script/generateArenaLeaderboard.mjs [--stats-file f] [--out f] [--target-games n] [--bootstrap n] [--bootstrap-per-map n] [--seed n] [--models-dir d]');
       process.exit(0);
     }
   }
@@ -511,7 +512,7 @@ export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory)
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const { registry, excluded, warning } = collectRegistry(join(PROJECT_DIR, 'rl', 'models'));
+  const { registry, excluded, warning } = collectRegistry(opts.modelsDir ?? join(PROJECT_DIR, 'rl', 'models'));
   const warnings = warning ? [warning] : [];
   const { matches, warnings: loadWarnings, retiredDropped, expiredKept } = loadMatches(opts.statsFile, registry);
   warnings.push(...loadWarnings);

@@ -53,8 +53,9 @@ export function parseArgs(argv) {
     else if (a === '--out') opts.out = resolve(argv[++i]);
     else if (a === '--notes') opts.notesFile = resolve(argv[++i]);
     else if (a === '--leaderboard') opts.leaderboardFile = resolve(argv[++i]);
+    else if (a === '--models-dir') opts.modelsDir = resolve(argv[++i]);
     else if (a === '--help' || a === '-h') {
-      console.log('Usage: node script/generateArenaStats.mjs [--stats-file f] [--out f] [--notes f] [--leaderboard f]');
+      console.log('Usage: node script/generateArenaStats.mjs [--stats-file f] [--out f] [--notes f] [--leaderboard f] [--models-dir d]');
       process.exit(0);
     }
   }
@@ -528,7 +529,7 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const modelsDir = join(PROJECT_DIR, 'rl', 'models');
+  const modelsDir = opts.modelsDir ?? join(PROJECT_DIR, 'rl', 'models');
   const { registry, warning } = collectRegistry(modelsDir);
   const warnings = warning ? [warning] : [];
   const { matches, warnings: loadWarnings, retiredDropped, formatDropped } = loadMatchDetails(opts.statsFile, registry);

@@ -109,11 +109,17 @@ describe('resolveModelFile', () => {
 });
 
 describe('过期与作废互斥', () => {
-  const runExpire = (version: string) => spawnSync(
-    process.execPath,
-    ['script/expireArenaModels.mjs', '--expire', version, '--reason', 'test', '--dry-run'],
-    { cwd: REPO_ROOT, encoding: 'utf8' },
-  );
+  // 以仓库根为 cwd spawn 真脚本；--models-dir 指向自建临时目录——真 rl/models 是
+  // gitignored 的本机产物，CI 全新检出上不存在（缺目录会先报「无法读取模型目录」）。
+  const runExpire = (version: string) => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-expire-'));
+    return spawnSync(
+      process.execPath,
+      ['script/expireArenaModels.mjs', '--expire', version, '--reason', 'test', '--dry-run',
+        '--models-dir', tempDir],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+  };
 
   it('--expire 拒绝登记已作废版本（两态语义互相抵消）', () => {
     const retired = [...RETIRED_VERSIONS][0]; // 首个 retired 版本（保持 MODEL_STATUS_BY_VERSION 键序）：zip 已移入 deprecated/，源头上直接拒

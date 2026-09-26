@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -145,15 +145,22 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-smoke-'));
     const statsFile = join(tempDir, 'matches.jsonl');
     const outFile = join(tempDir, 'lb.json');
-    // 参与者用 rl/models/ 真实存在的 zip + 注册算法：v2.2.0 走 MODEL_STATUS_BY_VERSION
+    // 参与者用注册算法 + 自建模型 zip：v2.2.0 走 MODEL_STATUS_BY_VERSION
     // 查表分支（legacy）、v2.3.2 已过期（expired）、算法（builtin）。
     writeFileSync(statsFile,
       line(VALID, EXPIRED_ZIP, EXPIRED_ZIP) +
       line(VALID, 'algo_threat@v1', VALID));
 
+    // --models-dir 指向自建临时目录：真 rl/models 是 gitignored 的本机产物，CI 检出上没有。
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    writeFileSync(join(modelsDir, EXPIRED_ZIP), 'zip');
+
     const result = spawnSync(
       process.execPath,
-      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile],
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir],
       { cwd: REPO_ROOT, encoding: 'utf8' },
     );
     expect(result.status, result.stderr).toBe(0);

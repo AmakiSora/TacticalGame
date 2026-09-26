@@ -9,7 +9,7 @@ import { createInitialGame } from '../../src/state/store.js';
 import type { GameState } from '../../src/types.js';
 
 function setup(id: string): { game: GameState; bus: EventBus } {
-  const game = createInitialGame(id, 'marathon');
+  const game = createInitialGame(id, 'whirlpool');
   const bus = new EventBus();
   joinGame(game, bus, 'B');
   return { game, bus };
@@ -72,6 +72,8 @@ describe('unlimited rounds (maxTurns: null)', () => {
     // 隔离全局地图缓存中的配置，避免污染其他用同一地图的对局。
     game.config = structuredClone(game.config);
     game.config.balance.comebackSupply = { startRound: 99, scoreGapPercent: 40, amountPerRound: 20 };
+    // 追赶补给按裁决分差触发：whirlpool 的 supplies 权重为 0，补给差撑不开分差，这里显式给出权重。
+    game.config.balance.adjudicationWeights = { ...game.config.balance.adjudicationWeights, supplies: 1 };
     game.resources.player_a.supplies = 0;
     game.resources.player_b.supplies = 5000;
     atRound99(game);

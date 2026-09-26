@@ -332,14 +332,14 @@ describe('map editor page', () => {
 
   it('keeps maxTurns null through import, serialization and validation', () => {
     const core = loadCore();
-    const marathon = JSON.parse(read('maps/marathon.json'));
+    const whirlpool = JSON.parse(read('maps/whirlpool.json'));
 
-    const normalized = core.normalizeImportedMap(marathon);
+    const normalized = core.normalizeImportedMap(whirlpool);
     expect(normalized.balance.maxTurns).toBeNull();
 
     const serialized = core.serializeMapConfig(normalized);
     expect(serialized.balance.maxTurns).toBeNull();
-    expect(core.validateMapConfig(serialized, 'marathon').filter(error => error.includes('maxTurns'))).toEqual([]);
+    expect(core.validateMapConfig(serialized, 'whirlpool').filter(error => error.includes('maxTurns'))).toEqual([]);
   });
 
   it('still rejects missing or zero maxTurns in the editor', () => {

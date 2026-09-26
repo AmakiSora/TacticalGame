@@ -113,7 +113,7 @@ describe('GameStore persistence', () => {
     const file = tempFile();
     const store = new GameStore({ persistenceFile: file });
     const ids = ['saved-null', 'saved-zero', 'saved-string', 'saved-missing', 'saved-finite'];
-    for (const id of ids) store.save(createInitialGame(id, id === 'saved-null' ? 'marathon' : 'default'));
+    for (const id of ids) store.save(createInitialGame(id, id === 'saved-null' ? 'whirlpool' : 'default'));
 
     const payload = JSON.parse(readFileSync(file, 'utf8')) as { games: Array<{ id: string; config: any }> };
     const overrides: Record<string, unknown> = {

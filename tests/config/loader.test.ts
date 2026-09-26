@@ -196,15 +196,15 @@ describe('map config loader', () => {
     },
   );
 
-  it('ships marathon as an unlimited-round standard map', () => {
+  it('ships whirlpool as an unlimited-round standard map', () => {
     resetConfig();
     loadMaps();
 
-    const map = listMaps().find(item => item.id === 'marathon')!;
+    const map = listMaps().find(item => item.id === 'whirlpool')!;
 
     expect(map.preview.mode).toBe('standard');
     expect(map.preview.maxTurns).toBeNull();
-    expect(getMapConfig('marathon').balance.maxTurns).toBeNull();
+    expect(getMapConfig('whirlpool').balance.maxTurns).toBeNull();
     resetConfig();
   });
 
@@ -585,6 +585,51 @@ describe('map config loader', () => {
     const bHeavy = forge.startingUnits.filter(u => u.owner === 'player_b' && u.type === 'heavy');
     expect(aHeavy.length).toBe(1);
     expect(bHeavy.length).toBe(1);
+
+    resetConfig();
+  });
+
+  it('ships whirlpool with a combat-viable but non-monopolised unit table', () => {
+    resetConfig();
+    loadMaps();
+
+    const map = getMapConfig('whirlpool');
+    const units = map.units;
+    const variance = map.balance.damageVarianceRange;
+    const types = ['infantry', 'scout', 'heavy', 'ranger', 'support'] as const;
+    const worstHit = (attacker: (typeof types)[number], target: (typeof types)[number]) =>
+      units[attacker].attack - units[target].defense - variance;
+
+    // 廉价杂兵不允许互相秒杀：以本图基线攻击（步兵）衡量，任何单位都要能活过一次最坏掷骰
+    for (const type of types) {
+      expect(worstHit('infantry', type), `infantry can one-shot ${type}`).toBeLessThan(units[type].hp);
+    }
+
+    // 专精克制必须真的成立：远程全额秒掉侦察，否则轻装海无解
+    expect(worstHit('ranger', 'scout')).toBeGreaterThanOrEqual(units.scout.hp);
+
+    // 重装靠耐久而非爆发：不允许一击秒杀任何兵种
+    for (const type of types) {
+      expect(worstHit('heavy', type), `heavy can one-shot ${type}`).toBeLessThan(units[type].hp);
+    }
+
+    // 每点成本的存活击数不得出现垄断：重装允许领跑，但保持在步兵的 1.35 倍以内
+    const hitsToDie = (type: (typeof types)[number]) =>
+      Math.ceil(units[type].hp / Math.max(1, units.infantry.attack - units[type].defense));
+    const perCost = (type: (typeof types)[number]) => hitsToDie(type) / units[type].cost;
+    const infantryPerCost = perCost('infantry');
+    for (const type of types) {
+      expect(perCost(type) / infantryPerCost, `${type} durability-per-cost out of band`)
+        .toBeLessThanOrEqual(1.35);
+    }
+
+    // 占点权只交给廉价单位：可占领兵种必须比不可占领的重装与远程便宜
+    const capturers = types.filter(type => units[type].canCapture);
+    expect(capturers).toEqual(['infantry', 'scout']);
+    for (const type of capturers) {
+      expect(units[type].cost).toBeLessThan(units.heavy.cost);
+      expect(units[type].cost).toBeLessThan(units.ranger.cost);
+    }
 
     resetConfig();
   });

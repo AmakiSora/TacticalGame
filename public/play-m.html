@@ -102,6 +102,18 @@
             <img src="/icons/lucide/rotate-ccw.svg" alt="" aria-hidden="true" />
           </button>
         </div>
+        <div class="available-games-filters">
+          <select id="available-games-mode-filter" aria-label="按模式筛选">
+            <option value="">全部模式</option>
+            <option value="standard">标准</option>
+            <option value="annihilation">歼灭</option>
+            <option value="simultaneous">同时</option>
+            <option value="royale">大逃杀</option>
+          </select>
+          <select id="available-games-map-filter" aria-label="按地图筛选">
+            <option value="">全部地图</option>
+          </select>
+        </div>
         <div id="available-games" class="available-games" aria-live="polite">
           <p class="available-games-state">正在检测…</p>
         </div>

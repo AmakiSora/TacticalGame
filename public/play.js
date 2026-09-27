@@ -38,6 +38,7 @@ const els = {
   lobbySummary: $('lobby-summary'), joinLobbySummary: $('join-lobby-summary'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
   joinPlayerToken: $('join-player-token'), joinPlayerTokenRow: $('join-player-token-row'),
   availableGames: $('available-games'), btnRefreshGames: $('btn-refresh-games'),
+  availableGamesModeFilter: $('available-games-mode-filter'), availableGamesMapFilter: $('available-games-map-filter'),
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
   btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'), planPanel: $('plan-panel'),
@@ -1553,6 +1554,18 @@ function availableGameAge(createdAt) {
   return `${Math.floor(hours / 24)} 天前`;
 }
 
+function syncAvailableGamesMapOptions(games) {
+  if (!els.availableGamesMapFilter) return;
+  const maps = [...new Set(games.map(game => game.mapId || 'default'))].sort();
+  const signature = maps.join(',');
+  if (els.availableGamesMapFilter.dataset.options === signature) return;
+  els.availableGamesMapFilter.dataset.options = signature;
+  els.availableGamesMapFilter.innerHTML = ['<option value="">全部地图</option>']
+    .concat(maps.map(map => `<option value="${esc(map)}">${esc(map)}</option>`)).join('');
+  const current = els.availableGamesMapFilter.value;
+  els.availableGamesMapFilter.value = maps.includes(current) ? current : '';
+}
+
 function renderAvailableGames(games) {
   if (!els.availableGames) return;
   const joinableGames = games
@@ -1562,9 +1575,20 @@ function renderAvailableGames(games) {
     els.availableGames.innerHTML = '<p class="available-games-state">暂无等待加入的对局</p>';
     return;
   }
-  const pageCount = Math.max(1, Math.ceil(joinableGames.length / AVAILABLE_GAMES_PAGE_SIZE));
+  const modeFilter = els.availableGamesModeFilter?.value || '';
+  const filteredGames = joinableGames
+    .filter(game => !modeFilter || game.mode === modeFilter);
+  syncAvailableGamesMapOptions(filteredGames);
+  const mapFilter = els.availableGamesMapFilter?.value || '';
+  const visibleGames = filteredGames
+    .filter(game => !mapFilter || (game.mapId || 'default') === mapFilter);
+  if (!visibleGames.length) {
+    els.availableGames.innerHTML = '<p class="available-games-state">没有符合筛选条件的对局</p>';
+    return;
+  }
+  const pageCount = Math.max(1, Math.ceil(visibleGames.length / AVAILABLE_GAMES_PAGE_SIZE));
   availableGamesPage = Math.min(Math.max(availableGamesPage, 1), pageCount);
-  const pageGames = joinableGames.slice(
+  const pageGames = visibleGames.slice(
     (availableGamesPage - 1) * AVAILABLE_GAMES_PAGE_SIZE,
     availableGamesPage * AVAILABLE_GAMES_PAGE_SIZE,
   );
@@ -1584,9 +1608,11 @@ function renderAvailableGames(games) {
   }).join('');
   els.availableGames.innerHTML = `${listHtml}
     <div class="available-games-pager" aria-label="对局列表翻页">
+      <button type="button" class="available-games-page-btn" data-games-page="first" aria-label="最新一页" title="最新一页" ${availableGamesPage <= 1 ? 'disabled' : ''}>«</button>
       <button type="button" class="available-games-page-btn" data-games-page="prev" aria-label="上一页" ${availableGamesPage <= 1 ? 'disabled' : ''}>‹</button>
-      <span class="available-games-pager-info">第 ${availableGamesPage} / ${pageCount} 页 · 共 ${joinableGames.length} 局</span>
+      <span class="available-games-pager-info">第 ${availableGamesPage} / ${pageCount} 页 · 共 ${visibleGames.length} 局</span>
       <button type="button" class="available-games-page-btn" data-games-page="next" aria-label="下一页" ${availableGamesPage >= pageCount ? 'disabled' : ''}>›</button>
+      <button type="button" class="available-games-page-btn" data-games-page="last" aria-label="最后一页" title="最后一页" ${availableGamesPage >= pageCount ? 'disabled' : ''}>»</button>
     </div>`;
 }
 
@@ -1960,10 +1986,22 @@ document.querySelectorAll('.lobby-tab').forEach(tab => tab.addEventListener('cli
   if (tab.dataset.tab === 'join') refreshAvailableGames();
 }));
 els.btnRefreshGames?.addEventListener('click', refreshAvailableGames);
+els.availableGamesModeFilter?.addEventListener('change', () => {
+  availableGamesPage = 1;
+  if (availableGamesData.length) renderAvailableGames(availableGamesData);
+});
+els.availableGamesMapFilter?.addEventListener('change', () => {
+  availableGamesPage = 1;
+  if (availableGamesData.length) renderAvailableGames(availableGamesData);
+});
 document.addEventListener('click', e => {
   const pageBtn = e.target.closest?.('[data-games-page]');
   if (pageBtn && !pageBtn.disabled) {
-    availableGamesPage += pageBtn.dataset.gamesPage === 'next' ? 1 : -1;
+    const action = pageBtn.dataset.gamesPage;
+    if (action === 'next') availableGamesPage += 1;
+    else if (action === 'prev') availableGamesPage -= 1;
+    else if (action === 'first') availableGamesPage = 1;
+    else if (action === 'last') availableGamesPage = Number.POSITIVE_INFINITY;
     if (availableGamesData.length) renderAvailableGames(availableGamesData);
     return;
   }

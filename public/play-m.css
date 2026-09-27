@@ -371,6 +371,14 @@ body.player-m-shell .lobby-add-bot { min-height: 28px; }
 .available-games-refresh:disabled { opacity: .55; }
 .available-games-refresh img { width: 16px; height: 16px; filter: invert(78%) sepia(13%) saturate(535%) hue-rotate(158deg); }
 .available-games-refresh.refreshing img { animation: available-games-spin .8s linear infinite; }
+.available-games-filters { display: flex; gap: 8px; margin-bottom: 10px; }
+.available-games-filters select {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  font-size: 13px;
+  color: #9bb3c4;
+}
 .available-games { display: grid; gap: 8px; }
 .available-game {
   width: 100%;

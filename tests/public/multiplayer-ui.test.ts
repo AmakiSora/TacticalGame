@@ -58,6 +58,8 @@ describe('multiplayer UI wiring', () => {
 
       expect(html).toContain('id="available-games"');
       expect(html).toContain('id="btn-refresh-games"');
+      expect(html).toContain('id="available-games-mode-filter"');
+      expect(html).toContain('id="available-games-map-filter"');
       expect(source).toContain("fetch('/api/games')");
       expect(source).toContain("game.phase === 'lobby'");
       expect(source).toContain('game.playerCount < game.maxPlayers');

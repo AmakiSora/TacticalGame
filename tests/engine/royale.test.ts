@@ -8,7 +8,7 @@ import { createUnitFromConfig, addLobbyPlayer, createLobby } from '../../src/sta
 
 function createRoyaleGame(playerCount = 2) {
   const bus = new EventBus();
-  const game = createLobby('royale-test', 'terminus', {
+  const game = createLobby('royale-test', 'snowflake', {
     maxPlayers: playerCount,
     participate: true,
     playerName: 'A',
@@ -39,7 +39,7 @@ function advanceToRounds(context: ReturnType<typeof createRoyaleGame>, roundNumb
 }
 
 describe('royale mode', () => {
-  it.each([2, 3, 6])('starts a %i-player terminus game without headquarters and with plan state', playerCount => {
+  it.each([2, 3, 6])('starts a %i-player snowflake game without headquarters and with plan state', playerCount => {
     const { game } = createRoyaleGame(playerCount);
     const activePlayers = Object.values(game.players).filter(player => player?.status === 'active');
 
@@ -48,18 +48,18 @@ describe('royale mode', () => {
     expect(game.turn.currentPlayerId).toBeNull();
     expect(game.plan).toEqual({ queues: {}, committed: [] });
     expect(Object.keys(game.headquarters)).toHaveLength(0);
-    expect(game.units).toHaveLength(playerCount * 4);
+    expect(game.units).toHaveLength(playerCount * 3);
     expect(game.controlPoints.filter(point => point.owner !== null)).toHaveLength(playerCount);
     for (const player of activePlayers) {
-      expect(game.units.filter(unit => unit.owner === player!.id)).toHaveLength(4);
+      expect(game.units.filter(unit => unit.owner === player!.id)).toHaveLength(3);
       expect(game.controlPoints.filter(point => point.owner === player!.id)).toHaveLength(1);
     }
-    expect(game.artillery).toMatchObject({ safeRadius: 7, nextShrinkRound: 6 });
+    expect(game.artillery).toMatchObject({ safeRadius: 9, nextShrinkRound: 6 });
 
     const start = game.events.find(event => event.type === 'game_start')!;
     expect(start.payload.mode).toBe('royale');
     expect(start.payload.headquarters).toEqual({});
-    expect(start.payload.artillery).toMatchObject({ safeRadius: 7, nextShrinkRound: 6 });
+    expect(start.payload.artillery).toMatchObject({ safeRadius: 9, nextShrinkRound: 6 });
   });
 
   it('deploys from the owned spawn point during the plan phase and resolves on commit', () => {
@@ -69,7 +69,8 @@ describe('royale mode', () => {
     const dirs = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
     const target = dirs
       .map(([dq, dr]) => ({ q: point.q + dq!, r: point.r + dr! }))
-      .find(pos => !occupied.has(`${pos.q},${pos.r}`))!;
+      .find(pos => game.cells.some(cell => cell.q === pos.q && cell.r === pos.r)
+        && !occupied.has(`${pos.q},${pos.r}`))!;
     const suppliesBefore = game.resources['player_a']!.supplies;
 
     const queued = queueDeployAction(game, 'player_a', 'infantry', point.id, target.q, target.r);
@@ -81,9 +82,9 @@ describe('royale mode', () => {
 
     commitAll({ game, bus });
     const deploy = game.events.find(event => event.type === 'deploy');
-    expect(deploy?.payload).toMatchObject({ owner: 'player_a', fromId: point.id, cost: 40, discount: 15 });
-    // 结算后进入第 2 回合：扣部署费 40，轮界收入 base 20 + 据点 6。
-    expect(game.resources['player_a']!.supplies).toBe(suppliesBefore - 40 + 26);
+    expect(deploy?.payload).toMatchObject({ owner: 'player_a', fromId: point.id, cost: 55, discount: 0 });
+    // 结算后进入第 2 回合：扣部署费 55（本图无部署折扣），轮界收入 base 20 + 据点 20。
+    expect(game.resources['player_a']!.supplies).toBe(suppliesBefore - 55 + 40);
   });
 
   it('warns in round 5 and shrinks with artillery damage from round 6 on', () => {
@@ -93,21 +94,21 @@ describe('royale mode', () => {
 
     advanceToRounds({ game, bus }, 5);
     expect(game.turn.roundNumber).toBe(5);
-    expect(game.artillery).toMatchObject({ safeRadius: 7, nextShrinkRound: 6 });
+    expect(game.artillery).toMatchObject({ safeRadius: 9, nextShrinkRound: 6 });
     expect(game.artillery!.warningCells.length).toBeGreaterThan(0);
     expect(game.events.some(event => event.type === 'artillery_warning')).toBe(true);
     expect(game.events.some(event => event.type === 'artillery_damage')).toBe(false);
     expect(exposed.hp).toBe(exposed.maxHp);
 
     advanceToRounds({ game, bus }, 6);
-    expect(game.artillery).toMatchObject({ safeRadius: 6 });
+    expect(game.artillery).toMatchObject({ safeRadius: 8 });
     expect(game.events.some(event => event.type === 'artillery_shrunk')).toBe(true);
     expect(exposed.hp).toBe(exposed.maxHp - 25);
     expect(game.events.some(event => event.type === 'artillery_damage' && event.payload.owner === exposed.owner))
       .toBe(true);
 
     advanceToRounds({ game, bus }, 8);
-    expect(game.artillery).toMatchObject({ safeRadius: 4 });
+    expect(game.artillery).toMatchObject({ safeRadius: 6 });
     expect(exposed.alive).toBe(true);
     expect(exposed.hp).toBe(exposed.maxHp - 75);
   });
@@ -116,7 +117,7 @@ describe('royale mode', () => {
     const { game, bus } = createRoyaleGame();
     const point = game.controlPoints.find(candidate => candidate.owner === 'player_a')!;
 
-    advanceToRounds({ game, bus }, 8);
+    advanceToRounds({ game, bus }, 7);
     expect(isArtilleryDanger(game, point)).toBe(true);
     expect(queueDeployAction(game, 'player_a', 'infantry', point.id, point.q, point.r + 1))
       .toMatchObject({ ok: false, code: 'invalid_deploy' });
@@ -125,8 +126,13 @@ describe('royale mode', () => {
   it('blocks plan-phase heals aimed into the artillery zone', () => {
     const { game, bus } = createRoyaleGame();
     const owner = 'player_a';
-    const wounded = game.units.find(unit => unit.owner === owner && unit.type === 'infantry')!;
-    const support = createUnitFromConfig(game.config, owner, 'support', wounded.q + 1, wounded.r);
+    // player_a 的第二台重装在 (-8,-1)（第 7 回合起处于危险区）；占着内侧相邻
+    // 安全格 (-7,0) 的侦察兵先挪进内圈，给支援兵腾出这个第 7 回合唯一的邻接安全格。
+    const wounded = game.units.find(unit => unit.owner === owner && unit.type === 'heavy' && unit.q === -8)!;
+    const scout = game.units.find(unit => unit.owner === owner && unit.type === 'scout')!;
+    scout.q = -1;
+    scout.r = 0;
+    const support = createUnitFromConfig(game.config, owner, 'support', wounded.q + 1, wounded.r + 1);
     game.units.push(support);
 
     advanceToRounds({ game, bus }, 7);
@@ -140,7 +146,7 @@ describe('royale mode', () => {
     const { game, bus } = createRoyaleGame();
     const victim = 'player_b';
     const survivor = game.turn.turnOrder.find(owner => owner !== victim)!;
-    const dangerCells: { q: number; r: number }[] = [{ q: 7, r: 0 }, { q: 7, r: -1 }, { q: 6, r: -7 }, { q: 7, r: -7 }];
+    const dangerCells: { q: number; r: number }[] = [{ q: 9, r: 0 }, { q: 0, r: -9 }, { q: -9, r: 9 }];
     const victimUnits = game.units.filter(unit => unit.owner === victim);
     const survivorUnits = game.units.filter(unit => unit.owner === survivor);
     dangerCells.forEach((cell, index) => {
@@ -148,7 +154,7 @@ describe('royale mode', () => {
       victimUnits[index]!.r = cell.r;
     });
     survivorUnits.forEach((unit, index) => {
-      const safe = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 0, r: 1 }, { q: -1, r: 0 }][index]!;
+      const safe = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: -1, r: 0 }][index]!;
       unit.q = safe.q;
       unit.r = safe.r;
     });
@@ -168,7 +174,7 @@ describe('royale mode', () => {
       .toMatchObject({ playerId: victim, reason: 'artillery_destroyed' });
   });
 
-  it('collapses into mutual annihilation once the ring closes to the center point', () => {
+  it('collapses into mutual annihilation once the ring closes to the innermost cells', () => {
     const { game, bus } = createRoyaleGame();
 
     let guard = 0;
@@ -185,17 +191,18 @@ describe('royale mode', () => {
 
   it('eliminates both players as army_destroyed when a simultaneous exchange wipes both armies', () => {
     const { game, bus } = createRoyaleGame();
-    const duelist = game.units.find(unit => unit.owner === 'player_a' && unit.type === 'infantry')!;
-    const target = game.units.find(unit => unit.owner === 'player_b' && unit.type === 'infantry')!;
+    const duelist = game.units.find(unit => unit.owner === 'player_a' && unit.type === 'heavy')!;
+    const target = game.units.find(unit => unit.owner === 'player_b' && unit.type === 'heavy')!;
     game.units = [duelist, target];
+    // (1,0) 与 (1,-1) 都是雪花图内圈平原格，重装 arc 形状以相邻格定向扫三格。
     duelist.q = 1;
     duelist.r = 0;
-    target.q = 2;
-    target.r = 0;
+    target.q = 1;
+    target.r = -1;
     duelist.hp = 1;
     target.hp = 1;
 
-    expect(queueAttackAction(game, 'player_a', duelist.id, 2, 0)).toMatchObject({ ok: true });
+    expect(queueAttackAction(game, 'player_a', duelist.id, 1, -1)).toMatchObject({ ok: true });
     expect(queueAttackAction(game, 'player_b', target.id, 1, 0)).toMatchObject({ ok: true });
     commitAll({ game, bus });
 
@@ -209,16 +216,16 @@ describe('royale mode', () => {
 
   it('attributes army_destroyed elimination to the killer when only one side is wiped', () => {
     const { game, bus } = createRoyaleGame();
-    const killer = game.units.find(unit => unit.owner === 'player_a' && unit.type === 'infantry')!;
-    const victimUnit = game.units.find(unit => unit.owner === 'player_b' && unit.type === 'infantry')!;
+    const killer = game.units.find(unit => unit.owner === 'player_a' && unit.type === 'heavy')!;
+    const victimUnit = game.units.find(unit => unit.owner === 'player_b' && unit.type === 'heavy')!;
     game.units = [killer, victimUnit];
     killer.q = 1;
     killer.r = 0;
-    victimUnit.q = 2;
-    victimUnit.r = 0;
+    victimUnit.q = 1;
+    victimUnit.r = -1;
     victimUnit.hp = 1;
 
-    expect(queueAttackAction(game, 'player_a', killer.id, 2, 0)).toMatchObject({ ok: true });
+    expect(queueAttackAction(game, 'player_a', killer.id, 1, -1)).toMatchObject({ ok: true });
     commitAll({ game, bus });
 
     expect(game.phase).toBe('game_over');
@@ -250,8 +257,8 @@ describe('royale mode', () => {
     expect(game.turn.roundNumber).toBe(2);
     const incomeEvents = game.events.filter(event => event.type === 'income');
     expect(incomeEvents).toHaveLength(2);
-    expect(incomeEvents[0]!.payload).toMatchObject({ base: 20, control: 6 });
-    expect(game.resources['player_a']!.supplies).toBe(suppliesA + 26);
-    expect(game.resources['player_b']!.supplies).toBe(suppliesB + 26);
+    expect(incomeEvents[0]!.payload).toMatchObject({ base: 20, control: 20 });
+    expect(game.resources['player_a']!.supplies).toBe(suppliesA + 40);
+    expect(game.resources['player_b']!.supplies).toBe(suppliesB + 40);
   });
 });

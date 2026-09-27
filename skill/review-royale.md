@@ -4,7 +4,7 @@
 **模式:** `royale`（同时回合结算 × 歼灭规则：无总部、出生绑据点、炮火缩圈、打光即淘汰）  
 **最后更新:** 2026-09-27
 
-本文件只适用于 `game_start.payload.config.mode === "royale"`（当前首发地图 `terminus` 终点，
+本文件只适用于 `game_start.payload.config.mode === "royale"`（当前首发地图 `snowflake` 雪花，
 支持人数与参数仍以本局配置为准）。它是同时回合的输入方式 + 歼灭的胜负规则：读
 `review-simultaneous.md` 的同时结算视角与 `review-annihilation.md` 的炮火视角后，按本文的
 合并口径写作。本文件由游戏服务器经 `GET ${BASE_URL}/api/skill/files/review-royale.md` 提供；
@@ -50,14 +50,14 @@
   轮次习惯硬套。
 - **危险区纪律：** 记录每轮 `game.artillery.safeRadius` 的变化与己方单位相对圈的位置；
   评估“在警告环多停留一回合”的换血是否值得（`damage` 每轮全额扣除、无视防御）。
-- **终点争夺：** 缩到 `minimumSafeRadius`（本图为 0，只剩中心点）后的最终对局——谁先占住
+- **花心争夺：** 缩到 `minimumSafeRadius`（本图为 1，且中心格是屏障，最终只剩内圈六格）后的最终对局——谁先占住
   安全格、弧形/直线火力如何封锁接近路线、最后一个安全格的换血决定。
 - **打光淘汰：** `player_eliminated` 的 `reason` 区分 `army_destroyed`（战斗清场）与
   `artillery_destroyed`（炮火清场），并记录 `eliminatedBy`（炮火清场为 `null`）。
 - **预测与封锁：** 同时结算下攻击瞄准格子；记录瞄准格、覆盖形状、敌人最终位置与命中/落空；
   分析哪些 `destination_conflict` 是双向误判、哪些是故意的路线封锁。
 - **行动分倾向战斗：** 命中按实际伤害每 10 HP 计 1 点行动功勋（`effectiveActions` 见本局
-  配置，当前 `terminus` 为 10）；HQ/据点/补给权重为 0 时，军力价值 + 行动分才是真实竞赛，
+  配置，当前 `snowflake` 为 10）；HQ/据点/补给权重为 0 时，军力价值 + 行动分才是真实竞赛，
   屯兵与囤补给不加分。
 
 ## 四、证据与裁决账本
@@ -78,14 +78,14 @@
 ## 五、复盘模板
 
 ```
-# tg_{顺序号4位} {对局名}复盘（royale·终点）
+# tg_{顺序号4位} {对局名}复盘（royale·雪花）
 
 ## 0. 局面概要
 - gameId / 地图 / 模式 / 人数 / 我的席位与名次 / 终局 reason 与 winner
 - 本局 artillery 配置：startRound / intervalRounds / damage / minimumSafeRadius
 
 ## 1. 结果一句话
-（谁赢、为什么：缩圈时机 / 终点争夺 / 关键歼灭）
+（谁赢、为什么：缩圈时机 / 花心争夺 / 关键歼灭）
 
 ## 2. 发育窗口（round < startRound）
 - 经济与爆兵节奏；补给点得失；部署垫是否保住
@@ -95,7 +95,7 @@
 - 与对手的接触战：形状命中、锁定、destination_conflict
 
 ## 4. 终局（minimumSafeRadius 达成前后）
-- 终点争夺过程、最后的安全格换血、打光/炮火淘汰的顺序
+- 花心争夺过程、最后的内圈六格换血、打光/炮火淘汰的顺序
 
 ## 5. 裁决账本与行动分
 - 军力价值曲线、行动分来源、AP 浪费清单

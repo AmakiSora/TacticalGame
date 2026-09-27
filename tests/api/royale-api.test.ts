@@ -1,5 +1,5 @@
 // tests/api/royale-api.test.ts
-// royale 模式（terminus 地图）的 HTTP 端到端流程：计划入队 → 全员确认同时结算，
+// royale 模式（snowflake 地图）的 HTTP 端到端流程：计划入队 → 全员确认同时结算，
 // 轮界炮火收缩事件随事件流下发。
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildServer } from '../../src/server.js';
@@ -20,7 +20,7 @@ async function createRoyaleGame(playerCount = 2): Promise<{
   const createRes = await app.inject({
     method: 'POST',
     url: '/api/games',
-    payload: { mapId: 'terminus', maxPlayers: playerCount, playerName: 'A' },
+    payload: { mapId: 'snowflake', maxPlayers: playerCount, playerName: 'A' },
   });
   expect(createRes.statusCode).toBe(200);
   const created = createRes.json() as { gameId: string; hostToken: string; player: Seat };
@@ -89,7 +89,7 @@ afterEach(() => {
 });
 
 describe('royale mode API', () => {
-  it('creates and starts a terminus game with plan state and no headquarters', async () => {
+  it('creates and starts a snowflake game with plan state and no headquarters', async () => {
     const { app, gameId, seats } = await createRoyaleGame();
     try {
       const state = await getState(app, gameId, seats[0]!.token);
@@ -97,7 +97,7 @@ describe('royale mode API', () => {
       expect(state.turn.currentPlayerId).toBeNull();
       expect(state.plan).toEqual({ queues: {}, committed: [], myQueue: [] });
       expect(state.headquarters).toEqual({});
-      expect(state.artillery).toMatchObject({ safeRadius: 7, nextShrinkRound: 6 });
+      expect(state.artillery).toMatchObject({ safeRadius: 9, nextShrinkRound: 6 });
 
       const lobby = await app.inject({ method: 'GET', url: `/api/games/${gameId}/lobby` });
       expect(lobby.json().mode).toBe('royale');
@@ -113,9 +113,11 @@ describe('royale mode API', () => {
       const unit = state.units.find(candidate => candidate.owner === seats[0]!.id)!;
       const dirs = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
       const occupied = new Set(state.units.map(candidate => `${candidate.q},${candidate.r}`));
+      // 建局座位是真随机（东西侧各 50%），目标格必须校验在棋盘内且为平原。
       const target = dirs
         .map(([dq, dr]) => ({ q: unit.q + dq!, r: unit.r + dr! }))
-        .find(pos => !occupied.has(`${pos.q},${pos.r}`))!;
+        .find(pos => state.cells.some(cell => cell.q === pos.q && cell.r === pos.r && cell.terrain === 'plain')
+          && !occupied.has(`${pos.q},${pos.r}`))!;
 
       const moveRes = await app.inject({
         method: 'POST',
@@ -123,7 +125,7 @@ describe('royale mode API', () => {
         headers: { 'x-player-token': seats[0]!.token },
         payload: { unitId: unit.id, q: target.q, r: target.r },
       });
-      expect(moveRes.statusCode).toBe(200);
+      expect(moveRes.statusCode, JSON.stringify(moveRes.json())).toBe(200);
       expect(moveRes.json()).toMatchObject({ ok: true, queued: expect.objectContaining({ type: 'move' }) });
 
       const afterQueue = await getState(app, gameId, seats[0]!.token);
@@ -179,7 +181,7 @@ describe('royale mode API', () => {
 
       const state = await getState(app, gameId, seats[0]!.token);
       expect(state.turn.roundNumber).toBeGreaterThanOrEqual(6);
-      expect(state.artillery).toMatchObject({ safeRadius: 6 });
+      expect(state.artillery).toMatchObject({ safeRadius: 8 });
 
       const events = await listEvents(app, gameId);
       const warning = events.find(event => event.type === 'artillery_warning');

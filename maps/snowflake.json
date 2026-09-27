@@ -1,0 +1,906 @@
+{
+  "mode": "royale",
+  "name": "雪花",
+  "description": "大逃杀模式首发图。半径 9 的雪花战场：六条放射通道被屏障与水域切割，六个前进基地分居六角，全图没有补给与维修点——占住基地就是命脉，治疗兵是唯一的续航。前 5 回合高经济和平发育、放手爆兵，第 5 回合出现炮火预警，第 6 回合起炮火每回合向中心收缩一圈，第 13 回合起安全区收缩至极限，只剩中心一圈六格立足——幸存者在雪花花心决出唯一的赢家。支持 2、3、6 人。",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 9,
+  "terrainCells": [
+    {
+      "q": -9,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -9,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -8,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -8,
+      "r": 4,
+      "terrain": "water"
+    },
+    {
+      "q": -8,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -7,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -7,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -7,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -6,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -6,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": -6,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -6,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -6,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 7,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 8,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 9,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": -4,
+      "terrain": "water"
+    },
+    {
+      "q": -4,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 2,
+      "terrain": "water"
+    },
+    {
+      "q": -4,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 8,
+      "terrain": "water"
+    },
+    {
+      "q": -4,
+      "r": 9,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 8,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": -2,
+      "terrain": "water"
+    },
+    {
+      "q": -2,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 4,
+      "terrain": "water"
+    },
+    {
+      "q": -2,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 7,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": 7,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": -7,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -7,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -4,
+      "terrain": "water"
+    },
+    {
+      "q": 2,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 2,
+      "terrain": "water"
+    },
+    {
+      "q": 2,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": -8,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -9,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -8,
+      "terrain": "water"
+    },
+    {
+      "q": 4,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -2,
+      "terrain": "water"
+    },
+    {
+      "q": 4,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": 4,
+      "terrain": "water"
+    },
+    {
+      "q": 4,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -9,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -8,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -7,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 7,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 7,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 7,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 8,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 8,
+      "r": -4,
+      "terrain": "water"
+    },
+    {
+      "q": 8,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 9,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 9,
+      "r": -4,
+      "terrain": "blocker"
+    }
+  ],
+  "controlPoints": [
+    {
+      "id": "cp_1",
+      "name": "据点 1",
+      "kind": "forward_base",
+      "q": 0,
+      "r": 8
+    },
+    {
+      "id": "cp_2",
+      "name": "据点 2",
+      "kind": "forward_base",
+      "q": -8,
+      "r": 8
+    },
+    {
+      "id": "cp_3",
+      "name": "据点 3",
+      "kind": "forward_base",
+      "q": -8,
+      "r": 0
+    },
+    {
+      "id": "cp_4",
+      "name": "据点 4",
+      "kind": "forward_base",
+      "q": 0,
+      "r": -8
+    },
+    {
+      "id": "cp_5",
+      "name": "据点 5",
+      "kind": "forward_base",
+      "q": 8,
+      "r": -8
+    },
+    {
+      "id": "cp_6",
+      "name": "据点 6",
+      "kind": "forward_base",
+      "q": 8,
+      "r": 0
+    }
+  ],
+  "units": {
+    "infantry": {
+      "hp": 90,
+      "attack": 31,
+      "defense": 7,
+      "moveRange": 3,
+      "attackRange": 2,
+      "cost": 55,
+      "canCapture": true,
+      "attackShape": {
+        "type": "line",
+        "length": 2
+      }
+    },
+    "scout": {
+      "hp": 70,
+      "attack": 16,
+      "defense": 4,
+      "moveRange": 4,
+      "attackRange": 1,
+      "cost": 42,
+      "canCapture": true
+    },
+    "heavy": {
+      "hp": 140,
+      "attack": 40,
+      "defense": 9,
+      "moveRange": 2,
+      "attackRange": 1,
+      "cost": 100,
+      "canCapture": false,
+      "attackShape": {
+        "type": "arc"
+      }
+    },
+    "ranger": {
+      "hp": 68,
+      "attack": 34,
+      "defense": 3,
+      "moveRange": 3,
+      "attackRange": 3,
+      "cost": 80,
+      "canCapture": false,
+      "attackLock": true
+    },
+    "support": {
+      "hp": 76,
+      "attack": 10,
+      "defense": 5,
+      "moveRange": 3,
+      "attackRange": 2,
+      "cost": 68,
+      "canCapture": false,
+      "healPower": 20,
+      "healShape": {
+        "type": "arc"
+      }
+    }
+  },
+  "headquartersSpec": {
+    "hp": 1,
+    "defense": 0
+  },
+  "balance": {
+    "startingSupplies": 500,
+    "baseIncome": 20,
+    "controlPointIncome": 12,
+    "damageVarianceRange": 2,
+    "minimumDamage": 1,
+    "healVarianceRange": 10,
+    "actionsPerTurn": 8,
+    "maxTurns": null,
+    "adjudicationWeights": {
+      "enemyHqDamage": 0,
+      "ownHqHp": 0,
+      "controlPoint": 0,
+      "armyValue": 5,
+      "supplies": 0,
+      "effectiveActions": 10
+    },
+    "controlPointTypes": {
+      "supply": {
+        "income": 12,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "forward_base": {
+        "income": 20,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "repair": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 10
+      }
+    }
+  },
+  "annihilation": {
+    "artillery": {
+      "startRound": 6,
+      "intervalRounds": 1,
+      "damage": 25,
+      "minimumSafeRadius": 1
+    }
+  },
+  "spawnSlots": [
+    {
+      "id": "slot_east",
+      "headquarters": {
+        "q": 9,
+        "r": 0
+      },
+      "controlPointId": "cp_6",
+      "startingUnits": [
+        {
+          "type": "heavy",
+          "q": 9,
+          "r": -1
+        },
+        {
+          "type": "heavy",
+          "q": 8,
+          "r": 1
+        },
+        {
+          "type": "scout",
+          "q": 7,
+          "r": 0
+        }
+      ]
+    },
+    {
+      "id": "slot_northeast",
+      "headquarters": {
+        "q": 9,
+        "r": -9
+      },
+      "controlPointId": "cp_5",
+      "startingUnits": [
+        {
+          "type": "heavy",
+          "q": 8,
+          "r": -9
+        },
+        {
+          "type": "heavy",
+          "q": 9,
+          "r": -8
+        },
+        {
+          "type": "scout",
+          "q": 7,
+          "r": -7
+        }
+      ]
+    },
+    {
+      "id": "slot_northwest",
+      "headquarters": {
+        "q": 0,
+        "r": -9
+      },
+      "controlPointId": "cp_4",
+      "startingUnits": [
+        {
+          "type": "scout",
+          "q": 0,
+          "r": -7
+        },
+        {
+          "type": "heavy",
+          "q": -1,
+          "r": -8
+        },
+        {
+          "type": "heavy",
+          "q": 1,
+          "r": -9
+        }
+      ]
+    },
+    {
+      "id": "slot_west",
+      "headquarters": {
+        "q": -9,
+        "r": 0
+      },
+      "controlPointId": "cp_3",
+      "startingUnits": [
+        {
+          "type": "heavy",
+          "q": -9,
+          "r": 1
+        },
+        {
+          "type": "heavy",
+          "q": -8,
+          "r": -1
+        },
+        {
+          "type": "scout",
+          "q": -7,
+          "r": 0
+        }
+      ]
+    },
+    {
+      "id": "slot_southwest",
+      "headquarters": {
+        "q": -9,
+        "r": 9
+      },
+      "controlPointId": "cp_2",
+      "startingUnits": [
+        {
+          "type": "scout",
+          "q": -7,
+          "r": 7
+        },
+        {
+          "type": "heavy",
+          "q": -9,
+          "r": 8
+        },
+        {
+          "type": "heavy",
+          "q": -8,
+          "r": 9
+        }
+      ]
+    },
+    {
+      "id": "slot_southeast",
+      "headquarters": {
+        "q": 0,
+        "r": 9
+      },
+      "controlPointId": "cp_1",
+      "startingUnits": [
+        {
+          "type": "heavy",
+          "q": -1,
+          "r": 9
+        },
+        {
+          "type": "heavy",
+          "q": 1,
+          "r": 8
+        },
+        {
+          "type": "scout",
+          "q": 0,
+          "r": 7
+        }
+      ]
+    }
+  ],
+  "layouts": {
+    "2": [
+      "slot_east",
+      "slot_west"
+    ],
+    "3": [
+      "slot_east",
+      "slot_northwest",
+      "slot_southwest"
+    ],
+    "6": [
+      "slot_east",
+      "slot_northeast",
+      "slot_northwest",
+      "slot_west",
+      "slot_southwest",
+      "slot_southeast"
+    ]
+  }
+}

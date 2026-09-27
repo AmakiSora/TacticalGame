@@ -250,15 +250,15 @@ describe('map editor page', () => {
 
   it('accepts minimumSafeRadius 0 in royale maps and still rejects negatives', () => {
     const core = loadCore();
-    const serialized = core.serializeMapConfig(core.normalizeImportedMap(JSON.parse(read('maps/terminus.json'))));
+    const serialized = core.serializeMapConfig(core.normalizeImportedMap(JSON.parse(read('maps/snowflake.json'))));
 
     expect(serialized.mode).toBe('royale');
-    expect(serialized.annihilation.artillery.minimumSafeRadius).toBe(0);
-    expect(core.validateMapConfig(serialized, 'terminus')).toEqual([]);
+    expect(serialized.annihilation.artillery.minimumSafeRadius).toBe(1);
+    expect(core.validateMapConfig(serialized, 'snowflake')).toEqual([]);
 
     serialized.annihilation.artillery.minimumSafeRadius = -1;
-    expect(core.validateMapConfig(serialized, 'terminus'))
-      .toContain('Map "terminus".annihilation.artillery.minimumSafeRadius must be a number >= 0');
+    expect(core.validateMapConfig(serialized, 'snowflake'))
+      .toContain('Map "snowflake".annihilation.artillery.minimumSafeRadius must be a number >= 0');
   });
 
   it('keeps annihilation radius and spawn point references consistent during edits', () => {

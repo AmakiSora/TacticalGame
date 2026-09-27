@@ -1,6 +1,6 @@
 # Royale mode (大逃杀)
 
-Use only when `game.config.mode === "royale"` (map: `terminus` 终点, 2/3/6 players).  
+Use only when `game.config.mode === "royale"` (map: `snowflake` 雪花, 2/3/6 players).  
 If the game is `standard`, `annihilation`, or `simultaneous`, stop and read that mode file instead — do not apply this file.
 
 Royale = **simultaneous resolution** (secret plans, full-commit settlement) × **annihilation rules**
@@ -68,28 +68,33 @@ Do **not** memorize a fixed timetable. Each royale map carries its own schedule.
   repair. Combat and movement remain allowed.
 - When `safeRadius` reaches `minimumSafeRadius`, `nextShrinkRound` turns `null` and the ring holds.
 
-## Terminus map (终点) specifics
+## Snowflake map (雪花) specifics
 
-- Radius-7 hexagon, six-fold symmetric. Spawn: **owned forward_base CP** (deploy pad) + 2 infantry
-  + 1 scout + 1 heavy — ranger and support are deploy-only; composition is an economy decision.
-- Control points: six `forward_base` spawn pads (`deployDiscount 15`), six `supply` income points on
-  the middle ring, and center `cp_center` 终点站 (`repair`).
+- Radius-9 snowflake: six radial corridors cut by blockers and water — movement is channelized, so
+  narrow cells are natural kill zones. Spawn: **owned forward_base CP** (the map's ONLY CP kind:
+  sole income + deploy pad, no deploy discount) + 2 heavy + 1 scout — ranger and support are
+  deploy-only; composition is an economy decision.
+- Control points: exactly six `forward_base` corner pads, **no supply and no repair points**.
+  Losing your pad means no income beyond base and no reinforcements; supports are the only
+  sustain on this map (no repair stations, and healing is banned inside danger).
 - Roster (per-map numbers — always re-read `config.units`; heal range falls back to `attackRange`):
   | unit | HP | atk | def | move | range | shape / ability |
   |---|---:|---:|---:|---:|---:|---|
-  | infantry | 90 | 31 | 7 | 2 | 2 | `line` 2 — 直线轰击前方两格；费用55 |
-  | scout | 60 | 16 | 4 | 3 | 1 | `single` — 单格，快速占点；费用42 |
+  | infantry | 90 | 31 | 7 | 3 | 2 | `line` 2 — 直线轰击前方两格；费用55 |
+  | scout | 70 | 16 | 4 | 4 | 1 | `single` — 单格，快速机动；费用42 |
   | heavy | 140 | 40 | 9 | 2 | 1 | `arc` — 横扫周围三格扇形；费用100 |
-  | ranger | 68 | 38 | 3 | 2 | 3 | `single` + **锁定**（未逃出射程必命中）；费用80 |
-  | support | 76 | 10 | 5 | 2 | 2 | `healShape` `arc` — 区域治疗三格，治疗力20；费用68 |
-- Economy (generous by design): `startingSupplies 180`, `baseIncome 20`, supply CP income 12,
-  forward_base income 6 + deploy discount 15, `actionsPerTurn 5`. Rounds 1–5 (`round < startRound`)
-  are the build-up window — flood units and grab safe supply points.
+  | ranger | 68 | 34 | 3 | 3 | 3 | `single` + **锁定**（未逃出射程必命中）；费用80 |
+  | support | 76 | 10 | 5 | 3 | 2 | `healShape` `arc` — 区域治疗三格，治疗力20；费用68 |
+- Economy (generous by design): `startingSupplies 500`, `baseIncome 20`, forward_base income 20
+  (no deploy discount), `actionsPerTurn 8`. Rounds 1–5 (`round < startRound`) are the build-up
+  window — flood units and defend your pad; healing rolls add `healVarianceRange 10` variance.
 - Artillery schedule (this map only — re-derive on any other royale map): `startRound 6`,
-  `intervalRounds 1`, `damage 25`, `minimumSafeRadius 0`. Round 5 shows the warning ring; from
-  round 6 the safe radius shrinks **one ring per round** (round R safe radius ≈ 12 − R); from
-  round 12 only the center point is safe. `maxTurns: null` — no round adjudication; the match ends
-  by elimination (combat wipe, artillery wipe) or the host's `/force-adjudicate`.
+  `intervalRounds 1`, `damage 25`, `minimumSafeRadius 1`. Round 5 shows the warning ring; from
+  round 6 the safe radius shrinks **one ring per round** (round R safe radius ≈ 14 − R); from
+  round 13 it floors at 1 — and the center hex itself is impassable, so the final contested
+  ground is the **six cells of the inner ring** (the snowflake's heart). `maxTurns: null` — no
+  round adjudication; the match ends by elimination (combat wipe, artillery wipe) or the host's
+  `/force-adjudicate`.
 - Scoring: HQ/CP/supply weights are 0 — **army value + actionScore are the real race**
   (`effectiveActions 10`; simultaneous hits award 1 merit per 10 HP). Read `adjudication.weights`
   of the live game instead of trusting this summary.
@@ -117,14 +122,15 @@ Unless the user asks for a different style:
    heavy arcs on clumps. Seat-wiping finishers are gold — army-wipe elimination is instant.
 3. **Evacuate** friendlies on `dangerCells`/`warningCells` toward the current safe radius (unless
    this activation gets a guaranteed kill and the unit can still leave before the next boundary).
-4. **Heal** only if support and aim cells are both outside danger.
+4. **Heal** only if support and aim cells are both outside danger. There are no repair
+   points on snowflake — supports are your only sustain, keep them alive and out of the ring.
 5. **Deploy** from a safe owned CP into a safe adjacent cell: pre-shrink → capturers/economy;
    fights incoming → heavy/ranger; wounded cluster → support. No owned CP → skip.
-6. **Pre-shrink** (`round < artillery.startRound`): grab safe `supply` points and hold your deploy
-   pad; flood units while income is untouched by the ring.
+6. **Pre-shrink** (`round < artillery.startRound`): hold your forward_base pad (sole income +
+   deploy pad — there are no other CPs) and flood units while income is untouched by the ring.
 7. **From first shrink** (`round >= startRound`): move inward ahead of the ring, fight inside the
-   safe zone, deny the center approach lanes. Near `minimumSafeRadius`, position for the final
-   center fight — the last safe cell holds at most one unit per hex.
+   safe zone, deny the corridor lanes leading to the heart. Near `minimumSafeRadius`, position for
+   the final fight on the six inner-ring cells (the impassable center hex cannot be occupied).
 8. **No useful action** → `/end-turn` (commit). Do not hold the table hostage.
 
 ## Pre-commit sanity pass

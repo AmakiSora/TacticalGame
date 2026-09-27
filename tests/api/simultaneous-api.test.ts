@@ -394,7 +394,8 @@ describe('simultaneous mode API', () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  // 该用例两次 buildServer + 落盘回读，全量并行负载下会越过默认 5s 超时（单跑约 4s），给足余量。
+  }, 20000);
 });
 
 describe('sequential mode regression', () => {

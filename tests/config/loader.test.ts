@@ -634,16 +634,16 @@ describe('map config loader', () => {
     resetConfig();
   });
 
-  it('loads the royale map terminus with artillery config and control-point spawns', () => {
+  it('loads the royale map snowflake with artillery config and control-point spawns', () => {
     resetConfig();
     loadMaps();
 
-    const map = getMapConfig('terminus');
+    const map = getMapConfig('snowflake');
     expect(map.mode).toBe('royale');
-    expect(map.name).toBe('终点');
+    expect(map.name).toBe('雪花');
     expect(map.balance.maxTurns).toBeNull();
     expect(map.annihilation?.artillery).toEqual({
-      startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 0,
+      startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 1,
     });
     expect(map.spawnSlots.length).toBe(6);
     for (const slot of map.spawnSlots) {
@@ -654,16 +654,16 @@ describe('map config loader', () => {
     resetConfig();
   });
 
-  it('exposes terminus in the map list as a royale preview', () => {
+  it('exposes snowflake in the map list as a royale preview', () => {
     resetConfig();
     loadMaps();
 
-    const map = listMaps().find(item => item.id === 'terminus')!;
-    expect(map.name).toBe('终点');
+    const map = listMaps().find(item => item.id === 'snowflake')!;
+    expect(map.name).toBe('雪花');
     expect(map.preview.mode).toBe('royale');
     expect(map.preview.maxTurns).toBeNull();
     expect(map.preview.artillery).toEqual({
-      startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 0,
+      startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 1,
     });
     resetConfig();
   });

@@ -527,7 +527,7 @@
         const value = num(artillery, key, `${mapName}.annihilation.artillery`, 1);
         if (!Number.isInteger(value)) errors.push(`${mapName}.annihilation.artillery.${key} must be an integer`);
       }
-      // minimumSafeRadius 允许 0：最终安全区收缩到只剩中心点（大逃杀 terminus 即如此）。
+      // minimumSafeRadius 允许 0：最终安全区收缩到只剩中心点。
       const minimumSafeRadius = num(artillery, 'minimumSafeRadius', `${mapName}.annihilation.artillery`, 0);
       if (!Number.isInteger(minimumSafeRadius)) {
         errors.push(`${mapName}.annihilation.artillery.minimumSafeRadius must be an integer`);

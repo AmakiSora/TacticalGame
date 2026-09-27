@@ -123,18 +123,22 @@ describe('map editor page', () => {
 
   it('round-trips irregular cells and complete multiplayer spawn layouts', () => {
     const core = loadCore();
-    const irregular = JSON.parse(read('maps/four-corners.json'));
+    const irregular = JSON.parse(read('maps/whirlpool.json'));
 
     const normalized = core.normalizeImportedMap(irregular);
     const serialized = core.serializeMapConfig(normalized);
 
-    expect(serialized.playableCells).toHaveLength(163);
-    expect(core.createCellsFromConfig(normalized)).toHaveLength(163);
-    expect(serialized.spawnSlots).toHaveLength(4);
-    expect(serialized.layouts).toEqual({ 4: ['slot_nw', 'slot_ne', 'slot_se', 'slot_sw'] });
+    expect(serialized.playableCells).toHaveLength(217);
+    expect(core.createCellsFromConfig(normalized)).toHaveLength(217);
+    expect(serialized.spawnSlots).toHaveLength(6);
+    expect(serialized.layouts).toEqual({
+      2: ['slot_e', 'slot_w'],
+      3: ['slot_e', 'slot_sw', 'slot_nw'],
+      6: ['slot_e', 'slot_se', 'slot_sw', 'slot_w', 'slot_nw', 'slot_ne'],
+    });
     expect(serialized).not.toHaveProperty('headquarters');
     expect(serialized).not.toHaveProperty('startingUnits');
-    expect(core.validateMapConfig(serialized, 'four-corners')).toEqual([]);
+    expect(core.validateMapConfig(serialized, 'whirlpool')).toEqual([]);
   });
 
   it('preserves annihilation mode, artillery settings, and spawn point ownership links', () => {

@@ -198,7 +198,7 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('POST /api/games/:id/leave');
     expect(skill).toContain('last_player_standing');
     expect(skill).toContain('multiplayer-ring');
-    expect(skill).toContain('four-corners');
+    expect(skill).toContain('standoff');
     expect(skill).toContain('GET /api/maps');
     expect(skill).toContain('preview.supportedPlayerCounts');
     expect(skill).toContain('never hardcode `player_b`');

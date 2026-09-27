@@ -4,6 +4,16 @@
 
 自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.5.7
+
+### 移除
+
+- **下线 4 人地图「四角交锋」（`maps/four-corners.json`）**：`GET /api/maps` 不再返回该图，以 `mapId: four-corners` 建局会被拒绝，服务器自此没有 4 人专属图（多人图余 2/3/6 人：`multiplayer-ring` / `artillery-zone` / `snowflake` / `standoff`）。历史资产不受影响：回放 JSON 的 `game_start` 事件内嵌完整地图快照，`records/` 存档回放不依赖 `maps/` 目录；持久化对局的配置随局内嵌，`runtime/` 旧档照常恢复；统计看板中的 four-corners 历史战绩原样保留。配套同步：`skill/SKILL.md` 人数说明与 `skill/example-game.sh` 示例移除该图，README 内置地图清单更新；5 处测试引用改写——异形图样例改用 `whirlpool`（loader / map-editor / multiplayer-api 预览），「半径内缺失格拒绝移动/部署/拆除」的引擎边界用例改为临时加载挖洞 whirlpool 合成图，four-corners 专属的 4 人镜像出生与 4 人建局用例随图删除（多人在 API 层的建局/开局覆盖由 artillery-zone 2/3/6 参数化用例承接）。
+
+### 测试与验证
+
+- `npm run build && npm test` 通过（65 个测试文件 / 627 个用例）；`npm run check-version` 校验 3.5.7 全部引用一致（本版本在 release/3.5.7 分支上经 `npm run version 3.5.7` 对齐）。
+
 ## 3.5.6
 
 ### 新增

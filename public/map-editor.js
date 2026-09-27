@@ -10,6 +10,9 @@
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
   const CONTROL_POINT_KINDS = ['supply', 'forward_base', 'repair'];
   const CONTROL_POINT_NAMES = { supply: '补给站', forward_base: '前线基地', repair: '维修站' };
+  // 模式谓词：royale = 同时回合结算 × 歼灭规则（无总部/炮火缩圈/打光淘汰），两条轴都要生效。
+  const isAnnihilationMode = mode => mode === 'annihilation' || mode === 'royale';
+  const isSimultaneousMode = mode => mode === 'simultaneous' || mode === 'royale';
   const BALANCE_KEYS = [
     ['startingSupplies', '初始金币', 0],
     ['baseIncome', '每回合基础收入', 0],
@@ -192,18 +195,18 @@
   }
 
   function configureMapMode(input, mode, annihilationDraft = null) {
-    if (mode !== 'standard' && mode !== 'annihilation' && mode !== 'simultaneous') {
-      throw new Error('玩法模式必须是 standard、annihilation 或 simultaneous');
+    if (mode !== 'standard' && mode !== 'annihilation' && mode !== 'simultaneous' && mode !== 'royale') {
+      throw new Error('玩法模式必须是 standard、annihilation、simultaneous 或 royale');
     }
     const configured = deepClone(input);
-    const previousMode = configured.mode === 'annihilation' ? 'annihilation' : 'standard';
+    const previousMode = isAnnihilationMode(configured.mode) ? 'annihilation' : 'standard';
     const previousDefaultWeight = previousMode === 'annihilation' ? 10 : 2;
-    const nextDefaultWeight = mode === 'annihilation' ? 10 : 2;
+    const nextDefaultWeight = isAnnihilationMode(mode) ? 10 : 2;
     if (configured.balance?.adjudicationWeights?.effectiveActions === previousDefaultWeight) {
       configured.balance.adjudicationWeights.effectiveActions = nextDefaultWeight;
     }
     configured.mode = mode;
-    if (mode === 'annihilation') {
+    if (isAnnihilationMode(mode)) {
       configured.radius = Math.max(2, configured.radius);
       configured.annihilation = normalizeAnnihilation(annihilationDraft || configured.annihilation, configured.radius);
       enableSpawnMode(configured);
@@ -251,7 +254,7 @@
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('地图 JSON 必须是对象');
     const defaults = createDefaultMapConfig();
     const cfg = deepClone(data);
-    const mode = cfg.mode === 'annihilation' || cfg.mode === 'simultaneous' ? cfg.mode : 'standard';
+    const mode = ['annihilation', 'simultaneous', 'royale'].includes(cfg.mode) ? cfg.mode : 'standard';
     const radius = Number.isInteger(cfg.radius) && cfg.radius > 0 ? cfg.radius : defaults.radius;
     const normalized = {
       mode,
@@ -283,7 +286,7 @@
       spawnMode: Array.isArray(cfg.spawnSlots),
       spawnSlots: [],
       layouts: {},
-      ...(mode === 'annihilation' ? { annihilation: normalizeAnnihilation(cfg.annihilation, radius) } : {}),
+      ...(isAnnihilationMode(mode) ? { annihilation: normalizeAnnihilation(cfg.annihilation, radius) } : {}),
     };
 
     if (normalized.spawnMode) {
@@ -335,7 +338,7 @@
     if (sourceBalance.deployFromHq === false) normalized.balance.deployFromHq = false;
     normalized.balance.adjudicationWeights = {};
     for (const [key] of WEIGHT_KEYS) {
-      const fallback = key === 'effectiveActions' && normalized.mode === 'annihilation'
+      const fallback = key === 'effectiveActions' && isAnnihilationMode(normalized.mode)
         ? 10
         : defaults.balance.adjudicationWeights[key];
       const sourceValue = key === 'effectiveActions'
@@ -428,7 +431,7 @@
         defense: Number(config.headquartersSpec?.defense ?? 0),
       },
       balance,
-      ...(config.mode === 'annihilation' && config.annihilation ? { annihilation: deepClone(config.annihilation) } : {}),
+      ...(isAnnihilationMode(config.mode) && config.annihilation ? { annihilation: deepClone(config.annihilation) } : {}),
     };
     if (config.spawnMode) {
       serialized.spawnSlots = (config.spawnSlots || []).map((slot, index) => ({
@@ -507,8 +510,8 @@
     }
 
     const mode = c.mode === undefined ? 'standard' : c.mode;
-    if (mode !== 'standard' && mode !== 'annihilation' && mode !== 'simultaneous') {
-      errors.push(`${mapName}.mode must be standard, annihilation, or simultaneous`);
+    if (mode !== 'standard' && mode !== 'annihilation' && mode !== 'simultaneous' && mode !== 'royale') {
+      errors.push(`${mapName}.mode must be standard, annihilation, simultaneous, or royale`);
     }
     str(c, 'name', mapName);
     str(c, 'description', mapName);
@@ -517,18 +520,23 @@
     const radius = num(c, 'radius', mapName, 1);
     if (!Number.isInteger(radius)) errors.push(`${mapName} radius must be an integer`);
 
-    if (mode === 'annihilation') {
+    if (isAnnihilationMode(mode)) {
       const annihilation = record(c.annihilation, `${mapName}.annihilation`);
       const artillery = record(annihilation.artillery, `${mapName}.annihilation.artillery`);
-      for (const key of ['startRound', 'intervalRounds', 'damage', 'minimumSafeRadius']) {
+      for (const key of ['startRound', 'intervalRounds', 'damage']) {
         const value = num(artillery, key, `${mapName}.annihilation.artillery`, 1);
         if (!Number.isInteger(value)) errors.push(`${mapName}.annihilation.artillery.${key} must be an integer`);
       }
-      if (artillery.minimumSafeRadius >= radius) {
+      // minimumSafeRadius 允许 0：最终安全区收缩到只剩中心点（大逃杀 terminus 即如此）。
+      const minimumSafeRadius = num(artillery, 'minimumSafeRadius', `${mapName}.annihilation.artillery`, 0);
+      if (!Number.isInteger(minimumSafeRadius)) {
+        errors.push(`${mapName}.annihilation.artillery.minimumSafeRadius must be an integer`);
+      }
+      if (minimumSafeRadius >= radius) {
         errors.push(`${mapName}.annihilation.artillery.minimumSafeRadius must be smaller than radius`);
       }
     } else if ('annihilation' in c) {
-      errors.push(`${mapName}.annihilation is only valid in annihilation mode`);
+      errors.push(`${mapName}.annihilation is only valid in annihilation or royale mode`);
     }
 
     const sourcePlayableCells = 'playableCells' in c ? c.playableCells : allCells(radius);
@@ -644,7 +652,7 @@
       claim(pos(unit, `startingUnits[${i}]`, radius), `startingUnits[${i}]`);
     });
 
-    if (mode === 'annihilation' && !Array.isArray(c.spawnSlots)) {
+    if (isAnnihilationMode(mode) && !Array.isArray(c.spawnSlots)) {
       errors.push(`${mapName}.spawnSlots must contain 2-8 slots`);
     }
     if (Array.isArray(c.spawnSlots)) {
@@ -656,7 +664,7 @@
         str(slot, 'id', `spawnSlots[${slotIndex}]`);
         if (ids.has(slot.id)) errors.push(`spawnSlots[${slotIndex}].id must be unique`);
         ids.add(slot.id);
-        if (mode === 'annihilation') {
+        if (isAnnihilationMode(mode)) {
           if (Array.isArray(c.controlPoints) && c.controlPoints.length > 0) {
             str(slot, 'controlPointId', `spawnSlots[${slotIndex}]`);
             if (
@@ -802,7 +810,7 @@
     match = text.match(/^spawnSlots\[(\d+)\]$/);
     if (match) return `出生槽 ${Number(match[1]) + 1}`;
     match = text.match(/^spawnSlots\[(\d+)\]\.headquarters$/);
-    if (match) return `出生槽 ${Number(match[1]) + 1} ${config.mode === 'annihilation' ? '出生点' : '总部'}`;
+    if (match) return `出生槽 ${Number(match[1]) + 1} ${isAnnihilationMode(config.mode) ? '出生点' : '总部'}`;
     return text;
   }
 
@@ -846,8 +854,8 @@
     if (error.includes('grid must be "hex"')) return '地图网格必须是 hex。';
     if (error.includes('orientation must be "pointy"')) return '地图方向必须是 pointy。';
     if (error.includes('radius must be an integer')) return '地图半径必须是整数。';
-    if (error.includes('.mode must be standard, annihilation, or simultaneous')) return '玩法模式必须是普通模式、歼灭模式或同时模式。';
-    if (error.includes('.annihilation is only valid in annihilation mode')) return '只有歼灭模式可以配置炮火收缩。';
+    if (error.includes('.mode must be standard, annihilation, simultaneous, or royale')) return '玩法模式必须是普通模式、歼灭模式、同时模式或大逃杀模式。';
+    if (error.includes('.annihilation is only valid in annihilation or royale mode')) return '只有歼灭模式或大逃杀模式可以配置炮火收缩。';
     if (error.includes('.minimumSafeRadius must be smaller than radius')) return '炮火最小安全半径必须小于地图半径。';
     if (error.includes('.controlPointId must reference a control point')) return `出生槽 ${itemNumber(error)} 绑定了不存在的据点。`;
     if (error.includes('.controlPointId must be unique')) return `出生槽 ${itemNumber(error)} 绑定的据点已被其他出生槽使用。`;
@@ -865,7 +873,7 @@
   }
 
   function resizeMapRadius(config, radius, confirmRemoval) {
-    const minimumRadius = config.mode === 'annihilation' ? 2 : 1;
+    const minimumRadius = isAnnihilationMode(config.mode) ? 2 : 1;
     const nextRadius = Math.max(minimumRadius, Math.floor(Number(radius) || minimumRadius));
     const copy = deepClone(config);
     const outside = [];
@@ -905,7 +913,7 @@
         slot.startingUnits.forEach(unit => occupied.add(hexKey(unit)));
       });
     }
-    if (copy.mode === 'annihilation' && copy.annihilation?.artillery) {
+    if (isAnnihilationMode(copy.mode) && copy.annihilation?.artillery) {
       copy.annihilation.artillery.minimumSafeRadius = Math.min(copy.annihilation.artillery.minimumSafeRadius, nextRadius - 1);
     }
     return { config: copy, removed: outside.length, requiresConfirmation: false };
@@ -998,7 +1006,7 @@
 
   // 歼灭模式下出生槽的 headquarters 只是出生锚点，不是总部；文案与图标按模式区分
   function hqTerm() {
-    return config.mode === 'annihilation' ? '出生点' : '总部';
+    return isAnnihilationMode(config.mode) ? '出生点' : '总部';
   }
 
   function selectedSlotIndex() {
@@ -1299,7 +1307,7 @@
     for (const point of config.controlPoints) drawControlPoint(point);
     if (config.spawnMode) {
       config.spawnSlots.forEach((slot, slotIndex) => {
-        if (config.mode === 'annihilation') drawSpawnAnchor(slot.id, slot.headquarters, slotIndex);
+        if (isAnnihilationMode(config.mode)) drawSpawnAnchor(slot.id, slot.headquarters, slotIndex);
         else drawHeadquarters(slot.id, slot.headquarters, slotIndex);
         slot.startingUnits.forEach(unit => drawUnit({ ...unit, owner: slot.id, slotIndex }));
       });
@@ -1476,7 +1484,7 @@
     els.mapName.value = config.name;
     els.mapDescription.value = config.description;
     els.mapRadius.value = config.radius;
-    els.mapRadius.min = config.mode === 'annihilation' ? '2' : '1';
+    els.mapRadius.min = isAnnihilationMode(config.mode) ? '2' : '1';
     els.mapMode.querySelectorAll('[data-mode]').forEach(button => {
       const active = button.dataset.mode === config.mode;
       button.setAttribute('aria-pressed', String(active));
@@ -1492,13 +1500,13 @@
     const label = hqTerm();
     labelEl.textContent = label;
     button.title = `放置${label}`;
-    if (iconEl) iconEl.className = `token-icon ${config.mode === 'annihilation' ? 'spawn-point' : 'headquarters'}`;
+    if (iconEl) iconEl.className = `token-icon ${isAnnihilationMode(config.mode) ? 'spawn-point' : 'headquarters'}`;
     // 当前激活工具是总部/出生点时同步提示条
     if (tool === 'hq') els.toolHint.textContent = label;
   }
 
   function renderAnnihilationFields() {
-    const active = config.mode === 'annihilation';
+    const active = isAnnihilationMode(config.mode);
     els.annihilationPanel.hidden = !active;
     if (!active) {
       els.artilleryFields.innerHTML = '';
@@ -1510,7 +1518,7 @@
       fieldHtml('artillery:startRound', '开始轮次', artillery.startRound, 1),
       fieldHtml('artillery:intervalRounds', '收缩间隔', artillery.intervalRounds, 1),
       fieldHtml('artillery:damage', '炮火伤害', artillery.damage, 1),
-      fieldHtml('artillery:minimumSafeRadius', '最小安全半径', artillery.minimumSafeRadius, 1, Math.max(1, config.radius - 1)),
+      fieldHtml('artillery:minimumSafeRadius', '最小安全半径', artillery.minimumSafeRadius, 0, Math.max(1, config.radius - 1)),
     ].join('');
     els.artilleryFields.querySelectorAll('input[data-bind]').forEach(input => {
       input.addEventListener('change', () => {
@@ -1548,7 +1556,7 @@
       `<label class="toggle-field">无回合上限 <input id="unlimited-turns-enabled" type="checkbox"${config.balance.maxTurns === null ? ' checked' : ''} /></label>`,
       ...WEIGHT_KEYS.map(([key, label]) => fieldHtml(`weight:${key}`, `裁决 ${label}`, config.balance.adjudicationWeights[key], 0)),
       // 歼灭模式没有总部，总部规格仅作占位，隐藏避免误导
-      ...(config.mode === 'annihilation'
+      ...(isAnnihilationMode(config.mode)
         ? []
         : [
           fieldHtml('hq:hp', '总部 HP', config.headquartersSpec.hp, 1),
@@ -1669,7 +1677,7 @@
       <input class="spawn-slot-id" value="${esc(slot.id)}" aria-label="出生槽 ID" />
       <button class="spawn-select" type="button">选择</button>
       <button class="spawn-delete danger" type="button">删除</button>
-      ${config.mode === 'annihilation' ? `<label class="spawn-control-point-field">绑定出生据点
+      ${isAnnihilationMode(config.mode) ? `<label class="spawn-control-point-field">绑定出生据点
         <select class="spawn-control-point">${controlPointOptions(index, slot.controlPointId)}</select>
       </label>` : ''}
     </div>`).join('');
@@ -1698,7 +1706,7 @@
       const slot = {
         id: `slot_${number}`,
         headquarters: { ...position },
-        ...(config.mode === 'annihilation' && availableControlPoint ? { controlPointId: availableControlPoint.id } : {}),
+        ...(isAnnihilationMode(config.mode) && availableControlPoint ? { controlPointId: availableControlPoint.id } : {}),
         startingUnits: [],
       };
       config.spawnSlots.push(slot);
@@ -1818,7 +1826,7 @@
     } else if (selected.type === 'spawnHeadquarters') {
       const slot = config.spawnSlots[selected.slotIndex];
       els.selectionTitleText.textContent = `${hqTerm()} ${slot.id}`;
-      setSelectionIcon(config.mode === 'annihilation' ? 'spawn-point' : 'headquarters', slotColor(selected.slotIndex));
+      setSelectionIcon(isAnnihilationMode(config.mode) ? 'spawn-point' : 'headquarters', slotColor(selected.slotIndex));
     } else if (selected.type === 'controlPoint') {
       els.selectionTitleText.textContent = `据点 ${obj.id}`;
       setSelectionIcon(obj.kind || 'supply', '#d6b34a');
@@ -1973,12 +1981,12 @@
     button.addEventListener('click', () => {
       const nextMode = button.dataset.mode;
       if (nextMode === config.mode) return;
-      if (config.mode === 'annihilation') annihilationDraft = deepClone(config.annihilation);
+      if (isAnnihilationMode(config.mode)) annihilationDraft = deepClone(config.annihilation);
       config = configureMapMode(config, nextMode, annihilationDraft);
       selected = null;
       syncAll();
-      if (nextMode === 'annihilation') activateInspectorTab('rules');
-      setStatus(nextMode === 'annihilation' ? '已切换为歼灭模式，请配置出生据点与炮火参数' : '已切换为普通模式', 'ok');
+      if (isAnnihilationMode(nextMode)) activateInspectorTab('rules');
+      setStatus(isAnnihilationMode(nextMode) ? `已切换为${nextMode === 'royale' ? '大逃杀' : '歼灭'}模式，请配置出生据点与炮火参数` : '已切换为普通模式', 'ok');
     });
   });
   els.mapRadius.addEventListener('change', () => {

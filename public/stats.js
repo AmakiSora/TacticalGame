@@ -57,12 +57,14 @@
     standard: '标准',
     annihilation: '歼灭',
     simultaneous: '同时',
+    royale: '大逃杀',
   };
 
   const MODE_CLASSES = {
     standard: 'mode-std',
     annihilation: 'mode-anni',
     simultaneous: 'mode-simul',
+    royale: 'mode-royale',
   };
 
   function modeLabel(mode) {
@@ -74,7 +76,7 @@
   }
 
   function modeSummary(modeDist) {
-    const preferred = ['standard', 'annihilation', 'simultaneous'];
+    const preferred = ['standard', 'annihilation', 'simultaneous', 'royale'];
     const extra = Object.keys(modeDist || {}).filter(mode => !preferred.includes(mode)).sort();
     return [...preferred, ...extra]
       .filter(mode => Object.prototype.hasOwnProperty.call(modeDist || {}, mode))

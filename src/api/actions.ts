@@ -15,6 +15,7 @@ import {
 import type { Result } from '../engine/result.js';
 import type { AuthContext } from './auth.js';
 import type { UnitType } from '../types.js';
+import { isSimultaneousMode } from '../types.js';
 import { globalStore } from '../state/store.js';
 
 function badRequest(reply: FastifyReply, msg: string) {
@@ -55,7 +56,7 @@ async function dispatchAction(
   const ctx = authenticate(req, reply);
   if (!ctx) return;
   if (!basicGate(ctx, reply)) return;
-  if (ctx.game.config.mode === 'simultaneous') {
+  if (isSimultaneousMode(ctx.game.config.mode)) {
     if (ctx.game.plan?.committed.includes(ctx.player)) {
       return reply.code(statusForCode('not_your_turn')).send({ error: 'plan already committed', code: 'not_your_turn' });
     }
@@ -160,7 +161,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
     if (!basicGate(ctx, reply)) return;
-    if (ctx.game.config.mode === 'simultaneous') {
+    if (isSimultaneousMode(ctx.game.config.mode)) {
       const result = commitAndMaybeResolve(ctx.game, globalEventBus, ctx.player);
       if (!result.ok) {
         return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
@@ -188,7 +189,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: RevokeBody }>('/api/games/:id/plan/revoke', async (req, reply) => {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
-    if (ctx.game.config.mode !== 'simultaneous') {
+    if (!isSimultaneousMode(ctx.game.config.mode)) {
       return reply.code(statusForCode('not_simultaneous_game')).send({ error: 'game is not in simultaneous mode', code: 'not_simultaneous_game' });
     }
     if (!basicGate(ctx, reply)) return;
@@ -207,7 +208,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string } }>('/api/games/:id/plan/clear', async (req, reply) => {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
-    if (ctx.game.config.mode !== 'simultaneous') {
+    if (!isSimultaneousMode(ctx.game.config.mode)) {
       return reply.code(statusForCode('not_simultaneous_game')).send({ error: 'game is not in simultaneous mode', code: 'not_simultaneous_game' });
     }
     if (!basicGate(ctx, reply)) return;

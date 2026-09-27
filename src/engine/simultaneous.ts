@@ -9,9 +9,11 @@
 //      落空即浪费）+ 治疗（按目标最终位置复核射程）；净血量 = 先治疗、再按顺序
 //      施加伤害（等价同时，且击杀归属确定）；
 //   4. 占点（每个存活玩家，一格一单位无冲突）；
-//   5. 回合边界：round_end → 回合上限裁定 → 翻盘补给 → 回合数+1 → 重置全员行动
-//      标志与计划状态 → 全员发收入与维修 → round_start。
+//   5. 回合边界：round_end → 回合上限裁定 → 翻盘补给 → 回合数+1 → 炮火收缩
+//      （annihilation/royale）→ 重置全员行动标志与计划状态 → 全员发收入与维修
+//      → round_start。
 import type { GameState, Headquarters, PendingAction, PlayerId, PlayerRecord, Unit } from '../types.js';
+import { isAnnihilationMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import { appendEvent } from './events.js';
 import { hexDistance } from './hex.js';
@@ -23,6 +25,7 @@ import { ACTION_MERIT, addActionMerit, attackActionMerit, effectActionMerit } fr
 import {
   activePlayerIds, adjudicateAtTurnLimit, captureControlPoints, collectIncome,
   endGame, grantComebackSupplies, markPlayerEliminated, repairFromControlPoints, resetActions,
+  updateArtilleryForRound,
 } from './engine.js';
 import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound, coveredCellsFor } from './planning.js';
 import { nextGameRandom } from './random.js';
@@ -437,6 +440,19 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     }
   }
 
+  // 歼灭规则（annihilation/royale）没有总部兜底：兵力打光的玩家立即淘汰，
+  // 击杀归属取其本回合阵亡单位的凶手；终局交给下方 activeAfterDeaths 检查。
+  if (isAnnihilationMode(game.config.mode)) {
+    const killedBy = new Map<PlayerId, PlayerId>();
+    for (const death of deaths) {
+      if (death.kind === 'unit') killedBy.set((death.entity as Unit).owner, death.killer);
+    }
+    for (const owner of activePlayerIds(game)) {
+      if (game.units.some(unit => unit.owner === owner && unit.alive)) continue;
+      markPlayerEliminated(game, bus, owner, 'army_destroyed', killedBy.get(owner) ?? null);
+    }
+  }
+
   const finish = (gameOver: boolean): void => {
     appendEvent(game, bus, 'round_end', { roundNumber, gameOver });
     appendEvent(game, bus, 'round_resolved', { roundNumber, gameOver, results: outcomes });
@@ -473,6 +489,9 @@ export function resolveRound(game: GameState, bus: EventBus): void {
   grantComebackSupplies(game, bus);
   game.turn.roundNumber += 1;
   game.turn.turnNumber = game.turn.roundNumber;
+  // 轮界炮火收缩（annihilation/royale）：与顺序版 advanceTurn 同序——轮号自增后
+  // 立即缩圈、对圈外单位造成伤害并清场淘汰；若就此终局则不再进入新一轮。
+  if (updateArtilleryForRound(game, bus)) return;
   resetPlanForRound(game);
   for (const id of activePlayerIds(game)) {
     resetActions(game, id);

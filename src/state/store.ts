@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type {
   GameState, Headquarters, MapCell, PlayerId, PlayerState, Unit, UnitType,
 } from '../types.js';
-import { isPlayerId, MAX_PLAYER_NAME_LEN, PLAYER_IDS } from '../types.js';
+import { isAnnihilationMode, isPlayerId, isSimultaneousMode, MAX_PLAYER_NAME_LEN, PLAYER_IDS } from '../types.js';
 import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
 import { createMapCells } from '../config/geometry.js';
@@ -164,8 +164,8 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
     player.status = 'active';
     player.spawnSlotId = slot.id;
     player.turnOrder = index;
-    // simultaneous 与 standard 一样按出生点建总部；仅 annihilation 改为出生点控制点归属。
-    if (game.config.mode !== 'annihilation') {
+    // 歼灭系模式（annihilation/royale）不建总部，改为出生点控制点归属；其余模式按出生点建总部。
+    if (!isAnnihilationMode(game.config.mode)) {
       game.headquarters[owner] = createHQ(owner, game.config, slot);
     } else {
       const point = game.controlPoints.find(candidate => candidate.id === slot.controlPointId);
@@ -180,7 +180,7 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
   const turnOrder = [...assignedPlayers.slice(startIndex), ...assignedPlayers.slice(0, startIndex)];
   turnOrder.forEach((id, index) => { game.players[id]!.turnOrder = index; });
   game.phase = 'active';
-  const simultaneous = game.config.mode === 'simultaneous';
+  const simultaneous = isSimultaneousMode(game.config.mode);
   game.turn = {
     roundNumber: 1,
     // simultaneous 模式没有"当前玩家"：全员并行计划，结算顺序仍由 turnOrder 决定。
@@ -215,7 +215,7 @@ export function createInitialGameWithConfig(id: string, config: MapConfig, mapId
     player.spawnSlotId = slots[index].id;
     player.turnOrder = index;
     const slot = slots[index];
-    if (config.mode !== 'annihilation') {
+    if (!isAnnihilationMode(config.mode)) {
       game.headquarters[owner] = createHQ(owner, config, slot);
     } else {
       const point = game.controlPoints.find(candidate => candidate.id === slot.controlPointId);
@@ -227,7 +227,7 @@ export function createInitialGameWithConfig(id: string, config: MapConfig, mapId
   game.phase = 'active';
   game.turn.phase = 'active';
   game.turn.turnOrder = ['player_a', 'player_b'];
-  const simultaneous = config.mode === 'simultaneous';
+  const simultaneous = isSimultaneousMode(config.mode);
   game.turn.currentPlayerId = simultaneous ? null : 'player_a';
   game.turn.currentOwner = simultaneous ? null : 'player_a';
   game.plan = simultaneous ? { queues: {}, committed: [] } : null;
@@ -238,7 +238,7 @@ export function createInitialGameWithConfig(id: string, config: MapConfig, mapId
 function restoreActionStats(game: GameState): void {
   // simultaneous 对局的事件带每玩家独立的 actionsUsed（队列位置），需要按玩家分别累计；
   // 顺序模式沿用原有的全局计数器逻辑，保持与旧回放一致。
-  const simultaneous = game.config?.mode === 'simultaneous';
+  const simultaneous = game.config ? isSimultaneousMode(game.config.mode) : false;
   const actionPointTotals = new Map<PlayerId, number>();
   const actionMeritTotals = new Map<PlayerId, number>();
   const unitOwners = new Map<string, PlayerId>();

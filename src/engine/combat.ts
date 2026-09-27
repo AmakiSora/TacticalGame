@@ -1,5 +1,6 @@
 // src/engine/combat.ts
 import type { GameState, Headquarters, PlayerId, Unit } from '../types.js';
+import { isAnnihilationMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { hexDistance } from './hex.js';
@@ -101,7 +102,7 @@ export function attackTarget(
         r: target.entity.r,
       });
       if (
-        game.config.mode === 'annihilation' &&
+        isAnnihilationMode(game.config.mode) &&
         !game.units.some(unit => unit.owner === target.entity.owner && unit.alive)
       ) {
         eliminatePlayer(game, bus, target.entity.owner, 'army_destroyed', owner);

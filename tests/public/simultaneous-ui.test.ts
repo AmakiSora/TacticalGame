@@ -118,8 +118,9 @@ describe('simultaneous mode UI', () => {
   it('labels the simultaneous map in the map picker', () => {
     for (const file of playerClients) {
       const source = read(file);
-      expect(source).toContain("map.preview?.mode === 'simultaneous' ? '同时'");
-      expect(source).toContain("map.preview?.mode === 'annihilation' ? '歼灭' : '标准'");
+      expect(source).toContain("const modeLabel = map.preview?.mode === 'simultaneous' ? '同时'");
+      expect(source).toContain("map.preview?.mode === 'annihilation' ? '歼灭'");
+      expect(source).toContain("? '大逃杀' : '标准';");
     }
   });
 

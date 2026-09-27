@@ -2,7 +2,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { GameState, PlayerId } from '../types.js';
-import { PLAYER_IDS } from '../types.js';
+import { isSimultaneousMode, PLAYER_IDS } from '../types.js';
 import { globalStore } from '../state/store.js';
 import { buildAdjudicationSnapshot } from '../engine/engine.js';
 
@@ -82,7 +82,7 @@ export function sanitizeGameForResponse(game: GameState, viewer?: PlayerId): unk
   body.adjudication = buildAdjudicationSnapshot(game);
   // simultaneous 模式下，其他玩家的计划队列属于秘密：只保留请求者自己的队列，
   // committed 名单公开（"谁已确认"不是秘密）。
-  if (game.config.mode === 'simultaneous' && body.plan && typeof body.plan === 'object') {
+  if (isSimultaneousMode(game.config.mode) && body.plan && typeof body.plan === 'object') {
     const plan = body.plan as { queues: Record<string, unknown>; committed: unknown };
     const sanitizedQueues: Record<string, unknown> = {};
     const myQueue = viewer && game.plan?.queues[viewer] ? game.plan.queues[viewer] : [];

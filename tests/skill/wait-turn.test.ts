@@ -23,6 +23,10 @@ function simultaneousGame(overrides = {}) {
   });
 }
 
+function royaleGame(overrides = {}) {
+  return simultaneousGame({ config: { mode: 'royale' }, ...overrides });
+}
+
 describe('wait-turn classifyState', () => {
   it('keeps the sequential contract unchanged', () => {
     expect(classifyState(baseGame(), 'player_b')).toMatchObject({ result: 'my_turn', exit: EXIT.MY_TURN });
@@ -40,6 +44,13 @@ describe('wait-turn classifyState', () => {
     // 对手确认与否与自己无关。
     expect(classifyState(simultaneousGame({ plan: { committed: ['player_b'] } }), 'player_a'))
       .toMatchObject({ result: 'my_turn', exit: EXIT.MY_TURN });
+  });
+
+  it('treats an open royale planning window as my_turn (same contract)', () => {
+    expect(classifyState(royaleGame(), 'player_a')).toMatchObject({ result: 'my_turn', round: 3, exit: EXIT.MY_TURN });
+    expect(classifyState(royaleGame({ plan: { committed: ['player_a'] } }), 'player_a')).toBeNull();
+    expect(classifyState(royaleGame({ phase: 'game_over', winner: 'player_b' }), 'player_a'))
+      .toMatchObject({ result: 'game_over', exit: EXIT.GAME_OVER });
   });
 
   it('still reports game over and elimination in simultaneous mode', () => {

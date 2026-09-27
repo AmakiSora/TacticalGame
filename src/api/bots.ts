@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { GameState, PlayerId } from '../types.js';
-import { MAX_PLAYER_NAME_LEN } from '../types.js';
+import { isSimultaneousMode, MAX_PLAYER_NAME_LEN } from '../types.js';
 import { globalStore, addLobbyPlayer } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
@@ -446,7 +446,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       if (game.phase !== 'lobby') {
         return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
       }
-      if (game.maxPlayers !== 2 || game.config.mode === 'simultaneous') {
+      if (game.maxPlayers !== 2 || isSimultaneousMode(game.config.mode)) {
         return reply.code(400).send({
           error: '强化学习 AI 仅支持双人顺序对局',
           code: 'bot_not_supported',

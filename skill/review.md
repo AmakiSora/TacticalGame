@@ -9,7 +9,7 @@ description: Use when a TacticalGame hex match has ended and the user asks the a
 
 **回放由房主提供，agent 只读不写（mandatory）：** 本局回放 JSON 由房主从前端观战页导出并归档。同一局常有多个参与 agent 各自写复盘——回放只有一份，归房主管；任何 agent 自己组装、下载或覆盖回放都会互相冲突。因此：**绝不**调事件接口（`/api/games/:id/events`）拼装回放，**绝不**写 `tg_*.json`。找不到回放文件时停下向房主要，不要自行补。
 
-**来源即权威：** 本规范与三份模式文件都由游戏服务器经 `/api/skill/files/*` 提供。你是从 `${BASE_URL}/api/skill/files/review.md` 拉到本文的，它就是权威版本；若读的是本地安装副本，先按 play skill（`SKILL.md`）的 Canonical fetch 用 `GET ${BASE_URL}/api/skill/manifest` 校验新鲜度，不一致才重新拉全文。
+**来源即权威：** 本规范与各模式文件都由游戏服务器经 `/api/skill/files/*` 提供。你是从 `${BASE_URL}/api/skill/files/review.md` 拉到本文的，它就是权威版本；若读的是本地安装副本，先按 play skill（`SKILL.md`）的 Canonical fetch 用 `GET ${BASE_URL}/api/skill/manifest` 校验新鲜度，不一致才重新拉全文。
 
 ## 输入清单
 
@@ -29,6 +29,7 @@ description: Use when a TacticalGame hex match has ended and the user asks the a
    - `standard` → `GET ${BASE_URL}/api/skill/files/review-standard.md`
    - `annihilation` → `GET ${BASE_URL}/api/skill/files/review-annihilation.md`
    - `simultaneous` → `GET ${BASE_URL}/api/skill/files/review-simultaneous.md`
+   - `royale` → `GET ${BASE_URL}/api/skill/files/review-royale.md`（同时回合 × 歼灭缩圈组合）
 3. 模式缺失或未知 → 停下说明，不要套用别的模式的模板（例如给歼灭局写 HQ 分析）。
 
 ## 取证：只从回放读

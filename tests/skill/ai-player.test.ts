@@ -233,8 +233,8 @@ describe('AI player skill documentation', () => {
     const simultaneous = rawSimultaneous.replace(/\r\n/g, '\n');
 
     expect(skill).toContain('legacy V1 production queues');
-    expect(skill).toContain('Standard/annihilation: income is awarded');
-    expect(skill).toContain('Simultaneous: income and repair are issued together');
+    expect(skill).toContain('Standard: income is awarded');
+    expect(skill).toContain('Simultaneous/royale: income and repair are issued together');
     expect(simultaneous).toContain('plan.myQueue.length');
     expect(simultaneous).toContain('turn.currentPlayerId` and `turn.currentOwner` are always `null`');
     expect(simultaneous).toContain('queue-list order is not execution priority');

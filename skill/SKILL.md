@@ -1,6 +1,6 @@
 ---
 name: play-hex-api-game
-description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, and the simultaneous-turn standoff map.
+description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, the simultaneous-turn standoff map, and the royale terminus map.
 ---
 
 # Play Hex API Game
@@ -20,7 +20,8 @@ After the first successful `GET ${BASE_URL}/api/games/:id` in an active game:
    - `standard` → `GET ${BASE_URL}/api/skill/files/standard.md`
    - `annihilation` → `GET ${BASE_URL}/api/skill/files/annihilation.md`
    - `simultaneous` → `GET ${BASE_URL}/api/skill/files/simultaneous.md`
-   Offline fallback only: read the same file from a local skill install ([`standard.md`](standard.md), [`annihilation.md`](annihilation.md), [`simultaneous.md`](simultaneous.md)).
+   - `royale` → `GET ${BASE_URL}/api/skill/files/royale.md` (同时回合 × 歼灭缩圈组合)
+   Offline fallback only: read the same file from a local skill install ([`standard.md`](standard.md), [`annihilation.md`](annihilation.md), [`simultaneous.md`](simultaneous.md), [`royale.md`](royale.md)).
 3. Follow **only** that mode file for turn checklists, deploy origins, win conditions, scoring priorities, and the decision order.
 4. If mode is missing or unknown, stop and report it. Do not guess HQ rules on annihilation maps.
 
@@ -101,7 +102,7 @@ The server serves this skill at `${BASE_URL}/api/skill*` — unauthenticated, re
 
 Always fetch these from the server regardless of the check (small files you have not read this game, so there is no double-read to save):
 
-- Mode file (Mode routing): `GET ${BASE_URL}/api/skill/files/standard.md` / `annihilation.md` / `simultaneous.md`.
+- Mode file (Mode routing): `GET ${BASE_URL}/api/skill/files/standard.md` / `annihilation.md` / `simultaneous.md` / `royale.md`.
 - Wait script: `curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o "$SCRATCH/wait-turn.mjs"` (optionally verify its sha256 against the manifest; `$SCRATCH` is defined in [Scratch files](#scratch-files-mandatory)).
 - Any other skill file: `GET ${BASE_URL}/api/skill/files/<name>`.
 
@@ -153,7 +154,7 @@ Transient `502`/`503`: back off, hit `/readyz`, re-fetch with the **existing** t
 When a game is over and the user asks for a battle summary / 经验总结 / 复盘, do not invent your own format:
 
 1. Fetch the review skill entry from the server: `GET ${BASE_URL}/api/skill/files/review.md` (Canonical fetch applies when reading a locally installed copy).
-2. Follow it exactly: it routes to the mode-specific review spec (`review-standard.md` / `review-annihilation.md` / `review-simultaneous.md`) and writes the review markdown into `records/V3/` under the user-assigned sequence number.
+2. Follow it exactly: it routes to the mode-specific review spec (`review-standard.md` / `review-annihilation.md` / `review-simultaneous.md` / `review-royale.md`) and writes the review markdown into `records/V3/` under the user-assigned sequence number.
 
 The replay JSON is exported and archived by the host from the spectator page — **never** generate, download, or overwrite it yourself (several agents may be summarizing the same game; a second writer would collide). Read the replay path the host gives you; the review markdown is your only deliverable and is exempt from the Scratch files rule.
 
@@ -168,7 +169,7 @@ Seats: `player_a` … `player_h` (2–8). Server assigns seats in join order.
 5. `POST /api/games/:id/start` with `X-Host-Token` when ≥2 players and the map supports that count
 6. Play until last survivor, HQ/army destruction, or max-round adjudication. On unlimited maps (`config.balance.maxTurns === null`) rounds never run out — only elimination or the host's `POST /api/games/:id/force-adjudicate` ends the game
 
-Most maps are 2-player only. `multiplayer-ring` and annihilation `artillery-zone` support 2/3/6; `four-corners` is exactly 4; simultaneous `standoff` supports 2/3/6. Unsupported `maxPlayers` → `unsupported_player_count`.
+Most maps are 2-player only. `multiplayer-ring`, annihilation `artillery-zone` and royale `terminus` support 2/3/6; `four-corners` is exactly 4; simultaneous `standoff` supports 2/3/6. Unsupported `maxPlayers` → `unsupported_player_count`.
 
 ## API
 
@@ -212,10 +213,10 @@ Mode-specific deploy origins, elimination, artillery, and scoring live in the mo
 - Move/deploy/demolish targets must exist in `game.cells`.
 - Pathfinding blocked by water, blockers, units, and HQs **when HQs exist**.
 - Attack/heal: range only, no LOS.
-- Standard/annihilation: income is awarded when the turn is gained (base + owned CP income;
+- Standard: income is awarded when the turn is gained (base + owned CP income;
   typed CPs may override via `controlPointTypes`).
-- Simultaneous: income and repair are issued together for every living player at the round
-  boundary; see [`simultaneous.md`](simultaneous.md).
+- Simultaneous/royale: income and repair are issued together for every living player at the round
+  boundary; see [`simultaneous.md`](simultaneous.md) / [`royale.md`](royale.md).
 
 ### Units — read stats every game (mandatory)
 
@@ -263,7 +264,7 @@ Where:
 - Breakdown fields live on `adjudication.scores.<playerId>`: `headquartersDamage`, `ownHqHp`, `controlPoints`, `armyValue`, `supplies`, `actionScore`, `total`.
 - `armyValue` = sum over living units of `round(cost * hp / maxHp)`.
 - `actionScore` = `players.<id>.stats.actionMerit * effectiveActions`.
-- `effectiveActions` comes from `adjudication.weights.effectiveActions` (API snapshot always exposes it). Resolution order in engine: map `balance.adjudicationWeights.effectiveActions`, else legacy `actionPoints`, else mode default (**standard 2**, **annihilation 10**).
+- `effectiveActions` comes from `adjudication.weights.effectiveActions` (API snapshot always exposes it). Resolution order in engine: map `balance.adjudicationWeights.effectiveActions`, else legacy `actionPoints`, else mode default (**standard 2**, **annihilation/royale 10**).
 - **Action merit** (not the same as action points spent): pure moves score **0**. Productive events add merit:
   - deploy `+1`, demolish `+1`, control-point capture `+2`
   - attack: `ceil(actualDamage / 20)`

@@ -120,7 +120,7 @@ export function classifyState(game, owner) {
   if (game.phase === 'active' && self?.status && self.status !== 'active') {
     return { result: 'eliminated', status: self.status, exit: EXIT.ELIMINATED };
   }
-  if (game.config?.mode === 'simultaneous') {
+  if (game.config?.mode === 'simultaneous' || game.config?.mode === 'royale') {
     // 同时回合模式：计划阶段且自己尚未确认提交 = "轮到你了"。
     if (game.phase === 'active' && !(game.plan?.committed ?? []).includes(owner)) {
       const round = game.turn?.roundNumber ?? game.turn?.turnNumber ?? null;

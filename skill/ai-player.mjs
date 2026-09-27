@@ -370,7 +370,7 @@ async function tryHeal(game, args, seat, unit) {
 }
 
 export function movementGoal(game, owner, unit) {
-  if (game.config?.mode === 'annihilation') {
+  if (game.config?.mode === 'annihilation' || game.config?.mode === 'royale') {
     const roundNumber = game.turn?.roundNumber ?? game.turn?.turnNumber ?? 1;
     const startRound = game.config?.annihilation?.artillery?.startRound;
     // Pre-shrink economy window is config-driven; never hardcode "rounds 1-4".
@@ -731,7 +731,7 @@ async function main() {
       continue;
     }
 
-    if (game.config?.mode === 'simultaneous') {
+    if (game.config?.mode === 'simultaneous' || game.config?.mode === 'royale') {
       // 同时模式：计划窗口开启且自己未确认时行动；已确认则等所有人提交、结算完成。
       if ((game.plan?.committed ?? []).includes(seat.owner)) {
         await sleep(args.delayMs);

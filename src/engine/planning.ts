@@ -3,6 +3,7 @@
 // simultaneous.ts 统一同时结算。所有校验针对计划时刻的棋盘（结算前棋盘不会变化）。
 import { randomUUID } from 'node:crypto';
 import type { GameState, PendingAction, PlayerId, Position, UnitType } from '../types.js';
+import { isSimultaneousMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result, Failure } from './result.js';
 import { appendEvent } from './events.js';
@@ -13,7 +14,7 @@ import { isArtilleryDanger } from './artillery.js';
 import type { UnitSpec } from '../config/loader.js';
 
 export function isSimultaneous(game: GameState): boolean {
-  return game.config.mode === 'simultaneous';
+  return isSimultaneousMode(game.config.mode);
 }
 
 type Plan = NonNullable<GameState['plan']>;

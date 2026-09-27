@@ -3,7 +3,7 @@ import type {
   AdjudicationScore, AdjudicationSnapshot, EliminationReason, GameOverReason, GameRanking,
   GameState, PlayerId, PlayerRecord,
 } from '../types.js';
-import { PLAYER_IDS } from '../types.js';
+import { PLAYER_IDS, isAnnihilationMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { appendEvent } from './events.js';
@@ -173,7 +173,7 @@ function armyValue(game: GameState, owner: PlayerId): number {
 function actionScorePerPoint(game: GameState): number {
   return game.config.balance.adjudicationWeights.effectiveActions
     ?? game.config.balance.adjudicationWeights.actionPoints
-    ?? (game.config.mode === 'annihilation' ? ANNIHILATION_ACTION_SCORE_PER_POINT : STANDARD_ACTION_SCORE_PER_POINT);
+    ?? (isAnnihilationMode(game.config.mode) ? ANNIHILATION_ACTION_SCORE_PER_POINT : STANDARD_ACTION_SCORE_PER_POINT);
 }
 
 function scorePlayer(game: GameState, owner: PlayerId): AdjudicationScore {
@@ -355,7 +355,7 @@ export function markPlayerEliminated(
 }
 
 function resolveAnnihilationWipes(game: GameState, bus: EventBus): boolean {
-  if (game.config.mode !== 'annihilation') return false;
+  if (!isAnnihilationMode(game.config.mode)) return false;
   const activeBefore = activePlayerIds(game);
   const wiped = activeBefore.filter(owner => !game.units.some(unit => unit.owner === owner && unit.alive));
   if (wiped.length === 0) return false;
@@ -375,8 +375,8 @@ function resolveAnnihilationWipes(game: GameState, bus: EventBus): boolean {
   return false;
 }
 
-function updateArtilleryForRound(game: GameState, bus: EventBus): boolean {
-  if (game.config.mode !== 'annihilation') return false;
+export function updateArtilleryForRound(game: GameState, bus: EventBus): boolean {
+  if (!isAnnihilationMode(game.config.mode)) return false;
   const previousSafeRadius = game.artillery?.safeRadius ?? game.map.radius;
   game.artillery = artilleryStateForRound(game, game.turn.roundNumber);
   if (!game.artillery) return false;

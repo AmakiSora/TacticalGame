@@ -1,9 +1,10 @@
 import type { ArtilleryState, GameState, Position } from '../types.js';
+import { isAnnihilationMode } from '../types.js';
 import { hexDistance } from './hex.js';
 
 export function artilleryStateForRound(game: GameState, roundNumber: number): ArtilleryState | null {
   const config = game.config.annihilation?.artillery;
-  if (game.config.mode !== 'annihilation' || !config) return null;
+  if (!isAnnihilationMode(game.config.mode) || !config) return null;
 
   const shrinkCount = roundNumber < config.startRound
     ? 0

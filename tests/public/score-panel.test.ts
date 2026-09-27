@@ -31,7 +31,7 @@ describe('adjudication score panels', () => {
       expect(source).toContain('function renderScorePanel');
       expect(source).toContain('scorePanelEl.innerHTML');
       expect(source).toContain('state?.result?.scores');
-      expect(source).toContain("gameConfig?.mode === 'annihilation' ? 10 : 2");
+      expect(source).toContain("isAnnihilationRules() ? 10 : 2");
       expect(source).toContain('行动分 ${score.actionScore ?? 0}');
     }
   });

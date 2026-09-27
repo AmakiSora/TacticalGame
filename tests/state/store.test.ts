@@ -109,6 +109,23 @@ describe('GameStore persistence', () => {
     expect(restored.get('simultaneous-reordered-actions')!.players.player_a!.stats.actionPointsUsed).toBe(3);
   });
 
+  it('restores royale games with planning state, control-point spawns and artillery', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    store.save(createInitialGame('royale-restore', 'terminus'));
+
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    const game = restored.get('royale-restore')!;
+    expect(game.config.mode).toBe('royale');
+    expect(game.plan).toEqual({ queues: {}, committed: [] });
+    expect(game.headquarters).toEqual({});
+    expect(game.turn.currentPlayerId).toBeNull();
+    expect(game.artillery).toMatchObject({ safeRadius: 7, nextShrinkRound: 6 });
+    expect(game.controlPoints.filter(point => point.owner !== null)).toHaveLength(2);
+  });
+
   it('coerces illegal saved maxTurns while preserving the unlimited sentinel', () => {
     const file = tempFile();
     const store = new GameStore({ persistenceFile: file });

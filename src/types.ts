@@ -17,7 +17,17 @@ export function isPlayerId(value: unknown): value is PlayerId {
 }
 
 export type UnitType = 'infantry' | 'scout' | 'heavy' | 'ranger' | 'support';
-export type GameMode = 'standard' | 'annihilation' | 'simultaneous';
+export type GameMode = 'standard' | 'annihilation' | 'simultaneous' | 'royale';
+
+/** 回合机制轴：这些模式下全员并行计划、统一同时结算（plan 队列语义）。 */
+export function isSimultaneousMode(mode: GameMode): boolean {
+  return mode === 'simultaneous' || mode === 'royale';
+}
+
+/** 歼灭规则轴：这些模式下无总部、出生绑据点、炮火缩圈、打光即淘汰。 */
+export function isAnnihilationMode(mode: GameMode): boolean {
+  return mode === 'annihilation' || mode === 'royale';
+}
 export type GamePhase = 'lobby' | 'active' | 'game_over';
 export type PlayerStatus = 'lobby' | 'active' | 'eliminated';
 export type GameOverReason =

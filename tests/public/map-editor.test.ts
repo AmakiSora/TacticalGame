@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 type EditorCore = {
   createDefaultMapConfig: () => any;
-  configureMapMode: (config: any, mode: 'standard' | 'annihilation' | 'simultaneous', annihilationDraft?: any) => any;
+  configureMapMode: (config: any, mode: 'standard' | 'annihilation' | 'simultaneous' | 'royale', annihilationDraft?: any) => any;
   normalizeImportedMap: (data: any) => any;
   serializeMapConfig: (config: any) => any;
   validateMapConfig: (config: any, id?: string) => string[];
@@ -45,6 +45,7 @@ describe('map editor page', () => {
     expect(html).toContain('data-mode="standard"');
     expect(html).toContain('data-mode="annihilation"');
     expect(html).toContain('data-mode="simultaneous"');
+    expect(html).toContain('data-mode="royale"');
     expect(html).toContain('id="annihilation-panel"');
     expect(html).toContain('<script src="/map-editor.js?v=3.2.7"></script>');
   });
@@ -247,6 +248,19 @@ describe('map editor page', () => {
       .toContain('spawnSlots[1].controlPointId must reference a control point');
   });
 
+  it('accepts minimumSafeRadius 0 in royale maps and still rejects negatives', () => {
+    const core = loadCore();
+    const serialized = core.serializeMapConfig(core.normalizeImportedMap(JSON.parse(read('maps/terminus.json'))));
+
+    expect(serialized.mode).toBe('royale');
+    expect(serialized.annihilation.artillery.minimumSafeRadius).toBe(0);
+    expect(core.validateMapConfig(serialized, 'terminus')).toEqual([]);
+
+    serialized.annihilation.artillery.minimumSafeRadius = -1;
+    expect(core.validateMapConfig(serialized, 'terminus'))
+      .toContain('Map "terminus".annihilation.artillery.minimumSafeRadius must be a number >= 0');
+  });
+
   it('keeps annihilation radius and spawn point references consistent during edits', () => {
     const core = loadCore();
     const config = core.configureMapMode(core.createDefaultMapConfig(), 'annihilation');
@@ -431,17 +445,17 @@ describe('map editor page', () => {
     expect(core.formatValidationError('spawnSlots[0].headquarters (6,-6) is outside radius 5')).toBe('出生槽 1 总部 的坐标 (6,-6) 超出地图半径 5。');
 
     // 歼灭模式：画布绘制与选中面板按模式分流为出生点
-    expect(source).toContain("if (config.mode === 'annihilation') drawSpawnAnchor(slot.id, slot.headquarters, slotIndex);");
+    expect(source).toContain("if (isAnnihilationMode(config.mode)) drawSpawnAnchor(slot.id, slot.headquarters, slotIndex);");
     expect(source).toContain('else drawHeadquarters(slot.id, slot.headquarters, slotIndex);');
     expect(source).toContain('function drawSpawnAnchor');
     expect(source).toContain('function hqTerm()');
-    expect(source).toContain("config.mode === 'annihilation' ? '出生点' : '总部'");
-    expect(source).toContain("setSelectionIcon(config.mode === 'annihilation' ? 'spawn-point' : 'headquarters'");
+    expect(source).toContain("isAnnihilationMode(config.mode) ? '出生点' : '总部'");
+    expect(source).toContain("setSelectionIcon(isAnnihilationMode(config.mode) ? 'spawn-point' : 'headquarters'");
 
     // 工具按钮带动态标签挂载点，规则页歼灭模式隐藏总部规格
     expect(html).toContain('id="hq-tool-label"');
     expect(html).toContain('id="hq-tool-icon"');
-    expect(source).toContain("...(config.mode === 'annihilation'");
+    expect(source).toContain("...(isAnnihilationMode(config.mode)");
     expect(source).toContain("fieldHtml('hq:hp'");
   });
 

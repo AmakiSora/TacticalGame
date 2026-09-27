@@ -1,4 +1,5 @@
 import type { EventType, GameState, PlayerId } from '../types.js';
+import { isSimultaneousMode } from '../types.js';
 
 export const ACTION_MERIT = {
   deploy: 1,
@@ -16,7 +17,7 @@ export function effectActionMerit(amount: unknown, hpPerPoint: number = ACTION_M
 }
 
 export function attackActionMerit(game: GameState, amount: unknown): number {
-  const hpPerPoint = game.config.mode === 'simultaneous'
+  const hpPerPoint = isSimultaneousMode(game.config.mode)
     ? ACTION_MERIT.simultaneousAttackHpPerPoint
     : ACTION_MERIT.hpPerPoint;
   return effectActionMerit(amount, hpPerPoint);

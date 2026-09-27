@@ -408,12 +408,12 @@ function renderMapPreview(preview) {
     const p = point(cp);
     return `<circle class="preview-marker cp" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"><title>${esc(cp.name)}</title></circle>`;
   }).join('');
-  const spawnHeadquarters = (preview.mode === 'annihilation' ? [] : (preview.spawnSlots || [])).map((slot, index) => ({
+  const spawnHeadquarters = (preview.mode === 'annihilation' || preview.mode === 'royale' ? [] : (preview.spawnSlots || [])).map((slot, index) => ({
     id: slot.id,
     index,
     ...slot.headquarters,
   }));
-  const legacyHeadquarters = preview.mode === 'annihilation' ? [] : Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, ...pos }));
+  const legacyHeadquarters = preview.mode === 'annihilation' || preview.mode === 'royale' ? [] : Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, ...pos }));
   const headquarters = (spawnHeadquarters.length ? spawnHeadquarters : legacyHeadquarters).map(slot => {
     const p = point(slot);
     return `<rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"><title>${esc(slot.id)}</title></rect>`;
@@ -475,7 +475,7 @@ function renderMapPicker(maps) {
 		    const maxTurns = map.preview?.maxTurns === null ? '∞' : map.preview?.maxTurns ?? '-';
 		    const actionsPerTurn = map.preview?.actionsPerTurn ?? '-';
 	    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
-	    const modeLabel = map.preview?.mode === 'simultaneous' ? '同时' : map.preview?.mode === 'annihilation' ? '歼灭' : '标准';
+	    const modeLabel = map.preview?.mode === 'simultaneous' ? '同时' : map.preview?.mode === 'annihilation' ? '歼灭' : map.preview?.mode === 'royale' ? '大逃杀' : '标准';
     return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}" aria-label="${esc(map.name)} (${esc(map.id)})">
       ${renderMapPreview(map.preview)}
       <span class="map-card-copy">
@@ -1116,7 +1116,8 @@ function renderLoop(now) {
 }
 
 function actionsPerTurn() { return gameConfig?.balance?.actionsPerTurn ?? 0; }
-function isSimultaneous() { return gameConfig?.mode === 'simultaneous'; }
+function isSimultaneous() { return gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale'; }
+function isAnnihilationRules() { return gameConfig?.mode === 'annihilation' || gameConfig?.mode === 'royale'; }
 function deployFromHqEnabled() { return gameConfig?.balance?.deployFromHq !== false; }
 function myPlanQueue() { return state?.plan?.myQueue ?? []; }
 function committedList() { return state?.plan?.committed ?? []; }
@@ -1209,7 +1210,7 @@ function playerScore(owner) {
     : null;
   if (preserved) return { ...preserved };
   const ownHq = [...state.headquarters.values()].find(h => h.owner === owner);
-  if (!ownHq && gameConfig?.mode !== 'annihilation') return null;
+  if (!ownHq && !isAnnihilationRules()) return null;
   const headquartersDamage = state.players?.[owner]?.stats?.headquartersDamage ?? [...state.headquarters.values()]
     .filter(h => h.owner !== owner)
     .reduce((sum, hq) => sum + Math.max(0, (hq.maxHp || 0) - (hq.hp || 0)), 0);
@@ -1221,7 +1222,7 @@ function playerScore(owner) {
   const supplies = state.resources?.[owner]?.supplies || 0;
   const actionScorePerPoint = gameConfig?.balance?.adjudicationWeights?.effectiveActions
     ?? gameConfig?.balance?.adjudicationWeights?.actionPoints
-    ?? (gameConfig?.mode === 'annihilation' ? 10 : 2);
+    ?? (isAnnihilationRules() ? 10 : 2);
   const actionScore = (state.players?.[owner]?.stats?.actionMerit ?? 0) * actionScorePerPoint;
   return {
     headquartersDamage,
@@ -1259,7 +1260,7 @@ function liveAdjudicationRankings() {
 }
 
 function scoreBreakdown(score) {
-  if (gameConfig?.mode === 'annihilation') return `存活兵力 ${score.armyValue} · 行动分 ${score.actionScore ?? 0}`;
+  if (isAnnihilationRules()) return `存活兵力 ${score.armyValue} · 行动分 ${score.actionScore ?? 0}`;
   return `HQ伤害 ${score.headquartersDamage ?? score.enemyHqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies} · 行动分 ${score.actionScore ?? 0}`;
 }
 

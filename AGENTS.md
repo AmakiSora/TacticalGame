@@ -1,6 +1,6 @@
 # AGENTS.md
 
-TacticalGame：六角战棋（Node.js + TypeScript + Fastify，前端原生 JS + Canvas）。三种模式：`standard` 逐人轮流、`annihilation` 歼灭（炮火收缩圈）、`simultaneous` 同时回合（地图 `standoff`）。详情见 [README.md](README.md)。
+TacticalGame：六角战棋（Node.js + TypeScript + Fastify，前端原生 JS + Canvas）。四种模式：`standard` 逐人轮流、`annihilation` 歼灭（炮火收缩圈）、`simultaneous` 同时回合（地图 `standoff`）、`royale` 大逃杀（同时回合 × 歼灭缩圈组合，地图 `terminus`）。详情见 [README.md](README.md)。
 
 ## 命令
 

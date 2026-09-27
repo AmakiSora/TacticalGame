@@ -633,4 +633,111 @@ describe('map config loader', () => {
 
     resetConfig();
   });
+
+  it('loads the royale map terminus with artillery config and control-point spawns', () => {
+    resetConfig();
+    loadMaps();
+
+    const map = getMapConfig('terminus');
+    expect(map.mode).toBe('royale');
+    expect(map.name).toBe('终点');
+    expect(map.balance.maxTurns).toBeNull();
+    expect(map.annihilation?.artillery).toEqual({
+      startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 0,
+    });
+    expect(map.spawnSlots.length).toBe(6);
+    for (const slot of map.spawnSlots) {
+      expect(slot.controlPointId).toBeTruthy();
+      expect(map.controlPoints.some(point => point.id === slot.controlPointId)).toBe(true);
+    }
+    expect(map.balance.adjudicationWeights.effectiveActions).toBe(10);
+    resetConfig();
+  });
+
+  it('exposes terminus in the map list as a royale preview', () => {
+    resetConfig();
+    loadMaps();
+
+    const map = listMaps().find(item => item.id === 'terminus')!;
+    expect(map.name).toBe('终点');
+    expect(map.preview.mode).toBe('royale');
+    expect(map.preview.maxTurns).toBeNull();
+    expect(map.preview.artillery).toEqual({
+      startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 0,
+    });
+    resetConfig();
+  });
+
+  function royaleMap() {
+    const base: Record<string, unknown> = { ...validMap() };
+    // 新式 spawnSlots 存在时遗留 headquarters/startingUnits 不再参与推导，删除以免与控制点抢格。
+    delete base.headquarters;
+    delete base.startingUnits;
+    return {
+      ...base,
+      mode: 'royale',
+      annihilation: { artillery: { startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 0 } },
+      controlPoints: [
+        { id: 'cp_a', name: 'A', q: 1, r: 0 },
+        { id: 'cp_b', name: 'B', q: -1, r: 0 },
+      ],
+      spawnSlots: [
+        { id: 'slot_a', headquarters: { q: 2, r: 0 }, controlPointId: 'cp_a', startingUnits: [] },
+        { id: 'slot_b', headquarters: { q: -2, r: 0 }, controlPointId: 'cp_b', startingUnits: [] },
+      ],
+      layouts: { '2': ['slot_a', 'slot_b'] },
+    } as Record<string, unknown>;
+  }
+
+  it('accepts a minimal royale map with minimumSafeRadius 0', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(royaleMap()));
+
+    expect(() => loadMaps(dir)).not.toThrow();
+    expect(getMapConfig('default').mode).toBe('royale');
+    resetConfig();
+  });
+
+  it('requires the annihilation block in royale mode', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = royaleMap();
+    delete map.annihilation;
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('Map "default".annihilation must be an object');
+    resetConfig();
+  });
+
+  it('still rejects the annihilation block on standard and simultaneous maps', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = { ...validMap(), annihilation: { artillery: { startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 0 } } };
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('Map "default".annihilation is only valid in annihilation or royale mode');
+    resetConfig();
+  });
+
+  it.each([
+    [-1, 'minimumSafeRadius must be a number >= 0'],
+    [2, 'minimumSafeRadius must be smaller than radius'],
+    [1.5, 'minimumSafeRadius must be an integer'],
+  ])('validates royale artillery minimumSafeRadius %#', (minimumSafeRadius, message) => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = royaleMap() as Record<string, any>;
+    map.annihilation.artillery.minimumSafeRadius = minimumSafeRadius;
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow(message);
+    resetConfig();
+  });
+
+  it('requires royale spawn slots to bind control points', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = royaleMap() as Record<string, any>;
+    delete map.spawnSlots[1].controlPointId;
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('spawnSlots[1].controlPointId');
+    resetConfig();
+  });
 });

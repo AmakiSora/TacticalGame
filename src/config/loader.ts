@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ControlPointKind, GameMode, MapCell, PlayerId, Position, TerrainType, UnitType } from '../types.js';
+import { isAnnihilationMode } from '../types.js';
 import { isValidHex } from '../engine/hex.js';
 import { arePlayableCellsConnected, createMapCells, createRadiusPlayableCells } from './geometry.js';
 
@@ -261,8 +262,8 @@ function assertPosition(obj: Record<string, unknown>, ctx: string, radius: numbe
 
 function validateMap(id: string, config: unknown): asserts config is MapConfig {
   const c = asRecord(config, `Map "${id}"`);
-  if (c.mode !== 'standard' && c.mode !== 'annihilation' && c.mode !== 'simultaneous') {
-    throw new Error(`Map "${id}".mode must be standard, annihilation, or simultaneous`);
+  if (c.mode !== 'standard' && c.mode !== 'annihilation' && c.mode !== 'simultaneous' && c.mode !== 'royale') {
+    throw new Error(`Map "${id}".mode must be standard, annihilation, simultaneous, or royale`);
   }
   const name = assertString(c, 'name', `Map "${id}"`);
   const description = assertString(c, 'description', `Map "${id}"`);
@@ -384,18 +385,23 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
   }
 
-  if (c.mode === 'annihilation') {
+  if (isAnnihilationMode(c.mode)) {
     const annihilation = asRecord(c.annihilation, `Map "${id}".annihilation`);
     const artillery = asRecord(annihilation.artillery, `Map "${id}".annihilation.artillery`);
-    for (const key of ['startRound', 'intervalRounds', 'damage', 'minimumSafeRadius']) {
+    for (const key of ['startRound', 'intervalRounds', 'damage']) {
       const value = assertNumber(artillery, key, `Map "${id}".annihilation.artillery`, 1);
       if (!Number.isInteger(value)) throw new Error(`Map "${id}".annihilation.artillery.${key} must be an integer`);
     }
-    if ((artillery.minimumSafeRadius as number) >= radius) {
+    // minimumSafeRadius 允许 0：最终安全区收缩到只剩中心点。
+    const minimumSafeRadius = assertNumber(artillery, 'minimumSafeRadius', `Map "${id}".annihilation.artillery`, 0);
+    if (!Number.isInteger(minimumSafeRadius)) {
+      throw new Error(`Map "${id}".annihilation.artillery.minimumSafeRadius must be an integer`);
+    }
+    if (minimumSafeRadius >= radius) {
       throw new Error(`Map "${id}".annihilation.artillery.minimumSafeRadius must be smaller than radius`);
     }
   } else if ('annihilation' in c) {
-    throw new Error(`Map "${id}".annihilation is only valid in annihilation mode`);
+    throw new Error(`Map "${id}".annihilation is only valid in annihilation or royale mode`);
   }
 
   const hq = asRecord(c.headquarters, `Map "${id}".headquarters`);
@@ -466,7 +472,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     const slotId = assertString(slot, 'id', `spawnSlots[${i}]`);
     if (spawnIds.has(slotId)) throw new Error(`spawnSlots[${i}].id must be unique`);
     spawnIds.add(slotId);
-    if (c.mode === 'annihilation' && Array.isArray(c.controlPoints) && c.controlPoints.length > 0) {
+    if (isAnnihilationMode(c.mode) && Array.isArray(c.controlPoints) && c.controlPoints.length > 0) {
       const controlPointId = assertString(slot, 'controlPointId', `spawnSlots[${i}]`);
       if (!(c.controlPoints as ControlPointConfig[]).some(point => point.id === controlPointId)) {
         throw new Error(`spawnSlots[${i}].controlPointId must reference a control point`);

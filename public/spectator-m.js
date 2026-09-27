@@ -145,8 +145,9 @@ function turnProgressLabel() {
 }
 
 function isSimultaneousReplay() {
-  return gameConfig?.mode === 'simultaneous';
+  return gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale';
 }
+function isAnnihilationRules() { return gameConfig?.mode === 'annihilation' || gameConfig?.mode === 'royale'; }
 
 function replayActionUsageText() {
   const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
@@ -332,7 +333,7 @@ function recordActionPoint(s, owner, payload) {
   const player = s.players?.[owner];
   if (!player) return;
   if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
-  if (gameConfig?.mode === 'simultaneous') {
+  if (gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale') {
     const previous = s.turn.actionsUsedByPlayer?.[owner] ?? 0;
     if (payload.actionsUsed <= previous) return;
     if (!s.turn.actionsUsedByPlayer) s.turn.actionsUsedByPlayer = {};
@@ -361,7 +362,7 @@ function applyEvent(s, ev) {
   switch (ev.type) {
     case 'game_start':
       gameConfig = p.config || null;
-      const simultaneousStart = p.mode === 'simultaneous' || p.config?.mode === 'simultaneous' || p.map?.mode === 'simultaneous';
+      const simultaneousStart = p.mode === 'simultaneous' || p.mode === 'royale' || p.config?.mode === 'simultaneous' || p.config?.mode === 'royale' || p.map?.mode === 'simultaneous' || p.map?.mode === 'royale';
       if (p.playerNames) playerNames = { ...p.playerNames };
       s.players = JSON.parse(JSON.stringify(p.players || {}));
       s.turn.turnOrder = [...(p.turnOrder || [])];
@@ -478,7 +479,7 @@ function applyEvent(s, ev) {
         if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
-      if (gameConfig?.mode === 'simultaneous') s.turn.actionsUsedByPlayer = {};
+      if (gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale') s.turn.actionsUsedByPlayer = {};
       break;
     case 'turn_end':
       s.turn.currentOwner = p.nextPlayerId || p.nextOwner;
@@ -497,7 +498,7 @@ function applyEvent(s, ev) {
       s.turn.actionsUsed = 0;
       s.turn.actionsUsedByPlayer = {};
       s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : [] };
-      if (gameConfig?.mode === 'simultaneous') {
+      if (gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale') {
         s.turn.currentPlayerId = null;
         s.turn.currentOwner = null;
       }
@@ -513,7 +514,7 @@ function applyEvent(s, ev) {
     case 'action_failed':
       // 失败/落空动作仍消耗 AP；同时模式按玩家队列位置累计。
       recordActionPoint(s, p.owner, p);
-      if (typeof p.actionsUsed === 'number' && gameConfig?.mode !== 'simultaneous') s.turn.actionsUsed = p.actionsUsed;
+      if (typeof p.actionsUsed === 'number' && gameConfig?.mode !== 'simultaneous' && gameConfig?.mode !== 'royale') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'turn_skipped':
       break;
@@ -991,7 +992,7 @@ function playerScore(owner) {
     : null;
   if (preserved) return { ...preserved };
   const ownHq = [...state.headquarters.values()].find(h => h.owner === owner);
-  if (!ownHq && gameConfig?.mode !== 'annihilation') return null;
+  if (!ownHq && !isAnnihilationRules()) return null;
   // Prefer per-player cumulative HQ damage from attack events (server-compatible).
   // Fall back to total enemy HQ damage only when stats are unavailable (legacy replays).
   const tracked = state.players?.[owner]?.stats?.headquartersDamage;
@@ -1008,7 +1009,7 @@ function playerScore(owner) {
   const supplies = state.resources?.[owner]?.supplies || 0;
   const actionScorePerPoint = gameConfig?.balance?.adjudicationWeights?.effectiveActions
     ?? gameConfig?.balance?.adjudicationWeights?.actionPoints
-    ?? (gameConfig?.mode === 'annihilation' ? 10 : 2);
+    ?? (isAnnihilationRules() ? 10 : 2);
   const actionScore = (state.players?.[owner]?.stats?.actionMerit ?? 0) * actionScorePerPoint;
   return {
     headquartersDamage,
@@ -1047,7 +1048,7 @@ function liveAdjudicationRankings() {
 
 function scoreBreakdown(score) {
   const hqDamage = score.headquartersDamage ?? score.enemyHqDamage ?? 0;
-  if (gameConfig?.mode === 'annihilation') return `存活兵力 ${score.armyValue} · 行动分 ${score.actionScore ?? 0}`;
+  if (isAnnihilationRules()) return `存活兵力 ${score.armyValue} · 行动分 ${score.actionScore ?? 0}`;
   return `HQ伤害 ${hqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies} · 行动分 ${score.actionScore ?? 0}`;
 }
 

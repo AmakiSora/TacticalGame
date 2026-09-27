@@ -83,6 +83,9 @@ const playback = window.PlaybackQueue.create({
 let lobbyPollTimer = null;
 let availableGamesTimer = null;
 let availableGamesLoading = false;
+let availableGamesData = [];
+let availableGamesPage = 1;
+const AVAILABLE_GAMES_PAGE_SIZE = 4;
 let hoverCell = null;
 let selectedUnitId = null;
 let selectedOriginId = null;
@@ -1815,26 +1818,56 @@ function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target =
   target.innerHTML = lobbySummaryMarkup(lobby, canKick);
 }
 
+function availableGameModeLabel(mode) {
+  return mode === 'simultaneous' ? '同时' : mode === 'annihilation' ? '歼灭' : mode === 'royale' ? '大逃杀' : '标准';
+}
+
+function availableGameAge(createdAt) {
+  if (!createdAt) return '';
+  const elapsed = Math.max(0, Date.now() - createdAt);
+  if (elapsed < 60000) return '刚刚创建';
+  const minutes = Math.floor(elapsed / 60000);
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  return `${Math.floor(hours / 24)} 天前`;
+}
+
 function renderAvailableGames(games) {
   if (!els.availableGames) return;
   const joinableGames = games
-    .filter(game => game.phase === 'lobby' && game.playerCount < game.maxPlayers)
-    .reverse();
+    .filter(game => game.phase === 'lobby' && game.playerCount < game.maxPlayers);
   if (!joinableGames.length) {
+    availableGamesPage = 1;
     els.availableGames.innerHTML = '<p class="available-games-state">暂无等待加入的对局</p>';
     return;
   }
+  const pageCount = Math.max(1, Math.ceil(joinableGames.length / AVAILABLE_GAMES_PAGE_SIZE));
+  availableGamesPage = Math.min(Math.max(availableGamesPage, 1), pageCount);
+  const pageGames = joinableGames.slice(
+    (availableGamesPage - 1) * AVAILABLE_GAMES_PAGE_SIZE,
+    availableGamesPage * AVAILABLE_GAMES_PAGE_SIZE,
+  );
   const selectedId = els.gameId.value.trim();
-  els.availableGames.innerHTML = joinableGames.map(game => {
+  const listHtml = pageGames.map(game => {
     const id = String(game.gameId || '');
     const selected = id === selectedId;
+    const names = (game.players || []).map(player => player?.name || player?.id).filter(Boolean);
+    const age = availableGameAge(game.createdAt);
     return `<button type="button" class="available-game${selected ? ' selected' : ''}" data-available-game-id="${esc(id)}" aria-pressed="${selected}" title="${esc(id)}">
       <span class="available-game-id">${esc(id)}</span>
-      <span class="available-game-seats">${esc(game.playerCount)}/${esc(game.maxPlayers)} 人</span>
-      <span class="available-game-map">地图 ${esc(game.mapId || 'default')}</span>
+      <span class="available-game-badges"><span class="available-game-mode" data-mode="${esc(game.mode || 'standard')}">${esc(availableGameModeLabel(game.mode))}</span><span class="available-game-seats">${esc(game.playerCount)}/${esc(game.maxPlayers)} 人</span></span>
+      <span class="available-game-meta">地图 ${esc(game.mapId || 'default')}${age ? ` · ${esc(age)}` : ''}</span>
       <span class="available-game-action">选择</span>
+      <span class="available-game-players">${names.length ? `玩家：${esc(names.join('、'))}` : '暂无玩家'}</span>
     </button>`;
   }).join('');
+  els.availableGames.innerHTML = `${listHtml}
+    <div class="available-games-pager" aria-label="对局列表翻页">
+      <button type="button" class="available-games-page-btn" data-games-page="prev" aria-label="上一页" ${availableGamesPage <= 1 ? 'disabled' : ''}>‹</button>
+      <span class="available-games-pager-info">第 ${availableGamesPage} / ${pageCount} 页 · 共 ${joinableGames.length} 局</span>
+      <button type="button" class="available-games-page-btn" data-games-page="next" aria-label="下一页" ${availableGamesPage >= pageCount ? 'disabled' : ''}>›</button>
+    </div>`;
 }
 
 async function refreshAvailableGames() {
@@ -1846,7 +1879,8 @@ async function refreshAvailableGames() {
     const res = await fetch('/api/games');
     if (!res.ok) throw new Error('request failed');
     const data = await res.json();
-    renderAvailableGames(Array.isArray(data.games) ? data.games : []);
+    availableGamesData = Array.isArray(data.games) ? data.games : [];
+    renderAvailableGames(availableGamesData);
   } catch {
     if (!els.availableGames.querySelector('.available-game')) {
       els.availableGames.innerHTML = '<p class="available-games-state">暂时无法获取对局</p>';
@@ -2210,6 +2244,12 @@ document.querySelectorAll('.lobby-tab').forEach(tab => tab.addEventListener('cli
 }));
 els.btnRefreshGames?.addEventListener('click', refreshAvailableGames);
 document.addEventListener('click', e => {
+  const pageBtn = e.target.closest?.('[data-games-page]');
+  if (pageBtn && !pageBtn.disabled) {
+    availableGamesPage += pageBtn.dataset.gamesPage === 'next' ? 1 : -1;
+    if (availableGamesData.length) renderAvailableGames(availableGamesData);
+    return;
+  }
   const availableGame = e.target.closest?.('[data-available-game-id]');
   if (availableGame) {
     els.gameId.value = availableGame.dataset.availableGameId;

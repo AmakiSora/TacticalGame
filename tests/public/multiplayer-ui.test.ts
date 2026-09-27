@@ -63,7 +63,10 @@ describe('multiplayer UI wiring', () => {
       expect(source).toContain('game.playerCount < game.maxPlayers');
       expect(source).toContain('data-available-game-id');
       expect(source).toContain('els.gameId.value = availableGame.dataset.availableGameId');
+      expect(source).toContain('data-games-page');
+      expect(source).toContain('AVAILABLE_GAMES_PAGE_SIZE');
       expect(css).toContain('.available-game');
+      expect(css).toContain('.available-games-pager');
     }
   });
 });

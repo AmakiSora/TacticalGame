@@ -6,6 +6,10 @@
 
 ## 3.5.7
 
+### 变更
+
+- **玩家页「等待加入的对局」列表改为分页，卡片信息加量**：待加入的对局一多，列表就在大厅下方排成长龙。现在桌面端每页 5 局、移动端每页 4 局，列表底部新增 ‹ › 翻页控件与「第 x / y 页 · 共 N 局」计数，手动刷新与 5 秒自动刷新都保持当前页。卡片在 Game ID、人数、地图之外新增：模式徽章（标准/歼灭/同时/大逃杀，分色显示）、局内玩家名单与建局时长（刚刚创建/N 分钟前/N 小时前/N 天前）。列表顺序从「最旧在前」改为「最新在前」：原先靠整页滚动还能看到新局，分页后新局会沉到末页，而最新待加入的局才最值得加入（与 `/api/games` 本身的排序一致）。
+
 ### 移除
 
 - **下线 4 人地图「四角交锋」（`maps/four-corners.json`）**：`GET /api/maps` 不再返回该图，以 `mapId: four-corners` 建局会被拒绝，服务器自此没有 4 人专属图（多人图余 2/3/6 人：`multiplayer-ring` / `artillery-zone` / `snowflake` / `standoff`）。历史资产不受影响：回放 JSON 的 `game_start` 事件内嵌完整地图快照，`records/` 存档回放不依赖 `maps/` 目录；持久化对局的配置随局内嵌，`runtime/` 旧档照常恢复；统计看板中的 four-corners 历史战绩原样保留。配套同步：`skill/SKILL.md` 人数说明与 `skill/example-game.sh` 示例移除该图，README 内置地图清单更新；5 处测试引用改写——异形图样例改用 `whirlpool`（loader / map-editor / multiplayer-api 预览），「半径内缺失格拒绝移动/部署/拆除」的引擎边界用例改为临时加载挖洞 whirlpool 合成图，four-corners 专属的 4 人镜像出生与 4 人建局用例随图删除（多人在 API 层的建局/开局覆盖由 artillery-zone 2/3/6 参数化用例承接）。

@@ -486,9 +486,59 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   font: 600 12px "SF Mono", "Consolas", monospace;
   white-space: nowrap;
 }
+.available-game-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+}
+.available-game-mode {
+  padding: 1px 8px;
+  border: 1px solid #33506a;
+  border-radius: 999px;
+  color: #9bb3c4;
+  font-size: 10px;
+  font-weight: 700;
+}
+.available-game-mode[data-mode="annihilation"] { border-color: #5a4634; color: #e0a878; }
+.available-game-mode[data-mode="simultaneous"] { border-color: #2f5462; color: #7fc9db; }
+.available-game-mode[data-mode="royale"] { border-color: #315440; color: #8ecfae; }
 .available-game-seats { color: #d8e0e8; font-size: 12px; font-weight: 700; }
-.available-game-map { color: #668495; font-size: 11px; }
+.available-game-meta { color: #668495; font-size: 11px; }
+.available-game-players {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #8fa5b5;
+  font-size: 11px;
+  white-space: nowrap;
+}
 .available-game-action { color: #70a7c4; font-size: 11px; font-weight: 700; }
+.available-games-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 6px 0 2px;
+}
+.available-games-page-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  background: #16222d;
+  color: #9bb3c4;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.available-games-page-btn:hover:not(:disabled) { border-color: #4a7188; background: #1d3040; }
+.available-games-page-btn:disabled { opacity: .4; cursor: default; }
+.available-games-pager-info { color: #668495; font-size: 11px; }
 .available-games-state {
   padding: 16px 10px;
   border: 1px dashed #2a3a4a;

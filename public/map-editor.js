@@ -1986,7 +1986,8 @@
       selected = null;
       syncAll();
       if (isAnnihilationMode(nextMode)) activateInspectorTab('rules');
-      setStatus(isAnnihilationMode(nextMode) ? `已切换为${nextMode === 'royale' ? '大逃杀' : '歼灭'}模式，请配置出生据点与炮火参数` : '已切换为普通模式', 'ok');
+      const modeName = { standard: '普通', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀' }[nextMode];
+      setStatus(isAnnihilationMode(nextMode) ? `已切换为${modeName}模式，请配置出生据点与炮火参数` : `已切换为${modeName}模式`, 'ok');
     });
   });
   els.mapRadius.addEventListener('change', () => {

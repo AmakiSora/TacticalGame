@@ -6,6 +6,10 @@
 
 ## 3.5.8
 
+### 修复
+
+- **地图编辑器切到「同时模式」时状态栏提示错报为「已切换为普通模式」**：模式切换按钮的提示分支只区分歼灭系（`annihilation`/`royale`，带出生据点与炮火参数引导）与其余模式，其余一律落到普通模式文案，`simultaneous` 没有专属提示。现在按目标模式给出对应名称——普通/歼灭/同时/大逃杀，歼灭系文案保持原有的参数配置引导不变。
+
 ### 移除
 
 - **下线 2 人标准地图「裂谷控制区」（`maps/desert.json`）**：该图出场率太低，且规则空间与 `default` 高度重叠（同为对称双总部、基础收入 10 + 据点 +12 的经典经济、15 回合上限、每方 2 步兵 + 1 侦察开局，仅地形布局不同），保留双份维护成本不划算。`GET /api/maps` 不再返回该图，以 `mapId: desert` 建局会被拒绝，服务器自此余 5 张 2 人标准图（`default` / `breach` / `danger-close` / `dual-lanes` / `forge`）。历史资产不受影响：回放 JSON 的 `game_start` 事件内嵌完整地图快照，`records/` 存档回放不依赖 `maps/` 目录；持久化对局的配置随局内嵌，`runtime/` 旧档照常恢复；统计看板与 arena 中的 desert 历史战绩原样保留。配套同步：arena 评估控制台的已知地图列表（`src/api/arenaEval.ts` `KNOWN_MAPS` 与前端首屏兜底列表）及 `rl/evaluation/round_robin.py` `DEFAULT_MAPS` 移除 desert（两处注释约定保持一致）；首页标准模式卡「代表地图」、README 内置地图说明与经济说明同步移除；3 个算法自博弈合法性测试（verdict / threat / field）的 desert 参数化用例行随图删除，其余 5 张静态图用例继续覆盖。

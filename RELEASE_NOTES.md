@@ -4,6 +4,12 @@
 
 自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.5.8
+
+### 移除
+
+- **下线 2 人标准地图「裂谷控制区」（`maps/desert.json`）**：该图出场率太低，且规则空间与 `default` 高度重叠（同为对称双总部、基础收入 10 + 据点 +12 的经典经济、15 回合上限、每方 2 步兵 + 1 侦察开局，仅地形布局不同），保留双份维护成本不划算。`GET /api/maps` 不再返回该图，以 `mapId: desert` 建局会被拒绝，服务器自此余 5 张 2 人标准图（`default` / `breach` / `danger-close` / `dual-lanes` / `forge`）。历史资产不受影响：回放 JSON 的 `game_start` 事件内嵌完整地图快照，`records/` 存档回放不依赖 `maps/` 目录；持久化对局的配置随局内嵌，`runtime/` 旧档照常恢复；统计看板与 arena 中的 desert 历史战绩原样保留。配套同步：arena 评估控制台的已知地图列表（`src/api/arenaEval.ts` `KNOWN_MAPS` 与前端首屏兜底列表）及 `rl/evaluation/round_robin.py` `DEFAULT_MAPS` 移除 desert（两处注释约定保持一致）；首页标准模式卡「代表地图」、README 内置地图说明与经济说明同步移除；3 个算法自博弈合法性测试（verdict / threat / field）的 desert 参数化用例行随图删除，其余 5 张静态图用例继续覆盖。
+
 ## 3.5.7
 
 ### 变更

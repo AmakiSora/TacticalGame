@@ -114,7 +114,6 @@ describe('field 自博弈合法性（decide 不得返回引擎拒绝的动作）
   it.each([
     ['default', 'player_a'],
     ['breach', 'player_b'],
-    ['desert', 'player_a'],
     ['dual-lanes', 'player_b'],
   ] as const)('%s 地图整局零非法动作', async (mapId, seat) => {
     const r = await playGame(mapId, 4242, seat);

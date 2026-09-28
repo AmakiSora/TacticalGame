@@ -114,7 +114,6 @@ describe('verdict 自博弈合法性（decide 不得返回引擎拒绝的动作�
   it.each([
     ['default', 'player_a'],
     ['breach', 'player_b'],
-    ['desert', 'player_a'],
     ['dual-lanes', 'player_b'],
     ['danger-close', 'player_a'],
     ['multiplayer-ring', 'player_b'],

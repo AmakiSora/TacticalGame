@@ -83,9 +83,11 @@ const detailEl = document.getElementById('detail-content');
 const cellInfoEl = document.getElementById('cell-info');
 const selDetailEl = document.getElementById('selection-detail');
 const btnStart = document.getElementById('btn-start');
+const btnPrevTurn = document.getElementById('btn-prev-turn');
 const btnPrev = document.getElementById('btn-prev');
 const btnPlay = document.getElementById('btn-play');
 const btnNext = document.getElementById('btn-next');
+const btnNextTurn = document.getElementById('btn-next-turn');
 const btnEnd = document.getElementById('btn-end');
 const speedSelect = document.getElementById('speed-select');
 const stepInfo = document.getElementById('step-info');
@@ -1148,6 +1150,19 @@ function updateControls() {
   timeline.value = Math.max(0, currentStep);
   btnPlay.textContent = playing ? '⏸' : '▶';
   btnPlay.classList.toggle('active', playing);
+  const turnStarts = turnStartSteps();
+  btnPrevTurn.disabled = !turnStarts.some(step => step < currentStep);
+  btnNextTurn.disabled = !turnStarts.some(step => step > currentStep);
+}
+
+// 回合开始的边界事件：game_start 开启第 1 回合；顺序模式 turn_end 应用后进入下一玩家回合，
+// 同时/royale 模式 round_start 应用后进入新一轮（收入/维修等事件都在边界事件之前入流）。
+function turnStartSteps() {
+  const steps = [];
+  allEvents.forEach((ev, i) => {
+    if (ev.type === 'game_start' || ev.type === 'turn_end' || ev.type === 'round_start') steps.push(i);
+  });
+  return steps;
 }
 
 function stepForward() {
@@ -1160,6 +1175,18 @@ function stepForward() {
   drawBoard(); renderSidebar(); renderDetail(); updateControls();
 }
 function stepBackward() { if (currentStep > 0) rebuildToStep(currentStep - 1); }
+function prevTurnStart() {
+  const target = turnStartSteps().reverse().find(step => step < currentStep);
+  if (target === undefined) return;
+  pinnedReplayStep = target < allEvents.length - 1;
+  rebuildToStep(target);
+}
+function nextTurnStart() {
+  const target = turnStartSteps().find(step => step > currentStep);
+  if (target === undefined) return;
+  pinnedReplayStep = target < allEvents.length - 1;
+  rebuildToStep(target);
+}
 function goToStart() { pausePlayback(); rebuildToStep(allEvents.length ? 0 : -1); }
 function goToEnd() { pausePlayback(); pinnedReplayStep = false; rebuildToStep(allEvents.length - 1); }
 function startPlayback() {
@@ -1669,9 +1696,11 @@ refreshBtn.addEventListener('click', fetchGameList);
 forceAdjudicateBtn?.addEventListener('click', forceAdjudicateCurrentGame);
 deleteGameBtn.addEventListener('click', deleteCurrentGame);
 btnStart.addEventListener('click', goToStart);
+btnPrevTurn.addEventListener('click', () => { pausePlayback(); prevTurnStart(); });
 btnPrev.addEventListener('click', () => { pausePlayback(); stepBackward(); });
 btnPlay.addEventListener('click', () => playing ? pausePlayback() : startPlayback());
 btnNext.addEventListener('click', () => { pausePlayback(); stepForward(); });
+btnNextTurn.addEventListener('click', () => { pausePlayback(); nextTurnStart(); });
 btnEnd.addEventListener('click', goToEnd);
 timeline.addEventListener('input', () => {
   pausePlayback();

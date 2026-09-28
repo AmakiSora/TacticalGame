@@ -595,8 +595,9 @@ main {
   display: flex; align-items: center; justify-content: center;
   padding: 0; transition: all .15s;
 }
-#control-buttons button:hover { background: #26384a; color: #d8e0e8; }
+#control-buttons button:not(:disabled):hover { background: #26384a; color: #d8e0e8; }
 #control-buttons button.active { background: #1a4a2a; border-color: #2a8a4a; color: #8da; }
+#control-buttons button:disabled { opacity: .4; cursor: default; }
 #speed-select {
   padding: 4px 8px; background: #1e2e3e; color: #b0c8d8;
   border: 1px solid #2a3a4a; border-radius: 6px; font-size: 12px;

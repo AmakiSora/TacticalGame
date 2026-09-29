@@ -297,7 +297,7 @@ function saveSessionFromSettings() {
   return true;
 }
 
-function clearSessionFromSettings() {
+function clearSavedSession() {
   gameId = null;
   myToken = null;
   hostToken = null;
@@ -307,6 +307,10 @@ function clearSessionFromSettings() {
   } catch {
     // 浏览器禁用本地存储时只清内存。
   }
+}
+
+function clearSessionFromSettings() {
+  clearSavedSession();
   fillSettingsFromSession();
   toast('会话已清除', 'ok');
 }
@@ -1980,6 +1984,55 @@ async function enterGame() {
   els.joinPanel.classList.add('hidden'); els.gameUI.classList.remove('hidden');
   subscribeSse(); drawBoard(); renderSidebar(); statusBadge('已连接', 'ok');
 }
+
+// 刷新/重开后用本地会话回到对局：active 直接进局，lobby 恢复大厅视图，对局已不存在则清会话。
+async function reconnectSavedSession() {
+  if (!gameId) return;
+  let lobby = null;
+  try {
+    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/lobby`);
+    lobby = res.ok ? await res.json() : null;
+  } catch {
+    return; // 服务器不可达时留在大厅页，不误清会话。
+  }
+  if (!lobby) {
+    clearSavedSession();
+    return;
+  }
+  if (myPlayer && !(lobby.players || []).some(player => player.id === myPlayer)) {
+    // 已被房主移出大厅：清掉残留会话，避免每次打开都指向旧局。
+    clearSavedSession();
+    return;
+  }
+  if (lobby.phase === 'active') {
+    await enterGame();
+    return;
+  }
+  restoreLobbyView(lobby);
+}
+
+function restoreLobbyView(lobby) {
+  if (hostToken) {
+    els.createdGameId.textContent = gameId;
+    els.createdHostToken.textContent = hostToken;
+    els.createdToken.textContent = myToken || '未参战';
+    els.createdPlayerTokenRow?.classList.toggle('hidden', !myToken);
+    renderLobbySummary(lobby, els.lobbySummary, true);
+    els.createResult?.classList.remove('hidden');
+    statusBadge('大厅中', 'idle');
+  } else if (myToken) {
+    document.querySelector('.lobby-tab[data-tab="join"]')?.click();
+    if (els.joinStatusText) els.joinStatusText.textContent = '已恢复大厅，等待房主开始';
+    if (els.joinPlayerToken) els.joinPlayerToken.textContent = myToken;
+    els.joinPlayerTokenRow?.classList.remove('hidden');
+    renderLobbySummary(lobby, els.joinLobbySummary);
+    els.joinResult?.classList.remove('hidden');
+    statusBadge('大厅中', 'idle');
+  } else {
+    return; // 只有 gameId 的观战会话：维持大厅页现状。
+  }
+  startLobbyPolling();
+}
 function ensureJoinConnectButton() {
   if (!els.joinResult || els.btnConnectJoin) return;
   const btn = document.createElement('button');
@@ -2105,6 +2158,7 @@ els.btnClearSession?.addEventListener('click', e => {
 });
 restoreSessionIntoMemory();
 fillSettingsFromSession();
+reconnectSavedSession();
 window.RandomMapUI?.setPreviewRenderer(renderMapPreview);
 loadMapList();
 startAvailableGamesRefresh();

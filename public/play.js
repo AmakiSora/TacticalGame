@@ -1294,6 +1294,8 @@ function renderSidebar() {
     ${statusCard}
     ${resourceRows}
   </div>`;
+  // 无玩家 token 的观战房主没有操作权，结束回合只会得到 401。
+  els.btnEndTurn.classList.toggle('hidden', !myToken);
   els.btnEndTurn.textContent = simultaneous ? (iCommitted() ? '等待结算…' : '确认行动') : '结束回合';
   renderActionsDisplay(owner);
   renderScorePanel();
@@ -1891,7 +1893,7 @@ async function startHostedGame() {
   if (!res.ok) return toast(data.error || '开始失败', 'err');
   toast('对局已开始', 'ok');
   stopLobbyPolling();
-  if (!myToken) {
+  if (!myToken && !hostToken) {
     window.location.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
     return;
   }
@@ -1974,7 +1976,7 @@ async function enterGame() {
     if (handleLobbyRemoval(lobby)) return;
     return toast('对局尚未开始', 'info');
   }
-  if (!myToken) {
+  if (!myToken && !hostToken) {
     window.location.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
     return;
   }

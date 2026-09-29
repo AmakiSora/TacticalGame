@@ -1361,7 +1361,21 @@ function showPopup(cell, title, items, cb) {
   popup.style.left = `${p.x + 18}px`; popup.style.top = `${p.y - 10}px`;
   popup.innerHTML = `<div class="map-popup-title">${esc(title)}</div>` + items.map(i => `<button class="map-popup-btn" data-action="${esc(i.action)}" data-type="${esc(i.type || '')}"><span>${esc(i.label)}</span>${i.cost != null ? `<span class="map-popup-cost">${i.cost}</span>` : ''}</button>`).join('');
   popup.classList.remove('hidden');
+  clampPopupInBoard(popup, p.x);
   popup.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => cb(btn.dataset.action, btn.dataset.type)));
+}
+// 锚点靠棋盘边缘时把弹出菜单收拢回 .board-wrap 可视区（右侧放不下翻到锚点左侧），避免撑出滚动条被裁切
+function clampPopupInBoard(popup, anchorX) {
+  const wrap = els.canvas.parentElement;
+  if (!wrap) return;
+  const w = popup.offsetWidth, h = popup.offsetHeight;
+  const minX = wrap.scrollLeft + 6, minY = wrap.scrollTop + 6;
+  const maxX = Math.max(minX, wrap.scrollLeft + wrap.clientWidth - w - 6);
+  const maxY = Math.max(minY, wrap.scrollTop + wrap.clientHeight - h - 6);
+  let left = parseFloat(popup.style.left) || 0;
+  if (left > maxX) left = anchorX - 18 - w;
+  popup.style.left = `${Math.min(Math.max(left, minX), maxX)}px`;
+  popup.style.top = `${Math.min(Math.max(parseFloat(popup.style.top) || 0, minY), maxY)}px`;
 }
 function closePopup() { $('map-popup').classList.add('hidden'); }
 function deselect() { selectedUnitId = null; selectedOriginId = null; selectedDeployType = null; interactionMode = 'idle'; rangeHighlights = []; closePopup(); renderSidebar(); drawBoard(); }

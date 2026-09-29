@@ -42,7 +42,7 @@ const els = {
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
   btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'), planPanel: $('plan-panel'),
-  btnSkipReplay: $('btn-skip-replay'),
+  btnSkipReplay: $('btn-skip-replay'), btnQuitGame: $('btn-quit-game'),
   selDetail: $('selection-detail'), events: $('events'), scorePanel: $('score-panel'),
   btnSettings: $('btn-settings'), settingsPopover: $('settings-popover'),
   settingsControlToken: $('settings-control-token'), btnSaveControlToken: $('btn-save-control-token'),
@@ -2168,6 +2168,12 @@ async function startHostedGame() {
 }
 
 els.btnEndTurn.addEventListener('click', async () => { if (playback.isActive()) return; if (await apiAction(`/api/games/${gameId}/end-turn`, {})) afterAction(isSimultaneous() ? '本回合计划已确认，等待全员提交' : '回合结束'); });
+// 退出对局是纯本地行为：清掉会话回到大厅页；席位保留、对局继续，由房主管理残留席位。
+els.btnQuitGame?.addEventListener('click', () => {
+  if (!window.confirm('确定退出本局对局？退出后将回到大厅页，本局无法再继续操作。')) return;
+  clearSavedSession();
+  window.location.reload();
+});
 els.btnSkipReplay?.addEventListener('click', () => playback.skip());
 els.btnRefresh.addEventListener('click', async () => { await loadFullState(); drawBoard(); renderSidebar(); toast('状态已刷新', 'ok'); });
 els.btnCreate.addEventListener('click', async () => {

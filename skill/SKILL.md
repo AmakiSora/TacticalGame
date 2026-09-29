@@ -29,7 +29,7 @@ Do not keep both mode files in working memory as equal authority. The inactive m
 
 Re-read the mode file if you are about to deploy, attack a "base", or score near adjudication and are unsure.
 
-`simultaneous` (map `standoff`) changes the whole turn structure: there is no turn order — all
+`simultaneous` (maps `standoff`, `narrow-road`) changes the whole turn structure: there is no turn order — all
 players queue actions secretly in a planning phase, then the server resolves them strictly at
 once; attacks target cells instead of units, and each unit acts at most once per round.
 `wait-turn.mjs` exit 0 there means "your planning window is open and you have not committed".

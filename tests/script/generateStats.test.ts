@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import {
   AGENT_NAMES,
   aggregate,
+  bradleyTerryRatings,
+  btElo,
   canonicalizeModel,
   extractMatch,
   isDrawMatch,
@@ -242,5 +244,101 @@ describe('stats aggregation', () => {
 
     expect(row).toMatchObject({ duelGames: 0, duelRating: null, multiGames: 1, multiPlacement: 0.5 });
     expect(row?.multiRating).toBeCloseTo(wilsonLower(0.5, 1), 4);
+  });
+
+  it('orders a transitive duel chain with bradleyTerryRatings anchored around 1', () => {
+    const ratings = bradleyTerryRatings([
+      { a: 'model-a', b: 'model-b', games: 4, winsA: 4, winsB: 0 },
+      { a: 'model-b', b: 'model-c', games: 4, winsA: 4, winsB: 0 },
+    ]);
+
+    expect(ratings.get('model-a')!).toBeGreaterThan(ratings.get('model-b')!);
+    expect(ratings.get('model-b')!).toBeGreaterThan(ratings.get('model-c')!);
+    expect(ratings.get('model-b')!).toBeCloseTo(1, 6);
+    expect(ratings.get('model-a')! * ratings.get('model-c')!).toBeCloseTo(1, 6);
+    expect(btElo(ratings.get('model-a')!)).toBeGreaterThan(1000);
+    expect(btElo(ratings.get('model-c')!)).toBeLessThan(1000);
+  });
+
+  it('shrinks a single duel toward the prior mean instead of an extreme rating', () => {
+    const ratings = bradleyTerryRatings([
+      { a: 'model-a', b: 'model-b', games: 1, winsA: 1, winsB: 0 },
+    ]);
+
+    expect(btElo(ratings.get('model-a')!)).toBeCloseTo(1059.0, 1);
+    expect(btElo(ratings.get('model-b')!)).toBeCloseTo(941.0, 1);
+  });
+
+  it('fits BT duel ratings from aggregate() and sorts the leaderboard by them', () => {
+    const duel = (recordId: string, winner: string, loser: string) =>
+      match({
+        recordId,
+        participants: [
+          participant('player_a', winner, 1, true),
+          participant('player_b', loser, 2),
+        ],
+      });
+    const games = [
+      duel('tg_bt1', 'model-a', 'model-b'),
+      duel('tg_bt2', 'model-a', 'model-b'),
+      duel('tg_bt3', 'model-b', 'model-c'),
+    ];
+
+    const board = aggregate(games).modelLeaderboard;
+
+    expect(board.map(row => row.model)).toEqual(['model-a', 'model-b', 'model-c']);
+    expect(board[0].duelBtRating).toBeGreaterThan(1000);
+    expect(board[2].duelBtRating).toBeLessThan(1000);
+    expect(board[0].duelRating).toBeCloseTo(wilsonLower(2, 2), 4);
+  });
+
+  it('excludes mirror duels from the BT fit but keeps them in duel totals', () => {
+    const mirror = match({
+      participants: [
+        participant('player_a', 'model-a', 1, true),
+        participant('player_b', 'model-a', 2),
+      ],
+    });
+
+    const row = aggregate([mirror]).modelLeaderboard.find(item => item.model === 'model-a');
+
+    expect(row).toMatchObject({ games: 2, duelGames: 2, duelWins: 1, duelLosses: 1 });
+    expect(row?.duelRating).not.toBeNull();
+    expect(row?.duelBtRating).toBeNull();
+  });
+
+  it('sinks models without cross-model duels below BT-rated ones', () => {
+    const duel = (recordId: string, winner: string, loser: string) =>
+      match({
+        recordId,
+        participants: [
+          participant('player_a', winner, 1, true),
+          participant('player_b', loser, 2),
+        ],
+      });
+    const multiplayer = match({
+      recordId: 'tg_mp',
+      participants: [
+        participant('player_a', 'model-z', 1, true),
+        participant('player_b', 'model-y', 2),
+        participant('player_c', 'model-x', 3),
+      ],
+      winner: 'player_a',
+    });
+
+    const board = aggregate([
+      duel('tg_bt1', 'model-a', 'model-b'),
+      duel('tg_bt2', 'model-b', 'model-c'),
+      multiplayer,
+    ]).modelLeaderboard;
+
+    expect(board.map(row => row.model)).toEqual([
+      'model-a',
+      'model-b',
+      'model-c',
+      'model-z',
+      'model-y',
+      'model-x',
+    ]);
   });
 });

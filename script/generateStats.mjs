@@ -690,6 +690,7 @@ export function aggregate(matches) {
   const models = new Map();
   const agents = new Map();
   const maps = new Map();
+  const duelPairs = new Map(); // "a\0b"(a<b) -> { a, b, games, winsA, winsB }，BT 拟合输入
 
   const validMatches = [];
 
@@ -741,6 +742,26 @@ export function aggregate(matches) {
     // pairwise model matchups within this game
     const parts = match.participants || [];
     const isDraw = isDrawMatch(match);
+
+    // BT 拟合输入：双人局的模型对战绩。镜像局（同模型左右互搏）无信息量、
+    // 无胜者的异常局不进拟合，两者照常计入下方双人口径统计。
+    if (parts.length === 2 && parts[0].model !== parts[1].model) {
+      const [x, y] = parts;
+      const xWin = !isDraw && (x.isWinner || x.rank === 1) ? 1 : 0;
+      const yWin = !isDraw && (y.isWinner || y.rank === 1) ? 1 : 0;
+      if (isDraw || xWin + yWin === 1) {
+        const [a, b, wA, wB] = x.model < y.model
+          ? [x.model, y.model, xWin, yWin]
+          : [y.model, x.model, yWin, xWin];
+        const key = `${a}\u0000${b}`;
+        const pair = duelPairs.get(key) ?? { a, b, games: 0, winsA: 0, winsB: 0 };
+        pair.games += 1;
+        pair.winsA += wA + (isDraw ? 0.5 : 0);
+        pair.winsB += wB + (isDraw ? 0.5 : 0);
+        duelPairs.set(key, pair);
+      }
+    }
+
     for (const p of parts) {
       if (!models.has(p.model)) models.set(p.model, emptyModelBucket(p.model));
       const b = models.get(p.model);
@@ -814,6 +835,8 @@ export function aggregate(matches) {
   overview.avgRounds =
     validMatches.length > 0 ? round2(roundsTotal / validMatches.length) : 0;
 
+  const btRatings = bradleyTerryRatings([...duelPairs.values()]);
+
   const modelLeaderboard = [...models.values()]
     .map(b => {
       const winRate = b.games > 0 ? b.wins / b.games : 0;
@@ -843,6 +866,7 @@ export function aggregate(matches) {
         duelRating: b.duelGames > 0
           ? round4(wilsonLower(b.duelWins + b.duelDraws * 0.5, b.duelGames))
           : null,
+        duelBtRating: btRatings.has(b.model) ? round1(btElo(btRatings.get(b.model))) : null,
         multiGames: b.multiGames,
         multiPlacement: multiPlacement == null ? null : round4(multiPlacement),
         multiRating: b.multiGames > 0
@@ -856,8 +880,10 @@ export function aggregate(matches) {
       };
     })
     .sort((a, b) => {
-      if (a.duelRating == null && b.duelRating != null) return 1;
-      if (b.duelRating == null && a.duelRating != null) return -1;
+      // 默认按 BT 评分排序；无跨模型对局的模型（BT 为 null）沉底，再按 Wilson 双人评分兜底。
+      if (a.duelBtRating == null && b.duelBtRating != null) return 1;
+      if (b.duelBtRating == null && a.duelBtRating != null) return -1;
+      if (b.duelBtRating !== a.duelBtRating) return (b.duelBtRating ?? 0) - (a.duelBtRating ?? 0);
       if (b.duelRating !== a.duelRating) return (b.duelRating ?? 0) - (a.duelRating ?? 0);
       if (b.duelWins !== a.duelWins) return b.duelWins - a.duelWins;
       return b.duelGames - a.duelGames;
@@ -939,6 +965,63 @@ export function wilsonLower(successes, trials) {
   const centre = p + z2 / (2 * trials);
   const margin = z * Math.sqrt((p * (1 - p) + z2 / (4 * trials)) / trials);
   return (centre - margin) / denom;
+}
+
+/** Bradley-Terry 先验伪对局数：每个模型视作与「全场平均强度」虚拟对手打 K 场（K/2 胜）。 */
+export const BT_PRIOR_GAMES = 4;
+
+/** BT 强度 R 映射到 Elo 尺度：1000 = 全场平均水平，400 分差距 = 10 倍强度。 */
+export function btElo(rating) {
+  return 1000 + 400 * Math.log10(rating);
+}
+
+/**
+ * Bradley-Terry 双人评分：对模型对加权战绩（平局按 0.5/0.5 拆分）做 MM 迭代最大后验拟合。
+ * pairs 元素为 { a, b, games, winsA, winsB }（wins 已含 0.5×平），与 Wilson 评分的区别在于
+ * 胜场按对手强度加权——赢强敌加分多于赢弱敌。Beta(K/2, K/2) 先验经强度恒为 1 的虚拟对手
+ * 锚定尺度，返回 model -> R（全场几何均值 ≈ 1）；无任何跨模型对局的模型不在结果里。
+ */
+export function bradleyTerryRatings(pairs, { priorGames = BT_PRIOR_GAMES } = {}) {
+  const names = [];
+  const index = new Map();
+  for (const pair of pairs) {
+    for (const name of [pair.a, pair.b]) {
+      if (!index.has(name)) {
+        index.set(name, names.length);
+        names.push(name);
+      }
+    }
+  }
+  const n = names.length;
+  const oppGames = Array.from({ length: n }, () => new Map());
+  const wins = new Array(n).fill(0);
+  for (const pair of pairs) {
+    const i = index.get(pair.a);
+    const j = index.get(pair.b);
+    if (i === j) continue;
+    const games = pair.games || 0;
+    oppGames[i].set(j, (oppGames[i].get(j) ?? 0) + games);
+    oppGames[j].set(i, (oppGames[j].get(i) ?? 0) + games);
+    wins[i] += pair.winsA || 0;
+    wins[j] += pair.winsB || 0;
+  }
+  const priorWins = priorGames / 2;
+  const ratings = new Array(n).fill(1);
+  for (let iter = 0; iter < 20000; iter += 1) {
+    let maxDelta = 0;
+    const next = new Array(n);
+    for (let i = 0; i < n; i += 1) {
+      let denom = priorGames / (ratings[i] + 1); // 虚拟对手强度固定为 1
+      for (const [j, games] of oppGames[i]) denom += games / (ratings[i] + ratings[j]);
+      next[i] = (wins[i] + priorWins) / denom;
+      maxDelta = Math.max(maxDelta, Math.abs(next[i] - ratings[i]));
+    }
+    for (let i = 0; i < n; i += 1) ratings[i] = next[i];
+    if (maxDelta < 1e-12) break;
+  }
+  const result = new Map();
+  for (let i = 0; i < n; i += 1) result.set(names[i], ratings[i]);
+  return result;
 }
 
 /** 娱乐统计的时长有效性上限（3 天），两个脚本共用同一判定。 */
@@ -1078,7 +1161,7 @@ function main() {
   console.log('Top duel models:');
   for (const row of payload.modelLeaderboard.slice(0, 10)) {
     console.log(
-      `  #${row.rank} ${row.model}  duel=${row.duelWins}W/${row.duelLosses}L/${row.duelDraws}D  games=${row.duelGames}  rating=${row.duelRating?.toFixed(3) ?? '-'}  multi=${row.multiRating?.toFixed(3) ?? '-'}`,
+      `  #${row.rank} ${row.model}  duel=${row.duelWins}W/${row.duelLosses}L/${row.duelDraws}D  games=${row.duelGames}  bt=${row.duelBtRating?.toFixed(1) ?? '-'}  wilson=${row.duelRating?.toFixed(3) ?? '-'}  multi=${row.multiRating?.toFixed(3) ?? '-'}`,
     );
   }
 }

@@ -8,8 +8,10 @@ describe('stats dashboard', () => {
     expect(source).toContain('title="${escapeAttr(name)}">${escapeHtml(label)}');
     expect(source).toContain('if (!isRankedMatch(m)) continue;');
     expect(source).toContain('if (!isDraw && (p.isWinner || p.rank === 1)) ag.wins += 1;');
-    expect(source).toContain("let modelSort = { key: 'duelRating', dir: 'desc' };");
+    expect(source).toContain("let modelSort = { key: 'duelBtRating', dir: 'desc' };");
     expect(source).toContain('multiRating: b.multiGames > 0');
+    expect(source).toContain('function bradleyTerryRatings');
+    expect(source).toContain('data-label="BT评分"');
     expect(source).toContain("simultaneous: '同时'");
     expect(source).toContain('function modeSummary(modeDist)');
     expect(source).toContain('modeClass(m.mode)');
@@ -30,6 +32,8 @@ describe('stats dashboard', () => {
     expect(html).toContain('id="match-sort-mobile"');
     expect(html).toContain('id="model-sort-direction"');
     expect(html).toContain('id="match-sort-direction"');
+    expect(html).toContain('<option value="duelBtRating">BT评分</option>');
+    expect(html).toContain('data-sort="duelBtRating"');
     expect(source).toContain('data-label="模型"');
     expect(source).toContain('data-label="参赛模型"');
     expect(source).toContain('data-label="双人评分"');

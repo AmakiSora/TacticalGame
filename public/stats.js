@@ -35,7 +35,7 @@
   /** @type {any[]} */
   let filteredMatches = [];
   let selectedModel = null;
-  let modelSort = { key: 'duelRating', dir: 'desc' };
+  let modelSort = { key: 'duelBtRating', dir: 'desc' };
   let matchSort = { key: 'date', dir: 'desc' };
 
   const REASON_LABELS = {
@@ -117,6 +117,57 @@
     return (centre - margin) / denom;
   }
 
+  // BT_PRIOR_GAMES / btElo / bradleyTerryRatings 与后端 script/generateStats.mjs 保持同一实现，
+  // 便于筛选子集在前端实时重算 BT 评分；改动任一侧需同步另一侧。
+  const BT_PRIOR_GAMES = 4;
+
+  function btElo(rating) {
+    return 1000 + 400 * Math.log10(rating);
+  }
+
+  function bradleyTerryRatings(pairs, { priorGames = BT_PRIOR_GAMES } = {}) {
+    const names = [];
+    const index = new Map();
+    for (const pair of pairs) {
+      for (const name of [pair.a, pair.b]) {
+        if (!index.has(name)) {
+          index.set(name, names.length);
+          names.push(name);
+        }
+      }
+    }
+    const n = names.length;
+    const oppGames = Array.from({ length: n }, () => new Map());
+    const wins = new Array(n).fill(0);
+    for (const pair of pairs) {
+      const i = index.get(pair.a);
+      const j = index.get(pair.b);
+      if (i === j) continue;
+      const games = pair.games || 0;
+      oppGames[i].set(j, (oppGames[i].get(j) ?? 0) + games);
+      oppGames[j].set(i, (oppGames[j].get(i) ?? 0) + games);
+      wins[i] += pair.winsA || 0;
+      wins[j] += pair.winsB || 0;
+    }
+    const priorWins = priorGames / 2;
+    const ratings = new Array(n).fill(1);
+    for (let iter = 0; iter < 20000; iter += 1) {
+      let maxDelta = 0;
+      const next = new Array(n);
+      for (let i = 0; i < n; i += 1) {
+        let denom = priorGames / (ratings[i] + 1); // 虚拟对手强度固定为 1
+        for (const [j, games] of oppGames[i]) denom += games / (ratings[i] + ratings[j]);
+        next[i] = (wins[i] + priorWins) / denom;
+        maxDelta = Math.max(maxDelta, Math.abs(next[i] - ratings[i]));
+      }
+      for (let i = 0; i < n; i += 1) ratings[i] = next[i];
+      if (maxDelta < 1e-12) break;
+    }
+    const result = new Map();
+    for (let i = 0; i < n; i += 1) result.set(names[i], ratings[i]);
+    return result;
+  }
+
   function isDrawMatch(match) {
     return match.reason === 'turn_limit_draw' || match.reason === 'forced_adjudication_draw' || Boolean(match.reviewFlags?.deadlock);
   }
@@ -165,6 +216,7 @@
   function recomputeFromMatches(matches) {
     const models = new Map();
     const agents = new Map();
+    const duelPairs = new Map(); // "a\0b"(a<b) -> { a, b, games, winsA, winsB }，BT 拟合输入
     const mapDist = {};
     const reasonDist = {};
     const modeDist = {};
@@ -210,6 +262,25 @@
 
       const parts = m.participants || [];
       const isDraw = isDrawMatch(m);
+
+      // BT 拟合输入：双人局的模型对战绩（镜像局/无胜者局不计入，与后端一致）。
+      if (parts.length === 2 && parts[0].model !== parts[1].model) {
+        const [x, y] = parts;
+        const xWin = !isDraw && (x.isWinner || x.rank === 1) ? 1 : 0;
+        const yWin = !isDraw && (y.isWinner || y.rank === 1) ? 1 : 0;
+        if (isDraw || xWin + yWin === 1) {
+          const [a, b, wA, wB] = x.model < y.model
+            ? [x.model, y.model, xWin, yWin]
+            : [y.model, x.model, yWin, xWin];
+          const key = `${a}\u0000${b}`;
+          const pair = duelPairs.get(key) ?? { a, b, games: 0, winsA: 0, winsB: 0 };
+          pair.games += 1;
+          pair.winsA += wA + (isDraw ? 0.5 : 0);
+          pair.winsB += wB + (isDraw ? 0.5 : 0);
+          duelPairs.set(key, pair);
+        }
+      }
+
       for (const p of parts) {
         if (!models.has(p.model)) models.set(p.model, emptyModel(p.model));
         const b = models.get(p.model);
@@ -278,6 +349,8 @@
       }
     }
 
+    const btRatings = bradleyTerryRatings([...duelPairs.values()]);
+
     const modelLeaderboard = [...models.values()]
       .map(b => {
         const winRate = b.games > 0 ? b.wins / b.games : 0;
@@ -307,6 +380,9 @@
           duelRating: b.duelGames > 0
             ? wilsonLower(b.duelWins + b.duelDraws * 0.5, b.duelGames)
             : null,
+          duelBtRating: btRatings.has(b.model)
+            ? Math.round(btElo(btRatings.get(b.model)) * 10) / 10
+            : null,
           multiGames: b.multiGames,
           multiPlacement: b.multiGames > 0 ? b.multiPlacementSum / b.multiGames : null,
           multiRating: b.multiGames > 0 ? wilsonLower(b.multiPlacementSum, b.multiGames) : null,
@@ -316,9 +392,10 @@
         };
       })
       .sort((a, b) => {
-        if (a.duelRating == null && b.duelRating != null) return 1;
-        if (b.duelRating == null && a.duelRating != null) return -1;
-        return (b.duelRating ?? 0) - (a.duelRating ?? 0)
+        if (a.duelBtRating == null && b.duelBtRating != null) return 1;
+        if (b.duelBtRating == null && a.duelBtRating != null) return -1;
+        return (b.duelBtRating ?? 0) - (a.duelBtRating ?? 0)
+          || (b.duelRating ?? 0) - (a.duelRating ?? 0)
           || b.duelWins - a.duelWins
           || b.duelGames - a.duelGames;
       })
@@ -472,9 +549,9 @@
 
   function renderModelTable(rows) {
     const sorted = sortRows(rows, modelSort).map((row, i) =>
-      modelSort.key === 'duelRating' && modelSort.dir === 'desc' ? row : { ...row, rank: i + 1 },
+      modelSort.key === 'duelBtRating' && modelSort.dir === 'desc' ? row : { ...row, rank: i + 1 },
     );
-    // 默认保留双人评分排名，切换排序时显示当前顺序。
+    // 默认保留 BT 评分排名，切换排序时显示当前顺序。
     const body = el.modelTable.querySelector('tbody');
     body.innerHTML = sorted
       .map(r => {
@@ -490,6 +567,7 @@
           <td class="num" data-label="双人胜-负-平">${duelRecord}</td>
           <td class="num" data-label="双人胜率">${r.duelWinRate == null ? '—' : `<span class="pill-rate">${pct(r.duelWinRate)}</span>`}</td>
           <td class="num" data-label="双人评分">${r.duelRating == null ? '—' : fmtNum(r.duelRating, 3)}</td>
+          <td class="num" data-label="BT评分">${r.duelBtRating == null ? '—' : fmtNum(r.duelBtRating, 1)}</td>
           <td class="num" data-label="多人场次">${r.multiGames}</td>
           <td class="num" data-label="多人名次分">${r.multiPlacement == null ? '—' : pct(r.multiPlacement)}</td>
           <td class="num" data-label="多人评分">${r.multiRating == null ? '—' : fmtNum(r.multiRating, 3)}</td>

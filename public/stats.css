@@ -269,7 +269,30 @@ button:focus-visible,
 .data-table .model-name {
   font-weight: 700;
   color: #e6f4ff;
+  cursor: copy;
 }
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 36px;
+  transform: translateX(-50%) translateY(8px);
+  max-width: 80vw;
+  padding: 8px 16px;
+  border: 1px solid #2e5a4a;
+  border-radius: 8px;
+  background: #14261e;
+  color: #9fe0b8;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 999;
+}
+.copy-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.copy-toast.err { border-color: #5a2e2e; background: #2a1616; color: #e0a0a0; }
 .data-table .muted { color: #6a8496; }
 .data-table .win { color: #6dcc8a; font-weight: 700; }
 .data-table .loss { color: #d88; }

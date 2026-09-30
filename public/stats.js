@@ -434,6 +434,42 @@
       .join('');
   }
 
+  // http 部署（非 https 且非 localhost）没有 navigator.clipboard，走 execCommand 降级。
+  async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch { /* 落到 execCommand 降级 */ }
+    }
+    const helper = document.createElement('textarea');
+    helper.value = text;
+    helper.setAttribute('readonly', '');
+    helper.style.position = 'fixed';
+    helper.style.opacity = '0';
+    document.body.appendChild(helper);
+    helper.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    helper.remove();
+    return ok;
+  }
+
+  let copyToastTimer = null;
+  function showCopyToast(message, ok) {
+    let toast = document.querySelector('.copy-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'copy-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.toggle('err', !ok);
+    toast.classList.add('show');
+    clearTimeout(copyToastTimer);
+    copyToastTimer = setTimeout(() => toast.classList.remove('show'), 1600);
+  }
+
   function renderModelTable(rows) {
     const sorted = sortRows(rows, modelSort).map((row, i) =>
       modelSort.key === 'duelRating' && modelSort.dir === 'desc' ? row : { ...row, rank: i + 1 },
@@ -448,7 +484,7 @@
           : '—';
         return `<tr data-model="${escapeAttr(r.model)}" class="${selected}">
           <td class="num" data-label="排名">${r.rank}</td>
-          <td class="model-name" data-label="模型">${escapeHtml(r.model)}</td>
+          <td class="model-name" data-label="模型" title="点击复制模型名">${escapeHtml(r.model)}</td>
           <td class="num" data-label="总场次">${r.games}</td>
           <td class="num" data-label="双人场次">${r.duelGames}</td>
           <td class="num" data-label="双人胜-负-平">${duelRecord}</td>
@@ -712,10 +748,16 @@
     applyAndRender();
   });
 
-  el.modelTable.querySelector('tbody').addEventListener('click', e => {
+  el.modelTable.querySelector('tbody').addEventListener('click', async e => {
     const tr = e.target.closest('tr[data-model]');
     if (!tr) return;
     const model = tr.dataset.model;
+    // 只有点模型名字才复制，不触发行选中；其余区域保持原有选中/取消逻辑。
+    if (e.target.closest('td.model-name')) {
+      const ok = await copyText(model);
+      showCopyToast(ok ? `已复制：${model}` : '复制失败', ok);
+      return;
+    }
     selectedModel = selectedModel === model ? null : model;
     applyAndRender();
   });

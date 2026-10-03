@@ -45,7 +45,7 @@ describe('multiplayer free-for-all engine', () => {
 
       expect(isInBounds(game, 8, -4)).toBe(false);
       expect(isInBounds(game, 7, -3)).toBe(true);
-      const hq = Object.values(game.headquarters).find(candidate => candidate.q === 1 && candidate.r === 0)!;
+      const hq = game.headquarters.player_a;
       const cp = game.controlPoints.find(point => point.q === 7 && point.r === -4)!;
       cp.owner = hq.owner; // whirlpool 禁从总部部署（deployFromHq: false），借己方据点当合法起点
       const unit = game.units.find(candidate => candidate.owner === hq.owner && candidate.alive)!;

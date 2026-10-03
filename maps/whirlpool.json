@@ -1,6 +1,6 @@
 {
   "name": "星海漩涡",
-  "description": "六条旋臂从中央残核之海伸向富饶的日冕环：离总部越远土地越肥沃。开局背靠死水只有一条出路——扩张或灭亡。旋臂间的裂片可被重装爆破成刺杀天台。无回合上限。",
+  "description": "六条旋臂从中央残核之海伸向富饶的日冕环：离总部越远土地越肥沃。旋臂间的裂片可被重装爆破成刺杀天台。无回合上限。",
   "grid": "hex",
   "orientation": "pointy",
   "radius": 8,
@@ -876,6 +876,16 @@
   ],
   "terrainCells": [
     {
+      "q": -8,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -8,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
       "q": -7,
       "r": 5,
       "terrain": "blocker"
@@ -883,6 +893,11 @@
     {
       "q": -7,
       "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -6,
+      "r": -2,
       "terrain": "blocker"
     },
     {
@@ -913,6 +928,11 @@
     {
       "q": -6,
       "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": -3,
       "terrain": "blocker"
     },
     {
@@ -1006,6 +1026,11 @@
       "terrain": "water"
     },
     {
+      "q": -3,
+      "r": 8,
+      "terrain": "blocker"
+    },
+    {
       "q": -2,
       "r": -4,
       "terrain": "blocker"
@@ -1038,6 +1063,11 @@
     {
       "q": -2,
       "r": 7,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 8,
       "terrain": "blocker"
     },
     {
@@ -1197,6 +1227,11 @@
     },
     {
       "q": 2,
+      "r": -8,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
       "r": -7,
       "terrain": "blocker"
     },
@@ -1228,6 +1263,11 @@
     {
       "q": 2,
       "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": -8,
       "terrain": "blocker"
     },
     {
@@ -1321,6 +1361,11 @@
       "terrain": "blocker"
     },
     {
+      "q": 5,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
       "q": 6,
       "r": -6,
       "terrain": "blocker"
@@ -1351,12 +1396,27 @@
       "terrain": "blocker"
     },
     {
+      "q": 6,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
       "q": 7,
       "r": -6,
       "terrain": "blocker"
     },
     {
       "q": 7,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 8,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 8,
       "r": -5,
       "terrain": "blocker"
     }
@@ -1544,15 +1604,10 @@
     {
       "id": "slot_e",
       "headquarters": {
-        "q": 1,
-        "r": 0
+        "q": 4,
+        "r": -1
       },
       "startingUnits": [
-        {
-          "type": "infantry",
-          "q": 4,
-          "r": -1
-        },
         {
           "type": "infantry",
           "q": 4,
@@ -1573,15 +1628,10 @@
     {
       "id": "slot_se",
       "headquarters": {
-        "q": 0,
-        "r": 1
+        "q": 1,
+        "r": 3
       },
       "startingUnits": [
-        {
-          "type": "infantry",
-          "q": 1,
-          "r": 3
-        },
         {
           "type": "infantry",
           "q": 2,
@@ -1602,15 +1652,10 @@
     {
       "id": "slot_sw",
       "headquarters": {
-        "q": -1,
-        "r": 1
+        "q": -3,
+        "r": 4
       },
       "startingUnits": [
-        {
-          "type": "infantry",
-          "q": -3,
-          "r": 4
-        },
         {
           "type": "infantry",
           "q": -2,
@@ -1631,15 +1676,10 @@
     {
       "id": "slot_w",
       "headquarters": {
-        "q": -1,
-        "r": 0
+        "q": -4,
+        "r": 1
       },
       "startingUnits": [
-        {
-          "type": "infantry",
-          "q": -4,
-          "r": 1
-        },
         {
           "type": "infantry",
           "q": -4,
@@ -1660,15 +1700,10 @@
     {
       "id": "slot_nw",
       "headquarters": {
-        "q": 0,
-        "r": -1
+        "q": -1,
+        "r": -3
       },
       "startingUnits": [
-        {
-          "type": "infantry",
-          "q": -1,
-          "r": -3
-        },
         {
           "type": "infantry",
           "q": -2,
@@ -1689,18 +1724,13 @@
     {
       "id": "slot_ne",
       "headquarters": {
-        "q": 1,
-        "r": -1
+        "q": 3,
+        "r": -4
       },
       "startingUnits": [
         {
           "type": "infantry",
           "q": 2,
-          "r": -4
-        },
-        {
-          "type": "infantry",
-          "q": 3,
           "r": -4
         },
         {

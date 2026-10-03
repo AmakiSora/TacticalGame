@@ -1,6 +1,6 @@
 # Royale mode (大逃杀)
 
-Use only when `game.config.mode === "royale"` (map: `snowflake` 雪花, 2/3/6 players).  
+Use only when `game.config.mode === "royale"` (maps: `snowflake` 雪花 2/3/6 players, `narrow-road` 狭路相逢 2 players).  
 If the game is `standard`, `annihilation`, or `simultaneous`, stop and read that mode file instead — do not apply this file.
 
 Royale = **simultaneous resolution** (secret plans, full-commit settlement) × **annihilation rules**
@@ -98,6 +98,26 @@ Do **not** memorize a fixed timetable. Each royale map carries its own schedule.
 - Scoring: HQ/CP/supply weights are 0 — **army value + actionScore are the real race**
   (`effectiveActions 10`; simultaneous hits award 1 merit per 10 HP). Read `adjudication.weights`
   of the live game instead of trusting this summary.
+
+## Narrow-road map (狭路相逢) specifics
+
+- 2-player radius-8 duel: two open funnels at `q = ±8` joined by an 11-cell **single-cell-wide road**
+  — the road is a one-at-a-time choke; whoever stands in the mouth is the gatekeeper. Blockers flank
+  the road: heavy demolition opens side lanes, so the "wall" is never fully safe.
+- Spawn: **owned `forward_base` CP** at each base (`cp_west` / `cp_east`, one ring inside the base
+  marker) — the map's only CPs and your only deploy pads, capturable by the enemy. **Zero starting
+  units**: queue a deploy during the round-1 planning phase or the wipe check eliminates you
+  (`army_destroyed`) the moment round 1 resolves — there is no HQ to keep you alive.
+- Cheap roster (`infantry 5 / scout 4 / support 7 / ranger 9 / heavy 10`; HP 9/5/8/3/15 — always
+  re-read `config.units`): `startingSupplies 20`, `baseIncome 5`, CP income 0, `actionsPerTurn 5`.
+  Expect roughly a unit per turn from income alone.
+- Artillery (this map only — re-derive on any other royale map): `startRound 5`, `intervalRounds 1`,
+  `damage 5`, `minimumSafeRadius 1` — one ring per round from round 5, flooring at radius 1 from
+  round 11. The pads sit at distance 7: from round 7 no safe cell borders them, so the deployment
+  window is effectively rounds 1–6 — build your army early, then fight.
+- Scoring: `armyValue 1 + supplies 1 + effectiveActions 15` (HQ weights are dead — royale has no
+  HQ). Real actions (attacks, heals, deploys, captures) dwarf everything else; do not burn turns on
+  empty moves.
 
 ## Planning checklist
 

@@ -1,6 +1,6 @@
 # Simultaneous mode (同时回合)
 
-Use only when `game.config.mode === "simultaneous"` (maps: `standoff` 对峙之地 2/3/6 players, `narrow-road` 狭路相逢 2 players).  
+Use only when `game.config.mode === "simultaneous"` (map: `standoff` 对峙之地 2/3/6 players).  
 If the game is `standard` or `annihilation`, stop and read that mode file instead — do not apply this file.
 
 Core loop difference: there is **no turn order**. Every round all players secretly queue

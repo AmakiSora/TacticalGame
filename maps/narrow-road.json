@@ -1,7 +1,7 @@
 {
-  "mode": "simultaneous",
+  "mode": "royale",
   "name": "狭路相逢",
-  "description": "双人对垒图。两座基地各踞一端的开阔漏斗，中间由一条 11 格长、单格宽的狭路相连——狭路一次只能过一支部队，谁站在路口谁就是门神。全图无据点，经济只靠基地产出；远程火力可以越过墙齐射，奶妈贴墙续航，砸开对面的墙、把狙击手顶到对面门口，狭路相逢勇者胜。",
+  "description": "双人大逃杀对垒图。两座基地各踞一端的开阔漏斗，中间由一条 11 格长、单格宽的狭路相连——狭路一次只能过一支部队，谁站在路口谁就是门神。两端基地前哨是唯一的部署点，经济只靠基地产出，开局无一兵一卒、全靠部署建军。远程火力可以越过墙齐射，奶妈贴墙续航，砸开对面的墙、把狙击手顶到对面门口；第 5 轮起炮火逐轮推进，打到全灭为止，狭路相逢勇者胜。",
   "grid": "hex",
   "orientation": "pointy",
   "radius": 8,
@@ -901,23 +901,64 @@
     "defense": 0
   },
   "balance": {
-    "startingSupplies": 18,
+    "startingSupplies": 20,
     "baseIncome": 5,
     "controlPointIncome": 0,
     "damageVarianceRange": 0,
     "minimumDamage": 1,
     "healVarianceRange": 0,
-    "actionsPerTurn": 4,
-    "maxTurns": 20,
+    "actionsPerTurn": 5,
+    "maxTurns": null,
     "adjudicationWeights": {
       "enemyHqDamage": 4,
       "ownHqHp": 2,
       "controlPoint": 0,
       "armyValue": 1,
       "supplies": 1,
-      "effectiveActions": 2
+      "effectiveActions": 15
+    },
+    "controlPointTypes": {
+      "supply": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "forward_base": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "repair": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      }
     }
   },
+  "annihilation": {
+    "artillery": {
+      "startRound": 5,
+      "intervalRounds": 1,
+      "damage": 5,
+      "minimumSafeRadius": 1
+    }
+  },
+  "controlPoints": [
+    {
+      "id": "cp_west",
+      "name": "西端基地",
+      "kind": "forward_base",
+      "q": -7,
+      "r": 0
+    },
+    {
+      "id": "cp_east",
+      "name": "东端基地",
+      "kind": "forward_base",
+      "q": 7,
+      "r": 0
+    }
+  ],
   "spawnSlots": [
     {
       "id": "slot_a",
@@ -925,6 +966,7 @@
         "q": -8,
         "r": 0
       },
+      "controlPointId": "cp_west",
       "startingUnits": []
     },
     {
@@ -933,6 +975,7 @@
         "q": 8,
         "r": 0
       },
+      "controlPointId": "cp_east",
       "startingUnits": []
     }
   ],

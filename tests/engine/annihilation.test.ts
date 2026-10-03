@@ -157,7 +157,7 @@ describe('annihilation mode', () => {
       .toMatchObject({ base: 8, control: 12, amount: 20 });
   });
 
-  it('closes outer production in round 9 and inner production in round 11', () => {
+  it('closes outer production in round 9, inner in round 11, and saturates at radius 1 in round 13', () => {
     const { game, bus } = createAnnihilationGame();
     const outerPoint = game.controlPoints.find(point => point.kind === 'forward_base')!;
     const innerPoint = game.controlPoints.find(point => point.kind === 'supply')!;
@@ -171,7 +171,17 @@ describe('annihilation mode', () => {
     expect(game.artillery?.safeRadius).toBe(2);
     expect(isArtilleryDanger(game, outerPoint)).toBe(true);
     expect(isArtilleryDanger(game, innerPoint)).toBe(true);
-    expect(game.config.balance.maxTurns).toBe(12);
+    expect(game.config.balance.maxTurns).toBe(20);
+
+    // 原地不动的部队会在第 12 轮被炮火全灭，全员撤进花心才能观察到最终收缩
+    for (const unit of game.units) {
+      unit.q = 0;
+      unit.r = 0;
+    }
+    while (game.phase === 'active' && game.turn.roundNumber < 13) finishRound(game, bus);
+    expect(game.artillery?.safeRadius).toBe(1);
+    expect(game.artillery?.nextShrinkRound).toBeNull();
+    expect(game.phase).toBe('active');
   });
 
   it('warns before shrinking, damages the full danger ring, and blocks deployment there', () => {

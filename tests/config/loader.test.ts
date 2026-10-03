@@ -352,7 +352,7 @@ describe('map config loader', () => {
     expect(map.balance).toMatchObject({
       baseIncome: 8,
       actionsPerTurn: 4,
-      maxTurns: 12,
+      maxTurns: 20,
       controlPointTypes: {
         forward_base: { income: 4 },
         supply: { income: 8 },

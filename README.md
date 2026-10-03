@@ -234,7 +234,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 `balance.maxTurns` 接受 `>= 1` 的有限数字，或写成 `null` 表示**无回合上限**：引擎不会在回合边界做轮数裁决，对局仅由一方全灭、总部/军力被毁或房主 `POST /api/games/:id/force-adjudicate` 结束。前端回合角标此时显示 `当前轮/∞`，地图卡片显示 `⏱∞`，地图编辑器可用「无回合上限」开关切换。
 
-歼灭模式地图另外声明 `mode: "annihilation"`、`annihilation.artillery`，并让每个 `spawnSlots[]` 通过 `controlPointId` 关联一个唯一出生据点；大逃杀模式地图声明 `mode: "royale"` 时同样**必须**携带 `annihilation.artillery` 与据点绑定的出生槽（`minimumSafeRadius` 允许为 0，即最终只剩中心一格安全）。炮火参数包含首次生效轮次 `startRound`、收缩间隔 `intervalRounds`、每轮伤害 `damage` 和最终安全半径 `minimumSafeRadius`。当前内置歼灭模式地图“炮火禁区”（`artillery-zone`）支持 2、3、6 人，采用六向旋转对称出生布局，共 12 轮：第 1–4 轮争夺内圈补给点，第 5–8 轮利用额外收入扩军，第 9–12 轮外圈与内圈据点依次被炮火覆盖。炮火在第 4 轮预告、第 5 轮首次收缩，此后每两轮收缩一层。
+歼灭模式地图另外声明 `mode: "annihilation"`、`annihilation.artillery`，并让每个 `spawnSlots[]` 通过 `controlPointId` 关联一个唯一出生据点；大逃杀模式地图声明 `mode: "royale"` 时同样**必须**携带 `annihilation.artillery` 与据点绑定的出生槽（`minimumSafeRadius` 允许为 0，即最终只剩中心一格安全）。炮火参数包含首次生效轮次 `startRound`、收缩间隔 `intervalRounds`、每轮伤害 `damage` 和最终安全半径 `minimumSafeRadius`。当前内置歼灭模式地图“炮火禁区”（`artillery-zone`）支持 2、3、6 人，采用六向旋转对称出生布局，共 20 轮：第 1–4 轮争夺内圈补给点，第 5–12 轮利用额外收入扩军、外圈与内圈据点依次被炮火覆盖，第 13 轮起安全区收缩至最终半径 1、在内圈核心决胜，第 20 轮仍未分胜负则按裁决分收尾。炮火在第 4 轮预告、第 5 轮首次收缩，此后每两轮收缩一层，至第 13 轮到达最终安全半径 1。
 
 未列在 `terrainCells` 的可用格默认为 `plain`。地图编辑器支持添加和移除地块，并可维护 2–8 个出生槽及对应人数布局；移除包含对象的格子会被阻止，避免隐式丢失配置。
 

@@ -78,7 +78,7 @@ next           = game.artillery.nextShrinkRound   # may be null
 - **Pre-shrink** (`round < startRound`): economy / board-control window. Send capturers to **safe** neutral income CPs (prefer `kind === "supply"` when present, else best safe income/deploy pad). Secure a deploy-capable owned CP before the ring bites.
 - **From first shrink** (`round >= startRound`): prioritize leaving `dangerCells` / soon-`warningCells`, keep fighting inside current `safeRadius`, close on the nearest living enemy army. Do not farm rings that config will delete.
 - **Between shrinks:** use `nextShrinkRound` and `warningCells` as the clock — not a hardcoded offset like "startRound − 1" alone (warning is computed when the next shrink is exactly one round away).
-- Example only (current `artillery-zone`, **do not copy as universal law**): `startRound: 5`, `intervalRounds: 2`, `damage: 25`, `minimumSafeRadius: 2` ⇒ pre-shrink is rounds 1–4 on that map alone.
+- Example only (current `artillery-zone`, **do not copy as universal law**): `startRound: 5`, `intervalRounds: 2`, `damage: 25`, `minimumSafeRadius: 1` ⇒ pre-shrink is rounds 1–4 on that map alone.
 
 ### Win / score
 

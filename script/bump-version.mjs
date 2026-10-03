@@ -92,6 +92,13 @@ const TARGETS = [
     write: (text, version) =>
       text.replace(new RegExp(String.raw`(/random-map-ui\.js\?v=)${SEMVER}`, 'g'), `$1${version}`),
   },
+  {
+    label: 'tests/public/map-editor.test.ts（map-editor.js 缓存参数断言）',
+    file: 'tests/public/map-editor.test.ts',
+    read: text => firstCapture(text, new RegExp(String.raw`/map-editor\.js\?v=(${SEMVER})`)),
+    write: (text, version) =>
+      text.replace(new RegExp(String.raw`(/map-editor\.js\?v=)${SEMVER}`, 'g'), `$1${version}`),
+  },
 ];
 
 function firstCapture(text, re) {
@@ -123,21 +130,34 @@ async function collectVersions() {
   return found;
 }
 
-/** public/*.html 中脚本缓存参数只提升与旧应用版本一致的那些（如 app.js?v=3.2.13），
- *  board-animation.js?v=3.2.6 这类独立维护的参数保持不动。 */
-async function bumpHtmlCacheBust(oldVersion, newVersion) {
+/** public/*.html 中的脚本缓存参数与发版号保持一致：扫描全部 ?v=x.y.z 引用并汇总取值。
+ *  新增脚本引用时 ?v= 直接写当时的发版号；偏离发版号的参数会被 check-version 报 DRIFT，
+ *  并随下次提升/同步收拢（历史上 board-animation.js?v=3.2.6 这类独立维护的参数即由此失同步）。 */
+async function collectHtmlCacheBust() {
   const publicDir = path.join(ROOT, 'public');
-  const changed = [];
   const files = (await readdir(publicDir)).filter(name => name.endsWith('.html'));
-  const paramRe = new RegExp(String.raw`(\?v=)${oldVersion.replaceAll('.', String.raw`\.`)}(?=["'])`, 'g');
+  const paramRe = new RegExp(String.raw`(\?v=)(${SEMVER})(?=["'])`, 'g');
+  const found = [];
   for (const name of files) {
-    const abs = path.join(publicDir, name);
-    const text = await readFile(abs, 'utf8');
-    if (!paramRe.test(text)) continue;
-    paramRe.lastIndex = 0;
-    const updated = text.replace(paramRe, `$1${newVersion}`);
+    const text = await readFile(path.join(publicDir, name), 'utf8');
+    const values = [...new Set([...text.matchAll(paramRe)].map(match => match[2]))];
+    if (values.length > 0) found.push({ name, values });
+  }
+  return found;
+}
+
+/** 把 public/*.html 中所有脚本缓存参数统一为目标版本，返回发生变化的文件与其原取值。 */
+async function syncHtmlCacheBust(version) {
+  const changed = [];
+  for (const { name, values } of await collectHtmlCacheBust()) {
+    if (values.every(value => value === version)) continue;
+    const abs = resolveFile(`public/${name}`);
+    const updated = (await readFile(abs, 'utf8')).replace(
+      new RegExp(String.raw`(\?v=)${SEMVER}(?=["'])`, 'g'),
+      `$1${version}`,
+    );
     await writeFile(abs, updated, 'utf8');
-    changed.push(`public/${name}`);
+    changed.push({ file: `public/${name}`, from: values.join(',') });
   }
   return changed;
 }
@@ -176,8 +196,14 @@ async function main() {
   if (mode === 'check') {
     printReport(`版本一致性检查（基准：package.json ${baseline}）`, entries, baseline);
     const drifted = entries.filter(e => e.version !== baseline);
-    if (drifted.length > 0) {
-      console.error(`\n发现 ${drifted.length} 处版本不一致，请运行：node script/bump-version.mjs（同步）或 node script/bump-version.mjs <version>（提升）。`);
+    const driftedHtml = (await collectHtmlCacheBust())
+      .filter(entry => entry.values.some(value => value !== baseline));
+    for (const { name, values } of driftedHtml) {
+      console.log(`  DRIFT public/${name} 脚本缓存参数: ?v=${values.join(',')}（应为 ?v=${baseline}）`);
+    }
+    const total = drifted.length + driftedHtml.length;
+    if (total > 0) {
+      console.error(`\n发现 ${total} 处版本不一致，请运行：node script/bump-version.mjs（同步）或 node script/bump-version.mjs <version>（提升）。`);
       process.exit(1);
     }
     console.log('\n所有版本引用一致。');
@@ -200,14 +226,11 @@ async function main() {
     changed += 1;
   }
 
-  if (mode === 'bump') {
-    const htmlFiles = await bumpHtmlCacheBust(baseline, targetVersion);
-    for (const file of htmlFiles) {
-      console.log(`已提升 ${file} 的脚本缓存参数 ?v=${baseline} -> ?v=${targetVersion}`);
-    }
-    if (await ensureReleaseNotesSection(targetVersion)) {
-      console.log(`已在 RELEASE_NOTES.md 插入 ${targetVersion} 占位小节，请补充改动说明`);
-    }
+  for (const { file, from } of await syncHtmlCacheBust(targetVersion)) {
+    console.log(`${mode === 'bump' ? '已提升' : '已同步'} ${file} 的脚本缓存参数 ?v=${from} -> ?v=${targetVersion}`);
+  }
+  if (mode === 'bump' && await ensureReleaseNotesSection(targetVersion)) {
+    console.log(`已在 RELEASE_NOTES.md 插入 ${targetVersion} 占位小节，请补充改动说明`);
   }
 
   if (changed === 0) {

@@ -47,7 +47,7 @@ describe('map editor page', () => {
     expect(html).toContain('data-mode="simultaneous"');
     expect(html).toContain('data-mode="royale"');
     expect(html).toContain('id="annihilation-panel"');
-    expect(html).toContain('<script src="/map-editor.js?v=3.2.7"></script>');
+    expect(html).toContain('<script src="/map-editor.js?v=3.5.10"></script>');
   });
 
   it('supports toolbar zoom buttons without hijacking wheel scroll', () => {
@@ -152,9 +152,9 @@ describe('map editor page', () => {
       startRound: 5,
       intervalRounds: 2,
       damage: 25,
-      minimumSafeRadius: 2,
+      minimumSafeRadius: 1,
     });
-    expect(serialized.balance.maxTurns).toBe(12);
+    expect(serialized.balance.maxTurns).toBe(20);
     expect(serialized.controlPoints.filter((point: any) => point.kind === 'supply')).toHaveLength(6);
     expect(serialized.spawnSlots.map((slot: any) => slot.controlPointId)).toEqual([
       'cp_east',

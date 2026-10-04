@@ -29,4 +29,18 @@ describe('event log ordering', () => {
       expect(source).not.toMatch(/els\.events\.scrollTop = els\.events\.scrollHeight/);
     }
   });
+
+  it('titles the replay detail card 当前事件 and keeps it inside the page scrollbar', () => {
+    for (const file of ['public/spectator.html', 'public/spectator-m.html']) {
+      expect(read(file)).toContain('<h3>当前事件</h3>');
+    }
+    expect(read('public/spectator.html')).not.toContain('当前操作');
+    const detailRule = read('public/style.css').split('#detail-content {')[1].split('}')[0];
+    // 卡片自身不再开滚动区（整页单滚动条约定），限高只留给展开后的原始数据
+    expect(detailRule).not.toContain('max-height');
+    expect(detailRule).not.toContain('overflow');
+    expect(read('public/style.css')).toMatch(/\.ev-payload \{[\s\S]*?max-height: 200px;[\s\S]*?overflow: auto/);
+    // 摘要与类型标签同文时不再重复排一遍
+    expect(read('public/app.js')).toContain('summary === label');
+  });
 });

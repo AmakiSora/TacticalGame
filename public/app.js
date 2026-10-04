@@ -1195,17 +1195,18 @@ function resultText(result) {
 
 function renderDetail() {
   if (!state || currentStep < 0 || currentStep >= allEvents.length) {
-    detailEl.innerHTML = '<span style="color:#666">无操作</span>';
+    detailEl.innerHTML = '<div class="ev-empty">回放尚未开始，用时间轴选择一步</div>';
     return;
   }
   const ev = allEvents[currentStep];
+  const label = eventLabel(ev.type);
+  const summary = formatEventShort(ev);
   detailEl.innerHTML = `
     <div class="ev-detail-head">
-      <span class="ev-type ${ev.type}">${esc(eventLabel(ev.type))}</span>
-      <span class="ev-seq">#${ev.seq}</span>
-      <span class="ev-type-raw">${esc(ev.type)}</span>
+      <span class="ev-type ${ev.type}">${esc(label)}</span>
+      ${summary === label ? '' : `<span class="ev-summary">${esc(summary)}</span>`}
+      <span class="ev-meta"><span class="ev-seq">#${ev.seq}</span><span class="ev-type-raw">${esc(ev.type)}</span></span>
     </div>
-    <div class="ev-summary">${esc(formatEventShort(ev))}</div>
     <details class="ev-raw">
       <summary>原始数据</summary>
       <span class="ev-payload">${esc(JSON.stringify(ev.payload, null, 2))}</span>

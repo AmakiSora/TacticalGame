@@ -852,28 +852,20 @@ main {
 #events li[data-type="control_point_repair"] { border-left-color: #6a8; color: #8ca; }
 #events li[data-type="player_eliminated"] { border-left-color: #a66; color: #c88; }
 
-/* Event detail panel */
-#event-detail {
-  background: #0f1a24;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid #2a3a4a;
-}
+/* Event detail panel — 卡片外框沿用 .tg-zone section 的统一样式，此处只管内容排布 */
 #detail-content {
   font-size: 13px;
-  line-height: 1.6;
-  font-family: "Cascadia Code", "Fira Code", monospace;
-  color: #ccc;
-  max-height: 160px;
-  overflow: auto;
+  line-height: 1.55;
+  color: #b8ccd8;
 }
 #detail-content .ev-type {
-  font-weight: bold;
+  font-weight: 600;
   display: inline-block;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  margin-right: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: .2px;
+  flex-shrink: 0;
 }
 #detail-content .ev-type.attack { background: #633; color: #f88; }
 #detail-content .ev-type.move { background: #336; color: #8af; }
@@ -903,33 +895,57 @@ main {
 #detail-content .ev-detail-head {
   display: flex;
   align-items: center;
-  gap: 6px;
   flex-wrap: wrap;
+  gap: 6px 10px;
 }
-#detail-content .ev-seq { color: #888; font-size: 11px; }
+#detail-content .ev-summary { flex: 1 1 auto; color: #e2edf5; }
+#detail-content .ev-meta {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #6e8a9a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
 #detail-content .ev-type-raw {
-  color: #556;
-  font-size: 10px;
+  color: #4d6675;
+  font-size: 10.5px;
   font-family: "SF Mono", "Consolas", "Cascadia Code", monospace;
 }
-#detail-content .ev-summary { margin-top: 5px; color: #cde; font-size: 12px; line-height: 1.5; }
+#detail-content .ev-empty { color: #668495; }
+#detail-content .ev-raw { margin-top: 10px; padding-top: 8px; border-top: 1px solid #223341; }
 #detail-content .ev-raw summary {
   cursor: pointer;
-  color: #789;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #7a9aaa;
   font-size: 11px;
-  margin-top: 6px;
   user-select: none;
+  list-style: none;
 }
-#detail-content .ev-raw summary:hover { color: #abc; }
+#detail-content .ev-raw summary::-webkit-details-marker { display: none; }
+#detail-content .ev-raw summary::before { content: '▸'; transition: transform .15s; }
+#detail-content .ev-raw[open] summary::before { transform: rotate(90deg); }
+#detail-content .ev-raw summary:hover { color: #a8c4d4; }
 #detail-content .ev-payload {
   display: block;
-  margin-top: 4px;
-  padding: 4px 8px;
-  background: #111;
-  border-radius: 3px;
-  font-size: 12px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: #0b1219;
+  border: 1px solid #1e2e3e;
+  border-radius: 6px;
+  font-family: "SF Mono", "Consolas", "Cascadia Code", monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #9fb8c8;
   white-space: pre-wrap;
   word-break: break-all;
+  max-height: 200px;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .player-a { color: #6cf; }

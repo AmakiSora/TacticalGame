@@ -34,12 +34,13 @@
       leftCol: 'minmax(190px, 220px)',
       rightCol: 'minmax(300px, 340px)',
       cards: [
+        // 顺序即各分区内的上下顺序：左 资源/查看单位，中（地图下方） 当前事件/事件流，右 回合/分数排行榜
+        { id: 'resources', selector: '#resources', defaultZone: 'left' },
         { id: 'selection-panel', selector: '#selection-panel', defaultZone: 'left' },
-        { id: 'resources', selector: '#resources', defaultZone: 'right' },
-        { id: 'score-panel', selector: '#score-panel', defaultZone: 'right' },
+        { id: 'event-detail', selector: '#event-detail', defaultZone: 'bottom' },
+        { id: 'event-log', selector: '#event-log', defaultZone: 'bottom' },
         { id: 'turn-info', selector: '#turn-info', defaultZone: 'right' },
-        { id: 'event-detail', selector: '#event-detail', defaultZone: 'right' },
-        { id: 'event-log', selector: '#event-log', defaultZone: 'right' },
+        { id: 'score-panel', selector: '#score-panel', defaultZone: 'right' },
       ],
     },
   };

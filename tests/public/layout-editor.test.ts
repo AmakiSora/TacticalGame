@@ -55,6 +55,22 @@ describe('layout editor', () => {
     expect(read('public/style.css')).toContain('var(--tg-grid');
   });
 
+  it('ships the spectator default layout as 资源/查看单位 left, 当前事件/事件流 under the board, 回合/排行榜 right', () => {
+    const source = read('public/layout-editor.js');
+    const block = source.slice(source.indexOf('spectator: {'), source.indexOf('function detectConfig'));
+    // defaultState() 按 cards 声明顺序填充各分区，声明顺序即分区内的上下顺序
+    const zones = [...block.matchAll(/id: '([\w-]+)',\s*selector: '[^']+',\s*defaultZone: '(\w+)'/g)]
+      .map(m => `${m[2]}:${m[1]}`);
+    expect(zones).toEqual([
+      'left:resources',
+      'left:selection-panel',
+      'bottom:event-detail',
+      'bottom:event-log',
+      'right:turn-info',
+      'right:score-panel',
+    ]);
+  });
+
   it('stacks the bottom zone directly under the board instead of a second grid row', () => {
     const source = read('public/layout-editor.js');
     // 地图与底部卡片同在一个纵向中列里，网格只剩一行，底部卡片才不会被更高的侧栏顶开

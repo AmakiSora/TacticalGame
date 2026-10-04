@@ -58,12 +58,17 @@
   if (!container || !boardEl || !rightZone) return;
 
   // ── 构建分区 ──
+  // 地图与底部卡片同处中列纵向堆叠：网格只有一行，底部卡片才不会被侧栏高度顶开
+  const centerCol = document.createElement('div');
+  centerCol.className = 'tg-col-center';
+  container.insertBefore(centerCol, boardEl);
   const leftZone = document.createElement('div');
   leftZone.className = 'tg-zone tg-zone-left';
-  container.insertBefore(leftZone, boardEl);
+  container.insertBefore(leftZone, centerCol);
+  centerCol.appendChild(boardEl);
   const bottomZone = document.createElement('div');
   bottomZone.className = 'tg-zone tg-zone-bottom';
-  container.appendChild(bottomZone);
+  centerCol.appendChild(bottomZone);
   rightZone.classList.add('tg-zone', 'tg-zone-right');
   const zoneEls = { left: leftZone, right: rightZone, bottom: bottomZone };
 
@@ -172,22 +177,17 @@
     container.style.setProperty('--tg-grid', cols.join(' '));
 
     const boardCol = showLeft ? '2' : '1';
-    boardEl.style.gridRow = '1';
-    boardEl.style.gridColumn = boardCol;
+    centerCol.style.gridColumn = boardCol;
 
     leftZone.style.display = showLeft ? '' : 'none';
     leftZone.style.gridColumn = '1';
-    leftZone.style.gridRow = '1';
     leftZone.classList.toggle('tg-empty', !hasLeft);
 
     rightZone.style.display = showRight ? '' : 'none';
     rightZone.style.gridColumn = String(cols.length);
-    rightZone.style.gridRow = '1';
     rightZone.classList.toggle('tg-empty', !hasRight);
 
     bottomZone.style.display = showBottom ? '' : 'none';
-    bottomZone.style.gridColumn = boardCol;
-    bottomZone.style.gridRow = '2';
     bottomZone.classList.toggle('tg-empty', !hasBottom);
   }
 

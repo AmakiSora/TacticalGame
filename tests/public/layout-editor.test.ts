@@ -55,6 +55,19 @@ describe('layout editor', () => {
     expect(read('public/style.css')).toContain('var(--tg-grid');
   });
 
+  it('stacks the bottom zone directly under the board instead of a second grid row', () => {
+    const source = read('public/layout-editor.js');
+    // 地图与底部卡片同在一个纵向中列里，网格只剩一行，底部卡片才不会被更高的侧栏顶开
+    expect(source).toContain("centerCol.appendChild(boardEl)");
+    expect(source).toContain('centerCol.appendChild(bottomZone)');
+    expect(source).not.toMatch(/bottomZone\.style\.gridRow/);
+    expect(source).not.toMatch(/boardEl\.style\.gridColumn/);
+    const css = read('public/layout-editor.css');
+    expect(css).toMatch(/\.tg-col-center\s*\{[^}]*flex-direction: column/);
+    // .tg-zone 默认 align-self: start，在纵向列里会收成内容宽，底部卡片必须撑满列宽
+    expect(css).toMatch(/\.tg-zone-bottom\s*\{[^}]*align-self: stretch/);
+  });
+
   it('keeps card frame styles when cards are moved out of the sidebar', () => {
     for (const css of ['public/play.css', 'public/style.css']) {
       expect(read(css)).toContain('.tg-zone section');

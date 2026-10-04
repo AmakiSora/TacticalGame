@@ -8,7 +8,17 @@
   min-width: 0;
   align-self: start;
 }
+/* 中列：地图框在上、底部卡片在下，同列纵向堆叠 */
+.tg-col-center {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
 /* 底部区域：与中间地图同列同宽，卡片撑满列宽 */
+.tg-zone-bottom {
+  align-self: stretch;
+}
 .tg-zone-bottom .tg-card {
   width: 100%;
   position: static !important;
@@ -137,6 +147,11 @@ body.tg-editing .tg-board-resizer:hover {
 @media (max-width: 1180px) {
   .tg-zone-left {
     order: 1;
+    width: 100%;
+    max-width: 760px;
+  }
+  .tg-col-center {
+    order: 2;
     width: 100%;
     max-width: 760px;
   }

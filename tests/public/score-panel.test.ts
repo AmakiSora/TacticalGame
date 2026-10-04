@@ -32,7 +32,69 @@ describe('adjudication score panels', () => {
       expect(source).toContain('scorePanelEl.innerHTML');
       expect(source).toContain('state?.result?.scores');
       expect(source).toContain("isAnnihilationRules() ? 10 : 2");
-      expect(source).toContain('行动分 ${score.actionScore ?? 0}');
+      expect(source).toContain("label: '有效行动'");
+    }
+  });
+
+  it('renders the adjudication score as a weighted formula on every client', () => {
+    for (const file of ['public/app.js', 'public/play.js', 'public/play-m.js', 'public/spectator-m.js']) {
+      const source = read(file);
+      // 每个分项都要显式给出「数值 × 权重 = 分项」，权重为 0 的项不进榜。
+      expect(source).toContain('function scoreTerms');
+      expect(source).toContain('return terms.filter(term => term.weight > 0)');
+      expect(source).toContain('<span class="st-weight">×${formatScore(term.weight)}</span>');
+      expect(source).toContain('<span class="st-part">${formatScore(term.part)}</span>');
+      expect(source).toContain('style="--share:${share}%"');
+      expect(source).toContain('style="--tint:${scoreTint(owner)}"');
+      expect(source).not.toMatch(/class="score-breakdown">\$\{esc\(scoreBreakdown/);
+    }
+    for (const file of ['public/style.css', 'public/play.css', 'public/play-m.css', 'public/spectator-m.css']) {
+      const css = read(file);
+      expect(css).toContain('.score-term');
+      expect(css).toContain('.score-term-math .st-weight');
+      expect(css).toContain('var(--share, 0%)');
+      expect(css).toContain('.score-toggle');
+    }
+  });
+
+  it('keeps the formula collapsed by default with the whole card as the hit target', () => {
+    for (const file of ['public/app.js', 'public/play.js', 'public/play-m.js', 'public/spectator-m.js']) {
+      const source = read(file);
+      // 明细只在展开时生成，折叠态每人一行；开合状态存在 Map 里，SSE 重渲染不会把它冲掉。
+      expect(source).toContain('open ? scoreBreakdown(score) : ');
+      expect(source).toContain('const scoreRowOpen = new Map()');
+      expect(source).toContain('function bindScoreToggles');
+      expect(source).toContain('data-score-owner="${esc(owner)}"');
+      expect(source).toContain('data-score-open="${open}"');
+      expect(source).toContain('bindScoreToggles();');
+      // 点整张卡片都开合，但卡内的改名按钮等控件必须留给各自逻辑，只有「公式」按钮本身例外。
+      expect(source).toContain("event.target?.closest?.('[data-score-owner]')");
+      expect(source).toContain("if (!event.target.closest('.score-toggle') && event.target.closest('button, a, input, select, textarea')) return;");
+      expect(source).toContain('aria-expanded="${open}"');
+    }
+    for (const file of ['public/style.css', 'public/play.css', 'public/play-m.css', 'public/spectator-m.css']) {
+      const css = read(file);
+      expect(css).toContain('.score-term');
+      expect(css).toContain('.score-term-math .st-weight');
+      expect(css).toContain('var(--share, 0%)');
+      expect(css).toContain('.score-toggle');
+      // 整卡可点要有指针与底色反馈，且反馈不能覆盖玩家色左边框。
+      expect(css.slice(css.indexOf('.score-row {'), css.indexOf('.score-row.player-a'))).toContain('cursor: pointer');
+      expect(css).toMatch(/\.score-row:(hover|active)\s*\{\s*background: #131c26; \}/);
+      expect(css).not.toMatch(/\.score-row:(hover|active)\s*\{[^}]*border/);
+    }
+    // 玩家页默认展开我方席位，观战页没有「我方」概念，默认展开第一名。
+    for (const file of ['public/play.js', 'public/play-m.js']) {
+      expect(read(file)).toContain('isScoreRowOpen(owner, owner === myPlayer)');
+    }
+    for (const file of ['public/app.js', 'public/spectator-m.js']) {
+      expect(read(file)).toContain('isScoreRowOpen(owner, rank === 1)');
+    }
+    // 移动端抽屉是侧栏 HTML 副本，点击后必须整侧栏重渲染才会同步。
+    for (const file of ['public/play-m.js', 'public/spectator-m.js']) {
+      const source = read(file);
+      const handler = source.slice(source.indexOf('function bindScoreToggles'), source.indexOf('function bindScoreToggles') + 900);
+      expect(handler).toContain('renderSidebar();');
     }
   });
 

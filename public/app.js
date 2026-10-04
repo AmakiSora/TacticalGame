@@ -1019,14 +1019,59 @@ function liveAdjudicationRankings() {
   return Array.isArray(rows) ? rows : [];
 }
 
+const SCORE_TERM_DEFS = [
+  ['敌方总部伤害', 'enemyHqDamage', score => score.headquartersDamage ?? score.enemyHqDamage ?? 0],
+  ['己方总部血量', 'ownHqHp', score => score.ownHqHp ?? 0],
+  ['占领据点', 'controlPoint', score => score.controlPoints ?? 0],
+  ['存活兵力', 'armyValue', score => score.armyValue ?? 0],
+  ['囤积补给', 'supplies', score => score.supplies ?? 0],
+];
+
+function formatScore(value) {
+  const n = Math.round((Number(value) || 0) * 10) / 10;
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+/** 逐分项：原始数值 × 地图权重 = 该项得分；权重为 0 的项不参与裁决，直接省略。 */
+function scoreTerms(score) {
+  const weights = gameConfig?.balance?.adjudicationWeights;
+  if (!weights) return [];
+  const perAction = weights.effectiveActions ?? weights.actionPoints ?? (isAnnihilationRules() ? 10 : 2);
+  const actionScore = score.actionScore ?? 0;
+  const terms = SCORE_TERM_DEFS.map(([label, weightKey, read]) => {
+    const weight = Number(weights[weightKey]) || 0;
+    const value = read(score);
+    return { label, value, weight, part: value * weight };
+  });
+  terms.push({ label: '有效行动', value: perAction > 0 ? actionScore / perAction : actionScore, weight: perAction, part: actionScore });
+  return terms.filter(term => term.weight > 0);
+}
+
+/** 权重条底色：按玩家色淡染，与卡片左边框同源。 */
+function scoreTint(owner) {
+  const hex = String(ownerColor(owner) || '#9aa7b3').replace('#', '');
+  if (hex.length !== 6) return 'rgba(154,167,179,.16)';
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
+  return `rgba(${r},${g},${b},.16)`;
+}
+
 function scoreBreakdown(score) {
-  const hqDamage = score.headquartersDamage ?? score.enemyHqDamage ?? 0;
-  if (isAnnihilationRules()) return `存活兵力 ${score.armyValue} · 行动分 ${score.actionScore ?? 0}`;
-  return `HQ伤害 ${hqDamage} · HQ血量 ${score.ownHqHp} · 据点 ${score.controlPoints} · 兵力 ${score.armyValue} · 补给 ${score.supplies} · 行动分 ${score.actionScore ?? 0}`;
+  const terms = scoreTerms(score);
+  if (!terms.length) return '';
+  const total = Math.max(Number(score.total) || 0, terms.reduce((sum, term) => sum + Math.max(term.part, 0), 0));
+  return `<div class="score-breakdown">${terms.map(term => {
+    const share = total > 0 ? Math.min(100, Math.max(0, Math.round((Math.max(term.part, 0) / total) * 100))) : 0;
+    const formula = `${term.label}：${formatScore(term.value)} × ${formatScore(term.weight)} = ${formatScore(term.part)}`;
+    return `<div class="score-term${term.part > 0 ? '' : ' is-zero'}" style="--share:${share}%" title="${esc(formula)}">
+      <span class="score-term-label">${esc(term.label)}</span>
+      <span class="score-term-math"><span class="st-value">${formatScore(term.value)}</span><span class="st-weight">×${formatScore(term.weight)}</span><span class="st-eq">=</span><span class="st-part">${formatScore(term.part)}</span></span>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderScorePanel() {
   if (!scorePanelEl) return;
+  bindScoreToggles();
   const scores = liveAdjudicationScores();
   if (!scores) {
     scorePanelEl.innerHTML = '<h3>分数排行榜</h3><div class="score-empty">等待对局开始</div>';
@@ -1054,10 +1099,33 @@ function scoreRank(rows, index) {
 function renderScoreRow(owner, score, rank) {
   const cls = ownerClass(owner);
   const eliminated = state?.players?.[owner]?.status === 'eliminated';
-  return `<div class="score-row ${cls}${eliminated ? ' eliminated' : ''}">
-    <div class="score-row-head"><span><em class="score-rank">#${rank}</em>${playerNameControl(owner)}${eliminated ? ' <em class="score-status">已淘汰</em>' : ''}</span><strong>${score.total}</strong></div>
-    <div class="score-breakdown">${esc(scoreBreakdown(score))}</div>
+  const open = isScoreRowOpen(owner, rank === 1);
+  const chip = `<button class="score-toggle${open ? ' open' : ''}" type="button" aria-expanded="${open}" title="${open ? '收起裁决分算式' : '展开裁决分算式'}">公式<i>${open ? '▴' : '▾'}</i></button>`;
+  return `<div class="score-row ${cls}${eliminated ? ' eliminated' : ''}${open ? ' expanded' : ''}" data-score-owner="${esc(owner)}" data-score-open="${open}" style="--tint:${scoreTint(owner)}">
+    <div class="score-row-head"><span><em class="score-rank">#${rank}</em>${playerNameControl(owner)}${eliminated ? ' <em class="score-status">已淘汰</em>' : ''}${chip}</span><strong>${formatScore(score.total)}</strong></div>
+    ${open ? scoreBreakdown(score) : ''}
   </div>`;
+}
+
+/** 折叠态每人只占一行；默认展开第一名，整卡可点，手动开合后按玩家记住（重渲染不丢）。 */
+const scoreRowOpen = new Map();
+let scoreToggleBound = false;
+
+function isScoreRowOpen(owner, byDefault) {
+  return scoreRowOpen.has(owner) ? scoreRowOpen.get(owner) : byDefault;
+}
+
+function bindScoreToggles() {
+  if (scoreToggleBound) return;
+  scoreToggleBound = true;
+  document.addEventListener('click', event => {
+    const row = event.target?.closest?.('[data-score-owner]');
+    if (!row || !state) return;
+    // 「公式」按钮是键盘可达的入口；卡内的改名按钮等控件仍走各自逻辑。
+    if (!event.target.closest('.score-toggle') && event.target.closest('button, a, input, select, textarea')) return;
+    scoreRowOpen.set(row.dataset.scoreOwner, row.dataset.scoreOpen !== 'true');
+    renderScorePanel();
+  });
 }
 
 function renderSidebar() {
@@ -1090,14 +1158,16 @@ function renderSidebar() {
     </div>`;
 
   eventsEl.innerHTML = '';
-  allEvents.forEach((ev, i) => {
+  // 最新事件置顶：倒序遍历，索引 i 仍是对局内的原始步序（点击跳步、当前步高亮都按它取）
+  for (let i = allEvents.length - 1; i >= 0; i--) {
+    const ev = allEvents[i];
     const li = document.createElement('li');
     li.dataset.type = ev.type;
     li.textContent = `#${ev.seq} ${formatEventShort(ev)}`;
     if (i === currentStep) li.classList.add('active');
     li.addEventListener('click', () => { pausePlayback(); rebuildToStep(i); });
     eventsEl.appendChild(li);
-  });
+  }
   // 事件流是定高滚动区，回放时要让当前步留在框内；不用 scrollIntoView，避免连带滚动整页
   const activeLi = eventsEl.querySelector('li.active');
   if (activeLi) {

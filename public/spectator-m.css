@@ -857,7 +857,10 @@ main {
   border: 1px solid #243545;
   border-left-width: 3px;
   border-radius: 6px;
+  cursor: pointer;
 }
+/* 整卡是展开热区；点按只动底色，不覆盖玩家色左边框 */
+.score-row:active { background: #131c26; }
 .score-row.player-a { border-left-color: #66ccff; }
 .score-row.player-b { border-left-color: #ff9966; }
 .score-row.player-c { border-left-color: #9fdf6f; }
@@ -899,12 +902,58 @@ main {
   color: #d8e0e8;
   font: 800 18px "SF Mono", "Consolas", monospace;
 }
+.score-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 20px;
+  padding: 2px 8px;
+  background: #172431;
+  border: 1px solid #2a3a4a;
+  border-radius: 5px;
+  color: #6d8798;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.score-toggle i { font-style: normal; font-size: 9px; }
+.score-toggle:active { color: #cfe0ef; border-color: #3a5a7a; }
+.score-toggle.open { color: #f0d77c; border-color: rgba(240, 215, 124, .4); }
 .score-breakdown {
-  margin-top: 4px;
+  display: grid;
+  gap: 3px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed #213243;
   color: #7a9aaa;
   font-size: 11px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
+.score-term {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--tint, rgba(122,154,170,.18)) var(--share, 0%), rgba(255,255,255,0) var(--share, 0%));
+}
+.score-term:active { background: linear-gradient(90deg, var(--tint, rgba(122,154,170,.18)) 100%, rgba(255,255,255,0) 100%); }
+.score-term.is-zero { opacity: .5; }
+.score-term-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score-term-math {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: "SF Mono", "Consolas", monospace;
+  white-space: nowrap;
+}
+.score-term-math .st-value { min-width: 3.4em; text-align: right; color: #9fb3c4; }
+.score-term-math .st-weight { min-width: 3.4em; color: #f0a860; font-weight: 700; }
+.score-term-math .st-eq { color: #456073; }
+.score-term-math .st-part { min-width: 3.6em; text-align: right; color: #dce6f0; font-weight: 700; }
 .score-empty { color: #668495; font-size: 12px; }
 
 /* Cell info overlay */

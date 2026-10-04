@@ -46,7 +46,7 @@ describe('annihilation mode UI', () => {
       expect(source).toContain("stats?.actionMerit ?? 0");
       expect(source).toContain('function recordActionMerit');
       expect(source).toContain("const preserved = state.players?.[owner]?.status === 'eliminated'");
-      expect(source).toContain('行动分 ${score.actionScore ?? 0}');
+      expect(source).toContain("label: '有效行动'");
     }
   });
 });

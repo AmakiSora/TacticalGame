@@ -16,3 +16,8 @@ export function deployDiscountForOrigin(game: GameState, owner: PlayerId, fromId
   return controlPointTypeSpec(game, point)?.deployDiscount ?? 0;
 }
 
+/** 据点类型是否可作部署起点：canDeploy 显式为 false 的类型禁止，无类型或缺省允许。 */
+export function kindAllowsDeploy(game: GameState, point: ControlPoint): boolean {
+  return controlPointTypeSpec(game, point)?.canDeploy !== false;
+}
+

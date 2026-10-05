@@ -94,9 +94,9 @@ function sampleAdjudicationWeights(rng: () => number) {
 /** 据点类型收入随机：danger-close(8/0/0) ~ breach(20/8/8)。折扣/维修量保持基准。 */
 function sampleControlPointTypes(rng: () => number) {
   return {
-    supply: { income: 8 + Math.floor(rng() * 13), deployDiscount: 0, repairAmount: 0 },
-    forward_base: { income: Math.floor(rng() * 9), deployDiscount: 8, repairAmount: 0 },
-    repair: { income: Math.floor(rng() * 9), deployDiscount: 0, repairAmount: 10 },
+    supply: { income: 8 + Math.floor(rng() * 13), deployDiscount: 0, repairAmount: 0, canDeploy: true },
+    forward_base: { income: Math.floor(rng() * 9), deployDiscount: 8, repairAmount: 0, canDeploy: true },
+    repair: { income: Math.floor(rng() * 9), deployDiscount: 0, repairAmount: 10, canDeploy: true },
   };
 }
 

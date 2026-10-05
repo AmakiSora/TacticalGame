@@ -30,7 +30,8 @@ halves: the plan/commit loop governs *how* you act, the artillery ring and army-
    Each queued action costs 1 AP (queue length ≤ `config.balance.actionsPerTurn`); each unit acts
    at most once. Revoke with `/plan/revoke` / `/plan/clear` before committing.
 3. **Deploy only from owned control points** (`fromId` = owned CP id) into an adjacent empty plain
-   cell. Origin **or** target in artillery danger → plan-time rejection `invalid_deploy`.
+   cell. CP kinds the map bans (`controlPointTypes.<kind>.canDeploy: false`) are not legal origins.
+   Origin **or** target in artillery danger → plan-time rejection `invalid_deploy`.
 4. `POST /api/games/:id/end-turn` = **commit and lock**. When the last living player commits, the
    server resolves all queues strictly simultaneously (`round_resolved` carries per-action outcomes).
 5. Stuck players → host `POST /api/games/:id/host/force-resolve`. Once resolution begins, do not

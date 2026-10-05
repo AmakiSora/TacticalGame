@@ -257,6 +257,38 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('accepts per-kind deploy switches and surfaces them on the loaded config', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as unknown as BrokenMap;
+    map.controlPoints = [{ id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' }];
+    map.balance.controlPointTypes = {
+      ...controlPointTypes(),
+      supply: { ...controlPointTypes().supply, canDeploy: false },
+    };
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+    resetConfig();
+    loadMaps(dir);
+
+    const loaded = getMapConfig('default');
+    expect(loaded.balance.controlPointTypes?.supply.canDeploy).toBe(false);
+    expect(loaded.balance.controlPointTypes?.forward_base.canDeploy).toBeUndefined();
+    resetConfig();
+  });
+
+  it('rejects non-boolean canDeploy on control point types', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as unknown as BrokenMap;
+    map.controlPoints = [{ id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' }];
+    map.balance.controlPointTypes = {
+      ...controlPointTypes(),
+      supply: { ...controlPointTypes().supply, canDeploy: 'yes' },
+    };
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('balance.controlPointTypes.supply.canDeploy must be boolean');
+    resetConfig();
+  });
+
   it('loads dual-lanes as a typed control point map without changing legacy maps', () => {
     resetConfig();
     loadMaps();

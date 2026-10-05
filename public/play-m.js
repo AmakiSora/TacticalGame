@@ -1023,18 +1023,22 @@ function controlPointEffect(cp) {
   if (!cp?.kind) return null;
   return gameConfig?.balance?.controlPointTypes?.[cp.kind] || null;
 }
+function cpDeployEnabled(cp) {
+  return controlPointEffect(cp)?.canDeploy !== false;
+}
 function controlPointLabel(cp) {
   return CONTROL_POINT_LABELS[cp?.kind] || 'CP';
 }
 function controlPointStats(cp) {
   const effect = controlPointEffect(cp);
   const income = effect ? effect.income : gameConfig?.balance?.controlPointIncome ?? 12;
+  const deployable = cpDeployEnabled(cp);
   return [
     statItem('类型', cp.kind ? CONTROL_POINT_NAMES[cp.kind] || cp.kind : '普通据点', ''),
     statItem('收入', `+${income}`, 'cost'),
     effect?.deployDiscount ? statItem('部署折扣', `-${effect.deployDiscount}`, 'move') : '',
     effect?.repairAmount ? statItem('维修', `+${effect.repairAmount}`, 'heal') : '',
-    statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : ''),
+    statItem('部署', deployable ? (cp.owner ? '可用' : '中立') : '不可部署', deployable && cp.owner ? 'move' : ''),
   ].join('');
 }
 function effectiveDeployCost(type, origin) {
@@ -1711,7 +1715,7 @@ async function handleBoardTap(cell) {
   closePopup(); rangeHighlights = [];
   if (unit) selectUnit(unit);
   else if (hq && hq.owner === myPlayer && deployFromHqEnabled()) selectDeployOrigin(hq);
-  else if (cp && cp.owner === myPlayer) selectDeployOrigin(cp);
+  else if (cp && cp.owner === myPlayer && cpDeployEnabled(cp)) selectDeployOrigin(cp);
   else { selectedUnitId = null; selectedOriginId = null; renderSelectionInfo(hq || cp); drawBoard(); }
 }
 

@@ -17,7 +17,7 @@ Every action on your turn, inspect:
 
 - Your units **with** `config.units` + each instance's `moveRange` / `attackRange` / `canCapture` / `healPower` / cost (maps retune heavies, rangers, etc. — do not hardcode)
 - Supplies, AP
-- **Owned control points** (only legal deploy origins)
+- **Owned control points** (only legal deploy origins; kinds with `controlPointTypes.<kind>.canDeploy: false` are excluded)
 - Living **enemy units/armies** only — no HQ objects
 - **Artillery config + live state** (see below) — required every action
 - Live `adjudication`, but read **`weights` and breakdowns** first

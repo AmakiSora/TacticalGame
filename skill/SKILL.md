@@ -239,6 +239,7 @@ Unit numbers are **per map**. Never reuse memorized move/attack/cost values from
 | Demolish | **Only** `type === "heavy"` | Target hex: in `game.cells`, terrain **blocker**, **unoccupied**, **exactly distance 1**, turns into plain. |
 
 Deploy cost comes from `config.units[type].cost` minus any `forward_base` (or typed) deploy discount on the origin CP. Instance `cost` is what army-value scoring uses.
+A map may also ban deploy per CP kind: `balance.controlPointTypes.<kind>.canDeploy: false` makes owned CPs of that kind illegal `fromId` (rejected `invalid_deploy`); kinds without the flag stay deployable — check before picking an origin.
 - Last survivor wins immediately (`last_player_standing`). Else adjudication at `maxTurns`.
 - When `maxTurns` is `null` the map has **no round cap** and auto-adjudication never fires: read live `adjudication` from `GET /api/games/:id` and plan for a host-forced end instead of running out the clock.
 - Trust live `adjudication` on `GET /api/games/:id`. Always read **weights** and per-player breakdown fields before prioritizing score levers.

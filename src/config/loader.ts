@@ -58,6 +58,8 @@ export interface ControlPointTypeSpec {
   income: number;
   deployDiscount: number;
   repairAmount: number;
+  /** false = 该类型据点不可作为部署起点；缺省允许。 */
+  canDeploy?: boolean;
 }
 
 export interface ComebackSupplySpec {
@@ -370,6 +372,9 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
       assertNumber(spec, 'income', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
       assertNumber(spec, 'deployDiscount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
       assertNumber(spec, 'repairAmount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
+      if ('canDeploy' in spec && typeof spec.canDeploy !== 'boolean') {
+        throw new Error(`Map "${id}".balance.controlPointTypes.${kind}.canDeploy must be boolean`);
+      }
     }
   }
   if ('comebackSupply' in balance) {

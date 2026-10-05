@@ -225,6 +225,24 @@ describe('hex V2 rules', () => {
     expect(game.events.at(-1)!.type).toBe('deploy');
   });
 
+  it('rejects deploying from an owned control point whose kind is deploy-disabled', () => {
+    const game = createInitialGame('g1', 'dual-lanes');
+    const bus = new EventBus();
+    joinGame(game, bus, 'B');
+    // config 是 loader 缓存的共享对象，改动前必须克隆，避免污染同文件后续用例。
+    game.config = structuredClone(game.config);
+    game.config.balance.controlPointTypes!.supply.canDeploy = false;
+    const origin = game.controlPoints.find(p => p.id === 'cp_nw')!;
+    origin.owner = 'player_a';
+    game.resources.player_a.supplies = 80;
+
+    const result = deployUnit(game, bus, 'player_a', 'scout', origin.id, -1, -4);
+
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ code: 'invalid_deploy' });
+    expect(game.turn.actionsUsed).toBe(0);
+  });
+
   it('repairs friendly units near owned repair points at the start of their turn', () => {
     const game = createInitialGame('g1', 'dual-lanes');
     const bus = new EventBus();

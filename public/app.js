@@ -800,6 +800,10 @@ function controlPointEffect(cp) {
   return gameConfig?.balance?.controlPointTypes?.[cp.kind] || null;
 }
 
+function cpDeployEnabled(cp) {
+  return controlPointEffect(cp)?.canDeploy !== false;
+}
+
 function controlPointLabel(cp) {
   return CONTROL_POINT_LABELS[cp?.kind] || 'CP';
 }
@@ -812,7 +816,7 @@ function controlPointStats(cp) {
     statItem('收入', `+${income}`, 'cost'),
     effect?.deployDiscount ? statItem('部署折扣', `-${effect.deployDiscount}`, 'move') : '',
     effect?.repairAmount ? statItem('维修', `+${effect.repairAmount}`, 'heal') : '',
-    statItem('部署', cp.owner ? '可用' : '中立', cp.owner ? 'move' : ''),
+    statItem('部署', cpDeployEnabled(cp) ? (cp.owner ? '可用' : '中立') : '不可部署', cpDeployEnabled(cp) && cp.owner ? 'move' : ''),
   ].join('');
 }
 

@@ -305,7 +305,26 @@ describe('map editor page', () => {
       'supply', 'repair', 'supply', 'forward_base', 'repair', 'forward_base',
     ]);
     expect(serialized.balance.controlPointTypes.forward_base.deployDiscount).toBe(8);
+    // 缺省允许部署：canDeploy 为 true 时不落盘（与 deployFromHq 同口径）。
+    expect(serialized.balance.controlPointTypes.supply.canDeploy).toBeUndefined();
     expect(core.validateMapConfig(serialized, 'dual-lanes')).toEqual([]);
+  });
+
+  it('serializes per-kind deploy switches and drops them when re-enabled', () => {
+    const core = loadCore();
+    const typed = JSON.parse(read('maps/dual-lanes.json'));
+
+    const banned = core.normalizeImportedMap(typed);
+    banned.balance.controlPointTypes.supply.canDeploy = false;
+    const bannedSerialized = core.serializeMapConfig(banned);
+    expect(bannedSerialized.balance.controlPointTypes.supply.canDeploy).toBe(false);
+    expect(bannedSerialized.balance.controlPointTypes.forward_base.canDeploy).toBeUndefined();
+    expect(core.validateMapConfig(bannedSerialized, 'dual-lanes')).toEqual([]);
+
+    const reEnabled = core.normalizeImportedMap(bannedSerialized);
+    reEnabled.balance.controlPointTypes.supply.canDeploy = true;
+    const reEnabledSerialized = core.serializeMapConfig(reEnabled);
+    expect(reEnabledSerialized.balance.controlPointTypes.supply.canDeploy).toBeUndefined();
   });
 
   it('preserves optional comeback supply configuration and omits it when disabled', () => {

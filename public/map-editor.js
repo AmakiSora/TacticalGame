@@ -101,9 +101,9 @@
 
   function defaultControlPointTypes() {
     return {
-      supply: { income: 12, deployDiscount: 0, repairAmount: 0 },
-      forward_base: { income: 8, deployDiscount: 8, repairAmount: 0 },
-      repair: { income: 8, deployDiscount: 0, repairAmount: 10 },
+      supply: { income: 12, deployDiscount: 0, repairAmount: 0, canDeploy: true },
+      forward_base: { income: 8, deployDiscount: 8, repairAmount: 0, canDeploy: true },
+      repair: { income: 8, deployDiscount: 0, repairAmount: 10, canDeploy: true },
     };
   }
 
@@ -353,6 +353,7 @@
           income: numberOrDefault(sourceBalance.controlPointTypes[kind]?.income, defaults.balance.controlPointTypes[kind].income),
           deployDiscount: numberOrDefault(sourceBalance.controlPointTypes[kind]?.deployDiscount, defaults.balance.controlPointTypes[kind].deployDiscount),
           repairAmount: numberOrDefault(sourceBalance.controlPointTypes[kind]?.repairAmount, defaults.balance.controlPointTypes[kind].repairAmount),
+          canDeploy: sourceBalance.controlPointTypes[kind]?.canDeploy !== false,
         };
       }
     }
@@ -396,6 +397,8 @@
           deployDiscount: Number(types[kind]?.deployDiscount ?? 0),
           repairAmount: Number(types[kind]?.repairAmount ?? 0),
         };
+        // 与 deployFromHq 同口径：缺省（允许部署）不落盘，仅在勾掉时写出。
+        if (types[kind]?.canDeploy === false) balance.controlPointTypes[kind].canDeploy = false;
       }
     }
 
@@ -590,6 +593,9 @@
         num(spec, 'income', `${mapName}.balance.controlPointTypes.${kind}`, 0);
         num(spec, 'deployDiscount', `${mapName}.balance.controlPointTypes.${kind}`, 0);
         num(spec, 'repairAmount', `${mapName}.balance.controlPointTypes.${kind}`, 0);
+        if ('canDeploy' in spec && typeof spec.canDeploy !== 'boolean') {
+          errors.push(`${mapName}.balance.controlPointTypes.${kind}.canDeploy must be boolean`);
+        }
       }
     }
     if ('comebackSupply' in balance) {
@@ -772,6 +778,7 @@
       income: '收入',
       deployDiscount: '部署折扣',
       repairAmount: '维修量',
+      canDeploy: '可部署',
       startRound: '开始轮次',
       scoreGapPercent: '分差百分比',
       amountPerRound: '每轮补给量',
@@ -868,6 +875,10 @@
     if (error.includes('.canCapture must be boolean')) {
       const unit = error.match(/^units\.(\w+)/)?.[1];
       return `${humanUnit(unit)}规格的可占点必须是布尔值。`;
+    }
+    if (error.includes('.canDeploy must be boolean')) {
+      const kind = error.match(/controlPointTypes\.(\w+)\.canDeploy/)?.[1];
+      return `${humanKind(kind)}据点类型的可部署必须是布尔值。`;
     }
     return error;
   }
@@ -1641,12 +1652,13 @@
         ${fieldHtml(`cpType:${kind}:income`, '收入', spec.income, 0)}
         ${fieldHtml(`cpType:${kind}:deployDiscount`, '部署折扣', spec.deployDiscount, 0)}
         ${fieldHtml(`cpType:${kind}:repairAmount`, '维修量', spec.repairAmount, 0)}
+        <label>可部署 <input type="checkbox" data-bind="cpType:${esc(kind)}:canDeploy"${spec.canDeploy !== false ? ' checked' : ''}></label>
       </div></div>`;
     }).join('');
     els.controlTypeFields.querySelectorAll('input[data-bind]').forEach(input => {
       input.addEventListener('change', () => {
         const [, kind, key] = input.dataset.bind.split(':');
-        config.balance.controlPointTypes[kind][key] = Math.max(0, Number(input.value) || 0);
+        config.balance.controlPointTypes[kind][key] = key === 'canDeploy' ? input.checked : Math.max(0, Number(input.value) || 0);
         syncAll();
       });
     });

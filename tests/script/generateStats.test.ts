@@ -92,7 +92,7 @@ describe('stats aggregation', () => {
     expect(AGENT_NAMES.get('TC')).toBe('TraeCode');
     expect(AGENT_NAMES.get('TW')).toBe('TraeWork');
     expect(AGENT_NAMES.get('DSH')).toBe('DeepSeek Harness');
-    expect(AGENT_NAMES.get('WB')).toBe('workbuddy');
+    expect(AGENT_NAMES.get('WB')).toBe('WorkBuddy');
     for (const agent of ['TC', 'TW', 'DSH']) expect(KNOWN_AGENTS.has(agent)).toBe(true);
 
     expect(parseReviewFileName('tg_0155_rank02_TC@Dsv4Pro0813.md')).toMatchObject({

@@ -19,18 +19,19 @@ export const PROJECT_DIR = dirname(SCRIPT_DIR);
  * 只写简写，此处是唯一的简写对照表；新增 Agent 时同步补这里。
  */
 export const AGENT_NAMES = new Map([
-  ['PI', 'pi'],
-  ['OMP', 'oh my pi'],
+  ['PI', 'Pi'],
+  ['OMP', 'Oh My Pi'],
   ['DSH', 'DeepSeek Harness'],
-  ['QD', 'qoder'],
+  ['QD', 'Qoder'],
   ['QW', 'QoderWork'],
   ['TW', 'TraeWork'],
   ['TC', 'TraeCode'],
   ['CP', 'CatPaw'],
-  ['WB', 'workbuddy'],
+  ['WB', 'WorkBuddy'],
   ['ZC', 'zcode'],
   ['CC', 'ClaudeCode'],
-  ['CX', 'codex'],
+  ['CX', 'Codex'],
+  ['WEB', 'WebAgent'],
 ]);
 
 export const KNOWN_AGENTS = new Set([...AGENT_NAMES.keys(), 'SCRIPT']);

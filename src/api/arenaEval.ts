@@ -31,7 +31,7 @@ const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json'
 const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRIPT];
 
 // 与 rl/evaluation/round_robin.py 的 DEFAULT_MAPS 保持一致。
-export const KNOWN_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes', 'forge'] as const;
+export const KNOWN_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes', 'molten-throne'] as const;
 
 export type EvalRunStatus = 'idle' | 'running' | 'finished' | 'failed' | 'stopped' | 'interrupted';
 

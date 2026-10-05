@@ -534,38 +534,38 @@ describe('map config loader', () => {
     resetConfig();
   });
 
-  it('loads forge map with diagonal HQs and a 24-point crucible for king-of-the-hill play', () => {
+  it('loads molten-throne map with diagonal HQs and a 24-point crucible for king-of-the-hill play', () => {
     resetConfig();
     loadMaps();
 
-    const forge = getMapConfig('forge');
-    expect(forge.name).toBe('熔池王座');
-    expect(forge.radius).toBe(6);
-    expect(forge.balance.maxTurns).toBe(20);
+    const map = getMapConfig('molten-throne');
+    expect(map.name).toBe('熔池王座');
+    expect(map.radius).toBe(6);
+    expect(map.balance.maxTurns).toBe(20);
     // 对角线总部：双方斜向对峙，距离为 10
-    expect(forge.headquarters.player_a).toEqual({ q: -5, r: 5 });
-    expect(forge.headquarters.player_b).toEqual({ q: 5, r: -5 });
-    expect(hexDistance(forge.headquarters.player_a, forge.headquarters.player_b)).toBe(10);
-    expect(forge.headquartersSpec.hp).toBe(100);
-    expect(forge.headquartersSpec.defense).toBe(3);
+    expect(map.headquarters.player_a).toEqual({ q: -5, r: 5 });
+    expect(map.headquarters.player_b).toEqual({ q: 5, r: -5 });
+    expect(hexDistance(map.headquarters.player_a, map.headquarters.player_b)).toBe(10);
+    expect(map.headquartersSpec.hp).toBe(100);
+    expect(map.headquartersSpec.defense).toBe(3);
 
     // 占点为王：24 座据点全部类型化，不再有全局 controlPointIncome，增援不得从总部部署
-    expect(forge.controlPoints.length).toBe(24);
-    expect(forge.balance.controlPointIncome).toBeUndefined();
-    expect(forge.balance.deployFromHq).toBe(false);
+    expect(map.controlPoints.length).toBe(24);
+    expect(map.balance.controlPointIncome).toBeUndefined();
+    expect(map.balance.deployFromHq).toBe(false);
     // 全图仅前哨站可部署：补给站/维修站显式 canDeploy:false
-    expect(forge.balance.controlPointTypes?.supply.canDeploy).toBe(false);
-    expect(forge.balance.controlPointTypes?.repair.canDeploy).toBe(false);
-    const kindCounts = forge.controlPoints.reduce<Record<string, number>>((acc, point) => {
+    expect(map.balance.controlPointTypes?.supply.canDeploy).toBe(false);
+    expect(map.balance.controlPointTypes?.repair.canDeploy).toBe(false);
+    const kindCounts = map.controlPoints.reduce<Record<string, number>>((acc, point) => {
       acc[point.kind] = (acc[point.kind] ?? 0) + 1;
       return acc;
     }, {});
     expect(kindCounts).toEqual({ supply: 16, repair: 4, forward_base: 4 });
     // 据点名全图唯一，观战与战报可读
-    const names = forge.controlPoints.map(point => point.name);
+    const names = map.controlPoints.map(point => point.name);
     expect(new Set(names).size).toBe(names.length);
     // 部署起点（前哨站）内外两环各一对：内环东北/西南，外环西北/东南对角；修缮点各领其侧
-    const kindAt = (q: number, r: number) => forge.controlPoints.find(c => c.q === q && c.r === r)!.kind;
+    const kindAt = (q: number, r: number) => map.controlPoints.find(c => c.q === q && c.r === r)!.kind;
     expect(kindAt(1, -1)).toBe('forward_base');
     expect(kindAt(-1, 1)).toBe('forward_base');
     expect(kindAt(-2, -2)).toBe('forward_base');
@@ -576,48 +576,48 @@ describe('map config loader', () => {
     expect(kindAt(1, 2)).toBe('repair');
 
     // 24 座据点关于原点 180° 对称、类型一致
-    for (const point of forge.controlPoints) {
+    for (const point of map.controlPoints) {
       expect(point.kind).toBeTruthy();
       const mirror = originReflection(point);
-      const counterpart = forge.controlPoints.find(c => c.q === mirror.q && c.r === mirror.r);
+      const counterpart = map.controlPoints.find(c => c.q === mirror.q && c.r === mirror.r);
       expect(counterpart, `${point.id} should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
       expect(counterpart!.kind).toBe(point.kind);
     }
 
     // 地形关于原点对称
-    for (const cell of forge.terrainCells) {
+    for (const cell of map.terrainCells) {
       const mirror = originReflection(cell);
-      const counterpart = forge.terrainCells.find(c => c.q === mirror.q && c.r === mirror.r);
+      const counterpart = map.terrainCells.find(c => c.q === mirror.q && c.r === mirror.r);
       expect(counterpart, `terrain (${cell.q},${cell.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
       expect(counterpart!.terrain).toBe(cell.terrain);
     }
 
     // 中央熔池不可通行；西北/东南两角墙垣加水域封死，争夺全部压向中腹
-    expect(terrainAt(forge, 0, 0)).toBe('water');
-    expect(terrainAt(forge, -3, -3)).toBe('water');
-    expect(terrainAt(forge, 3, 3)).toBe('water');
-    expect(terrainAt(forge, -3, 0)).toBe('blocker');
-    expect(terrainAt(forge, 0, -3)).toBe('blocker');
-    expect(terrainAt(forge, 3, 0)).toBe('blocker');
-    expect(terrainAt(forge, 0, 3)).toBe('blocker');
+    expect(terrainAt(map, 0, 0)).toBe('water');
+    expect(terrainAt(map, -3, -3)).toBe('water');
+    expect(terrainAt(map, 3, 3)).toBe('water');
+    expect(terrainAt(map, -3, 0)).toBe('blocker');
+    expect(terrainAt(map, 0, -3)).toBe('blocker');
+    expect(terrainAt(map, 3, 0)).toBe('blocker');
+    expect(terrainAt(map, 0, 3)).toBe('blocker');
     // 斜向窄缝仍可通行
-    expect(terrainAt(forge, 1, -1)).toBe('plain');
-    expect(terrainAt(forge, -1, 1)).toBe('plain');
+    expect(terrainAt(map, 1, -1)).toBe('plain');
+    expect(terrainAt(map, -1, 1)).toBe('plain');
 
     // 起手 5 斥候 + 1 支援（斥候为唯一可占点兵种），槽位关于原点对称、归属互换
-    expect(forge.startingUnits.length).toBe(12);
-    for (const slot of forge.spawnSlots) {
+    expect(map.startingUnits.length).toBe(12);
+    for (const slot of map.spawnSlots) {
       expect(slot.startingUnits.map(u => u.type).sort()).toEqual(['scout', 'scout', 'scout', 'scout', 'scout', 'support']);
     }
-    for (const unit of forge.startingUnits) {
+    for (const unit of map.startingUnits) {
       const mirror = originReflection(unit);
-      const counterpart = forge.startingUnits.find(c => c.q === mirror.q && c.r === mirror.r);
+      const counterpart = map.startingUnits.find(c => c.q === mirror.q && c.r === mirror.r);
       expect(counterpart, `starting unit (${unit.q},${unit.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
       expect(counterpart!.type).toBe(unit.type);
       expect(counterpart!.owner).toBe(unit.owner === 'player_a' ? 'player_b' : 'player_a');
     }
     // 本图斥候特化为可战之兵（攻 25，其余地图为 16）
-    expect(forge.units.scout.attack).toBe(25);
+    expect(map.units.scout.attack).toBe(25);
 
     resetConfig();
   });

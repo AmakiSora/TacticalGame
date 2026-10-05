@@ -480,7 +480,7 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models
 
 # 全量跑批（模型+算法两两 × 7 图 × 24 局，建议先跑随机图出第一版榜单）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default,breach,danger-close,desert,dual-lanes,forge
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default,breach,danger-close,desert,dual-lanes,molten-throne
 
 # 纯模型循环赛（不带算法，如复现旧口径）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --algorithms none

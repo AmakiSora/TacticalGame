@@ -320,7 +320,7 @@ describe('AI 竞技场评估控制台 API', () => {
     const ok = parseProgressLine('[3/12] OK  a.zip vs b.zip @ default（2 局 / 10s，0.2 局/s）| 剩余约 1m30s');
     expect(ok).toMatchObject({ done: 3, total: 12, ok: true });
     expect(ok?.label).toBe('a.zip vs b.zip @ default（2 局 / 10s，0.2 局/s）| 剩余约 1m30s');
-    expect(parseProgressLine('[4/12] FAIL a.zip vs c.zip @ forge（1 局 / 9s，0.1 局/s）')).toMatchObject({ ok: false });
+    expect(parseProgressLine('[4/12] FAIL a.zip vs c.zip @ molten-throne（1 局 / 9s，0.1 局/s）')).toMatchObject({ ok: false });
     expect(parseSummaryLine('完成批次 12/12，新增 24 局，失败 0 批，总用时 5m30s（0.1 局/s）。'))
       .toEqual({ done: 12, total: 12, games: 24, failed: 0 });
   });

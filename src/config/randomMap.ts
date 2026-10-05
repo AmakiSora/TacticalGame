@@ -31,10 +31,10 @@ export interface RandomMapOptions {
   /**
    * 初始单位数量（0-4）。省略=0-4 均匀随机（现行为）。
    * v4.0.0：RL 随机域联合边角重要性采样（RL_RANDOM_CORNER_BOOST）用它把
-   * 低 HQ×多据点×满编开局的 forge 生态位组合提频——各维边缘分布
+   * 低 HQ×多据点×满编开局的熔炉系图生态位组合提频——各维边缘分布
    * 虽已拓宽，联合命中率是边缘概率的乘积 <<1%（v3.1.1 起旧版 forge 连续 0:48）。
-   * 3.5.11 forge 重做为 20 回合长局、24 据点、每方 6 单位起手：上述生态位
-   * 描述已过时，且覆盖缺口（上界 4 < forge 6）待 RL 域重校准时收口。
+   * 3.5.11 该图重做为 molten-throne（熔池王座，原 forge）：20 回合长局、24 据点、每方 6 单位起手，上述生态位
+   * 描述已过时，且覆盖缺口（上界 4 < 6）待 RL 域重校准时收口。
    */
   startingUnitCount?: RandomParam;
 }
@@ -75,10 +75,10 @@ const DEFAULT_RANGES: Record<string, [number, number]> = {
 };
 
 // 默认域包线按 6 张静态图的极值校准（danger-close 的 1 行动点/20 补给/零据点收入、
-// dual-lanes 的 0 初始单位/208 补给、forge 的 100 血总部/24 据点等），让随机图
+// dual-lanes 的 0 初始单位/208 补给、molten-throne（原 forge）的 100 血总部/24 据点等），让随机图
 // 本身就能覆盖全部静态图的规则空间——RL 侧 v3.0.2-v3.1.0 三代的 whack-a-mole
 // （某张静态图整图崩塌）根因即这些维度从未进过训练分布。
-// 已知缺口：3.5.11 forge 重做后每方起始 6 单位、据点 24，均超出本域
+// 已知缺口：3.5.11 molten-throne（原 forge）重做后每方起始 6 单位、据点 24，均超出本域
 // （startingUnitCount 上界 4、controlPointCount 上界 9），待 RL 域重校准收口。
 
 /** 裁决权重在静态图包线内随机：danger-close(20/1/30/1/0) ~ default(5/2/90/2/1)。 */
@@ -101,10 +101,10 @@ function sampleControlPointTypes(rng: () => number) {
   };
 }
 
-/** 初始单位构成抽取池：基础兵种权重高，覆盖 breach(2 heavy) 等开局（forge 3.5.11 起为斥候群开局，不在池内）。 */
+/** 初始单位构成抽取池：基础兵种权重高，覆盖 breach(2 heavy) 等开局（molten-throne 3.5.11 起为斥候群开局，不在池内）。 */
 const STARTING_UNIT_POOL: UnitType[] = ['infantry', 'infantry', 'scout', 'scout', 'heavy', 'ranger'];
 
-/** 每方初始单位数量：默认 0-4 均匀随机（dual-lanes(0) 起，其余静态图 ≤3）；可用 options.startingUnitCount 收窄/固定。forge 3.5.11 起为 6，超出本域。 */
+/** 每方初始单位数量：默认 0-4 均匀随机（dual-lanes(0) 起，其余静态图 ≤3）；可用 options.startingUnitCount 收窄/固定。molten-throne 3.5.11 起为 6，超出本域。 */
 function sampleStartingUnits(rng: () => number, count: number): UnitType[] {
   return Array.from({ length: count }, () => STARTING_UNIT_POOL[Math.floor(rng() * STARTING_UNIT_POOL.length)]);
 }

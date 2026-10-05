@@ -140,7 +140,7 @@ describe('random map generator', () => {
   it('default domain covers the static-map extremes (RL 训练分布包线)', () => {
     // v3.0.2-v3.1.0 三代 whack-a-mole 的根因修复：随机图默认域必须覆盖
     // danger-close(1 行动点/20 补给/零据点收入)、dual-lanes(0 初始单位/208 补给)、
-    // forge(100 血总部/6 据点) 等静态图极值；裁决权重与据点类型收入也必须可变。
+    // molten-throne(100 血总部/24 据点) 等静态图极值；裁决权重与据点类型收入也必须可变。
     const seen = {
       minAp: 99, maxAp: 0, minSupplies: 9999, maxSupplies: 0,
       minHq: 9999, maxHq: 0, minCp: 99, maxCp: 0,

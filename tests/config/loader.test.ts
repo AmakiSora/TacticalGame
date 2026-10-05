@@ -539,7 +539,7 @@ describe('map config loader', () => {
     loadMaps();
 
     const forge = getMapConfig('forge');
-    expect(forge.name).toBe('熔炉重铸');
+    expect(forge.name).toBe('熔池王座');
     expect(forge.radius).toBe(6);
     expect(forge.balance.maxTurns).toBe(20);
     // 对角线总部：双方斜向对峙，距离为 10

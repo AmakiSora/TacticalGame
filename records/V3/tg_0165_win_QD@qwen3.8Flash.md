@@ -3,7 +3,7 @@
 **日期/游戏ID/回放版本:** 2026-09-24 / `76ef96b5-8754-4e5b-8d39-9c6054ba1860` / 规范 V3（3.0）；回放 `schemaVersion = 3.5.5`（`format: hex-v2-replay`，`eventCount = 209`，`exportedAt 2026-09-24T06:51:21.577Z`，落盘 `records/V3/tg_0165_20260924.json`）
 **地图/参战人数:** `breach`（破障行动，pointy-top 半径 8，217 格：178 plain / 27 blocker / 12 water）/ 2 人；**模式:** `standard`（总部制、顺序回合）
 **玩家:** qwen3.8flash-QD（`QD@qwen3.8Flash`，Qoder 桌面 agent 逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用 `ai-player.mjs`）
-**对手:** `player_a` = mimov2.6flash-OMP（`OMP@mimov2.6flash`），房主兼先手
+**对手:** `player_a` = mimo2.6flash-OMP（`OMP@mimo2.6flash`），房主兼先手
 **席位与出生:** `player_b`，出生槽 `slot_a`，行动顺序第 **2**（后手，`turnOrder = ["player_a","player_b"]`、`firstPlayer = player_a`，seq3），HQ **(-8,0)**（`6eb16049`）100/100 def0；初始单位 侦 `91b11866`@(-6,0)、重 `d8103d74`@(-6,-1)、重 `5e8b1661`@(-7,1)；初始补给 50（双方相同）
 **结果:** 🏆 **第 1 名** — `turn_limit_score`（打满 15 整轮、双方均存活、无淘汰，六项裁决 **3012 : 755**）
 **结束轮次:** 第 15 / 15 整轮（`maxTurns 15`）；**HQ 最终 HP:** 我方 **100/100（全程零承伤）**，对手 58/100（我方累计打掉 42）
@@ -41,7 +41,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 🏆 1 | `player_b`（我） | qwen3.8flash-QD | active | **3012** | — | 据点 **5:1**（+360）、军力 **1004:148**（+1712）、行动分 126:20（+106）、HQ 伤害 42:0（+210） |
-| 2 | `player_a` | mimov2.6flash-OMP | active | **755** | **−2257** | 仅剩余补给 233:18（+215）一项领先，且它自身 HQ 掉到 58 |
+| 2 | `player_a` | mimo2.6flash-OMP | active | **755** | **−2257** | 仅剩余补给 233:18（+215）一项领先，且它自身 HQ 掉到 58 |
 
 > 权威来源 `game_over.payload.rankings`（seq209）：`player_b rank 1 total 3012` / `player_a rank 2 total 755`，`reason: turn_limit_score`，双方 `status: active`（均未被淘汰）。顶层 `finalResult` 与 rankings 一致。
 

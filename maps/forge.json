@@ -1,80 +1,435 @@
 {
+  "mode": "simultaneous",
   "name": "熔炉重铸",
-  "description": "半径6对称地图，6据点均分无先手优势，中央熔炉墙十字阻断直通需重装爆破开路",
+  "description": "占点为王的中腹混战图：16 座补给站环中央熔池密布，四座维修站分居西北、东南两侧。内外两环共四座前哨站是全部部署起点——总部与其他据点均不可出兵，前哨归属即增援通道。西北与东南两角被墙垣封死，争夺全部压向中腹。180° 旋转对称、无先手优势，20 回合终局以据点多寡定胜负。",
   "grid": "hex",
   "orientation": "pointy",
   "radius": 6,
   "terrainCells": [
-    { "q": -1, "r": 0, "terrain": "blocker" },
-    { "q": 0, "r": 0, "terrain": "blocker" },
-    { "q": 1, "r": 0, "terrain": "blocker" },
-    { "q": 0, "r": -1, "terrain": "blocker" },
-    { "q": 0, "r": 1, "terrain": "blocker" },
-    { "q": 2, "r": -1, "terrain": "blocker" },
-    { "q": -2, "r": 1, "terrain": "blocker" },
-    { "q": -4, "r": -2, "terrain": "water" },
-    { "q": 4, "r": 2, "terrain": "water" },
-    { "q": -5, "r": 1, "terrain": "water" },
-    { "q": 5, "r": -1, "terrain": "water" }
+    {
+      "q": -3,
+      "r": -3,
+      "terrain": "water"
+    },
+    {
+      "q": -3,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 0,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 3,
+      "terrain": "water"
+    }
   ],
   "controlPoints": [
-    { "id": "cp_supply_a", "name": "西麓矿场", "kind": "supply", "q": -4, "r": 2 },
-    { "id": "cp_supply_b", "name": "东麓矿场", "kind": "supply", "q": 4, "r": -2 },
-    { "id": "cp_fb_a", "name": "北岭前哨", "kind": "forward_base", "q": -2, "r": -2 },
-    { "id": "cp_fb_b", "name": "南岭前哨", "kind": "forward_base", "q": 2, "r": 2 },
-    { "id": "cp_repair_a", "name": "西熔炉维修站", "kind": "repair", "q": -2, "r": -3 },
-    { "id": "cp_repair_b", "name": "东熔炉维修站", "kind": "repair", "q": 2, "r": 3 }
-  ],
-  "headquarters": {
-    "player_a": { "q": -5, "r": 5 },
-    "player_b": { "q": 5, "r": -5 }
-  },
-  "startingUnits": [
-    { "owner": "player_a", "type": "infantry", "q": -5, "r": 4 },
-    { "owner": "player_a", "type": "scout", "q": -4, "r": 5 },
-    { "owner": "player_a", "type": "heavy", "q": -5, "r": 6 },
-    { "owner": "player_a", "type": "ranger", "q": -6, "r": 5 },
-    { "owner": "player_b", "type": "infantry", "q": 5, "r": -4 },
-    { "owner": "player_b", "type": "scout", "q": 4, "r": -5 },
-    { "owner": "player_b", "type": "heavy", "q": 5, "r": -6 },
-    { "owner": "player_b", "type": "ranger", "q": 6, "r": -5 }
+    {
+      "id": "cp_6",
+      "name": "补给站 1",
+      "kind": "supply",
+      "q": 0,
+      "r": -1
+    },
+    {
+      "id": "cp_7",
+      "name": "北前哨站",
+      "kind": "forward_base",
+      "q": 1,
+      "r": -1
+    },
+    {
+      "id": "cp_8",
+      "name": "补给站 2",
+      "kind": "supply",
+      "q": 1,
+      "r": 0
+    },
+    {
+      "id": "cp_9",
+      "name": "补给站 3",
+      "kind": "supply",
+      "q": 0,
+      "r": 1
+    },
+    {
+      "id": "cp_10",
+      "name": "南前哨站",
+      "kind": "forward_base",
+      "q": -1,
+      "r": 1
+    },
+    {
+      "id": "cp_11",
+      "name": "补给站 4",
+      "kind": "supply",
+      "q": -1,
+      "r": 0
+    },
+    {
+      "id": "cp_12",
+      "name": "补给站 13",
+      "kind": "supply",
+      "q": -2,
+      "r": 1
+    },
+    {
+      "id": "cp_13",
+      "name": "补给站 14",
+      "kind": "supply",
+      "q": -2,
+      "r": 0
+    },
+    {
+      "id": "cp_14",
+      "name": "补给站 15",
+      "kind": "supply",
+      "q": -1,
+      "r": -1
+    },
+    {
+      "id": "cp_15",
+      "name": "补给站 16",
+      "kind": "supply",
+      "q": 0,
+      "r": -2
+    },
+    {
+      "id": "cp_16",
+      "name": "补给站 5",
+      "kind": "supply",
+      "q": 1,
+      "r": -2
+    },
+    {
+      "id": "cp_17",
+      "name": "补给站 6",
+      "kind": "supply",
+      "q": 2,
+      "r": -2
+    },
+    {
+      "id": "cp_18",
+      "name": "补给站 7",
+      "kind": "supply",
+      "q": 2,
+      "r": -1
+    },
+    {
+      "id": "cp_19",
+      "name": "补给站 8",
+      "kind": "supply",
+      "q": 2,
+      "r": 0
+    },
+    {
+      "id": "cp_20",
+      "name": "补给站 9",
+      "kind": "supply",
+      "q": 1,
+      "r": 1
+    },
+    {
+      "id": "cp_21",
+      "name": "补给站 10",
+      "kind": "supply",
+      "q": 0,
+      "r": 2
+    },
+    {
+      "id": "cp_22",
+      "name": "补给站 11",
+      "kind": "supply",
+      "q": -1,
+      "r": 2
+    },
+    {
+      "id": "cp_23",
+      "name": "补给站 12",
+      "kind": "supply",
+      "q": -2,
+      "r": 2
+    },
+    {
+      "id": "cp_24",
+      "name": "维修站 1",
+      "kind": "repair",
+      "q": -1,
+      "r": -2
+    },
+    {
+      "id": "cp_25",
+      "name": "维修站 2",
+      "kind": "repair",
+      "q": -2,
+      "r": -1
+    },
+    {
+      "id": "cp_26",
+      "name": "维修站 3",
+      "kind": "repair",
+      "q": 2,
+      "r": 1
+    },
+    {
+      "id": "cp_27",
+      "name": "维修站 4",
+      "kind": "repair",
+      "q": 1,
+      "r": 2
+    },
+    {
+      "id": "cp_28",
+      "name": "西前哨站",
+      "kind": "forward_base",
+      "q": -2,
+      "r": -2
+    },
+    {
+      "id": "cp_29",
+      "name": "东前哨站",
+      "kind": "forward_base",
+      "q": 2,
+      "r": 2
+    }
   ],
   "units": {
-    "infantry": { "hp": 90, "attack": 28, "defense": 7, "moveRange": 3, "attackRange": 1, "cost": 42, "canCapture": true },
-    "scout": { "hp": 58, "attack": 15, "defense": 4, "moveRange": 5, "attackRange": 1, "cost": 35, "canCapture": true },
-    "heavy": { "hp": 140, "attack": 36, "defense": 12, "moveRange": 2, "attackRange": 1, "cost": 88, "canCapture": false },
-    "ranger": { "hp": 68, "attack": 40, "defense": 3, "moveRange": 2, "attackRange": 3, "cost": 72, "canCapture": false },
-    "support": { "hp": 78, "attack": 10, "defense": 5, "moveRange": 3, "attackRange": 1, "cost": 56, "canCapture": false, "healPower": 20 }
+    "infantry": {
+      "hp": 90,
+      "attack": 28,
+      "defense": 7,
+      "moveRange": 3,
+      "attackRange": 1,
+      "cost": 42,
+      "canCapture": true
+    },
+    "scout": {
+      "hp": 58,
+      "attack": 25,
+      "defense": 4,
+      "moveRange": 5,
+      "attackRange": 1,
+      "cost": 35,
+      "canCapture": true
+    },
+    "heavy": {
+      "hp": 140,
+      "attack": 36,
+      "defense": 12,
+      "moveRange": 2,
+      "attackRange": 1,
+      "cost": 88,
+      "canCapture": false
+    },
+    "ranger": {
+      "hp": 68,
+      "attack": 40,
+      "defense": 3,
+      "moveRange": 2,
+      "attackRange": 3,
+      "cost": 72,
+      "canCapture": false
+    },
+    "support": {
+      "hp": 78,
+      "attack": 10,
+      "defense": 5,
+      "moveRange": 3,
+      "attackRange": 1,
+      "cost": 56,
+      "canCapture": false,
+      "healPower": 20
+    }
   },
   "headquartersSpec": {
     "hp": 100,
     "defense": 3
   },
   "balance": {
-    "startingSupplies": 80,
-    "baseIncome": 10,
-    "controlPointIncome": 10,
-    "damageVarianceRange": 3,
+    "startingSupplies": 40,
+    "baseIncome": 5,
+    "damageVarianceRange": 5,
     "minimumDamage": 1,
-    "healVarianceRange": 5,
+    "healVarianceRange": 10,
     "actionsPerTurn": 4,
-    "maxTurns": 10,
+    "maxTurns": 20,
     "adjudicationWeights": {
       "enemyHqDamage": 7,
       "ownHqHp": 2,
       "controlPoint": 75,
       "armyValue": 2,
-      "supplies": 1
+      "supplies": 1,
+      "effectiveActions": 2
     },
-    "controlPointTypes": {
-      "supply": { "income": 12, "deployDiscount": 0, "repairAmount": 0 },
-      "forward_base": { "income": 8, "deployDiscount": 8, "repairAmount": 0 },
-      "repair": { "income": 8, "deployDiscount": 0, "repairAmount": 10 }
-    },
+    "deployFromHq": false,
     "comebackSupply": {
       "startRound": 4,
       "scoreGapPercent": 15,
       "amountPerRound": 12
+    },
+    "controlPointTypes": {
+      "supply": {
+        "income": 12,
+        "deployDiscount": 0,
+        "repairAmount": 0,
+        "canDeploy": false
+      },
+      "forward_base": {
+        "income": 8,
+        "deployDiscount": 7,
+        "repairAmount": 0
+      },
+      "repair": {
+        "income": 8,
+        "deployDiscount": 0,
+        "repairAmount": 15,
+        "canDeploy": false
+      }
     }
+  },
+  "spawnSlots": [
+    {
+      "id": "slot_a",
+      "headquarters": {
+        "q": -5,
+        "r": 5
+      },
+      "startingUnits": [
+        {
+          "type": "scout",
+          "q": -6,
+          "r": 5
+        },
+        {
+          "type": "scout",
+          "q": -5,
+          "r": 6
+        },
+        {
+          "type": "scout",
+          "q": -4,
+          "r": 5
+        },
+        {
+          "type": "scout",
+          "q": -4,
+          "r": 4
+        },
+        {
+          "type": "scout",
+          "q": -5,
+          "r": 4
+        },
+        {
+          "type": "support",
+          "q": -6,
+          "r": 6
+        }
+      ]
+    },
+    {
+      "id": "slot_b",
+      "headquarters": {
+        "q": 5,
+        "r": -5
+      },
+      "startingUnits": [
+        {
+          "type": "support",
+          "q": 6,
+          "r": -6
+        },
+        {
+          "type": "scout",
+          "q": 5,
+          "r": -6
+        },
+        {
+          "type": "scout",
+          "q": 4,
+          "r": -5
+        },
+        {
+          "type": "scout",
+          "q": 4,
+          "r": -4
+        },
+        {
+          "type": "scout",
+          "q": 5,
+          "r": -4
+        },
+        {
+          "type": "scout",
+          "q": 6,
+          "r": -5
+        }
+      ]
+    }
+  ],
+  "layouts": {
+    "2": [
+      "slot_a",
+      "slot_b"
+    ]
   }
 }

@@ -112,7 +112,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 - 移动使用路径搜索，不能穿过水域、阻挡、单位或总部。
 - 攻击/治疗只按六边形距离判断，不做视线阻挡。
 - 只有步兵和侦察兵可占领据点；站在据点上结束己方回合即占领。
-- 回合切换后，新当前玩家获得基础收入 + 己方据点收入；旧地图使用统一 `controlPointIncome`，类型化据点地图按据点类型分别计算。
+- 回合切换后，新当前玩家获得基础收入 + 己方据点收入，按据点类型分别计算。
 - 可从己方总部或己方据点向相邻空白平地部署单位；`forward_base` 据点可按地图配置降低从该点部署的实际费用。地图可设 `balance.deployFromHq: false` 禁止从总部部署（缺省允许），此时只能从己方据点出兵。类型化据点地图还可按类型关闭部署入口：`balance.controlPointTypes.<类型>.canDeploy: false` 时该类型据点不能作为部署起点（缺省允许）。
 - `repair` 据点会在拥有者行动开始时修复站上或距离 1 格内的己方受伤单位；总部和敌军不会被修复，每个单位每回合最多被据点修复一次。
 - 重装单位可花费本回合行动爆破相邻 `blocker` 地形，将其永久变为 `plain`。爆破遵循行动点上限；已移动但未行动的重装可继续爆破，爆破后不能攻击或治疗。
@@ -214,7 +214,6 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
   "balance": {
     "startingSupplies": 80,
     "baseIncome": 10,
-    "controlPointIncome": 12,
     "controlPointTypes": {
       "supply": { "income": 12, "deployDiscount": 0, "repairAmount": 0 },
       "forward_base": { "income": 8, "deployDiscount": 8, "repairAmount": 0 },
@@ -238,7 +237,7 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 
 未列在 `terrainCells` 的可用格默认为 `plain`。地图编辑器支持添加和移除地块，并可维护 2–8 个出生槽及对应人数布局；移除包含对象的格子会被阻止，避免隐式丢失配置。
 
-据点可选 `kind`：`supply`、`forward_base`、`repair`。如果地图没有任何据点写 `kind`，引擎使用旧规则：统一 `balance.controlPointIncome`、无部署折扣、无据点维修。如果任意据点写了 `kind`，则该地图所有据点都必须写 `kind`，并且 `balance.controlPointTypes` 必须完整配置三种类型的 `income`、`deployDiscount`、`repairAmount`。裁决分始终按据点数量计算，不按据点类型加权。
+每个据点必须写 `kind`：`supply`（补给站）、`forward_base`（前线基地）、`repair`（维修站）——不存在无类型的「普通据点」。`balance.controlPointTypes` 必须完整配置三种类型的 `income`、`deployDiscount`、`repairAmount`（含地图未用到的类型）。裁决分始终按据点数量计算，不按据点类型加权。
 
 ## AI 自动对战
 

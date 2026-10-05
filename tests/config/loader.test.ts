@@ -13,7 +13,7 @@ function validMap() {
     orientation: 'pointy',
     radius: 2,
     terrainCells: [],
-    controlPoints: [{ id: 'cp', name: 'Center', q: 0, r: 0 }],
+    controlPoints: [{ id: 'cp', name: 'Center', kind: 'supply', q: 0, r: 0 }],
     headquarters: {
       player_a: { q: -2, r: 0 },
       player_b: { q: 2, r: 0 },
@@ -30,7 +30,6 @@ function validMap() {
     balance: {
       startingSupplies: 80,
       baseIncome: 10,
-      controlPointIncome: 12,
       damageVarianceRange: 3,
       minimumDamage: 1,
       healVarianceRange: 6,
@@ -42,6 +41,11 @@ function validMap() {
         controlPoint: 120,
         armyValue: 2,
         supplies: 1,
+      },
+      controlPointTypes: {
+        supply: { income: 12, deployDiscount: 0, repairAmount: 0 },
+        forward_base: { income: 8, deployDiscount: 8, repairAmount: 0 },
+        repair: { income: 8, deployDiscount: 0, repairAmount: 10 },
       },
     },
   };
@@ -218,30 +222,26 @@ describe('map config loader', () => {
     resetConfig();
   });
 
-  it('requires full control point type config when any control point is typed', () => {
+  it('requires control point type config on every map', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as unknown as BrokenMap;
-    map.controlPoints = [
-      { id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' },
-      { id: 'cp_b', name: 'Untyped', q: 0, r: 1 },
-    ];
+    delete map.balance.controlPointTypes;
     writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
 
     expect(() => loadMaps(dir)).toThrow('balance.controlPointTypes is required');
     resetConfig();
   });
 
-  it('rejects mixed typed and untyped control points even with type config', () => {
+  it('requires kind on every control point', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as unknown as BrokenMap;
-    map.balance.controlPointTypes = controlPointTypes();
     map.controlPoints = [
       { id: 'cp_a', name: 'Typed', q: 0, r: 0, kind: 'supply' },
       { id: 'cp_b', name: 'Untyped', q: 0, r: 1 },
     ];
     writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
 
-    expect(() => loadMaps(dir)).toThrow('controlPoints must all define kind');
+    expect(() => loadMaps(dir)).toThrow('controlPoints[1].kind is required');
     resetConfig();
   });
 
@@ -289,15 +289,19 @@ describe('map config loader', () => {
     resetConfig();
   });
 
-  it('loads dual-lanes as a typed control point map without changing legacy maps', () => {
+  it('loads dual-lanes as a typed control point map alongside the converted default map', () => {
     resetConfig();
     loadMaps();
 
     const legacy = getMapConfig('default');
     const dual = getMapConfig('dual-lanes');
 
-    expect(legacy.controlPoints.every(point => !('kind' in point))).toBe(true);
-    expect(legacy.balance.controlPointTypes).toBeUndefined();
+    // 普通据点已移除：default 图五个据点全部转为补给站，收入沿用原统一值 12。
+    expect(legacy.controlPoints.map(point => point.kind)).toEqual([
+      'supply', 'supply', 'supply', 'supply', 'supply',
+    ]);
+    expect(legacy.balance.controlPointTypes?.supply).toMatchObject({ income: 12, deployDiscount: 0, repairAmount: 0 });
+    expect(legacy.balance.controlPointIncome).toBeUndefined();
     expect(dual.controlPoints.map(point => point.kind)).toEqual([
       'supply', 'repair', 'supply', 'forward_base', 'repair', 'forward_base',
     ]);
@@ -694,8 +698,8 @@ describe('map config loader', () => {
       mode: 'royale',
       annihilation: { artillery: { startRound: 6, intervalRounds: 1, damage: 25, minimumSafeRadius: 0 } },
       controlPoints: [
-        { id: 'cp_a', name: 'A', q: 1, r: 0 },
-        { id: 'cp_b', name: 'B', q: -1, r: 0 },
+        { id: 'cp_a', name: 'A', kind: 'supply', q: 1, r: 0 },
+        { id: 'cp_b', name: 'B', kind: 'supply', q: -1, r: 0 },
       ],
       spawnSlots: [
         { id: 'slot_a', headquarters: { q: 2, r: 0 }, controlPointId: 'cp_a', startingUnits: [] },

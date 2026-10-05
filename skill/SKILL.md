@@ -214,7 +214,7 @@ Mode-specific deploy origins, elimination, artillery, and scoring live in the mo
 - Pathfinding blocked by water, blockers, units, and HQs **when HQs exist**.
 - Attack/heal: range only, no LOS.
 - Standard: income is awarded when the turn is gained (base + owned CP income;
-  typed CPs may override via `controlPointTypes`).
+  per-kind amounts live in `controlPointTypes`).
 - Simultaneous/royale: income and repair are issued together for every living player at the round
   boundary; see [`simultaneous.md`](simultaneous.md) / [`royale.md`](royale.md).
 
@@ -238,7 +238,7 @@ Unit numbers are **per map**. Never reuse memorized move/attack/cost values from
 | Heal | **Only** `type === "support"` | `POST /heal` with `supportId` + `targetId`. Target must be a **living friendly unit** (not enemy, not self-as-enemy, not HQ). Both support and target must be within the support's `attackRange`. Annihilation: neither may be in artillery danger. |
 | Demolish | **Only** `type === "heavy"` | Target hex: in `game.cells`, terrain **blocker**, **unoccupied**, **exactly distance 1**, turns into plain. |
 
-Deploy cost comes from `config.units[type].cost` minus any `forward_base` (or typed) deploy discount on the origin CP. Instance `cost` is what army-value scoring uses.
+Deploy cost comes from `config.units[type].cost` minus the origin CP kind's `deployDiscount` from `controlPointTypes`. Instance `cost` is what army-value scoring uses.
 A map may also ban deploy per CP kind: `balance.controlPointTypes.<kind>.canDeploy: false` makes owned CPs of that kind illegal `fromId` (rejected `invalid_deploy`); kinds without the flag stay deployable — check before picking an origin.
 - Last survivor wins immediately (`last_player_standing`). Else adjudication at `maxTurns`.
 - When `maxTurns` is `null` the map has **no round cap** and auto-adjudication never fires: read live `adjudication` from `GET /api/games/:id` and plan for a host-forced end instead of running out the clock.
@@ -285,7 +285,7 @@ Read `config.balance.actionsPerTurn` per map.
 
 ### Economy (shared mechanics)
 
-- `baseIncome`, per-CP income / typed `supply` · `forward_base` · `repair`.
+- `baseIncome`, per-CP income by kind: `supply` · `forward_base` · `repair` (every CP is typed; `controlPointTypes`).
 - Optional `comebackSupply`: after non-final rounds past `startRound`, living players far enough behind the shared leader snapshot get `amountPerRound`.
 - CPs may still matter for **income and deploy** even when `weights.controlPoint === 0`.
 - Spend supplies when AP and legal deploy hexes exist; hoarding does not auto-convert under a tight AP cap.

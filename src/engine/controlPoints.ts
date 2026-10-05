@@ -7,7 +7,8 @@ export function controlPointTypeSpec(game: GameState, point: ControlPoint): Cont
 }
 
 export function controlPointIncome(game: GameState, point: ControlPoint): number {
-  return controlPointTypeSpec(game, point)?.income ?? game.config.balance.controlPointIncome;
+  // 末位 ?? 0 兜底旧内嵌配置缺字段的理论场景；存量旧配置均带 controlPointIncome。
+  return controlPointTypeSpec(game, point)?.income ?? game.config.balance.controlPointIncome ?? 0;
 }
 
 export function deployDiscountForOrigin(game: GameState, owner: PlayerId, fromId: string): number {

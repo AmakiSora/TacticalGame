@@ -34,7 +34,8 @@ function mapFingerprint(state: WorkerState): string {
 
 describe('local engine worker random maps', () => {
   it('creates a playable standard game on a random map', async () => {
-    const state = await reset({ seed: 'worker-a' });
+    // 随机数流随 3.5.11 移除 controlPointIncome 参数而偏移，选一个仍产出开局单位的种子。
+    const state = await reset({ seed: 'worker-a-2' });
     expect(state.phase).toBe('active');
     expect(state.mapId).toBe('random');
     expect(state.config.mode).toBe('standard');

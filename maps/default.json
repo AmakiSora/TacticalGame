@@ -17,11 +17,11 @@
     { "q": 5, "r": 2, "terrain": "blocker" }
   ],
   "controlPoints": [
-    { "id": "cp_a", "name": "西侧补给站", "q": -4, "r": 0 },
-    { "id": "cp_n", "name": "北部中继站", "q": 0, "r": -4 },
-    { "id": "cp_c", "name": "中央阵地", "q": 0, "r": 0 },
-    { "id": "cp_s", "name": "南部中继站", "q": 0, "r": 4 },
-    { "id": "cp_b", "name": "东侧补给站", "q": 4, "r": 0 }
+    { "id": "cp_a", "name": "西侧补给站", "kind": "supply", "q": -4, "r": 0 },
+    { "id": "cp_n", "name": "北部中继站", "kind": "supply", "q": 0, "r": -4 },
+    { "id": "cp_c", "name": "中央阵地", "kind": "supply", "q": 0, "r": 0 },
+    { "id": "cp_s", "name": "南部中继站", "kind": "supply", "q": 0, "r": 4 },
+    { "id": "cp_b", "name": "东侧补给站", "kind": "supply", "q": 4, "r": 0 }
   ],
   "headquarters": {
     "player_a": { "q": -8, "r": 0 },
@@ -90,7 +90,6 @@
   "balance": {
     "startingSupplies": 80,
     "baseIncome": 10,
-    "controlPointIncome": 12,
     "damageVarianceRange": 3,
     "minimumDamage": 1,
     "healVarianceRange": 6,
@@ -102,6 +101,11 @@
       "controlPoint": 90,
       "armyValue": 2,
       "supplies": 1
+    },
+    "controlPointTypes": {
+      "supply": { "income": 12, "deployDiscount": 0, "repairAmount": 0 },
+      "forward_base": { "income": 8, "deployDiscount": 8, "repairAmount": 0 },
+      "repair": { "income": 8, "deployDiscount": 0, "repairAmount": 10 }
     }
   }
 }

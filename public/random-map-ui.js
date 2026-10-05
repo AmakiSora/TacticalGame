@@ -14,7 +14,6 @@
     { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, defMin: 0, defMax: 0.25 },
     { key: 'startingSupplies', label: '初始补给', step: 5, defMin: 20, defMax: 220 },
     { key: 'baseIncome', label: '基础收入', step: 1, defMin: 6, defMax: 14 },
-    { key: 'controlPointIncome', label: '据点收入', step: 1, defMin: 0, defMax: 16 },
     { key: 'headquartersHp', label: '总部血量', step: 10, defMin: 80, defMax: 240 },
     { key: 'headquartersDefense', label: '总部防御', step: 1, defMin: 3, defMax: 10 },
   ];

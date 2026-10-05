@@ -102,7 +102,7 @@ Unless the user asks for a different style:
    - Wounded cluster reachable safely: support
    - No owned CP → skip deploy
    - `fromId` = owned CP id only
-6. **Pre-shrink** (`round < artillery.startRound`): move infantry/scouts to nearest **safe** neutral income CP (`supply` if typed), then secure a nearby deploy pad (`forward_base` / owned CP) that will remain usable as the ring contracts.
+6. **Pre-shrink** (`round < artillery.startRound`): move infantry/scouts to nearest **safe** neutral income CP (`supply` preferred), then secure a nearby deploy pad (`forward_base` / owned CP) that will remain usable as the ring contracts.
 7. **From first shrink** (`round >= startRound`): advance on nearest living enemy army inside the safe zone; favorable trades; no outer-ring tourism. Re-check `warningCells` / `nextShrinkRound` every activation.
 8. **Near adjudication:** re-read `adjudication.weights` and `scores.*.actionScore` / `armyValue`. If HQ/CP/supply weights are 0 → maximize army value and **actionScore** via real exchanges (damage/heal/deploy/capture/demolish); deny enemy army. Spend leftover supplies on safe deploys when AP allows. No capture-spam for phantom point score, no supply hoarding, no empty reposition loops, no searching for HQs.
 9. **No useful action** → `/end-turn`.

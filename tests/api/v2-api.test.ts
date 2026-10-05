@@ -161,7 +161,7 @@ describe('V2 API', () => {
     expect(gameStart.payload.config.units.ranger).toMatchObject({ hp: 72, attack: 44, cost: 78 });
     expect(gameStart.payload.config.units.support).toMatchObject({ hp: 82, attack: 10, healPower: 22, cost: 60 });
     expect(gameStart.payload.config.balance.actionsPerTurn).toBe(5);
-    expect(gameStart.payload.config.balance.controlPointIncome).toBe(12);
+    expect(gameStart.payload.config.balance.controlPointTypes.supply.income).toBe(12);
     expect(gameStart.payload.config.balance.maxTurns).toBe(15);
     await app.close();
   });

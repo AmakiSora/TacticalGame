@@ -16,7 +16,6 @@
   const BALANCE_KEYS = [
     ['startingSupplies', '初始金币', 0],
     ['baseIncome', '每回合基础收入', 0],
-    ['controlPointIncome', '普通据点收入', 0],
     ['damageVarianceRange', '伤害浮动', 0],
     ['minimumDamage', '最低伤害', 0],
     ['healVarianceRange', '治疗浮动', 0],
@@ -111,7 +110,6 @@
     return {
       startingSupplies: 80,
       baseIncome: 10,
-      controlPointIncome: 12,
       damageVarianceRange: 3,
       minimumDamage: 1,
       healVarianceRange: 6,
@@ -268,7 +266,7 @@
         : {}),
       terrainCells: Array.isArray(cfg.terrainCells) ? cfg.terrainCells.map(c => ({ q: c.q, r: c.r, terrain: c.terrain || 'plain' })) : [],
       controlPoints: Array.isArray(cfg.controlPoints)
-        ? cfg.controlPoints.map((p, i) => ({ id: p.id || `cp_${i + 1}`, name: p.name || `据点 ${i + 1}`, ...(p.kind ? { kind: p.kind } : {}), q: p.q, r: p.r }))
+        ? cfg.controlPoints.map((p, i) => ({ id: p.id || `cp_${i + 1}`, name: p.name || `据点 ${i + 1}`, kind: CONTROL_POINT_KINDS.includes(p.kind) ? p.kind : 'supply', q: p.q, r: p.r }))
         : [],
       headquarters: {
         player_a: { ...(cfg.headquarters?.player_a || defaults.headquarters.player_a) },
@@ -346,16 +344,20 @@
         : sourceBalance.adjudicationWeights?.[key];
       normalized.balance.adjudicationWeights[key] = numberOrDefault(sourceValue, fallback);
     }
-    if (sourceBalance.controlPointTypes && typeof sourceBalance.controlPointTypes === 'object') {
-      normalized.balance.controlPointTypes = {};
-      for (const kind of CONTROL_POINT_KINDS) {
-        normalized.balance.controlPointTypes[kind] = {
-          income: numberOrDefault(sourceBalance.controlPointTypes[kind]?.income, defaults.balance.controlPointTypes[kind].income),
-          deployDiscount: numberOrDefault(sourceBalance.controlPointTypes[kind]?.deployDiscount, defaults.balance.controlPointTypes[kind].deployDiscount),
-          repairAmount: numberOrDefault(sourceBalance.controlPointTypes[kind]?.repairAmount, defaults.balance.controlPointTypes[kind].repairAmount),
-          canDeploy: sourceBalance.controlPointTypes[kind]?.canDeploy !== false,
-        };
-      }
+    // 据点类型恒有配置；旧无类型地图（无 controlPointTypes）按默认迁移，
+    // supply 收入继承原 controlPointIncome 以保持经济不变。
+    const legacyControlPointIncome = numberOrDefault(sourceBalance.controlPointIncome, defaults.balance.controlPointTypes.supply.income);
+    const sourceTypes = sourceBalance.controlPointTypes && typeof sourceBalance.controlPointTypes === 'object'
+      ? sourceBalance.controlPointTypes
+      : null;
+    normalized.balance.controlPointTypes = {};
+    for (const kind of CONTROL_POINT_KINDS) {
+      normalized.balance.controlPointTypes[kind] = {
+        income: numberOrDefault(sourceTypes?.[kind]?.income, kind === 'supply' ? legacyControlPointIncome : defaults.balance.controlPointTypes[kind].income),
+        deployDiscount: numberOrDefault(sourceTypes?.[kind]?.deployDiscount, defaults.balance.controlPointTypes[kind].deployDiscount),
+        repairAmount: numberOrDefault(sourceTypes?.[kind]?.repairAmount, defaults.balance.controlPointTypes[kind].repairAmount),
+        canDeploy: sourceTypes?.[kind]?.canDeploy !== false,
+      };
     }
     if (sourceBalance.comebackSupply && typeof sourceBalance.comebackSupply === 'object') {
       normalized.balance.comebackSupply = {
@@ -372,7 +374,6 @@
   }
 
   function serializeMapConfig(config) {
-    const typed = (config.controlPoints || []).some(point => !!point.kind);
     const balance = {};
     for (const [key] of BALANCE_KEYS) {
       const raw = config.balance?.[key];
@@ -388,20 +389,18 @@
         amountPerRound: Number(config.balance.comebackSupply.amountPerRound),
       };
     }
-    if (typed) {
-      balance.controlPointTypes = {};
-      const types = config.balance?.controlPointTypes || defaultControlPointTypes();
-      for (const kind of CONTROL_POINT_KINDS) {
-        balance.controlPointTypes[kind] = {
-          income: Number(types[kind]?.income ?? 0),
-          deployDiscount: Number(types[kind]?.deployDiscount ?? 0),
-          repairAmount: Number(types[kind]?.repairAmount ?? 0),
-        };
-        // 与 deployFromHq 同口径：缺省（允许部署）不落盘，仅在勾掉时写出。
-        if (types[kind]?.canDeploy === false) balance.controlPointTypes[kind].canDeploy = false;
-      }
+    // 据点类型恒有配置（普通据点已移除），三类型与每个据点的 kind 一律落盘。
+    balance.controlPointTypes = {};
+    const types = config.balance?.controlPointTypes || defaultControlPointTypes();
+    for (const kind of CONTROL_POINT_KINDS) {
+      balance.controlPointTypes[kind] = {
+        income: Number(types[kind]?.income ?? 0),
+        deployDiscount: Number(types[kind]?.deployDiscount ?? 0),
+        repairAmount: Number(types[kind]?.repairAmount ?? 0),
+      };
+      // 与 deployFromHq 同口径：缺省（允许部署）不落盘，仅在勾掉时写出。
+      if (types[kind]?.canDeploy === false) balance.controlPointTypes[kind].canDeploy = false;
     }
-
     const units = {};
     for (const type of UNIT_TYPES) {
       const src = config.units?.[type] || {};
@@ -424,7 +423,7 @@
       controlPoints: (config.controlPoints || []).map((point, i) => ({
         id: String(point.id || `cp_${i + 1}`),
         name: String(point.name || `据点 ${i + 1}`),
-        ...(typed ? { kind: point.kind || 'supply' } : {}),
+        kind: point.kind || 'supply',
         q: Number(point.q),
         r: Number(point.r),
       })),
@@ -587,7 +586,8 @@
     const weights = record(balance.adjudicationWeights, `${mapName}.balance.adjudicationWeights`);
     for (const [key] of WEIGHT_KEYS) num(weights, key, `${mapName}.balance.adjudicationWeights`, 0);
     const controlPointTypes = balance.controlPointTypes && typeof balance.controlPointTypes === 'object' ? balance.controlPointTypes : null;
-    if (controlPointTypes) {
+    if (!controlPointTypes) errors.push(`${mapName}.balance.controlPointTypes is required`);
+    else {
       for (const kind of CONTROL_POINT_KINDS) {
         const spec = record(controlPointTypes[kind], `${mapName}.balance.controlPointTypes.${kind}`);
         num(spec, 'income', `${mapName}.balance.controlPointTypes.${kind}`, 0);
@@ -633,21 +633,15 @@
     });
 
     if (Array.isArray(c.controlPoints)) {
-      let typed = 0;
       c.controlPoints.forEach((pointValue, i) => {
         const point = record(pointValue, `controlPoints[${i}]`);
         str(point, 'id', `controlPoints[${i}]`);
         str(point, 'name', `controlPoints[${i}]`);
-        if ('kind' in point) {
-          if (!CONTROL_POINT_KINDS.includes(point.kind)) errors.push(`controlPoints[${i}].kind must be supply, forward_base, or repair`);
-          typed += 1;
-        }
+        // 普通据点已移除：每个据点都必须声明类型。
+        if (!('kind' in point)) errors.push(`controlPoints[${i}].kind is required`);
+        else if (!CONTROL_POINT_KINDS.includes(point.kind)) errors.push(`controlPoints[${i}].kind must be supply, forward_base, or repair`);
         claim(pos(point, `controlPoints[${i}]`, radius), `controlPoints[${i}]`);
       });
-      if (typed > 0) {
-        if (!controlPointTypes) errors.push(`${mapName}.balance.controlPointTypes is required when control points use kind`);
-        if (typed !== c.controlPoints.length) errors.push(`${mapName}.controlPoints must all define kind when any control point is typed`);
-      }
     }
 
     if (!Array.isArray(c.startingUnits)) errors.push(`${mapName}.startingUnits must be an array`);
@@ -764,7 +758,6 @@
       healPower: '治疗量',
       startingSupplies: '初始金币',
       baseIncome: '每回合基础收入',
-      controlPointIncome: '普通据点收入',
       damageVarianceRange: '伤害浮动',
       minimumDamage: '最低伤害',
       healVarianceRange: '治疗浮动',
@@ -848,10 +841,10 @@
     if (match) return `地形格 ${Number(match[1]) + 1} 的地形必须是平地、水域或阻挡。`;
     match = error.match(/^controlPoints\[(\d+)\]\.kind must be supply, forward_base, or repair$/);
     if (match) return `据点 ${Number(match[1]) + 1} 的类型必须是补给站、前线基地或维修站。`;
-    match = error.match(/^(.+)\.balance\.controlPointTypes is required when control points use kind$/);
-    if (match) return '据点使用类型时，必须配置三种据点类型的效果。';
-    match = error.match(/^(.+)\.controlPoints must all define kind when any control point is typed$/);
-    if (match) return '如果任意据点设置了类型，所有据点都必须设置类型。';
+    match = error.match(/^controlPoints\[(\d+)\]\.kind is required$/);
+    if (match) return `据点 ${Number(match[1]) + 1} 缺少类型。`;
+    match = error.match(/^(.+)\.balance\.controlPointTypes is required$/);
+    if (match) return '必须配置补给站、前线基地、维修站三种据点类型的效果。';
     match = error.match(/^(.+)\.startingUnits must be an array$/);
     if (match) return '初始单位列表必须是数组。';
     match = error.match(/^startingUnits\[(\d+)\]\.owner invalid$/);
@@ -1240,8 +1233,7 @@
       }
     } else if (tool === 'control') {
       if (!canPlace(pos)) return setStatus('该格已有固定对象，不能放置据点', 'err');
-      const kind = els.toolControlKind.value;
-      const point = { id: nextControlPointId(), name: `据点 ${config.controlPoints.length + 1}`, ...(kind ? { kind } : {}), q: pos.q, r: pos.r };
+      const point = { id: nextControlPointId(), name: `据点 ${config.controlPoints.length + 1}`, kind: els.toolControlKind.value || 'supply', q: pos.q, r: pos.r };
       config.controlPoints.push(point);
       selected = { type: 'controlPoint', index: config.controlPoints.length - 1, object: point };
     } else if (tool === 'unit') {
@@ -1856,7 +1848,7 @@
     </div>`;
     const detail = selected.type === 'controlPoint'
       ? `<label>ID <input id="sel-id" value="${esc(obj.id)}" /></label><label>名称 <input id="sel-name" value="${esc(obj.name)}" /></label>
-        <label>类型 <select id="sel-kind"><option value="">普通据点</option>${CONTROL_POINT_KINDS.map(k => `<option value="${k}">${esc(CONTROL_POINT_NAMES[k])}</option>`).join('')}</select></label>`
+        <label>类型 <select id="sel-kind">${CONTROL_POINT_KINDS.map(k => `<option value="${k}">${esc(CONTROL_POINT_NAMES[k])}</option>`).join('')}</select></label>`
       : selected.type === 'startingUnit'
         ? `<div class="field-grid compact"><label>玩家 <select id="sel-owner"><option value="player_a">player_a</option><option value="player_b">player_b</option></select></label>
           <label>单位 <select id="sel-type">${UNIT_TYPES.map(type => `<option value="${type}">${esc(UNIT_NAMES[type])}</option>`).join('')}</select></label></div>`
@@ -1866,7 +1858,7 @@
         : '';
     const canDelete = selected.type !== 'headquarters' && selected.type !== 'spawnHeadquarters';
     els.selectionFields.innerHTML = `${detail}${base}<div class="selection-actions"><button id="sel-apply" type="button">应用</button>${canDelete ? '<button id="sel-delete" class="danger" type="button">删除</button>' : ''}</div>`;
-    if ($('sel-kind')) $('sel-kind').value = obj.kind || '';
+    if ($('sel-kind')) $('sel-kind').value = obj.kind || 'supply';
     if ($('sel-owner')) $('sel-owner').value = obj.owner;
     if ($('sel-type')) $('sel-type').value = obj.type;
     $('sel-apply').addEventListener('click', () => applySelectionEdit());
@@ -1893,8 +1885,7 @@
       obj.id = $('sel-id').value.trim() || obj.id;
       obj.name = $('sel-name').value.trim() || obj.name;
       const kind = $('sel-kind').value;
-      if (kind) obj.kind = kind;
-      else delete obj.kind;
+      obj.kind = kind || 'supply';
       if (obj.id !== previousId) {
         updateSpawnControlPointReferences(config, previousId, obj.id);
       }

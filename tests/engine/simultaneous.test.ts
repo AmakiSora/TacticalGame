@@ -74,7 +74,6 @@ describe('simultaneous mode setup', () => {
     expect(game.config.balance).toMatchObject({
       startingSupplies: 120,
       baseIncome: 8,
-      controlPointIncome: 8,
       adjudicationWeights: { armyValue: 0.35, supplies: 0.25, effectiveActions: 6 },
     });
   });

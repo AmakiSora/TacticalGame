@@ -120,7 +120,8 @@ export interface MapConfig {
   balance: {
     startingSupplies: number;
     baseIncome: number;
-    controlPointIncome: number;
+    /** 已废弃（普通据点概念移除）：仅旧内嵌对局/回放配置仍带此字段，引擎按回退读取。 */
+    controlPointIncome?: number;
     damageVarianceRange: number;
     minimumDamage: number;
     healVarianceRange: number;
@@ -339,7 +340,7 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   assertNumber(hqSpec, 'defense', `Map "${id}".headquartersSpec`, 0);
 
   const balance = asRecord(c.balance, `Map "${id}".balance`);
-  for (const key of ['startingSupplies', 'baseIncome', 'controlPointIncome', 'damageVarianceRange', 'minimumDamage', 'healVarianceRange']) {
+  for (const key of ['startingSupplies', 'baseIncome', 'damageVarianceRange', 'minimumDamage', 'healVarianceRange']) {
     assertNumber(balance, key, `Map "${id}".balance`, 0);
   }
   if (!('actionsPerTurn' in balance)) throw new Error(`Map "${id}".balance.actionsPerTurn is required`);
@@ -366,15 +367,16 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   const controlPointTypes = 'controlPointTypes' in balance
     ? asRecord(balance.controlPointTypes, `Map "${id}".balance.controlPointTypes`)
     : null;
-  if (controlPointTypes) {
-    for (const kind of CONTROL_POINT_KINDS) {
-      const spec = asRecord(controlPointTypes[kind], `Map "${id}".balance.controlPointTypes.${kind}`);
-      assertNumber(spec, 'income', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
-      assertNumber(spec, 'deployDiscount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
-      assertNumber(spec, 'repairAmount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
-      if ('canDeploy' in spec && typeof spec.canDeploy !== 'boolean') {
-        throw new Error(`Map "${id}".balance.controlPointTypes.${kind}.canDeploy must be boolean`);
-      }
+  if (!controlPointTypes) {
+    throw new Error(`Map "${id}".balance.controlPointTypes is required`);
+  }
+  for (const kind of CONTROL_POINT_KINDS) {
+    const spec = asRecord(controlPointTypes[kind], `Map "${id}".balance.controlPointTypes.${kind}`);
+    assertNumber(spec, 'income', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
+    assertNumber(spec, 'deployDiscount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
+    assertNumber(spec, 'repairAmount', `Map "${id}".balance.controlPointTypes.${kind}`, 0);
+    if ('canDeploy' in spec && typeof spec.canDeploy !== 'boolean') {
+      throw new Error(`Map "${id}".balance.controlPointTypes.${kind}.canDeploy must be boolean`);
     }
   }
   if ('comebackSupply' in balance) {
@@ -432,28 +434,20 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
   }
 
-  let typedControlPoints = 0;
   const controlPoints = c.controlPoints as ControlPointConfig[];
   for (let i = 0; i < controlPoints.length; i++) {
     const cp = asRecord(controlPoints[i], `controlPoints[${i}]`);
     assertString(cp, 'id', `controlPoints[${i}]`);
     assertString(cp, 'name', `controlPoints[${i}]`);
-    if ('kind' in cp) {
-      if (!CONTROL_POINT_KINDS.includes(cp.kind as ControlPointKind)) {
-        throw new Error(`controlPoints[${i}].kind must be supply, forward_base, or repair`);
-      }
-      typedControlPoints += 1;
+    // 普通据点已移除：地图文件的每个据点都必须声明类型。
+    if (!('kind' in cp)) {
+      throw new Error(`controlPoints[${i}].kind is required`);
+    }
+    if (!CONTROL_POINT_KINDS.includes(cp.kind as ControlPointKind)) {
+      throw new Error(`controlPoints[${i}].kind must be supply, forward_base, or repair`);
     }
     const pos = assertPlayablePosition(cp, `controlPoints[${i}]`);
     claim(pos, `controlPoints[${i}]`);
-  }
-  if (typedControlPoints > 0) {
-    if (!controlPointTypes) {
-      throw new Error(`Map "${id}".balance.controlPointTypes is required when control points use kind`);
-    }
-    if (typedControlPoints !== controlPoints.length) {
-      throw new Error(`Map "${id}".controlPoints must all define kind when any control point is typed`);
-    }
   }
 
   if (!Array.isArray(c.startingUnits)) throw new Error(`Map "${id}".startingUnits must be an array`);

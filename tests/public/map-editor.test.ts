@@ -107,18 +107,59 @@ describe('map editor page', () => {
     expect(css).toContain('.token-icon.repair');
   });
 
-  it('exports legacy maps without forcing typed control points', () => {
+  it('exports every map with typed control points now that plain CPs are gone', () => {
     const core = loadCore();
     const legacy = JSON.parse(read('maps/default.json'));
 
     const normalized = core.normalizeImportedMap(legacy);
     const serialized = core.serializeMapConfig(normalized);
 
-    expect(serialized.controlPoints.every((point: any) => !('kind' in point))).toBe(true);
-    expect(serialized.balance.controlPointTypes).toBeUndefined();
+    expect(serialized.controlPoints.every((point: any) => point.kind === 'supply')).toBe(true);
+    expect(serialized.balance.controlPointTypes.supply).toMatchObject({ income: 12, deployDiscount: 0, repairAmount: 0 });
+    expect(serialized.balance.controlPointIncome).toBeUndefined();
     expect(serialized.spawnSlots).toBeUndefined();
     expect(serialized.layouts).toBeUndefined();
     expect(core.validateMapConfig(serialized, 'default')).toEqual([]);
+  });
+
+  it('migrates legacy untyped map imports to supply control points and inherits their income', () => {
+    const core = loadCore();
+    const legacy = {
+      name: 'Old Map',
+      description: 'pre-typing export',
+      grid: 'hex',
+      orientation: 'pointy',
+      radius: 2,
+      terrainCells: [],
+      controlPoints: [
+        { id: 'cp_a', name: 'A', q: -2, r: 0 },
+        { id: 'cp_b', name: 'B', q: 2, r: 0 },
+      ],
+      headquarters: { player_a: { q: -1, r: 0 }, player_b: { q: 1, r: 0 } },
+      startingUnits: [],
+      units: JSON.parse(read('maps/default.json')).units,
+      headquartersSpec: { hp: 180, defense: 6 },
+      balance: {
+        startingSupplies: 80,
+        baseIncome: 10,
+        controlPointIncome: 9,
+        damageVarianceRange: 3,
+        minimumDamage: 1,
+        healVarianceRange: 6,
+        actionsPerTurn: 5,
+        maxTurns: 15,
+        adjudicationWeights: { enemyHqDamage: 4, ownHqHp: 2, controlPoint: 90, armyValue: 2, supplies: 1 },
+      },
+    };
+
+    const normalized = core.normalizeImportedMap(legacy);
+    expect(normalized.controlPoints.map((point: any) => point.kind)).toEqual(['supply', 'supply']);
+    expect(normalized.balance.controlPointTypes.supply.income).toBe(9);
+    expect(normalized.balance.controlPointIncome).toBeUndefined();
+
+    const serialized = core.serializeMapConfig(normalized);
+    expect(serialized.balance.controlPointTypes.supply.income).toBe(9);
+    expect(core.validateMapConfig(serialized, 'old-map')).toEqual([]);
   });
 
   it('round-trips irregular cells and complete multiplayer spawn layouts', () => {
@@ -232,8 +273,8 @@ describe('map editor page', () => {
     const core = loadCore();
     const config = core.configureMapMode(core.createDefaultMapConfig(), 'annihilation');
     config.controlPoints = [
-      { id: 'cp_a', name: 'A', q: -4, r: 0 },
-      { id: 'cp_b', name: 'B', q: 4, r: 0 },
+      { id: 'cp_a', name: 'A', kind: 'supply', q: -4, r: 0 },
+      { id: 'cp_b', name: 'B', kind: 'supply', q: 4, r: 0 },
     ];
     config.spawnSlots[0].controlPointId = 'cp_a';
     config.spawnSlots[1].controlPointId = 'cp_a';
@@ -431,7 +472,7 @@ describe('map editor page', () => {
     expect(source).toContain('comebackSupplyDraft');
   });
 
-  it('validates positions, overlap, typed point consistency, and numeric ranges', () => {
+  it('validates positions, overlap, control point kinds, and numeric ranges', () => {
     const core = loadCore();
     const config = core.createDefaultMapConfig();
     config.controlPoints = [
@@ -446,7 +487,7 @@ describe('map editor page', () => {
 
     expect(errors).toContain('controlPoints[0] overlaps another fixed map object at 0,0');
     expect(errors).toContain('startingUnits[0] (10,0) is outside radius 8');
-    expect(errors).toContain('Map "broken".controlPoints must all define kind when any control point is typed');
+    expect(errors).toContain('controlPoints[1].kind is required');
     expect(errors).toContain('Map "broken".balance.startingSupplies must be a number >= 0');
   });
 
@@ -455,7 +496,8 @@ describe('map editor page', () => {
 
     expect(core.formatValidationError('startingUnits[0] (10,0) is outside radius 8')).toBe('初始单位 1 的坐标 (10,0) 超出地图半径 8。');
     expect(core.formatValidationError('controlPoints[0] overlaps another fixed map object at 0,0')).toBe('据点 1 与另一个固定对象重叠，位置为 0,0。');
-    expect(core.formatValidationError('Map "editor".controlPoints must all define kind when any control point is typed')).toBe('如果任意据点设置了类型，所有据点都必须设置类型。');
+    expect(core.formatValidationError('controlPoints[1].kind is required')).toBe('据点 2 缺少类型。');
+    expect(core.formatValidationError('Map "editor".balance.controlPointTypes is required')).toBe('必须配置补给站、前线基地、维修站三种据点类型的效果。');
     expect(core.formatValidationError('Map "editor".balance.startingSupplies must be a number >= 0')).toBe('平衡设置的初始金币必须是大于等于 0 的数字。');
   });
 

@@ -9,7 +9,7 @@ Every action on your turn, inspect:
 
 - Your units **with** `config.units` + each instance's `moveRange` / `attackRange` / `canCapture` / `healPower` / cost (never assume stock stats)
 - Supplies, `turn.actionsUsed` vs `actionsPerTurn`
-- Control points (owners and kinds if typed)
+- Control points (owners and kinds)
 - **All living opponents' headquarters** HP and your own HQ
 - Live `adjudication` (`scores`, `weights`, `leaders`, `margin`) including **`actionScore`** and `weights.effectiveActions`
 - Legal targets: enemy units **and** living enemy HQs
@@ -39,7 +39,7 @@ Unless the user asks for a different style:
 5. **Deploy** before ordinary moves when supplies + AP remain — especially high supplies, army not ahead of the strongest living rival, ≥2 owned CPs, or late game.
    - Comeback supplies: rebuild or contest income CPs; grants may stop when the gap closes.
    - `fromId` must be HQ id or owned CP id — HQ only when the map allows it (`config.balance.deployFromHq` is not `false`), and the CP's kind must not be deploy-banned (`controlPointTypes.<kind>.canDeploy: false`).
-6. **Early:** move infantry/scouts to neutral or enemy CPs. On typed maps: `supply` early, `forward_base` for sustained pressure, `repair` when wounded units can hold nearby.
+6. **Early:** move infantry/scouts to neutral or enemy CPs. `supply` early, `forward_base` for sustained pressure, `repair` when wounded units can hold nearby.
 7. **Late:** move scouts/rangers/infantry onto best enemy **HQ** attack hexes.
 8. **Near adjudication:** read `adjudication.scores` / `weights` / `leaders` / `margin`. Prioritize non-zero levers: HQ damage, CPs, valuable army survival, **productive action merit** (attacks, heals, deploys, captures, demolish), and convert excess supplies into units when AP/deploy hexes exist. Do **not** end the round on empty shuffles or supply hoarding — they add no `actionScore`. HQ damage already dealt to now-eliminated rivals still counts. On an unlimited map (`config.balance.maxTurns === null`) there is no final round to time: only elimination or the host's `/force-adjudicate` ends it, so keep contesting income CPs instead of banking for a cap.
 9. **No useful action** → `/end-turn`.

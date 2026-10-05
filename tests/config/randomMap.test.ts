@@ -143,7 +143,7 @@ describe('random map generator', () => {
     // forge(100 血总部/6 据点) 等静态图极值；裁决权重与据点类型收入也必须可变。
     const seen = {
       minAp: 99, maxAp: 0, minSupplies: 9999, maxSupplies: 0,
-      minHq: 9999, maxHq: 0, minCp: 99, maxCp: 0, minCpIncome: 999, maxCpIncome: -1,
+      minHq: 9999, maxHq: 0, minCp: 99, maxCp: 0,
       zeroUnits: 0, fourUnits: 0,
       adjWeights: new Set<string>(), cpTypeIncome: new Set<string>(),
     };
@@ -155,7 +155,6 @@ describe('random map generator', () => {
       const hq = config.headquartersSpec.hp;
       seen.minHq = Math.min(seen.minHq, hq); seen.maxHq = Math.max(seen.maxHq, hq);
       seen.minCp = Math.min(seen.minCp, config.controlPoints.length); seen.maxCp = Math.max(seen.maxCp, config.controlPoints.length);
-      seen.minCpIncome = Math.min(seen.minCpIncome, b.controlPointIncome); seen.maxCpIncome = Math.max(seen.maxCpIncome, b.controlPointIncome);
       const units = config.spawnSlots[0].startingUnits.length;
       if (units === 0) seen.zeroUnits++;
       if (units === 4) seen.fourUnits++;
@@ -166,7 +165,6 @@ describe('random map generator', () => {
     expect(seen.minSupplies).toBeLessThanOrEqual(40); expect(seen.maxSupplies).toBeGreaterThanOrEqual(200);
     expect(seen.minHq).toBeLessThanOrEqual(100); expect(seen.maxHq).toBeGreaterThanOrEqual(220);
     expect(seen.minCp).toBe(2); expect(seen.maxCp).toBe(6);
-    expect(seen.minCpIncome).toBe(0); expect(seen.maxCpIncome).toBeGreaterThanOrEqual(14);
     expect(seen.zeroUnits).toBeGreaterThan(0); expect(seen.fourUnits).toBeGreaterThan(0);
     expect(seen.adjWeights.size).toBeGreaterThan(50);
     expect(seen.cpTypeIncome.size).toBeGreaterThan(50);

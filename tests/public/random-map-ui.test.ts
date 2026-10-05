@@ -21,7 +21,7 @@ describe('random map creation UI', () => {
     const keys = ui.PARAMS.map((param: { key: string }) => param.key);
     for (const key of [
       'radius', 'terrainDensity', 'controlPointCount', 'maxTurns', 'actionsPerTurn',
-      'unitStatVariation', 'startingSupplies', 'baseIncome', 'controlPointIncome',
+      'unitStatVariation', 'startingSupplies', 'baseIncome',
       'headquartersHp', 'headquartersDefense',
     ]) {
       expect(keys).toContain(key);

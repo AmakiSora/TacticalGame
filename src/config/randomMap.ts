@@ -26,7 +26,6 @@ export interface RandomMapOptions {
   unitStatVariation?: RandomParam;
   startingSupplies?: RandomParam;
   baseIncome?: RandomParam;
-  controlPointIncome?: RandomParam;
   headquartersHp?: RandomParam;
   headquartersDefense?: RandomParam;
   /**
@@ -54,7 +53,6 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   unitStatVariation: { min: 0, max: 0.5, integer: false },
   startingSupplies: { min: 0, max: 9999, integer: true },
   baseIncome: { min: 0, max: 999, integer: true },
-  controlPointIncome: { min: 0, max: 999, integer: true },
   headquartersHp: { min: 1, max: 9999, integer: true },
   headquartersDefense: { min: 0, max: 99, integer: true },
   startingUnitCount: { min: 0, max: 4, integer: true },
@@ -69,7 +67,6 @@ const DEFAULT_RANGES: Record<string, [number, number]> = {
   unitStatVariation: [0, 0.25],
   startingSupplies: [20, 220],
   baseIncome: [6, 14],
-  controlPointIncome: [0, 16],
   headquartersHp: [80, 240],
   headquartersDefense: [3, 10],
   startingUnitCount: [0, 4],
@@ -337,7 +334,6 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
   const actionsPerTurn = Math.round(resolveParam(options.actionsPerTurn, 'actionsPerTurn', rng));
   const startingSupplies = Math.round(resolveParam(options.startingSupplies, 'startingSupplies', rng));
   const baseIncome = Math.round(resolveParam(options.baseIncome, 'baseIncome', rng));
-  const controlPointIncome = Math.round(resolveParam(options.controlPointIncome, 'controlPointIncome', rng));
   const headquartersHp = Math.round(resolveParam(options.headquartersHp, 'headquartersHp', rng));
   const headquartersDefense = Math.round(resolveParam(options.headquartersDefense, 'headquartersDefense', rng));
   const variation = resolveParam(options.unitStatVariation, 'unitStatVariation', rng);
@@ -380,7 +376,6 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
     balance: {
       startingSupplies,
       baseIncome,
-      controlPointIncome,
       damageVarianceRange: 3,
       minimumDamage: 1,
       healVarianceRange: 6,

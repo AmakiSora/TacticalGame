@@ -1,4 +1,4 @@
-window.APP_VERSION = '3.5.10';
+window.APP_VERSION = '3.5.11';
 
 function renderAppVersionBadges() {
   document.querySelectorAll('.version-badge').forEach(el => {

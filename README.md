@@ -288,12 +288,15 @@ python rl/evaluate.py --model rl/models/model.zip
 
 纯规则/搜索算法编写的 JavaScript AI，无需训练模型。房主在"添加 AI"对话框的"算法脚本"标签中选择算法类型，服务器会自动启动 Node.js 运行器。
 
-当前内置算法：
+**算法按对局模式注册，不同模式不能混用**：每个算法在注册表（`algorithms/registry.mjs` 的 `ALGORITHM_META.modes`）声明支持的模式，大厅添加、命令行运行器与竞技场评估都会按此校验；前端"算法类型"下拉只列出当前对局模式可用的算法。
+
+当前内置算法（未标注者为标准模式）：
 
 - **贪心算法（Greedy）**：优先攻击可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动
 - **随机算法（Random）**：从所有合法动作中随机选择
 - **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 每决策 100 次模拟推演，移动采样偏向 `movementGoal`，支持据点占领与入口部署决策；决策耗时 0.5-1 秒，实测对 greedy 胜率 25%（20 局 5:15），详细档案见 `algorithms/docs/algorithms/mcts.md`
 - **威胁感知算法（Threat）**：效用 AI + 威胁影响图——把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，内置敌方威胁图（落点承伤按敌方行动预算截断），因此集火斩杀、残血避险、走位避炮同时成立；单步决策 p50 0.25ms，实测对 greedy 胜率 70.6%（7 张标准地图 × 40 局）、对 mcts 14:6，为 2 人局最强的内置算法 AI（仅支持标准模式；3-4 人局权重未标定），详细档案见 `algorithms/docs/algorithms/threat.md`
+- **同时随机算法（Random-Sim，仅同时回合模式）**：从所有合法计划动作中随机选择入队（攻击/治疗按形状瞄准格子、一单位一轮一动作、队列长度即行动点），随后提交；同时回合模式的基线算法，详细档案见 `algorithms/docs/algorithms/random-sim.md`
 
 添加算法 AI 时可自定义玩家名，默认预填所选算法的中文名。
 
@@ -303,9 +306,9 @@ python rl/evaluate.py --model rl/models/model.zip
 # 启动服务器
 npm run dev
 
-# 在浏览器中创建标准模式游戏，获取 gameId 和 playerToken
+# 在浏览器中创建游戏（模式需与算法匹配），获取 gameId 和 playerToken
 
-# 运行贪心算法
+# 运行贪心算法（标准模式）
 node algorithms/runner.mjs \
   --algorithm greedy \
   --url http://localhost:3100 \
@@ -313,9 +316,9 @@ node algorithms/runner.mjs \
   --token <playerToken> \
   --side player_a
 
-# 运行随机算法
+# 运行同时随机算法（同时回合模式地图，如 standoff / molten-throne）
 node algorithms/runner.mjs \
-  --algorithm random \
+  --algorithm random-sim \
   --url http://localhost:3100 \
   --game <gameId> \
   --token <playerToken> \
@@ -326,7 +329,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, mcts, threat） |
+| `--algorithm <name>` | 算法名称（greedy, random, mcts, threat, field, verdict, random-sim） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |

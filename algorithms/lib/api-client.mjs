@@ -93,7 +93,7 @@ export class GameApiClient {
   }
 
   /**
-   * 攻击敌方单位或总部
+   * 攻击敌方单位或总部（standard 模式：按目标 id）
    * @param {string} attackerId - 攻击者单位 ID
    * @param {string} targetId - 目标单位或总部 ID
    * @returns {Promise<object>}
@@ -102,6 +102,21 @@ export class GameApiClient {
     return this._request('POST', `/api/games/${this.gameId}/attack`, {
       attackerId,
       targetId,
+    });
+  }
+
+  /**
+   * 攻击瞄准格子（simultaneous/royale 模式：预测射击，命中结算时落在覆盖格上的敌人）
+   * @param {string} attackerId - 攻击者单位 ID
+   * @param {number} q - 瞄准格坐标 q
+   * @param {number} r - 瞄准格坐标 r
+   * @returns {Promise<object>}
+   */
+  async attackCell(attackerId, q, r) {
+    return this._request('POST', `/api/games/${this.gameId}/attack`, {
+      attackerId,
+      q,
+      r,
     });
   }
 
@@ -138,7 +153,7 @@ export class GameApiClient {
   }
 
   /**
-   * 治疗友方单位
+   * 治疗友方单位（standard 模式：按目标 id）
    * @param {string} supportId - 支援单位 ID
    * @param {string} targetId - 目标友方单位 ID
    * @returns {Promise<object>}
@@ -147,6 +162,21 @@ export class GameApiClient {
     return this._request('POST', `/api/games/${this.gameId}/heal`, {
       supportId,
       targetId,
+    });
+  }
+
+  /**
+   * 治疗瞄准格子（simultaneous/royale 模式：结算时覆盖格上的受伤友方各自掷治疗量）
+   * @param {string} supportId - 支援单位 ID
+   * @param {number} q - 瞄准格坐标 q
+   * @param {number} r - 瞄准格坐标 r
+   * @returns {Promise<object>}
+   */
+  async healCell(supportId, q, r) {
+    return this._request('POST', `/api/games/${this.gameId}/heal`, {
+      supportId,
+      q,
+      r,
     });
   }
 

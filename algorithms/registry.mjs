@@ -19,13 +19,20 @@ export const ALGORITHMS = {
   threat: './builtin/threat.mjs',
   field: './builtin/field.mjs',
   verdict: './builtin/verdict.mjs',
+  'random-sim': './builtin/random-sim.mjs',
 };
 
 /**
- * 算法展示元数据（displayName/description/version）。
- * 这是算法中文名、描述与**当前版本**的唯一来源：线上 bot 清单（src/api/bots.ts）、
- * 竞技场排行榜与评估控制台（script/generateArenaLeaderboard.mjs、/api/arena/*）
- * 都从这里取，勿再另立清单（历史上双份同步出过前后端选项不一致的问题）。
+ * 算法展示元数据（displayName/description/version/modes）。
+ * 这是算法中文名、描述、**当前版本**与**支持模式**的唯一来源：线上 bot 清单
+ * （src/api/bots.ts）、竞技场排行榜与评估控制台（script/generateArenaLeaderboard.mjs、
+ * /api/arena/*）都从这里取，勿再另立清单（历史上双份同步出过前后端选项不一致的问题）。
+ *
+ * modes 声明算法可参与的对局模式（standard / simultaneous / royale / annihilation），
+ * 全链路强制隔离、不同模式不能混用：大厅 bot 接口（src/api/bots.ts）、REST runner
+ * （algorithms/runner.mjs）、进程内评估 decide 通道（rl/training/local-worker.ts）
+ * 与竞技场跑批发现（rl/evaluation/round_robin.py）都按它校验/过滤。缺省视为
+ * ['standard']。
  *
  * version 是算法的"当前版本"标注，进入竞技场参与者 id（algo_<name>@<version>）：
  * 算法实现被改进后升版时改这里（如 'v1' → 'v2'），此后新对局记在新版本 id 下，
@@ -34,12 +41,13 @@ export const ALGORITHMS = {
  * 因"未知参与者"被 loadMatches 过滤掉。
  */
 export const ALGORITHM_META = {
-  greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动', version: 'v1' },
-  random: { displayName: '随机算法', description: '从所有合法动作中随机选择', version: 'v1' },
-  mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1' },
-  threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1' },
-  field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1' },
-  verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v1' },
+  greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动', version: 'v1', modes: ['standard'] },
+  random: { displayName: '随机算法', description: '从所有合法动作中随机选择', version: 'v1', modes: ['standard'] },
+  mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1', modes: ['standard'] },
+  threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1', modes: ['standard'] },
+  field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'] },
+  verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v1', modes: ['standard'] },
+  'random-sim': { displayName: '同时随机算法', description: '同时回合：从所有合法计划动作中随机选择入队，随后提交', version: 'v1', modes: ['simultaneous'] },
 };
 
 /**
@@ -81,7 +89,7 @@ export function listAlgorithms() {
 
 /**
  * 列出算法及其展示元数据（未配置 meta 的算法回退为注册名）。
- * @returns {Array<{name: string, displayName: string, description: string, version: string}>}
+ * @returns {Array<{name: string, displayName: string, description: string, version: string, modes: string[]}>}
  */
 export function listAlgorithmInfo() {
   return listAlgorithms().map(name => ({
@@ -89,6 +97,7 @@ export function listAlgorithmInfo() {
     displayName: ALGORITHM_META[name]?.displayName ?? name,
     description: ALGORITHM_META[name]?.description ?? '',
     version: algorithmVersion(name),
+    modes: algorithmModes(name),
   }));
 }
 
@@ -99,6 +108,26 @@ export function listAlgorithmInfo() {
  */
 export function algorithmVersion(name) {
   return ALGORITHM_META[name]?.version ?? 'v1';
+}
+
+/**
+ * 算法声明支持的对局模式（未显式标注视为仅标准模式）。
+ * @param {string} name - 算法名称
+ * @returns {string[]}
+ */
+export function algorithmModes(name) {
+  const modes = ALGORITHM_META[name]?.modes;
+  return Array.isArray(modes) && modes.length ? modes : ['standard'];
+}
+
+/**
+ * 算法是否支持指定对局模式（不同模式不能混用算法的判定口径）。
+ * @param {string} name - 算法名称
+ * @param {string} mode - 对局模式（standard / simultaneous / royale / annihilation）
+ * @returns {boolean}
+ */
+export function algorithmSupportsMode(name, mode) {
+  return algorithmModes(name).includes(mode);
 }
 
 /**
@@ -126,7 +155,7 @@ export function algorithmVersionedId(name) {
 /**
  * 获取算法的元数据（不加载模块本身）
  * @param {string} name - 算法名称
- * @returns {{name: string, path: string, displayName: string, description: string, version: string} | null}
+ * @returns {{name: string, path: string, displayName: string, description: string, version: string, modes: string[]} | null}
  */
 export function getAlgorithmMeta(name) {
   const path = ALGORITHMS[name];
@@ -137,6 +166,7 @@ export function getAlgorithmMeta(name) {
     displayName: ALGORITHM_META[name]?.displayName ?? name,
     description: ALGORITHM_META[name]?.description ?? '',
     version: algorithmVersion(name),
+    modes: algorithmModes(name),
   };
 }
 

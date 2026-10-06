@@ -185,10 +185,13 @@ def discover_algorithms(root: Path) -> list[tuple[str, str]]:
     """读取 algorithms/registry.mjs 的注册算法及当前版本（经 node，避免手工维护第二份名单）。
 
     返回 (注册名, 版本) 对，两者拼成竞技场参与者 id ``algo_<注册名>@<版本>``。
+    只发现支持 standard 的算法：评估地图池全是标准模式图，且不同模式不能混用算法
+    （注册表 ALGORITHM_META.modes 是唯一口径）。
     """
     registry_url = (root / "algorithms" / "registry.mjs").as_posix()
     script = (f"import('file:///{registry_url}').then(r => console.log("
-              "r.listAlgorithmInfo().map(i => i.name + '@' + i.version).join(',')))")
+              "r.listAlgorithmInfo().filter(i => i.modes.includes('standard'))"
+              ".map(i => i.name + '@' + i.version).join(',')))")
     result = subprocess.run(
         ["node", "--input-type=module", "-e", script],
         cwd=str(root), capture_output=True, text=True,

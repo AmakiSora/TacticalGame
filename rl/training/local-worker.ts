@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { globalEventBus } from '../../src/events/bus.js';
 // 算法模块为 ESM .mjs，无类型声明（与 tests/algorithms 的引用方式一致）。
 // @ts-expect-error untyped .mjs module
-import { loadAlgorithm } from '../../algorithms/registry.mjs';
+import { loadAlgorithm, ALGORITHM_META } from '../../algorithms/registry.mjs';
 // @ts-expect-error untyped .mjs module
 import * as algorithmUtils from '../../algorithms/lib/game-utils.mjs';
 // @ts-expect-error untyped .mjs module
@@ -101,6 +101,8 @@ export async function handleCommand(command: Record<string, unknown>): Promise<u
       game = createInitialGame(randomUUID(), mapId);
     }
     if (game.config.mode !== 'standard') {
+      // apply 通道（moveUnit/attackTarget/... 逐动作立即执行）只实现标准语义；
+      // 同时模式的计划/结算链路不在这里支持，故 reset 一律拒绝非标准地图。
       throw new Error(`map "${mapId}" uses ${game.config.mode} mode; local baseline supports standard mode only`);
     }
     return snapshot();
@@ -136,6 +138,16 @@ async function decideAlgorithmAction(command: Record<string, unknown>): Promise<
   owner(command.owner);
   const name = typeof command.algorithm === 'string' ? command.algorithm : '';
   if (!name) throw new Error('decide requires an algorithm name');
+  // 不同模式不能混用算法：注册表 ALGORITHM_META.modes 是唯一口径（缺省仅 standard）。
+  // 注意 reset 仍只接受 standard 地图（apply 通道只实现标准语义），因此这里实际
+  // 挡住的是「标准图跑非标准算法」方向的混用。
+  const declared = ALGORITHM_META[name]?.modes;
+  const modes = Array.isArray(declared) && declared.length ? declared : ['standard'];
+  if (!modes.includes(game.config.mode)) {
+    throw new Error(
+      `algorithm "${name}" supports mode(s) [${modes.join(', ')}]; current game mode is "${game.config.mode}"`,
+    );
+  }
   const algorithm = await loadDecideAlgorithm(name);
   const view = snapshot();
   const action = await algorithm.decide(view, algorithmUtils);

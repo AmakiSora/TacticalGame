@@ -298,7 +298,9 @@ export function movementGoal(game, owner, unit) {
 
 /**
  * 获取部署源（总部和己方据点）
- * 地图 `balance.deployFromHq === false` 时总部不可作为部署起点，只返回据点。
+ * 地图 `balance.deployFromHq === false` 时总部不可作为部署起点，只返回据点；
+ * 据点类型 `canDeploy === false` 的据点同样排除（与引擎 deployOriginFor 同口径，
+ * 两种模式共用——如 molten-throne 仅前线基地可部署）。
  * @param {object} game - 游戏状态
  * @param {string} owner - 玩家 ID
  * @returns {Array<object>} 部署源数组
@@ -309,7 +311,9 @@ export function deployOrigins(game, owner) {
     const ownHq = game.headquarters?.[owner];
     if (ownHq && ownHq.alive !== false) origins.push(ownHq);
   }
-  origins.push(...(game.controlPoints || []).filter(cp => cp.owner === owner));
+  origins.push(...(game.controlPoints || []).filter(
+    cp => cp.owner === owner && cpKindEffect(game, cp)?.canDeploy !== false
+  ));
   return origins;
 }
 

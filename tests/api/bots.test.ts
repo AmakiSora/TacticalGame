@@ -359,6 +359,44 @@ describe('Algorithm bot endpoints', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe('bot_not_supported');
+    expect(res.json().error).toContain('标准');
+  });
+
+  it('rejects simultaneous-only algorithms on standard maps', async () => {
+    const created = await createTwoPlayerLobby(app);
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_random-sim' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('bot_not_supported');
+    expect(res.json().error).toContain('同时回合');
+  });
+
+  it('allows simultaneous-mode algorithm bots on simultaneous maps', async () => {
+    const created = await createTwoPlayerLobby(app, { mapId: 'standoff' });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_random-sim' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { bot: { name: string; algorithm: string } };
+    expect(body.bot.algorithm).toBe('random-sim');
+    expect(body.bot.name).toBe('同时随机算法');
+  });
+
+  it('lists per-algorithm supported modes in the catalog', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/algorithms' });
+    expect(res.statusCode).toBe(200);
+    const { algorithms } = res.json() as { algorithms: Array<{ id: string; modes: string[] }> };
+    const randomSim = algorithms.find(a => a.id === 'algo_random-sim');
+    expect(randomSim?.modes).toEqual(['simultaneous']);
+    const greedy = algorithms.find(a => a.id === 'algo_greedy');
+    expect(greedy?.modes).toEqual(['standard']);
   });
 
   it('auto-suffixed duplicate bot names stay distinguishable and within the length limit', async () => {

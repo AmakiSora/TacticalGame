@@ -150,4 +150,11 @@ describe('local engine worker algorithm decide channel', () => {
     await expect(handleCommand({ cmd: 'decide', owner: 'player_a' })).rejects.toThrow('algorithm');
     await expect(handleCommand({ cmd: 'decide', owner: 'player_c', algorithm: 'greedy' })).rejects.toThrow('owner');
   });
+
+  it('rejects algorithms whose registry modes do not cover the game mode', async () => {
+    await handleCommand({ cmd: 'reset', mapId: 'default' });
+    // random-sim 声明 modes: ['simultaneous']，在标准模式对局里走 decide 即混用。
+    await expect(handleCommand({ cmd: 'decide', owner: 'player_a', algorithm: 'random-sim' }))
+      .rejects.toThrow('mode');
+  });
 });

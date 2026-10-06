@@ -147,6 +147,8 @@ describe('AI 竞技场评估控制台 API', () => {
     const ids = data.algorithms.map((a: { id: string }) => a.id);
     expect(ids).toContain('algo_threat');
     expect(ids).toContain('algo_greedy');
+    // 评估跑批仅支持标准模式：非标准模式算法不进入参评清单（不同模式不能混用）。
+    expect(ids).not.toContain('algo_random-sim');
     const threat = data.algorithms.find((a: { id: string }) => a.id === 'algo_threat');
     expect(threat.name).toBe('威胁感知算法');
     expect(threat.description).toContain('威胁图');

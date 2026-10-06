@@ -23,12 +23,15 @@ node algorithms/runner.mjs \
 
 ### 可用算法
 
-- **greedy** - 贪心算法：攻击 > 治疗 > 爆破 > 部署 > 移动
-- **random** - 随机算法：从所有合法动作中随机选择
-- **mcts** - 蒙特卡洛树搜索：模拟推演选择最优动作
-- **threat** - 威胁感知算法：威胁图统一效用评估，集火斩杀、避险走位
-- **field** - 势场算法：斥力井（敌方火力）+ 引力井（据点/总部）+ 波前距离场，风筝走位、分头抢点
-- **verdict** - 裁决线算法：按引擎裁决权重选"用哪条线赢"（斩首/磨平/裁定），再从终局倒推攻城排程与期限
+- **greedy** - 贪心算法：攻击 > 治疗 > 爆破 > 部署 > 移动（标准模式）
+- **random** - 随机算法：从所有合法动作中随机选择（标准模式）
+- **mcts** - 蒙特卡洛树搜索：模拟推演选择最优动作（标准模式）
+- **threat** - 威胁感知算法：威胁图统一效用评估，集火斩杀、避险走位（标准模式）
+- **field** - 势场算法：斥力井（敌方火力）+ 引力井（据点/总部）+ 波前距离场，风筝走位、分头抢点（标准模式）
+- **verdict** - 裁决线算法：按引擎裁决权重选"用哪条线赢"（斩首/磨平/裁定），再从终局倒推攻城排程与期限（标准模式）
+- **random-sim** - 同时随机算法：从所有合法计划动作中随机选择入队，随后提交（同时回合模式）
+
+**算法按对局模式注册，不同模式不能混用**：每个算法在注册表 `ALGORITHM_META.modes` 声明支持的模式（缺省视为 `['standard']`）；大厅 bot 接口、`runner.mjs`、评估链路（local-worker / round_robin）都按它拒绝或过滤不匹配的算法，前端"算法类型"下拉也只列出当前对局模式可用的算法。
 
 ## 编写自定义算法
 
@@ -47,13 +50,15 @@ export default {
   description: '我的自定义算法',
 
   /**
-   * 决策函数：返回下一个动作或 null（结束回合）
+   * 决策函数：返回下一个动作或 null（结束回合 / 同时模式 = 提交计划）
    * @param {object} game - 完整的游戏状态
    * @param {object} utils - 游戏工具函数（见下文）
+   * @param {object} [ctx] - 调用上下文；ctx.owner 为算法座位
+   *   （同时回合模式没有 turn.currentPlayerId，座位只能从 ctx 拿）
    * @returns {object|null} 动作对象或 null
    */
-  async decide(game, utils) {
-    const owner = game.turn.currentPlayerId;
+  async decide(game, utils, ctx) {
+    const owner = game.turn?.currentPlayerId ?? ctx?.owner;
 
     // 示例：攻击射程内的第一个敌人
     const myUnits = utils.livingUnits(game, owner);
@@ -80,8 +85,11 @@ export default {
 **动作格式**：
 
 ```javascript
-// 攻击
+// 攻击（standard：按目标 id）
 { type: 'attack', payload: { attackerId: 'u_123', targetId: 'u_456' } }
+
+// 攻击（simultaneous/royale：瞄准格子，形状合法性按 config.units.<type>.attackShape）
+{ type: 'attack', payload: { attackerId: 'u_123', q: 5, r: -3 } }
 
 // 移动
 { type: 'move', payload: { unitId: 'u_123', q: 5, r: -3 } }
@@ -89,12 +97,17 @@ export default {
 // 部署
 { type: 'deploy', payload: { unitType: 'infantry', fromId: 'hq_a', q: 1, r: 0 } }
 
-// 治疗
+// 治疗（standard：按目标 id）
 { type: 'heal', payload: { supportId: 'u_123', targetId: 'u_456' } }
+
+// 治疗（simultaneous/royale：瞄准格子，覆盖格上的受伤友方各自结算）
+{ type: 'heal', payload: { supportId: 'u_123', q: 2, r: 1 } }
 
 // 爆破
 { type: 'demolish', payload: { unitId: 'u_123', q: 2, r: 1 } }
 ```
+
+**同时回合模式的额外约束**（详见 `skill/simultaneous.md`）：动作入队不立即执行；每单位每轮至多一个动作；己方队列长度即行动点用量（读 `game.plan.myQueue`，上限 `config.balance.actionsPerTurn`）；deploy/move 的目的格不能与己方队列中已声明的格子重复；`endTurn` 即提交并锁定计划。
 
 #### 2. 完整控制接口
 
@@ -176,12 +189,14 @@ export default {
 
 ```javascript
 await apiClient.getState()
-await apiClient.attack(attackerId, targetId)
+await apiClient.attack(attackerId, targetId)      // standard：按目标 id
+await apiClient.attackCell(attackerId, q, r)      // simultaneous/royale：瞄准格子
 await apiClient.move(unitId, q, r)
 await apiClient.deploy(unitType, fromId, q, r)
-await apiClient.heal(supportId, targetId)
+await apiClient.heal(supportId, targetId)         // standard：按目标 id
+await apiClient.healCell(supportId, q, r)         // simultaneous/royale：瞄准格子
 await apiClient.demolish(unitId, q, r)
-await apiClient.endTurn()
+await apiClient.endTurn()                         // simultaneous/royale：提交计划
 ```
 
 所有方法自动处理 429 限流重试。
@@ -236,13 +251,23 @@ await apiClient.endTurn()
 
 ## 注册算法
 
-编写完算法后，在 `algorithms/registry.mjs` 中注册：
+编写完算法后，在 `algorithms/registry.mjs` 中注册，并在 `ALGORITHM_META` 里声明展示名与支持模式：
 
 ```javascript
 export const ALGORITHMS = {
   greedy: './builtin/greedy.mjs',
   random: './builtin/random.mjs',
   'my-algorithm': './builtin/my-algorithm.mjs', // 添加这一行
+};
+
+export const ALGORITHM_META = {
+  // ...
+  'my-algorithm': {
+    displayName: '我的算法',
+    description: '……',
+    version: 'v1',
+    modes: ['standard'], // 支持的对局模式；缺省视为 ['standard']，不同模式不能混用
+  },
 };
 ```
 

@@ -6,12 +6,18 @@
 //       --game <gameId> --token <token> --side player_a
 
 import { pathToFileURL } from 'node:url';
-import { loadAlgorithm, listAlgorithms } from './registry.mjs';
+import { loadAlgorithm, listAlgorithms, getAlgorithmMeta } from './registry.mjs';
 import { GameApiClient } from './lib/api-client.mjs';
 import { runAlgorithm, validateAlgorithm } from './lib/interfaces.mjs';
 import * as utils from './lib/game-utils.mjs';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// 与 src/types.ts 的 isSimultaneousMode 同口径：simultaneous 与 royale 共享
+// 计划/提交机制（runner.mjs 是纯 JS，不能直接 import TS 源码）。
+function isSimultaneousMode(mode) {
+  return mode === 'simultaneous' || mode === 'royale';
+}
 
 /**
  * 解析命令行参数
@@ -131,6 +137,17 @@ async function waitForTurn(apiClient, side, pollSeconds, quiet) {
       return { done: true, state, reason: 'eliminated' };
     }
 
+    // 同时回合：没有轮次概念——对局进行中且己方尚未提交计划时行动；
+    // 已提交则等全员提交结算、下一轮 plan.committed 清空后再行动。
+    if (isSimultaneousMode(state.config?.mode)) {
+      const committed = state.plan?.committed ?? [];
+      if (state.phase === 'active' && !committed.includes(side)) {
+        return { done: false, state };
+      }
+      await sleep(pollSeconds * 1000);
+      continue;
+    }
+
     // 轮到己方
     const current = state.turn?.currentPlayerId || state.turn?.currentOwner;
     if (current === side) {
@@ -161,15 +178,17 @@ async function main() {
   // 创建 API 客户端
   const apiClient = new GameApiClient(args.url, args.game, args.token);
 
-  // 验证游戏模式
+  // 验证游戏模式：算法在注册表声明支持的模式（ALGORITHM_META.modes），
+  // 不同模式不能混用算法。
   log(`Connecting to game ${args.game}...`);
   const initialState = await apiClient.getState();
 
-  if (initialState.config?.mode && initialState.config.mode !== 'standard') {
+  const gameMode = initialState.config?.mode ?? 'standard';
+  const supportedModes = getAlgorithmMeta(args.algorithm)?.modes ?? ['standard'];
+  if (!supportedModes.includes(gameMode)) {
     throw new Error(
-      `This runner only supports standard mode. ` +
-      `Game mode is "${initialState.config.mode}". ` +
-      `Use scripts/auto-standard-game.mjs for full mode support.`
+      `Algorithm "${args.algorithm}" supports mode(s) [${supportedModes.join(', ')}], ` +
+      `but this game is "${gameMode}". Pick an algorithm registered for that mode.`
     );
   }
 
@@ -201,8 +220,8 @@ async function main() {
     try {
       log(`\n[Turn ${turnNo}] Running algorithm...`);
 
-      // 执行算法
-      await runAlgorithm(algorithm, gameState, apiClient, utils);
+      // 执行算法（ctx.owner 给同时模式算法提供座位——该模式没有 currentPlayerId）
+      await runAlgorithm(algorithm, gameState, apiClient, utils, { owner: args.side });
 
       turnsPlayed++;
       log(`[Turn ${turnNo}] Completed (${turnsPlayed}/${args.maxTurns})`);

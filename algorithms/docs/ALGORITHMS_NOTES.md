@@ -9,12 +9,13 @@
 ```
 algorithms/
 ├── builtin/           # 内置算法实现
-│   ├── greedy.mjs    # 贪心算法
-│   ├── random.mjs    # 随机算法
-│   ├── mcts.mjs      # 蒙特卡洛树搜索
-│   ├── threat.mjs    # 威胁感知算法
-│   ├── field.mjs     # 势场算法
-│   ├── verdict.mjs   # 裁决线算法
+│   ├── greedy.mjs    # 贪心算法（标准模式）
+│   ├── random.mjs    # 随机算法（标准模式）
+│   ├── mcts.mjs      # 蒙特卡洛树搜索（标准模式）
+│   ├── threat.mjs    # 威胁感知算法（标准模式）
+│   ├── field.mjs     # 势场算法（标准模式）
+│   ├── verdict.mjs   # 裁决线算法（标准模式）
+│   ├── random-sim.mjs # 同时随机算法（同时回合模式）
 │   └── README.md     # 算法开发指南
 ├── lib/              # 共享工具库
 │   ├── api-client.mjs    # REST API 客户端
@@ -29,14 +30,17 @@ algorithms/
 │       ├── mcts.md
 │       ├── threat.md
 │       ├── field.md
-│       └── verdict.md
+│       ├── verdict.md
+│       └── random-sim.md
 ├── registry.mjs      # 算法注册表
 └── runner.mjs        # 通用运行器
 ```
 
 ## 算法接口
 
-所有算法必须实现以下两种接口之一：
+所有算法必须实现以下两种接口之一。算法按对局模式注册（注册表 `ALGORITHM_META.modes`，
+缺省视为 `['standard']`），不同模式不能混用——大厅 bot 接口、runner、评估链路
+都会按注册表校验，模式不匹配一律拒绝。
 
 ### 策略接口（推荐）
 
@@ -47,13 +51,17 @@ export default {
   name: 'algorithm_name',
   description: '算法描述',
   
-  async decide(gameState, utils) {
+  async decide(gameState, utils, ctx) {
     // gameState: 完整游戏状态
     // utils: 工具函数集合
-    // 返回 { type: 'attack', payload: {...} } 或 null（结束回合）
+    // ctx.owner: 算法座位（同时回合模式没有 turn.currentPlayerId，座位只能从这里拿）
+    // 返回 { type: 'attack', payload: {...} } 或 null（结束回合；同时模式 = 提交计划）
   }
 }
 ```
+
+同时回合模式的动作形态不同：攻击/治疗瞄准格子（`payload: { attackerId, q, r }` /
+`{ supportId, q, r }`），动作入队而非立即执行，`plan.myQueue` 记录己方队列。
 
 ### 完整控制接口
 
@@ -96,6 +104,9 @@ export default {
 | **threat** | 效用/影响图 | O(单位×格子) | **2 人局最强内置**（vs greedy 7 图 ×40 局 70.6%，vs mcts 14:6）；3-4 人局未标定 | 走位稳健的对战、教学 |
 | **field** | 势场/梯度下降 | O(单位×格子) | 中上（vs greedy 7 图 ×30 局 **64.3%**）；**低行动点图最强**（danger-close 97%，threat 仅 18%）；高行动点图最弱（multiplayer-ring 7%） | 涌现式走位（风筝/分头抢点）、慢节奏消耗战 |
 | **verdict** | 反向规划/期限排程 | O(单位×格子 + 排程回合) | **对 greedy 最强**（7 图 ×30 局 **95.7%**，两套种子一致）；vs threat 76.7%、vs field 88.6%、vs random 24:0；`danger-close` 80%（threat 18%）、`multiplayer-ring` 100%（field 7%） | 全动作按裁决分统一计价、预算内斩首、守成与回防 |
+| **random-sim** | 随机 | O(n) | 未标定（仅同时回合模式） | 同时回合基线对照、模式隔离冒烟 |
+
+> 表中除 random-sim 外均为标准模式算法；random-sim 仅支持同时回合（simultaneous）模式。
 
 > b = 分支因子（~20），d = 搜索深度（8），k = 模拟次数（100）
 >

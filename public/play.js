@@ -1631,9 +1631,10 @@ function lobbySummaryMarkup(lobby, canKick = false) {
 
 function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target === els.lobbySummary && Boolean(hostToken)) {
   if (!target || !lobby) return;
-  // 记录大厅元信息，供「对战提示词」页签自动填充地图与人数。
+  // 记录大厅元信息，供「对战提示词」页签自动填充地图与人数、算法清单按模式过滤。
   if (lobby.mapId) botLobbyMapId = lobby.mapId;
   if (lobby.maxPlayers) botLobbyMaxPlayers = lobby.maxPlayers;
+  if (lobby.mode) botLobbyMode = lobby.mode;
   target.innerHTML = lobbySummaryMarkup(lobby, canKick);
 }
 
@@ -1813,9 +1814,10 @@ async function kickLobbyPlayer(playerId) {
 
 // —— 强化学习 AI：房主在大厅中一键添加 ——
 let botModelsLoaded = false;
-// 大厅元信息快照（renderLobbySummary 时刷新），供提示词模板自动填充。
+// 大厅元信息快照（renderLobbySummary 时刷新），供提示词模板自动填充、算法清单按模式过滤。
 let botLobbyMapId = '';
 let botLobbyMaxPlayers = 0;
+let botLobbyMode = '';
 
 async function ensureBotModels() {
   if (botModelsLoaded) return;
@@ -1842,16 +1844,45 @@ function openBotDialog() {
   if (!gameId || !hostToken) return;
   closeBotDialog();
   els.botName.value = '';
-  resetAlgorithmName();
+  els.algorithmName.value = '';
   switchBotTab('bots');
   els.botDialog.classList.remove('hidden');
   els.botDialogBackdrop.classList.remove('hidden');
   ensureBotModels();
+  ensureAlgorithmTypes();
   renderBotPromptText();
   els.botName.focus();
 }
 
-// —— 算法脚本页签：默认名取所选算法的中文名 ——
+// —— 算法脚本页签：算法清单从服务器按当前对局模式拉取 ——
+// 算法按模式注册（注册表 ALGORITHM_META.modes），不同模式不能混用；
+// 清单由 /api/algorithms 提供，勿再在前端另立写死的算法列表。
+let algorithmTypesCache = null;
+
+async function ensureAlgorithmTypes() {
+  if (!algorithmTypesCache) {
+    try {
+      const res = await fetch('/api/algorithms');
+      if (!res.ok) throw new Error('request failed');
+      const data = await res.json();
+      algorithmTypesCache = Array.isArray(data.algorithms) ? data.algorithms : [];
+    } catch {
+      algorithmTypesCache = [];
+    }
+  }
+  // gameConfig 只在开局后的 game_start 事件才有值，而添加 AI 弹窗仅存在于大厅阶段，
+  // 此时须回退到大厅快照的 mode，否则同时回合对局选不到 random-sim、非标准模式全被 400 拒。
+  const mode = gameConfig?.mode || botLobbyMode || 'standard';
+  const available = algorithmTypesCache.filter(algo =>
+    Array.isArray(algo.modes) ? algo.modes.includes(mode) : mode === 'standard');
+  els.algorithmType.innerHTML = available.length
+    ? available.map(algo =>
+        `<option value="${esc(algo.id)}" data-name="${esc(algo.name)}">${esc(algo.name)}</option>`).join('')
+    : '<option value="">（当前模式无可用算法）</option>';
+  resetAlgorithmName();
+}
+
+// 默认名取所选算法的中文名
 function defaultAlgorithmName() {
   return els.algorithmType.selectedOptions[0]?.dataset.name || '';
 }

@@ -148,14 +148,28 @@ export interface AlgorithmBotConfig {
   name: string;
   algorithm: string;
   description: string;
+  /** 算法声明支持的对局模式（注册表 ALGORITHM_META.modes），跨模式混用一律拒绝。 */
+  modes: string[];
 }
 export const ALGORITHM_BOTS: Record<string, AlgorithmBotConfig> = Object.fromEntries(
   listAlgorithmInfo().map(info => [algorithmParticipantId(info.name), {
     name: info.displayName,
     algorithm: info.name,
     description: info.description,
+    modes: info.modes,
   }]),
 );
+
+/** 对局模式的中文名（bot 拒绝文案用）。 */
+const MODE_LABELS: Record<string, string> = {
+  standard: '标准',
+  simultaneous: '同时回合',
+  royale: '大逃杀',
+  annihilation: '歼灭',
+};
+function modeLabel(mode: string): string {
+  return MODE_LABELS[mode] ?? mode;
+}
 
 /** 大厅内出现同名玩家会让踢人/观战难以区分：名称被占用时自动追加序号。 */
 function uniqueLobbyName(game: GameState, name: string): string {
@@ -436,6 +450,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       name: config.name,
       algorithm: config.algorithm,
       description: config.description,
+      modes: config.modes,
     })),
   }));
 
@@ -490,18 +505,20 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       if (game.phase !== 'lobby') {
         return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
       }
-      if (game.config.mode !== 'standard') {
-        return reply.code(400).send({
-          error: '算法 AI 目前仅支持标准模式',
-          code: 'bot_not_supported',
-        });
-      }
       const botType = req.body?.botType?.trim();
       const config = botType ? ALGORITHM_BOTS[botType] : undefined;
       if (!botType || !config) {
         return reply.code(400).send({
           error: `unknown algorithm bot type: "${botType ?? ''}"`,
           code: 'bot_not_found',
+        });
+      }
+      // 算法按注册表声明的 modes 与对局模式匹配，不同模式不能混用。
+      if (!config.modes.includes(game.config.mode)) {
+        return reply.code(400).send({
+          error: `算法「${config.name}」仅支持${config.modes.map(modeLabel).join('、')}模式，` +
+            `当前对局为${modeLabel(game.config.mode)}模式`,
+          code: 'bot_not_supported',
         });
       }
       const name = uniqueLobbyName(game, req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || config.name);

@@ -2,6 +2,25 @@
 
 > 本文档记录算法 AI 系统的版本历史、功能变更和性能进展。
 
+## 3.5.12（2026-10-06）— 算法按模式注册隔离 + 同时随机算法
+
+### 新增功能
+
+1. **同时随机算法（random-sim）**：首个同时回合（simultaneous）模式算法 `algorithms/builtin/random-sim.mjs`。与标准 random 同宗的随机基线：每轮从所有合法**计划动作**中随机入队，返回 null 即提交。适配同时模式的核心语义——攻/治按 `attackShape`/`healShape` 瞄准格子（single/line/arc）、一单位一轮一动作、队列长度即行动点、部署预算扣减已排队花费、己方目的格认领去重；座位经 `ctx.owner` 传入（同时模式没有 `turn.currentPlayerId`）。所有枚举镜像 `planning.ts` 入队校验（形状瞄准、一单位一动作、目的格认领、部署预算扣减、炮火危险区）——被拒动作会让 runner 空耗重问配额与请求往返，故按镜像直接过滤，不依赖服务器拒绝来发现非法动作。
+
+2. **算法按对局模式注册，不同模式不能混用**：注册表 `ALGORITHM_META` 新增 `modes` 字段（缺省 `['standard']`，存量 6 个算法显式标注），是全链路的唯一口径：
+   - 大厅 bot 接口 `POST /api/games/:id/bots/algorithm` 按算法 modes 校验对局模式，不匹配返回 400 `bot_not_supported`（文案列出算法支持的模式与当前模式）；
+   - `algorithms/runner.mjs` 启动时按注册表 modes 校验（替代原硬编码 standard-only），并支持同时模式的行动等待（`phase === 'active' && !plan.committed.includes(side)`）；
+   - `rl/training/local-worker.ts` 的 decide 通道拒绝模式不匹配的算法（`reset` 的 standard-only 保留——apply 通道只实现标准语义）；
+   - `rl/evaluation/round_robin.py` 的算法发现只取支持 standard 的算法（评估地图池全是标准图）；`/api/arena/participants` 同步过滤；
+   - 前端「算法类型」下拉（play.html / play-m.html）由写死的静态清单改为打开对话框时拉取 `/api/algorithms` 并按当前对局模式过滤——消除了注册表之外的第三份算法清单。
+
+3. **接口适配**：`runAlgorithm` 新增第五参 `ctx`（透传为 decide 第三参，存量算法签名不变）；`GameApiClient` 新增 `attackCell` / `healCell`（攻/治瞄格变体，与按目标 id 的原方法并存，interfaces 按 payload 形态自动分发）；`game-utils.deployOrigins` 排除 `canDeploy: false` 类型的据点（与引擎 `deployOriginFor` 同口径，molten-throne 仅前线基地可部署）。同时回合模式下动作被服务器拒绝（非 429）不再跳出循环提前提交计划——记住被拒动作、刷新状态让 decide 重选（同一被拒动作不重复请求服务器），重问与被拒合计 20 次即带已排计划提交兜底；逐人轮流模式保持「失败即结束回合」行为不变。
+
+### 测试
+
+- 新增 `tests/algorithms/random-sim.test.ts`（16 用例：line/arc/single 瞄准合法性、arc 治疗瞄格、AP 门控、已提交短路、无 ctx.owner 短路、一单位一动作、目的格认领、部署预算扣减、炮火危险区过滤四用例（部署出生点 / 落点、治疗施放者 / arc 覆盖扇形，均先用引擎入队校验交叉证实拒绝场景真实存在），以及真实 standoff 对局上「枚举动作全被引擎入队校验接受 + 双座提交后正常结算进下一轮」的整轮回归）；新增 `tests/algorithms/registry.test.ts`（注册算法 modes 完整性）与 `tests/algorithms/interfaces.test.ts`（5 用例：同时模式动作被拒后继续决策入队且最终只提交一次、同一被拒动作按上限重问且不重复请求服务器、连续多个动作被拒有上限兜底、轮流模式失败即断行为不变、429 原样抛出不提交）；`tests/api/bots.test.ts` 补模式隔离三用例与 `/api/algorithms` modes 断言；`tests/api/arena-eval.test.ts` 断言参评清单不含 `algo_random-sim`；`tests/rl/local-worker.test.ts` 补 decide 通道模式混用拒绝用例。
+
 ## 3.5.4（2026-09-18）— Verdict 裁决线算法
 
 ### 新增功能

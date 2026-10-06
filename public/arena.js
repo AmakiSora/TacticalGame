@@ -502,7 +502,7 @@
   let evalModels = [];
   let evalAlgos = [];
   // status 接口会返回 knownMaps；这里的列表只是首屏兜底，收到 status 后以服务端为准。
-  const EVAL_FALLBACK_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes', 'molten-throne'];
+  const EVAL_FALLBACK_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'];
   let renderedMapSig = '';
 
   const EVAL_PILL = {

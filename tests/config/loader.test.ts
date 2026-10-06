@@ -540,6 +540,8 @@ describe('map config loader', () => {
 
     const map = getMapConfig('molten-throne');
     expect(map.name).toBe('熔池王座');
+    // 本图运行于同时回合模式（秘密计划、统一结算）
+    expect(map.mode).toBe('simultaneous');
     expect(map.radius).toBe(6);
     expect(map.balance.maxTurns).toBe(20);
     // 对角线总部：双方斜向对峙，距离为 10

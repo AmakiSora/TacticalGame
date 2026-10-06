@@ -54,7 +54,7 @@ MODEL_RE = re.compile(r"^hex_ppo_(v\d+\.\d+\.\d+)_")
 EXCLUDED_VERSIONS = {"v1.0.0"}
 # 过期模型登记表（唯一事实来源，与 script/modelStatus.mjs 同读一份）。
 MODEL_STATUS_FILE = Path("arena/model-status.json")
-DEFAULT_MAPS = "random,default,breach,danger-close,dual-lanes,molten-throne"
+DEFAULT_MAPS = "random,default,breach,danger-close,dual-lanes"
 DEFAULT_STATS_FILE = Path("arena/matches.jsonl")
 # 模型批次的固定开销（torch 导入 + tsx worker 启动 + 模型加载）与单局耗时；
 # 纯算法批次不加载模型，开销与单局都低一档。用于预估耗时。

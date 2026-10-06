@@ -1342,6 +1342,21 @@ function renderScorePanel() {
     ${rows.map(([owner, score], index) => renderScoreRow(owner, score, resultRanks.get(owner) ?? scoreRank(rows, index))).join('')}`;
 }
 
+// 镜像引擎 collectIncome：回合开始补给 = 基础收入 + 名下据点收入之和，非活跃玩家不发放。
+// 追赶补给在回合末按当时的分数快照发放，无法预判，不计入。
+function nextTurnIncomeFor(owner) {
+  if (state?.players?.[owner]?.status !== 'active') return null;
+  const balance = gameConfig?.balance || {};
+  const fallback = balance.controlPointIncome ?? 0;
+  const control = [...(state.controlPoints?.values() ?? [])]
+    .filter(point => point.owner === owner)
+    .reduce((sum, point) => {
+      const spec = point.kind ? balance.controlPointTypes?.[point.kind] : null;
+      return sum + (spec ? spec.income ?? fallback : fallback);
+    }, 0);
+  return (balance.baseIncome ?? 0) + control;
+}
+
 function renderSidebar() {
   if (!state) return;
   const simultaneous = isSimultaneous();
@@ -1354,8 +1369,15 @@ function renderSidebar() {
     const color = OWNER_COLOR[id] || '#9aa7b2';
     const supplies = state.resources?.[id]?.supplies ?? 0;
     const planFlag = simultaneous && committedList().includes(id) ? '<em class="res-committed" title="已确认本回合计划">✓</em>' : '';
-    return `<div class="resource-pill ${playerClass(id)} ${myPlayer === id ? 'mine' : ''}" style="border-left-color:${esc(color)}">
-      <span>${esc(playerName(id))}${planFlag}</span><strong>${supplies}</strong>
+    const nextIncome = nextTurnIncomeFor(id);
+    const nextIncomeHtml = nextIncome == null
+      ? ''
+      : `<em class="resource-next" title="下回合补给收入" aria-label="下回合补给收入 +${nextIncome}">+${nextIncome}</em>`;
+    // 大数字按位数缩字号，数字行永不换行溢出。
+    const digitCount = String(supplies).length;
+    const lenClass = digitCount > 6 ? ` len-${Math.min(digitCount, 9)}` : '';
+    return `<div class="resource-pill ${playerClass(id)} ${myPlayer === id ? 'mine' : ''}${lenClass}" style="border-left-color:${esc(color)}">
+      <div class="resource-head"><span>${esc(playerName(id))}${planFlag}</span>${nextIncomeHtml}</div><strong>${supplies}</strong>
     </div>`;
   }).join('');
   const statusCard = simultaneous

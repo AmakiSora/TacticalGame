@@ -1162,11 +1162,35 @@ function bindScoreToggles() {
   });
 }
 
+// 镜像引擎 collectIncome：回合开始补给 = 基础收入 + 名下据点收入之和，非活跃玩家不发放。
+// 追赶补给在回合末按当时的分数快照发放，无法预判，不计入。
+function nextTurnIncomeFor(owner) {
+  if (state?.players?.[owner]?.status !== 'active') return null;
+  const balance = gameConfig?.balance || {};
+  const fallback = balance.controlPointIncome ?? 0;
+  const control = [...(state.controlPoints?.values() ?? [])]
+    .filter(point => point.owner === owner)
+    .reduce((sum, point) => {
+      const spec = point.kind ? balance.controlPointTypes?.[point.kind] : null;
+      return sum + (spec ? spec.income ?? fallback : fallback);
+    }, 0);
+  return (balance.baseIncome ?? 0) + control;
+}
+
 function renderSidebar() {
   if (!state) return;
   const resourceCards = Object.entries(state.resources || {})
     .filter(([owner]) => PLAYER_IDS.includes(owner))
-    .map(([owner, resource]) => `<div class="resource-card ${ownerClass(owner)}"><span>${playerNameControl(owner)}</span><strong>${resource.supplies ?? 0}</strong><em>补给</em></div>`)
+    .map(([owner, resource]) => {
+      const nextIncome = nextTurnIncomeFor(owner);
+      const nextIncomeHtml = nextIncome == null
+        ? ''
+        : `<em class="resource-next" title="下回合补给收入" aria-label="下回合补给收入 +${nextIncome}">+${nextIncome}</em>`;
+      // 大数字按位数缩字号，数字行永不换行溢出。
+      const digitCount = String(resource.supplies ?? 0).length;
+      const lenClass = digitCount > 6 ? ` len-${Math.min(digitCount, 9)}` : '';
+      return `<div class="resource-card ${ownerClass(owner)}${lenClass}"><div class="resource-head">${playerNameControl(owner)}${nextIncomeHtml}</div><div class="resource-amount"><strong>${resource.supplies ?? 0}</strong><em>补给</em></div></div>`;
+    })
     .join('');
   resourcesEl.innerHTML = `<div class="resource-grid">
       ${resourceCards || '<div class="resource-empty">等待对局开始</div>'}

@@ -716,24 +716,52 @@ main {
 .resource-card.player-g { border-left-color: #f27a9a; }
 .resource-card.player-h { border-left-color: #a7b7ff; }
 .resource-empty { color: #7894a6; font-size: 12px; }
-.resource-card span {
-  display: block;
+.resource-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.resource-head .player-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
   color: #7f98a9;
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
 }
+.resource-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 3px;
+  min-width: 0;
+}
 .resource-card strong {
-  display: inline-block;
-  margin-top: 4px;
   color: #d8e0e8;
   font: 800 20px "SF Mono", "Consolas", monospace;
+  line-height: 1.1;
 }
+.resource-card.len-7 strong { font-size: 16px; }
+.resource-card.len-8 strong, .resource-card.len-9 strong { font-size: 13px; }
 .resource-card em {
-  margin-left: 5px;
   color: #7894a6;
   font-size: 12px;
   font-style: normal;
+  white-space: nowrap;
+}
+.resource-card .resource-next {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(127, 199, 159, .1);
+  border: 1px solid rgba(127, 199, 159, .25);
+  color: #8fd4ab;
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 600;
+  white-space: nowrap;
 }
 .turn-card {
   padding: 10px 12px;

@@ -1464,6 +1464,14 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 #plan-panel.hidden { display: none; }
 .plan-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .plan-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border: 1px solid rgba(148, 163, 184, .25); border-radius: 6px; background: rgba(15, 23, 42, .55); font-size: 12px; }
+.plan-item:hover { border-color: rgba(148, 163, 184, .55); background: rgba(30, 41, 59, .7); }
+.plan-desc { flex: 1; min-width: 0; }
+.plan-num { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-style: normal; font-weight: 700; color: #0b1420; flex: none; }
+.plan-kind-move .plan-num { background: #3cc878; }
+.plan-kind-attack .plan-num { background: #ff5a5a; }
+.plan-kind-heal .plan-num { background: #50dcb4; }
+.plan-kind-deploy .plan-num { background: #f0d25a; }
+.plan-kind-demolish .plan-num { background: #ffaa46; }
 .plan-revoke { border: 1px solid rgba(214, 90, 74, .55); background: transparent; color: #d65a4a; border-radius: 5px; padding: 1px 8px; font-size: 11px; cursor: pointer; }
 .plan-revoke:hover { background: rgba(214, 90, 74, .18); }
 .plan-empty { color: #7c8ba1; font-size: 12px; padding: 2px 0; }

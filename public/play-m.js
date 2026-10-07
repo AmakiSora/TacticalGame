@@ -835,6 +835,124 @@ function attackRangeCells(unit) {
   return aimableCells(unit, 'attackShape');
 }
 
+// —— 同时模式：已排队指令的棋盘预览（编号与计划面板清单一一对应） ——
+const PLAN_COLORS = { move: '#3cc878', attack: '#ff5a5a', heal: '#50dcb4', deploy: '#f0d25a', demolish: '#ffaa46' };
+const PLAN_KIND_LABELS = { move: '移动', attack: '攻击', heal: '治疗', deploy: '部署', demolish: '爆破' };
+let planHoverId = null;
+
+function hexToRgba(hex, alpha) {
+  const h = String(hex).replace('#', '');
+  if (h.length !== 6) return `rgba(154,167,178,${alpha})`;
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${alpha})`;
+}
+
+/** 把我方计划队列翻译成预览图层；结算回放期间隐藏（棋盘上正在演真实结果）。 */
+function planOverlays() {
+  if (!isSimultaneous() || !state || playback.isActive()) return [];
+  return myPlanQueue().map((a, i) => {
+    const base = { id: a.id, index: i + 1, kind: a.type, to: Number.isFinite(a.q) && Number.isFinite(a.r) ? { q: a.q, r: a.r } : null };
+    if (a.type === 'deploy') {
+      const origin = state.headquarters.get(a.fromId) || state.controlPoints.get(a.fromId) || null;
+      return { ...base, unitType: a.unitType, from: origin ? { q: origin.q, r: origin.r } : null };
+    }
+    if (a.type === 'move' || a.type === 'demolish') {
+      const unit = state.units.get(a.unitId) || null;
+      return { ...base, unit, from: unit ? { q: unit.q, r: unit.r } : null };
+    }
+    if (a.type === 'attack' || a.type === 'heal') {
+      const unit = state.units.get(a.type === 'attack' ? a.attackerId : a.supportId) || null;
+      if (!unit || !base.to) return null;
+      const aim = shapeAimFor(unit, a.type === 'attack' ? 'attackShape' : 'healShape', a.q, a.r);
+      return { ...base, unit, from: { q: unit.q, r: unit.r }, cells: aim?.cells || [base.to] };
+    }
+    return null;
+  }).filter(Boolean);
+}
+
+function planBadge(x, y, index, color, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#0b1420'; ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
+  ctx.fillStyle = '#e8f0f8'; ctx.font = 'bold 9px system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(index), x, y + 0.5);
+  ctx.restore();
+}
+
+function planArrow(from, to, color, alpha) {
+  const a = hexToPixel(from.q, from.r), b = hexToPixel(to.q, to.r);
+  if (a.x === b.x && a.y === b.y) return;
+  const angle = Math.atan2(b.y - a.y, b.x - a.x);
+  const sx = a.x + Math.cos(angle) * HEX_SIZE * 0.52, sy = a.y + Math.sin(angle) * HEX_SIZE * 0.52;
+  const ex = b.x - Math.cos(angle) * HEX_SIZE * 0.58, ey = b.y - Math.sin(angle) * HEX_SIZE * 0.58;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(ex + Math.cos(angle) * 9, ey + Math.sin(angle) * 9);
+  ctx.lineTo(ex + Math.cos(angle + 2.55) * 7, ey + Math.sin(angle + 2.55) * 7);
+  ctx.lineTo(ex + Math.cos(angle - 2.55) * 7, ey + Math.sin(angle - 2.55) * 7);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+/** 目标格虚线高亮（画在实体单位之下）。 */
+function drawPlanCellHighlights() {
+  for (const o of planOverlays()) {
+    if (!o.to) continue;
+    const color = PLAN_COLORS[o.kind] || '#9aa7b2';
+    const alpha = planHoverId && o.id !== planHoverId ? 0.25 : 1;
+    for (const cell of o.cells || [o.to]) {
+      pathHex(cell.q, cell.r, 4);
+      ctx.fillStyle = hexToRgba(color, 0.14 * alpha);
+      ctx.fill();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = hexToRgba(color, 0.8 * alpha);
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+/** 箭头 / 幽灵单位 / 编号角标（画在实体单位之上）。 */
+function drawPlanActionOverlays() {
+  for (const o of planOverlays()) {
+    const color = PLAN_COLORS[o.kind] || '#9aa7b2';
+    const alpha = planHoverId && o.id !== planHoverId ? 0.25 : 1;
+    if (o.from && o.to) planArrow(o.from, o.to, color, alpha * 0.9);
+    if ((o.kind === 'move' || o.kind === 'deploy') && o.to) {
+      const ghostType = o.kind === 'move' ? o.unit?.type : o.unitType;
+      if (ghostType) {
+        const p = hexToPixel(o.to.q, o.to.r);
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.5;
+        ctx.fillStyle = OWNER_COLOR[myPlayer] || '#9aa7b2';
+        ctx.beginPath(); ctx.arc(p.x, p.y, HEX_SIZE * .42, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = alpha;
+        ctx.setLineDash([4, 3]); ctx.strokeStyle = color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, HEX_SIZE * .42, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        drawUnitGlyph(ghostType, p.x, p.y);
+        ctx.restore();
+        planBadge(p.x + 13, p.y - 13, o.index, color, alpha);
+      }
+    } else if (o.to) {
+      const p = hexToPixel(o.to.q, o.to.r);
+      planBadge(p.x + 13, p.y - 13, o.index, color, alpha);
+    }
+    if (o.from) {
+      const p = hexToPixel(o.from.q, o.from.r);
+      planBadge(p.x - 14, p.y - 14, o.index, color, alpha);
+    }
+  }
+}
+
 function drawHpBar(x, y, width, hp, maxHp) {
   if (!maxHp || hp >= maxHp) return;
   ctx.fillStyle = '#190d0d'; ctx.fillRect(x - width / 2, y, width, 4);
@@ -1110,12 +1228,14 @@ function drawBoard(now = performance.now()) {
     ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'attack' ? 'rgba(255,80,80,.28)' : h.type === 'attack-radius' ? 'rgba(255,80,80,.08)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : h.type === 'demolish' ? 'rgba(255,170,70,.28)' : 'rgba(80,220,180,.20)';
     ctx.fill();
   }
+  drawPlanCellHighlights();
   if (hoverCell) { pathHex(hoverCell.q, hoverCell.r, 2); ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fill(); }
   for (const cp of state.controlPoints.values()) {
     drawControlPointMarker(cp);
   }
   boardAnimation.forEachHeadquarters((hq, view) => drawHeadquartersMarker(hq, view));
   boardAnimation.forEachUnit((u, view) => drawUnitMarker(u, view));
+  drawPlanActionOverlays();
   boardAnimation.drawEffects(ctx, now);
 }
 
@@ -1167,12 +1287,15 @@ function renderPlanPanel() {
   if (!isSimultaneous()) { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
   const queue = myPlanQueue();
+  // 撤销/重渲后高亮项可能已不在队列里，残留 id 会把全部预览压暗，需清掉。
+  if (planHoverId && !queue.some(a => a.id === planHoverId)) planHoverId = null;
   const max = actionsPerTurn();
   const activeCount = joinedPlayerIds().filter(id => state.players[id]?.status === 'active').length;
   const committedNames = committedList().map(id => playerName(id)).join('、') || '—';
-  const rows = queue.map(a => `
-    <li class="plan-item">
-      <span>${esc(describePlanAction(a))}</span>
+  const rows = queue.map((a, i) => `
+    <li class="plan-item plan-kind-${esc(a.type)}" data-plan-id="${esc(a.id)}">
+      <em class="plan-num">${i + 1}</em>
+      <span class="plan-desc">${esc(describePlanAction(a))}</span>
       ${iCommitted() ? '' : `<button class="plan-revoke" data-revoke="${esc(a.id)}" title="撤销该指令">撤销</button>`}
     </li>`).join('');
   el.innerHTML = `<h3>本回合计划 <span class="plan-count">${queue.length}/${max}</span></h3>
@@ -1185,6 +1308,14 @@ function renderPlanPanel() {
       drawBoard();
     }
   }));
+  // 触屏没有悬停：点按清单项切换棋盘上对应预览的加亮（其余压暗）。
+  el.querySelectorAll('.plan-item[data-plan-id]').forEach(item => {
+    item.addEventListener('click', e => {
+      if (e.target.closest('.plan-revoke')) return;
+      planHoverId = planHoverId === item.dataset.planId ? null : item.dataset.planId;
+      drawBoard();
+    });
+  });
 }
 function renderActionsDisplay(owner) {
   const max = actionsPerTurn();
@@ -1749,7 +1880,8 @@ function updateHoverFromPoint(p) {
   else {
     const ent = entityAt(h.q, h.r);
     const cp = [...state.controlPoints.values()].find(c => c.q === h.q && c.r === h.r);
-    els.cellInfo.textContent = `(${h.q}, ${h.r})${cp ? ` | ${cp.name}` : ''}${ent ? ` | ${UNIT_NAMES[ent.type] || 'HQ'} ${ent.hp}/${ent.maxHp}` : ''}`;
+    const planned = planOverlays().find(o => (o.cells || (o.to ? [o.to] : [])).some(c => c.q === h.q && c.r === h.r));
+    els.cellInfo.textContent = `(${h.q}, ${h.r})${cp ? ` | ${cp.name}` : ''}${ent ? ` | ${UNIT_NAMES[ent.type] || 'HQ'} ${ent.hp}/${ent.maxHp}` : ''}${planned ? ` | 计划#${planned.index} ${PLAN_KIND_LABELS[planned.kind] || planned.kind}` : ''}`;
   }
   drawBoard();
 }

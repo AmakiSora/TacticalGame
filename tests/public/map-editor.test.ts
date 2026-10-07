@@ -47,7 +47,7 @@ describe('map editor page', () => {
     expect(html).toContain('data-mode="simultaneous"');
     expect(html).toContain('data-mode="royale"');
     expect(html).toContain('id="annihilation-panel"');
-    expect(html).toContain('<script src="/map-editor.js?v=3.5.12"></script>');
+    expect(html).toContain('<script src="/map-editor.js?v=3.5.13"></script>');
   });
 
   it('supports toolbar zoom buttons without hijacking wheel scroll', () => {

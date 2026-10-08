@@ -289,6 +289,14 @@
       addEffect({ kind: 'damageText', x: at.x, y: at.y, text, color, duration: 800 });
     }
 
+    // 位置回退链：先取插值中的实体视图，被消灭实体已移出视图时退回事件携带的 q/r 坐标。
+    function fallbackPosition(state, id, payload) {
+      const pos = entityPosition(id);
+      if (pos) return pos;
+      if (Number.isFinite(payload?.q) && Number.isFinite(payload?.r)) return safePixel(payload.q, payload.r);
+      return null;
+    }
+
     function flushPendingHeals(now) {
       if (!pendingHealFx.length) return;
       if (now - pendingHealFx[0].time < HEAL_FLUSH_MS) return;
@@ -393,14 +401,23 @@
             time: performance.now(),
           });
           break;
-        case 'control_point_repair':
-          addRing(entityPosition(payload.unitId), '#3effc8', 450, 1);
+        case 'control_point_repair': {
+          const at = entityPosition(payload.unitId);
+          addRing(at, '#3effc8', 450, 1);
+          if (Number(payload.amount) > 0) addDamageText(at, `+${payload.amount}`, HEAL_COLOR);
           break;
+        }
+        case 'artillery_damage': {
+          const at = fallbackPosition(state, payload.unitId, payload);
+          addHitFlash(at);
+          if (Number(payload.damage) > 0) addDamageText(at, `-${payload.damage}`, '#ff5c7a');
+          break;
+        }
         case 'deploy':
           addRing(safePixel(payload.q, payload.r), '#ffd23e', 500, 1.2);
           break;
         case 'unit_death':
-          addBurst(entityPosition(payload.unitId), '#ff8a5c', 500, 1);
+          addBurst(fallbackPosition(state, payload.unitId, payload), '#ff8a5c', 500, 1);
           break;
         case 'headquarters_destroyed': {
           const at = entityPosition(payload.headquartersId);

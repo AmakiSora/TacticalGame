@@ -42,7 +42,7 @@ const els = {
   gameUI: $('game-ui'), canvas: $('board'), cellInfo: $('cell-info'), turnBadge: $('turn-badge'),
   resDisplay: $('resources-display'), actionsDisplay: $('actions-display'),
   btnEndTurn: $('btn-end-turn'), btnRefresh: $('btn-refresh'), planPanel: $('plan-panel'),
-  btnSkipReplay: $('btn-skip-replay'), btnQuitGame: $('btn-quit-game'),
+  btnSkipReplay: $('btn-skip-replay'), btnQuitGame: $('btn-quit-game'), btnRules: $('btn-rules'),
   selDetail: $('selection-detail'), events: $('events'), scorePanel: $('score-panel'),
   btnSettings: $('btn-settings'), settingsPopover: $('settings-popover'),
   settingsControlToken: $('settings-control-token'), btnSaveControlToken: $('btn-save-control-token'),
@@ -835,6 +835,122 @@ function attackRangeCells(unit) {
   return aimableCells(unit, 'attackShape');
 }
 
+// —— 悬停看射程 / 攻击预演：推导覆盖格与伤害区间，不做任何服务器请求 ——
+function hoverRangeHint() {
+  if (!state || state.cells.length === 0 || !hoverCell) return null;
+  if (playback.isActive()) return null;
+  if (interactionMode !== 'idle' && interactionMode !== 'unit_selected') return null;
+  if (rangeHighlights.length > 0) return null;
+  const unit = [...state.units.values()].find(u => u.alive && u.q === hoverCell.q && u.r === hoverCell.r);
+  if (!unit) return null;
+  const hint = window.BoardInspect?.rangeHintFor(unit, state.cells, gameConfig);
+  return hint ? { ...hint, unit } : null;
+}
+
+/** 攻击/治疗瞄准预演：返回 { cells, entries }，entries 为 [{ q, r, text, tone, kill }]。 */
+function aimPreview() {
+  if (!state || !hoverCell) return null;
+  if (interactionMode !== 'attack_mode' && interactionMode !== 'heal_mode') return null;
+  const unit = state.units.get(selectedUnitId);
+  if (!unit) return null;
+  if (!rangeHighlights.some(h => h.q === hoverCell.q && h.r === hoverCell.r)) return null;
+  const isHeal = interactionMode === 'heal_mode';
+  let cells;
+  if (isSimultaneous()) {
+    const aim = shapeAimFor(unit, isHeal ? 'healShape' : 'attackShape', hoverCell.q, hoverCell.r);
+    if (!aim) return null;
+    cells = aim.cells;
+  } else {
+    cells = [{ q: hoverCell.q, r: hoverCell.r }];
+  }
+  const balance = gameConfig?.balance || {};
+  const variance = balance.damageVarianceRange ?? 0;
+  const minimum = balance.minimumDamage ?? 1;
+  const entries = [];
+  for (const cell of cells) {
+    if (isHeal) {
+      const target = [...state.units.values()].find(u => u.alive && u.owner === myPlayer && u.q === cell.q && u.r === cell.r && u.hp < u.maxHp);
+      if (!target) continue;
+      const base = unit.healPower ?? 0;
+      const max = base + (balance.healVarianceRange ?? 0);
+      const missing = target.maxHp - target.hp;
+      const lo = Math.min(base, missing), hi = Math.min(max, missing);
+      entries.push({ q: cell.q, r: cell.r, tone: 'heal', kill: false, text: lo === hi ? `+${lo}` : `+${lo}~${hi}` });
+    } else {
+      const target = entityAt(cell.q, cell.r);
+      if (!target || target.owner === myPlayer || target.alive === false) continue;
+      const lo0 = Math.max(minimum, unit.attack - (target.defense ?? 0) - variance);
+      const hi0 = Math.max(minimum, unit.attack - (target.defense ?? 0) + variance);
+      const kill = hi0 >= target.hp;
+      const lo = Math.min(lo0, target.hp), hi = Math.min(hi0, target.hp);
+      entries.push({ q: cell.q, r: cell.r, tone: 'attack', kill, text: kill ? `-${hi} 致死` : lo === hi ? `-${lo}` : `-${lo}~${hi}` });
+    }
+  }
+  if (!isSimultaneous() && !entries.length) return null;
+  return { cells, entries };
+}
+
+function drawChipAt(x, y, text, tone, kill) {
+  ctx.save();
+  ctx.font = 'bold 10px system-ui, sans-serif';
+  const w = ctx.measureText(text).width + 10;
+  const h = 15;
+  const rx = x - w / 2, ry = y - h - 20;
+  ctx.beginPath();
+  ctx.moveTo(rx + 4, ry); ctx.lineTo(rx + w - 4, ry); ctx.arcTo(rx + w, ry, rx + w, ry + 4, 4);
+  ctx.lineTo(rx + w, ry + h - 4); ctx.arcTo(rx + w, ry + h, rx + w - 4, ry + h, 4);
+  ctx.lineTo(rx + 4, ry + h); ctx.arcTo(rx, ry + h, rx, ry + h - 4, 4);
+  ctx.lineTo(rx, ry + 4); ctx.arcTo(rx, ry, rx + 4, ry, 4); ctx.closePath();
+  ctx.fillStyle = tone === 'heal' ? 'rgba(8, 38, 30, .88)' : 'rgba(46, 10, 16, .88)';
+  ctx.fill();
+  ctx.strokeStyle = tone === 'heal' ? '#3effc8' : kill ? '#ff3b5c' : '#ff8a9a';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = tone === 'heal' ? '#8affdd' : kill ? '#ffb3c0' : '#ffd2da';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, ry + h / 2 + 0.5);
+  ctx.restore();
+}
+
+function drawHoverRangeHints() {
+  const hint = hoverRangeHint();
+  if (!hint) return;
+  ctx.save();
+  const heal = hint.kind === 'heal';
+  ctx.fillStyle = heal ? 'rgba(62,255,200,.05)' : 'rgba(255,95,95,.06)';
+  ctx.strokeStyle = heal ? 'rgba(62,255,200,.32)' : 'rgba(255,95,95,.34)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  for (const c of hint.cells) { pathHex(c.q, c.r, 3); ctx.fill(); ctx.stroke(); }
+  ctx.setLineDash([]);
+  const p = hexToPixel(hint.unit.q, hint.unit.r);
+  ctx.strokeStyle = 'rgba(255,200,120,.7)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(p.x, p.y, HEX_SIZE * .5, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+
+function drawAimPreview() {
+  const preview = aimPreview();
+  if (!preview) return;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,220,120,.07)';
+  ctx.strokeStyle = 'rgba(255,220,120,.6)';
+  ctx.lineWidth = 1.6;
+  for (const c of preview.cells) { pathHex(c.q, c.r, 4); ctx.fill(); ctx.stroke(); }
+  ctx.restore();
+  for (const e of preview.entries) {
+    const p = hexToPixel(e.q, e.r);
+    drawChipAt(p.x, p.y, e.text, e.tone, e.kill);
+  }
+}
+
+function aimPreviewInfo() {
+  const preview = aimPreview();
+  if (!preview || !preview.entries.length) return '';
+  return ` | 预计 ${preview.entries.map(e => e.text).join('、')}`;
+}
+
 // —— 同时模式：已排队指令的棋盘预览（编号与计划面板清单一一对应） ——
 const PLAN_COLORS = { move: '#3cc878', attack: '#ff5a5a', heal: '#50dcb4', deploy: '#f0d25a', demolish: '#ffaa46' };
 const PLAN_KIND_LABELS = { move: '移动', attack: '攻击', heal: '治疗', deploy: '部署', demolish: '爆破' };
@@ -1223,6 +1339,7 @@ function drawBoard(now = performance.now()) {
   for (const cell of state.artillery?.dangerCells || []) {
     pathHex(cell.q, cell.r, 2); ctx.fillStyle = 'rgba(205, 55, 45, .34)'; ctx.fill(); ctx.strokeStyle = 'rgba(255, 95, 75, .68)'; ctx.lineWidth = 1.5; ctx.stroke();
   }
+  drawHoverRangeHints();
   for (const h of rangeHighlights) {
     pathHex(h.q, h.r, 3);
     ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'attack' ? 'rgba(255,80,80,.28)' : h.type === 'attack-radius' ? 'rgba(255,80,80,.08)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : h.type === 'demolish' ? 'rgba(255,170,70,.28)' : 'rgba(80,220,180,.20)';
@@ -1236,6 +1353,7 @@ function drawBoard(now = performance.now()) {
   boardAnimation.forEachHeadquarters((hq, view) => drawHeadquartersMarker(hq, view));
   boardAnimation.forEachUnit((u, view) => drawUnitMarker(u, view));
   drawPlanActionOverlays();
+  drawAimPreview();
   boardAnimation.drawEffects(ctx, now);
 }
 
@@ -1281,6 +1399,51 @@ function describePlanAction(a) {
   if (Number.isFinite(a.q) && Number.isFinite(a.r)) return `${typeLabel} → (${a.q}, ${a.r})`;
   return typeLabel;
 }
+/** 把已入队的计划动作还原为重新入队所需的接口请求（重排 = 清空后按新顺序重放）。 */
+function planActionRequest(a) {
+  switch (a?.type) {
+    case 'move': return { path: 'move', body: { unitId: a.unitId, q: a.q, r: a.r } };
+    case 'attack': return { path: 'attack', body: { attackerId: a.attackerId, q: a.q, r: a.r } };
+    case 'heal': return { path: 'heal', body: { supportId: a.supportId, q: a.q, r: a.r } };
+    case 'deploy': return { path: 'deploy', body: { unitType: a.unitType, fromId: a.fromId, q: a.q, r: a.r } };
+    case 'demolish': return { path: 'demolish', body: { unitId: a.unitId, q: a.q, r: a.r } };
+    default: return null;
+  }
+}
+let planReordering = false;
+/** 调整计划顺序：结算与顺序无关，仅影响清单编号与棋盘角标的核对体验。 */
+async function reorderPlan(fromIndex, toIndex) {
+  if (planReordering) return;
+  const queue = myPlanQueue();
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= queue.length || toIndex >= queue.length) return;
+  const next = [...queue];
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  planReordering = true;
+  try {
+    if (!await apiAction(`/api/games/${gameId}/plan/clear`, {})) return;
+    for (const a of next) {
+      const req = planActionRequest(a);
+      if (!req || !await apiAction(`/api/games/${gameId}/${req.path}`, req.body)) {
+        toast('重排中途失败，请核对当前计划', 'err');
+        break;
+      }
+    }
+    await refreshAdjudication();
+    renderSidebar();
+    drawBoard();
+  } finally {
+    planReordering = false;
+  }
+}
+async function clearAllPlans() {
+  if (planReordering || !myPlanQueue().length) return;
+  if (!await apiAction(`/api/games/${gameId}/plan/clear`, {})) return;
+  toast('已清空本回合计划', 'ok');
+  await refreshAdjudication();
+  renderSidebar();
+  drawBoard();
+}
 function renderPlanPanel() {
   const el = els.planPanel;
   if (!el) return;
@@ -1296,10 +1459,14 @@ function renderPlanPanel() {
     <li class="plan-item plan-kind-${esc(a.type)}" data-plan-id="${esc(a.id)}">
       <em class="plan-num">${i + 1}</em>
       <span class="plan-desc">${esc(describePlanAction(a))}</span>
-      ${iCommitted() ? '' : `<button class="plan-revoke" data-revoke="${esc(a.id)}" title="撤销该指令">撤销</button>`}
+      ${iCommitted() ? '' : `<span class="plan-order"><button type="button" class="plan-order-btn" data-plan-move="${i}:${i - 1}" ${i === 0 ? 'disabled' : ''} title="上移" aria-label="上移第 ${i + 1} 条">▲</button><button type="button" class="plan-order-btn" data-plan-move="${i}:${i + 1}" ${i === queue.length - 1 ? 'disabled' : ''} title="下移" aria-label="下移第 ${i + 1} 条">▼</button></span><button class="plan-revoke" data-revoke="${esc(a.id)}" title="撤销该指令">撤销</button>`}
     </li>`).join('');
+  const clearBtn = (!iCommitted() && queue.length > 0)
+    ? `<button type="button" class="plan-clear-all">全部撤销（${queue.length} 条）</button>`
+    : '';
   el.innerHTML = `<h3>本回合计划 <span class="plan-count">${queue.length}/${max}</span></h3>
     <ul class="plan-list">${rows || '<li class="plan-empty">尚未下达指令，点击棋盘单位开始排队</li>'}</ul>
+    ${clearBtn ? `<div class="plan-tools">${clearBtn}</div>` : ''}
     <div class="plan-status">${iCommitted() ? '已确认，等待全员提交后统一结算' : `已确认 ${committedList().length}/${activeCount}（${esc(committedNames)}）`}</div>`;
   el.querySelectorAll('.plan-revoke').forEach(btn => btn.addEventListener('click', async () => {
     if (await apiAction(`/api/games/${gameId}/plan/revoke`, { actionId: btn.dataset.revoke })) {
@@ -1308,6 +1475,12 @@ function renderPlanPanel() {
       drawBoard();
     }
   }));
+  el.querySelectorAll('.plan-order-btn').forEach(btn => btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const [from, to] = String(btn.dataset.planMove || '').split(':').map(Number);
+    reorderPlan(from, to);
+  }));
+  el.querySelector('.plan-clear-all')?.addEventListener('click', clearAllPlans);
   // 触屏没有悬停：点按清单项切换棋盘上对应预览的加亮（其余压暗）。
   el.querySelectorAll('.plan-item[data-plan-id]').forEach(item => {
     item.addEventListener('click', e => {
@@ -1881,7 +2054,7 @@ function updateHoverFromPoint(p) {
     const ent = entityAt(h.q, h.r);
     const cp = [...state.controlPoints.values()].find(c => c.q === h.q && c.r === h.r);
     const planned = planOverlays().find(o => (o.cells || (o.to ? [o.to] : [])).some(c => c.q === h.q && c.r === h.r));
-    els.cellInfo.textContent = `(${h.q}, ${h.r})${cp ? ` | ${cp.name}` : ''}${ent ? ` | ${UNIT_NAMES[ent.type] || 'HQ'} ${ent.hp}/${ent.maxHp}` : ''}${planned ? ` | 计划#${planned.index} ${PLAN_KIND_LABELS[planned.kind] || planned.kind}` : ''}`;
+    els.cellInfo.textContent = `(${h.q}, ${h.r})${cp ? ` | ${cp.name}` : ''}${ent ? ` | ${UNIT_NAMES[ent.type] || 'HQ'} ${ent.hp}/${ent.maxHp}` : ''}${planned ? ` | 计划#${planned.index} ${PLAN_KIND_LABELS[planned.kind] || planned.kind}` : ''}${aimPreviewInfo()}`;
   }
   drawBoard();
 }
@@ -1918,6 +2091,9 @@ function onPointerDown(e) {
     gesture.originPanX = boardPanX;
     gesture.originPanY = boardPanY;
     gesture.downEvent = e;
+    // 触屏没有悬停：手指按在棋盘上即视为“悬停该格”，攻击/治疗瞄准预演与射程提示立即可见；
+    // 滑动超过阈值转为平移、松手才执行，等于免费获得“按住预览、松手确认”。
+    updateHoverFromPoint(eventToCanvasPoint(e));
   } else if (gesture.pointers.size >= 2) {
     const [a, b] = pointerList();
     gesture.mode = 'pinch';
@@ -2439,6 +2615,8 @@ els.btnQuitGame?.addEventListener('click', () => {
   window.location.reload();
 });
 els.btnSkipReplay?.addEventListener('click', () => playback.skip());
+// 本局规则速查：内容随对局配置实时生成（进行中对局与历史回放各显示当时数值）。
+const rulesSheet = window.RulesSheet?.attach({ triggerEl: els.btnRules, getConfig: () => gameConfig });
 els.btnRefresh.addEventListener('click', async () => { await loadFullState(); drawBoard(); renderSidebar(); toast('状态已刷新', 'ok'); });
 els.btnCreate.addEventListener('click', async () => {
   els.btnCreate.disabled = true;

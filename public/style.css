@@ -1197,3 +1197,73 @@ main {
 ::-webkit-scrollbar-track { background: #0f141c; }
 ::-webkit-scrollbar-thumb { background: #2a3a4a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a5a6a; }
+
+/* —— 本局规则速查弹层（规则内容由对局内嵌配置驱动，rs-* 为四端共享样式） —— */
+.rs-backdrop {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(4, 8, 12, .62);
+}
+.rs-panel {
+  position: fixed; z-index: 81;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(600px, calc(100vw - 28px));
+  max-height: min(78vh, 720px);
+  display: flex; flex-direction: column;
+  background: #101a26; color: #d8e0e8;
+  border: 1px solid #2a3a4a; border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+  overflow: hidden;
+}
+.rs-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid #1e2c3a;
+}
+.rs-head h3 { margin: 0; font-size: 15px; color: #e8f0f8; }
+.rs-close {
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1px solid #2a3a4a; background: #1e2e3e; color: #b0c8d8;
+  font-size: 13px; cursor: pointer; padding: 0;
+}
+.rs-close:hover { background: #26384a; color: #e8f0f8; }
+.rs-body { padding: 12px 16px 16px; overflow-y: auto; }
+.rs-block { margin-bottom: 14px; }
+.rs-block h4 { margin: 0 0 8px; font-size: 13px; color: #9ec3d8; }
+.rs-mode-row { margin-bottom: 8px; }
+.rs-mode-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; color: #ffe9a8; background: #2a2416; border: 1px solid #4a3f22;
+}
+.rs-note {
+  font-size: 12px; line-height: 1.7; color: #b8c8d4;
+  background: #0d1622; border: 1px solid #1e2c3a; border-radius: 8px; padding: 8px 10px;
+}
+.rs-table-wrap { overflow-x: auto; border: 1px solid #1e2c3a; border-radius: 8px; }
+.rs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rs-table th, .rs-table td { padding: 6px 8px; text-align: left; white-space: nowrap; }
+.rs-table thead th { color: #8fb0c4; font-weight: 600; background: #0d1622; border-bottom: 1px solid #1e2c3a; }
+.rs-table tbody tr + tr td { border-top: 1px solid #16222e; }
+.rs-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, .015); }
+.rs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rs-chip {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 4px 9px; border-radius: 999px; font-size: 11px; color: #a8bcc8;
+  background: #0d1622; border: 1px solid #1e2c3a;
+}
+.rs-chip b { color: #ffe9a8; font-size: 12px; }
+.rs-empty { color: #708090; font-size: 12px; padding: 4px 0; }
+
+/* —— 悬停看射程（棋盘 canvas 内高亮提示） —— */
+.hir-cell { fill: rgba(255, 95, 95, .06); stroke: rgba(255, 95, 95, .34); stroke-width: 1; stroke-dasharray: 4 3; }
+.hir-cell.heal { fill: rgba(62, 255, 200, .05); stroke: rgba(62, 255, 200, .32); }
+.hir-source { fill: none; stroke: rgba(255, 200, 120, .7); stroke-width: 1.4; }
+
+/* 快捷操作里的规则按钮（与设置按钮同款造型） */
+#btn-rules {
+  width: 32px; height: 32px;
+  background: #1e2e3e; color: #b0c8d8;
+  border: 1px solid #2a3a4a; border-radius: 6px;
+  cursor: pointer; font-size: 15px; font-weight: 700; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; transition: all .15s;
+}
+#btn-rules:hover { background: #26384a; color: #d8e0e8; }

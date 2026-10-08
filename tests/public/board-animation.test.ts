@@ -407,4 +407,57 @@ describe('shared board animation layer', () => {
     expect(context.strokeStyles).toContain('#ff7a45');
     expect(context.texts).toContain('-18');
   });
+
+  it('shows damage floaters for artillery damage events', () => {
+    const loaded = loadAnimation();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+    const animation = createController(loaded);
+    const state = createState();
+    animation.syncState(state, { animate: false });
+
+    // 单位被炮火击中：存活实体取插值视图位置。
+    animation.recordEvent({
+      type: 'artillery_damage', seq: 41,
+      payload: { unitId: 'unit-1', owner: 'player_a', damage: 25, unitHp: 75, q: 0, r: 0, roundNumber: 5 },
+    }, state);
+    expect(animation._debugEffects()).toContain('hitFlash');
+    expect(animation._debugEffects()).toContain('damageText');
+    let context = new RecordingContext();
+    loaded.setTime(100);
+    animation.drawEffects(context, 100);
+    expect(context.texts).toContain('-25');
+
+    // 实体已被移除（被炮火消灭后先弹 unit_death 清理视图）时回退事件坐标，飘字仍不丢失。
+    const animation2 = createController(loaded);
+    animation2.recordEvent({
+      type: 'artillery_damage', seq: 42,
+      payload: { unitId: 'ghost-unit', owner: 'player_b', damage: 30, unitHp: 0, q: 5, r: -2, roundNumber: 5 },
+    }, state);
+    expect(animation2._debugEffects()).toContain('damageText');
+    context = new RecordingContext();
+    loaded.setTime(200);
+    animation2.drawEffects(context, 200);
+    expect(context.texts).toContain('-30');
+  });
+
+  it('shows heal floaters for control-point repair events', () => {
+    const loaded = loadAnimation();
+    expect(loaded).not.toBeNull();
+    if (!loaded) return;
+    const animation = createController(loaded);
+    const state = createState();
+    animation.syncState(state, { animate: false });
+
+    animation.recordEvent({
+      type: 'control_point_repair', seq: 51,
+      payload: { pointId: 'point-1', pointName: '维修站 1', unitId: 'unit-1', amount: 12, unitHp: 100, owner: 'player_a' },
+    }, state);
+    expect(animation._debugEffects()).toContain('ring');
+    expect(animation._debugEffects()).toContain('damageText');
+    const context = new RecordingContext();
+    loaded.setTime(100);
+    animation.drawEffects(context, 100);
+    expect(context.texts).toContain('+12');
+  });
 });

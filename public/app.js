@@ -97,6 +97,7 @@ const autoRefreshCb = document.getElementById('auto-refresh');
 const followLatestCb = document.getElementById('follow-latest');
 const refreshIntervalInput = document.getElementById('refresh-interval');
 const btnSettings = document.getElementById('btn-settings');
+const btnRules = document.getElementById('btn-rules');
 const settingsPopover = document.getElementById('settings-popover');
 const btnExportJson = document.getElementById('btn-export-json');
 const btnImport = document.getElementById('btn-import');
@@ -726,6 +727,33 @@ function drawControlPointMarker(cp) {
   }
 }
 
+// —— 悬停看射程：观战端无交互模式，悬停任意存活单位即淡显其攻击/治疗覆盖范围 ——
+function hoverRangeHint() {
+  if (!state || !state.cells?.length || !hoverCell) return null;
+  const unit = [...(state.units?.values?.() || [])].find(u => u.alive && u.q === hoverCell.q && u.r === hoverCell.r);
+  if (!unit) return null;
+  const hint = window.BoardInspect?.rangeHintFor(unit, state.cells, gameConfig);
+  return hint ? { ...hint, unit } : null;
+}
+
+function drawHoverRangeHints() {
+  const hint = hoverRangeHint();
+  if (!hint) return;
+  ctx.save();
+  const heal = hint.kind === 'heal';
+  ctx.fillStyle = heal ? 'rgba(62,255,200,.05)' : 'rgba(255,95,95,.06)';
+  ctx.strokeStyle = heal ? 'rgba(62,255,200,.32)' : 'rgba(255,95,95,.34)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  for (const c of hint.cells) { pathHex(c.q, c.r, 3); ctx.fill(); ctx.stroke(); }
+  ctx.setLineDash([]);
+  const p = hexToPixel(hint.unit.q, hint.unit.r);
+  ctx.strokeStyle = 'rgba(255,200,120,.7)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(p.x, p.y, HEX_SIZE * .5, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+
 function drawBoard(now = performance.now()) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#0a0e14';
@@ -757,6 +785,8 @@ function drawBoard(now = performance.now()) {
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
+
+  drawHoverRangeHints();
 
   if (hoverCell) {
     pathHex(hoverCell.q, hoverCell.r, 2);
@@ -1820,6 +1850,8 @@ btnSettings.addEventListener('click', e => {
   settingsPopover.classList.toggle('open');
 });
 document.addEventListener('click', e => { if (!settingsPopover.contains(e.target) && e.target !== btnSettings) settingsPopover.classList.remove('open'); });
+// 本局规则速查：观战/回放均可查看该局内嵌配置的规则与数值。
+window.RulesSheet?.attach({ triggerEl: btnRules, getConfig: () => gameConfig });
 btnSaveControlToken?.addEventListener('click', e => {
   e.stopPropagation();
   saveControlTokenFromSettings();

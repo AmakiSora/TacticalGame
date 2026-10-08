@@ -1739,8 +1739,13 @@ function renderResourceListHtml(owner) {
   </div>`;
 }
 
+function renderActionHint() {
+  const value = actionsPerTurn() || '—';
+  document.querySelectorAll('#action-hints [data-hint-ap]').forEach(el => { el.textContent = String(value); });
+}
 function renderSidebar() {
   if (!state) return;
+  renderActionHint();
   const simultaneous = isSimultaneous();
   const replaying = playback.isActive();
   const owner = simultaneous ? null : (state.turn.currentPlayerId || state.turn.currentOwner);

@@ -4,6 +4,17 @@
 
 自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.5.14
+
+### 新增
+
+- **观战页新增「回放库」：直接浏览并回放归档对局，不再需要手动导入 JSON 文件**：此前观看历史对局只能在观战页点「导入」再从磁盘挑一个文件，归档散落在 `records/` 下无从查找。现在观战页头部新增「回放库」选择器，与实时「选择对局」并列但以独立橙色指示点区分归档 / 实时；点开即列出全部归档回放（V2 与 V3），每条顶部为彩色标签行——`#序号`（橙）/ 日期（蓝）/ 地图（绿）三枚胶囊标签与右侧模式徽标（大逃杀 / 歼灭 / 同时 / 标准，不再显示 V2/V3 存档版本），玩家行按「玩家名左栏自适应省略、胜者金色右对齐」双栏排布，长短玩家名下胜者列始终对齐；列表按对局顺序号倒序（跨 V2/V3 连续，即完整时间线），顶部支持按编号 / 地图 / 玩家即时筛选，选中后选择器胶囊显示「#序号 · 日期」，选中一条即一步载入并在棋盘上回放——复用与手动导入完全相同的渲染管线（`normalizeImportedReplay` → `loadImportedReplay`），单条 V2 旧版回放同样可读。另支持 `?record=V3/tg_XXXX_YYYYMMDD.json` 深链直达（`public/spectator.html` / `public/app.js` / `public/style.css`；桌面端，移动端暂不提供）。
+- **新增只读回放库接口 `/api/records` 与 `/api/records/*`**：服务器启动时扫描仓库根 `records/V2`、`records/V3` 下的回放 JSON 读入内存，`GET /api/records` 返回归档元数据列表（按文件名里的对局顺序号倒序、无序号兑底按日期，含解析好的胜者显示名 `winnerName`——V3 取 `finalResult`，V2 老回放无此字段则从末尾 `game_over` 事件回取，正文不进列表响应），`GET /api/records/:id` 按启动时扫到的文件名白名单返回回放原文（天然拒绝路径穿越），带 ETag（sha256）与 304 缓存语义，实现方式与既有的 `/api/skill*` 一致；目录缺失时整组接口返回 503 而不影响服务启动，单条损坏的回放只跳过并告警。配套调整打包：`.dockerignore` 放行 `records/`、`Dockerfile` 运行时阶段 `COPY records`，使线上「回放库」可用而非空列表（`src/api/records.ts` / `src/server.ts` / `.dockerignore` / `Dockerfile`）。
+
+### 测试与验证
+
+- `npm run build` 通过、`npm test` 全绿，`npm run check-version` 校验 3.5.14 全部引用一致。新增 `tests/api/records.test.ts` 4 例：列表返回归档元数据（`version` / `mode` / `gameId` / `sha256` / `bytes` 与盘上原文一致、不含正文、按日期倒序）、`GET /api/records/:id` 返回原文且带 ETag、`If-None-Match` 命中返回 304、未知 id 与路径穿越（`..%2F..%2Fpackage.json` 等）一律 404。
+
 ## 3.5.13
 
 ### 新增

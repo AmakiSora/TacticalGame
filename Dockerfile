@@ -76,6 +76,9 @@ COPY --chown=tactical:tactical arena/model-status.json ./arena/
 COPY --chown=tactical:tactical rl ./rl
 # agent 通过 /api/skill* 接口拉取最新 skill，镜像需携带权威 skill 目录。
 COPY --chown=tactical:tactical skill ./skill
+# 观战页 /api/records* 浏览历史回放：归档目录必须随镜像发布，
+# 否则线上「回放库」列表为空（.dockerignore 已放行 records/）。
+COPY --chown=tactical:tactical records ./records
 
 USER tactical
 

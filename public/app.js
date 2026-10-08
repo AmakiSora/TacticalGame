@@ -58,6 +58,8 @@ let state = null;
 let hoverCell = null;
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
 let gamesList = [];
+let recordsList = [];
+let activeRecordId = null;
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -71,6 +73,12 @@ const gamePicker = document.querySelector('.game-picker');
 const gamePickerButton = document.getElementById('game-picker-button');
 const gamePickerLabel = document.getElementById('game-picker-label');
 const gamePickerMenu = document.getElementById('game-picker-menu');
+const recordPicker = document.getElementById('record-picker');
+const recordPickerButton = document.getElementById('record-picker-button');
+const recordPickerLabel = document.getElementById('record-picker-label');
+const recordPickerMenu = document.getElementById('record-picker-menu');
+const recordListEl = document.getElementById('record-list');
+const recordFilterInput = document.getElementById('record-filter');
 const refreshBtn = document.getElementById('refresh-list');
 const forceAdjudicateBtn = document.getElementById('force-adjudicate');
 const deleteGameBtn = document.getElementById('delete-game');
@@ -1425,6 +1433,114 @@ async function selectGame(id) {
   subscribeSse(id);
 }
 
+// ---- 回放库（浏览 records/ 归档） ----
+const RECORD_MODE_LABELS = { standard: '标准', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀' };
+
+function recordDateText(record) {
+  const d = record.date;
+  return d && d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : '';
+}
+
+// 选中后胶囊只显示「#序号 · 日期」，完整信息在弹层条目里。
+function recordOptionText(record) {
+  const parts = [record.seq ? `#${record.seq}` : '', recordDateText(record) || record.exportedAt || ''];
+  return parts.filter(Boolean).join(' · ') || record.fileName;
+}
+
+async function fetchRecordList() {
+  try {
+    const res = await fetch('/api/records');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    recordsList = Array.isArray(payload?.records) ? payload.records : [];
+  } catch {
+    recordsList = [];
+  }
+  renderRecordPickerMenu();
+  return recordsList;
+}
+
+function closeRecordPicker() {
+  recordPicker.classList.remove('open');
+  recordPickerButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleRecordPicker() {
+  const open = !recordPicker.classList.contains('open');
+  recordPicker.classList.toggle('open', open);
+  recordPickerButton.setAttribute('aria-expanded', String(open));
+  if (open) {
+    if (recordsList.length === 0) fetchRecordList();
+    recordFilterInput?.focus();
+  }
+}
+
+function recordMatches(record, query) {
+  if (!query) return true;
+  const hay = [record.gameId, record.mapId, record.fileName, record.date, ...(record.players || [])]
+    .filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(query);
+}
+
+function renderRecordPickerMenu() {
+  if (!recordListEl) return;
+  recordListEl.replaceChildren();
+  const query = (recordFilterInput?.value || '').trim().toLowerCase();
+  const matches = recordsList.filter(record => recordMatches(record, query));
+  if (matches.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'game-picker-empty';
+    empty.textContent = recordsList.length === 0 ? '暂无归档回放' : '无匹配回放';
+    recordListEl.append(empty);
+    return;
+  }
+  for (const record of matches) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'game-picker-option record-picker-option';
+    option.dataset.recordId = record.id;
+    option.setAttribute('role', 'option');
+    option.classList.toggle('active', record.id === activeRecordId);
+    const mode = record.mode || 'standard';
+    const modeLabel = RECORD_MODE_LABELS[mode] || esc(mode);
+    const players = (record.players || []).join(' / ');
+    const winnerName = record.winnerName || record.winner;
+    const winner = winnerName ? `胜者 ${esc(winnerName)}` : (record.reason ? esc(record.reason) : '—');
+    const seqBadge = record.seq ? `<span class="record-seq">#${esc(record.seq)}</span>` : '';
+    const dateBadge = (recordDateText(record) || record.exportedAt || '')
+      ? `<span class="record-date">${esc(recordDateText(record) || record.exportedAt)}</span>` : '';
+    const mapBadge = record.mapId ? `<span class="record-map">${esc(record.mapId)}</span>` : '';
+    option.innerHTML = `<span class="record-top">
+        <span class="record-badges">${seqBadge}${dateBadge}${mapBadge}</span>
+        <span class="record-version">${esc(modeLabel)}</span>
+      </span>
+      <span class="game-id">${esc(record.gameId ? record.gameId.slice(0, 8) : record.fileName)}</span>
+      <span class="game-meta-line"><span class="record-players">${esc(players || '未知玩家')}</span><span class="record-winner">${winner}</span></span>`;
+    option.addEventListener('click', () => selectRecord(record.id));
+    recordListEl.append(option);
+  }
+}
+
+async function selectRecord(id) {
+  if (!id) return;
+  statusEl.textContent = '载入回放…';
+  try {
+    const res = await fetch(`/api/records/${id.split('/').map(encodeURIComponent).join('/')}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const replay = normalizeImportedReplay(data);
+    loadImportedReplay(replay);
+    activeRecordId = id;
+    const record = recordsList.find(r => r.id === id);
+    recordPickerLabel.textContent = record ? recordOptionText(record) : id;
+    renderRecordPickerMenu();
+    closeRecordPicker();
+    statusEl.textContent = `已载入回放 ${allEvents.length} 事件`;
+  } catch (err) {
+    statusEl.textContent = `载入回放失败: ${err.message}`;
+  }
+}
+
 async function fetchGameList() {
   let payload;
   try {
@@ -1821,6 +1937,15 @@ gamePickerButton.addEventListener('keydown', e => {
 });
 gamePickerMenu.addEventListener('click', e => e.stopPropagation());
 gamePickerMenu.addEventListener('keydown', e => e.stopPropagation());
+recordPickerButton.addEventListener('click', e => { e.stopPropagation(); toggleRecordPicker(); });
+recordPickerButton.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRecordPicker(); }
+  if (e.key === 'Escape') closeRecordPicker();
+});
+recordFilterInput?.addEventListener('input', renderRecordPickerMenu);
+recordFilterInput?.addEventListener('keydown', e => e.stopPropagation());
+recordPickerMenu.addEventListener('click', e => e.stopPropagation());
 refreshBtn.addEventListener('click', fetchGameList);
 forceAdjudicateBtn?.addEventListener('click', forceAdjudicateCurrentGame);
 deleteGameBtn.addEventListener('click', deleteCurrentGame);
@@ -1876,6 +2001,7 @@ function saveControlTokenFromSettings() {
 }
 
 document.addEventListener('click', e => { if (!gamePicker.contains(e.target)) closeGamePicker(); });
+document.addEventListener('click', e => { if (!recordPicker.contains(e.target)) closeRecordPicker(); });
 document.addEventListener('click', e => {
   const target = e.target.closest('[data-rename-player]');
   if (!target) return;
@@ -1891,8 +2017,13 @@ document.addEventListener('keydown', e => {
 async function initializeApp() {
   const games = await fetchGameList();
   const params = new URLSearchParams(window.location.search);
+  const requestedRecordId = params.get('record');
   const requestedGameId = params.get('gameId') || params.get('game');
-  if (requestedGameId) {
+  if (requestedRecordId) {
+    await fetchRecordList();
+    if (recordsList.some(r => r.id === requestedRecordId)) await selectRecord(requestedRecordId);
+    else statusEl.textContent = `未找到回放 ${requestedRecordId}`;
+  } else if (requestedGameId) {
     const game = games.find(item => item.id === requestedGameId);
     if (game) await selectGame(game.id);
     else statusEl.textContent = `未找到对局 ${requestedGameId}`;

@@ -802,17 +802,18 @@
     selectedModel = null;
     applyAndRender();
   });
+  // select 一次选择会同时触发 input 与 change，两者都绑会整套重算两遍，故只绑 change；
+  // 搜索框没有 change 语义（失焦才触发），必须绑 input。
   for (const node of [
     el.filterVersion,
     el.filterMap,
     el.filterPlayers,
     el.filterMode,
     el.filterModel,
-    el.filterSearch,
   ]) {
-    node.addEventListener('input', () => applyAndRender());
     node.addEventListener('change', () => applyAndRender());
   }
+  el.filterSearch.addEventListener('input', () => applyAndRender());
 
   el.modelTable.querySelector('thead').addEventListener('click', e => {
     const th = e.target.closest('th[data-sort]');

@@ -47,4 +47,24 @@ describe('stats dashboard', () => {
     expect(source).toContain("classList.toggle('icon-arrow-up'");
     expect(html).toContain('.mode-simul');
   });
+
+  it('binds each filter to a single event so one selection renders once', () => {
+    const source = readFileSync('public/stats.js', 'utf8');
+
+    // select 的每次选择会同时触发 input 与 change；两者都绑会让整套聚合与两张表重绘两遍。
+    const selectKeys = ['el.filterVersion', 'el.filterMap', 'el.filterPlayers', 'el.filterMode', 'el.filterModel'];
+    for (const key of selectKeys) {
+      expect(source, `${key} 应绑定 change`).toContain(`addEventListener('change', () => applyAndRender());`);
+    }
+    // 搜索框没有 change 语义（失焦才触发），只能绑 input。
+    expect(source).toContain("el.filterSearch.addEventListener('input', () => applyAndRender());");
+    // 回归守卫：不允许再出现「同一节点同时绑 input 与 change」的循环写法。
+    expect(source).not.toContain("node.addEventListener('input', () => applyAndRender());");
+    // 且搜索框不得再混进 select 循环里（否则会同时吃到 change 与 input）。
+    const loopStart = source.indexOf('for (const node of [');
+    const loopEnd = source.indexOf(']) {', loopStart);
+    expect(loopStart, '应保留筛选控件的循环绑定').toBeGreaterThan(-1);
+    expect(loopEnd).toBeGreaterThan(loopStart);
+    expect(source.slice(loopStart, loopEnd)).not.toContain('el.filterSearch');
+  });
 });

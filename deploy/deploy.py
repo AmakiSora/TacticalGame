@@ -94,7 +94,9 @@ EXCLUDE_PATTERNS = [
     r'\.workbuddy/', r'\.workbuddy$', r'\.github/', r'\.github$',
     r'runtime/', r'runtime$', r'backups/', r'backups$', r'temp/', r'temp$',
     r'\.log$', r'hexstate\.json$', r'state\.json$', r'skill\.zip$',
-    r'records/', r'records$', r'deploy/', r'deploy$',
+    # records/ 是随镜像发布的回放归档（Dockerfile COPY records，观战页 /api/records* 的数据源），
+    # 必须上传：排除它会让远端构建因缺 records/ 目录直接失败。
+    r'deploy/', r'deploy$',
     # RL 训练产物与 Windows 本地环境体积大且服务器用不上（镜像内重建）
     r'^rl/\.venv', r'^rl/checkpoints', r'^rl/tb', r'^rl/distill',
     r'^rl/models/deprecated', r'^rl/test-output', r'^rl/selfplay', r'__pycache__',

@@ -963,6 +963,20 @@ const PHASE_LABELS = {
   active: '进行中',
   game_over: '已结束',
 };
+const MODE_LABELS = { standard: '标准', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀' };
+
+// 对局条目筛选：短码 / 完整 id / 地图 / 玩家名 / 模式与阶段（英文值与中文标签均可命中），
+// 与桌面端 app.js 同口径。
+function gameMatches(game, query) {
+  if (!query) return true;
+  const names = game.playerNames || {};
+  const playerNames = (game.players || []).map(p => names[p.id] || p.name).filter(Boolean);
+  const hay = [
+    game.id, game.mapId, game.mode, game.phase,
+    MODE_LABELS[game.mode], phaseLabel(game.phase), ...playerNames,
+  ].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(query);
+}
 
 function eventLabel(type) {
   return EVENT_LABELS[type] || type;
@@ -1413,8 +1427,40 @@ function buildTimelineMarkers() {
   });
 }
 
+// 选中后胶囊：短码 + 阶段（已结束显示回合数），与桌面端同款。
 function gameOptionText(game) {
-  return `${game.id.slice(0, 8)} - ${phaseLabel(game.phase)} 回合${game.turnNumber}`;
+  const parts = [game.id.slice(0, 8)];
+  if (game.phase === 'game_over') parts.push(`回合${game.turnNumber}`);
+  else parts.push(phaseLabel(game.phase));
+  return parts.join(' · ');
+}
+
+// 对局选择器条目与桌面端同款标签化：顶部标签行（模式/地图/回合/人数 + 右侧阶段徽标），
+// 下行玩家名与胜者双栏排布。
+function gameBadgesHtml(game) {
+  const modeLabel = MODE_LABELS[game.mode] || game.mode || '';
+  const modeBadge = modeLabel ? `<span class="record-map">${esc(modeLabel)}</span>` : '';
+  const mapBadge = game.mapId ? `<span class="record-map">${esc(game.mapId)}</span>` : '';
+  const turnBadge = game.phase !== 'lobby'
+    ? `<span class="record-date">回合 ${esc(game.turnNumber)}</span>` : '';
+  const countBadge = `<span class="record-date">${esc(game.playerCount ?? (game.players || []).length)}/${esc(game.maxPlayers ?? '?')}人</span>`;
+  return `<span class="record-top">
+      <span class="record-badges">${modeBadge}${mapBadge}${turnBadge}${countBadge}</span>
+      <span class="phase-badge phase-${esc(game.phase || 'unknown')}">${esc(phaseLabel(game.phase))}</span>
+    </span>
+    <span class="game-id">${esc(game.id.slice(0, 8))}</span>`;
+}
+
+function gamePlayersLineHtml(game) {
+  const names = game.playerNames || {};
+  const players = (game.players || []);
+  const playerLine = players.length
+    ? players.map(p => names[p.id] || p.name || playerName(p.id)).filter(Boolean).join(' / ')
+    : Object.values(names).filter(Boolean).join(' / ');
+  const winnerId = game.phase === 'game_over' ? game.winner : null;
+  const winnerName = winnerId ? (names[winnerId] || playerName(winnerId)) : null;
+  const winner = winnerName ? `胜者 ${esc(winnerName)}` : '';
+  return `<span class="game-meta-line"><span class="record-players">${esc(playerLine || '暂无玩家')}</span><span class="record-winner">${winner}</span></span>`;
 }
 
 function normalizeListedGame(game) {
@@ -1479,9 +1525,7 @@ function renderGamePickerMenu() {
         option.className = `game-picker-option phase-${game.phase || 'unknown'}`;
         option.dataset.gameId = game.id;
         option.setAttribute('role', 'option');
-        option.innerHTML = `<span class="game-id">${esc(game.id.slice(0, 8))}</span>
-          <span class="phase-badge phase-${esc(game.phase || 'unknown')}">${esc(phaseLabel(game.phase))}</span>
-          <span class="game-meta-line">回合 ${esc(game.turnNumber)} · ${esc(game.mapId || 'default')}</span>`;
+        option.innerHTML = `${gameBadgesHtml(game)}${gamePlayersLineHtml(game)}`;
         option.addEventListener('click', () => selectGame(game.id));
         gamePickerMenu.append(option);
       }
@@ -2150,13 +2194,18 @@ function renderDrawerGameList() {
     list.innerHTML = '<div class="drawer-game-option">暂无对局</div>';
     return;
   }
-  list.innerHTML = gamesList.map(g => {
+  const query = document.getElementById('drawer-game-filter')?.value?.trim().toLowerCase() || '';
+  const matches = gamesList.filter(g => gameMatches(g, query));
+  if (!matches.length) {
+    list.innerHTML = '<div class="drawer-game-option">无匹配对局</div>';
+    return;
+  }
+  list.innerHTML = matches.map(g => {
     const id = g.id || g.gameId || '';
-    const phase = phaseLabel(g.phase || g.status) || '';
     const active = id === current ? ' active' : '';
     return `<button type="button" class="drawer-game-option${active}" data-id="${esc(id)}">
-      <div class="game-id">${esc(id)}</div>
-      <div class="game-meta-line">${esc(phase)}</div>
+      ${gameBadgesHtml({ ...g, id })}
+      ${gamePlayersLineHtml({ ...g, id })}
     </button>`;
   }).join('');
   list.querySelectorAll('.drawer-game-option[data-id]').forEach(btn => {
@@ -2176,6 +2225,18 @@ document.getElementById('drawer-backdrop')?.addEventListener('click', closeDrawe
 // 本局规则速查：观战/回放均可查看该局内嵌配置的规则与数值。
 window.RulesSheet?.attach({ triggerEl: document.getElementById('btn-rules'), getConfig: () => gameConfig });
 document.getElementById('btn-refresh-list-drawer')?.addEventListener('click', () => refreshBtn?.click());
+document.getElementById('drawer-game-filter')?.addEventListener('input', renderDrawerGameList);
+// 抽屉筛选框 Esc：先清筛选，再关抽屉（与桌面端筛选框连续 Esc 体验一致）。
+document.getElementById('drawer-game-filter')?.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key !== 'Escape') return;
+  const input = document.getElementById('drawer-game-filter');
+  if (input.value) {
+    input.value = '';
+    renderDrawerGameList();
+    input.focus();
+  } else closeDrawer();
+});
 document.getElementById('btn-delete-drawer')?.addEventListener('click', () => deleteGameBtn?.click());
 document.getElementById('btn-export-drawer')?.addEventListener('click', () => btnExportJson?.click());
 document.getElementById('btn-import-drawer')?.addEventListener('click', () => btnImport?.click());

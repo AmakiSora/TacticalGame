@@ -160,19 +160,72 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0; whi
   background: #203247;
   border-color: #5caed0;
 }
-.game-picker-option .game-id {
+:is(.game-picker-option, .drawer-game-option) .game-id {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font: 700 13px "SF Mono", "Consolas", monospace;
 }
-.game-picker-option .game-meta-line {
+/* 条目内标签行（与桌面端对局/回放选择器同款）：胶囊标签行 + 右侧阶段徽标。 */
+:is(.game-picker-option, .drawer-game-option) .record-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+:is(.game-picker-option, .drawer-game-option) .record-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+:is(.game-picker-option, .drawer-game-option) .record-date,
+:is(.game-picker-option, .drawer-game-option) .record-map {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:is(.game-picker-option, .drawer-game-option) .record-date {
+  background: rgba(92,174,208,.12);
+  border: 1px solid rgba(92,174,208,.35);
+  color: #a8d8ec;
+}
+:is(.game-picker-option, .drawer-game-option) .record-map {
+  background: rgba(159,223,111,.1);
+  border: 1px solid rgba(159,223,111,.3);
+  color: #c2e8a8;
+  max-width: 110px;
+}
+/* 玩家行：玩家名左栏自适应省略，胜者右栏固定不挤——长短名都对齐。 */
+:is(.game-picker-option, .drawer-game-option) .game-meta-line {
   grid-column: 1 / -1;
   color: #7f9aae;
   font-size: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
-.game-picker-option .phase-badge {
+:is(.game-picker-option, .drawer-game-option) .record-players {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:is(.game-picker-option, .drawer-game-option) .record-winner {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: #ffe9a8;
+  font-weight: 700;
+}
+:is(.game-picker-option, .drawer-game-option) .phase-badge {
   padding: 2px 8px;
   border-radius: 999px;
   background: rgba(148,163,184,.14);
@@ -181,17 +234,17 @@ header h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0; whi
   font-size: 11px;
   font-weight: 700;
 }
-.game-picker-option .phase-badge.phase-lobby {
+:is(.game-picker-option, .drawer-game-option) .phase-badge.phase-lobby {
   background: rgba(245,158,11,.15);
   border-color: rgba(245,158,11,.48);
   color: #fbbf24;
 }
-.game-picker-option .phase-badge.phase-active {
+:is(.game-picker-option, .drawer-game-option) .phase-badge.phase-active {
   background: rgba(34,197,94,.15);
   border-color: rgba(34,197,94,.48);
   color: #86efac;
 }
-.game-picker-option .phase-badge.phase-game_over {
+:is(.game-picker-option, .drawer-game-option) .phase-badge.phase-game_over {
   background: rgba(148,163,184,.16);
   border-color: rgba(148,163,184,.42);
   color: #cbd5e1;
@@ -1567,6 +1620,21 @@ body.spectator-m-shell .drawer-game-list {
   max-height: 40vh;
   overflow: auto;
 }
+/* 抽屉筛选框：与桌面端筛选框同款造型。 */
+body.spectator-m-shell #drawer-game-filter {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: #0b121a;
+  border: 1px solid #23384a;
+  border-radius: 8px;
+  color: #d8e0e8;
+  font-size: 13px;
+  outline: none;
+}
+body.spectator-m-shell #drawer-game-filter:focus { border-color: #5caed0; }
+/* 抽屉条目复用 game-picker-option 的标签化子元素样式（record-top/game-id/game-meta-line
+   的 grid-column 依赖 grid 布局上下文），这里提供同款容器。 */
 body.spectator-m-shell .drawer-game-option {
   text-align: left;
   padding: 10px;
@@ -1575,6 +1643,10 @@ body.spectator-m-shell .drawer-game-option {
   background: #162332;
   color: #d8e0e8;
   cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
 }
 body.spectator-m-shell .drawer-game-option.active {
   border-color: #5caed0;

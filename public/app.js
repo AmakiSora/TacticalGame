@@ -73,6 +73,8 @@ const gamePicker = document.querySelector('.game-picker');
 const gamePickerButton = document.getElementById('game-picker-button');
 const gamePickerLabel = document.getElementById('game-picker-label');
 const gamePickerMenu = document.getElementById('game-picker-menu');
+const gameOptionList = document.getElementById('game-option-list');
+const gameFilterInput = document.getElementById('game-filter');
 const recordPicker = document.getElementById('record-picker');
 const recordPickerButton = document.getElementById('record-picker-button');
 const recordPickerLabel = document.getElementById('record-picker-label');
@@ -943,6 +945,7 @@ const PHASE_LABELS = {
   active: '进行中',
   game_over: '已结束',
 };
+const MODE_LABELS = { standard: '标准', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀' };
 
 function eventLabel(type) {
   return EVENT_LABELS[type] || type;
@@ -1354,8 +1357,40 @@ function buildTimelineMarkers() {
   });
 }
 
+// 选中后胶囊：短码 + 阶段（进行中/等待中才有意义，已结束显示回合数）。
 function gameOptionText(game) {
-  return `${game.id.slice(0, 8)} - ${phaseLabel(game.phase)} 回合${game.turnNumber}`;
+  const parts = [game.id.slice(0, 8)];
+  if (game.phase === 'game_over') parts.push(`回合${game.turnNumber}`);
+  else parts.push(phaseLabel(game.phase));
+  return parts.join(' · ');
+}
+
+// 对局选择器条目与回放库同款标签化：顶部标签行（模式/地图/回合/人数 + 右侧阶段徽标），
+// 下行玩家名与胜者双栏排布。
+function gameBadgesHtml(game) {
+  const modeLabel = MODE_LABELS[game.mode] || game.mode || '';
+  const modeBadge = modeLabel ? `<span class="record-map">${esc(modeLabel)}</span>` : '';
+  const mapBadge = game.mapId ? `<span class="record-map">${esc(game.mapId)}</span>` : '';
+  const turnBadge = game.phase !== 'lobby'
+    ? `<span class="record-date">回合 ${esc(game.turnNumber)}</span>` : '';
+  const countBadge = `<span class="record-date">${esc(game.playerCount ?? (game.players || []).length)}/${esc(game.maxPlayers ?? '?')}人</span>`;
+  return `<span class="record-top">
+      <span class="record-badges">${modeBadge}${mapBadge}${turnBadge}${countBadge}</span>
+      <span class="phase-badge phase-${esc(game.phase || 'unknown')}">${esc(phaseLabel(game.phase))}</span>
+    </span>
+    <span class="game-id">${esc(game.id.slice(0, 8))}</span>`;
+}
+
+function gamePlayersLineHtml(game) {
+  const names = game.playerNames || {};
+  const players = (game.players || []);
+  const playerLine = players.length
+    ? players.map(p => names[p.id] || p.name || playerName(p.id)).filter(Boolean).join(' / ')
+    : Object.values(names).filter(Boolean).join(' / ');
+  const winnerId = game.phase === 'game_over' ? game.winner : null;
+  const winnerName = winnerId ? (names[winnerId] || playerName(winnerId)) : null;
+  const winner = winnerName ? `胜者 ${esc(winnerName)}` : '';
+  return `<span class="game-meta-line"><span class="record-players">${esc(playerLine || '暂无玩家')}</span><span class="record-winner">${winner}</span></span>`;
 }
 
 function normalizeListedGame(game) {
@@ -1381,6 +1416,7 @@ function toggleGamePicker() {
   const open = !gamePicker.classList.contains('open');
   gamePicker.classList.toggle('open', open);
   gamePickerButton.setAttribute('aria-expanded', String(open));
+  if (open) gameFilterInput?.focus();
 }
 
 function syncGamePickerLabel() {
@@ -1399,27 +1435,40 @@ function updateForceAdjudicateButton() {
   forceAdjudicateBtn.disabled = selected?.phase !== 'active';
 }
 
+// 对局条目筛选：短码 / 完整 id / 地图 / 玩家名 / 模式与阶段（英文值与中文标签均可命中）。
+function gameMatches(game, query) {
+  if (!query) return true;
+  const names = game.playerNames || {};
+  const playerNames = (game.players || []).map(p => names[p.id] || p.name).filter(Boolean);
+  const hay = [
+    game.id, game.mapId, game.mode, game.phase,
+    MODE_LABELS[game.mode], phaseLabel(game.phase), ...playerNames,
+  ].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(query);
+}
+
 function renderGamePickerMenu() {
-  gamePickerMenu.replaceChildren();
-  if (gamesList.length === 0) {
+  if (!gameOptionList) return;
+  gameOptionList.replaceChildren();
+  const query = (gameFilterInput?.value || '').trim().toLowerCase();
+  const matches = gamesList.filter(game => gameMatches(game, query));
+  if (matches.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'game-picker-empty';
-    empty.textContent = '暂无在线对局';
-    gamePickerMenu.append(empty);
+    empty.textContent = gamesList.length === 0 ? '暂无在线对局' : '无匹配对局';
+    gameOptionList.append(empty);
     syncGamePickerLabel();
     return;
   }
-  for (const game of gamesList) {
+  for (const game of matches) {
     const option = document.createElement('button');
     option.type = 'button';
     option.className = `game-picker-option phase-${game.phase || 'unknown'}`;
     option.dataset.gameId = game.id;
     option.setAttribute('role', 'option');
-    option.innerHTML = `<span class="game-id">${esc(game.id.slice(0, 8))}</span>
-      <span class="phase-badge phase-${esc(game.phase || 'unknown')}">${esc(phaseLabel(game.phase))}</span>
-      <span class="game-meta-line">回合 ${esc(game.turnNumber)} · ${esc(game.mapId || 'default')}</span>`;
+    option.innerHTML = `${gameBadgesHtml(game)}${gamePlayersLineHtml(game)}`;
     option.addEventListener('click', () => selectGame(game.id));
-    gamePickerMenu.append(option);
+    gameOptionList.append(option);
   }
   syncGamePickerLabel();
 }
@@ -1434,7 +1483,7 @@ async function selectGame(id) {
 }
 
 // ---- 回放库（浏览 records/ 归档） ----
-const RECORD_MODE_LABELS = { standard: '标准', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀' };
+const RECORD_MODE_LABELS = MODE_LABELS;
 
 function recordDateText(record) {
   const d = record.date;
@@ -1932,11 +1981,12 @@ gamePickerButton.addEventListener('keydown', e => {
     e.preventDefault();
     gamePicker.classList.add('open');
     gamePickerButton.setAttribute('aria-expanded', 'true');
-    gamePickerMenu.querySelector('.game-picker-option')?.focus();
+    gameOptionList?.querySelector('.game-picker-option')?.focus();
   }
 });
 gamePickerMenu.addEventListener('click', e => e.stopPropagation());
 gamePickerMenu.addEventListener('keydown', e => e.stopPropagation());
+gameFilterInput?.addEventListener('input', renderGamePickerMenu);
 recordPickerButton.addEventListener('click', e => { e.stopPropagation(); toggleRecordPicker(); });
 recordPickerButton.addEventListener('keydown', e => {
   e.stopPropagation();
@@ -1944,7 +1994,24 @@ recordPickerButton.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeRecordPicker();
 });
 recordFilterInput?.addEventListener('input', renderRecordPickerMenu);
-recordFilterInput?.addEventListener('keydown', e => e.stopPropagation());
+recordFilterInput?.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key !== 'Escape') return;
+  if (recordFilterInput.value) {
+    recordFilterInput.value = '';
+    renderRecordPickerMenu();
+    recordFilterInput.focus();
+  } else closeRecordPicker();
+});
+gameFilterInput?.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key !== 'Escape') return;
+  if (gameFilterInput.value) {
+    gameFilterInput.value = '';
+    renderGamePickerMenu();
+    gameFilterInput.focus();
+  } else closeGamePicker();
+});
 recordPickerMenu.addEventListener('click', e => e.stopPropagation());
 refreshBtn.addEventListener('click', fetchGameList);
 forceAdjudicateBtn?.addEventListener('click', forceAdjudicateCurrentGame);

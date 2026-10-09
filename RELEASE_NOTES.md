@@ -11,9 +11,14 @@
 - **观战页新增「回放库」：直接浏览并回放归档对局，不再需要手动导入 JSON 文件**：此前观看历史对局只能在观战页点「导入」再从磁盘挑一个文件，归档散落在 `records/` 下无从查找。现在观战页头部新增「回放库」选择器，与实时「选择对局」并列但以独立橙色指示点区分归档 / 实时；点开即列出全部归档回放（V2 与 V3），每条顶部为彩色标签行——`#序号`（橙）/ 日期（蓝）/ 地图（绿）三枚胶囊标签与右侧模式徽标（大逃杀 / 歼灭 / 同时 / 标准，不再显示 V2/V3 存档版本），玩家行按「玩家名左栏自适应省略、胜者金色右对齐」双栏排布，长短玩家名下胜者列始终对齐；列表按对局顺序号倒序（跨 V2/V3 连续，即完整时间线），顶部支持按编号 / 地图 / 玩家即时筛选，选中后选择器胶囊显示「#序号 · 日期」，选中一条即一步载入并在棋盘上回放——复用与手动导入完全相同的渲染管线（`normalizeImportedReplay` → `loadImportedReplay`），单条 V2 旧版回放同样可读。另支持 `?record=V3/tg_XXXX_YYYYMMDD.json` 深链直达（`public/spectator.html` / `public/app.js` / `public/style.css`；桌面端，移动端暂不提供）。
 - **新增只读回放库接口 `/api/records` 与 `/api/records/*`**：服务器启动时扫描仓库根 `records/V2`、`records/V3` 下的回放 JSON 读入内存，`GET /api/records` 返回归档元数据列表（按文件名里的对局顺序号倒序、无序号兑底按日期，含解析好的胜者显示名 `winnerName`——V3 取 `finalResult`，V2 老回放无此字段则从末尾 `game_over` 事件回取，正文不进列表响应），`GET /api/records/:id` 按启动时扫到的文件名白名单返回回放原文（天然拒绝路径穿越），带 ETag（sha256）与 304 缓存语义，实现方式与既有的 `/api/skill*` 一致；目录缺失时整组接口返回 503 而不影响服务启动，单条损坏的回放只跳过并告警。配套调整打包：`.dockerignore` 放行 `records/`、`Dockerfile` 运行时阶段 `COPY records`，使线上「回放库」可用而非空列表（`src/api/records.ts` / `src/server.ts` / `.dockerignore` / `Dockerfile`）。
 
+### 变更
+
+- **实时对局条目改用与回放库同款的标签行布局**：此前「选择对局」弹层里每局只有短码、阶段徽标与一行「回合 N · 地图」的纯文本，局内玩家名单与最终胜者都看不到，与刚上线的回放库条目风格也不一致。现在条目顶部为彩色胶囊标签行——模式（绿）/ 地图（绿）/ 回合 N（蓝）与右侧阶段徽标（等待中 / 进行中 / 已结束），下行按「玩家名左栏自适应省略、胜者金色右对齐」双栏排布，已结束的对局直接标出胜者；未开局（等待中）的条目不显示回合标签，人数胶囊以「已加入 / 上限」展示（如 `2/4人`）。高度基本持平而信息量更大，玩家名长短不一时胜者列也始终对齐。桌面观战页与移动观战端菜单 / 抽屉三处同步（`public/app.js` / `public/spectator-m.js` / `public/spectator-m.html` / `public/style.css` / `public/spectator-m.css`）。样式上把回放库选择器一族子元素规则（标签行 / 胶囊 / 玩家行）合并到两个选择器共用的 `.game-picker-option` 上，回放条目因同时带 `game-picker-option record-picker-option` 两个类而不受影响。
+- **对局选择器新增即时筛选，筛选框 Esc 行为与回放库对齐**：实时对局多了以后只能靠肉眼在长列表里翻。现在桌面观战页「选择对局」弹层顶部新增筛选框（筛选框钉顶、列表独立滚动，`#game-option-list`），移动观战端抽屉的对局列表上方同样新增一个，输入即过滤：短码 / 完整 id / 地图 / 玩家名 / 模式与阶段都能命中，模式与阶段的**英文值与中文标签**等价可搜（如 `royale` 与 `大逃杀`、`game_over` 与 `已结束`），空态文案区分「暂无在线对局」与「无匹配对局」。两处筛选框的 Esc 统一为先清空筛选、再按一次才关闭弹层或抽屉，与回放库筛选框同口径（此前对局侧是直接关闭）。样式上 `.record-filter` 的共用规则从只覆盖回放库扩到对局侧（`public/spectator.html` / `public/app.js` / `public/style.css` / `public/spectator-m.js` / `public/spectator-m.css`）。
+
 ### 测试与验证
 
-- `npm run build` 通过、`npm test` 全绿，`npm run check-version` 校验 3.5.14 全部引用一致。新增 `tests/api/records.test.ts` 4 例：列表返回归档元数据（`version` / `mode` / `gameId` / `sha256` / `bytes` 与盘上原文一致、不含正文、按日期倒序）、`GET /api/records/:id` 返回原文且带 ETag、`If-None-Match` 命中返回 304、未知 id 与路径穿越（`..%2F..%2Fpackage.json` 等）一律 404。
+- `npm run build` 通过、`npm test` 713 例（78 个文件）全部通过，`npm run check-version` 校验 3.5.14 全部引用一致——本版本前端渲染与交互层改动未触及引擎与接口行为。新增 `tests/api/records.test.ts` 4 例：列表返回归档元数据（`version` / `mode` / `gameId` / `sha256` / `bytes` 与盘上原文一致、不含正文、按日期倒序）、`GET /api/records/:id` 返回原文且带 ETag、`If-None-Match` 命中返回 304、未知 id 与路径穿越（`..%2F..%2Fpackage.json` 等）一律 404。
 
 ## 3.5.13
 

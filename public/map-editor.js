@@ -28,7 +28,7 @@
     ['controlPoint', '据点数量'],
     ['armyValue', '兵力价值'],
     ['supplies', '金币'],
-    ['effectiveActions', '有效行动'],
+    ['killValue', '击杀价值'],
   ];
 
   function deepClone(value) {
@@ -120,8 +120,8 @@
         ownHqHp: 2,
         controlPoint: 120,
         armyValue: 2,
-        supplies: 1,
-        effectiveActions: 2,
+        supplies: 0,
+        killValue: 0.5,
       },
       controlPointTypes: defaultControlPointTypes(),
     };
@@ -197,12 +197,6 @@
       throw new Error('玩法模式必须是 standard、annihilation、simultaneous 或 royale');
     }
     const configured = deepClone(input);
-    const previousMode = isAnnihilationMode(configured.mode) ? 'annihilation' : 'standard';
-    const previousDefaultWeight = previousMode === 'annihilation' ? 10 : 2;
-    const nextDefaultWeight = isAnnihilationMode(mode) ? 10 : 2;
-    if (configured.balance?.adjudicationWeights?.effectiveActions === previousDefaultWeight) {
-      configured.balance.adjudicationWeights.effectiveActions = nextDefaultWeight;
-    }
     configured.mode = mode;
     if (isAnnihilationMode(mode)) {
       configured.radius = Math.max(2, configured.radius);
@@ -336,13 +330,10 @@
     if (sourceBalance.deployFromHq === false) normalized.balance.deployFromHq = false;
     normalized.balance.adjudicationWeights = {};
     for (const [key] of WEIGHT_KEYS) {
-      const fallback = key === 'effectiveActions' && isAnnihilationMode(normalized.mode)
-        ? 10
-        : defaults.balance.adjudicationWeights[key];
-      const sourceValue = key === 'effectiveActions'
-        ? sourceBalance.adjudicationWeights?.effectiveActions ?? sourceBalance.adjudicationWeights?.actionPoints
-        : sourceBalance.adjudicationWeights?.[key];
-      normalized.balance.adjudicationWeights[key] = numberOrDefault(sourceValue, fallback);
+      normalized.balance.adjudicationWeights[key] = numberOrDefault(
+        sourceBalance.adjudicationWeights?.[key],
+        defaults.balance.adjudicationWeights[key],
+      );
     }
     // 据点类型恒有配置；旧无类型地图（无 controlPointTypes）按默认迁移，
     // supply 收入继承原 controlPointIncome 以保持经济不变。

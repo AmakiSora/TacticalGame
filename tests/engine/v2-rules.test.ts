@@ -106,18 +106,27 @@ describe('hex V2 rules', () => {
     game.units = [];
     const scores = buildAdjudicationScores(game);
     expect(scores.player_b.controlPoints).toBe(3);
-    expect(scores.player_b.total).toBe(180 * 2 + 3 * 90 + game.players.player_b!.stats.actionMerit * 2);
+    // 3.6.0 起据点分 = 流量持有×flowRatio + 期末持有×(1−flowRatio)；本例无整轮累计，只算期末部分。
+    const w = game.config.balance.adjudicationWeights;
+    const flowRatio = w.controlPointFlowRatio ?? 0.7;
+    const expected = game.headquarters.player_b!.hp * w.ownHqHp + 3 * w.controlPoint * (1 - flowRatio);
+    expect(scores.player_b.total).toBeCloseTo(expected, 5);
     const snapshot = buildAdjudicationSnapshot(game);
     expect(snapshot.scores).toEqual(scores);
     expect(snapshot.maxTurns).toBe(game.config.balance.maxTurns);
-    expect(snapshot.weights).toEqual({ ...game.config.balance.adjudicationWeights, effectiveActions: 2 });
+    expect(snapshot.weights).toEqual({
+      ...game.config.balance.adjudicationWeights,
+      killValue: w.killValue ?? 0,
+      controlPointFlowRatio: flowRatio,
+    });
     expect(snapshot.leaders).toEqual(['player_b']);
     expect(snapshot.margin).toBe(scores.player_b.total - scores.player_a.total);
   });
 
   it('force-adjudicates an active game using the current scores', () => {
     const { game, bus } = setup();
-    game.resources.player_a.supplies += 25;
+    // 内置图补给权重为 0：用 HQ 伤害拉开分差（enemyHqDamage 权重计入总分）。
+    game.players.player_a!.stats.headquartersDamage += 25;
 
     const result = forceAdjudication(game, bus);
 

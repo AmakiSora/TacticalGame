@@ -21,10 +21,9 @@ import { computeDamage } from './combat.js';
 import { getCellOccupant, getTerrain } from './validation.js';
 import { createUnitFromConfig } from '../state/store.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
-import { ACTION_MERIT, addActionMerit, attackActionMerit, effectActionMerit } from './actionScore.js';
 import {
-  activePlayerIds, adjudicateAtTurnLimit, captureControlPoints, collectIncome,
-  endGame, grantComebackSupplies, markPlayerEliminated, repairFromControlPoints, resetActions,
+  accumulateControlHold, activePlayerIds, adjudicateAtTurnLimit, captureControlPoints, collectIncome,
+  creditKill, endGame, grantComebackSupplies, markPlayerEliminated, repairFromControlPoints, resetActions,
   updateArtilleryForRound,
 } from './engine.js';
 import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound, coveredCellsFor } from './planning.js';
@@ -168,7 +167,6 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       unit.hasActed = false;
       unit.actionSpent = true;
       game.units.push(unit);
-      addActionMerit(game, id, ACTION_MERIT.deploy);
       appendEvent(game, bus, 'deploy', {
         unitId: unit.id, owner: id, unitType: action.unitType, fromId: action.fromId,
         q: action.q, r: action.r, cost, unitCost: spec.cost, discount,
@@ -225,7 +223,6 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       }
       setTerrainPlain(game, action.q!, action.r!);
       unit.hasActed = true;
-      addActionMerit(game, id, ACTION_MERIT.demolish);
       appendEvent(game, bus, 'demolish', {
         unitId: unit.id, owner: id, q: action.q, r: action.r,
         fromTerrain: 'blocker', toTerrain: 'plain',
@@ -332,7 +329,6 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     }
     for (const { target, amount: applied } of appliedList) {
       target.hp += applied;
-      addActionMerit(game, heal.owner, effectActionMerit(applied));
       appendEvent(game, bus, 'heal', {
         owner: heal.owner, supportId: heal.support.id, targetId: target.id,
         amount: applied, targetHp: target.hp,
@@ -397,7 +393,6 @@ export function resolveRound(game: GameState, bus: EventBus): void {
         const stats = game.players[strike.owner]?.stats;
         if (stats) stats.headquartersDamage += actualDamage;
       }
-      addActionMerit(game, strike.owner, attackActionMerit(game, actualDamage));
       appendEvent(game, bus, 'attack', {
         owner: strike.owner, attackerId: strike.attacker.id,
         q: entity.q, r: entity.r, hit: true,
@@ -427,6 +422,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       unit.alive = false;
       const stats = game.players[death.killer]?.stats;
       if (stats) stats.unitsDestroyed += 1;
+      creditKill(game, death.killer, unit);
       appendEvent(game, bus, 'unit_death', {
         unitId: unit.id, owner: unit.owner, type: unit.type, q: unit.q, r: unit.r, cause: 'attack',
       });
@@ -481,6 +477,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
   }
 
   // ---------------------------------------------------------------- 阶段五回合边界
+  accumulateControlHold(game);
   appendEvent(game, bus, 'round_end', { roundNumber, gameOver: false });
   const adjudicated = adjudicateAtTurnLimit(game, bus);
   appendEvent(game, bus, 'round_resolved', { roundNumber, gameOver: adjudicated, results: outcomes });

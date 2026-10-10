@@ -177,7 +177,10 @@ function adjudicationWeights(game) {
     ownHqHp: w.ownHqHp ?? 2,
     cp: w.controlPoint ?? 90,
     army: w.armyValue ?? 2,
-    supplies: w.supplies ?? 1,
+    supplies: w.supplies ?? 0,
+    // 3.6.0 起：击杀入账与据点流量持有比例也进裁决权重。
+    kill: w.killValue ?? 0,
+    cpFlow: w.controlPointFlowRatio ?? 0.7,
   };
 }
 
@@ -214,18 +217,24 @@ function hqDamageDealt(game, utils, owner) {
 /** 席位当前分项（不含行动功绩：客户端视角看不到，且双方近似对称）。 */
 function scoreOf(game, utils, owner, w) {
   const hq = game.headquarters?.[owner];
+  // 服务器裁决快照提供击杀入账与据点均持（3.6.0 起）；缺失时退化为 0 与当前持有。
+  const snapshot = game.adjudication?.scores?.[owner];
+  const cps = (game.controlPoints || []).filter(cp => cp.owner === owner).length;
   const parts = {
     hqDamage: hqDamageDealt(game, utils, owner),
     ownHqHp: hq && hq.alive !== false ? hq.hp : 0,
-    cps: (game.controlPoints || []).filter(cp => cp.owner === owner).length,
+    cps,
+    cpHold: snapshot?.controlHold ?? cps,
     army: armyValue(game, utils, owner),
     supplies: game.resources?.[owner]?.supplies ?? 0,
+    kills: snapshot?.killValue ?? 0,
   };
   parts.total = parts.hqDamage * w.hqDamage
     + parts.ownHqHp * w.ownHqHp
-    + parts.cps * w.cp
+    + (w.cpFlow * parts.cpHold + (1 - w.cpFlow) * parts.cps) * w.cp
     + parts.army * w.army
-    + parts.supplies * w.supplies;
+    + parts.supplies * w.supplies
+    + parts.kills * w.kill;
   return parts;
 }
 
@@ -596,6 +605,8 @@ function strikePoints(game, w, minDamage, ctx, attacker, target) {
   if (worst >= e.hp) {
     // 击杀：目标剩下的输出威胁也一并消失（tempo 分，不是分数）
     pts += KILL_TEMPO * unitWorth(e, w) * Math.max(0.3, (e.hp + dealt) / e.maxHp);
+    // 3.6.0 起引擎对击杀按造价入账（最后一击归属），与裁决分同币种。
+    pts += (e.cost || 0) * (w.kill ?? 0);
   }
   return pts;
 }

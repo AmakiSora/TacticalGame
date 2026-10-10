@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.5.14`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.6.0`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
@@ -254,25 +254,23 @@ Server total for a living player is:
 total =
   headquartersDamage * weights.enemyHqDamage +
   ownHqHp            * weights.ownHqHp +
-  controlPoints      * weights.controlPoint +
+  (controlPointFlowRatio * controlHold + (1 - controlPointFlowRatio) * controlPoints)
+                     * weights.controlPoint +
   armyValue          * weights.armyValue +
   supplies           * weights.supplies +
-  actionScore
+  killValue          * weights.killValue
 ```
 
 Where:
 
-- Breakdown fields live on `adjudication.scores.<playerId>`: `headquartersDamage`, `ownHqHp`, `controlPoints`, `armyValue`, `supplies`, `actionScore`, `total`.
+- Breakdown fields live on `adjudication.scores.<playerId>`: `headquartersDamage`, `ownHqHp`, `controlPoints`, `controlHold`, `armyValue`, `supplies`, `killValue`, `total`.
 - `armyValue` = sum over living units of `round(cost * hp / maxHp)`.
-- `actionScore` = `players.<id>.stats.actionMerit * effectiveActions`.
-- `effectiveActions` comes from `adjudication.weights.effectiveActions` (API snapshot always exposes it). Resolution order in engine: map `balance.adjudicationWeights.effectiveActions`, else legacy `actionPoints`, else mode default (**standard 2**, **annihilation/royale 10**).
-- **Action merit** (not the same as action points spent): pure moves score **0**. Productive events add merit:
-  - deploy `+1`, demolish `+1`, control-point capture `+2`
-  - attack: `ceil(actualDamage / 20)`
-  - heal: `ceil(amount / 20)`
-- `actionScore` is **added as-is** (already multiplied by `effectiveActions`); do not multiply it by another weight key.
+- `controlPoints` = CPs held **right now** (end-of-game snapshot term).
+- `controlHold` = **time-averaged** CPs held per completed round (flow term): the engine accumulates each living player's held-CP count at every round boundary and divides by accumulated rounds. `controlPointFlowRatio` (snapshot `adjudication.weights.controlPointFlowRatio`, default **0.7**) is the flow share; the rest prices the current snapshot. Holding a CP all game scores the same as before; snatching one on the last round scores only the small snapshot part.
+- `killValue` = total **cost of enemy units you killed**, credited to whoever landed the killing blow (last hit). Artillery/environment kills credit no one. Damaging without killing scores **0** directly (it only lowers the victim's `armyValue`).
+- There is **no action/merit score anymore** (removed in 3.6.0): deploys, demolishes, captures, damage and heals earn score only through the six terms above — never through an activity counter. Legacy map keys `effectiveActions` / `actionPoints` are ignored.
 - Eliminated players keep the frozen `adjudicationScore` snapshot from elimination time.
-- **On finite maps, near max round:** read which weights are non-zero. Empty moves and hoarding supplies do **not** raise `actionScore`. Convert supplies into units/fights when AP allows; take real damage/heals/deploys/captures/demolish instead of idling.
+- **On finite maps, near max round:** read which weights are non-zero. Hoarding supplies only helps if `weights.supplies > 0` (all built-in maps now use `0`); convert supplies into units/fights when AP allows, secure kills (not just damage), and keep CPs held rather than trading them late.
 
 ### Action points
 

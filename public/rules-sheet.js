@@ -9,11 +9,10 @@
   const WEIGHT_LABELS = [
     ['enemyHqDamage', '敌方总部伤害'],
     ['ownHqHp', '己方总部血量'],
-    ['controlPoint', '占领据点'],
+    ['controlPoint', '占领据点（持有+期末）'],
     ['armyValue', '存活兵力'],
     ['supplies', '囤积补给'],
-    ['effectiveActions', '有效行动'],
-    ['actionPoints', '行动点'],
+    ['killValue', '击杀价值'],
   ];
 
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

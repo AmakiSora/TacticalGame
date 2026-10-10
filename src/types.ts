@@ -55,7 +55,14 @@ export interface PlayerStats {
   unitsDestroyed: number;
   playersEliminated: number;
   actionPointsUsed: number;
+  /** @deprecated 3.6.0 起行动功绩不再产生也不再计分，仅为兼容旧回放/旧存档保留。 */
   actionMerit: number;
+  /** 累计击杀敌军单位的造价（按最后一击归属；炮火/环境击杀无归属）。 */
+  killValue: number;
+  /** 每个整轮结束时持有据点数的累计（流量口径）。 */
+  controlHold: number;
+  /** controlHold 已累计的整轮数。 */
+  controlHoldRounds: number;
 }
 
 export interface PlayerState {
@@ -210,10 +217,14 @@ export interface GameEvent {
 export interface AdjudicationScore {
   headquartersDamage: number;
   ownHqHp: number;
+  /** 期末当前持有据点数（存量口径）。 */
   controlPoints: number;
+  /** 每整轮平均持有据点数（流量口径，= stats.controlHold / controlHoldRounds）。 */
+  controlHold: number;
   armyValue: number;
   supplies: number;
-  actionScore: number;
+  /** 累计击杀敌军单位的造价。 */
+  killValue: number;
   total: number;
 }
 
@@ -237,9 +248,16 @@ export interface AdjudicationWeights {
   controlPoint: number;
   armyValue: number;
   supplies: number;
-  /** Optional per-effective-action merit score; defaults to 10 in annihilation and 2 in standard mode. */
+  /** 每点击杀造价的分数；缺省 0（不计击杀分）。 */
+  killValue?: number;
+  /**
+   * 据点分中"流量"（每轮平均持有）的占比，0..1，缺省 0.7；
+   * 其余 (1 - ratio) 按期末当前持有计。
+   */
+  controlPointFlowRatio?: number;
+  /** @deprecated 3.6.0 起不再参与计分（行动功绩已移除），仅为兼容旧地图配置保留。 */
   effectiveActions?: number;
-  /** Backward-compatible alias for maps created before effective-action scoring. */
+  /** @deprecated effectiveActions 的旧别名，同样不再参与计分。 */
   actionPoints?: number;
 }
 

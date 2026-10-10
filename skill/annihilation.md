@@ -21,9 +21,9 @@ Every action on your turn, inspect:
 - Living **enemy units/armies** only — no HQ objects
 - **Artillery config + live state** (see below) — required every action
 - Live `adjudication`, but read **`weights` and breakdowns** first
-  - Fields: `adjudication.scores.<id>.armyValue`, `.actionScore`, `.total`, plus zeroed HQ/CP/supply terms
-  - `adjudication.weights.effectiveActions` (annihilation default **10** if unset)
-  - When `enemyHqDamage` / `ownHqHp` / `controlPoint` / `supplies` are `0` (as on current `artillery-zone`): practical total ≈ `armyValue * weights.armyValue` + **`actionScore`**
+  - Fields: `adjudication.scores.<id>.armyValue`, `.killValue`, `.total`, plus zeroed HQ/CP/supply terms
+  - `adjudication.weights.killValue` (points per killed-unit cost)
+  - When `enemyHqDamage` / `ownHqHp` / `controlPoint` / `supplies` are `0` (as on current `artillery-zone`): practical total ≈ `armyValue * weights.armyValue` + **`killValue * weights.killValue`**
   - Always re-read **this game's** weights; do not assume every annihilation map zeroes the same keys
 - Legal targets: **unit-vs-unit only**
 
@@ -84,8 +84,8 @@ next           = game.artillery.nextShrinkRound   # may be null
 
 - Seat dies on **last unit death**; their CPs neutralise.
 - Last survivor wins; else adjudication at max round using the shared formula in `SKILL.md`. Annihilation maps ship a finite `maxTurns`; on a `maxTurns: null` map the artillery ring still saturates at its minimum safe radius (`nextShrinkRound` turns `null`) and then holds, while the match continues indefinitely — only last-survivor or a host force-adjudicate ends it.
-- When HQ/CP/supply weights are 0: **army value + actionScore are the real race**. Do **not** rush empty "point score", fake HQ damage, **hoard supplies**, or **burn the turn on empty moves** — those do not raise `actionScore`.
-- Raise score by: surviving/high-HP valuable units, real attacks (damage merit), heals, deploys, demolish, captures that enable income/deploy, and denying enemy army value.
+- When HQ/CP/supply weights are 0: **army value + kill score are the real race**. Do **not** rush empty "point score", fake HQ damage, **hoard supplies**, or **burn the turn on empty moves** — none of those raise `armyValue` or `killValue`.
+- Raise score by: surviving/high-HP valuable units, **securing kills** (the killing blow banks the victim's full cost as `killValue`; chip damage alone scores nothing), and denying enemy army value. Artillery kills credit **no one** — a unit the ring finishes is lost score for everyone.
 - CPs still matter for **income + deploy pads**, not for end-score farming when `controlPoint` weight is 0.
 
 ## Decision order
@@ -104,10 +104,10 @@ Unless the user asks for a different style:
    - `fromId` = owned CP id only
 6. **Pre-shrink** (`round < artillery.startRound`): move infantry/scouts to nearest **safe** neutral income CP (`supply` preferred), then secure a nearby deploy pad (`forward_base` / owned CP) that will remain usable as the ring contracts.
 7. **From first shrink** (`round >= startRound`): advance on nearest living enemy army inside the safe zone; favorable trades; no outer-ring tourism. Re-check `warningCells` / `nextShrinkRound` every activation.
-8. **Near adjudication:** re-read `adjudication.weights` and `scores.*.actionScore` / `armyValue`. If HQ/CP/supply weights are 0 → maximize army value and **actionScore** via real exchanges (damage/heal/deploy/capture/demolish); deny enemy army. Spend leftover supplies on safe deploys when AP allows. No capture-spam for phantom point score, no supply hoarding, no empty reposition loops, no searching for HQs.
+8. **Near adjudication:** re-read `adjudication.weights` and `scores.*.killValue` / `armyValue`. If HQ/CP/supply weights are 0 → maximize army value and **killValue** via real exchanges (finish wounded enemies for the kill credit; deny enemy army). Spend leftover supplies on safe deploys when AP allows. No capture-spam for phantom point score, no supply hoarding, no empty reposition loops, no searching for HQs.
 9. **No useful action** → `/end-turn`.
 
-Never stall for adjudication while a kill, a safe capture that enables deploy/income, a merit-scoring fight, or an inward escape is available.
+Never stall for adjudication while a kill, a safe capture that enables deploy/income, a favorable trade, or an inward escape is available.
 
 ## Pre-action checks
 

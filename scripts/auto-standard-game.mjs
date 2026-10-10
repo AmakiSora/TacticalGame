@@ -628,7 +628,7 @@ function summarize(game) {
   log(`winner=${w}  phase=${game.phase}`);
   for (const [id, s] of Object.entries(adj)) {
     if (!s) continue;
-    log(`  ${id}: total=${s.total}  cp=${s.controlPoints}  hqHp=${s.ownHqHp}  dmg=${s.headquartersDamage}  army=${s.armyValue}  supplies=${s.supplies}  action=${s.actionScore}`);
+    log(`  ${id}: total=${s.total}  cp=${s.controlPoints}  cpHold=${s.controlHold}  hqHp=${s.ownHqHp}  dmg=${s.headquartersDamage}  army=${s.armyValue}  supplies=${s.supplies}  kill=${s.killValue}`);
   }
   return { winner: w, scores: adj };
 }

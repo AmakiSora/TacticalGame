@@ -129,7 +129,7 @@ const algos = { [seatA.key]: seatA.mod, [seatB.key]: seatB.mod };
 args.a = seatA.key;
 args.b = seatB.key;
 const stat = name => ({
-  name, wins: 0, games: 0, score: 0, hqDamage: 0, ownHq: 0, cps: 0, army: 0, supplies: 0, merit: 0,
+  name, wins: 0, games: 0, score: 0, hqDamage: 0, ownHq: 0, cps: 0, army: 0, supplies: 0, kills: 0,
   illegal: {}, mix: {}, turns: 0, turnsWithApLeft: 0, firsts: 0, firstWins: 0,
 });
 const table = new Map();
@@ -214,7 +214,7 @@ for (let i = 0; i < args.games; i++) {
     row.cps += (game.controlPoints || []).filter(cp => cp.owner === seatId).length;
     row.army += s.armyValue ?? 0;
     row.supplies += s.supplies ?? 0;
-    row.merit += game.players[seatId]?.stats?.actionMerit ?? 0;
+    row.kills += game.players[seatId]?.stats?.killValue ?? 0;
     if (seatId === 'player_a') { row.firsts++; if (winner === seatId) row.firstWins++; }
     if (winner === seatId) row.wins++;
   }

@@ -8,7 +8,6 @@ import { appendEvent } from './events.js';
 import { createUnitFromConfig } from '../state/store.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import { isArtilleryDanger } from './artillery.js';
-import { ACTION_MERIT, addActionMerit } from './actionScore.js';
 
 export function deployUnit(
   game: GameState,
@@ -58,7 +57,6 @@ export function deployUnit(
   unit.hasActed = false;
   unit.actionSpent = true;
   game.units.push(unit);
-  addActionMerit(game, owner, ACTION_MERIT.deploy);
   appendEvent(game, bus, 'deploy', {
     unitId: unit.id, owner, unitType, fromId, q, r, cost: actualCost, unitCost: spec.cost, discount,
     hp: unit.hp, attack: unit.attack, defense: unit.defense,

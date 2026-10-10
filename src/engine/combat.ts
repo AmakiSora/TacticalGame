@@ -6,9 +6,8 @@ import type { Result } from './result.js';
 import { hexDistance } from './hex.js';
 import { consumeAction, actionsRemaining } from './validation.js';
 import { appendEvent } from './events.js';
-import { eliminatePlayer } from './engine.js';
+import { eliminatePlayer, creditKill } from './engine.js';
 import { isArtilleryDanger } from './artillery.js';
-import { addActionMerit, attackActionMerit, effectActionMerit } from './actionScore.js';
 import { nextGameRandom } from './random.js';
 
 type Target =
@@ -71,7 +70,6 @@ export function attackTarget(
   if (target.kind === 'headquarters' && game.players[owner]) {
     game.players[owner]!.stats.headquartersDamage += actualDamage;
   }
-  addActionMerit(game, owner, attackActionMerit(game, actualDamage));
   attacker.hasActed = true;
   appendEvent(game, bus, 'attack', {
     owner,
@@ -94,12 +92,14 @@ export function attackTarget(
       eliminatePlayer(game, bus, target.entity.owner, 'headquarters_destroyed', owner);
     } else {
       if (game.players[owner]) game.players[owner]!.stats.unitsDestroyed += 1;
+      creditKill(game, owner, target.entity);
       appendEvent(game, bus, 'unit_death', {
         unitId: target.entity.id,
         owner: target.entity.owner,
         type: target.entity.type,
         q: target.entity.q,
         r: target.entity.r,
+        cause: 'attack',
       });
       if (
         isAnnihilationMode(game.config.mode) &&
@@ -140,7 +140,6 @@ export function healTarget(
   const amount = rollHeal(game, support);
   const healed = Math.min(target.maxHp - target.hp, amount);
   target.hp += healed;
-  addActionMerit(game, owner, effectActionMerit(healed));
   support.hasActed = true;
   appendEvent(game, bus, 'heal', {
     owner, supportId, targetId, amount: healed, targetHp: target.hp,

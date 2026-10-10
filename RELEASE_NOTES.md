@@ -4,6 +4,24 @@
 
 自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.6.0
+
+### 变更
+
+- **裁决分公式重构：消除重复计分与套利，新增「击杀价值」分项，据点分改为流量制**：旧公式存在四类重复计分（对总部伤害同时计入 HQ 分项与攻击功绩、占点同时计入据点数与占领功绩、部署同时提升军力价值与记部署功绩、治疗按治疗量记功绩反而奖励挨打），且「有效行动」功绩分鼓励无意义刷动作；补给权重普遍低于军力价值权重（1 < 2）又使「囤补给→终局爆兵」成为净赚约 +45 分/次的套利。新公式为 `总分 = 对总部伤害×enemyHqDamage + 己方总部生命×ownHqHp + 据点分 + 军力价值×armyValue + 补给×supplies + 击杀价值×killValue`，其中**据点分 = controlPoint × (flowRatio × 场均持有 + (1−flowRatio) × 期末持有)**（`controlPointFlowRatio` 默认 0.7，可按图配置）：每个回合边界为未淘汰玩家累计当期持有点数（`controlHold` / `controlHoldRounds`），终局取时间均值与期末快照按 7:3 混合——全程稳定持有的得分与旧口径完全一致，但「前期不抢点、终局一把偷点」的收益被压到约三成，反之「长期经营、末期被翻」也不再血本无归。行动功绩（actionScore / 功绩 × 有效行动）整体移除：攻击、治疗、部署、爆破、占领不再直接得分，其价值全部经由 HQ 伤害、击杀、据点持有等结果项体现（`src/engine/engine.ts` / `combat.ts` / `simultaneous.ts` / `deployment.ts` / `demolition.ts` / `src/types.ts`）。
+- **新增「击杀价值」分项：致命一击归属制，环境击杀无人得分**：击毁敌方单位时，打出致命一击的玩家获得该单位造价等值的 `killValue`（多人对局中解决「压血是公共品、无人愿补刀」的搭便车问题）；同时回合模式按 turnOrder 顺序施加伤害，归属确定且同回合互杀依然成立。炮火 / 环境击杀（`unit_death` 事件 `cause: 'artillery'`）不归属任何玩家。服务器重启与旧存档重放时从既有事件流重建 `killValue` 与 `controlHold`（攻击事件 `targetKind==='unit' && targetHp===0` 定位致命一击；`round_end` 且 `gameOver !== true` 重建轮界持有累计），无需新增事件类型（`src/engine/engine.ts` `creditKill` / `accumulateControlHold`、`src/state/store.ts` `restoreActionStats`）。
+- **全部 11 张内置地图裁决权重再平衡：补给权重一律归零，新增击杀权重**：`supplies: 0` 从构造上根除囤补给 / 部署套利（补给仍是对局内经济资源，只是不再直接计分）；`killValue` 权重按图设定为军力价值权重的 0.25–0.5 倍（标准 / 突破口 / 双线 0.5、多人环 0.3、对峙 0.15、漩涡 0.15、危险距离 0.25、炮火区 0.5、雪花 1.5、窄路 1）；`effectiveActions` 权重键自全部地图移除。随机地图权重采样同步：`supplies` 恒 0，`killValue` 取 `armyValue × (0.25~0.5)`。歼灭 / 大逃杀类地图（雪花、窄路、炮火区）记分由此收敛为「军力 + 击杀」两项，与「无总部、无占领」的玩法自洽（`maps/*.json` / `src/config/randomMap.ts` / `src/config/loader.ts` 新增 `killValue ≥ 0` 与 `controlPointFlowRatio ∈ [0,1]` 校验）。
+- **四端前端与内置算法同步新口径**：计分板 / 分数明细改为「据点持有（均值）」「期末据点」「击杀价值」三项（含旧回放兼容分支——含 `actionScore` 的 3.6.0 前快照仍按旧六项展示）；事件镜像在攻击事件 `targetHp === 0` 时累计击杀价值、`round_end`（非终局）累计据点持有。地图编辑器权重键由「有效行动」改为「击杀价值」（默认 0.5，补给默认 0）；规则速查弹层同步。内置算法 `verdict.mjs` 的局势评估加入击杀项与据点流量混合， lethal 打击按目标造价 × 击杀权重加分；竞技场与自动对局脚本的统计列由 `merit` 改为 `kills`（`public/app.js` / `play.js` / `play-m.js` / `spectator-m.js` / `map-editor.js` / `rules-sheet.js` / `algorithms/builtin/verdict.mjs` / `scripts/algorithm-arena.mjs` / `scripts/auto-standard-game.mjs`）。
+- **skill 文档与复盘模板同步**：`skill/SKILL.md` 权威公式段落重写为新公式与分项语义，明确「3.6.0 起无行动功绩分」、旧权重键被忽略，临上限回合建议更新为「补给不计分、稳拿击杀、守住据点」；四份模式文档与四份复盘模板的账本公式、权重表同步更新（炮火击杀注明无归属）。
+
+### 移除
+
+- **行动功绩计分（actionScore / actionMerit）**：部署 / 爆破 +1、占领 +2、攻击治疗每 20HP +1 的功绩体系及其「功绩 × 有效行动」分项整体移除；`stats.actionMerit`、`effectiveActions` / `actionPoints` 权重键保留为 deprecated 字段以兼容旧存档与旧回放，但不再参与任何计分。
+
+### 测试与验证
+
+- `npm run build` 通过、`npm test` 718 例全部通过，`npm run check-version` 校验 3.6.0 全部引用一致。存量用例适配新口径 15 例（改用 HQ 伤害拉开分差替代补给分差、占点断言改为持有累计、功绩断言改为 0）；新增 4 例：同时回合多人命中同一单位时致命一击归属击杀价值、炮火击杀无归属且无人记击杀数、跨两轮据点持有均值与期末快照的流量混合计分、淘汰冻结分包含击杀价值与持有均值且之后不再变化。
+
 ## 3.5.14
 
 ### 新增

@@ -11,7 +11,7 @@ Every action on your turn, inspect:
 - Supplies, `turn.actionsUsed` vs `actionsPerTurn`
 - Control points (owners and kinds)
 - **All living opponents' headquarters** HP and your own HQ
-- Live `adjudication` (`scores`, `weights`, `leaders`, `margin`) including **`actionScore`** and `weights.effectiveActions`
+- Live `adjudication` (`scores`, `weights`, `leaders`, `margin`) including **`killValue` / `controlHold`** and `weights.killValue` / `weights.controlPointFlowRatio`
 - Legal targets: enemy units **and** living enemy HQs
 
 ## Rules (standard only)
@@ -22,9 +22,10 @@ Every action on your turn, inspect:
   - A map may set `balance.deployFromHq: false` — the HQ is then **not** a legal deploy origin; only owned CPs are. Check `config.balance.deployFromHq` before planning an HQ deploy; an HQ-deploy on such a map is rejected (`invalid_deploy`).
   - A map may also ban deploy per CP kind: `balance.controlPointTypes.<kind>.canDeploy: false` makes owned CPs of that kind illegal origins (rejected `invalid_deploy`); kinds without the flag stay deployable.
 - **Elimination:** destroying a player's HQ eliminates them — units removed, their CPs go neutral, resources freeze; match continues for remaining players.
-- **Adjudication** uses the shared six-term formula in `SKILL.md`: HQ damage, own HQ HP, CPs, army value, supplies, **and `actionScore`**. Enemy HQ damage accumulates across opponents in multiplayer.
-- `actionScore = actionMerit × effectiveActions` (standard default **2** per merit point unless the map sets `weights.effectiveActions`). Merit comes from deploy / demolish / capture / damage / heal — **not** from pure moves.
-- Read `adjudication.scores.<you>.actionScore` and rival breakdowns; do not recompute.
+- **Adjudication** uses the shared formula in `SKILL.md`: HQ damage, own HQ HP, CPs (time-averaged hold + final snapshot), army value, supplies, **and `killValue`**. Enemy HQ damage accumulates across opponents in multiplayer.
+- `killValue` = total cost of enemy units **you** killed (last hit). Securing kills beats chip damage: non-lethal damage scores nothing directly.
+- CP scoring is mostly **flow**: holding a point every round is worth far more than grabbing it on the last round (`controlPointFlowRatio`, default 0.7).
+- Read `adjudication.scores.<you>` and rival breakdowns; do not recompute.
 - Movement cannot path through living HQs.
 - Prefer HQ pressure when board state and non-zero HQ weights reward it.
 
@@ -41,7 +42,7 @@ Unless the user asks for a different style:
    - `fromId` must be HQ id or owned CP id — HQ only when the map allows it (`config.balance.deployFromHq` is not `false`), and the CP's kind must not be deploy-banned (`controlPointTypes.<kind>.canDeploy: false`).
 6. **Early:** move infantry/scouts to neutral or enemy CPs. `supply` early, `forward_base` for sustained pressure, `repair` when wounded units can hold nearby.
 7. **Late:** move scouts/rangers/infantry onto best enemy **HQ** attack hexes.
-8. **Near adjudication:** read `adjudication.scores` / `weights` / `leaders` / `margin`. Prioritize non-zero levers: HQ damage, CPs, valuable army survival, **productive action merit** (attacks, heals, deploys, captures, demolish), and convert excess supplies into units when AP/deploy hexes exist. Do **not** end the round on empty shuffles or supply hoarding — they add no `actionScore`. HQ damage already dealt to now-eliminated rivals still counts. On an unlimited map (`config.balance.maxTurns === null`) there is no final round to time: only elimination or the host's `/force-adjudicate` ends it, so keep contesting income CPs instead of banking for a cap.
+8. **Near adjudication:** read `adjudication.scores` / `weights` / `leaders` / `margin`. Prioritize non-zero levers: HQ damage, CPs (keep them **held** — flow beats last-round grabs), valuable army survival, **securing kills** (last hit banks the victim's full cost as `killValue`), and convert excess supplies into units when AP/deploy hexes exist (built-in maps give supplies **0** weight — unspent supplies are worthless at the horn). HQ damage already dealt to now-eliminated rivals still counts. On an unlimited map (`config.balance.maxTurns === null`) there is no final round to time: only elimination or the host's `/force-adjudicate` ends it, so keep contesting income CPs instead of banking for a cap.
 9. **No useful action** → `/end-turn`.
 
 ## Pre-action checks

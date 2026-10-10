@@ -171,6 +171,7 @@ describe('V2 API', () => {
     const { gameId, playerAToken } = await createAndJoin(app);
 
     const game = globalStore.get(gameId)!;
+    // 内置图补给权重为 0：用 HQ 伤害拉开分差（enemyHqDamage 权重计入总分）
     game.resources.player_a.supplies = 0;
     game.resources.player_b.supplies = 10;
     game.units = [];
@@ -178,7 +179,7 @@ describe('V2 API', () => {
     game.headquarters.player_a.hp = 200;
     game.headquarters.player_b.hp = 200;
     game.players.player_a!.stats.headquartersDamage = 0;
-    game.players.player_b!.stats.headquartersDamage = 0;
+    game.players.player_b!.stats.headquartersDamage = 10;
 
     const res = await app.inject({
       method: 'GET',
@@ -194,7 +195,7 @@ describe('V2 API', () => {
       maxTurns: game.config.balance.maxTurns,
       weights,
       leaders: ['player_b'],
-      margin: 10 * weights.supplies,
+      margin: 10 * weights.enemyHqDamage,
       scores: {
         player_a: expect.objectContaining({
           headquartersDamage: 0,
@@ -205,12 +206,12 @@ describe('V2 API', () => {
           total: 200 * weights.ownHqHp,
         }),
         player_b: expect.objectContaining({
-          headquartersDamage: 0,
+          headquartersDamage: 10,
           ownHqHp: 200,
           controlPoints: 0,
           armyValue: 0,
           supplies: 10,
-          total: 200 * weights.ownHqHp + 10 * weights.supplies,
+          total: 200 * weights.ownHqHp + 10 * weights.enemyHqDamage,
         }),
       },
     });
@@ -228,8 +229,10 @@ describe('V2 API', () => {
     game.turn.currentOwner = 'player_b';
     game.turn.currentPlayerId = 'player_b';
     game.turn.actedThisRound = ['player_a'];
+    // 内置图补给权重为 0：用 HQ 伤害拉开分差（enemyHqDamage 权重计入总分）
     game.resources.player_a.supplies = 0;
-    game.resources.player_b.supplies = 10;
+    game.resources.player_b.supplies = 0;
+    game.players.player_b!.stats.headquartersDamage = 10;
     game.units = [];
     game.controlPoints.forEach((p: any) => { p.owner = null; });
     game.headquarters.player_a.hp = 200;
@@ -274,7 +277,8 @@ describe('V2 API', () => {
     try {
       const { gameId } = await createAndJoin(app);
       const game = globalStore.get(gameId)!;
-      game.resources.player_a.supplies += 25;
+      // 内置图补给权重为 0：用 HQ 伤害拉开分差（enemyHqDamage 权重计入总分）
+      game.players.player_a!.stats.headquartersDamage += 25;
 
       const rejected = await app.inject({
         method: 'POST',

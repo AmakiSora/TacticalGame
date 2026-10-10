@@ -2,7 +2,7 @@
 // simultaneous 模式（对峙之地 standoff 地图）的计划阶段与严格同时结算器测试。
 import { describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/events/bus.js';
-import { eliminatePlayer, startGame } from '../../src/engine/engine.js';
+import { buildAdjudicationScores, eliminatePlayer, startGame } from '../../src/engine/engine.js';
 import {
   clearPlanActions, queueAttackAction, queueDemolishAction, queueDeployAction,
   queueHealAction, queueMoveAction, revokePlanAction,
@@ -74,7 +74,7 @@ describe('simultaneous mode setup', () => {
     expect(game.config.balance).toMatchObject({
       startingSupplies: 120,
       baseIncome: 8,
-      adjudicationWeights: { armyValue: 0.35, supplies: 0.25, effectiveActions: 6 },
+      adjudicationWeights: { armyValue: 0.35, supplies: 0, killValue: 0.15 },
     });
   });
 
@@ -258,8 +258,35 @@ describe('simultaneous resolution', () => {
     expect(attacks[0]!.payload.aimQ).toBe(0);
     expect(attacks[0]!.payload.aimR).toBe(0);
     expect(target.hp).toBeLessThan(hpBefore);
-    expect(game.players[a]!.stats.actionMerit)
-      .toBe(Math.ceil((attacks[0]!.payload.actualDamage as number) / 10));
+    // 3.6.0 起攻击伤害不再记行动功绩；非致命伤害不直接得分。
+    expect(game.players[a]!.stats.actionMerit).toBe(0);
+    expect(game.players[a]!.stats.killValue).toBe(0);
+  });
+
+  it('credits the kill to the last-hit striker when multiple players hit the same unit', () => {
+    const { game, bus } = createStandoffGame(3);
+    const [a, b, c] = game.turn.turnOrder as [PlayerId, PlayerId, PlayerId];
+    const attackerA = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    const attackerC = game.units.find(u => u.owner === c && u.type === 'infantry')!;
+    const target = game.units.find(u => u.owner === b && u.type === 'infantry')!;
+    // 步兵为 2 格直线攻击：c 的射线 (-1,0)->(0,0)->(1,0)，a 放在射线外的 (0,1) 避免误伤。
+    place(attackerA, 0, 1);
+    place(attackerC, -1, 0);
+    place(target, 0, 0);
+    // 伤害按 turnOrder 顺序施加：a 先压血（非致命），c 的致命一击拿走击杀价值。
+    attackerA.attack = 5;
+    attackerC.attack = 999;
+    target.defense = 0;
+    target.hp = 200;
+    expect(queueAttackAction(game, a, attackerA.id, 0, 0).ok).toBe(true);
+    expect(queueAttackAction(game, c, attackerC.id, 0, 0).ok).toBe(true);
+    commitAll(game, bus, [a, b, c]);
+    expect(target.alive).toBe(false);
+    expect(game.players[a]!.stats.unitsDestroyed).toBe(0);
+    expect(game.players[a]!.stats.killValue).toBe(0);
+    expect(game.players[c]!.stats.unitsDestroyed).toBe(1);
+    expect(game.players[c]!.stats.killValue).toBe(target.cost);
+    expect(buildAdjudicationScores(game)[c]!.killValue).toBe(target.cost);
   });
 
   it('misses when the target moves away and hits a unit moving into the attacked cell', () => {
@@ -434,7 +461,7 @@ describe('simultaneous resolution', () => {
     expect(game.units).toHaveLength(6);
   });
 
-  it('captures control points after resolution and grants merit', () => {
+  it('captures control points after resolution and accumulates control hold', () => {
     const { game, bus } = createStandoffGame();
     const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
     const infantry = game.units.find(u => u.owner === a && u.type === 'infantry')!;
@@ -444,7 +471,44 @@ describe('simultaneous resolution', () => {
     const cp = game.controlPoints.find(point => point.q === 3 && point.r === 0)!;
     expect(cp.owner).toBe(a);
     expect(events(game, 'control_point_captured')).toHaveLength(1);
-    expect(game.players[a]!.stats.actionMerit).toBeGreaterThanOrEqual(2);
+    // 3.6.0 起占点不再记行动功绩，改为在轮界累计据点流量持有。
+    expect(game.players[a]!.stats.actionMerit).toBe(0);
+    expect(game.players[a]!.stats.controlHold).toBeGreaterThanOrEqual(1);
+    expect(game.players[a]!.stats.controlHoldRounds).toBe(1);
+  });
+
+  it('averages control hold across rounds and mixes it with the final holdings', () => {
+    const { game, bus } = createStandoffGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    // 直接让 a 持有一个据点（绕过占领流程），b 全程不持点。
+    for (const point of game.controlPoints) point.owner = null;
+    game.controlPoints[0]!.owner = a;
+
+    commitAll(game, bus, [a, b]); // round 1 → 2
+    commitAll(game, bus, [a, b]); // round 2 → 3
+
+    // 两轮轮界各累计一次：a 每轮持 1 点，b 持 0 点。
+    expect(game.players[a]!.stats.controlHoldRounds).toBe(2);
+    expect(game.players[a]!.stats.controlHold).toBe(2);
+    expect(game.players[b]!.stats.controlHoldRounds).toBe(2);
+    expect(game.players[b]!.stats.controlHold).toBe(0);
+
+    // 均值 1、期末 1：流量混合后与「全程稳定持有 1 点」的旧口径一致。
+    const weights = game.config.balance.adjudicationWeights;
+    const ratio = weights.controlPointFlowRatio ?? 0.7;
+    const scoreA = buildAdjudicationScores(game)[a]!;
+    expect(scoreA.controlHold).toBe(1);
+    expect(scoreA.controlPoints).toBe(1);
+    const expectedControl = weights.controlPoint * (ratio * 1 + (1 - ratio) * 1);
+    const scoreB = buildAdjudicationScores(game)[b]!;
+    expect(scoreA.total - scoreB.total).toBeCloseTo(
+      expectedControl +
+        (scoreA.armyValue - scoreB.armyValue) * weights.armyValue +
+        (scoreA.supplies - scoreB.supplies) * weights.supplies +
+        (scoreA.ownHqHp - scoreB.ownHqHp) * weights.ownHqHp,
+      6,
+    );
+    expect(scoreB.controlHold).toBe(0);
   });
 
   it('advances the round boundary: reset flags, symmetric income, fresh plan', () => {

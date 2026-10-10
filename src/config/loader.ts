@@ -136,6 +136,8 @@ export interface MapConfig {
       controlPoint: number;
       armyValue: number;
       supplies: number;
+      killValue?: number;
+      controlPointFlowRatio?: number;
       effectiveActions?: number;
       actionPoints?: number;
     };
@@ -363,6 +365,15 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   }
   if ('effectiveActions' in weights) {
     assertNumber(weights, 'effectiveActions', `Map "${id}".balance.adjudicationWeights`, 0);
+  }
+  if ('killValue' in weights) {
+    assertNumber(weights, 'killValue', `Map "${id}".balance.adjudicationWeights`, 0);
+  }
+  if ('controlPointFlowRatio' in weights) {
+    assertNumber(weights, 'controlPointFlowRatio', `Map "${id}".balance.adjudicationWeights`, 0);
+    if ((weights.controlPointFlowRatio as number) > 1) {
+      throw new Error(`Map "${id}".balance.adjudicationWeights.controlPointFlowRatio must be a number between 0 and 1`);
+    }
   }
   const controlPointTypes = 'controlPointTypes' in balance
     ? asRecord(balance.controlPointTypes, `Map "${id}".balance.controlPointTypes`)

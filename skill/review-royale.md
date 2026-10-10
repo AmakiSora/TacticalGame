@@ -56,9 +56,9 @@
   `artillery_destroyed`（炮火清场），并记录 `eliminatedBy`（炮火清场为 `null`）。
 - **预测与封锁：** 同时结算下攻击瞄准格子；记录瞄准格、覆盖形状、敌人最终位置与命中/落空；
   分析哪些 `destination_conflict` 是双向误判、哪些是故意的路线封锁。
-- **行动分倾向战斗：** 命中按实际伤害每 10 HP 计 1 点行动功勋（`effectiveActions` 见本局
-  配置，当前 `snowflake` 为 10）；HQ/据点/补给权重为 0 时，军力价值 + 行动分才是真实竞赛，
-  屯兵与囤补给不加分。
+- **击杀按最后一击归属：** 3.6.0 起不再有行动功绩分；击杀敌军按造价入账（`killValue`，
+  本图权重 1.5），炮火击杀无归属、任何人不得分。HQ/据点/补给权重为 0 时，军力价值 +
+  击杀造价才是真实竞赛，屯兵与囤补给不加分。
 
 ## 四、证据与裁决账本
 
@@ -68,11 +68,12 @@
 
 裁决分仍按本局权重计算：
 
-`累计 HQ伤害×enemyHqDamage + 己方HQ HP×ownHqHp + 据点数×controlPoint + 存活军力价值×armyValue
-+ 剩余补给×supplies + actionScore`。
+`累计 HQ伤害×enemyHqDamage + 己方HQ HP×ownHqHp + (据点流量持有×controlPointFlowRatio
++ 期末据点×(1−controlPointFlowRatio))×controlPoint + 存活军力价值×armyValue
++ 剩余补给×supplies + 击杀造价×killValue`。
 
 账本在同时回合的“计划动作数 / 成功 / 失败、落空、失效数 / AP 浪费原因”之外，增加
-“每轮圈外掉血总量 / 因炮火减员的单位 / 因打光淘汰的轮次”，`actionScore` 只能按事件或
+“每轮圈外掉血总量 / 因炮火减员的单位 / 因打光淘汰的轮次”，`killValue` 只能按事件或
 `game_over` 记录，不能由队列长度臆算。
 
 ## 五、复盘模板
@@ -97,8 +98,8 @@
 ## 4. 终局（minimumSafeRadius 达成前后）
 - 花心争夺过程、最后的内圈六格换血、打光/炮火淘汰的顺序
 
-## 5. 裁决账本与行动分
-- 军力价值曲线、行动分来源、AP 浪费清单
+## 5. 裁决账本与击杀分
+- 军力价值曲线、击杀造价（`killValue`）来源、AP 浪费清单
 
 ## 6. 经验教训（≥3 条，可执行）
 ```

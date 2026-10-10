@@ -41,12 +41,14 @@ describe('annihilation mode UI', () => {
       const source = read(file);
       expect(source).toContain("if (!ownHq && !isAnnihilationRules()) return null;");
       expect(source).toContain('const ownHqHp = ownHq ? Math.max(0, ownHq.hp || 0) : 0;');
-      expect(source).toContain("gameConfig?.balance?.adjudicationWeights?.effectiveActions");
-      expect(source).toContain("isAnnihilationRules() ? 10 : 2");
-      expect(source).toContain("stats?.actionMerit ?? 0");
-      expect(source).toContain('function recordActionMerit');
+      // 3.6.0 起记分改为击杀价值 + 据点持有流量混合，行动功绩彻底移除。
+      expect(source).toContain('const killValue = state.players?.[owner]?.stats?.killValue ?? 0;');
+      expect(source).toContain('const flowRatio = Number(weights.controlPointFlowRatio ?? 0.7);');
+      expect(source).toContain("label: '击杀价值'");
+      expect(source).not.toContain('function recordActionMerit');
+      // 旧回放（含 actionScore 快照）仍走兼容分支展示「有效行动」。
+      expect(source).toContain("score.actionScore !== undefined && score.killValue === undefined");
       expect(source).toContain("const preserved = state.players?.[owner]?.status === 'eliminated'");
-      expect(source).toContain("label: '有效行动'");
     }
   });
 });

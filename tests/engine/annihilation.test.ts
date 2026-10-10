@@ -106,7 +106,7 @@ describe('annihilation mode', () => {
     expect(game.events.find(event => event.type === 'player_eliminated')?.payload).toMatchObject({ score: before });
   });
 
-  it('does not award action score for movement alone', () => {
+  it('does not award score for movement alone', () => {
     const { game, bus } = createAnnihilationGame();
     const owner = game.turn.currentPlayerId!;
     const unit = game.units.find(candidate => candidate.owner === owner)!;
@@ -118,11 +118,11 @@ describe('annihilation mode', () => {
     const after = buildAdjudicationScores(game)[owner]!;
     expect(game.players[owner]?.stats.actionPointsUsed).toBe(1);
     expect(game.players[owner]?.stats.actionMerit).toBe(0);
-    expect(after.actionScore).toBe(0);
+    expect(after.killValue).toBe(0);
     expect(after.total - before.total).toBe(0);
   });
 
-  it('scores actual combat damage in twenty-HP contribution buckets', () => {
+  it('does not score non-lethal combat damage directly, only via enemy army loss', () => {
     const { game, bus } = createAnnihilationGame();
     const owner = game.turn.currentPlayerId!;
     const enemy = game.turn.turnOrder.find(candidate => candidate !== owner)!;
@@ -132,14 +132,73 @@ describe('annihilation mode', () => {
     attacker.attack = 40;
     target.defense = 0;
     target.hp = 100;
+    const enemyArmyBefore = buildAdjudicationScores(game)[enemy]!.armyValue;
 
     expect(attackTarget(game, bus, owner, attacker.id, target.id)).toMatchObject({ ok: true });
 
-    const actualDamage = game.events.findLast(event => event.type === 'attack')!.payload.actualDamage as number;
-    const expectedMerit = Math.ceil(actualDamage / 20);
+    // 3.6.0 起伤害本身不再记功绩/得分；压血只体现在对方军力价值下降。
     expect(game.players[owner]?.stats.actionPointsUsed).toBe(1);
-    expect(game.players[owner]?.stats.actionMerit).toBe(expectedMerit);
-    expect(buildAdjudicationScores(game)[owner]?.actionScore).toBe(expectedMerit * 10);
+    expect(game.players[owner]?.stats.actionMerit).toBe(0);
+    expect(game.players[owner]?.stats.killValue).toBe(0);
+    expect(buildAdjudicationScores(game)[enemy]!.armyValue).toBeLessThan(enemyArmyBefore);
+  });
+
+  it('banks the killed unit cost as killValue for the killing blow', () => {
+    const { game, bus } = createAnnihilationGame();
+    const owner = game.turn.currentPlayerId!;
+    const enemy = game.turn.turnOrder.find(candidate => candidate !== owner)!;
+    const attacker = game.units.find(candidate => candidate.owner === owner)!;
+    const target = game.units.find(candidate => candidate.owner === enemy)!;
+    attacker.attackRange = 20;
+    attacker.attack = 40;
+    target.defense = 0;
+    target.hp = 1;
+
+    expect(attackTarget(game, bus, owner, attacker.id, target.id)).toMatchObject({ ok: true });
+
+    expect(game.players[owner]?.stats.unitsDestroyed).toBe(1);
+    expect(game.players[owner]?.stats.killValue).toBe(target.cost);
+    expect(buildAdjudicationScores(game)[owner]?.killValue).toBe(target.cost);
+  });
+
+  it('credits no one when artillery destroys a unit', () => {
+    const { game, bus } = createAnnihilationGame();
+    const exposed = game.units.find(unit => unit.q === -5 && unit.r === 0)!;
+    exposed.q = -6;
+    exposed.r = 1;
+    exposed.hp = 1;
+
+    finishRound(game, bus); // enter round 2
+    finishRound(game, bus); // enter round 3
+    finishRound(game, bus); // enter round 4, warning
+    finishRound(game, bus); // enter round 5, radius 5 danger ring activates
+
+    // 环境伤害（炮火）击杀不归属任何玩家：无人获得击杀价值。
+    expect(exposed.alive).toBe(false);
+    const death = game.events.find(event => event.type === 'unit_death' && event.payload.unitId === exposed.id);
+    expect(death?.payload.cause).toBe('artillery');
+    for (const player of Object.values(game.players)) {
+      expect(player?.stats.killValue ?? 0).toBe(0);
+      expect(player?.stats.unitsDestroyed ?? 0).toBe(0);
+    }
+  });
+
+  it('freezes killValue and controlHold into the eliminated player score', () => {
+    const { game, bus } = createAnnihilationGame(3);
+    const victim = 'player_b';
+    game.players[victim]!.stats.killValue = 123;
+    game.players[victim]!.stats.controlHold = 4;
+    game.players[victim]!.stats.controlHoldRounds = 2;
+
+    expect(eliminatePlayer(game, bus, victim, 'host_eliminated', null)).toMatchObject({ ok: true });
+
+    const frozen = game.players[victim]!.adjudicationScore!;
+    expect(frozen.killValue).toBe(123);
+    expect(frozen.controlHold).toBe(2);
+    // 冻结分含击杀价值贡献（artillery-zone 击杀权重 0.5），且之后不再随战局变化。
+    const weights = game.config.balance.adjudicationWeights;
+    expect(frozen.total).toBeCloseTo(frozen.armyValue * weights.armyValue + 123 * (weights.killValue ?? 0), 6);
+    expect(buildAdjudicationScores(game)[victim]).toEqual(frozen);
   });
 
   it('raises turn income from 12 to 20 after capturing an inner supply point', () => {

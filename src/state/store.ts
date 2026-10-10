@@ -56,7 +56,10 @@ export function createPlayer(id: PlayerId, name?: string): PlayerState {
     turnOrder: null,
     eliminatedAt: null,
     eliminatedBy: null,
-    stats: { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 },
+    stats: {
+      headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0,
+      actionMerit: 0, killValue: 0, controlHold: 0, controlHoldRounds: 0,
+    },
   };
 }
 
@@ -242,6 +245,13 @@ function restoreActionStats(game: GameState): void {
   const actionPointTotals = new Map<PlayerId, number>();
   const actionMeritTotals = new Map<PlayerId, number>();
   const unitOwners = new Map<string, PlayerId>();
+  // 3.6.0 起新增：击杀入账与据点流量持有也从事件重建，保证重启/旧存档恢复后裁决分口径一致。
+  const pointOwners = new Map<string, PlayerId | null>();
+  const eliminated = new Set<PlayerId>();
+  const killCreditByUnit = new Map<string, PlayerId>();
+  const killValueTotals = new Map<PlayerId, number>();
+  const controlHoldTotals = new Map<PlayerId, number>();
+  const controlHoldRoundTotals = new Map<PlayerId, number>();
   let actionsUsed = 0;
   const ownerActionsUsed = new Map<PlayerId, number>();
 
@@ -250,11 +260,25 @@ function restoreActionStats(game: GameState): void {
     if (event.type === 'game_start') {
       actionsUsed = 0;
       ownerActionsUsed.clear();
+      pointOwners.clear();
+      eliminated.clear();
+      killCreditByUnit.clear();
+      killValueTotals.clear();
+      controlHoldTotals.clear();
+      controlHoldRoundTotals.clear();
       const units = Array.isArray(payload.units) ? payload.units : [];
       for (const unit of units) {
         if (!unit || typeof unit !== 'object') continue;
         const row = unit as Record<string, unknown>;
         if (typeof row.id === 'string' && isPlayerId(row.owner)) unitOwners.set(row.id, row.owner);
+      }
+      const points = Array.isArray(payload.controlPoints) ? payload.controlPoints : [];
+      for (const point of points) {
+        if (!point || typeof point !== 'object') continue;
+        const row = point as Record<string, unknown>;
+        if (typeof row.id === 'string') {
+          pointOwners.set(row.id, isPlayerId(row.owner) ? row.owner : null);
+        }
       }
       continue;
     }
@@ -264,6 +288,46 @@ function restoreActionStats(game: GameState): void {
     }
     if (event.type === 'turn_end' || event.type === 'reset_actions') {
       actionsUsed = typeof payload.actionsUsed === 'number' ? payload.actionsUsed : 0;
+      continue;
+    }
+
+    // 击杀入账重建：把目标打到 0 血的攻击者即凶手（与引擎"最后一击归属"同口径）；
+    // 炮火（cause: 'artillery'）等环境击杀无归属。旧顺序模式事件的 unit_death 无 cause 字段，按攻击击杀处理。
+    if (event.type === 'attack' && payload.targetKind === 'unit' && payload.targetHp === 0
+      && typeof payload.targetId === 'string' && isPlayerId(payload.owner)) {
+      killCreditByUnit.set(payload.targetId, payload.owner);
+    }
+    if (event.type === 'unit_death' && typeof payload.unitId === 'string') {
+      const killer = killCreditByUnit.get(payload.unitId);
+      const unitType = typeof payload.type === 'string' ? payload.type : null;
+      const cost = unitType ? (game.config?.units?.[unitType as UnitType]?.cost ?? 0) : 0;
+      if (killer && payload.cause !== 'artillery' && cost > 0) {
+        killValueTotals.set(killer, (killValueTotals.get(killer) ?? 0) + cost);
+      }
+      killCreditByUnit.delete(payload.unitId);
+    }
+
+    // 据点流量持有重建：与引擎 accumulateControlHold 同口径——每个继续进行的整轮结束时，
+    // 按当时归属给未淘汰玩家累计持有数；淘汰者分数已冻结不再累计。
+    if (event.type === 'control_point_captured' && typeof payload.pointId === 'string') {
+      pointOwners.set(payload.pointId, isPlayerId(payload.owner) ? payload.owner : null);
+    }
+    if (event.type === 'control_point_neutralized' && typeof payload.pointId === 'string') {
+      pointOwners.set(payload.pointId, null);
+    }
+    if (event.type === 'player_eliminated' && isPlayerId(payload.playerId)) {
+      eliminated.add(payload.playerId);
+    }
+    if (event.type === 'round_end' && payload.gameOver !== true) {
+      for (const id of PLAYER_IDS) {
+        if (!game.players[id] || eliminated.has(id)) continue;
+        let held = 0;
+        for (const pointOwner of pointOwners.values()) {
+          if (pointOwner === id) held += 1;
+        }
+        controlHoldTotals.set(id, (controlHoldTotals.get(id) ?? 0) + held);
+        controlHoldRoundTotals.set(id, (controlHoldRoundTotals.get(id) ?? 0) + 1);
+      }
       continue;
     }
 
@@ -306,6 +370,9 @@ function restoreActionStats(game: GameState): void {
     if (stats) {
       stats.actionPointsUsed = actionPointTotals.get(id) ?? 0;
       stats.actionMerit = actionMeritTotals.get(id) ?? 0;
+      stats.killValue = killValueTotals.get(id) ?? 0;
+      stats.controlHold = controlHoldTotals.get(id) ?? 0;
+      stats.controlHoldRounds = controlHoldRoundTotals.get(id) ?? 0;
     }
   }
 }

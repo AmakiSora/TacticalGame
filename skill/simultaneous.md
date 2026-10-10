@@ -120,8 +120,8 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
   HQ: HP 200, defense 6.
 - Balance: `startingSupplies 120`, `baseIncome 8`, supply control-point income 8 (repair center income 6), `actionsPerTurn 5`,
   `maxTurns 15`, comeback supplies from round 4 (40% gap → +12/round). Adjudication weights
-  favor CPs (60) and HQ damage (5), with army/supplies at 0.35/0.25; actionScore is 6/merit point.
-  Standoff attack hits award 1 merit per 10 HP (other effect merits retain the standard 20 HP bucket).
+  favor CPs (60, mostly time-averaged hold) and HQ damage (5), with army at 0.35, supplies 0,
+  and kills at 0.15 per killed-unit cost (last hit).
   Move ranges are short by design (2, scouts 4): escaping a `line`/`arc` footprint or a
   ranger's lock bubble costs the mover's whole action, so pure kiting cannot win.
 - Win conditions (standard HQ rules): destroy an enemy HQ to eliminate them; last player

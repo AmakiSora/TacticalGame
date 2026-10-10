@@ -685,7 +685,7 @@ describe('map config loader', () => {
       expect(slot.controlPointId).toBeTruthy();
       expect(map.controlPoints.some(point => point.id === slot.controlPointId)).toBe(true);
     }
-    expect(map.balance.adjudicationWeights.effectiveActions).toBe(10);
+    expect(map.balance.adjudicationWeights.killValue).toBe(1.5);
     resetConfig();
   });
 

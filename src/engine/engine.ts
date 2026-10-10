@@ -1,7 +1,7 @@
 // src/engine/engine.ts
 import type {
   AdjudicationScore, AdjudicationSnapshot, EliminationReason, GameOverReason, GameRanking,
-  GameState, PlayerId, PlayerRecord,
+  GameState, PlayerId, PlayerRecord, Unit,
 } from '../types.js';
 import { PLAYER_IDS, isAnnihilationMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
@@ -11,10 +11,9 @@ import { hexDistance } from './hex.js';
 import { controlPointIncome, controlPointTypeSpec } from './controlPoints.js';
 import { addLobbyPlayer, initializeLobbyGame } from '../state/store.js';
 import { artilleryStateForRound, isArtilleryDanger } from './artillery.js';
-import { ACTION_MERIT, addActionMerit } from './actionScore.js';
 
-const ANNIHILATION_ACTION_SCORE_PER_POINT = 10;
-const STANDARD_ACTION_SCORE_PER_POINT = 2;
+/** 据点分中"流量持有"的默认占比（其余按期末当前持有计）。 */
+export const DEFAULT_CONTROL_POINT_FLOW_RATIO = 0.7;
 
 export function joinedPlayerIds(game: GameState): PlayerId[] {
   return PLAYER_IDS.filter(id => game.players[id]);
@@ -107,7 +106,6 @@ export function captureControlPoints(game: GameState, bus: EventBus, owner: Play
     if (!capturer || point.owner === owner) continue;
     const previousOwner = point.owner;
     point.owner = owner;
-    addActionMerit(game, owner, ACTION_MERIT.capture);
     appendEvent(game, bus, 'control_point_captured', {
       pointId: point.id, name: point.name, owner, previousOwner,
       unitId: capturer.id, q: point.q, r: point.r,
@@ -170,28 +168,50 @@ function armyValue(game: GameState, owner: PlayerId): number {
     .reduce((sum, unit) => sum + Math.round(unit.cost * (unit.hp / unit.maxHp)), 0);
 }
 
-function actionScorePerPoint(game: GameState): number {
-  return game.config.balance.adjudicationWeights.effectiveActions
-    ?? game.config.balance.adjudicationWeights.actionPoints
-    ?? (isAnnihilationMode(game.config.mode) ? ANNIHILATION_ACTION_SCORE_PER_POINT : STANDARD_ACTION_SCORE_PER_POINT);
+/**
+ * 击杀入账：按最后一击归属，累计被击杀单位的造价。
+ * 炮火/环境击杀不调用本函数（无归属，任何人不得分）。
+ */
+export function creditKill(game: GameState, killer: PlayerId, unit: Unit): void {
+  const stats = game.players[killer]?.stats;
+  if (!stats || game.players[killer]?.status !== 'active') return;
+  stats.killValue = (stats.killValue ?? 0) + unit.cost;
+}
+
+/** 整轮结束时累积据点持有（流量口径）；被淘汰者的分数已冻结，不再累计。 */
+export function accumulateControlHold(game: GameState): void {
+  for (const id of joinedPlayerIds(game)) {
+    const player = game.players[id];
+    if (!player || player.status !== 'active') continue;
+    const held = game.controlPoints.filter(point => point.owner === id).length;
+    player.stats.controlHold = (player.stats.controlHold ?? 0) + held;
+    player.stats.controlHoldRounds = (player.stats.controlHoldRounds ?? 0) + 1;
+  }
 }
 
 function scorePlayer(game: GameState, owner: PlayerId): AdjudicationScore {
   const weights = game.config.balance.adjudicationWeights;
-  const headquartersDamage = game.players[owner]?.stats.headquartersDamage ?? 0;
+  const stats = game.players[owner]?.stats;
+  const headquartersDamage = stats?.headquartersDamage ?? 0;
   const ownHqHp = game.headquarters[owner]?.hp ?? 0;
   const controlPoints = game.controlPoints.filter(point => point.owner === owner).length;
   const army = armyValue(game, owner);
   const supplies = game.resources[owner]?.supplies ?? 0;
-  const actionScore = (game.players[owner]?.stats.actionMerit ?? 0) * actionScorePerPoint(game);
+  const killValue = stats?.killValue ?? 0;
+  const flowRatio = weights.controlPointFlowRatio ?? DEFAULT_CONTROL_POINT_FLOW_RATIO;
+  const holdRounds = Math.max(1, stats?.controlHoldRounds ?? 0);
+  const controlHold = Math.round(((stats?.controlHold ?? 0) / holdRounds) * 100) / 100;
+  const controlScore =
+    weights.controlPoint * (flowRatio * controlHold + (1 - flowRatio) * controlPoints);
   return {
-    headquartersDamage, ownHqHp, controlPoints, armyValue: army, supplies, actionScore,
+    headquartersDamage, ownHqHp, controlPoints, controlHold, armyValue: army, supplies, killValue,
     total:
       headquartersDamage * weights.enemyHqDamage +
       ownHqHp * weights.ownHqHp +
-      controlPoints * weights.controlPoint +
+      controlScore +
       army * weights.armyValue +
-      supplies * weights.supplies + actionScore,
+      supplies * weights.supplies +
+      killValue * (weights.killValue ?? 0),
   };
 }
 
@@ -230,7 +250,12 @@ export function buildAdjudicationSnapshot(game: GameState): AdjudicationSnapshot
   const margin = sortedTotals.length >= 2 ? sortedTotals[0] - sortedTotals[1] : (sortedTotals[0] ?? 0);
   return {
     maxTurns: game.config.balance.maxTurns,
-    weights: { ...game.config.balance.adjudicationWeights, effectiveActions: actionScorePerPoint(game) },
+    weights: {
+      ...game.config.balance.adjudicationWeights,
+      killValue: game.config.balance.adjudicationWeights.killValue ?? 0,
+      controlPointFlowRatio:
+        game.config.balance.adjudicationWeights.controlPointFlowRatio ?? DEFAULT_CONTROL_POINT_FLOW_RATIO,
+    },
     scores,
     rankings,
     leaders,
@@ -439,6 +464,7 @@ function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): v
   if (remaining.size > 0) {
     next = nextActiveInOrder(game, previousOwner, remaining);
   } else {
+    accumulateControlHold(game);
     appendEvent(game, bus, 'round_end', { roundNumber: game.turn.roundNumber });
     if (adjudicateAtTurnLimit(game, bus)) return;
     grantComebackSupplies(game, bus);

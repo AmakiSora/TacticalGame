@@ -96,9 +96,10 @@ Do **not** memorize a fixed timetable. Each royale map carries its own schedule.
   ground is the **six cells of the inner ring** (the snowflake's heart). `maxTurns: null` — no
   round adjudication; the match ends by elimination (combat wipe, artillery wipe) or the host's
   `/force-adjudicate`.
-- Scoring: HQ/CP/supply weights are 0 — **army value + actionScore are the real race**
-  (`effectiveActions 10`; simultaneous hits award 1 merit per 10 HP). Read `adjudication.weights`
-  of the live game instead of trusting this summary.
+- Scoring: HQ/CP/supply weights are 0 — **army value + kill score are the real race**
+  (`armyValue 5`, `killValue 1.5` per killed-unit cost; last hit banks the victim's full cost,
+  artillery kills credit no one). Read `adjudication.weights` of the live game instead of
+  trusting this summary.
 
 ## Narrow-road map (狭路相逢) specifics
 
@@ -116,9 +117,9 @@ Do **not** memorize a fixed timetable. Each royale map carries its own schedule.
   `damage 5`, `minimumSafeRadius 1` — one ring per round from round 5, flooring at radius 1 from
   round 11. The pads sit at distance 7: from round 7 no safe cell borders them, so the deployment
   window is effectively rounds 1–6 — build your army early, then fight.
-- Scoring: `armyValue 1 + supplies 1 + effectiveActions 15` (HQ weights are dead — royale has no
-  HQ). Real actions (attacks, heals, deploys, captures) dwarf everything else; do not burn turns on
-  empty moves.
+- Scoring: `armyValue 1 + killValue 1` (HQ/CP/supply weights are dead — royale has no
+  HQ, and supplies score 0). Securing kills (last hit) and keeping your cheap army alive are
+  the whole game; do not burn turns on empty moves or hoard supplies.
 
 ## Planning checklist
 

@@ -47,7 +47,7 @@ describe('map editor page', () => {
     expect(html).toContain('data-mode="simultaneous"');
     expect(html).toContain('data-mode="royale"');
     expect(html).toContain('id="annihilation-panel"');
-    expect(html).toContain('<script src="/map-editor.js?v=3.5.14"></script>');
+    expect(html).toContain('<script src="/map-editor.js?v=3.6.0"></script>');
   });
 
   it('supports toolbar zoom buttons without hijacking wheel scroll', () => {
@@ -259,14 +259,14 @@ describe('map editor page', () => {
       damage: 25,
       minimumSafeRadius: 2,
     });
-    expect(serialized.balance.adjudicationWeights.effectiveActions).toBe(10);
+    expect(serialized.balance.adjudicationWeights.killValue).toBe(0.5);
     expect(serialized.spawnSlots.map((slot: any) => slot.controlPointId)).toEqual(['cp_a', 'cp_b']);
     expect(core.validateMapConfig(serialized, 'new-annihilation')).toEqual([]);
 
     const standard = core.configureMapMode(annihilation, 'standard');
     expect(standard.mode).toBe('standard');
     expect(standard.annihilation).toBeUndefined();
-    expect(standard.balance.adjudicationWeights.effectiveActions).toBe(2);
+    expect(standard.balance.adjudicationWeights.killValue).toBe(0.5);
   });
 
   it('validates annihilation artillery and unique spawn point ownership links', () => {

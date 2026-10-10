@@ -81,14 +81,18 @@ const DEFAULT_RANGES: Record<string, [number, number]> = {
 // 已知缺口：3.5.11 molten-throne（原 forge）重做后每方起始 6 单位、据点 24，均超出本域
 // （startingUnitCount 上界 4、controlPointCount 上界 9），待 RL 域重校准收口。
 
-/** 裁决权重在静态图包线内随机：danger-close(20/1/30/1/0) ~ default(5/2/90/2/1)。 */
+/** 裁决权重在静态图包线内随机：danger-close(20/1/30/1/0+kill0.25) ~ default(5/2/90/2/0+kill0.5)。
+ *  3.6.0 起补给恒不计分（supplies: 0，杜绝囤补给/期末爆兵套利），
+ *  击杀分按军队价值权重的 25%~50% 随机。 */
 function sampleAdjudicationWeights(rng: () => number) {
+  const armyValue = 1 + Math.floor(rng() * 2);
   return {
     enemyHqDamage: 3 + Math.floor(rng() * 18),
     ownHqHp: 1 + Math.floor(rng() * 2),
     controlPoint: 30 + Math.floor(rng() * 61),
-    armyValue: 1 + Math.floor(rng() * 2),
-    supplies: Math.floor(rng() * 2),
+    armyValue,
+    supplies: 0,
+    killValue: Math.round(armyValue * (0.25 + rng() * 0.25) * 100) / 100,
   };
 }
 

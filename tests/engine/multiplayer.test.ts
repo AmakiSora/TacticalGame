@@ -104,7 +104,7 @@ describe('multiplayer free-for-all engine', () => {
     expect(game.winner).toBeNull();
   });
 
-  it('does not award standard-mode action score for movement alone', () => {
+  it('does not award score for movement alone', () => {
     const { game, bus } = createThreePlayerGame();
     const owner = game.turn.currentPlayerId!;
     const unit = game.units.find(candidate => candidate.owner === owner)!;
@@ -116,7 +116,7 @@ describe('multiplayer free-for-all engine', () => {
     const after = buildAdjudicationScores(game)[owner]!;
     expect(game.players[owner]?.stats.actionPointsUsed).toBe(1);
     expect(game.players[owner]?.stats.actionMerit).toBe(0);
-    expect(after.actionScore).toBe(0);
+    expect(after.killValue).toBe(0);
     expect(after.total - before.total).toBe(0);
   });
 
@@ -163,9 +163,9 @@ describe('multiplayer free-for-all engine', () => {
     expect(hq.hp).toBeLessThan(before);
     expect(game.players[attacker]!.stats.headquartersDamage).toBeGreaterThan(0);
     expect(game.players[attacker]!.stats.headquartersDamage).toBe(before - hq.hp);
-    const expectedMerit = Math.ceil((before - hq.hp) / 20);
-    expect(game.players[attacker]!.stats.actionMerit).toBe(expectedMerit);
-    expect(buildAdjudicationScores(game)[attacker]?.actionScore).toBe(expectedMerit * 2);
+    // 3.6.0 起 HQ 伤害只经 enemyHqDamage 权重计分，不再重复记行动功绩。
+    expect(game.players[attacker]!.stats.actionMerit).toBe(0);
+    expect(buildAdjudicationScores(game)[attacker]?.headquartersDamage).toBe(before - hq.hp);
   });
 
   it('rotates three active players through a full round before incrementing roundNumber', () => {

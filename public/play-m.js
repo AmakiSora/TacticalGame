@@ -546,14 +546,9 @@ function recordActionPoint(s, owner, payload) {
   if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
   player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - (s.turn.actionsUsed ?? 0);
 }
-function recordActionMerit(s, owner, type, payload) {
-  const fixed = type === 'deploy' || type === 'demolish' ? 1 : type === 'control_point_captured' ? 2 : 0;
-  const amount = type === 'attack' ? payload.actualDamage ?? payload.damage : type === 'heal' ? payload.amount : 0;
-  const merit = fixed || (typeof amount === 'number' && amount > 0 ? Math.ceil(amount / 20) : 0);
-  const player = owner ? s.players?.[owner] : null;
-  if (!player || merit <= 0) return;
+function ensureStats(player) {
   if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
-  player.stats.actionMerit = (player.stats.actionMerit ?? 0) + merit;
+  return player.stats;
 }
 function applyEvent(s, ev) {
   if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
@@ -578,18 +573,20 @@ function applyEvent(s, ev) {
       break;
     case 'deploy':
       recordActionPoint(s, p.owner, p);
-      recordActionMerit(s, p.owner, ev.type, p);
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies -= p.cost || 0;
       s.units.set(p.unitId, { id: p.unitId, owner: p.owner, type: p.unitType, q: p.q, r: p.r, hp: p.hp, maxHp: p.hp, attack: p.attack, defense: p.defense, moveRange: p.moveRange, attackRange: p.attackRange, alive: true, hasMoved: true, hasActed: false, actionSpent: true, canCapture: !!p.canCapture, healPower: p.healPower, cost: p.unitCost ?? p.cost });
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'move': { const u = s.units.get(p.unitId); recordActionPoint(s, p.owner || u?.owner, p); if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
-    case 'attack': { const t = s.units.get(p.targetId) || s.headquarters.get(p.targetId); if (t) t.hp = p.targetHp; const a = s.units.get(p.attackerId); recordActionPoint(s, p.owner || a?.owner, p); recordActionMerit(s, p.owner || a?.owner, ev.type, p); if (a) { a.hasActed = true; a.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
-    case 'heal': { const t = s.units.get(p.targetId); if (t) t.hp = p.targetHp; const u = s.units.get(p.supportId); recordActionPoint(s, p.owner || u?.owner, p); recordActionMerit(s, p.owner || u?.owner, ev.type, p); if (u) { u.hasActed = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
+    case 'attack': { const t = s.units.get(p.targetId) || s.headquarters.get(p.targetId); if (t) t.hp = p.targetHp; const a = s.units.get(p.attackerId); recordActionPoint(s, p.owner || a?.owner, p); if (a) { a.hasActed = true; a.actionSpent = true; }
+      // 击杀入账：把单位打到 0 血即凶手（与服务器"最后一击归属"同口径）；炮火等环境击杀无归属。
+      if (t && p.targetHp === 0 && a && s.units.has(p.targetId)) { const pl = s.players[a.owner]; if (pl) { ensureStats(pl); pl.stats.killValue = (pl.stats.killValue ?? 0) + (t.cost || 0); } }
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
+    case 'heal': { const t = s.units.get(p.targetId); if (t) t.hp = p.targetHp; const u = s.units.get(p.supportId); recordActionPoint(s, p.owner || u?.owner, p); if (u) { u.hasActed = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
     case 'unit_death': { const u = s.units.get(p.unitId); if (u) u.alive = false; break; }
     case 'headquarters_destroyed': { const h = s.headquarters.get(p.headquartersId); if (h) h.alive = false; break; }
-    case 'control_point_captured': { recordActionMerit(s, p.owner, ev.type, p); const cp = s.controlPoints.get(p.pointId); if (cp) cp.owner = p.owner; break; }
+    case 'control_point_captured': { const cp = s.controlPoints.get(p.pointId); if (cp) cp.owner = p.owner; break; }
     case 'control_point_repair': { const u = s.units.get(p.unitId); if (u) u.hp = p.unitHp; break; }
     case 'income':
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
@@ -642,6 +639,16 @@ function applyEvent(s, ev) {
       if (Array.isArray(p.committed)) s.plan.committed = [...p.committed];
       break;
     case 'round_end':
+      // 整轮边界：为未淘汰玩家累计据点持有（与服务器 accumulateControlHold 同口径）。
+      if (p.gameOver !== true) {
+        for (const [pid, pl] of Object.entries(s.players || {})) {
+          if (pl.status === 'eliminated') continue;
+          ensureStats(pl);
+          const held = [...s.controlPoints.values()].filter(cp => cp.owner === pid).length;
+          pl.stats.controlHold = (pl.stats.controlHold ?? 0) + held;
+          pl.stats.controlHoldRounds = (pl.stats.controlHoldRounds ?? 0) + 1;
+        }
+      }
       break;
     case 'round_resolved':
       s.plan = { committed: [], myQueue: [] };
@@ -672,7 +679,6 @@ function applyEvent(s, ev) {
       setCellTerrain(s, p.q, p.r, p.toTerrain || 'plain');
       const u = s.units.get(p.unitId);
       recordActionPoint(s, p.owner || u?.owner, p);
-      recordActionMerit(s, p.owner || u?.owner, ev.type, p);
       if (u) { u.hasActed = true; u.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -1536,24 +1542,27 @@ function playerScore(owner) {
     .filter(u => u.owner === owner && u.alive)
     .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
   const supplies = state.resources?.[owner]?.supplies || 0;
-  const actionScorePerPoint = gameConfig?.balance?.adjudicationWeights?.effectiveActions
-    ?? gameConfig?.balance?.adjudicationWeights?.actionPoints
-    ?? (isAnnihilationRules() ? 10 : 2);
-  const actionScore = (state.players?.[owner]?.stats?.actionMerit ?? 0) * actionScorePerPoint;
+  const killValue = state.players?.[owner]?.stats?.killValue ?? 0;
+  const flowRatio = Number(weights.controlPointFlowRatio ?? 0.7);
+  const holdRounds = Math.max(1, state.players?.[owner]?.stats?.controlHoldRounds ?? 0);
+  const controlHold = Math.round(((state.players?.[owner]?.stats?.controlHold ?? 0) / holdRounds) * 100) / 100;
+  const controlScore = weights.controlPoint * (flowRatio * controlHold + (1 - flowRatio) * controlPoints);
   return {
     headquartersDamage,
     enemyHqDamage: headquartersDamage,
     ownHqHp,
     controlPoints,
+    controlHold,
     armyValue,
     supplies,
-    actionScore,
+    killValue,
     total:
       headquartersDamage * weights.enemyHqDamage +
       ownHqHp * weights.ownHqHp +
-      controlPoints * weights.controlPoint +
+      controlScore +
       armyValue * weights.armyValue +
-      supplies * weights.supplies + actionScore,
+      supplies * weights.supplies +
+      killValue * (Number(weights.killValue) || 0),
   };
 }
 
@@ -1578,7 +1587,6 @@ function liveAdjudicationRankings() {
 const SCORE_TERM_DEFS = [
   ['敌方总部伤害', 'enemyHqDamage', score => score.headquartersDamage ?? score.enemyHqDamage ?? 0],
   ['己方总部血量', 'ownHqHp', score => score.ownHqHp ?? 0],
-  ['占领据点', 'controlPoint', score => score.controlPoints ?? 0],
   ['存活兵力', 'armyValue', score => score.armyValue ?? 0],
   ['囤积补给', 'supplies', score => score.supplies ?? 0],
 ];
@@ -1596,14 +1604,39 @@ function formatScore(value) {
 function scoreTerms(score) {
   const weights = adjudicationWeights();
   if (!weights) return [];
-  const perAction = weights.effectiveActions ?? weights.actionPoints ?? (isAnnihilationRules() ? 10 : 2);
-  const actionScore = score.actionScore ?? 0;
   const terms = SCORE_TERM_DEFS.map(([label, weightKey, read]) => {
     const weight = Number(weights[weightKey]) || 0;
     const value = read(score);
     return { label, value, weight, part: value * weight };
   });
-  terms.push({ label: '有效行动', value: perAction > 0 ? actionScore / perAction : actionScore, weight: perAction, part: actionScore });
+  const cpWeight = Number(weights.controlPoint) || 0;
+  // 旧回放（3.6.0 前的分数快照含 actionScore）：据点按全额权重、附加"有效行动"项展示。
+  if (score.actionScore !== undefined && score.killValue === undefined) {
+    terms.splice(2, 0, {
+      label: '占领据点', value: score.controlPoints ?? 0, weight: cpWeight,
+      part: (score.controlPoints ?? 0) * cpWeight,
+    });
+    const perAction = weights.effectiveActions ?? weights.actionPoints ?? (isAnnihilationRules() ? 10 : 2);
+    const actionScore = score.actionScore ?? 0;
+    terms.push({ label: '有效行动', value: perAction > 0 ? actionScore / perAction : actionScore, weight: perAction, part: actionScore });
+    return terms.filter(term => term.weight > 0);
+  }
+  const flowRatio = Number(weights.controlPointFlowRatio ?? 0.7);
+  terms.splice(2, 0,
+    {
+      label: '据点持有(均值)', value: score.controlHold ?? 0, weight: cpWeight * flowRatio,
+      part: (score.controlHold ?? 0) * cpWeight * flowRatio,
+    },
+    {
+      label: '期末据点', value: score.controlPoints ?? 0, weight: cpWeight * (1 - flowRatio),
+      part: (score.controlPoints ?? 0) * cpWeight * (1 - flowRatio),
+    },
+  );
+  const killWeight = Number(weights.killValue) || 0;
+  terms.push({
+    label: '击杀价值', value: score.killValue ?? 0, weight: killWeight,
+    part: (score.killValue ?? 0) * killWeight,
+  });
   return terms.filter(term => term.weight > 0);
 }
 

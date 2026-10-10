@@ -47,10 +47,36 @@ describe('annihilation mode UI', () => {
       expect(source).toContain("label: '击杀价值'");
       // 过量击杀：同一轮内打在尸体上的第二发 targetHp 仍是 0，只有把活单位打到 0 血才算凶手。
       expect(source).toContain('previousHp > 0 && p.targetHp === 0');
-      expect(source).not.toContain('function recordActionMerit');
       // 旧回放（含 actionScore 快照）仍走兼容分支展示「有效行动」。
       expect(source).toContain("score.actionScore !== undefined && score.killValue === undefined");
       expect(source).toContain("const preserved = state.players?.[owner]?.status === 'eliminated'");
+    }
+  });
+
+  // 回放口径由文件自带的 schemaVersion 决定：[3.2.4, 3.6.0) 记行动功绩，3.6.0 起改击杀 + 流量。
+  it('renders pre-3.6.0 replays with the scoring era they were recorded in', () => {
+    for (const file of ['public/app.js', 'public/spectator-m.js']) {
+      const source = read(file);
+      expect(source).toContain("const MERIT_ADJUDICATION_SCHEMA_VERSION = '3.2.4';");
+      expect(source).toContain("const LEGACY_ADJUDICATION_SCHEMA_VERSION = '3.6.0';");
+      expect(source).toContain('function scoringEraFromVersion(version)');
+      // 最早期导出没写版本戳，退回按存档结算分的形态判口径。
+      expect(source).toContain('function scoringEraFromScores(events)');
+      expect(source).toContain("scoringEra: replay.hasSchemaVersion");
+      // 功绩镜像只在功绩时代累计，且攻击桶宽照当时服务器（同时回合 3.3.4 起 10HP）。
+      expect(source).toContain("if (replayScoringEra() !== 'merit') return;");
+      expect(source).toContain("const SIMULTANEOUS_MERIT_SCHEMA_VERSION = '3.3.4';");
+      // 旧口径回放不吃击杀分项，也不累计据点流量。
+      expect(source).toContain('if (!usesLegacyAdjudication() && target && previousHp > 0');
+      expect(source).toContain('if (p.gameOver !== true && !usesLegacyAdjudication()) {');
+      // 重导出旧回放必须沿用旧版本戳，否则会被误判成新规则对局。
+      expect(source).toContain('function replayExportStamp()');
+    }
+    // 玩家页只服务实时对局，不存在旧口径回放，因此不应带任何功绩镜像。
+    for (const file of ['public/play.js', 'public/play-m.js']) {
+      const source = read(file);
+      expect(source).not.toContain('recordActionMerit');
+      expect(source).not.toContain('replayScoringEra');
     }
   });
 });

@@ -44,6 +44,12 @@ function entityTokenMarkup(type, ownerClass, title) {
 const APP_VERSION = window.APP_VERSION;
 const REPLAY_EXPORT_FORMAT = 'hex-v2-replay';
 const REPLAY_SCHEMA_VERSION = APP_VERSION;
+// 裁决分口径随版本变过两次：3.2.4 加入「功绩 × 有效行动」，3.6.0 换成「击杀价值 + 据点流量」。
+// 回放按文件自带的 schemaVersion 选回当年口径，否则面板复算出的分数与文件里存档的结算分对不上。
+const MERIT_ADJUDICATION_SCHEMA_VERSION = '3.2.4';
+const LEGACY_ADJUDICATION_SCHEMA_VERSION = '3.6.0';
+// 同时回合 / 大逃杀的攻击功绩桶从该版本起由每 20HP 一档改为每 10HP 一档。
+const SIMULTANEOUS_MERIT_SCHEMA_VERSION = '3.3.4';
 
 let gameConfig = null;
 let playerNames = defaultPlayerNames();
@@ -334,6 +340,52 @@ function ensureStats(player) {
   return player.stats;
 }
 
+/** 按版本戳划口径：[3.2.4, 3.6.0) 记功绩，更早只有五项基础分。 */
+function scoringEraFromVersion(version) {
+  const againstLegacy = compareSemver(version, LEGACY_ADJUDICATION_SCHEMA_VERSION);
+  if (!Number.isFinite(againstLegacy) || againstLegacy >= 0) return 'current';
+  return compareSemver(version, MERIT_ADJUDICATION_SCHEMA_VERSION) >= 0 ? 'merit' : 'base';
+}
+
+// 最早的导出没写版本戳（只含 events 的对象、裸事件数组），无版本可依据时看存档自身的
+// 结算分形态：分项里带 killValue 是 3.6.0 口径，带 actionScore 是功绩口径，都没有则更早。
+function scoringEraFromScores(events) {
+  const scores = events.filter(ev => ev.type === 'game_over').pop()?.payload?.scores;
+  const frozen = events.find(ev => ev.payload?.score)?.payload?.score;
+  const sample = (scores && Object.values(scores)[0]) || frozen || {};
+  if ('killValue' in sample) return 'current';
+  return 'actionScore' in sample ? 'merit' : 'base';
+}
+
+/** 回放载入时算好的口径；实时对局没有版本戳，一律按服务器当前口径。 */
+function replayScoringEra() {
+  return importedReplayMeta?.scoringEra ?? 'current';
+}
+
+/** 是否为 3.6.0 之前的旧口径回放（既不吃击杀分项，也不累计据点流量）。 */
+function usesLegacyAdjudication() {
+  return replayScoringEra() !== 'current';
+}
+
+// 3.2.4～3.5.x 的行动功绩：部署 / 爆破 +1、占领 +2、伤害与治疗按 HP 桶计分，
+// 终局按「功绩 × 有效行动」加分。仅用于旧回放镜像——桶宽照当时服务器 actionMeritForEvent：
+// **只有攻击**同时回合 / 大逃杀自 3.3.4 起改为每 10HP 一档；治疗与其余情况恒 20HP 一档。
+// 治疗若也套细桶会高估功绩，复现不出存档里的 actionScore。
+function recordActionMerit(s, owner, type, payload) {
+  if (replayScoringEra() !== 'merit') return;
+  const simultaneous = gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale';
+  const fineBucket = simultaneous && importedReplayMeta?.schemaVersion
+    && compareSemver(importedReplayMeta.schemaVersion, SIMULTANEOUS_MERIT_SCHEMA_VERSION) >= 0;
+  const fixed = type === 'deploy' || type === 'demolish' ? 1 : type === 'control_point_captured' ? 2 : 0;
+  const amount = type === 'attack' ? payload.actualDamage ?? payload.damage : type === 'heal' ? payload.amount : 0;
+  const bucket = type === 'attack' && fineBucket ? 10 : 20;
+  const merit = fixed || (typeof amount === 'number' && amount > 0 ? Math.ceil(amount / bucket) : 0);
+  const player = owner ? s.players?.[owner] : null;
+  if (!player || merit <= 0) return;
+  ensureStats(player);
+  player.stats.actionMerit = (player.stats.actionMerit ?? 0) + merit;
+}
+
 function applyEvent(s, ev) {
   if (s.eventLog.some(existing => existing.seq === ev.seq)) return;
   s.eventLog.push(ev);
@@ -364,6 +416,7 @@ function applyEvent(s, ev) {
       break;
     case 'deploy':
       recordActionPoint(s, p.owner, p);
+      recordActionMerit(s, p.owner, ev.type, p);
       if (!s.resources[p.owner]) s.resources[p.owner] = { supplies: 0 };
       s.resources[p.owner].supplies -= p.cost || 0;
       s.units.set(p.unitId, {
@@ -386,6 +439,7 @@ function applyEvent(s, ev) {
       const target = s.units.get(p.targetId) || s.headquarters.get(p.targetId);
       const a = s.units.get(p.attackerId);
       recordActionPoint(s, p.owner || a?.owner, p);
+      recordActionMerit(s, p.owner || a?.owner, ev.type, p);
       const previousHp = target ? target.hp : null;
       if (target) target.hp = p.targetHp;
       if (a) { a.hasActed = true; a.actionSpent = true; }
@@ -400,7 +454,8 @@ function applyEvent(s, ev) {
       }
       // 击杀入账：把活着的单位打到 0 血才是凶手（与服务器"最后一击归属"同口径）；
       // 同一轮内后续打在尸体上的过量击杀 targetHp 仍是 0，不能再记一次。炮火等环境击杀没有 attack 事件，自然无归属。
-      if (target && previousHp > 0 && p.targetHp === 0 && a && s.units.has(p.targetId)) {
+      // 旧回放（3.6.0 前）没有击杀分项，功绩已在上面按旧口径记账。
+      if (!usesLegacyAdjudication() && target && previousHp > 0 && p.targetHp === 0 && a && s.units.has(p.targetId)) {
         const player = s.players[a.owner];
         if (player) {
           ensureStats(player);
@@ -415,6 +470,7 @@ function applyEvent(s, ev) {
       if (target) target.hp = p.targetHp;
       const support = s.units.get(p.supportId);
       recordActionPoint(s, p.owner || support?.owner, p);
+      recordActionMerit(s, p.owner || support?.owner, ev.type, p);
       if (support) { support.hasActed = true; support.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -430,6 +486,7 @@ function applyEvent(s, ev) {
       break;
     }
     case 'control_point_captured': {
+      recordActionMerit(s, p.owner, ev.type, p);
       const cp = s.controlPoints.get(p.pointId);
       if (cp) cp.owner = p.owner;
       break;
@@ -474,7 +531,8 @@ function applyEvent(s, ev) {
       break;
     case 'round_end':
       // 整轮边界：为未淘汰玩家累计据点持有（与服务器 accumulateControlHold 同口径）。
-      if (p.gameOver !== true) {
+      // 旧回放（3.6.0 前）据点按期末全额计分，不累计流量。
+      if (p.gameOver !== true && !usesLegacyAdjudication()) {
         for (const [pid, pl] of Object.entries(s.players || {})) {
           if (pl.status === 'eliminated') continue;
           ensureStats(pl);
@@ -545,6 +603,7 @@ function applyEvent(s, ev) {
       setCellTerrain(s, p.q, p.r, p.toTerrain || 'plain');
       const u = s.units.get(p.unitId);
       recordActionPoint(s, p.owner || u?.owner, p);
+      recordActionMerit(s, p.owner || u?.owner, ev.type, p);
       if (u) { u.hasActed = true; u.actionSpent = true; }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
@@ -1033,6 +1092,32 @@ function playerScore(owner) {
     .filter(u => u.owner === owner && u.alive)
     .reduce((sum, unit) => sum + Math.round((unit.cost || 0) * ((unit.hp || 0) / (unit.maxHp || 1))), 0);
   const supplies = state.resources?.[owner]?.supplies || 0;
+  // 旧口径回放按当年的公式复算：据点全额乘 controlPoint，3.2.4 起再叠加「功绩 × 有效行动」，
+  // 且不含击杀 / 流量分项——分数明细据此落回旧口径展示分支。
+  const era = replayScoringEra();
+  if (era !== 'current') {
+    const total =
+      headquartersDamage * weights.enemyHqDamage +
+      ownHqHp * weights.ownHqHp +
+      controlPoints * weights.controlPoint +
+      armyValue * weights.armyValue +
+      supplies * weights.supplies;
+    const score = {
+      headquartersDamage,
+      enemyHqDamage: headquartersDamage,
+      ownHqHp,
+      controlPoints,
+      armyValue,
+      supplies,
+      total,
+    };
+    if (era === 'merit') {
+      const perAction = weights.effectiveActions ?? weights.actionPoints ?? (isAnnihilationRules() ? 10 : 2);
+      score.actionScore = (state.players?.[owner]?.stats?.actionMerit ?? 0) * perAction;
+      score.total += score.actionScore;
+    }
+    return score;
+  }
   const killValue = state.players?.[owner]?.stats?.killValue ?? 0;
   const flowRatio = Number(weights.controlPointFlowRatio ?? 0.7);
   const holdRounds = Math.max(1, state.players?.[owner]?.stats?.controlHoldRounds ?? 0);
@@ -1097,15 +1182,18 @@ function scoreTerms(score) {
     return { label, value, weight, part: value * weight };
   });
   const cpWeight = Number(weights.controlPoint) || 0;
-  // 旧回放（3.6.0 前的分数快照含 actionScore）：据点按全额权重、附加"有效行动"项展示。
-  if (score.actionScore !== undefined && score.killValue === undefined) {
+  // 旧口径明细：据点按全额权重列一行；带功绩分项时（3.2.4～3.5.x 的存档）再附「有效行动」一行。
+  // 判据取两侧：回放文件的 schemaVersion，或分数快照本身含 actionScore（历史结算分 / 淘汰冻结分）。
+  if (usesLegacyAdjudication() || (score.actionScore !== undefined && score.killValue === undefined)) {
     terms.splice(2, 0, {
       label: '占领据点', value: score.controlPoints ?? 0, weight: cpWeight,
       part: (score.controlPoints ?? 0) * cpWeight,
     });
-    const perAction = weights.effectiveActions ?? weights.actionPoints ?? (isAnnihilationRules() ? 10 : 2);
-    const actionScore = score.actionScore ?? 0;
-    terms.push({ label: '有效行动', value: perAction > 0 ? actionScore / perAction : actionScore, weight: perAction, part: actionScore });
+    if (score.actionScore !== undefined) {
+      const perAction = weights.effectiveActions ?? weights.actionPoints ?? (isAnnihilationRules() ? 10 : 2);
+      const actionScore = score.actionScore ?? 0;
+      terms.push({ label: '有效行动', value: perAction > 0 ? actionScore / perAction : actionScore, weight: perAction, part: actionScore });
+    }
     return terms.filter(term => term.weight > 0);
   }
   const flowRatio = Number(weights.controlPointFlowRatio ?? 0.7);
@@ -1880,10 +1968,20 @@ function compareSemver(a, b) {
   return 0;
 }
 
+// 重导出旧回放时沿用它的版本戳：事件流与结算分仍是旧口径，改戳新版本会被误判成新规则对局。
+// 无戳的旧局按其口径补写该口径的起始版本；实时对局用当前版本。
+function replayExportStamp() {
+  if (importedReplayMeta?.schemaVersion) return importedReplayMeta.schemaVersion;
+  const era = replayScoringEra();
+  if (era === 'merit') return MERIT_ADJUDICATION_SCHEMA_VERSION;
+  if (era === 'base') return '1.0.0';
+  return REPLAY_SCHEMA_VERSION;
+}
+
 function buildReplayExport() {
   return {
     format: REPLAY_EXPORT_FORMAT,
-    schemaVersion: REPLAY_SCHEMA_VERSION,
+    schemaVersion: replayExportStamp(),
     gameId: importedReplayMeta?.gameId || gameSelect.value || 'offline',
     mapId: importedReplayMeta?.mapId || replayMapId(),
     playerNames: importedReplayMeta?.playerNames || playerNames,
@@ -1926,6 +2024,8 @@ function normalizeImportedReplay(data) {
   return {
     format: Array.isArray(data) ? 'legacy-event-array' : data.format || 'legacy-replay-object',
     schemaVersion,
+    // 早期导出根本没写版本号，此时不能拿兜底的 1.0.0 当依据去判口径。
+    hasSchemaVersion: !Array.isArray(data) && typeof data.schemaVersion === 'string',
     gameId: Array.isArray(data) ? 'offline' : data.gameId,
     mapId: Array.isArray(data) ? null : data.mapId ?? null,
     playerNames: Array.isArray(data) ? null : data.playerNames ?? null,
@@ -1941,6 +2041,10 @@ function loadImportedReplay(replay) {
     mapId: replay.mapId || null,
     playerNames: replay.playerNames || null,
     finalResult: replay.finalResult ?? null,
+    schemaVersion: replay.hasSchemaVersion ? replay.schemaVersion : null,
+    scoringEra: replay.hasSchemaVersion
+      ? scoringEraFromVersion(replay.schemaVersion)
+      : scoringEraFromScores(replay.events ?? []),
   };
   allEvents = replay.events;
   pinnedReplayStep = false;

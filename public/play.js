@@ -537,9 +537,9 @@ function applyEvent(s, ev) {
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'move': { const u = s.units.get(p.unitId); recordActionPoint(s, p.owner || u?.owner, p); if (u) { u.q = p.toQ; u.r = p.toR; u.hasMoved = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
-    case 'attack': { const t = s.units.get(p.targetId) || s.headquarters.get(p.targetId); if (t) t.hp = p.targetHp; const a = s.units.get(p.attackerId); recordActionPoint(s, p.owner || a?.owner, p); if (a) { a.hasActed = true; a.actionSpent = true; }
-      // 击杀入账：把单位打到 0 血即凶手（与服务器"最后一击归属"同口径）；炮火等环境击杀无归属。
-      if (t && p.targetHp === 0 && a && s.units.has(p.targetId)) { const pl = s.players[a.owner]; if (pl) { ensureStats(pl); pl.stats.killValue = (pl.stats.killValue ?? 0) + (t.cost || 0); } }
+    case 'attack': { const t = s.units.get(p.targetId) || s.headquarters.get(p.targetId); const previousHp = t ? t.hp : null; if (t) t.hp = p.targetHp; const a = s.units.get(p.attackerId); recordActionPoint(s, p.owner || a?.owner, p); if (a) { a.hasActed = true; a.actionSpent = true; }
+      // 击杀入账：把活着的单位打到 0 血才是凶手（与服务器"最后一击归属"同口径，同一轮内打在尸体上的过量击杀不再重复记账）；炮火等环境击杀无归属。
+      if (t && previousHp > 0 && p.targetHp === 0 && a && s.units.has(p.targetId)) { const pl = s.players[a.owner]; if (pl) { ensureStats(pl); pl.stats.killValue = (pl.stats.killValue ?? 0) + (t.cost || 0); } }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
     case 'heal': { const t = s.units.get(p.targetId); if (t) t.hp = p.targetHp; const u = s.units.get(p.supportId); recordActionPoint(s, p.owner || u?.owner, p); if (u) { u.hasActed = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
     case 'unit_death': { const u = s.units.get(p.unitId); if (u) u.alive = false; break; }

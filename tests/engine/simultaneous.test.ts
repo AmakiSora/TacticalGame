@@ -289,6 +289,36 @@ describe('simultaneous resolution', () => {
     expect(buildAdjudicationScores(game)[c]!.killValue).toBe(target.cost);
   });
 
+  it('credits only the first killing blow when later attacks overkill the corpse', () => {
+    const { game, bus } = createStandoffGame(3);
+    const [a, b, c] = game.turn.turnOrder as [PlayerId, PlayerId, PlayerId];
+    const attackerA = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    const attackerC = game.units.find(u => u.owner === c && u.type === 'infantry')!;
+    const target = game.units.find(u => u.owner === b && u.type === 'infantry')!;
+    place(attackerA, 0, 1);
+    place(attackerC, -1, 0);
+    place(target, 0, 0);
+    // 双方都是致命伤害。单位要到死亡阶段才 alive=false，所以 turnOrder 靠后者清零之后，
+    // 靠前者仍会把这一发打在尸体上，事件流里出现第二个 targetHp: 0 的 attack。
+    attackerA.attack = 999;
+    attackerC.attack = 999;
+    target.defense = 0;
+    target.hp = 200;
+    expect(queueAttackAction(game, a, attackerA.id, 0, 0).ok).toBe(true);
+    expect(queueAttackAction(game, c, attackerC.id, 0, 0).ok).toBe(true);
+    commitAll(game, bus, [a, b, c]);
+
+    const lethalHits = game.events.filter(event =>
+      event.type === 'attack' && event.payload.targetId === target.id && event.payload.targetHp === 0);
+    // 过量击杀确实发生：同一具尸体被记了两次 0 血命中，但击杀只归第一个清零的人。
+    expect(lethalHits.map(event => event.payload.owner)).toEqual([a, c]);
+    expect(game.players[a]!.stats.unitsDestroyed).toBe(1);
+    expect(game.players[a]!.stats.killValue).toBe(target.cost);
+    expect(game.players[c]!.stats.unitsDestroyed).toBe(0);
+    expect(game.players[c]!.stats.killValue).toBe(0);
+    expect(buildAdjudicationScores(game)[c]!.killValue).toBe(0);
+  });
+
   it('misses when the target moves away and hits a unit moving into the attacked cell', () => {
     const { game, bus } = createStandoffGame();
     const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];

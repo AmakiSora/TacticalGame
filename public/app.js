@@ -398,9 +398,9 @@ function applyEvent(s, ev) {
           player.stats.headquartersDamage += actualDamage;
         }
       }
-      // 击杀入账：把单位打到 0 血即凶手（与服务器"最后一击归属"同口径）；
-      // 炮火等环境击杀没有 attack 事件，自然无归属。
-      if (target && p.targetHp === 0 && a && s.units.has(p.targetId)) {
+      // 击杀入账：把活着的单位打到 0 血才是凶手（与服务器"最后一击归属"同口径）；
+      // 同一轮内后续打在尸体上的过量击杀 targetHp 仍是 0，不能再记一次。炮火等环境击杀没有 attack 事件，自然无归属。
+      if (target && previousHp > 0 && p.targetHp === 0 && a && s.units.has(p.targetId)) {
         const player = s.players[a.owner];
         if (player) {
           ensureStats(player);

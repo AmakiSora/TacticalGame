@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialGame, GameStore } from '../../src/state/store.js';
+import { addLobbyPlayer, createInitialGame, createLobby, GameStore } from '../../src/state/store.js';
 
 let tempDir: string | null = null;
 
@@ -107,6 +107,31 @@ describe('GameStore persistence', () => {
     restored.loadFromDisk();
 
     expect(restored.get('simultaneous-reordered-actions')!.players.player_a!.stats.actionPointsUsed).toBe(3);
+  });
+
+  it('restores killValue for the first killing blow when saved events overkill', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    const game = createLobby('overkill-restore', 'standoff', { maxPlayers: 3, participate: true, playerName: 'A' });
+    expect(addLobbyPlayer(game, 'B')).not.toBeNull();
+    expect(addLobbyPlayer(game, 'C')).not.toBeNull();
+    game.events = [
+      { seq: 1, type: 'game_start', timestamp: 1, payload: { units: [], controlPoints: [] } },
+      // 同时结算下单位要到死亡阶段才 alive=false，所以先清零者之后还有人把同一具尸体打到 0 血。
+      // 重建必须与引擎同口径：击杀只归第一个清零的人，过量击杀不重复入账。
+      { seq: 2, type: 'attack', timestamp: 2, payload: { owner: 'player_a', targetKind: 'unit', targetId: 'unit-x', targetHp: 0 } },
+      { seq: 3, type: 'attack', timestamp: 3, payload: { owner: 'player_b', targetKind: 'unit', targetId: 'unit-x', targetHp: 0 } },
+      { seq: 4, type: 'unit_death', timestamp: 4, payload: { unitId: 'unit-x', owner: 'player_c', type: 'infantry', cause: 'attack' } },
+    ];
+    store.save(game);
+
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    const loaded = restored.get('overkill-restore')!;
+    expect(loaded.players.player_a!.stats.killValue).toBe(loaded.config.units.infantry.cost);
+    expect(loaded.players.player_b!.stats.killValue).toBe(0);
+    expect(loaded.players.player_c!.stats.killValue).toBe(0);
   });
 
   it('restores royale games with planning state, control-point spawns and artillery', () => {

@@ -293,8 +293,11 @@ function restoreActionStats(game: GameState): void {
 
     // 击杀入账重建：把目标打到 0 血的攻击者即凶手（与引擎"最后一击归属"同口径）；
     // 炮火（cause: 'artillery'）等环境击杀无归属。旧顺序模式事件的 unit_death 无 cause 字段，按攻击击杀处理。
+    // 同时模式下单位要到死亡阶段才置 alive=false，同一轮内可能有多个攻击打出 targetHp:0（过量击杀），
+    // 引擎只记第一个把血量清零的人（recordedDeaths），故此处首次入账即定，后续覆盖会让凶手漂移。
     if (event.type === 'attack' && payload.targetKind === 'unit' && payload.targetHp === 0
-      && typeof payload.targetId === 'string' && isPlayerId(payload.owner)) {
+      && typeof payload.targetId === 'string' && isPlayerId(payload.owner)
+      && !killCreditByUnit.has(payload.targetId)) {
       killCreditByUnit.set(payload.targetId, payload.owner);
     }
     if (event.type === 'unit_death' && typeof payload.unitId === 'string') {

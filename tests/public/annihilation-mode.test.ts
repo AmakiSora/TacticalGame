@@ -45,6 +45,8 @@ describe('annihilation mode UI', () => {
       expect(source).toContain('const killValue = state.players?.[owner]?.stats?.killValue ?? 0;');
       expect(source).toContain('const flowRatio = Number(weights.controlPointFlowRatio ?? 0.7);');
       expect(source).toContain("label: '击杀价值'");
+      // 过量击杀：同一轮内打在尸体上的第二发 targetHp 仍是 0，只有把活单位打到 0 血才算凶手。
+      expect(source).toContain('previousHp > 0 && p.targetHp === 0');
       expect(source).not.toContain('function recordActionMerit');
       // 旧回放（含 actionScore 快照）仍走兼容分支展示「有效行动」。
       expect(source).toContain("score.actionScore !== undefined && score.killValue === undefined");

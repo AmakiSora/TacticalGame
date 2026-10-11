@@ -1,3 +1,5 @@
+import './version.js';
+
 (function initMapEditor(global) {
   const SQRT3 = Math.sqrt(3);
   const HEX_SIZE = 34;

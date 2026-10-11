@@ -41,7 +41,8 @@ async function loadPage() {
   };
   context.globalThis = context;
   vm.createContext(context);
-  vm.runInContext(readFileSync('public/stats.js', 'utf8'), context);
+  // ESM import 头在 VM Script 模式下非法，执行前剥离。
+  vm.runInContext(readFileSync('public/stats.js', 'utf8').replace(/^import\s+'[^']+';\s*$/gm, ''), context);
   await new Promise((r) => setTimeout(r, 0));
   return { elements, data };
 }

@@ -1,3 +1,5 @@
+import './version.js';
+
 /* 竞技场玩法统计 + 参与者档案 — reads /data/arena-stats.json only. */
 (() => {
   const DATA_URL = '/data/arena-stats.json';

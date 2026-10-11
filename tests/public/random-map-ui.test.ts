@@ -52,7 +52,8 @@ describe('random map creation UI', () => {
 
     expect(html).toContain('id="random-map-options"');
     expect(html).toContain('<option value="random">随机地图</option>');
-    expect(html).toContain('<script src="/random-map-ui.js?v=3.6.0"></script>');
+    // random-map-ui 由客户端入口以 ESM import 引入（不再直接以 script 标签加载）。
+    expect(source).toContain("import './random-map-ui.js';");
     expect(source).toContain('window.RandomMapUI?.renderRandomMapCard');
     expect(source).toContain('window.RandomMapUI.collectRandomOptions()');
     expect(source).toContain("els.mapSelect.value === 'random'");
@@ -66,7 +67,8 @@ describe('random map creation UI', () => {
 
     expect(html).toContain('id="random-map-options"');
     expect(html).toContain('<option value="random">随机地图</option>');
-    expect(html).toContain('<script src="/random-map-ui.js?v=3.6.0"></script>');
+    // random-map-ui 由客户端入口以 ESM import 引入（不再直接以 script 标签加载）。
+    expect(source).toContain("import './random-map-ui.js';");
     expect(source).toContain('window.RandomMapUI?.renderRandomMapCard');
     expect(source).toContain('window.RandomMapUI.collectRandomOptions()');
     expect(source).toContain("els.mapSelect.value === 'random'");

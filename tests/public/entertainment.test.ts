@@ -40,7 +40,8 @@ async function loadPage() {
   };
   context.globalThis = context;
   vm.createContext(context);
-  vm.runInContext(readFileSync('public/entertainment.js', 'utf8'), context);
+  // ESM import 头在 VM Script 模式下非法，执行前剥离。
+  vm.runInContext(readFileSync('public/entertainment.js', 'utf8').replace(/^import\s+'[^']+';\s*$/gm, ''), context);
   // loadData 是 async：等一个宏任务让 fetch/render 链跑完
   await new Promise((r) => setTimeout(r, 0));
   return { elements, data };

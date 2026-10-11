@@ -4,6 +4,10 @@ import { resolve } from 'path';
 export default defineConfig({
   root: 'public',
 
+  // root 即源码目录（含 icons/、data/ 等纯静态资源）。Vite 不会把 root 本身拷进产物，
+  // 这些资源由 script/copy-static.mjs 在构建后补拷，保证 dev 与生产 URL 一致。
+  publicDir: false,
+
   build: {
     outDir: '../dist-public',
     emptyOutDir: true,

@@ -4,6 +4,18 @@
 
 自 3.0.0 起按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.6.1
+
+### 变更
+
+- **前端构建管线真正接入生产：页面脚本经 Vite 压缩、hash 化与跨页面分块缓存，主包体积约降四成**：此前 `npm run build:frontend` 的产物（dist-public/）从未被部署使用——`src/server.ts` 与 Docker 运行时阶段都直接托管 public/ 源目录，且各页面 HTML 里的 `<script>` 缺 `type="module"`，Vite 不把它们视为构建入口，全部 JS（如 play-m.js 138.7KB）未经压缩原样上线，构建形同虚设。现在九个页面入口统一改为 ESM module 入口，共享模块（board-animation / playback / board-inspect / rules-sheet / random-map-ui / agent-prompt / layout-editor / version）不再以 `<script>` 标签加载，改由各页面入口文件顶部静态 `import` 引入——原 classic script 依赖文档顺序保证的加载时序改由 ESM 静态顺序承担，共享文件本身零改动（它们经 `window.*` 挂载，与 module 作用域兼容）；生产托管切换到 dist-public 构建产物，dev（tsx 直跑 src/）仍托管 public/ 源码，vite dev 三种模式 URL 一致。实测主包体积：play-m.js 138.7→83.6KB、play.js 125.7→75.1KB、spectator-m.js 103.0→57.9KB、app.js 95.0→53.7KB（约 -40%），gzip 传输 38.2→27.3KB 等；共享模块自动拆为跨页面复用的独立 chunk，多页跳转共享缓存。arena.html 约 80 行与 stats.html 5 行内联 `<style>` 抽出为 public/arena.css 与 stats.css 末尾追加（Vite 的 module 入口构建管线不支持页面内联样式），顺带修复 play-m.css 与 stats.css 各一处孤儿 `}`（此前每次构建持续报 css-syntax-error 警告，浏览器容错下无可见渲染缺陷）。
+- **静态资源缓存策略分级：hash 产物永久缓存，数据文件保持协商缓存**：此前静态资源无任何 Cache-Control，浏览器每次访问都发协商请求。现在 `/assets/*`（Vite 内容 hash 文件名，改文件即改名）缓存一年并标记 immutable，`/icons/*` 按天缓存，HTML 与 `/data/*.json`（stats 脚本可重新生成）为 no-cache 走协商缓存保证新鲜（`src/server.ts` 的 fastifyStatic `setHeaders`，需 `cacheControl: false` 关闭插件默认头，否则它会在 setHeaders 之后再次写入覆盖自定义值）。`?v=x.y.z` 手动缓存参数机制整体退役（内容 hash 接管失效职责），`script/bump-version.mjs` 移除 HTML 缓存参数扫描与同步逻辑；Dockerfile 构建期执行 `build:frontend`、运行时阶段改拷 dist-public；新增 `script/copy-static.mjs` 在构建后补拷 public/icons 与 public/data（Vite 不会把 root 本身的文件拷进产物，三种运行模式 URL 保持一致）。
+
+### 测试与验证
+
+- `npm run build` 通过、`npm test` 727 例全部通过、`npm run check-version` 校验 3.6.1 全部引用一致。存量用例适配：9 例断言 `?v=` 缓存参数与共享脚本标签的用例改为断言 module 入口与入口文件内的 import（board-animation / playback / layout-editor / agent-prompt / random-map-ui / score-panel 版本徽章 / plan-tools 接线顺序 / map-editor / layout-editor 页面接线），5 个 VM 执行前端源码的测试（map-editor / entertainment / stats-runtime / replay-merit-mirror / stats-dashboard）在加载前剥离入口文件头部的 ESM import（VM Script 模式下非法）。本轮未改任何对局与接口逻辑；页面 script 执行模型从 classic 变为 module（自动严格模式）。
+- `npm run build:frontend` 产物确认全部 JS 经 terser 压缩且文件名 hash 化（构建输出此前只有空 sourcemap、无任何 JS chunk）；生产模式冒烟（`node dist/server.js` 托管 dist-public）：HTML / module JS / CSS / icons / data 全部 200，四类 Cache-Control 头逐类实测生效（assets `public, max-age=31536000, immutable`、icons `max-age=86400`、HTML 与 data `no-cache`），gzip 传输实测 play-m 入口 27.3KB。
+
 ## 3.6.0
 
 ### 变更

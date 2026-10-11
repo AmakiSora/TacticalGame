@@ -7,12 +7,13 @@ function read(path: string): string {
 
 describe('layout editor', () => {
   it('offers layout editing entry in settings on player and spectator pages', () => {
-    for (const file of ['public/play.html', 'public/spectator.html']) {
-      const html = read(file);
+    for (const [page, entry] of [['public/play.html', 'public/play.js'], ['public/spectator.html', 'public/app.js']]) {
+      const html = read(page);
       expect(html).toContain('id="btn-edit-layout"');
       expect(html).toContain('改变布局');
-      expect(html).toContain('/layout-editor.js');
       expect(html).toContain('/layout-editor.css');
+      // layout-editor 由桌面页入口 ESM import 引入（不再直接以 script 标签加载）。
+      expect(read(entry)).toContain("import './layout-editor.js';");
     }
   });
 

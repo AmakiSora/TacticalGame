@@ -14,9 +14,12 @@ describe('adjudication score panels', () => {
   it('shows the application version on spectator and play pages', () => {
     const spectator = read('public/spectator.html');
     const play = read('public/play.html');
+    const spectatorEntry = read('public/app.js');
+    const playEntry = read('public/play.js');
 
-    expect(spectator).toContain('<script src="/version.js"></script>');
-    expect(play).toContain('<script src="/version.js"></script>');
+    // version.js 由入口 ESM import 引入（不再直接以 script 标签加载）。
+    expect(spectatorEntry).toContain("import './version.js';");
+    expect(playEntry).toContain("import './version.js';");
     expect(spectator).toContain('<span class="version-badge"></span>');
     expect(play).toContain('<span class="version-badge"></span>');
     expect(spectator).not.toMatch(/version-badge">v\d+\.\d+\.\d+/);

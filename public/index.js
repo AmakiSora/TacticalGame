@@ -1,3 +1,5 @@
+import './version.js';
+
 /* ══════════ home page ══════════ */
 
 const $ = id => document.getElementById(id);

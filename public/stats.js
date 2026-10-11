@@ -1,3 +1,5 @@
+import './version.js';
+
 /* Static stats dashboard — reads /data/stats.json only. */
 (() => {
   const DATA_URL = '/data/stats.json';

@@ -17,7 +17,8 @@ import { globalStore } from './state/store.js';
 import { logger } from './utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = join(__dirname, '..', 'public');
+// dev（tsx 跑 src/）托管源目录 public/；生产（node dist/server.js）托管 Vite 产物 dist-public/。
+const PUBLIC_DIR = join(__dirname, '..', __dirname.replace(/\\/g, '/').endsWith('/dist') ? 'dist-public' : 'public');
 const DEFAULT_PROTECTED_RATE_LIMIT = 120;
 const RATE_WINDOW_MS = 60_000;
 
@@ -135,7 +136,27 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(eventsRoutes);
   await app.register(skillRoutes);
   await app.register(recordsRoutes);
-  await app.register(fastifyStatic, { root: PUBLIC_DIR, prefix: '/' });
+  // 静态资源缓存策略（cacheControl: false 关闭默认的 public, max-age=0，
+  // 否则它会在 setHeaders 之后再次写入并覆盖自定义值）：
+  //  - /assets/*：Vite 产物，文件名含内容 hash，可永久缓存；
+  //  - /icons/*：极少变化的图标，按天缓存；
+  //  - HTML 与 /data/*.json（stats 脚本可重新生成）：no-cache，走协商缓存保证新鲜。
+  await app.register(fastifyStatic, {
+    root: PUBLIC_DIR,
+    prefix: '/',
+    cacheControl: false,
+    setHeaders(res, filePath) {
+      // filePath 为磁盘绝对路径；windows 下是反斜杠，统一成斜杠再判断。
+      const normalized = filePath.replace(/\\/g, '/');
+      if (normalized.includes('/assets/')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (normalized.includes('/icons/')) {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      } else {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  });
   ready = true;
   return app;
 }

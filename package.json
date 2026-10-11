@@ -1,6 +1,6 @@
 {
   "name": "tactical-game",
-  "version": "3.6.0",
+  "version": "3.6.1",
   "engines": {
     "node": ">=24 <25"
   },
@@ -10,7 +10,7 @@
     "dev:frontend": "vite",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:frontend\"",
     "build": "tsc",
-    "build:frontend": "vite build",
+    "build:frontend": "vite build && node script/copy-static.mjs",
     "build:all": "npm run build && npm run build:frontend",
     "preview": "vite preview",
     "start": "node dist/server.js",

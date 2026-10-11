@@ -1,3 +1,5 @@
+import './version.js';
+
 /* 娱乐数据页 — reads /data/fun-stats.json only. 视觉复用 stats.css 站点体系。 */
 (() => {
   'use strict';

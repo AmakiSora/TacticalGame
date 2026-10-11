@@ -35,7 +35,9 @@ type Api = {
 };
 
 // 从单个前端产物里切出真实函数，注入最小 DOM 桩后在 VM 中执行。
-function buildApi(source: string): Api {
+function buildApi(originalSource: string): Api {
+  // 入口文件的 ESM import 头（依赖引入）在 VM Script 模式下非法，切函数前剥离。
+  const source = originalSource.replace(/^import\s+'[^']+';\s*$/gm, '');
   const domStart = source.indexOf('\nconst canvas =');
   if (domStart < 0) throw new Error('找不到 DOM 常量块边界');
   const sliceA = source.slice(0, domStart);

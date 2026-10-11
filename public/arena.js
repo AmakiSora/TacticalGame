@@ -1,3 +1,5 @@
+import './version.js';
+
 /* AI 竞技场排行榜 — reads /data/arena-leaderboard.json only. */
 (() => {
   const DATA_URL = '/data/arena-leaderboard.json';

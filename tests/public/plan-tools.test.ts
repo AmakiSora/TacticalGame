@@ -66,40 +66,29 @@ describe('simultaneous plan panel tools', () => {
 });
 
 describe('rules sheet wiring across the four pages', () => {
-  it('serves the shared modules before each page client', () => {
-    const pages: Array<[string, string]> = [
-      ['public/play.html', '/play.js'],
-      ['public/play-m.html', '/play-m.js'],
-      ['public/spectator.html', '/app.js'],
-      ['public/spectator-m.html', '/spectator-m.js'],
+  it('imports the shared modules in each page client entry', () => {
+    const entries: Array<[string, string[]]> = [
+      ['public/play.js', ['./version.js', './board-animation.js', './board-inspect.js', './rules-sheet.js']],
+      ['public/play-m.js', ['./version.js', './board-animation.js', './board-inspect.js', './rules-sheet.js']],
+      ['public/app.js', ['./version.js', './board-animation.js', './board-inspect.js', './rules-sheet.js']],
+      ['public/spectator-m.js', ['./version.js', './board-animation.js', './board-inspect.js', './rules-sheet.js']],
     ];
-    for (const [htmlPath, client] of pages) {
-      const html = read(htmlPath);
-      for (const dep of ['/board-inspect.js', '/rules-sheet.js']) {
-        const depIndex = html.indexOf(dep);
-        const clientIndex = html.indexOf(client);
-        expect(depIndex, `${htmlPath} 应引入 ${dep}`).toBeGreaterThan(-1);
-        expect(depIndex, `${htmlPath} 中 ${dep} 应先于 ${client} 加载`).toBeLessThan(clientIndex);
+    for (const [entry, deps] of entries) {
+      const source = read(entry);
+      let prevIndex = -1;
+      for (const dep of deps) {
+        const depIndex = source.indexOf(`import '${dep}'`);
+        expect(depIndex, `${entry} 应 import ${dep}`).toBeGreaterThan(-1);
+        expect(depIndex, `${entry} 中 ${dep} 的 import 应位于文件头部依赖区`).toBeGreaterThan(prevIndex);
+        prevIndex = depIndex;
       }
-      expect(html, `${htmlPath} 应有规则速查按钮`).toContain('id="btn-rules"');
-    }
-  });
-
-  it('attaches the rules modal with the live game config in all four clients', () => {
-    for (const file of [...PLAYER_CLIENTS, 'public/app.js', 'public/spectator-m.js']) {
-      const source = read(file);
-      expect(source, `${file} 应接线 RulesSheet.attach`).toContain('RulesSheet');
+      expect(source, `${entry} 应接线 RulesSheet.attach`).toContain('RulesSheet');
       expect(source).toContain('getConfig');
     }
-  });
-
-  it('keeps all script cache-busting params aligned with the release version', () => {
+    // 共享依赖与入口的接线页面侧由 import 静态保证；页面本身只需有规则速查按钮。
     const pages = ['public/play.html', 'public/play-m.html', 'public/spectator.html', 'public/spectator-m.html'];
     for (const page of pages) {
-      const html = read(page);
-      const params = [...html.matchAll(/\?v=(\d+\.\d+\.\d+)/g)].map(m => m[1]);
-      expect(params.length).toBeGreaterThan(0);
-      expect(new Set(params).size, `${page} 的 ?v= 参数应一致`).toBe(1);
+      expect(read(page), `${page} 应有规则速查按钮`).toContain('id="btn-rules"');
     }
   });
 });

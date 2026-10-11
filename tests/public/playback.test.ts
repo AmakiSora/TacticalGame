@@ -267,14 +267,19 @@ describe('player page playback wiring', () => {
     });
   }
 
-  const pages: Array<[string, string]> = [['play.html', '/play.js'], ['play-m.html', '/play-m.js']];
-  for (const [page, mainScript] of pages) {
-    it(`loads playback.js before ${mainScript} and ships the skip button in ${page}`, () => {
+  const pages: Array<[string, string, string]> = [
+    ['play.html', 'play.js', './playback.js'],
+    ['play-m.html', 'play-m.js', './playback.js'],
+  ];
+  for (const [page, mainScript, playbackImport] of pages) {
+    it(`imports playback.js (with board-animation first) in ${mainScript} and ships the skip button in ${page}`, () => {
       const html = read(page);
       expect(html).toContain('id="btn-skip-replay"');
-      expect(html).toContain('/playback.js');
-      expect(html.indexOf('/board-animation.js')).toBeLessThan(html.indexOf('/playback.js'));
-      expect(html.indexOf('/playback.js')).toBeLessThan(html.indexOf(mainScript));
+      const source = read(mainScript);
+      const animIndex = source.indexOf("import './board-animation.js'");
+      const playbackIndex = source.indexOf(`import '${playbackImport}'`);
+      expect(animIndex).toBeGreaterThan(-1);
+      expect(playbackIndex).toBeGreaterThan(animIndex);
     });
   }
 });

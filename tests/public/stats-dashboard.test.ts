@@ -45,7 +45,8 @@ describe('stats dashboard', () => {
     expect(html).toContain('/mobile-icons.css');
     expect(html).toContain('icon-arrow-down');
     expect(source).toContain("classList.toggle('icon-arrow-up'");
-    expect(html).toContain('.mode-simul');
+    // 模式徽章样式位于 stats.css（原 stats.html 内联样式，抽出后并入此文件）。
+    expect(css).toContain('.mode-simul');
   });
 
   it('binds each filter to a single event so one selection renders once', () => {

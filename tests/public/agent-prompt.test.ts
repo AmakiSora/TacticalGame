@@ -62,7 +62,6 @@ describe('agent prompt tab module', () => {
   it('is wired into the add-AI dialog on both desktop and mobile clients', () => {
     for (const file of ['public/play.html', 'public/play-m.html']) {
       const html = readFileSync(file, 'utf8');
-      expect(html).toContain('agent-prompt.js?v=');
       expect(html).toContain('id="bot-panel-prompt"');
       expect(html).toContain('id="bot-prompt-name"');
       expect(html).toContain('id="bot-prompt-skill"');
@@ -70,6 +69,8 @@ describe('agent prompt tab module', () => {
     }
     for (const file of ['public/play.js', 'public/play-m.js']) {
       const js = readFileSync(file, 'utf8');
+      // agent-prompt 由客户端入口以 ESM import 引入（不再直接以 script 标签加载）。
+      expect(js).toContain("import './agent-prompt.js';");
       expect(js).toContain('AgentPromptUI.buildPrompt');
       expect(js).toContain('function switchBotTab');
       expect(js).toContain('skillInstalled: els.botPromptSkill.checked');

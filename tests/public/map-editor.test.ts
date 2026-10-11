@@ -18,7 +18,8 @@ function read(path: string): string {
 }
 
 function loadCore(): EditorCore {
-  const source = read('public/map-editor.js');
+  // 入口文件的 ESM import 头在 VM Script 模式下非法，执行前剥离。
+  const source = read('public/map-editor.js').replace(/^import\s+'[^']+';\s*$/gm, '');
   const context: any = { console, window: {}, navigator: { clipboard: null }, Blob: class Blob {}, URL: { createObjectURL: () => '', revokeObjectURL: () => {} } };
   context.globalThis = context;
   vm.createContext(context);
@@ -47,7 +48,7 @@ describe('map editor page', () => {
     expect(html).toContain('data-mode="simultaneous"');
     expect(html).toContain('data-mode="royale"');
     expect(html).toContain('id="annihilation-panel"');
-    expect(html).toContain('<script src="/map-editor.js?v=3.6.0"></script>');
+    expect(html).toContain('<script type="module" src="/map-editor.js"></script>');
   });
 
   it('supports toolbar zoom buttons without hijacking wheel scroll', () => {

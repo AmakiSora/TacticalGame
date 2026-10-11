@@ -118,50 +118,45 @@ function createController(loaded: NonNullable<ReturnType<typeof loadAnimation>>)
 }
 
 describe('shared board animation layer', () => {
-  it('serves the shared dependency before desktop spectator code', async () => {
+  /** 页面以 ESM module 入口加载客户端，board-animation 由入口静态 import 引入。 */
+  async function expectEntryImportsShared(
+    app: Awaited<ReturnType<typeof buildServer>>,
+    pageUrl: string,
+    entryUrl: string,
+  ): Promise<void> {
+    const page = await app.inject({ method: 'GET', url: pageUrl });
+    const entry = await app.inject({ method: 'GET', url: entryUrl });
+    expect(page.statusCode).toBe(200);
+    expect(entry.statusCode).toBe(200);
+    const importIndex = entry.body.indexOf("import './board-animation.js'");
+    const bodyIndex = entry.body.indexOf('const HEX_SIZE');
+    expect(importIndex).toBeGreaterThan(-1);
+    expect(importIndex).toBeLessThan(bodyIndex);
+  }
+
+  it('is imported by desktop spectator code', async () => {
     const app = await buildServer();
     try {
-      const page = await app.inject({ method: 'GET', url: '/spectator.html' });
-      const shared = await app.inject({ method: 'GET', url: '/board-animation.js' });
-      expect(page.statusCode).toBe(200);
-      expect(shared.statusCode).toBe(200);
-      const sharedIndex = page.body.indexOf('/board-animation.js');
-      const appIndex = page.body.indexOf('/app.js');
-      expect(sharedIndex).toBeGreaterThan(-1);
-      expect(sharedIndex).toBeLessThan(appIndex);
+      await expectEntryImportsShared(app, '/spectator.html', '/app.js');
     } finally {
       await app.close();
     }
   });
 
-  it('serves the shared dependency before desktop player code', async () => {
+  it('is imported by desktop player code', async () => {
     const app = await buildServer();
     try {
-      const page = await app.inject({ method: 'GET', url: '/play.html' });
-      expect(page.statusCode).toBe(200);
-      const sharedIndex = page.body.indexOf('/board-animation.js');
-      const playerIndex = page.body.indexOf('/play.js');
-      expect(sharedIndex).toBeGreaterThan(-1);
-      expect(sharedIndex).toBeLessThan(playerIndex);
+      await expectEntryImportsShared(app, '/play.html', '/play.js');
     } finally {
       await app.close();
     }
   });
 
-  it('serves the shared dependency before both mobile board clients', async () => {
+  it('is imported by both mobile board clients', async () => {
     const app = await buildServer();
     try {
-      for (const [pageUrl, clientPath] of [
-        ['/spectator-m.html', '/spectator-m.js'],
-        ['/play-m.html', '/play-m.js'],
-      ]) {
-        const page = await app.inject({ method: 'GET', url: pageUrl });
-        expect(page.statusCode).toBe(200);
-        const sharedIndex = page.body.indexOf('/board-animation.js');
-        const clientIndex = page.body.indexOf(clientPath);
-        expect(sharedIndex).toBeGreaterThan(-1);
-        expect(sharedIndex).toBeLessThan(clientIndex);
-      }
+      await expectEntryImportsShared(app, '/spectator-m.html', '/spectator-m.js');
+      await expectEntryImportsShared(app, '/play-m.html', '/play-m.js');
     } finally {
       await app.close();
     }

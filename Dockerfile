@@ -7,13 +7,17 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY tsconfig.json ./
+# 前端构建：vite（root=public）需 public/ 源与 vite.config.ts，copy-static.mjs 补拷 icons/data。
+COPY vite.config.ts ./
+COPY public ./public
+COPY script/copy-static.mjs ./script/
 COPY src ./src
 # 构建期 tsc 需解析 src/api/{bots,arenaEval}.ts 对 algorithms/registry.mjs 的
 # import（类型声明 registry.d.mts）；运行时依赖算法子进程，见下方 runtime 阶段的 COPY。
 COPY algorithms ./algorithms
 # 同上：src/api/bots.ts 静态 import script/modelStatus.mjs（过期模型名单唯一来源）。
 COPY script/modelStatus.mjs script/modelStatus.d.mts ./script/
-RUN npm run build
+RUN npm run build && npm run build:frontend
 
 # Install the runtime dependency set separately to keep the final image small.
 FROM node:24-bookworm-slim AS production-deps
@@ -59,7 +63,8 @@ RUN groupadd --system tactical && useradd --system --gid tactical --home-dir /ap
 COPY --from=production-deps --chown=tactical:tactical /app/node_modules ./node_modules
 COPY --chown=tactical:tactical package.json ./
 COPY --from=build --chown=tactical:tactical /app/dist ./dist
-COPY --chown=tactical:tactical public ./public
+# 前端托管 dist-public（Vite 产物：压缩 + hash 化 + icons/data 补拷），不再拷源目录 public。
+COPY --from=build --chown=tactical:tactical /app/dist-public ./dist-public
 COPY --chown=tactical:tactical maps ./maps
 # 算法 AI：src/api/bots.ts 会以子进程拉起 node algorithms/runner.mjs，镜像必须携带。
 COPY --chown=tactical:tactical algorithms ./algorithms

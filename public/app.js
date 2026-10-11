@@ -1,3 +1,10 @@
+// 共享依赖经 ESM import 保证执行顺序（替代原 classic script 标签的文档顺序）。
+import './version.js';
+import './board-animation.js';
+import './board-inspect.js';
+import './rules-sheet.js';
+import './layout-editor.js';
+
 const HEX_SIZE = 28;
 const PAD = 42;
 const SQRT3 = Math.sqrt(3);

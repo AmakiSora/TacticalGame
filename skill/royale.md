@@ -103,20 +103,22 @@ Do **not** memorize a fixed timetable. Each royale map carries its own schedule.
 
 ## Narrow-road map (狭路相逢) specifics
 
-- 2-player radius-8 duel: two open funnels at `q = ±8` joined by an 11-cell **single-cell-wide road**
-  — the road is a one-at-a-time choke; whoever stands in the mouth is the gatekeeper. Blockers flank
-  the road: heavy demolition opens side lanes, so the "wall" is never fully safe.
-- Spawn: **owned `forward_base` CP** at each base (`cp_west` / `cp_east`, one ring inside the base
-  marker) — the map's only CPs and your only deploy pads, capturable by the enemy. **Zero starting
-  units**: queue a deploy during the round-1 planning phase or the wipe check eliminates you
-  (`army_destroyed`) the moment round 1 resolves — there is no HQ to keep you alive.
+- 2-player radius-6 duel: two compact funnel pockets at `q = ±6` joined by a 7-cell
+  **single-cell-wide road** (`q = -3..3`) — the road is a one-at-a-time choke; whoever stands in the
+  mouth is the gatekeeper. Blockers flank the road: heavy demolition opens side lanes, so the "wall"
+  is never fully safe.
+- Spawn: **owned `forward_base` CP** at each base (`cp_1` / `cp_2` at `q = ±5`, one ring inside the
+  base marker) — the map's only CPs and your only deploy pads, capturable by the enemy. **Zero
+  starting units**: queue a deploy during the round-1 planning phase or the wipe check eliminates
+  you (`army_destroyed`) the moment round 1 resolves — there is no HQ to keep you alive.
 - Cheap roster (`infantry 5 / scout 4 / support 7 / ranger 9 / heavy 10`; HP 9/5/8/3/15 — always
   re-read `config.units`): `startingSupplies 20`, `baseIncome 5`, CP income 0, `actionsPerTurn 5`.
   Expect roughly a unit per turn from income alone.
-- Artillery (this map only — re-derive on any other royale map): `startRound 5`, `intervalRounds 1`,
-  `damage 5`, `minimumSafeRadius 1` — one ring per round from round 5, flooring at radius 1 from
-  round 11. The pads sit at distance 7: from round 7 no safe cell borders them, so the deployment
-  window is effectively rounds 1–6 — build your army early, then fight.
+- Artillery (this map only — re-derive on any other royale map): `startRound 10`, `intervalRounds 1`,
+  `damage 5`, `minimumSafeRadius 1` — one ring per round from round 10 (safe radius starts at 5 =
+  map radius − 1), flooring at radius 1 from round 14. The pads sit at distance 5: the pads
+  themselves fall inside the shelled zone from round 11, and from round 12 no safe cell borders
+  them, so the deployment window is effectively rounds 1–11 — build your army early, then fight.
 - Scoring: `armyValue 1 + killValue 1` (HQ/CP/supply weights are dead — royale has no
   HQ, and supplies score 0). Securing kills (last hit) and keeping your cheap army alive are
   the whole game; do not burn turns on empty moves or hoard supplies.

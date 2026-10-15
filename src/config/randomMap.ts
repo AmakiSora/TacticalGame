@@ -2,7 +2,8 @@
 // 随机地图生成器：为 AI 训练提供可播种、参数可随机/可固定的战场。
 // 生成结果必须通过 loader.validateGeneratedMap 的完整校验，保证地形连通、
 // 出生位合法等既有约束，任何情况下都产出可玩的地图。
-import type { ControlPointKind, Position, UnitType } from '../types.js';
+import type { ControlPointKind, GameMode, Position, UnitType } from '../types.js';
+import { isAnnihilationMode } from '../types.js';
 import { hexDistance, hexKey } from '../engine/hex.js';
 import { createRadiusPlayableCells } from './geometry.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from './loader.js';
@@ -14,6 +15,8 @@ export type RandomParam = number | [number, number];
 export interface RandomMapOptions {
   /** 随机种子（数字或字符串）；同种子产出完全相同的地图。 */
   seed?: number | string;
+  /** 游戏模式：standard（默认）/ annihilation / simultaneous / royale。 */
+  mode?: GameMode;
   /** 旋转对称公平模式，默认 true。 */
   symmetric?: boolean;
   radius?: RandomParam;
@@ -37,6 +40,14 @@ export interface RandomMapOptions {
    * 描述已过时，且覆盖缺口（上界 4 < 6）待 RL 域重校准时收口。
    */
   startingUnitCount?: RandomParam;
+  /** 歼灭/大逃杀：首次炮火回合（≥1）。 */
+  artilleryStartRound?: RandomParam;
+  /** 歼灭/大逃杀：炮火间隔回合数（≥1）。 */
+  artilleryIntervalRounds?: RandomParam;
+  /** 歼灭/大逃杀：炮火伤害（≥1）。 */
+  artilleryDamage?: RandomParam;
+  /** 歼灭/大逃杀：最终安全区半径（≥0 且 < 地图半径）。 */
+  artilleryMinimumSafeRadius?: RandomParam;
 }
 
 interface ParamBound {
@@ -58,6 +69,10 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   headquartersHp: { min: 1, max: 9999, integer: true },
   headquartersDefense: { min: 0, max: 99, integer: true },
   startingUnitCount: { min: 0, max: 4, integer: true },
+  artilleryStartRound: { min: 1, max: 10, integer: true },
+  artilleryIntervalRounds: { min: 1, max: 3, integer: true },
+  artilleryDamage: { min: 5, max: 30, integer: true },
+  artilleryMinimumSafeRadius: { min: 0, max: 3, integer: true },
 };
 
 const DEFAULT_RANGES: Record<string, [number, number]> = {
@@ -72,6 +87,10 @@ const DEFAULT_RANGES: Record<string, [number, number]> = {
   headquartersHp: [80, 240],
   headquartersDefense: [3, 10],
   startingUnitCount: [0, 4],
+  artilleryStartRound: [3, 8],
+  artilleryIntervalRounds: [1, 2],
+  artilleryDamage: [10, 25],
+  artilleryMinimumSafeRadius: [0, 1],
 };
 
 // 默认域包线按 6 张静态图的极值校准（danger-close 的 1 行动点/20 补给/零据点收入、
@@ -137,14 +156,21 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
     if (typeof raw.symmetric !== 'boolean') throw new Error('random.symmetric must be boolean');
     options.symmetric = raw.symmetric;
   }
+  if (raw.mode !== undefined) {
+    const MODES = ['standard', 'annihilation', 'simultaneous', 'royale'];
+    if (typeof raw.mode !== 'string' || !MODES.includes(raw.mode)) {
+      throw new Error('random.mode must be one of standard/annihilation/simultaneous/royale');
+    }
+    options.mode = raw.mode as GameMode;
+  }
 
   for (const [key, bound] of Object.entries(PARAM_BOUNDS)) {
     const value = raw[key];
     if (value === undefined) continue;
-    options[key as Exclude<keyof RandomMapOptions, 'seed' | 'symmetric'>] = sanitizeParam(key, value, bound);
+    options[key as Exclude<keyof RandomMapOptions, 'seed' | 'symmetric' | 'mode'>] = sanitizeParam(key, value, bound);
   }
 
-  const known = new Set(['seed', 'symmetric', ...Object.keys(PARAM_BOUNDS)]);
+  const known = new Set(['seed', 'symmetric', 'mode', ...Object.keys(PARAM_BOUNDS)]);
   for (const key of Object.keys(raw)) {
     if (!known.has(key)) throw new Error(`unknown random option "${key}"`);
   }
@@ -313,6 +339,7 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
   }
   const { rng, seedText } = createRng(options.seed);
   const symmetric = options.symmetric ?? true;
+  const mode: GameMode = options.mode ?? 'standard';
 
   // 半径：多人局保证足够空间。
   let radius = Math.round(resolveParam(options.radius, 'radius', rng));
@@ -334,8 +361,14 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
   }
 
   // 据点：中心（数量为奇数时）+ 环形分布；对称模式成对赋类型。
-  const cpCount = Math.round(resolveParam(options.controlPointCount, 'controlPointCount', rng));
-  const controlPoints = placeControlPoints(cpCount, radius, symmetric, rng, spawnPositions, playableSet, taken);
+  let cpCount = Math.round(resolveParam(options.controlPointCount, 'controlPointCount', rng));
+  // 歼灭/大逃杀：每个出生位必须绑定唯一据点（loader 硬约束），请求量至少与出生位数持平。
+  if (isAnnihilationMode(mode)) cpCount = Math.max(cpCount, playerCount);
+  let controlPoints = placeControlPoints(cpCount, radius, symmetric, rng, spawnPositions, playableSet, taken);
+  // 放置失败可能少于请求量：不足出生位数时放宽间距规则补放，保证绑定可行性。
+  if (isAnnihilationMode(mode) && controlPoints.length < spawnPositions.length) {
+    controlPoints = topUpControlPoints(controlPoints, spawnPositions, spawnPositions.length, playableSet, taken);
+  }
 
   // 回合/行动点/经济/总部参数。
   const maxTurns = Math.round(resolveParam(options.maxTurns, 'maxTurns', rng));
@@ -345,6 +378,14 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
   const headquartersHp = Math.round(resolveParam(options.headquartersHp, 'headquartersHp', rng));
   const headquartersDefense = Math.round(resolveParam(options.headquartersDefense, 'headquartersDefense', rng));
   const variation = resolveParam(options.unitStatVariation, 'unitStatVariation', rng);
+
+  // 炮火参数（仅歼灭/大逃杀注入配置）：固定序消费 rng 保证确定性。
+  const artillery = {
+    startRound: Math.round(resolveParam(options.artilleryStartRound, 'artilleryStartRound', rng)),
+    intervalRounds: Math.round(resolveParam(options.artilleryIntervalRounds, 'artilleryIntervalRounds', rng)),
+    damage: Math.round(resolveParam(options.artilleryDamage, 'artilleryDamage', rng)),
+    minimumSafeRadius: Math.round(resolveParam(options.artilleryMinimumSafeRadius, 'artilleryMinimumSafeRadius', rng)),
+  };
 
   // 地形：保护出生区与据点，抽样后校验连通性，失败重抽。
   const density = resolveParam(options.terrainDensity, 'terrainDensity', rng);
@@ -356,10 +397,10 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
   // startingUnitCount 收窄/固定数量（v3.3.0 边角采样用），省略时走默认范围 [0,4] 均匀随机。
   const startingUnitCount = Math.round(resolveParam(options.startingUnitCount, 'startingUnitCount', rng));
   const startingUnits = sampleStartingUnits(rng, startingUnitCount);
-  const spawnSlots = buildSpawnSlots(spawnPositions, playableSet, controlPoints, symmetric, startingUnits);
+  const spawnSlots = buildSpawnSlots(mode, spawnPositions, playableSet, controlPoints, symmetric, startingUnits);
 
   const config = {
-    mode: 'standard',
+    mode,
     name: '随机战场',
     description: `种子 ${seedText} · 半径 ${radius} · ${playerCount} 人 · ${symmetric ? '对称' : '非对称'}`,
     grid: 'hex',
@@ -392,6 +433,8 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
       adjudicationWeights: sampleAdjudicationWeights(rng),
       controlPointTypes: sampleControlPointTypes(rng),
     },
+    // 歼灭/大逃杀注入炮火收缩圈配置；minimumSafeRadius < radius 已由边界表保证（radius ≥ 5）。
+    ...(isAnnihilationMode(mode) ? { annihilation: { artillery } } : {}),
   };
 
   // 最终兜底校验：任何生成结果都必须通过与静态地图相同的验证。
@@ -425,6 +468,52 @@ interface GeneratedControlPoint {
   kind: ControlPointKind;
   q: number;
   r: number;
+}
+
+function topUpControlPoints(
+  existing: GeneratedControlPoint[],
+  spawnPositions: Position[],
+  target: number,
+  playableSet: Set<string>,
+  taken: Set<string>,
+): GeneratedControlPoint[] {
+  const points = [...existing];
+  // 在已有据点/出生位的邻近格补放，保持分布相对均匀；间距规则放宽，只要求格位空闲。
+  const claimable = (pos: Position): boolean => playableSet.has(hexKey(pos)) && !taken.has(hexKey(pos));
+  const candidatePool = (): Position[] => {
+    const anchors = [...points.map(cp => ({ q: cp.q, r: cp.r })), ...spawnPositions];
+    const seen = new Set<string>();
+    const list: Position[] = [];
+    for (const anchor of anchors) {
+      for (const offset of HEX_OFFSETS) {
+        const cell = { q: anchor.q + offset.q, r: anchor.r + offset.r };
+        const key = hexKey(cell);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        list.push(cell);
+      }
+    }
+    return list;
+  };
+  while (points.length < target) {
+    let placed = false;
+    for (const pos of candidatePool()) {
+      if (!claimable(pos)) continue;
+      const kind = KIND_CYCLE[points.length % KIND_CYCLE.length];
+      points.push({
+        id: `cp_${points.length + 1}`,
+        name: `${KIND_NAMES[kind]} ${points.length + 1}`,
+        kind,
+        q: pos.q,
+        r: pos.r,
+      });
+      taken.add(hexKey(pos));
+      placed = true;
+      break;
+    }
+    if (!placed) break;
+  }
+  return points;
 }
 
 function placeControlPoints(
@@ -593,12 +682,16 @@ function allReachable(
 }
 
 function buildSpawnSlots(
+  mode: GameMode,
   spawnPositions: Position[],
   playableSet: Set<string>,
   controlPoints: GeneratedControlPoint[],
   symmetric: boolean,
   startingUnits: UnitType[],
 ): SpawnSlotConfig[] {
+  // 歼灭/大逃杀的出生位绑定居留据点（store 据此设据点归属）：据点数足够时按序唯一分配。
+  const annihilate = isAnnihilationMode(mode)
+    && controlPoints.length > 0 && controlPoints.length >= spawnPositions.length;
   const occupied = new Set<string>(controlPoints.map(cp => hexKey(cp)));
   const slots: SpawnSlotConfig[] = new Array(spawnPositions.length);
   const placed: boolean[] = new Array(spawnPositions.length).fill(false);
@@ -634,11 +727,13 @@ function buildSpawnSlots(
       slots[index] = {
         id: `slot_${String.fromCharCode(97 + index)}`,
         headquarters: { q: hq.q, r: hq.r },
+        ...(annihilate ? { controlPointId: controlPoints[index].id } : {}),
         startingUnits: assignUnits(cells),
       };
       slots[mirrorIndex] = {
         id: `slot_${String.fromCharCode(97 + mirrorIndex)}`,
         headquarters: { q: mirrorHq.q, r: mirrorHq.r },
+        ...(annihilate ? { controlPointId: controlPoints[mirrorIndex].id } : {}),
         startingUnits: assignUnits(cells.map(cell => mirror(cell))),
       };
       placed[index] = true;
@@ -647,6 +742,7 @@ function buildSpawnSlots(
       slots[index] = {
         id: `slot_${String.fromCharCode(97 + index)}`,
         headquarters: { q: hq.q, r: hq.r },
+        ...(annihilate ? { controlPointId: controlPoints[index].id } : {}),
         startingUnits: assignUnits(unitCellsFor(hq)),
       };
       placed[index] = true;

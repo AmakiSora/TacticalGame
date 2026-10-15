@@ -78,6 +78,45 @@ describe('random map game creation API', () => {
     }
   });
 
+  it('passes game mode and artillery options through to the lobby', async () => {
+    app = await startTestServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      payload: {
+        mapId: 'random',
+        maxPlayers: 2,
+        playerName: 'A',
+        random: {
+          seed: 'api-mode',
+          mode: 'royale',
+          artilleryStartRound: 4,
+          artilleryIntervalRounds: 2,
+          artilleryDamage: 15,
+          artilleryMinimumSafeRadius: 1,
+        },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const created = res.json() as { lobby: { mode: string } };
+    expect(created.lobby.mode).toBe('royale');
+    const config = globalStore.list()
+      .map(id => globalStore.get(id)!)
+      .find(game => game.config.mode === 'royale');
+    expect(config).toBeDefined();
+    expect(config!.config.annihilation).toMatchObject({
+      artillery: {
+        startRound: 4,
+        intervalRounds: 2,
+        damage: 15,
+        minimumSafeRadius: 1,
+      },
+    });
+    // 歼灭/大逃杀出生位按序绑定唯一据点。
+    const boundIds = config!.config.spawnSlots.map((slot: { controlPointId?: string }) => slot.controlPointId);
+    expect(new Set(boundIds).size).toBe(config!.config.spawnSlots.length);
+  });
+
   it('rejects invalid player counts and malformed random options', async () => {
     app = await startTestServer();
     const badCount = await app.inject({

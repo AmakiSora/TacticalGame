@@ -23,8 +23,15 @@ describe('random map creation UI', () => {
       'radius', 'terrainDensity', 'controlPointCount', 'maxTurns', 'actionsPerTurn',
       'unitStatVariation', 'startingSupplies', 'baseIncome',
       'headquartersHp', 'headquartersDefense',
+      'artilleryStartRound', 'artilleryIntervalRounds', 'artilleryDamage', 'artilleryMinimumSafeRadius',
     ]) {
       expect(keys).toContain(key);
+    }
+    // 游戏模式下拉：标准/歼灭/同时回合/大逃杀，留空即默认标准。
+    const source = read('public/random-map-ui.js');
+    expect(source).toContain('id="rmo-game-mode"');
+    for (const mode of ['standard', 'annihilation', 'simultaneous', 'royale']) {
+      expect(source).toContain(`value: '${mode}'`);
     }
     expect(typeof ui.collectRandomOptions).toBe('function');
     expect(typeof ui.renderRandomMapCard).toBe('function');

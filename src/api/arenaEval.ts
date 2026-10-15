@@ -435,7 +435,8 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
   // 参评者清单（模型 + 内置算法）：评估控制台的勾选数据源，与 /api/rl/models、
   // /api/algorithms 同源，前端一个请求即可拿全。
   // 算法只列标准模式：评估跑批（round_robin → evaluate_cross → local-worker）
-  // 的地图池与进程内引擎仅支持标准模式，非标准模式算法（如 random-sim）参评必然失败。
+  // 的地图池与进程内引擎目前仅按标准模式对局，非标准模式算法（如 random-sim）参评必然失败。
+  // 注：随机地图生成器本身已支持全部四种模式，此处限制仅针对评估链路。
   app.get('/api/arena/participants', async () => ({
     models: refreshRlModels(),
     algorithms: Object.entries(ALGORITHM_BOTS)

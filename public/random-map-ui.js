@@ -16,6 +16,18 @@
     { key: 'baseIncome', label: '基础收入', step: 1, defMin: 6, defMax: 14 },
     { key: 'headquartersHp', label: '总部血量', step: 10, defMin: 80, defMax: 240 },
     { key: 'headquartersDefense', label: '总部防御', step: 1, defMin: 3, defMax: 10 },
+    { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, defMin: 3, defMax: 8 },
+    { key: 'artilleryIntervalRounds', label: '炮击间隔', step: 1, defMin: 1, defMax: 2 },
+    { key: 'artilleryDamage', label: '炮击伤害', step: 1, defMin: 10, defMax: 25 },
+    { key: 'artilleryMinimumSafeRadius', label: '安全区最小半径', step: 1, defMin: 0, defMax: 1 },
+  ];
+
+  const GAME_MODES = [
+    { value: '', label: '标准（默认）' },
+    { value: 'standard', label: '标准' },
+    { value: 'annihilation', label: '歼灭（炮火缩圈）' },
+    { value: 'simultaneous', label: '同时回合' },
+    { value: 'royale', label: '大逃杀（同时×缩圈）' },
   ];
 
   function esc(value) {
@@ -54,6 +66,12 @@
             <span class="switch-slider"></span>
           </span>
         </label>
+        <div class="field rmo-mode-field">
+          <label for="rmo-game-mode">游戏模式</label>
+          <select id="rmo-game-mode">
+            ${GAME_MODES.map(mode => `<option value="${mode.value}"${mode.value === '' ? ' selected' : ''}>${mode.label}</option>`).join('')}
+          </select>
+        </div>
         <div class="field rmo-seed-field">
           <label for="rmo-seed">种子（留空每次随机）</label>
           <input id="rmo-seed" maxlength="64" placeholder="相同种子生成相同地图" autocomplete="off" />
@@ -80,12 +98,12 @@
           <span class="meta-tag" data-label="地形与出生点">⊘ 随机</span>
           <span class="meta-tag" data-label="玩家数">⚑ 2-8</span>
           <span class="meta-tag" data-label="回合/行动点">⏱ 随机</span>
-          <span class="meta-tag" data-label="游戏模式">标准</span>
+          <span class="meta-tag" data-label="游戏模式">四种可选</span>
         </span>
       </span>
       <span class="map-card-tooltip" role="tooltip">
         <span class="tooltip-name">随机地图 <span class="tooltip-id">random</span></span>
-        <span class="tooltip-desc">服务端随机生成地形、复活点、回合数、行动点与兵种数值；参数可固定、可用种子复现</span>
+        <span class="tooltip-desc">支持标准/歼灭/同时回合/大逃杀四种模式，随机生成地形、复活点、回合数、行动点与兵种数值；参数可固定、可用种子复现</span>
       </span>
     </button>`;
   }
@@ -214,6 +232,10 @@
       const seed = document.getElementById('rmo-seed');
       const seedText = seed ? seed.value.trim() : '';
       if (seedText) options.seed = seedText;
+
+      const gameMode = document.getElementById('rmo-game-mode');
+      const modeValue = gameMode ? gameMode.value : '';
+      if (modeValue) options.mode = modeValue;
 
       document.querySelectorAll('.rmo-param').forEach(row => {
         const key = row.dataset.key;

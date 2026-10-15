@@ -68,6 +68,87 @@ describe('random map generator', () => {
     }
   });
 
+  it('defaults to standard mode without an annihilation block', () => {
+    const config = generateRandomMapConfig({ seed: 'mode-default' }, 2);
+    expect(config.mode).toBe('standard');
+    expect('annihilation' in config).toBe(false);
+  });
+
+  it('supports all four game modes with mode-appropriate artillery blocks', () => {
+    resetConfig();
+    loadMaps();
+    const expectations = {
+      standard: { annihilation: false },
+      annihilation: { annihilation: true },
+      simultaneous: { annihilation: false },
+      royale: { annihilation: true },
+    } as const;
+    for (const [mode, expected] of Object.entries(expectations)) {
+      const config = generateRandomMapConfig({ seed: `mode-${mode}`, mode: mode as any }, 2);
+      expect(config.mode, mode).toBe(mode);
+      expect(('annihilation' in config), mode).toBe(expected.annihilation);
+      if (expected.annihilation) {
+        // 歼灭/大逃杀必须带炮火配置且数值在边界表范围内。
+        expect(config.annihilation!.artillery).toMatchObject({
+          startRound: expect.any(Number),
+          intervalRounds: expect.any(Number),
+          damage: expect.any(Number),
+          minimumSafeRadius: expect.any(Number),
+        });
+        const artillery = config.annihilation!.artillery;
+        expect(artillery.startRound).toBeGreaterThanOrEqual(1);
+        expect(artillery.intervalRounds).toBeGreaterThanOrEqual(1);
+        expect(artillery.damage).toBeGreaterThanOrEqual(1);
+        expect(artillery.minimumSafeRadius).toBeGreaterThanOrEqual(0);
+        expect(artillery.minimumSafeRadius).toBeLessThan(config.radius);
+      }
+      // 歼灭/大逃杀的出生位按序绑定唯一据点（store 据此设据点归属）。
+      if (expected.annihilation && config.controlPoints.length >= config.spawnSlots.length) {
+        const boundIds = config.spawnSlots.map(slot => slot.controlPointId);
+        expect(new Set(boundIds).size, mode).toBe(config.spawnSlots.length);
+        for (const id of boundIds) {
+          expect(config.controlPoints.some(cp => cp.id === id), `${mode}:${id}`).toBe(true);
+        }
+      }
+      expect(() => validateGeneratedMap(JSON.parse(JSON.stringify(config))), mode).not.toThrow();
+    }
+    resetConfig();
+    loadMaps();
+  });
+
+  it('honors fixed artillery parameters in annihilation mode', () => {
+    const config = generateRandomMapConfig({
+      seed: 'artillery-fixed',
+      mode: 'annihilation',
+      artilleryStartRound: 7,
+      artilleryIntervalRounds: 2,
+      artilleryDamage: 18,
+      artilleryMinimumSafeRadius: 1,
+    }, 2);
+    expect(config.annihilation!.artillery).toEqual({
+      startRound: 7,
+      intervalRounds: 2,
+      damage: 18,
+      minimumSafeRadius: 1,
+    });
+  });
+
+  it('tops up control points to cover spawn slots in annihilation mode', () => {
+    // 请求 1 个据点（< 出生位数 2）：歼灭模式必须保证据点数 ≥ 出生位数，否则
+    // loader 的「每个出生位绑定唯一据点」约束无法满足。
+    const config = generateRandomMapConfig({
+      seed: 'cp-short',
+      mode: 'annihilation',
+      controlPointCount: 1,
+    }, 2);
+    expect(config.controlPoints.length).toBeGreaterThanOrEqual(config.spawnSlots.length);
+    const ids = new Set(config.spawnSlots.map(slot => slot.controlPointId));
+    expect(ids.size).toBe(config.spawnSlots.length);
+    for (const id of ids) {
+      expect(config.controlPoints.some(cp => cp.id === id)).toBe(true);
+    }
+  });
+
   it('always generates configs that pass the standard map validation', () => {
     resetConfig();
     loadMaps();
@@ -177,12 +258,16 @@ describe('sanitizeRandomOptions', () => {
     expect(sanitizeRandomOptions({ seed: 'abc', symmetric: false, maxTurns: 20 }))
       .toEqual({ seed: 'abc', symmetric: false, maxTurns: 20 });
     expect(sanitizeRandomOptions({ radius: [5, 8] }).radius).toEqual([5, 8]);
+    expect(sanitizeRandomOptions({ mode: 'royale' })).toEqual({ mode: 'royale' });
   });
 
   it('clamps out-of-range values and collapses ranges', () => {
     expect(sanitizeRandomOptions({ radius: 999 }).radius).toBe(12);
     expect(sanitizeRandomOptions({ maxTurns: [50, 5] }).maxTurns).toEqual([5, 50]);
     expect(sanitizeRandomOptions({ actionsPerTurn: [7, 7] }).actionsPerTurn).toBe(7);
+    expect(sanitizeRandomOptions({ artilleryDamage: 999 })).toEqual({ artilleryDamage: 30 });
+    expect(sanitizeRandomOptions({ artilleryStartRound: [0, 99] }).artilleryStartRound).toEqual([1, 10]);
+    expect(sanitizeRandomOptions({ artilleryMinimumSafeRadius: -1 })).toEqual({ artilleryMinimumSafeRadius: 0 });
   });
 
   it('rejects malformed options', () => {
@@ -192,6 +277,8 @@ describe('sanitizeRandomOptions', () => {
     expect(() => sanitizeRandomOptions({ maxTurns: Number.NaN })).toThrow();
     expect(() => sanitizeRandomOptions({ symmetric: 'yes' })).toThrow('symmetric');
     expect(() => sanitizeRandomOptions({ seed: '' })).toThrow('seed');
+    expect(() => sanitizeRandomOptions({ mode: 'chaos' })).toThrow('random.mode must be one of');
+    expect(() => sanitizeRandomOptions({ mode: 42 })).toThrow('random.mode must be one of');
     expect(() => sanitizeRandomOptions({ bogus: 1 })).toThrow('unknown random option');
   });
 });

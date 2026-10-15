@@ -335,7 +335,7 @@ class HexGameEnv(gym.Env):
         种子始终从 np_random 派生，保证 gym seed 下整条训练序列可复现；
         若显式传入了 seed 则作为固定种子使用（所有回合同一张图）。
 
-        v4.0.0：RL_RANDOM_CORNER_BOOST（JSON，如 ``{"p": 0.18}``）对随机域做
+        v3.3.0：RL_RANDOM_CORNER_BOOST（JSON，如 ``{"p": 0.18}``）对随机域做
         **联合边角重要性采样**。背景：forge 生态位（短 maxTurns × 低 HQ 血 ×
         6 据点 × 满编开局）各维边缘分布虽已进随机域（v3.1.1 拓宽），但联合
         命中率是边缘概率的乘积 <<1%，导致连续两代 forge 0:48 崩塌。以

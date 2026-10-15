@@ -3,6 +3,57 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-10-12 · v3.4.1 探针结项：蒸馏冷启动接住了 PPO 续训，但能力验收不通过，放弃该模型
+
+**一句话**：v3.4.1 探针（算法教师蒸馏件 → PPO 续训至 1,500,000 帧，hex_transformer 3层×d192 +
+net512，2.15M 参数）**工程目的达成、能力验收不合格** ⇒ 放弃，不替换 champion（仍为 v3.1.1）。
+
+**工程面（探针原本要回答的问题）**：蒸馏件价值头 holdout RMSE 2.01 / return std 6.27 过闸门后接
+PPO 续训，1.5M 帧全程 `explained_variance` 0.49–0.56（止损线 0.3 未触及）、
+`opponent/rejection_rate_window` 恒 0 ⇒「首轮 GAE 会摧毁克隆策略」这一担心被证伪，
+蒸馏→续训通道本身可用。
+
+**能力面（全部在 3.6.1 规则下实测）**：
+
+- **头对头**（random 图，192 局 × 两套 `--seed-prefix`）：对 v3.0.3 8.3% / 10.4%
+  （Wilson lb 5.2% / 6.8%），对 v3.1.1 5.2% / 8.9%（lb 2.9% / 5.6%）。两套同向，
+  远低于「lb > 50%」晋级线。
+- **静态图初筛**（各 48 局，对手 `algo:threat@v1`）：danger-close 48:0（100%，lb 92.6%），
+  **default 0:48、breach 0:48、dual-lanes 0:48** ⇒ 触发「任一图 0%」一票否决，
+  与 v3.3.0「default/breach/desert 三张 0%」同构。
+- **循环赛排名**（4 模型 × 3 算法 × 5 图 × 24 局 = 2,520 局，每位 720 局均衡）：
+  `field` 75.3% > `threat` 68.1% > `greedy` 61.1% > v3.1.1 54.9% > v3.0.3 51.4% >
+  v3.4.0_s1 21.7% > **v3.4.1 17.6%（7/7 垫底）**。
+- 探针分图（对全部对手，每图 144 局）：danger-close 41.7%、breach 33.3%、random 13.2%、
+  default 0/144、dual-lanes 0/144；分座位先手 23.1% / 后手 12.2%（差 10.9pt，门槛里唯一达标项）。
+
+**比排名更值钱的两条**：
+
+1. **v3.4.x 整代都在榜尾**：8M 步的正式件 v3.4.0_s1 也只有 21.7%，被 5M/8.8M 的 v3.0.3/v3.1.1
+   压住 30 个百分点。这不像步数不够，更像「大容量 transformer 提取器 + 蒸馏冷启动」这条路线
+   在这张卷子上系统性不及格 —— 下一代选题该先回答「v3.4.0 为什么退化」，而不是继续加步数。
+2. **静态图 0% 不只是配比病**：训练混合里 danger-close / default / breach / dual-lanes 权重
+   同为 0.05，成绩却分化成 100% / 0% / 0% / 0%（danger-close 甚至在随机图为主的分布下学得很好）。
+   同权重下分化到这个程度，说明瓶颈不是「静态图权重太小所以没梯度」，而是各图独有机制
+   （工事与炮火、双线分兵）能否被随机图学到的表征覆盖 —— v3.3.0 结论里那句
+   「静态图权重只有 0.05」的解释需要重新检验。
+
+**口径与保留意见**：评测用的引擎代码是同步到训练机的 3.6.1 树（原仓库快照是 3.5.5，直接拿它
+验收量的是旧规则）；地图只覆盖 standard 模式 5 张 —— `narrow-road` 属 royale、`artillery-zone`
+属 annihilation，`local-worker` 基线只支持 standard，这两张是**覆盖缺口**而非失败项。榜上算法
+参与者跟着 3.5.x/3.6.x 一路改过规则，而 v3.x 模型是旧规则下冻结的产物，所以「算法压制
+模型」里混着规则漂移红利，不能读成「算法强于 RL」。
+
+**运维副产品**（本代训练跨 5 次平台 8h 强制关机，工具沉淀在训练机 NAS）：暂停脚本
+`rl/test-output/launchers/pause_train_v341_probe.sh`（冻结 supervisor → 等断点落地 → SIGKILL
+冻结态 supervisor → 杀进程组 → 断点 zip 完整性校验；进程识别需排除僵尸与 `bash -c` 外壳，
+否则「杀了尸体、真训练照跑」）；断点密度 `RL_SAVE_FREQ` 12500→2500（每 2 万帧一个，硬停损失
+从 ~3.7h 降到 ~45min）；`RL_BEST_WARMUP_STEPS` 按「本次 learn() 起算」计步，尾程不足 30 万帧的
+续训会让 best 选择全程被抑制、`best/best_model.zip` 停留在上一轮 —— 交付须取端点断点。
+交付件 `hex_ppo_v3.4.1_probe_1500000.zip`（lr 闭包已清洗为常数）与各份 stats JSONL 留在
+`/mnt/workspace/game361/rl/test-output/stats/`，**未写入 `arena/matches.jsonl`**，线上排行榜不受影响。
+
+
 ## 2026-09-24 · 模型命名变更：四段式 → 三段式，步数段改记交付断点
 
 **新规范**：`hex_ppo_<版本>_<日期>_<步数>.zip`（旧：`hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数>`）。
@@ -33,12 +84,12 @@
 **注意**：`round_robin.py` 的 `MODEL_RE` 与 `modelStatus.mjs` 的 `MODEL_VERSION_RE` 是
 宽松前缀正则（`^hex_ppo_(v<数字>.<数字>.<数字>)_`），三段式天然兼容，未改动。
 
-## 2026-09-24 · v4.0.0 结项：从零训练 + 大容量 + 算法教师蒸馏，静态图三张 0% 未通过验收
+## 2026-09-24 · v3.3.0 结项：从零训练 + 大容量 + 算法教师蒸馏，静态图三张 0% 未通过验收
 
 **一句话**：三条结构性改动（从零 / 容量 0.87M→1.44M / 算法教师蒸馏）全部工程落地成功
 （吞吐 240–260 fps、无探索死锁、算法对抗 41/48/53%），但对 v3.1.1 只到 **46.6%**
 （lb 41.7%）、全图 **default/breach/desert 三张静态图 0%** ⇒ **未过线，champion 仍为 v3.1.1**。
-详见 `rl/docs/plans/v4.0.0_conclusion.md` 与 `rl/docs/models/v4.0.0.md`。
+详见 `rl/docs/plans/v3.3.0_conclusion.md` 与 `rl/docs/models/v3.3.0.md`。
 
 **本代最重要的产出是证伪了立项前提**：计划依据「历代模型对算法只有 16.5%」把「算法对抗」
 定为核心目标，但同尺子复测发现该数字是 **arena 7 图聚合的假象**——v3.1.1 在随机图上对
@@ -74,9 +125,9 @@ forge 41%）把总数拉低到 40%（含 random 的 54%）。**「对算法弱�
 并单调拉开（14.2M：rule 64% vs 72%、threat 33% vs 41%、field 39% vs 59%）；
 `explained_variance` 0.64 → 0.46、`ep_rew_mean` 5.5–6.9 → 4.83。机理：**收敛后抬 LR
 （8e-05 过高）+ 削减自对弈份额**，两者同时破坏已收敛策略。安全值仍是 5e-05（v3.2.0 champ
-与 v4.0.0 S2 均用此值）。
+与 v3.3.0 S2 均用此值）。
 
-**病灶记录：步兵海复发**。default 图 96 局统计：v4.0.0 步兵部署占比 **81%**、游侠 14%，
+**病灶记录：步兵海复发**。default 图 96 局统计：v3.3.0 步兵部署占比 **81%**、游侠 14%，
 对手 v3.1.1 为 53%/47%；造成伤害 774 vs 1111、HQ 伤害 75 vs 133。根因是 A5
 （`RL_REWARD_NEW_UNIT_TYPE`）只奖励**每兵种首次部署**，14M 帧长跑后完全失效。
 **跨代复发，下一轮值得单独消融**（改为持续性多样性奖励）。
@@ -92,13 +143,13 @@ forge 41%）把总数拉低到 40%（含 random 的 54%）。**「对算法弱�
 ④ 算法占比回落 20%。
 
 
-## 2026-09-22 · v4.1.0 前置：CUDA 服务器训练设施——TF32/torch.compile 开关 + 资源监控回调（无观测/动作语义变更）
+## 2026-09-22 · v3.4.0 前置：CUDA 服务器训练设施——TF32/torch.compile 开关 + 资源监控回调（无观测/动作语义变更）
 
 **同日补丁**：`eval_worker.py` 的 `evaluate()` 补 `torch.set_num_threads(1)`——评估 worker 是
 CPU 逐帧串行推理，torch 默认按核数开线程，8 核服务器上实测单评估进程吃 5.3 核，
 与 8 环境 rollout 争抢导致主训练 fps 165→46（A10 实例，96 局评估跑 25+ 分钟）。
 训练 worker 子进程（`train.py` `make_train_env._init`）早已单线程化，评估侧漏了。
-对本地 6 核 Windows 机同样有益（v4.0.0 S2 在跑，恢复时自带此修复，无行为语义变化）。
+对本地 6 核 Windows 机同样有益（v3.3.0 S2 在跑，恢复时自带此修复，无行为语义变化）。
 
 **同日补丁 2（A10 实测定论）**：`torch.set_num_threads(1)` 修复后 fps 依旧 ~48（非评估期）——
 补查 `top` 发现 **CPU 整机利用率仅 ~35%**、内存充裕、无 D 态进程 ⇒ 不是资源争抢，是
@@ -106,9 +157,9 @@ CPU 逐帧串行推理，torch 默认按核数开线程，8 核服务器上实�
 单线程延迟敏感型负载）。结论：该实例「8 核 A10」的 rollout 吞吐约为本地 6 核的 1/3
 （48fps vs 165fps），S1 8M 帧需 ~46h 而非 24h。预算修正：S1 8M + **S2 4M（累计 12M，
 launcher TARGET_TOTAL=12000000）**，总计 ~75h + 蒸馏/验收 ~8h ≈ 83h，余量给重启损耗。
-**v4.2.0 的中央推理服务器/引擎 Rust 化等结构性提速在此之前不划算；选型时应优先看单核频率而非核数/显存。**
+**v3.5.0 的中央推理服务器/引擎 Rust 化等结构性提速在此之前不划算；选型时应优先看单核频率而非核数/显存。**
 
-为 100 小时 CUDA 服务器（8 核 / 32GB / 24GB 显存）的 v4.1.0 从零训练（3 层×d192 + net_width 512，约 3.4M 参数）
+为 100 小时 CUDA 服务器（8 核 / 32GB / 24GB 显存）的 v3.4.0 从零训练（3 层×d192 + net_width 512，约 3.4M 参数）
 做的训练设施准备。**观测 6715 维 / `Discrete(155)` 不变，旧断点兼容，`bots.ts` 路由不变。**
 
 - `train.py` 新增 `PYTORCH_ALLOW_TF32=1`：`resolve_device()` 内开启
@@ -121,19 +172,19 @@ launcher TARGET_TOTAL=12000000）**，总计 ~75h + 蒸馏/验收 ~8h ≈ 83h，
 - `train.py` 新增 `ResourceMonitorCallback`（`RL_RESOURCE_MONITOR=1` 启用，**缺省关闭**）：
   每 `RL_EXPLORE_LOG_EVERY` 帧记录 `resource/gpu_mem_gb`（torch 显存峰值）、
   `resource/gpu_util_pct`（pynvml，可用时）、`resource/sys_mem_pct`（psutil，可用时）到 TB + stdout。
-  全部 best-effort，采集失败只降级该读数。缺省关闭是为保证 v4.0.0 等在途训练恢复后
+  全部 best-effort，采集失败只降级该读数。缺省关闭是为保证 v3.3.0 等在途训练恢复后
   日志流与启动时逐字节一致。
-  动机：32GB 内存服务器需要内存止损线（v4.0.0 S2 曾内存耗尽暴毙）；同时留下 GPU 利用率
+  动机：32GB 内存服务器需要内存止损线（v3.3.0 S2 曾内存耗尽暴毙）；同时留下 GPU 利用率
   时间线，用数据回答「PPO 采样瓶颈下 GPU 闲置是结构性还是可优化」。
-- 启动脚本（bash，gitignored 实验区）：`rl/test-output/launchers/run_train_v410_s1.sh`（从零 8M 帧）、
-  `run_train_v410_s2.sh`（续训 +8M 至 16M，LR 降档 1.5e-4→2e-5，对齐 v4.0.0 S2 评估节奏）、
-  `run_train_v410_b_mlp.sh`（对照轨：`RL_EXTRACTOR=mlp RL_NET_WIDTH=1024`，
+- 启动脚本（bash，gitignored 实验区）：`rl/test-output/launchers/run_train_v340_s1.sh`（从零 8M 帧）、
+  `run_train_v340_s2.sh`（续训 +8M 至 16M，LR 降档 1.5e-4→2e-5，对齐 v3.3.0 S2 评估节奏）、
+  `run_train_v340_b_mlp.sh`（对照轨：`RL_EXTRACTOR=mlp RL_NET_WIDTH=1024`，
   回答「Transformer 结构是否仍是必要项」——v3.1.0 已证伪容量假设，本对照补结构假设）。
   **S1/S2 均为 6 小时实例重启兜底版**：监督循环检测训练进程死亡后，自动从
   `rl/checkpoints/random/<run_id>/` 最新断点续跑、`RL_TIMESTEPS` 按剩余帧数重算，
   直到达到累计目标或连续 5 次无进展才放弃；`RL_SAVE_FREQ=62500`（8 环境下 = 每 50 万帧
   一个断点，关机最多丢 ~75 分钟）；全部产物落 `/mnt/workspace`（NAS 持久卷）。
-  每次实例重启后只需重新执行 `bash run_train_v410_s1.sh`，无需人工算增量。
+  每次实例重启后只需重新执行 `bash run_train_v340_s1.sh`，无需人工算增量。
 - 服务器要点（Alibaba PAI-DSW A10 实例，实测 2026-09-22）：ubuntu22.04 需 NodeSource 装
   Node 22（apt 默认 12 跑不动 tsx）；镜像预装 torch 2.13.0+cu130 与驱动 550.54.15
   （CUDA 12.4）不匹配 ⇒ `torch.cuda.is_available()=False`，需降级

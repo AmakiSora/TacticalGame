@@ -154,7 +154,7 @@ def tensorboard_available() -> bool:
 def latest_model_path(map_id: str) -> str:
     """最近修改的交付模型（`RL_LOAD_MODEL=latest` 用）。
 
-    v4.0.0（2026-09-24 命名变更）：文件名由四段式
+    v3.3.0（2026-09-24 命名变更）：文件名由四段式
     `hex_ppo_<版本>_<日期>_<地图>_<对手>_<步数>` 改为三段式
     `hex_ppo_<版本>_<日期>_<步数>`——**地图段已不存在**，因此本函数不再能按 map_id
     过滤。保持签名兼容（调用方仍传 map_id），改为按 mtime 取全部交付模型里最新的一个；
@@ -165,7 +165,7 @@ def latest_model_path(map_id: str) -> str:
     for root in ("rl/models", "rl"):
         for pattern in patterns:
             candidates += list(Path(root).glob(pattern))
-    # 新三段式（含 v1/v2/v3/v4 全部交付模型）
+    # 新三段式（含 v1/v2/v3 全部交付模型）
     candidates += list(Path("rl/models").glob("hex_ppo_v[0-9]*_[0-9]*_[0-9]*[KM].zip"))
     if not candidates:
         return ""
@@ -283,7 +283,7 @@ def resolve_device() -> str:
     device = "cuda" if requested == "auto" and available else requested
     if device == "auto":
         device = "cpu"
-    # v4.1.0：TF32 开关（Ampere+ matmul 加速，本地实测 PPO update 阶段 +18%）。
+    # v3.4.0：TF32 开关（Ampere+ matmul 加速，本地实测 PPO update 阶段 +18%）。
     # 缺省关闭保持与历代数值一致；CUDA 与 ROCm(HIP) 通用。
     if device == "cuda" and env_str("PYTORCH_ALLOW_TF32", "0") == "1":
         torch.backends.cuda.matmul.allow_tf32 = True
@@ -294,7 +294,7 @@ def resolve_device() -> str:
 
 
 def maybe_compile_policy(model: MaskablePPO) -> None:
-    """v4.1.0：RL_TORCH_COMPILE=1 时对策略网络做 torch.compile（reduce-overhead 走 CUDA Graph）。
+    """v3.4.0：RL_TORCH_COMPILE=1 时对策略网络做 torch.compile（reduce-overhead 走 CUDA Graph）。
 
     目标是消除 rollout 阶段每帧 batch=1 推理的 Python launch 开销（GPU 空闲大头）。
     图断裂/数值异常时不要用——Phase 3.5 冒烟实验先验证，缺省关闭不影响既有行为。
@@ -345,7 +345,7 @@ class AsyncEvalCallback(BaseCallback):
         # v3.2.0：评估是否加跑算法对手场景（RL_EVAL_ALGO，默认关；阶段 B 再开）。
         self.algo_scenarios = algo_scenarios
         self.algo_episodes = max(2, algo_episodes)
-        # v4.0.0（S3）：算法场景是否参与 best 选择键（RL_EVAL_ALGO_IN_SELECTION）。
+        # v3.3.0（S3）：算法场景是否参与 best 选择键（RL_EVAL_ALGO_IN_SELECTION）。
         # 开启条件 = 对算法胜率已稳定过 40%（详见 eval_worker.selection_score）。
         self.algo_in_selection = algo_in_selection
         self.eval_freq = max(1, eval_freq)
@@ -801,7 +801,7 @@ class ActionDiversityCallback(BaseCallback):
 
 
 class ResourceMonitorCallback(BaseCallback):
-    """v4.1.0：GPU/内存资源监控，回答「GPU 到底闲不闲」。
+    """v3.4.0：GPU/内存资源监控，回答「GPU 到底闲不闲」。
 
     PPO 是采样瓶颈算法（rollout 占 ~85% 墙钟），192GB/24GB 显存跑不满是结构性的；
     但没有时间线数据就分不清「结构性闲置」与「该优化的浪费」。每 RL_EXPLORE_LOG_EVERY
@@ -887,7 +887,7 @@ def main() -> None:
     # 同一份 v3.1.1，48 局给 46.3%、300 局给 54.3%。给算法场景设判据时应 ≥192 局，
     # 或配合 RL_EVAL_SEED_STRIDE 用大步长跨越整个种子空间。
     eval_algo_episodes = env_int("RL_EVAL_ALGO_EPISODES", 48, minimum=2)
-    # v4.0.0（S3）：算法场景是否参与 best 选择键。默认关（历史行为 = 只记录）。
+    # v3.3.0（S3）：算法场景是否参与 best 选择键。默认关（历史行为 = 只记录）。
     # 开启条件：对算法胜率已稳定过 40% —— 在那之前开启会让选择键被"对模型强但对
     # 算法弱"的早期断点主导（与 v3.0.2 的 OOD 教训同型，见 eval_worker.selection_score）。
     eval_algo_in_selection = env_int("RL_EVAL_ALGO_IN_SELECTION", 0, minimum=0) > 0
@@ -1011,7 +1011,7 @@ def main() -> None:
         raise FileNotFoundError(f"RL_LOAD_MODEL 指向的模型不存在: {load_path}")
 
     resume = bool(load_path)
-    # v4.0.0：从零训练世代必须显式关掉自动锚点。否则本分支会把 v2.7/v2.8 历史冠军
+    # v3.3.0：从零训练世代必须显式关掉自动锚点。否则本分支会把 v2.7/v2.8 历史冠军
     # 悄悄放进对手池（虽不加载为起点，但违背「不从任何历史版本开始」的约束，
     # 且 54 动作旧锚点经 map_v27_action 只覆盖候选 0，会拉偏新动作空间的探索）。
     no_auto_anchor = env_str("RL_NO_AUTO_ANCHOR", "0") == "1"
@@ -1119,8 +1119,8 @@ def main() -> None:
         # 探索监控：每 2 万帧（8 环境约 2500 次回调）汇报一次新候选选用率。
         explore_log_every = env_int("RL_EXPLORE_LOG_EVERY", 20_000, minimum=1)
         callbacks.append(ActionDiversityCallback(explore_log_every))
-        # 资源监控（v4.1.0）：同窗记录 GPU 显存/利用率与系统内存，数据留给容量与硬件决策。
-        # 开关默认关闭：v4.0.0 等在途训练恢复时保持与启动时逐字节一致的日志流。
+        # 资源监控（v3.4.0）：同窗记录 GPU 显存/利用率与系统内存，数据留给容量与硬件决策。
+        # 开关默认关闭：v3.3.0 等在途训练恢复时保持与启动时逐字节一致的日志流。
         if env_str("RL_RESOURCE_MONITOR", "0") == "1":
             callbacks.append(ResourceMonitorCallback(explore_log_every))
         if self_play_probability > 0:

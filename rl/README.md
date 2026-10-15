@@ -111,7 +111,7 @@ python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
 训练的主要瓶颈是 TypeScript 游戏模拟，不是神经网络；GPU 能加速 PPO 更新，但要明显
 提速还需要并行多个训练环境。
 
-### GPU 利用率（v4.1.0）
+### GPU 利用率（v3.4.0）
 
 PPO 是采样瓶颈算法：rollout（CPU 上 TS 引擎模拟 + 每帧 batch=1 推理）占墙钟约 85%，
 GPU 只在 rollout 间隙做 PPO 更新。因此**显存/利用率跑不满是结构性的**，即使把 update
@@ -128,7 +128,7 @@ GPU 只在 rollout 间隙做 PPO 更新。因此**显存/利用率跑不满是�
 
 训练期可用 `ResourceMonitorCallback` 的读数（`RL_RESOURCE_MONITOR=1` 启用，TB 前缀 `resource/`）持续观察：
 `gpu_mem_gb` / `gpu_util_pct` / `sys_mem_pct`。`sys_mem_pct > 85%` 是 32GB 内存
-服务器的止损线（v4.0.0 S2 曾因外部进程耗尽内存暴毙，服务器侧建议配 swap 兜底）。
+服务器的止损线（v3.3.0 S2 曾因外部进程耗尽内存暴毙，服务器侧建议配 swap 兜底）。
 
 新环境训练结果默认按以下格式命名：
 

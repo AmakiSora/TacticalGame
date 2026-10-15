@@ -30,7 +30,7 @@ export interface RandomMapOptions {
   headquartersDefense?: RandomParam;
   /**
    * 初始单位数量（0-4）。省略=0-4 均匀随机（现行为）。
-   * v4.0.0：RL 随机域联合边角重要性采样（RL_RANDOM_CORNER_BOOST）用它把
+   * v3.3.0：RL 随机域联合边角重要性采样（RL_RANDOM_CORNER_BOOST）用它把
    * 低 HQ×多据点×满编开局的熔炉系图生态位组合提频——各维边缘分布
    * 虽已拓宽，联合命中率是边缘概率的乘积 <<1%（v3.1.1 起旧版 forge 连续 0:48）。
    * 3.5.11 该图重做为 molten-throne（熔池王座，原 forge）：20 回合长局、24 据点、每方 6 单位起手，上述生态位
@@ -353,7 +353,7 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
   );
 
   // 出生位配置（总部 + 初始单位）。初始单位数量/构成全局抽一次、全员共享（公平性）。
-  // startingUnitCount 收窄/固定数量（v4.0.0 边角采样用），省略时走默认范围 [0,4] 均匀随机。
+  // startingUnitCount 收窄/固定数量（v3.3.0 边角采样用），省略时走默认范围 [0,4] 均匀随机。
   const startingUnitCount = Math.round(resolveParam(options.startingUnitCount, 'startingUnitCount', rng));
   const startingUnits = sampleStartingUnits(rng, startingUnitCount);
   const spawnSlots = buildSpawnSlots(spawnPositions, playableSet, controlPoints, symmetric, startingUnits);

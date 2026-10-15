@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-10T08:25:20.954Z",
+  "generatedAt": "2026-10-14T22:26:12.047Z",
   "source": {
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
     "matchCount": 48960,
@@ -885,7 +885,7 @@
         ]
       },
       {
-        "id": "hex_ppo_v4.0.0_20260923_11.4M.zip",
+        "id": "hex_ppo_v3.3.0_20260923_11.4M.zip",
         "games": 3528,
         "wins": 1830,
         "losses": 1698,
@@ -1224,10 +1224,10 @@
       "notes": "容量对照实验：仅把编码器扩为 3 层×128（其余与 v3.0.3 完全一致），whack-a-mole 未停止（forge 0:48 崩塌），容量假设证伪；文件名 1.5M 为训练终点，交付 best 为 10 万步断点（蒸馏克隆体跨场景平均胜率 52%【锚点场景 36%】即全程 best，之后 PPO 打散再爬回）"
     },
     {
-      "id": "hex_ppo_v4.0.0_20260923_11.4M.zip",
+      "id": "hex_ppo_v3.3.0_20260923_11.4M.zip",
       "kind": "model",
-      "short": "v4.0.0@11.4M",
-      "version": "v4.0.0",
+      "short": "v3.3.0@11.4M",
+      "version": "v3.3.0",
       "trainDate": "20260923",
       "trainMap": "random",
       "opponentType": "selfplay",
@@ -1244,9 +1244,9 @@
       "ratingHi": 1560,
       "winRate": 0.5187,
       "games": 3528,
-      "docRef": "models/v4.0.0.md",
+      "docRef": "models/v3.3.0.md",
       "docStatus": "验收未过线（静态图三张 0%，非 champion）",
-      "notes": "v4.0.0 候选产物（内部 num_timesteps = 11,400,000，文件名末段 14.0M 是训练目标步数）。从零训练：算法教师蒸馏冷启动（threat/greedy/field 经 decide 通道，不加载任何历史模型）+ hex_transformer 扩为 2 层×d128 / net_width 512（0.87M → 1.44M 参数，吞吐 240–260 fps）+ 无锚点（RL_NO_AUTO_ANCHOR=1）+ 随机域联合边角采样（RL_RANDOM_CORNER_BOOST）。S1 6M → S2 8M（7.15M 处宿主 OOM 后从 7.1M 无损恢复）→ S3 +3.0M 人工终止。对 v3.1.1 46.6%（lb 41.7%）、对 v3.0.3 53.6%（lb 48.6%），算法三场景 threat 41%/greedy 48%/field 53%；全图 480 局 default/breach/desert 三张静态图 0%（一票否决）、danger-close 96/96。病灶：步兵海复发（default 图步兵 81%/游侠 14%，对手 v3.1.1 为 53%/47%）——A5 novelty 是「每兵种首次部署」一次性奖励，14M 帧后失效。核心结论：「对算法 16.5%」是 7 图聚合假象（随机图上 v3.1.1 对同批算法 41%/45%/64%），静态图崩塌与算法对抗是同一个病。S1 中间产物与蒸馏断点已移入 rl/models/_archive_v4.0.0/（hex_ppo_v4.0.0_s1_6000000.zip 内部 5.7M、hex_ppo_v4.0.0_distilled.zip），未删除，可随时回滚"
+      "notes": "v3.3.0 候选产物（内部 num_timesteps = 11,400,000，文件名末段 14.0M 是训练目标步数）。从零训练：算法教师蒸馏冷启动（threat/greedy/field 经 decide 通道，不加载任何历史模型）+ hex_transformer 扩为 2 层×d128 / net_width 512（0.87M → 1.44M 参数，吞吐 240–260 fps）+ 无锚点（RL_NO_AUTO_ANCHOR=1）+ 随机域联合边角采样（RL_RANDOM_CORNER_BOOST）。S1 6M → S2 8M（7.15M 处宿主 OOM 后从 7.1M 无损恢复）→ S3 +3.0M 人工终止。对 v3.1.1 46.6%（lb 41.7%）、对 v3.0.3 53.6%（lb 48.6%），算法三场景 threat 41%/greedy 48%/field 53%；全图 480 局 default/breach/desert 三张静态图 0%（一票否决）、danger-close 96/96。病灶：步兵海复发（default 图步兵 81%/游侠 14%，对手 v3.1.1 为 53%/47%）——A5 novelty 是「每兵种首次部署」一次性奖励，14M 帧后失效。核心结论：「对算法 16.5%」是 7 图聚合假象（随机图上 v3.1.1 对同批算法 41%/45%/64%），静态图崩塌与算法对抗是同一个病。S1 中间产物与蒸馏断点已移入 rl/models/_archive_v3.3.0/（hex_ppo_v3.3.0_s1_6000000.zip 内部 5.7M、hex_ppo_v3.3.0_distilled.zip），未删除，可随时回滚"
     },
     {
       "id": "hex_ppo_v3.0.0_20260903_50K.zip",

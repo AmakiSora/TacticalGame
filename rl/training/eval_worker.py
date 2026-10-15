@@ -63,8 +63,8 @@ def build_scenarios(map_id: str, opponent_style: str, anchor_model: str, algo_sc
     field），它们只记录、初期不参与 best 选择（``_selection: False``，理由见
     ``selection_score``）。
 
-    v4.0.0（S3）：``algo_in_selection=True`` 把算法场景翻进 best 选择键。开启条件
-    是对算法胜率已稳定过 40%（v4.0.0 S2 交付点实测 threat 41%/greedy 49%/
+    v3.3.0（S3）：``algo_in_selection=True`` 把算法场景翻进 best 选择键。开启条件
+    是对算法胜率已稳定过 40%（v3.3.0 S2 交付点实测 threat 41%/greedy 49%/
     field 59%）；在那之前开启会让选择键被"对模型强但对算法弱"的早期断点主导
     （与 v3.0.2 的 OOD 教训同型）。
 
@@ -207,7 +207,7 @@ def evaluate(model_path: str, map_id: str, opponent_style: str, anchor_model: st
     from sb3_contrib import MaskablePPO
     import torch
 
-    # v4.1.0：评估 worker 是 CPU 逐帧推理，torch 默认按核数开线程会在 8 核机上
+    # v3.4.0：评估 worker 是 CPU 逐帧推理，torch 默认按核数开线程会在 8 核机上
     # 与训练 rollout 争抢（实测 eval 进程占 5+ 核、主训练 fps 165→46）。
     # 单线程足够：逐帧推理是串行依赖，多线程只加调度开销。
     torch.set_num_threads(1)
@@ -294,7 +294,7 @@ def main() -> None:
     # v3.2.0：算法对手评估场景（默认关，阶段 B 由 RL_EVAL_ALGO=1 打开）。
     parser.add_argument("--algo-scenarios", action="store_true")
     parser.add_argument("--algo-episodes", type=int, default=ALGO_EVAL_EPISODES)
-    # v4.0.0（S3）：算法场景是否参与 best 选择键（默认否 = 只记录）。
+    # v3.3.0（S3）：算法场景是否参与 best 选择键（默认否 = 只记录）。
     parser.add_argument("--algo-in-selection", action="store_true")
     args = parser.parse_args()
 

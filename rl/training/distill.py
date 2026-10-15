@@ -160,7 +160,7 @@ def masked_smoothed_ce(logits: torch.Tensor, mask: torch.Tensor, actions: torch.
 
 
 def collect_algo(args: argparse.Namespace) -> None:
-    """v4.0.0：规则算法教师（threat/greedy/field）蒸馏数据收集，不加载任何历史模型。
+    """v3.3.0：规则算法教师（threat/greedy/field）蒸馏数据收集，不加载任何历史模型。
 
     与模型教师 ``collect`` 的差别：教师动作经 worker 的 ``decide`` 通道取
     （引擎原生 payload），再映射回 155 动作表下标作为克隆标签；算法动作直接
@@ -495,7 +495,7 @@ def main() -> None:
     c.add_argument("--threads", type=int, default=2)
     c.set_defaults(func=collect)
 
-    ca = sub.add_parser("collect-algo", help="v4.0.0：规则算法教师（threat/greedy/field）收集蒸馏数据，不加载任何历史模型")
+    ca = sub.add_parser("collect-algo", help="v3.3.0：规则算法教师（threat/greedy/field）收集蒸馏数据，不加载任何历史模型")
     ca.add_argument("--teacher-algo", default="threat:0.4,greedy:0.35,field:0.25",
                     help="算法教师配比，格式同 RL_ALGO_MIX；每局双方座位独立抽取")
     ca.add_argument("--games", type=int, default=400)

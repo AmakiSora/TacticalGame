@@ -83,7 +83,7 @@ export const MODEL_META_BY_VERSION = {
   'v3.1.0': { trainMap: 'random', opponentType: 'selfplay' },
   'v3.1.1': { trainMap: 'random', opponentType: 'selfplay' },
   'v3.2.0': { trainMap: 'random', opponentType: 'selfplay' },
-  'v4.0.0': { trainMap: 'random', opponentType: 'selfplay' },
+  'v3.3.0': { trainMap: 'random', opponentType: 'selfplay' },
 };
 
 // 作废（retired）名单 MODEL_STATUS_BY_VERSION / RETIRED_VERSIONS 在 script/modelStatus.mjs

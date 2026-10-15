@@ -20,7 +20,7 @@ describe('random map creation UI', () => {
     expect(ui.RANDOM_MAP_ID).toBe('random');
     const keys = ui.PARAMS.map((param: { key: string }) => param.key);
     for (const key of [
-      'radius', 'terrainDensity', 'controlPointCount', 'maxTurns', 'actionsPerTurn',
+      'radius', 'waterDensity', 'wallDensity', 'controlPointCount', 'maxTurns', 'actionsPerTurn',
       'unitStatVariation', 'startingSupplies', 'baseIncome',
       'headquartersHp', 'headquartersDefense',
       'artilleryStartRound', 'artilleryIntervalRounds', 'artilleryDamage', 'artilleryMinimumSafeRadius',

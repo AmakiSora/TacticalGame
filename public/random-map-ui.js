@@ -7,7 +7,8 @@
 
   const PARAMS = [
     { key: 'radius', label: '地图半径', step: 1, defMin: 5, defMax: 10 },
-    { key: 'terrainDensity', label: '地形障碍密度', step: 0.01, defMin: 0.02, defMax: 0.12 },
+    { key: 'waterDensity', label: '水域密度', step: 0.01, defMin: 0.01, defMax: 0.07 },
+    { key: 'wallDensity', label: '阻挡密度', step: 0.01, defMin: 0.01, defMax: 0.05 },
     { key: 'controlPointCount', label: '据点数量', step: 1, defMin: 2, defMax: 6 },
     { key: 'maxTurns', label: '最大回合数', step: 1, defMin: 10, defMax: 30 },
     { key: 'actionsPerTurn', label: '每回合行动点', step: 1, defMin: 1, defMax: 8 },
@@ -60,7 +61,7 @@
       </div>
       <div class="rmo-row">
         <label class="field checkbox-field rmo-symmetric-field">
-          <span>对称公平</span>
+          <span title="2/3/4/6/8 人按 360/n 的最大六边形可用旋转对称（180°/120°/180°/60°/180°）；5/7 人无对称解，自动降级为非对称">对称公平</span>
           <span class="switch">
             <input id="rmo-symmetric" type="checkbox" checked />
             <span class="switch-slider"></span>

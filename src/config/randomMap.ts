@@ -17,10 +17,20 @@ export interface RandomMapOptions {
   seed?: number | string;
   /** 游戏模式：standard（默认）/ annihilation / simultaneous / royale。 */
   mode?: GameMode;
-  /** 旋转对称公平模式，默认 true。 */
+  /**
+   * 旋转对称公平模式，默认 true。取 360/n 与六边形网格自映射角（60° 整数倍）的最小公倍角：
+   * 2/4/8 人 → 180°、3 人 → 120°、6 人 → 60°；5/7 人无对称解，如实降级为非对称。
+   */
   symmetric?: boolean;
   radius?: RandomParam;
-  /** 水域+障碍占可玩格比例。 */
+  /** 水域占可玩格比例（不可通行、不可爆破）。 */
+  waterDensity?: RandomParam;
+  /** 阻挡（墙）占可玩格比例（不可通行，可被重装单位爆破拆除）。 */
+  wallDensity?: RandomParam;
+  /**
+   * @deprecated 旧的合并地形密度（水+墙）。仍接受，但仅当未显式给出 `waterDensity` / `wallDensity`
+   * 时生效，按水 60% / 墙 40% 拆分，等价于旧版取 `'water' : 'blocker' = 6 : 4` 的期望比例。
+   */
   terrainDensity?: RandomParam;
   controlPointCount?: RandomParam;
   maxTurns?: RandomParam;
@@ -59,6 +69,9 @@ interface ParamBound {
 /** 各参数的合法边界，同时是未指定时的默认随机范围。 */
 const PARAM_BOUNDS: Record<string, ParamBound> = {
   radius: { min: 4, max: 12, integer: true },
+  waterDensity: { min: 0, max: 0.4, integer: false },
+  wallDensity: { min: 0, max: 0.4, integer: false },
+  // 仅用于兼容旧调用方：解析后立即按 60/40 拆进 waterDensity / wallDensity，不参与生成。
   terrainDensity: { min: 0, max: 0.4, integer: false },
   controlPointCount: { min: 1, max: 9, integer: true },
   maxTurns: { min: 1, max: 99, integer: true },
@@ -77,7 +90,9 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
 
 const DEFAULT_RANGES: Record<string, [number, number]> = {
   radius: [5, 10],
-  terrainDensity: [0.02, 0.12],
+  // 水域 + 阻挡合计 ≈ 旧 terrainDensity 的 [0.02, 0.12]，保持默认地形总量不变。
+  waterDensity: [0.01, 0.07],
+  wallDensity: [0.01, 0.05],
   controlPointCount: [2, 6],
   maxTurns: [10, 30],
   actionsPerTurn: [1, 8],
@@ -170,11 +185,33 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
     options[key as Exclude<keyof RandomMapOptions, 'seed' | 'symmetric' | 'mode'>] = sanitizeParam(key, value, bound);
   }
 
+  // 兼容旧的合并地形密度：仅在未显式给出 waterDensity / wallDensity 时生效，按 60/40 拆分。
+  splitLegacyTerrainDensity(options);
+
   const known = new Set(['seed', 'symmetric', 'mode', ...Object.keys(PARAM_BOUNDS)]);
   for (const key of Object.keys(raw)) {
     if (!known.has(key)) throw new Error(`unknown random option "${key}"`);
   }
   return options;
+}
+
+/**
+ * 兼容旧的合并地形密度 `terrainDensity`：按水域 60% / 阻挡 40% 拆进 `waterDensity` / `wallDensity`
+ * （等价于旧版逐轨道取 `'water' : 'blocker' = 6 : 4` 的期望比例）。`sanitizeRandomOptions` 与
+ * `generateRandomMapConfig` 都会调用它——后者可被直接调用、绕过 sanitize。与新的细分参数同给则报错。
+ */
+function splitLegacyTerrainDensity(options: RandomMapOptions): void {
+  if (options.terrainDensity === undefined) return;
+  if (options.waterDensity !== undefined || options.wallDensity !== undefined) {
+    throw new Error('random.terrainDensity is deprecated and cannot be combined with waterDensity/wallDensity');
+  }
+  const share = (param: RandomParam, ratio: number): RandomParam => {
+    const round = (value: number): number => Number(value.toFixed(4));
+    return Array.isArray(param) ? [round(param[0] * ratio), round(param[1] * ratio)] : round(param * ratio);
+  };
+  options.waterDensity = share(options.terrainDensity, 0.6);
+  options.wallDensity = share(options.terrainDensity, 0.4);
+  delete options.terrainDensity;
 }
 
 function sanitizeParam(key: string, value: unknown, bound: ParamBound): RandomParam {
@@ -280,16 +317,59 @@ function cubeRound(qf: number, rf: number): Position {
   const ds = Math.abs(s - sf);
   if (dq > dr && dq > ds) q = -r - s;
   else if (dr > ds) r = -q - s;
-  return { q, r };
+  // Math.round(-0.4) 会得到 -0；不归一就会让 hexKey 出现 "-0,3" 与 "0,3" 两套键而查表失配。
+  return { q: nz(q), r: nz(r) };
 }
 
+/** 归一 -0：避免 hexKey 出现 "-0,3" 与 "0,3" 两套键，令格位查表失配。 */
+function nz(value: number): number {
+  return value === 0 ? 0 : value;
+}
+
+/** 180° 点对称（绕中心），等价于旋转 3×60°；也用于「朝中心」方向计算。 */
 function mirror(pos: Position): Position {
-  return { q: -pos.q, r: -pos.r };
+  return { q: nz(-pos.q), r: nz(-pos.r) };
 }
 
-/** 180° 旋转对称的半区判定；原点 (0,0) 是唯一不动点。 */
-function inHalfPlane(pos: Position): boolean {
-  return pos.q < 0 || (pos.q === 0 && pos.r < 0);
+/** 60° 旋转在六边形网格上恰好是整格映射（轴向坐标）：(q, r) → (-r, q + r)。 */
+function rotate60(pos: Position): Position {
+  return { q: nz(-pos.r), r: nz(pos.q + pos.r) };
+}
+
+/** 绕中心旋转 steps×60°（steps 可为负）。 */
+function rotateSteps(pos: Position, steps: number): Position {
+  const normalized = ((steps % 6) + 6) % 6;
+  let result = { q: pos.q, r: pos.r };
+  for (let i = 0; i < normalized; i++) result = rotate60(result);
+  return result;
+}
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+interface Symmetry {
+  /** 对称扇区数 m：地图切成 m 个全等扇区，绕中心旋转 360/m 度互为镜像。 */
+  sectors: number;
+  /** 每个扇区对应的 60° 步数 r = 6/m。 */
+  step60: number;
+}
+
+/**
+ * 玩家数可用的旋转对称。六边形网格只在 60° 的整数倍旋转下自映射，而 n 个等分出生位需要
+ * 每 360/n 度互相对应；两者取最小公倍角 r×60°（r = 6/gcd(n,6)）。r 取到 6 即只剩恒等变换，
+ * 说明该人数在这张网格上根本没有对称解（5、7 人），返回 null 交由调用方如实降级。
+ * 结果：2/4/8 人 → 180°（m=2）；3 人 → 120°（m=3）；6 人 → 60°（m=6）。
+ */
+function symmetryFor(playerCount: number): Symmetry | null {
+  const step60 = 6 / gcd(playerCount, 6);
+  if (step60 >= 6) return null;
+  return { sectors: 6 / step60, step60 };
+}
+
+/** 单个格子所在的对称轨道（绕中心旋转整圈的 m 个落点；中心点轨道退化为自身）。 */
+function orbitOf(pos: Position, symmetry: Symmetry): Position[] {
+  return Array.from({ length: symmetry.sectors }, (_, j) => rotateSteps(pos, j * symmetry.step60));
 }
 
 function pixelAngle(pos: Position): number {
@@ -333,13 +413,21 @@ const HEX_OFFSETS: Position[] = [
  * 内部会反复重试地形抽样直到所有出生位/据点经可通行格互相连通，
  * 因此返回值始终可玩；失败兜底是清空障碍地形。
  */
-export function generateRandomMapConfig(options: RandomMapOptions, playerCount: number): MapConfig {
+export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCount: number): MapConfig {
   if (!Number.isInteger(playerCount) || playerCount < 2 || playerCount > 8) {
     throw new Error('playerCount must be an integer between 2 and 8');
   }
+  // 本函数可被直接调用（RL/测试）而绕过 sanitize，故旧地形密度在这里也要归一化；
+  // 用浅拷贝避免改写调用方传入的对象。
+  const options = { ...rawOptions };
+  splitLegacyTerrainDensity(options);
   const { rng, seedText } = createRng(options.seed);
-  const symmetric = options.symmetric ?? true;
+  const requestedSymmetric = options.symmetric ?? true;
   const mode: GameMode = options.mode ?? 'standard';
+  // 实际生效的对称：请求对称但该人数在六边形网格上无解时（5、7 人）如实降级为非对称，
+  // 避免产出「标称对称、实则出生位与地形都不镜像」的假对称图。
+  const symmetry = requestedSymmetric ? symmetryFor(playerCount) : null;
+  const symmetric = symmetry !== null;
 
   // 半径：多人局保证足够空间。
   let radius = Math.round(resolveParam(options.radius, 'radius', rng));
@@ -359,15 +447,28 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
     spawnPositions.push(pos);
     taken.add(hexKey(pos));
   }
+  // 对称模式：只保留每条旋转轨道（基本扇区内的 index < stride）的实测落点，
+  // 其余出生位由轨道代表点绕中心旋转精确得出——findFreeCell 的避让会让落点偏离
+  // 理想角位，若不归一化，地形/据点即使镜像、出生位也不镜像，公平性无从谈起。
+  if (symmetry) {
+    const stride = playerCount / symmetry.sectors;
+    for (let i = 0; i < stride; i++) {
+      for (let j = 1; j < symmetry.sectors; j++) {
+        spawnPositions[i + j * stride] = rotateSteps(spawnPositions[i], j * symmetry.step60);
+      }
+    }
+  }
 
-  // 据点：中心（数量为奇数时）+ 环形分布；对称模式成对赋类型。
+  // 据点：中心（数量为奇数时）+ 环形分布；对称模式按旋转轨道整体放置。
   let cpCount = Math.round(resolveParam(options.controlPointCount, 'controlPointCount', rng));
   // 歼灭/大逃杀：每个出生位必须绑定唯一据点（loader 硬约束），请求量至少与出生位数持平。
   if (isAnnihilationMode(mode)) cpCount = Math.max(cpCount, playerCount);
-  let controlPoints = placeControlPoints(cpCount, radius, symmetric, rng, spawnPositions, playableSet, taken);
+  let controlPoints = placeControlPoints(cpCount, radius, symmetry, rng, spawnPositions, playableSet, taken);
   // 放置失败可能少于请求量：不足出生位数时放宽间距规则补放，保证绑定可行性。
   if (isAnnihilationMode(mode) && controlPoints.length < spawnPositions.length) {
-    controlPoints = topUpControlPoints(controlPoints, spawnPositions, spawnPositions.length, playableSet, taken);
+    controlPoints = topUpControlPoints(
+      controlPoints, spawnPositions, spawnPositions.length, playableSet, taken, symmetry,
+    );
   }
 
   // 回合/行动点/经济/总部参数。
@@ -387,17 +488,19 @@ export function generateRandomMapConfig(options: RandomMapOptions, playerCount: 
     minimumSafeRadius: Math.round(resolveParam(options.artilleryMinimumSafeRadius, 'artilleryMinimumSafeRadius', rng)),
   };
 
-  // 地形：保护出生区与据点，抽样后校验连通性，失败重抽。
-  const density = resolveParam(options.terrainDensity, 'terrainDensity', rng);
+  // 地形：水域与阻挡各自独立密度（旧 terrainDensity 已在 sanitize 时按 60/40 拆开）。
+  const waterDensity = resolveParam(options.waterDensity, 'waterDensity', rng);
+  const wallDensity = resolveParam(options.wallDensity, 'wallDensity', rng);
   const terrainCells = sampleTerrain(
-    density, symmetric, rng, playableCells, playableSet, spawnPositions, controlPoints.map(cp => ({ q: cp.q, r: cp.r })),
+    waterDensity, wallDensity, symmetry, rng, playableCells, playableSet, spawnPositions,
+    controlPoints.map(cp => ({ q: cp.q, r: cp.r })),
   );
 
   // 出生位配置（总部 + 初始单位）。初始单位数量/构成全局抽一次、全员共享（公平性）。
   // startingUnitCount 收窄/固定数量（v3.3.0 边角采样用），省略时走默认范围 [0,4] 均匀随机。
   const startingUnitCount = Math.round(resolveParam(options.startingUnitCount, 'startingUnitCount', rng));
   const startingUnits = sampleStartingUnits(rng, startingUnitCount);
-  const spawnSlots = buildSpawnSlots(mode, spawnPositions, playableSet, controlPoints, symmetric, startingUnits);
+  const spawnSlots = buildSpawnSlots(mode, spawnPositions, playableSet, controlPoints, symmetry, startingUnits);
 
   const config = {
     mode,
@@ -476,10 +579,19 @@ function topUpControlPoints(
   target: number,
   playableSet: Set<string>,
   taken: Set<string>,
+  symmetry: Symmetry | null,
 ): GeneratedControlPoint[] {
   const points = [...existing];
   // 在已有据点/出生位的邻近格补放，保持分布相对均匀；间距规则放宽，只要求格位空闲。
   const claimable = (pos: Position): boolean => playableSet.has(hexKey(pos)) && !taken.has(hexKey(pos));
+  // 对称模式整轨道补放：单个据点会让据点集失去旋转闭合，对称局的领土分配随之无法镜像。
+  const orbit = (pos: Position): Position[] => (symmetry ? orbitOf(pos, symmetry) : [pos]);
+  const accept = (pos: Position): boolean => {
+    const members = orbit(pos);
+    const keys = new Set(members.map(hexKey));
+    if (keys.size !== members.length) return false; // 退化为中心点（轨道只剩自身）时不补
+    return members.every(claimable);
+  };
   const candidatePool = (): Position[] => {
     const anchors = [...points.map(cp => ({ q: cp.q, r: cp.r })), ...spawnPositions];
     const seen = new Set<string>();
@@ -498,16 +610,18 @@ function topUpControlPoints(
   while (points.length < target) {
     let placed = false;
     for (const pos of candidatePool()) {
-      if (!claimable(pos)) continue;
-      const kind = KIND_CYCLE[points.length % KIND_CYCLE.length];
-      points.push({
-        id: `cp_${points.length + 1}`,
-        name: `${KIND_NAMES[kind]} ${points.length + 1}`,
-        kind,
-        q: pos.q,
-        r: pos.r,
-      });
-      taken.add(hexKey(pos));
+      if (!accept(pos)) continue;
+      for (const cell of orbit(pos)) {
+        const kind = KIND_CYCLE[points.length % KIND_CYCLE.length];
+        points.push({
+          id: `cp_${points.length + 1}`,
+          name: `${KIND_NAMES[kind]} ${points.length + 1}`,
+          kind,
+          q: cell.q,
+          r: cell.r,
+        });
+        taken.add(hexKey(cell));
+      }
       placed = true;
       break;
     }
@@ -516,10 +630,25 @@ function topUpControlPoints(
   return points;
 }
 
+/**
+ * 对称模式下的据点计划：据点须整轨道放置（中心点轨道为 1），故总数只能取 m×k 或 m×k+1。
+ * 取不小于请求量的最小可达值——宁可略多，也不要把据点削到远少于请求（6 人局 m=6 时若取最近，
+ * 请求 2 个据点会只剩中心 1 个）。m=2 时任意整数都可达，行为与旧版完全一致。
+ */
+function symmetricControlPointPlan(count: number, sectors: number): { orbits: number; center: boolean } {
+  const achievable: number[] = [];
+  for (let orbits = 0; orbits <= Math.ceil(count / sectors) + 1; orbits++) {
+    achievable.push(orbits * sectors, orbits * sectors + 1);
+  }
+  const sorted = [...new Set(achievable)].filter(total => total >= 1).sort((a, b) => a - b);
+  const chosen = sorted.find(total => total >= count) ?? sorted[sorted.length - 1];
+  return { orbits: Math.floor(chosen / sectors), center: chosen % sectors === 1 };
+}
+
 function placeControlPoints(
   count: number,
   radius: number,
-  symmetric: boolean,
+  symmetry: Symmetry | null,
   rng: () => number,
   spawnPositions: Position[],
   playableSet: Set<string>,
@@ -536,44 +665,50 @@ function placeControlPoints(
     points.push({ id: `cp_${index + 1}`, name: `${KIND_NAMES[kind]} ${index + 1}`, kind, q: pos.q, r: pos.r });
     return true;
   };
-  // 成对放置必须原子：先放 pos 再放 mirror 的旧写法在 mirror 失败时会留下不对称的单点。
-  const claimPair = (pos: Position, kind: ControlPointKind): boolean => {
-    if (!claimable(pos) || !claimable(mirror(pos))) return false;
-    claim(pos, kind);
-    claim(mirror(pos), kind);
+  // 据点轨道必须整条原子放置：只放一半会在旋转下失衡（中心点轨道退化为自身，不参与）。
+  const claimOrbit = (pos: Position, kind: ControlPointKind): boolean => {
+    const members = symmetry ? orbitOf(pos, symmetry) : [pos];
+    const keys = new Set(members.map(hexKey));
+    if (keys.size !== members.length) return false;
+    if (!members.every(claimable)) return false;
+    for (const member of members) claim(member, kind);
     return true;
   };
 
-  const includeCenter = count % 2 === 1;
-  const ringCount = count - (includeCenter ? 1 : 0);
   const ringDistance = Math.max(2, Math.round(radius / 2));
   const ringBase = rng() * Math.PI * 2;
 
-  if (includeCenter) {
-    const centerKind = KIND_CYCLE[Math.floor(rng() * KIND_CYCLE.length)];
-    if (!claim({ q: 0, r: 0 }, centerKind)) {
-      // 中心不可用时退化为环形多放一个（偶数化）。
-      return placeControlPoints(count + 1, radius, symmetric, rng, spawnPositions, playableSet, new Set([...taken].filter(key => key !== '0,0')));
+  if (symmetry) {
+    // 据点按轨道（扇区）放置：轨数 × m（外加可选中心点）。退避按「距离近→远→更近」×
+    // 「角度扫满一个扇区」二维搜索，避免小半径下可放格子集中在边缘时整轨落空。
+    const plan = symmetricControlPointPlan(count, symmetry.sectors);
+    if (plan.center) {
+      const centerKind = KIND_CYCLE[Math.floor(rng() * KIND_CYCLE.length)];
+      claim({ q: 0, r: 0 }, centerKind);
     }
-  }
-
-  if (symmetric) {
-    // 成对放置：半区角度取 ringCount/2 对，类型按对循环，保证镜像一致。
-    // 小半径下可放格子往往集中在远离出生轴的边缘，退避按「距离近→远→更近」×
-    // 「角度扫满半圆」二维搜索，而不是只往近处缩（seed coverage-87 的 0 据点事故）。
-    for (let i = 0; i < ringCount / 2; i++) {
+    const wedge = (2 * Math.PI) / symmetry.sectors;
+    for (let i = 0; i < plan.orbits; i++) {
       const kind = KIND_CYCLE[i % KIND_CYCLE.length];
-      const angle = ringBase + (i * 2 * Math.PI) / ringCount;
+      const angle = ringBase + (i * wedge) / Math.max(1, plan.orbits);
       outer:
       for (let ringTry = 0; ringTry < 4; ringTry++) {
         const distance = Math.min(radius, Math.max(1, ringDistance + [0, 1, -1, 2][ringTry]));
         for (let sweep = 0; sweep < 12; sweep++) {
-          const pos = axialFromAngle(angle + sweep * (Math.PI / 12), distance);
-          if (claimPair(pos, kind)) break outer;
+          const pos = axialFromAngle(angle + sweep * (wedge / 12), distance);
+          if (claimOrbit(pos, kind)) break outer;
         }
       }
     }
   } else {
+    const includeCenter = count % 2 === 1;
+    const ringCount = count - (includeCenter ? 1 : 0);
+    if (includeCenter) {
+      const centerKind = KIND_CYCLE[Math.floor(rng() * KIND_CYCLE.length)];
+      if (!claim({ q: 0, r: 0 }, centerKind)) {
+        // 中心不可用时退化为环形多放一个（偶数化）。
+        return placeControlPoints(count + 1, radius, null, rng, spawnPositions, playableSet, new Set([...taken].filter(key => key !== '0,0')));
+      }
+    }
     for (let i = 0; i < ringCount; i++) {
       const kind = KIND_CYCLE[i % KIND_CYCLE.length];
       const angle = ringBase + (i * 2 * Math.PI) / ringCount + (rng() - 0.5) * (Math.PI / ringCount);
@@ -582,15 +717,15 @@ function placeControlPoints(
       if (!claim(pos, kind)) claim(axialFromAngle(angle, ringDistance), kind);
     }
   }
-  // 保底：极端小半径下环形落点可能全部失败，全局扫描任意可放镜像对；
-  // 连镜像对都放不下（出生位贴中心）时退化为可放单点，至少保证有占点博弈。
+  // 保底：极端小半径下环形落点可能全部失败，全局扫描任意可放轨道；
+  // 连轨道都放不下（出生位贴中心）时退化为可放单点，至少保证有占点博弈。
   if (points.length === 0) {
-    let paired = false;
+    let matched = false;
     for (const key of playableSet) {
       const [q, r] = key.split(',').map(Number);
-      if (claimPair({ q, r }, 'supply')) { paired = true; break; }
+      if (claimOrbit({ q, r }, 'supply')) { matched = true; break; }
     }
-    if (!paired) {
+    if (!matched) {
       for (const key of playableSet) {
         const [q, r] = key.split(',').map(Number);
         if (claim({ q, r }, 'supply') && points.length >= 2) break;
@@ -601,8 +736,9 @@ function placeControlPoints(
 }
 
 function sampleTerrain(
-  density: number,
-  symmetric: boolean,
+  waterDensity: number,
+  wallDensity: number,
+  symmetry: Symmetry | null,
   rng: () => number,
   playableCells: Position[],
   playableSet: Set<string>,
@@ -611,33 +747,54 @@ function sampleTerrain(
 ): { q: number; r: number; terrain: 'water' | 'blocker' }[] {
   const protectedCells = new Set<string>();
   for (const cell of playableCells) {
-    const nearSpawn = spawnPositions.some(spawn => hexDistance(spawn, cell) <= 2);
-    const nearCenterOrCp = hexDistance(cell, { q: 0, r: 0 }) <= 1
-      || controlPointPositions.some(cp => hexDistance(cp, cell) <= 1);
+    // 出生位只保护到 1 环：初始单位只落在总部的 6 个邻格，1 环足以保证它们不被地形占据；
+    // 保护 2 环会在出生位较多时连成一整条带，把整个中圈挤出采样域（障碍只剩外圈）。
+    const nearSpawn = spawnPositions.some(spawn => hexDistance(spawn, cell) <= 1);
+    // 据点只保单格：部署单位只需据点本身可走，相邻连通性由 allReachable 兜底；
+    // 若连相邻也保护，据点数量多且均分时（如 6 据点）会整环吃掉三层，中圈再无地形。
+    const nearCenterOrCp = hexDistance(cell, { q: 0, r: 0 }) === 0
+      || controlPointPositions.some(cp => hexDistance(cp, cell) === 0);
     if (nearSpawn || nearCenterOrCp) protectedCells.add(hexKey(cell));
   }
+  // 基本域：每条旋转轨道只留一个代表格（按 (q,r) 取最小）。代表格抽样后整轨道复刻，
+  // 只要出生位/据点集本身旋转闭合，保护格也闭合，复刻就不会落回受保护区域。
+  const orbit = (pos: Position): Position[] => (symmetry ? orbitOf(pos, symmetry) : [pos]);
+  const canonicalKey = (pos: Position): string => {
+    if (!symmetry) return hexKey(pos);
+    let best = pos;
+    for (const member of orbit(pos)) {
+      if (member.q < best.q || (member.q === best.q && member.r < best.r)) best = member;
+    }
+    return hexKey(best);
+  };
 
-  let currentDensity = density;
+  const sectors = symmetry ? symmetry.sectors : 1;
+  // 水的占比在连通性重抽时保持不变，只整体摊薄总密度（每次重抽减 0.03）。
+  const initialTotal = waterDensity + wallDensity;
+  const waterShare = initialTotal > 0 ? waterDensity / initialTotal : 0;
+  let currentTotal = initialTotal;
   for (let attempt = 0; attempt < 200; attempt++) {
-    if (attempt > 0 && attempt % 50 === 0) currentDensity = Math.max(0, currentDensity - 0.03);
-    const terrainCount = Math.floor(playableCells.length * currentDensity);
+    if (attempt > 0 && attempt % 50 === 0) currentTotal = Math.max(0, currentTotal - 0.03);
+    const waterTarget = Math.floor(playableCells.length * currentTotal * waterShare);
+    const wallTarget = Math.floor(playableCells.length * currentTotal * (1 - waterShare));
     const terrain = new Map<string, 'water' | 'blocker'>();
 
-    if (terrainCount > 0) {
-      const candidates = playableCells.filter(cell => {
-        if (protectedCells.has(hexKey(cell))) return false;
-        return !symmetric || inHalfPlane(cell);
-      });
+    if (currentTotal > 0 && (waterDensity > 0 || wallDensity > 0)) {
+      const candidates = playableCells.filter(cell =>
+        !protectedCells.has(hexKey(cell)) && hexKey(cell) === canonicalKey(cell));
       shuffleInPlace(candidates, rng);
-      const picks = candidates.slice(0, symmetric ? Math.ceil(terrainCount / 2) : terrainCount);
-      for (const cell of picks) {
-        const kind: 'water' | 'blocker' = rng() < 0.6 ? 'water' : 'blocker';
-        terrain.set(hexKey(cell), kind);
-        if (symmetric) {
-          const mirrored = mirror(cell);
-          if (playableSet.has(hexKey(mirrored)) && !protectedCells.has(hexKey(mirrored))) {
-            terrain.set(hexKey(mirrored), kind);
-          }
+      // 水域与阻挡各占前 / 后若干轨道（candidates 已打乱，故两类在空间上都是随机子集）。
+      // 密度为 0 的一类整局不出现；正值密度至少给一组轨道——小地图上 floor 会把
+      // 「设了 0.01 水域」算成 0 格，出现「请求水域却没有水」的观感 bug。
+      const picksOf = (target: number, density: number): number =>
+        (density > 0 ? Math.max(1, Math.ceil(target / sectors)) : 0);
+      const waterPicks = picksOf(waterTarget, waterDensity);
+      const wallPicks = picksOf(wallTarget, wallDensity);
+      const picks = candidates.slice(0, waterPicks + wallPicks);
+      for (let index = 0; index < picks.length; index++) {
+        const kind: 'water' | 'blocker' = index < waterPicks ? 'water' : 'blocker';
+        for (const member of orbit(picks[index])) {
+          if (playableSet.has(hexKey(member))) terrain.set(hexKey(member), kind);
         }
       }
     }
@@ -681,20 +838,117 @@ function allReachable(
   return visited.size === passable.size;
 }
 
+/**
+ * 出生位 → 居留据点的唯一分配（歼灭/大逃杀专用，store 据此设开局据点归属）。
+ * 采用「就近优先」贪心：每轮挑当前总距离最小的一对；对称局以整条旋转轨道整体计分，
+ * 保证每个出生位绑定的是空间上邻近的据点（而非索引对位的据点），且对称局领土严格旋转闭合。
+ */
+function bindControlPoints(
+  mode: GameMode,
+  spawnPositions: Position[],
+  controlPoints: GeneratedControlPoint[],
+  symmetry: Symmetry | null,
+): (string | undefined)[] {
+  const count = spawnPositions.length;
+  const bindings: (string | undefined)[] = new Array(count).fill(undefined);
+  // 仅歼灭系需要据点归属；据点数不足以覆盖全部出生位时交由 loader 校验兜底（与旧行为一致）。
+  if (!isAnnihilationMode(mode) || controlPoints.length < count) return bindings;
+
+  const used = new Set<string>();
+  const at = (cp: GeneratedControlPoint): Position => ({ q: cp.q, r: cp.r });
+  const cpByKey = new Map(controlPoints.map(cp => [hexKey({ q: cp.q, r: cp.r }), cp]));
+  const remaining = new Set(spawnPositions.map((_, index) => index));
+  // 对称局：一条轨道内的出生位索引步长（把 360°/n 的角序换成 360°/m 的轨道序）。
+  const stride = symmetry ? count / symmetry.sectors : 0;
+  const orbitIndices = (index: number): number[] => (symmetry
+    ? Array.from({ length: symmetry.sectors }, (_, j) => (index + j * stride) % count)
+    : [index]);
+
+  while (remaining.size > 0) {
+    let best: {
+      score: number;
+      index: number;
+      orbitIndices: number[];
+      cpOrbit: GeneratedControlPoint[];
+    } | null = null;
+    for (const index of remaining) {
+      const hq = spawnPositions[index];
+      const orbitIdx = orbitIndices(index);
+      // 出生位轨道落点：轨道代表点绕中心旋转（与 buildSpawnSlots 写入的 HQ 同源）。
+      const spawnOrbit = symmetry
+        ? orbitIdx.map((_, j) => (j === 0 ? hq : rotateSteps(hq, j * symmetry.step60)))
+        : [hq];
+      for (const cp of controlPoints) {
+        if (used.has(cp.id)) continue;
+        let cpOrbit: GeneratedControlPoint[];
+        if (symmetry) {
+          cpOrbit = [];
+          let feasible = true;
+          for (let j = 0; j < spawnOrbit.length; j++) {
+            const member = cpByKey.get(hexKey(rotateSteps(at(cp), j * symmetry.step60)));
+            if (member === undefined || used.has(member.id)) { feasible = false; break; }
+            cpOrbit.push(member);
+          }
+          // 中心据点自映射（轨道退化为自身），不参与轨道绑定，留作公共争夺点。
+          if (!feasible || new Set(cpOrbit.map(m => m.id)).size !== spawnOrbit.length) continue;
+        } else {
+          cpOrbit = [cp];
+        }
+        let score = 0;
+        for (let j = 0; j < spawnOrbit.length; j++) score += hexDistance(spawnOrbit[j], at(cpOrbit[j]));
+        if (best === null || score < best.score) best = { score, index, orbitIndices: orbitIdx, cpOrbit };
+      }
+    }
+    if (best === null) {
+      // 对称局无可用轨道（据点集不闭合的极端情形）：退化为各自就近唯一分配。
+      for (const index of [...remaining]) {
+        let pick: GeneratedControlPoint | null = null;
+        let pickDistance = Number.POSITIVE_INFINITY;
+        for (const cp of controlPoints) {
+          if (used.has(cp.id)) continue;
+          const distance = hexDistance(spawnPositions[index], at(cp));
+          if (distance < pickDistance || (distance === pickDistance && pick !== null && cp.id < pick.id)) {
+            pickDistance = distance;
+            pick = cp;
+          }
+        }
+        if (pick === null) break;
+        bindings[index] = pick.id;
+        used.add(pick.id);
+        remaining.delete(index);
+      }
+      break;
+    }
+    for (let j = 0; j < best.orbitIndices.length; j++) {
+      const slotIndex = best.orbitIndices[j];
+      const cp = best.cpOrbit[j];
+      bindings[slotIndex] = cp.id;
+      used.add(cp.id);
+      if (remaining.has(slotIndex)) remaining.delete(slotIndex);
+    }
+  }
+  return bindings;
+}
+
 function buildSpawnSlots(
   mode: GameMode,
   spawnPositions: Position[],
   playableSet: Set<string>,
   controlPoints: GeneratedControlPoint[],
-  symmetric: boolean,
+  symmetry: Symmetry | null,
   startingUnits: UnitType[],
 ): SpawnSlotConfig[] {
-  // 歼灭/大逃杀的出生位绑定居留据点（store 据此设据点归属）：据点数足够时按序唯一分配。
-  const annihilate = isAnnihilationMode(mode)
-    && controlPoints.length > 0 && controlPoints.length >= spawnPositions.length;
+  // 歼灭/大逃杀的出生位绑定居留据点（store 据此设据点归属）：按空间就近唯一分配，
+  // 对称局按旋转轨道成组处理，保证开局领土与静态图「老家据点」语义一致且旋转闭合。
+  const bindings = bindControlPoints(mode, spawnPositions, controlPoints, symmetry);
   const occupied = new Set<string>(controlPoints.map(cp => hexKey(cp)));
   const slots: SpawnSlotConfig[] = new Array(spawnPositions.length);
   const placed: boolean[] = new Array(spawnPositions.length).fill(false);
+  const count = spawnPositions.length;
+  const stride = symmetry ? count / symmetry.sectors : 0;
+  const orbitIndices = (index: number): number[] => (symmetry
+    ? Array.from({ length: symmetry.sectors }, (_, j) => (index + j * stride) % count)
+    : [index]);
 
   // 初始单位放在最靠近地图中心的几个邻格：从正对中心起按角度依次取格。
   const unitCellsFor = (hq: Position): Position[] => {
@@ -711,38 +965,35 @@ function buildSpawnSlots(
     return { type: startingUnits[unitIndex], q: cell.q, r: cell.r };
   });
 
-  for (let index = 0; index < spawnPositions.length; index++) {
+  for (let index = 0; index < count; index++) {
     if (placed[index]) continue;
     const hq = spawnPositions[index];
     occupied.add(hexKey(hq));
-    // 偶数玩家对称局：镜像出生位成对处理，单位布局直接取反，
-    // 规避「最靠中心方向」出现角度平局时两侧侦察兵站位不镜像的边角情况。
-    const mirrorIndex = symmetric && spawnPositions.length % 2 === 0
-      ? (index + spawnPositions.length / 2) % spawnPositions.length
-      : -1;
-    if (mirrorIndex >= 0 && !placed[mirrorIndex]) {
-      const mirrorHq = mirror(hq);
-      occupied.add(hexKey(mirrorHq));
+    const orbit = orbitIndices(index);
+    // 对称局：整条轨道一次处理，H Q 取轨道代表点旋转，单位布局同取旋转，
+    // 规避「最靠中心方向」出现角度平局时两侧站位不镜像的边角情况。
+    if (symmetry && orbit.every(i => !placed[i])) {
+      for (let j = 1; j < orbit.length; j++) occupied.add(hexKey(spawnPositions[orbit[j]]));
       const cells = unitCellsFor(hq);
-      slots[index] = {
-        id: `slot_${String.fromCharCode(97 + index)}`,
-        headquarters: { q: hq.q, r: hq.r },
-        ...(annihilate ? { controlPointId: controlPoints[index].id } : {}),
-        startingUnits: assignUnits(cells),
-      };
-      slots[mirrorIndex] = {
-        id: `slot_${String.fromCharCode(97 + mirrorIndex)}`,
-        headquarters: { q: mirrorHq.q, r: mirrorHq.r },
-        ...(annihilate ? { controlPointId: controlPoints[mirrorIndex].id } : {}),
-        startingUnits: assignUnits(cells.map(cell => mirror(cell))),
-      };
-      placed[index] = true;
-      placed[mirrorIndex] = true;
+      for (let j = 0; j < orbit.length; j++) {
+        const slotIndex = orbit[j];
+        const slotHq = spawnPositions[slotIndex];
+        const boundId = bindings[slotIndex];
+        const slotCells = j === 0 ? cells : cells.map(cell => rotateSteps(cell, j * symmetry.step60));
+        slots[slotIndex] = {
+          id: `slot_${String.fromCharCode(97 + slotIndex)}`,
+          headquarters: { q: slotHq.q, r: slotHq.r },
+          ...(boundId !== undefined ? { controlPointId: boundId } : {}),
+          startingUnits: assignUnits(slotCells),
+        };
+        placed[slotIndex] = true;
+      }
     } else {
+      const boundId = bindings[index];
       slots[index] = {
         id: `slot_${String.fromCharCode(97 + index)}`,
         headquarters: { q: hq.q, r: hq.r },
-        ...(annihilate ? { controlPointId: controlPoints[index].id } : {}),
+        ...(boundId !== undefined ? { controlPointId: boundId } : {}),
         startingUnits: assignUnits(unitCellsFor(hq)),
       };
       placed[index] = true;

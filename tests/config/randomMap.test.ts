@@ -1,9 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { generateRandomMapConfig, sanitizeRandomOptions } from '../../src/config/randomMap.js';
 import { loadMaps, resetConfig, validateGeneratedMap } from '../../src/config/loader.js';
+import { hexDistance } from '../../src/engine/hex.js';
 
 function cellKey(pos: { q: number; r: number }): string {
   return `${pos.q},${pos.r}`;
+}
+
+/** 取负并归一 -0：配置侧把 -0 规范成 0，期望值同样处理后再比对。 */
+function neg(value: number): number {
+  return value === 0 ? 0 : -value;
+}
+
+/** 绕中心旋转 steps×60°（六边形网格整格映射）：(q, r) → (-r, q + r)，并把 -0 归一。 */
+function rot(pos: { q: number; r: number }, steps: number): { q: number; r: number } {
+  const normalized = ((steps % 6) + 6) % 6;
+  let current = { q: pos.q, r: pos.r };
+  for (let i = 0; i < normalized; i++) {
+    const q = current.q;
+    current = { q: current.r === 0 ? 0 : -current.r, r: q + current.r === 0 ? 0 : q + current.r };
+  }
+  return current;
 }
 
 describe('random map generator', () => {
@@ -21,11 +38,11 @@ describe('random map generator', () => {
 
     const terrain = new Set(config.terrainCells.map(cellKey));
     for (const cell of config.terrainCells) {
-      expect(terrain.has(`${-cell.q},${-cell.r}`)).toBe(true);
+      expect(terrain.has(`${neg(cell.q)},${neg(cell.r)}`)).toBe(true);
     }
 
     const [slotA, slotB] = config.spawnSlots;
-    expect(slotB.headquarters).toEqual({ q: -slotA.headquarters.q, r: -slotA.headquarters.r });
+    expect(slotB.headquarters).toEqual({ q: neg(slotA.headquarters.q), r: neg(slotA.headquarters.r) });
     // 初始单位布局严格镜像：相对位置取反后类型一致。
     const unitBAt = (q: number, r: number) =>
       slotB.startingUnits.find(unit => unit.q === slotB.headquarters.q - (q - slotA.headquarters.q)
@@ -38,8 +55,8 @@ describe('random map generator', () => {
 
     const cpSet = new Set(config.controlPoints.map(cp => cellKey(cp)));
     for (const cp of config.controlPoints) {
-      expect(cpSet.has(`${-cp.q},${-cp.r}`)).toBe(true);
-      const twin = config.controlPoints.find(other => other.q === -cp.q && other.r === -cp.r);
+      expect(cpSet.has(`${neg(cp.q)},${neg(cp.r)}`)).toBe(true);
+      const twin = config.controlPoints.find(other => other.q === neg(cp.q) && other.r === neg(cp.r));
       expect(twin!.kind).toBe(cp.kind);
     }
   });
@@ -149,6 +166,131 @@ describe('random map generator', () => {
     }
   });
 
+  it('binds each spawn slot to a nearby distinct control point instead of by index', () => {
+    // 回归：此前按 controlPoints[index] 顺序绑定，出生位常被绑到地图另一侧的据点
+    // （实测 77% 非最近、最远 12 格，偶数据点时中心点还被边缘出生位占有）。改为
+    // 就近唯一分配后，除「最近据点已被不更远的出生位占走」这一争用情形外，必须绑最近据点。
+    for (const playerCount of [2, 3, 4, 5, 6]) {
+      for (const seed of ['bind-a', 'bind-b', 'bind-c']) {
+        const config = generateRandomMapConfig({ seed, mode: 'annihilation', symmetric: false }, playerCount);
+        const byId = new Map(config.controlPoints.map(cp => [cp.id, cp]));
+        const ownerOf = new Map(config.spawnSlots.map(slot => [slot.controlPointId, slot]));
+        for (const slot of config.spawnSlots) {
+          const bound = byId.get(slot.controlPointId);
+          expect(bound, `${seed}:${playerCount}:${slot.id} 未绑定据点`).toBeDefined();
+          if (!bound) continue;
+          let nearest = bound;
+          let nearestDistance = hexDistance(slot.headquarters, bound);
+          for (const cp of config.controlPoints) {
+            const distance = hexDistance(slot.headquarters, cp);
+            if (distance < nearestDistance) {
+              nearest = cp;
+              nearestDistance = distance;
+            }
+          }
+          if (nearest.id !== bound.id) {
+            // 最近的据点被另一出生位占用，且该占用者到它的距离不比自己远（就近贪心的必然结果）。
+            const occupant = ownerOf.get(nearest.id);
+            expect(occupant, `${seed}:${playerCount}:${nearest.id} 无归属`).toBeDefined();
+            if (occupant) {
+              expect(hexDistance(occupant.headquarters, nearest)).toBeLessThanOrEqual(nearestDistance);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('binds mirror spawn slots to mirror control points in symmetric annihilation maps', () => {
+    // 对称偶数局必须保持开局领土镜像：出生位 i 与其镜像位绑定的据点互为镜像，
+    // 且据点集本身镜像闭合——补放也必须成对，否则对称性会从源头被破坏。
+    for (const playerCount of [2, 4, 6, 8]) {
+      for (const seed of ['sym-bind-a', 'sym-bind-b', 'sym-bind-c']) {
+        const config = generateRandomMapConfig({ seed, mode: 'royale', symmetric: true }, playerCount);
+        const keys = new Set(config.controlPoints.map(cp => cellKey(cp)));
+        for (const cp of config.controlPoints) {
+          expect(keys.has(cellKey({ q: neg(cp.q), r: neg(cp.r) })), `${seed}:${playerCount}:${cp.id} 缺镜像`).toBe(true);
+        }
+        const byId = new Map(config.controlPoints.map(cp => [cp.id, cp]));
+        const count = config.spawnSlots.length;
+        for (let index = 0; index < count; index++) {
+          const here = byId.get(config.spawnSlots[index].controlPointId);
+          const mirrored = byId.get(config.spawnSlots[(index + count / 2) % count].controlPointId);
+          expect(here, `${seed}:${playerCount}:${index} 未绑定`).toBeDefined();
+          expect(mirrored, `${seed}:${playerCount}:${index + count / 2} 未绑定`).toBeDefined();
+          if (!here || !mirrored) continue;
+          expect({ q: mirrored.q, r: mirrored.r }).toEqual({ q: neg(here.q), r: neg(here.r) });
+        }
+      }
+    }
+  });
+
+  it('generalizes rotation symmetry to the largest hex-compatible angle per player count', () => {
+    // 六边形网格只在 60° 整数倍旋转下自映射；出生位需要 360/n。二者最小公倍角 = step60×60°。
+    // 2/4/8 人 → 180°（m=2）；3 人 → 120°（m=3）；6 人 → 60°（m=6）。
+    const cases: Record<number, number> = { 2: 3, 3: 2, 4: 3, 6: 1, 8: 3 };
+    for (const [key, step60] of Object.entries(cases)) {
+      const playerCount = Number(key);
+      const sectors = 6 / step60;
+      const stride = playerCount / sectors;
+      for (const seed of ['rot-a', 'rot-b', 'rot-c']) {
+        const config = generateRandomMapConfig({ seed, symmetric: true }, playerCount);
+        const closed = (items: { q: number; r: number }[]): boolean => {
+          const keys = new Set(items.map(cellKey));
+          return items.every(pos => keys.has(cellKey(rot(pos, step60))));
+        };
+        expect(closed(config.spawnSlots.map(slot => slot.headquarters)), `${seed}:${playerCount} 出生位`).toBe(true);
+        expect(closed(config.terrainCells), `${seed}:${playerCount} 地形`).toBe(true);
+        expect(closed(config.controlPoints), `${seed}:${playerCount} 据点`).toBe(true);
+        // 初始单位按同一旋转成组：轨道代表点的单位旋转后即对位出生位的单位。
+        for (let i = 0; i < stride; i++) {
+          for (let j = 1; j < sectors; j++) {
+            const from = config.spawnSlots[i].startingUnits;
+            const to = config.spawnSlots[i + j * stride].startingUnits;
+            expect(to, `${seed}:${playerCount} 单位数`).toHaveLength(from.length);
+            for (let unitIndex = 0; unitIndex < from.length; unitIndex++) {
+              expect(to[unitIndex].type).toBe(from[unitIndex].type);
+              expect({ q: to[unitIndex].q, r: to[unitIndex].r }).toEqual(rot(from[unitIndex], j * step60));
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps annihilation territory rotation-closed for every symmetric player count', () => {
+    const cases: Record<number, number> = { 2: 3, 3: 2, 4: 3, 6: 1, 8: 3 };
+    for (const [key, step60] of Object.entries(cases)) {
+      const playerCount = Number(key);
+      const sectors = 6 / step60;
+      const stride = playerCount / sectors;
+      const config = generateRandomMapConfig({ seed: 'bind-rot', mode: 'annihilation', symmetric: true }, playerCount);
+      const byId = new Map(config.controlPoints.map(cp => [cp.id, cp]));
+      const boundIds = config.spawnSlots.map(slot => slot.controlPointId);
+      expect(new Set(boundIds).size, `${playerCount} 人绑定唯一`).toBe(playerCount);
+      for (let i = 0; i < stride; i++) {
+        for (let j = 1; j < sectors; j++) {
+          const base = byId.get(config.spawnSlots[i].controlPointId)!;
+          const peer = byId.get(config.spawnSlots[i + j * stride].controlPointId)!;
+          expect(peer, `${playerCount}:${i}+${j * stride}`).toBeDefined();
+          expect({ q: peer.q, r: peer.r }).toEqual(rot(base, j * step60));
+        }
+      }
+    }
+  });
+
+  it('falls back to a non-symmetric layout when the player count admits no hex rotation (5/7)', () => {
+    // 5 人需 72°、7 人需 360/7°，都不是 60° 的整数倍，六边盘无法自映射；如实降级而非假称对称。
+    for (const playerCount of [5, 7]) {
+      const config = generateRandomMapConfig({ seed: 'no-sym', symmetric: true }, playerCount);
+      expect(config.description).toContain('非对称');
+      expect(config.spawnSlots).toHaveLength(playerCount);
+      expect(() => validateGeneratedMap(JSON.parse(JSON.stringify(config)))).not.toThrow();
+      const b = generateRandomMapConfig({ seed: 'no-sym', symmetric: false }, playerCount);
+      expect(JSON.stringify(config)).toBe(JSON.stringify(b));
+    }
+  });
+
   it('always generates configs that pass the standard map validation', () => {
     resetConfig();
     loadMaps();
@@ -167,10 +309,10 @@ describe('random map generator', () => {
           for (let i = 0; i < playerCount / 2; i++) {
             const slotA = config.spawnSlots[i];
             const slotB = config.spawnSlots[i + playerCount / 2];
-            expect(slotB.headquarters).toEqual({ q: -slotA.headquarters.q, r: -slotA.headquarters.r });
+            expect(slotB.headquarters).toEqual({ q: neg(slotA.headquarters.q), r: neg(slotA.headquarters.r) });
             expect(slotB.startingUnits).toHaveLength(slotA.startingUnits.length);
             for (const unit of slotA.startingUnits) {
-              const twin = slotB.startingUnits.find(other => other.q === -unit.q && other.r === -unit.r);
+              const twin = slotB.startingUnits.find(other => other.q === neg(unit.q) && other.r === neg(unit.r));
               expect(twin, `unit ${unit.type}@(${unit.q},${unit.r}) missing mirror`).toBeDefined();
               expect(twin!.type).toBe(unit.type);
             }
@@ -206,6 +348,89 @@ describe('random map generator', () => {
       }
     }
     expect(visited.size).toBe(playable.length);
+  });
+
+  it('never places terrain on a spawn headquarters or its neighbours', () => {
+    // 初始单位只落在总部的 6 个邻格，且落格前不查地形；出生位保护必须覆盖这 6 格，
+    // 否则会出兵站水里。用高密度压力验证该不变量。
+    for (const playerCount of [2, 3, 4, 6]) {
+      for (const symmetric of [true, false]) {
+        const config = generateRandomMapConfig(
+          { seed: 'spawn-plain', mode: 'annihilation', symmetric, terrainDensity: 0.3 }, playerCount,
+        );
+        const terrain = new Set(config.terrainCells.map(cellKey));
+        for (const slot of config.spawnSlots) {
+          expect(terrain.has(cellKey(slot.headquarters)), `总部落在 ${cellKey(slot.headquarters)}`).toBe(false);
+          for (const unit of slot.startingUnits) {
+            expect(terrain.has(cellKey(unit)), `初始单位落在 ${cellKey(unit)}`).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('scatters terrain across the map instead of only the rim', () => {
+    // 回归：此前出生位保护 2 环、据点保护 1 环，出生位/据点又多又均分时会连成整条带，
+    // 把整个中圈挤出采样域，障碍只剩最外几圈（6 人图实测中圈 100% 无地形）。
+    for (const playerCount of [2, 3, 4, 6]) {
+      for (const symmetric of [true, false]) {
+        let withInnerTerrain = 0;
+        const games = 40;
+        for (let seed = 0; seed < games; seed++) {
+          const config = generateRandomMapConfig({ seed: `scatter-${seed}`, symmetric, terrainDensity: 0.12 }, playerCount);
+          const innerHalf = Math.floor(config.radius / 2);
+          if (config.terrainCells.some(cell => hexDistance(cell, { q: 0, r: 0 }) <= innerHalf)) withInnerTerrain++;
+        }
+        expect(withInnerTerrain, `${playerCount}人 symmetric=${symmetric}`).toBeGreaterThanOrEqual(games * 0.3);
+      }
+    }
+  });
+
+  it('splits terrain into independently controlled water and wall densities', () => {
+    // 水域与阻挡各自独立：某类密度为 0 时整局不出现该类；两者都为正时两类都出现。
+    const cases: Array<{ waterDensity: number; wallDensity: number; expectWater: boolean; expectWall: boolean }> = [
+      { waterDensity: 0.06, wallDensity: 0, expectWater: true, expectWall: false },
+      { waterDensity: 0, wallDensity: 0.06, expectWater: false, expectWall: true },
+      { waterDensity: 0.06, wallDensity: 0.06, expectWater: true, expectWall: true },
+    ];
+    for (const { waterDensity, wallDensity, expectWater, expectWall } of cases) {
+      for (let seed = 0; seed < 12; seed++) {
+        const config = generateRandomMapConfig({ seed: `split-${seed}`, symmetric: true, waterDensity, wallDensity }, 4);
+        const water = config.terrainCells.filter(cell => cell.terrain === 'water').length;
+        const wall = config.terrainCells.filter(cell => cell.terrain === 'blocker').length;
+        const label = `water=${waterDensity} wall=${wallDensity} seed=${seed}`;
+        if (expectWater) expect(water, `${label} 缺水域`).toBeGreaterThan(0);
+        else expect(water, `${label} 出现水域`).toBe(0);
+        if (expectWall) expect(wall, `${label} 缺阻挡`).toBeGreaterThan(0);
+        else expect(wall, `${label} 出现阻挡`).toBe(0);
+      }
+    }
+    // 小地图 + 极小正值密度也必须真的出现（floor 曾把 0.005×91 格算成 0 格）。
+    const tiny = generateRandomMapConfig(
+      { seed: 'tiny-densities', symmetric: true, radius: 5, waterDensity: 0.005, wallDensity: 0.005 }, 6,
+    );
+    expect(tiny.terrainCells.some(cell => cell.terrain === 'water')).toBe(true);
+    expect(tiny.terrainCells.some(cell => cell.terrain === 'blocker')).toBe(true);
+  });
+
+  it('keeps the deprecated terrainDensity as a 60/40 alias for water/wall', () => {
+    const sanitized = sanitizeRandomOptions({ terrainDensity: 0.1 });
+    expect(sanitized.terrainDensity).toBeUndefined();
+    expect(sanitized.waterDensity).toBeCloseTo(0.06);
+    expect(sanitized.wallDensity).toBeCloseTo(0.04);
+    expect(sanitizeRandomOptions({ terrainDensity: [0.02, 0.12] })).toEqual({
+      waterDensity: [0.012, 0.072],
+      wallDensity: [0.008, 0.048],
+    });
+    // 生成器可被直接调用（不经 sanitize），旧参数在这里同样要生效。
+    const legacy = generateRandomMapConfig({ seed: 'legacy-density', terrainDensity: 0.12 }, 4);
+    const explicit = generateRandomMapConfig({ seed: 'legacy-density', waterDensity: 0.072, wallDensity: 0.048 }, 4);
+    expect(JSON.stringify(legacy)).toBe(JSON.stringify(explicit));
+    // 与新细分参数同给则报错，避免静默忽略其中一边。
+    expect(() => sanitizeRandomOptions({ terrainDensity: 0.1, waterDensity: 0.02 }))
+      .toThrow('terrainDensity is deprecated');
+    expect(() => generateRandomMapConfig({ seed: 'x', terrainDensity: 0.1, wallDensity: 0.02 }, 4))
+      .toThrow('terrainDensity is deprecated');
   });
 
   it('generates varied unit stats within the requested variation', () => {

@@ -1,0 +1,6574 @@
+{
+  "format": "hex-v2-replay",
+  "schemaVersion": "3.6.1",
+  "gameId": "3e17d021-02a8-4954-ae38-da39b6bde610",
+  "mapId": "standoff",
+  "playerNames": {
+    "player_a": "Step5-WB",
+    "player_b": "Dsv4Flash0731-TE"
+  },
+  "exportedAt": "2026-10-14T21:52:01.637Z",
+  "eventCount": 226,
+  "finalResult": {
+    "winner": "player_a",
+    "reason": "turn_limit_score",
+    "scores": {
+      "player_a": {
+        "headquartersDamage": 0,
+        "ownHqHp": 200,
+        "controlPoints": 5,
+        "controlHold": 4.07,
+        "armyValue": 523,
+        "supplies": 29,
+        "killValue": 0,
+        "total": 643.99
+      },
+      "player_b": {
+        "headquartersDamage": 0,
+        "ownHqHp": 200,
+        "controlPoints": 2,
+        "controlHold": 1.93,
+        "armyValue": 405,
+        "supplies": 65,
+        "killValue": 194,
+        "total": 487.91
+      }
+    }
+  },
+  "events": [
+    {
+      "seq": 1,
+      "type": "player_joined",
+      "timestamp": 1792010057464,
+      "payload": {
+        "playerId": "player_a",
+        "name": "Step5-WB"
+      }
+    },
+    {
+      "seq": 2,
+      "type": "player_joined",
+      "timestamp": 1792011053412,
+      "payload": {
+        "playerId": "player_b",
+        "name": "Dsv4Flash0731-TE"
+      }
+    },
+    {
+      "seq": 3,
+      "type": "game_start",
+      "timestamp": 1792011055272,
+      "payload": {
+        "mapId": "standoff",
+        "mode": "simultaneous",
+        "map": {
+          "id": "standoff",
+          "name": "对峙之地",
+          "description": "同时回合模式专用地图。全员秘密下达指令，服务器统一同时结算：移动撞车即全部失败，攻击指定格子或方向。兵种全面改造：步兵沿方向轰击前两格、重装横扫周围三格、游侠锁定目标（未逃出射程必命中）、支援兵区域治疗。支持2、3、6人对称开局，中央控制点为全员争夺焦点。",
+          "mode": "simultaneous",
+          "grid": "hex",
+          "orientation": "pointy",
+          "radius": 5,
+          "terrainCells": [
+            {
+              "q": -5,
+              "r": 2,
+              "terrain": "blocker"
+            },
+            {
+              "q": -5,
+              "r": 3,
+              "terrain": "blocker"
+            },
+            {
+              "q": -3,
+              "r": -2,
+              "terrain": "blocker"
+            },
+            {
+              "q": -3,
+              "r": 5,
+              "terrain": "blocker"
+            },
+            {
+              "q": -2,
+              "r": -3,
+              "terrain": "blocker"
+            },
+            {
+              "q": -2,
+              "r": 5,
+              "terrain": "blocker"
+            },
+            {
+              "q": 2,
+              "r": -5,
+              "terrain": "blocker"
+            },
+            {
+              "q": 2,
+              "r": 3,
+              "terrain": "blocker"
+            },
+            {
+              "q": 3,
+              "r": -5,
+              "terrain": "blocker"
+            },
+            {
+              "q": 3,
+              "r": 2,
+              "terrain": "blocker"
+            },
+            {
+              "q": 5,
+              "r": -3,
+              "terrain": "blocker"
+            },
+            {
+              "q": 5,
+              "r": -2,
+              "terrain": "blocker"
+            }
+          ],
+          "cells": [
+            {
+              "q": -5,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 2,
+              "terrain": "blocker"
+            },
+            {
+              "q": -5,
+              "r": 3,
+              "terrain": "blocker"
+            },
+            {
+              "q": -5,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -5,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -4,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": -2,
+              "terrain": "blocker"
+            },
+            {
+              "q": -3,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -3,
+              "r": 5,
+              "terrain": "blocker"
+            },
+            {
+              "q": -2,
+              "r": -3,
+              "terrain": "blocker"
+            },
+            {
+              "q": -2,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -2,
+              "r": 5,
+              "terrain": "blocker"
+            },
+            {
+              "q": -1,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": -1,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": 0,
+              "r": 5,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 3,
+              "terrain": "plain"
+            },
+            {
+              "q": 1,
+              "r": 4,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -5,
+              "terrain": "blocker"
+            },
+            {
+              "q": 2,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 2,
+              "terrain": "plain"
+            },
+            {
+              "q": 2,
+              "r": 3,
+              "terrain": "blocker"
+            },
+            {
+              "q": 3,
+              "r": -5,
+              "terrain": "blocker"
+            },
+            {
+              "q": 3,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 3,
+              "r": 2,
+              "terrain": "blocker"
+            },
+            {
+              "q": 4,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -3,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -2,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": 0,
+              "terrain": "plain"
+            },
+            {
+              "q": 4,
+              "r": 1,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -5,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -4,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": -3,
+              "terrain": "blocker"
+            },
+            {
+              "q": 5,
+              "r": -2,
+              "terrain": "blocker"
+            },
+            {
+              "q": 5,
+              "r": -1,
+              "terrain": "plain"
+            },
+            {
+              "q": 5,
+              "r": 0,
+              "terrain": "plain"
+            }
+          ]
+        },
+        "players": {
+          "player_a": {
+            "id": "player_a",
+            "name": "Step5-WB",
+            "joinedAt": 1792010057464,
+            "status": "active",
+            "spawnSlotId": "slot_1",
+            "turnOrder": 0,
+            "eliminatedAt": null,
+            "eliminatedBy": null,
+            "stats": {
+              "headquartersDamage": 0,
+              "unitsDestroyed": 0,
+              "playersEliminated": 0,
+              "actionPointsUsed": 0,
+              "actionMerit": 0,
+              "killValue": 0,
+              "controlHold": 0,
+              "controlHoldRounds": 0
+            }
+          },
+          "player_b": {
+            "id": "player_b",
+            "name": "Dsv4Flash0731-TE",
+            "joinedAt": 1792011053412,
+            "status": "active",
+            "spawnSlotId": "slot_4",
+            "turnOrder": 1,
+            "eliminatedAt": null,
+            "eliminatedBy": null,
+            "stats": {
+              "headquartersDamage": 0,
+              "unitsDestroyed": 0,
+              "playersEliminated": 0,
+              "actionPointsUsed": 0,
+              "actionMerit": 0,
+              "killValue": 0,
+              "controlHold": 0,
+              "controlHoldRounds": 0
+            }
+          }
+        },
+        "turnOrder": [
+          "player_a",
+          "player_b"
+        ],
+        "controlPoints": [
+          {
+            "id": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "q": 3,
+            "r": 0,
+            "owner": null
+          },
+          {
+            "id": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "q": 0,
+            "r": 3,
+            "owner": null
+          },
+          {
+            "id": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "q": -3,
+            "r": 3,
+            "owner": null
+          },
+          {
+            "id": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "q": -3,
+            "r": 0,
+            "owner": null
+          },
+          {
+            "id": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "q": 0,
+            "r": -3,
+            "owner": null
+          },
+          {
+            "id": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "q": 3,
+            "r": -3,
+            "owner": null
+          },
+          {
+            "id": "cp_center",
+            "name": "中心维修站",
+            "kind": "repair",
+            "q": 0,
+            "r": 0,
+            "owner": null
+          }
+        ],
+        "headquarters": {
+          "player_a": {
+            "id": "193f820e-9e8e-4463-b2d9-d8a260a3f2b3",
+            "owner": "player_a",
+            "q": 5,
+            "r": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "defense": 6,
+            "alive": true
+          },
+          "player_b": {
+            "id": "1849bf2f-94be-4897-b9e8-970b4bea525e",
+            "owner": "player_b",
+            "q": -5,
+            "r": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "defense": 6,
+            "alive": true
+          }
+        },
+        "units": [
+          {
+            "id": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+            "owner": "player_a",
+            "type": "infantry",
+            "q": 4,
+            "r": 1,
+            "hp": 90,
+            "maxHp": 90,
+            "attack": 31,
+            "defense": 7,
+            "moveRange": 2,
+            "attackRange": 2,
+            "cost": 55,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "82f758db-8985-4369-80e8-17aff7c64019",
+            "owner": "player_a",
+            "type": "scout",
+            "q": 4,
+            "r": 0,
+            "hp": 60,
+            "maxHp": 60,
+            "attack": 16,
+            "defense": 4,
+            "moveRange": 3,
+            "attackRange": 1,
+            "cost": 42,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "6e21301a-9b64-4a35-bc54-2939a4afd4a4",
+            "owner": "player_a",
+            "type": "infantry",
+            "q": 5,
+            "r": -1,
+            "hp": 90,
+            "maxHp": 90,
+            "attack": 31,
+            "defense": 7,
+            "moveRange": 2,
+            "attackRange": 2,
+            "cost": 55,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "e292afe4-40f0-4441-b365-ee8a674e7588",
+            "owner": "player_b",
+            "type": "scout",
+            "q": -4,
+            "r": 0,
+            "hp": 60,
+            "maxHp": 60,
+            "attack": 16,
+            "defense": 4,
+            "moveRange": 3,
+            "attackRange": 1,
+            "cost": 42,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+            "owner": "player_b",
+            "type": "infantry",
+            "q": -5,
+            "r": 1,
+            "hp": 90,
+            "maxHp": 90,
+            "attack": 31,
+            "defense": 7,
+            "moveRange": 2,
+            "attackRange": 2,
+            "cost": 55,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          },
+          {
+            "id": "0f01eb6a-bb84-45a4-bcb3-517e731ceb31",
+            "owner": "player_b",
+            "type": "infantry",
+            "q": -4,
+            "r": -1,
+            "hp": 90,
+            "maxHp": 90,
+            "attack": 31,
+            "defense": 7,
+            "moveRange": 2,
+            "attackRange": 2,
+            "cost": 55,
+            "alive": true,
+            "hasMoved": false,
+            "hasActed": false,
+            "actionSpent": false,
+            "canCapture": true
+          }
+        ],
+        "resources": {
+          "player_a": {
+            "supplies": 120
+          },
+          "player_b": {
+            "supplies": 120
+          }
+        },
+        "artillery": null,
+        "firstPlayer": null,
+        "playerNames": {
+          "player_a": "Step5-WB",
+          "player_b": "Dsv4Flash0731-TE"
+        },
+        "config": {
+          "mode": "simultaneous",
+          "units": {
+            "infantry": {
+              "hp": 90,
+              "attack": 31,
+              "defense": 7,
+              "moveRange": 2,
+              "attackRange": 2,
+              "cost": 55,
+              "canCapture": true,
+              "attackShape": {
+                "type": "line",
+                "length": 2
+              }
+            },
+            "scout": {
+              "hp": 60,
+              "attack": 16,
+              "defense": 4,
+              "moveRange": 3,
+              "attackRange": 1,
+              "cost": 42,
+              "canCapture": true
+            },
+            "heavy": {
+              "hp": 140,
+              "attack": 40,
+              "defense": 9,
+              "moveRange": 2,
+              "attackRange": 1,
+              "cost": 100,
+              "canCapture": false,
+              "attackShape": {
+                "type": "arc"
+              }
+            },
+            "ranger": {
+              "hp": 68,
+              "attack": 38,
+              "defense": 3,
+              "moveRange": 2,
+              "attackRange": 3,
+              "cost": 80,
+              "canCapture": false,
+              "attackLock": true
+            },
+            "support": {
+              "hp": 76,
+              "attack": 10,
+              "defense": 5,
+              "moveRange": 2,
+              "attackRange": 2,
+              "cost": 68,
+              "canCapture": false,
+              "healPower": 20,
+              "healShape": {
+                "type": "arc"
+              }
+            }
+          },
+          "headquartersSpec": {
+            "hp": 200,
+            "defense": 6
+          },
+          "balance": {
+            "startingSupplies": 120,
+            "baseIncome": 8,
+            "damageVarianceRange": 3,
+            "minimumDamage": 1,
+            "healVarianceRange": 6,
+            "actionsPerTurn": 5,
+            "maxTurns": 15,
+            "adjudicationWeights": {
+              "enemyHqDamage": 5,
+              "ownHqHp": 1,
+              "controlPoint": 60,
+              "armyValue": 0.35,
+              "supplies": 0,
+              "killValue": 0.15
+            },
+            "comebackSupply": {
+              "startRound": 4,
+              "scoreGapPercent": 40,
+              "amountPerRound": 12
+            },
+            "controlPointTypes": {
+              "supply": {
+                "income": 8,
+                "deployDiscount": 0,
+                "repairAmount": 0
+              },
+              "forward_base": {
+                "income": 6,
+                "deployDiscount": 8,
+                "repairAmount": 0
+              },
+              "repair": {
+                "income": 6,
+                "deployDiscount": 0,
+                "repairAmount": 10
+              }
+            }
+          }
+        },
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 4,
+      "type": "plan_committed",
+      "timestamp": 1792011200471,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 1,
+        "committed": [
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 5,
+      "type": "plan_committed",
+      "timestamp": 1792011218036,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 1,
+        "committed": [
+          "player_a",
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "type": "move",
+      "timestamp": 1792011218039,
+      "payload": {
+        "unitId": "82f758db-8985-4369-80e8-17aff7c64019",
+        "owner": "player_a",
+        "fromQ": 4,
+        "fromR": 0,
+        "toQ": 3,
+        "toR": 0,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 7,
+      "type": "move",
+      "timestamp": 1792011218039,
+      "payload": {
+        "unitId": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+        "owner": "player_a",
+        "fromQ": 4,
+        "fromR": 1,
+        "toQ": 2,
+        "toR": 1,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 8,
+      "type": "move",
+      "timestamp": 1792011218039,
+      "payload": {
+        "unitId": "6e21301a-9b64-4a35-bc54-2939a4afd4a4",
+        "owner": "player_a",
+        "fromQ": 5,
+        "fromR": -1,
+        "toQ": 3,
+        "toR": -1,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 9,
+      "type": "move",
+      "timestamp": 1792011218039,
+      "payload": {
+        "unitId": "e292afe4-40f0-4441-b365-ee8a674e7588",
+        "owner": "player_b",
+        "fromQ": -4,
+        "fromR": 0,
+        "toQ": -3,
+        "toR": 0,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 10,
+      "type": "move",
+      "timestamp": 1792011218039,
+      "payload": {
+        "unitId": "0f01eb6a-bb84-45a4-bcb3-517e731ceb31",
+        "owner": "player_b",
+        "fromQ": -4,
+        "fromR": -1,
+        "toQ": -2,
+        "toR": -1,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 11,
+      "type": "move",
+      "timestamp": 1792011218039,
+      "payload": {
+        "unitId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "owner": "player_b",
+        "fromQ": -5,
+        "fromR": 1,
+        "toQ": -3,
+        "toR": 1,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 12,
+      "type": "control_point_captured",
+      "timestamp": 1792011218039,
+      "payload": {
+        "pointId": "cp_1",
+        "name": "东侧哨点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "82f758db-8985-4369-80e8-17aff7c64019",
+        "q": 3,
+        "r": 0,
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 13,
+      "type": "control_point_captured",
+      "timestamp": 1792011218039,
+      "payload": {
+        "pointId": "cp_4",
+        "name": "西侧哨点",
+        "owner": "player_b",
+        "previousOwner": null,
+        "unitId": "e292afe4-40f0-4441-b365-ee8a674e7588",
+        "q": -3,
+        "r": 0,
+        "roundNumber": 1
+      }
+    },
+    {
+      "seq": 14,
+      "type": "round_end",
+      "timestamp": 1792011218039,
+      "payload": {
+        "roundNumber": 1,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 15,
+      "type": "round_resolved",
+      "timestamp": 1792011218040,
+      "payload": {
+        "roundNumber": 1,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "2cdb0231-393e-448c-af35-f8683ee7a79a",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 4,
+                "fromR": 0,
+                "toQ": 3,
+                "toR": 0
+              }
+            },
+            {
+              "actionId": "decc80c1-779b-4495-9616-e8992e76167d",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 4,
+                "fromR": 1,
+                "toQ": 2,
+                "toR": 1
+              }
+            },
+            {
+              "actionId": "5b51e7d2-3030-4135-91ba-4b7891859aa4",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 5,
+                "fromR": -1,
+                "toQ": 3,
+                "toR": -1
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "51f0dd9e-3316-4623-b240-858c722b48cf",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -4,
+                "fromR": 0,
+                "toQ": -3,
+                "toR": 0
+              }
+            },
+            {
+              "actionId": "3d85e01e-538b-4961-a802-90ca06ef1766",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -4,
+                "fromR": -1,
+                "toQ": -2,
+                "toR": -1
+              }
+            },
+            {
+              "actionId": "f2605e04-3578-407f-a96c-838d5eb66e2d",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -5,
+                "fromR": 1,
+                "toQ": -3,
+                "toR": 1
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 16,
+      "type": "income",
+      "timestamp": 1792011218042,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 8,
+        "controlPoints": 1,
+        "amount": 16,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 17,
+      "type": "income",
+      "timestamp": 1792011218042,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 8,
+        "controlPoints": 1,
+        "amount": 16,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 18,
+      "type": "round_start",
+      "timestamp": 1792011218042,
+      "payload": {
+        "roundNumber": 2,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 19,
+      "type": "plan_committed",
+      "timestamp": 1792011338571,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 2,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 20,
+      "type": "plan_committed",
+      "timestamp": 1792011359219,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 2,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 21,
+      "type": "deploy",
+      "timestamp": 1792011359220,
+      "payload": {
+        "unitId": "027b794e-a48e-4057-ae61-d8b609859004",
+        "owner": "player_a",
+        "unitType": "scout",
+        "fromId": "cp_1",
+        "q": 2,
+        "r": 0,
+        "cost": 42,
+        "unitCost": 42,
+        "discount": 0,
+        "hp": 60,
+        "attack": 16,
+        "defense": 4,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 22,
+      "type": "deploy",
+      "timestamp": 1792011359220,
+      "payload": {
+        "unitId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "193f820e-9e8e-4463-b2d9-d8a260a3f2b3",
+        "q": 4,
+        "r": 0,
+        "cost": 55,
+        "unitCost": 55,
+        "discount": 0,
+        "hp": 90,
+        "attack": 31,
+        "defense": 7,
+        "moveRange": 2,
+        "attackRange": 2,
+        "canCapture": true,
+        "actionsUsed": 5,
+        "actionsRemaining": 0,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 23,
+      "type": "deploy",
+      "timestamp": 1792011359220,
+      "payload": {
+        "unitId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "owner": "player_b",
+        "unitType": "ranger",
+        "fromId": "1849bf2f-94be-4897-b9e8-970b4bea525e",
+        "q": -4,
+        "r": 0,
+        "cost": 80,
+        "unitCost": 80,
+        "discount": 0,
+        "hp": 68,
+        "attack": 38,
+        "defense": 3,
+        "moveRange": 2,
+        "attackRange": 3,
+        "canCapture": false,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 24,
+      "type": "move",
+      "timestamp": 1792011359220,
+      "payload": {
+        "unitId": "6e21301a-9b64-4a35-bc54-2939a4afd4a4",
+        "owner": "player_a",
+        "fromQ": 3,
+        "fromR": -1,
+        "toQ": 3,
+        "toR": -3,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 25,
+      "type": "move",
+      "timestamp": 1792011359220,
+      "payload": {
+        "unitId": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 1,
+        "toQ": 1,
+        "toR": 1,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 26,
+      "type": "action_failed",
+      "timestamp": 1792011359220,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "f9ca7bd1-b37f-4879-88a4-b214e9cde4a9",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 2,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 3
+      }
+    },
+    {
+      "seq": 27,
+      "type": "move",
+      "timestamp": 1792011359220,
+      "payload": {
+        "unitId": "0f01eb6a-bb84-45a4-bcb3-517e731ceb31",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": -1,
+        "toQ": 0,
+        "toR": -3,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 28,
+      "type": "move",
+      "timestamp": 1792011359220,
+      "payload": {
+        "unitId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": 1,
+        "toQ": -1,
+        "toR": 1,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 29,
+      "type": "action_failed",
+      "timestamp": 1792011359220,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "0dfc2b02-8495-4b0d-937d-30eca186a712",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 2,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 3
+      }
+    },
+    {
+      "seq": 30,
+      "type": "control_point_captured",
+      "timestamp": 1792011359220,
+      "payload": {
+        "pointId": "cp_6",
+        "name": "东北哨点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "6e21301a-9b64-4a35-bc54-2939a4afd4a4",
+        "q": 3,
+        "r": -3,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 31,
+      "type": "control_point_captured",
+      "timestamp": 1792011359220,
+      "payload": {
+        "pointId": "cp_5",
+        "name": "西北哨点",
+        "owner": "player_b",
+        "previousOwner": null,
+        "unitId": "0f01eb6a-bb84-45a4-bcb3-517e731ceb31",
+        "q": 0,
+        "r": -3,
+        "roundNumber": 2
+      }
+    },
+    {
+      "seq": 32,
+      "type": "round_end",
+      "timestamp": 1792011359220,
+      "payload": {
+        "roundNumber": 2,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 33,
+      "type": "round_resolved",
+      "timestamp": 1792011359220,
+      "payload": {
+        "roundNumber": 2,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "aafe8dc4-785d-43d9-a387-d23b5be65bdc",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "027b794e-a48e-4057-ae61-d8b609859004",
+                "cost": 42
+              }
+            },
+            {
+              "actionId": "711d1adf-dfc3-49a2-b248-cf4a636f460b",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+                "cost": 55
+              }
+            },
+            {
+              "actionId": "95039a82-d029-4323-9bbe-22a5d19c30bb",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 3,
+                "fromR": -1,
+                "toQ": 3,
+                "toR": -3
+              }
+            },
+            {
+              "actionId": "f67f4e32-dfb8-45f5-b7a1-0d73bc859ed6",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 2,
+                "fromR": 1,
+                "toQ": 1,
+                "toR": 1
+              }
+            },
+            {
+              "actionId": "f9ca7bd1-b37f-4879-88a4-b214e9cde4a9",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "6624d79f-f32e-43ef-82ae-01e9a826faca",
+              "type": "deploy",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "unitId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+                "cost": 80
+              }
+            },
+            {
+              "actionId": "a724cb1f-c399-4e61-8517-dd17c75169f4",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -2,
+                "fromR": -1,
+                "toQ": 0,
+                "toR": -3
+              }
+            },
+            {
+              "actionId": "d7758abe-1b9c-4c5d-b38e-e0e253fdaee0",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -3,
+                "fromR": 1,
+                "toQ": -1,
+                "toR": 1
+              }
+            },
+            {
+              "actionId": "0dfc2b02-8495-4b0d-937d-30eca186a712",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 34,
+      "type": "income",
+      "timestamp": 1792011359221,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 35,
+      "type": "income",
+      "timestamp": 1792011359221,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 36,
+      "type": "round_start",
+      "timestamp": 1792011359221,
+      "payload": {
+        "roundNumber": 3,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 37,
+      "type": "plan_committed",
+      "timestamp": 1792011484152,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 3,
+        "committed": [
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 38,
+      "type": "plan_committed",
+      "timestamp": 1792011515709,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 3,
+        "committed": [
+          "player_a",
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 39,
+      "type": "deploy",
+      "timestamp": 1792011515709,
+      "payload": {
+        "unitId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+        "owner": "player_a",
+        "unitType": "scout",
+        "fromId": "193f820e-9e8e-4463-b2d9-d8a260a3f2b3",
+        "q": 4,
+        "r": 1,
+        "cost": 42,
+        "unitCost": 42,
+        "discount": 0,
+        "hp": 60,
+        "attack": 16,
+        "defense": 4,
+        "moveRange": 3,
+        "attackRange": 1,
+        "canCapture": true,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 40,
+      "type": "deploy",
+      "timestamp": 1792011515709,
+      "payload": {
+        "unitId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "owner": "player_b",
+        "unitType": "support",
+        "fromId": "cp_5",
+        "q": 0,
+        "r": -2,
+        "cost": 68,
+        "unitCost": 68,
+        "discount": 0,
+        "hp": 76,
+        "attack": 10,
+        "defense": 5,
+        "moveRange": 2,
+        "attackRange": 2,
+        "canCapture": false,
+        "healPower": 20,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 41,
+      "type": "move",
+      "timestamp": 1792011515709,
+      "payload": {
+        "unitId": "027b794e-a48e-4057-ae61-d8b609859004",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 0,
+        "toQ": 0,
+        "toR": 3,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 42,
+      "type": "action_failed",
+      "timestamp": 1792011515709,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "1bc547e4-77b2-45d6-b21d-378a74688958",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 3,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 2
+      }
+    },
+    {
+      "seq": 43,
+      "type": "move",
+      "timestamp": 1792011515709,
+      "payload": {
+        "unitId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "owner": "player_a",
+        "fromQ": 4,
+        "fromR": 0,
+        "toQ": 3,
+        "toR": 1,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 44,
+      "type": "action_failed",
+      "timestamp": 1792011515709,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "a306b88c-a403-4b7b-9b60-91271eee3a0d",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 3,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 45,
+      "type": "move",
+      "timestamp": 1792011515709,
+      "payload": {
+        "unitId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "owner": "player_b",
+        "fromQ": -4,
+        "fromR": 0,
+        "toQ": -2,
+        "toR": -1,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 46,
+      "type": "control_point_captured",
+      "timestamp": 1792011515709,
+      "payload": {
+        "pointId": "cp_2",
+        "name": "东南哨点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "027b794e-a48e-4057-ae61-d8b609859004",
+        "q": 0,
+        "r": 3,
+        "roundNumber": 3
+      }
+    },
+    {
+      "seq": 47,
+      "type": "round_end",
+      "timestamp": 1792011515709,
+      "payload": {
+        "roundNumber": 3,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 48,
+      "type": "round_resolved",
+      "timestamp": 1792011515709,
+      "payload": {
+        "roundNumber": 3,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "86b33a9c-4081-427d-8aed-00b2563cfae2",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+                "cost": 42
+              }
+            },
+            {
+              "actionId": "8da4bb8b-7c65-442f-be9a-804641fa1cc6",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 2,
+                "fromR": 0,
+                "toQ": 0,
+                "toR": 3
+              }
+            },
+            {
+              "actionId": "1bc547e4-77b2-45d6-b21d-378a74688958",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "3102e268-cb3f-40b1-b7cc-7fa4db89da9b",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 4,
+                "fromR": 0,
+                "toQ": 3,
+                "toR": 1
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "f8742213-6792-4392-a1ee-a87f6674dd5d",
+              "type": "deploy",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "unitId": "ea548af5-6a89-4130-b232-0413d9924f56",
+                "cost": 68
+              }
+            },
+            {
+              "actionId": "a306b88c-a403-4b7b-9b60-91271eee3a0d",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "3e515e5a-9566-495d-9625-ba7cc6dd6d60",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -4,
+                "fromR": 0,
+                "toQ": -2,
+                "toR": -1
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 49,
+      "type": "income",
+      "timestamp": 1792011515710,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 24,
+        "controlPoints": 3,
+        "amount": 32,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 50,
+      "type": "income",
+      "timestamp": 1792011515710,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 51,
+      "type": "round_start",
+      "timestamp": 1792011515710,
+      "payload": {
+        "roundNumber": 4,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 52,
+      "type": "plan_committed",
+      "timestamp": 1792011629340,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 4,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 53,
+      "type": "plan_committed",
+      "timestamp": 1792011771779,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 4,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 54,
+      "type": "action_failed",
+      "timestamp": 1792011771779,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "3ef47a49-a859-4be8-b3e6-5211e80ee092",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 4,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 55,
+      "type": "move",
+      "timestamp": 1792011771779,
+      "payload": {
+        "unitId": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+        "owner": "player_a",
+        "fromQ": 1,
+        "fromR": 1,
+        "toQ": 2,
+        "toR": 1,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 56,
+      "type": "move",
+      "timestamp": 1792011771779,
+      "payload": {
+        "unitId": "027b794e-a48e-4057-ae61-d8b609859004",
+        "owner": "player_a",
+        "fromQ": 0,
+        "fromR": 3,
+        "toQ": -3,
+        "toR": 3,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 57,
+      "type": "move",
+      "timestamp": 1792011771779,
+      "payload": {
+        "unitId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "owner": "player_a",
+        "fromQ": 3,
+        "fromR": 1,
+        "toQ": 2,
+        "toR": 0,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 58,
+      "type": "action_failed",
+      "timestamp": 1792011771779,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "abc232db-3853-4521-b8b5-0414b1036330",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 4,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 59,
+      "type": "move",
+      "timestamp": 1792011771779,
+      "payload": {
+        "unitId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "owner": "player_b",
+        "fromQ": -2,
+        "fromR": -1,
+        "toQ": -1,
+        "toR": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 60,
+      "type": "attack",
+      "timestamp": 1792011771779,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "q": 1,
+        "r": 1,
+        "hit": false,
+        "aimQ": 1,
+        "aimR": 1,
+        "shape": "line",
+        "locked": false,
+        "targetId": null,
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 61,
+      "type": "control_point_captured",
+      "timestamp": 1792011771779,
+      "payload": {
+        "pointId": "cp_3",
+        "name": "西南哨点",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "027b794e-a48e-4057-ae61-d8b609859004",
+        "q": -3,
+        "r": 3,
+        "roundNumber": 4
+      }
+    },
+    {
+      "seq": 62,
+      "type": "round_end",
+      "timestamp": 1792011771779,
+      "payload": {
+        "roundNumber": 4,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 63,
+      "type": "round_resolved",
+      "timestamp": 1792011771780,
+      "payload": {
+        "roundNumber": 4,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "3ef47a49-a859-4be8-b3e6-5211e80ee092",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "3a1cd33b-1ffa-4042-aa3f-1628c6bdd290",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 1,
+                "fromR": 1,
+                "toQ": 2,
+                "toR": 1
+              }
+            },
+            {
+              "actionId": "cb064c99-7777-4154-84e5-7a0c3b56913c",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 0,
+                "fromR": 3,
+                "toQ": -3,
+                "toR": 3
+              }
+            },
+            {
+              "actionId": "6a2a3344-ba1a-4f1e-b86b-79fab4e7150f",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 3,
+                "fromR": 1,
+                "toQ": 2,
+                "toR": 0
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "abc232db-3853-4521-b8b5-0414b1036330",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "a6be6fd1-bf77-4826-ac57-5ee467ca65cb",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -2,
+                "fromR": -1,
+                "toQ": -1,
+                "toR": 0
+              }
+            },
+            {
+              "actionId": "87388706-7a5c-4103-8dc8-0d820498c2d6",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "missed",
+              "detail": {
+                "q": 1,
+                "r": 1,
+                "shape": "line",
+                "locked": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 64,
+      "type": "income",
+      "timestamp": 1792011771780,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 32,
+        "controlPoints": 4,
+        "amount": 40,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 5
+      }
+    },
+    {
+      "seq": 65,
+      "type": "income",
+      "timestamp": 1792011771780,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 5
+      }
+    },
+    {
+      "seq": 66,
+      "type": "round_start",
+      "timestamp": 1792011771780,
+      "payload": {
+        "roundNumber": 5,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 67,
+      "type": "plan_committed",
+      "timestamp": 1792011887261,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 5,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 68,
+      "type": "plan_committed",
+      "timestamp": 1792011924556,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 5,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 69,
+      "type": "deploy",
+      "timestamp": 1792011924556,
+      "payload": {
+        "unitId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+        "owner": "player_a",
+        "unitType": "ranger",
+        "fromId": "cp_1",
+        "q": 3,
+        "r": 1,
+        "cost": 80,
+        "unitCost": 80,
+        "discount": 0,
+        "hp": 68,
+        "attack": 38,
+        "defense": 3,
+        "moveRange": 2,
+        "attackRange": 3,
+        "canCapture": false,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 5
+      }
+    },
+    {
+      "seq": 70,
+      "type": "action_failed",
+      "timestamp": 1792011924557,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "15f48ff9-505e-4dff-b395-2b94c8c1c79a",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 5,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 71,
+      "type": "move",
+      "timestamp": 1792011924557,
+      "payload": {
+        "unitId": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 1,
+        "toQ": 1,
+        "toR": 1,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 5
+      }
+    },
+    {
+      "seq": 72,
+      "type": "move",
+      "timestamp": 1792011924557,
+      "payload": {
+        "unitId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+        "owner": "player_a",
+        "fromQ": 4,
+        "fromR": 1,
+        "toQ": 2,
+        "toR": 2,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 5
+      }
+    },
+    {
+      "seq": 73,
+      "type": "action_failed",
+      "timestamp": 1792011924557,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "a312f0fc-3e07-4448-bdea-f2ac512c1ba4",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 5,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 74,
+      "type": "move",
+      "timestamp": 1792011924557,
+      "payload": {
+        "unitId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "owner": "player_b",
+        "fromQ": 0,
+        "fromR": -2,
+        "toQ": 0,
+        "toR": -1,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 5
+      }
+    },
+    {
+      "seq": 75,
+      "type": "attack",
+      "timestamp": 1792011924571,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 2,
+        "r": 0,
+        "hit": true,
+        "aimQ": 2,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "targetKind": "unit",
+        "damage": 33,
+        "actualDamage": 33,
+        "targetHp": 57,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 5
+      }
+    },
+    {
+      "seq": 76,
+      "type": "round_end",
+      "timestamp": 1792011924571,
+      "payload": {
+        "roundNumber": 5,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 77,
+      "type": "round_resolved",
+      "timestamp": 1792011924571,
+      "payload": {
+        "roundNumber": 5,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "18322603-de36-4550-bcd9-580dc18a9d8a",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+                "cost": 80
+              }
+            },
+            {
+              "actionId": "15f48ff9-505e-4dff-b395-2b94c8c1c79a",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "ae145512-1c78-419a-b90f-381b25ca859d",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 2,
+                "fromR": 1,
+                "toQ": 1,
+                "toR": 1
+              }
+            },
+            {
+              "actionId": "ebbdff56-a450-47c2-9b2f-9d1072afed2c",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 4,
+                "fromR": 1,
+                "toQ": 2,
+                "toR": 2
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "a312f0fc-3e07-4448-bdea-f2ac512c1ba4",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "789f2c8c-52e9-4084-8fb4-adb7b0d0d021",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": 0,
+                "fromR": -2,
+                "toQ": 0,
+                "toR": -1
+              }
+            },
+            {
+              "actionId": "ac8e5743-841b-4b93-8127-b0f4b0e9bc45",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 2,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+                    "kind": "unit",
+                    "damage": 33,
+                    "actualDamage": 33,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 78,
+      "type": "income",
+      "timestamp": 1792011924572,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 32,
+        "controlPoints": 4,
+        "amount": 40,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 79,
+      "type": "income",
+      "timestamp": 1792011924572,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 80,
+      "type": "round_start",
+      "timestamp": 1792011924572,
+      "payload": {
+        "roundNumber": 6,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 81,
+      "type": "plan_committed",
+      "timestamp": 1792012026527,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 6,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 82,
+      "type": "plan_committed",
+      "timestamp": 1792012214715,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 6,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 83,
+      "type": "deploy",
+      "timestamp": 1792012214715,
+      "payload": {
+        "unitId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "owner": "player_b",
+        "unitType": "ranger",
+        "fromId": "cp_4",
+        "q": -2,
+        "r": 0,
+        "cost": 80,
+        "unitCost": 80,
+        "discount": 0,
+        "hp": 68,
+        "attack": 38,
+        "defense": 3,
+        "moveRange": 2,
+        "attackRange": 3,
+        "canCapture": false,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 84,
+      "type": "action_failed",
+      "timestamp": 1792012214716,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "85d3e70f-4d83-44a1-87e0-db1c22147fe0",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 6,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 85,
+      "type": "move",
+      "timestamp": 1792012214716,
+      "payload": {
+        "unitId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+        "owner": "player_a",
+        "fromQ": 3,
+        "fromR": 1,
+        "toQ": 2,
+        "toR": 1,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 86,
+      "type": "move",
+      "timestamp": 1792012214716,
+      "payload": {
+        "unitId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 0,
+        "toQ": 1,
+        "toR": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 87,
+      "type": "move",
+      "timestamp": 1792012214716,
+      "payload": {
+        "unitId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 2,
+        "toQ": 0,
+        "toR": 2,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 88,
+      "type": "action_failed",
+      "timestamp": 1792012214716,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "54511824-5e6e-430e-9ed3-52e9588b57d1",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 6,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 89,
+      "type": "attack",
+      "timestamp": 1792012214716,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "q": 1,
+        "r": 1,
+        "hit": true,
+        "aimQ": 1,
+        "aimR": 1,
+        "shape": "line",
+        "locked": false,
+        "targetId": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+        "targetKind": "unit",
+        "damage": 21,
+        "actualDamage": 21,
+        "targetHp": 69,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 90,
+      "type": "attack",
+      "timestamp": 1792012214716,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 1,
+        "r": 0,
+        "hit": true,
+        "aimQ": 2,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "targetKind": "unit",
+        "damage": 28,
+        "actualDamage": 28,
+        "targetHp": 29,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 6
+      }
+    },
+    {
+      "seq": 91,
+      "type": "round_end",
+      "timestamp": 1792012214717,
+      "payload": {
+        "roundNumber": 6,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 92,
+      "type": "round_resolved",
+      "timestamp": 1792012214717,
+      "payload": {
+        "roundNumber": 6,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "85d3e70f-4d83-44a1-87e0-db1c22147fe0",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "37af130a-b7ad-4296-9483-fa30598eaf69",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 3,
+                "fromR": 1,
+                "toQ": 2,
+                "toR": 1
+              }
+            },
+            {
+              "actionId": "08cbe094-c031-4855-9997-3d5f841b3b64",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 2,
+                "fromR": 0,
+                "toQ": 1,
+                "toR": 0
+              }
+            },
+            {
+              "actionId": "133f8dcf-8177-4ee3-8df0-df55051efbca",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 2,
+                "fromR": 2,
+                "toQ": 0,
+                "toR": 2
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "125d12a4-72c3-4ebe-9e8e-93afcacc791f",
+              "type": "deploy",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "unitId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+                "cost": 80
+              }
+            },
+            {
+              "actionId": "54511824-5e6e-430e-9ed3-52e9588b57d1",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "c93d63a2-e705-4393-98a9-8a7f48bdd8dc",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 1,
+                "r": 1,
+                "shape": "line",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+                    "kind": "unit",
+                    "damage": 21,
+                    "actualDamage": 21,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "58931420-cffd-4e92-b8e9-0c10c24a722b",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 2,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+                    "kind": "unit",
+                    "damage": 28,
+                    "actualDamage": 28,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 93,
+      "type": "income",
+      "timestamp": 1792012214717,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 32,
+        "controlPoints": 4,
+        "amount": 40,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 94,
+      "type": "income",
+      "timestamp": 1792012214717,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 95,
+      "type": "round_start",
+      "timestamp": 1792012214717,
+      "payload": {
+        "roundNumber": 7,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 96,
+      "type": "plan_committed",
+      "timestamp": 1792012306072,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 7,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 97,
+      "type": "plan_committed",
+      "timestamp": 1792012441046,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 7,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 98,
+      "type": "deploy",
+      "timestamp": 1792012441046,
+      "payload": {
+        "unitId": "8745262a-d326-4a5b-81cb-0ee39f9570cf",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "cp_1",
+        "q": 3,
+        "r": 1,
+        "cost": 55,
+        "unitCost": 55,
+        "discount": 0,
+        "hp": 90,
+        "attack": 31,
+        "defense": 7,
+        "moveRange": 2,
+        "attackRange": 2,
+        "canCapture": true,
+        "actionsUsed": 5,
+        "actionsRemaining": 0,
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 99,
+      "type": "action_failed",
+      "timestamp": 1792012441046,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "1d83a8c5-f6b2-4e13-a0d4-ffa3eade7dec",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 7,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 100,
+      "type": "move",
+      "timestamp": 1792012441046,
+      "payload": {
+        "unitId": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+        "owner": "player_a",
+        "fromQ": 1,
+        "fromR": 1,
+        "toQ": 2,
+        "toR": 2,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 101,
+      "type": "action_failed",
+      "timestamp": 1792012441046,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "1d46dd69-d277-44fd-ac94-5a6f92a20e71",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 7,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 102,
+      "type": "attack",
+      "timestamp": 1792012441046,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+        "q": -1,
+        "r": 1,
+        "hit": true,
+        "aimQ": -1,
+        "aimR": 1,
+        "shape": "single",
+        "locked": true,
+        "targetId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "targetKind": "unit",
+        "damage": 34,
+        "actualDamage": 34,
+        "targetHp": 56,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 103,
+      "type": "attack",
+      "timestamp": 1792012441047,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "q": -1,
+        "r": 0,
+        "hit": true,
+        "aimQ": -1,
+        "aimR": 0,
+        "shape": "line",
+        "locked": false,
+        "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "targetKind": "unit",
+        "damage": 31,
+        "actualDamage": 31,
+        "targetHp": 37,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 104,
+      "type": "attack",
+      "timestamp": 1792012441047,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 1,
+        "r": 0,
+        "hit": true,
+        "aimQ": 1,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "targetKind": "unit",
+        "damage": 32,
+        "actualDamage": 29,
+        "targetHp": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 105,
+      "type": "attack",
+      "timestamp": 1792012441047,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "q": 1,
+        "r": 1,
+        "hit": false,
+        "aimQ": 1,
+        "aimR": 1,
+        "shape": "line",
+        "locked": false,
+        "targetId": null,
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 106,
+      "type": "unit_death",
+      "timestamp": 1792012441050,
+      "payload": {
+        "unitId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+        "owner": "player_a",
+        "type": "infantry",
+        "q": 1,
+        "r": 0,
+        "cause": "attack",
+        "roundNumber": 7
+      }
+    },
+    {
+      "seq": 107,
+      "type": "round_end",
+      "timestamp": 1792012441050,
+      "payload": {
+        "roundNumber": 7,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 108,
+      "type": "round_resolved",
+      "timestamp": 1792012441050,
+      "payload": {
+        "roundNumber": 7,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "4776762a-5053-4983-8410-39d5095e3d14",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "8745262a-d326-4a5b-81cb-0ee39f9570cf",
+                "cost": 55
+              }
+            },
+            {
+              "actionId": "1d83a8c5-f6b2-4e13-a0d4-ffa3eade7dec",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "bed5f4d9-fb43-4537-a2d8-cc9cb4dc7839",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 1,
+                "fromR": 1,
+                "toQ": 2,
+                "toR": 2
+              }
+            },
+            {
+              "actionId": "101edcb8-d091-4bcb-8666-1f4916537c2e",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "q": -1,
+                "r": 1,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+                    "kind": "unit",
+                    "damage": 34,
+                    "actualDamage": 34,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "fb2b6661-44cf-4727-9e83-dce93839382c",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "q": -1,
+                "r": 0,
+                "shape": "line",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+                    "kind": "unit",
+                    "damage": 31,
+                    "actualDamage": 31,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "1d46dd69-d277-44fd-ac94-5a6f92a20e71",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "454c6bb6-d9b6-48eb-b05c-b2a6fcbfde13",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 1,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "029339b6-229e-4d8c-9b26-d95d74e07c0a",
+                    "kind": "unit",
+                    "damage": 32,
+                    "actualDamage": 29,
+                    "killed": true
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "b514dbbe-ad0c-40a0-91d6-68add9a1c99d",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "missed",
+              "detail": {
+                "q": 1,
+                "r": 1,
+                "shape": "line",
+                "locked": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 109,
+      "type": "income",
+      "timestamp": 1792012441051,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 32,
+        "controlPoints": 4,
+        "amount": 40,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 110,
+      "type": "income",
+      "timestamp": 1792012441051,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 111,
+      "type": "round_start",
+      "timestamp": 1792012441051,
+      "payload": {
+        "roundNumber": 8,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 112,
+      "type": "plan_committed",
+      "timestamp": 1792012583242,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 8,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 113,
+      "type": "plan_committed",
+      "timestamp": 1792012631173,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 8,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 114,
+      "type": "deploy",
+      "timestamp": 1792012631173,
+      "payload": {
+        "unitId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "cp_1",
+        "q": 2,
+        "r": 0,
+        "cost": 55,
+        "unitCost": 55,
+        "discount": 0,
+        "hp": 90,
+        "attack": 31,
+        "defense": 7,
+        "moveRange": 2,
+        "attackRange": 2,
+        "canCapture": true,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 115,
+      "type": "move",
+      "timestamp": 1792012631173,
+      "payload": {
+        "unitId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+        "owner": "player_a",
+        "fromQ": 0,
+        "fromR": 2,
+        "toQ": 0,
+        "toR": 0,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 116,
+      "type": "heal",
+      "timestamp": 1792012631207,
+      "payload": {
+        "owner": "player_b",
+        "supportId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "amount": 21,
+        "targetHp": 58,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 117,
+      "type": "attack",
+      "timestamp": 1792012631207,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+        "q": -1,
+        "r": 1,
+        "hit": true,
+        "aimQ": -1,
+        "aimR": 1,
+        "shape": "single",
+        "locked": true,
+        "targetId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "targetKind": "unit",
+        "damage": 30,
+        "actualDamage": 30,
+        "targetHp": 26,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 118,
+      "type": "attack",
+      "timestamp": 1792012631207,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 2,
+        "shape": "single",
+        "locked": true,
+        "targetId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+        "targetKind": "unit",
+        "damage": 32,
+        "actualDamage": 32,
+        "targetHp": 28,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 119,
+      "type": "attack",
+      "timestamp": 1792012631208,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "single",
+        "locked": false,
+        "targetId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+        "targetKind": "unit",
+        "damage": 34,
+        "actualDamage": 28,
+        "targetHp": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 120,
+      "type": "attack",
+      "timestamp": 1792012631208,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "line",
+        "locked": false,
+        "targetId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+        "targetKind": "unit",
+        "damage": 29,
+        "actualDamage": 0,
+        "targetHp": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 121,
+      "type": "unit_death",
+      "timestamp": 1792012631208,
+      "payload": {
+        "unitId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+        "owner": "player_a",
+        "type": "scout",
+        "q": 0,
+        "r": 0,
+        "cause": "attack",
+        "roundNumber": 8
+      }
+    },
+    {
+      "seq": 122,
+      "type": "round_end",
+      "timestamp": 1792012631208,
+      "payload": {
+        "roundNumber": 8,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 123,
+      "type": "round_resolved",
+      "timestamp": 1792012631208,
+      "payload": {
+        "roundNumber": 8,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "311eec5e-72d2-46fc-b3df-11cf67c10b4a",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+                "cost": 55
+              }
+            },
+            {
+              "actionId": "55285e9d-a086-43be-b48f-3bd9891440de",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 0,
+                "fromR": 2,
+                "toQ": 0,
+                "toR": 0
+              }
+            },
+            {
+              "actionId": "738a1f89-7a94-4878-87d6-d0765fee4b81",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "q": -1,
+                "r": 1,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+                    "kind": "unit",
+                    "damage": 30,
+                    "actualDamage": 30,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "3b89178f-1859-4a3f-ae17-a0507bc79622",
+              "type": "heal",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "targets": [
+                  {
+                    "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+                    "amount": 21
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "fba1ac2a-7b27-4e55-8e51-83df9b28a16f",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 2,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+                    "kind": "unit",
+                    "damage": 32,
+                    "actualDamage": 32,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "faa72dfc-0546-4c33-b7fa-77db6c206b6b",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "single",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+                    "kind": "unit",
+                    "damage": 34,
+                    "actualDamage": 28,
+                    "killed": true
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "47e655f4-8500-4250-a478-ff42c2294671",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "line",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "080ada5c-4d85-4bc4-a00f-1d61fcd1ca7a",
+                    "kind": "unit",
+                    "damage": 29,
+                    "actualDamage": 0,
+                    "killed": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 124,
+      "type": "income",
+      "timestamp": 1792012631208,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 32,
+        "controlPoints": 4,
+        "amount": 40,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 125,
+      "type": "income",
+      "timestamp": 1792012631208,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 126,
+      "type": "round_start",
+      "timestamp": 1792012631208,
+      "payload": {
+        "roundNumber": 9,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 127,
+      "type": "plan_committed",
+      "timestamp": 1792012699891,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 9,
+        "committed": [
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 128,
+      "type": "plan_committed",
+      "timestamp": 1792012750159,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 9,
+        "committed": [
+          "player_a",
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 129,
+      "type": "deploy",
+      "timestamp": 1792012750159,
+      "payload": {
+        "unitId": "6019bb9a-bf65-4435-a11b-98d75fadf1ed",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "193f820e-9e8e-4463-b2d9-d8a260a3f2b3",
+        "q": 4,
+        "r": 0,
+        "cost": 55,
+        "unitCost": 55,
+        "discount": 0,
+        "hp": 90,
+        "attack": 31,
+        "defense": 7,
+        "moveRange": 2,
+        "attackRange": 2,
+        "canCapture": true,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 130,
+      "type": "move",
+      "timestamp": 1792012750160,
+      "payload": {
+        "unitId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 0,
+        "toQ": 0,
+        "toR": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 131,
+      "type": "move",
+      "timestamp": 1792012750160,
+      "payload": {
+        "unitId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "owner": "player_b",
+        "fromQ": -1,
+        "fromR": 1,
+        "toQ": -2,
+        "toR": 1,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 132,
+      "type": "heal",
+      "timestamp": 1792012750160,
+      "payload": {
+        "owner": "player_b",
+        "supportId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "amount": 10,
+        "targetHp": 68,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 133,
+      "type": "attack",
+      "timestamp": 1792012750160,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+        "q": -1,
+        "r": 1,
+        "hit": false,
+        "aimQ": -1,
+        "aimR": 1,
+        "shape": "single",
+        "locked": true,
+        "targetId": "1e8ba813-1331-45ce-9e73-bc136b59c220",
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 134,
+      "type": "attack",
+      "timestamp": 1792012750160,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 2,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "targetKind": "unit",
+        "damage": 28,
+        "actualDamage": 28,
+        "targetHp": 62,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 135,
+      "type": "attack",
+      "timestamp": 1792012750160,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "single",
+        "locked": false,
+        "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "targetKind": "unit",
+        "damage": 30,
+        "actualDamage": 30,
+        "targetHp": 32,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 136,
+      "type": "control_point_captured",
+      "timestamp": 1792012750160,
+      "payload": {
+        "pointId": "cp_center",
+        "name": "中心维修站",
+        "owner": "player_a",
+        "previousOwner": null,
+        "unitId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "q": 0,
+        "r": 0,
+        "roundNumber": 9
+      }
+    },
+    {
+      "seq": 137,
+      "type": "round_end",
+      "timestamp": 1792012750160,
+      "payload": {
+        "roundNumber": 9,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 138,
+      "type": "round_resolved",
+      "timestamp": 1792012750160,
+      "payload": {
+        "roundNumber": 9,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "85bf3fa7-a55e-4d73-892c-dcc5a45164eb",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "6019bb9a-bf65-4435-a11b-98d75fadf1ed",
+                "cost": 55
+              }
+            },
+            {
+              "actionId": "95af0212-77d5-4be9-9207-b40f5b1e3ae9",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 2,
+                "fromR": 0,
+                "toQ": 0,
+                "toR": 0
+              }
+            },
+            {
+              "actionId": "ecd2a194-94d3-447c-8e87-893b5b3343b7",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "missed",
+              "reason": "target_escaped",
+              "detail": {
+                "q": -1,
+                "r": 1,
+                "shape": "single",
+                "locked": true
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "7c37d4de-06e3-4ad7-985e-3ca617eababa",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -1,
+                "fromR": 1,
+                "toQ": -2,
+                "toR": 1
+              }
+            },
+            {
+              "actionId": "dc6d9bc3-b9f4-490f-a50b-f1451bab1008",
+              "type": "heal",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "targets": [
+                  {
+                    "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+                    "amount": 10
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "34d3acec-2fcb-4a1a-b69c-b14ff27dc49b",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 2,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+                    "kind": "unit",
+                    "damage": 28,
+                    "actualDamage": 28,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "4e5eb405-d5c8-4bb7-b918-7d09dfdedfac",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "single",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+                    "kind": "unit",
+                    "damage": 30,
+                    "actualDamage": 30,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 139,
+      "type": "income",
+      "timestamp": 1792012750161,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 38,
+        "controlPoints": 5,
+        "amount": 46,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_center",
+            "name": "中心维修站",
+            "kind": "repair",
+            "amount": 6
+          }
+        ],
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 140,
+      "type": "control_point_repair",
+      "timestamp": 1792012750161,
+      "payload": {
+        "owner": "player_a",
+        "pointId": "cp_center",
+        "pointName": "中心维修站",
+        "unitId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "amount": 10,
+        "unitHp": 42,
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 141,
+      "type": "income",
+      "timestamp": 1792012750161,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 142,
+      "type": "round_start",
+      "timestamp": 1792012750161,
+      "payload": {
+        "roundNumber": 10,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 143,
+      "type": "plan_committed",
+      "timestamp": 1792012852558,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 10,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 144,
+      "type": "plan_committed",
+      "timestamp": 1792012917032,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 10,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 145,
+      "type": "deploy",
+      "timestamp": 1792012917032,
+      "payload": {
+        "unitId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "owner": "player_b",
+        "unitType": "heavy",
+        "fromId": "cp_5",
+        "q": 0,
+        "r": -2,
+        "cost": 100,
+        "unitCost": 100,
+        "discount": 0,
+        "hp": 140,
+        "attack": 40,
+        "defense": 9,
+        "moveRange": 2,
+        "attackRange": 1,
+        "canCapture": false,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 146,
+      "type": "attack",
+      "timestamp": 1792012917032,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "q": -1,
+        "r": 0,
+        "hit": true,
+        "aimQ": -2,
+        "aimR": 0,
+        "shape": "line",
+        "locked": false,
+        "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "targetKind": "unit",
+        "damage": 27,
+        "actualDamage": 27,
+        "targetHp": 41,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 147,
+      "type": "attack",
+      "timestamp": 1792012917032,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "q": -2,
+        "r": 0,
+        "hit": true,
+        "aimQ": -2,
+        "aimR": 0,
+        "shape": "line",
+        "locked": false,
+        "targetId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "targetKind": "unit",
+        "damage": 25,
+        "actualDamage": 25,
+        "targetHp": 43,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 148,
+      "type": "attack",
+      "timestamp": 1792012917032,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "targetKind": "unit",
+        "damage": 30,
+        "actualDamage": 30,
+        "targetHp": 12,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 149,
+      "type": "attack",
+      "timestamp": 1792012917032,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "targetKind": "unit",
+        "damage": 33,
+        "actualDamage": 12,
+        "targetHp": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 150,
+      "type": "attack",
+      "timestamp": 1792012917032,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "single",
+        "locked": false,
+        "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "targetKind": "unit",
+        "damage": 4,
+        "actualDamage": 0,
+        "targetHp": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 151,
+      "type": "unit_death",
+      "timestamp": 1792012917032,
+      "payload": {
+        "unitId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+        "owner": "player_a",
+        "type": "infantry",
+        "q": 0,
+        "r": 0,
+        "cause": "attack",
+        "roundNumber": 10
+      }
+    },
+    {
+      "seq": 152,
+      "type": "round_end",
+      "timestamp": 1792012917033,
+      "payload": {
+        "roundNumber": 10,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 153,
+      "type": "round_resolved",
+      "timestamp": 1792012917033,
+      "payload": {
+        "roundNumber": 10,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "445f13cc-fe18-4496-8a35-e4a5e172241b",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "q": -2,
+                "r": 0,
+                "shape": "line",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+                    "kind": "unit",
+                    "damage": 27,
+                    "actualDamage": 27,
+                    "killed": false
+                  },
+                  {
+                    "targetId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+                    "kind": "unit",
+                    "damage": 25,
+                    "actualDamage": 25,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "0776d0fe-f519-4a89-a9e4-4a139d8f56f1",
+              "type": "deploy",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "unitId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+                "cost": 100
+              }
+            },
+            {
+              "actionId": "98d5e4fe-b45b-4a02-b333-d69eb128a50f",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+                    "kind": "unit",
+                    "damage": 30,
+                    "actualDamage": 30,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "3a5d2494-0208-4380-9675-446bc6fc7dde",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+                    "kind": "unit",
+                    "damage": 33,
+                    "actualDamage": 12,
+                    "killed": true
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "04746f24-81dc-44cf-9f46-1926ff13d5a1",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "single",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "1daad746-60d8-4352-a443-c15f2dc381d5",
+                    "kind": "unit",
+                    "damage": 4,
+                    "actualDamage": 0,
+                    "killed": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 154,
+      "type": "income",
+      "timestamp": 1792012917033,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 38,
+        "controlPoints": 5,
+        "amount": 46,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_center",
+            "name": "中心维修站",
+            "kind": "repair",
+            "amount": 6
+          }
+        ],
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 155,
+      "type": "income",
+      "timestamp": 1792012917033,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 156,
+      "type": "round_start",
+      "timestamp": 1792012917033,
+      "payload": {
+        "roundNumber": 11,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 157,
+      "type": "plan_committed",
+      "timestamp": 1792013022622,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 11,
+        "committed": [
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 158,
+      "type": "plan_committed",
+      "timestamp": 1792013093828,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 11,
+        "committed": [
+          "player_a",
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 159,
+      "type": "deploy",
+      "timestamp": 1792013093828,
+      "payload": {
+        "unitId": "38bf89c0-11c8-4198-b67c-f0a2aabbd282",
+        "owner": "player_a",
+        "unitType": "heavy",
+        "fromId": "cp_1",
+        "q": 2,
+        "r": 0,
+        "cost": 100,
+        "unitCost": 100,
+        "discount": 0,
+        "hp": 140,
+        "attack": 40,
+        "defense": 9,
+        "moveRange": 2,
+        "attackRange": 1,
+        "canCapture": false,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 160,
+      "type": "move",
+      "timestamp": 1792013093828,
+      "payload": {
+        "unitId": "82f758db-8985-4369-80e8-17aff7c64019",
+        "owner": "player_a",
+        "fromQ": 3,
+        "fromR": 0,
+        "toQ": 0,
+        "toR": 0,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 161,
+      "type": "move",
+      "timestamp": 1792013093828,
+      "payload": {
+        "unitId": "6aec037d-17e0-4a63-b0d8-e33c9a84acf3",
+        "owner": "player_a",
+        "fromQ": 2,
+        "fromR": 2,
+        "toQ": 1,
+        "toR": 2,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 162,
+      "type": "move",
+      "timestamp": 1792013093828,
+      "payload": {
+        "unitId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "owner": "player_b",
+        "fromQ": 0,
+        "fromR": -2,
+        "toQ": 1,
+        "toR": -1,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 163,
+      "type": "move",
+      "timestamp": 1792013093828,
+      "payload": {
+        "unitId": "e292afe4-40f0-4441-b365-ee8a674e7588",
+        "owner": "player_b",
+        "fromQ": -3,
+        "fromR": 0,
+        "toQ": -1,
+        "toR": -1,
+        "actionsUsed": 5,
+        "actionsRemaining": 0,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 164,
+      "type": "heal",
+      "timestamp": 1792013093828,
+      "payload": {
+        "owner": "player_b",
+        "supportId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "amount": 25,
+        "targetHp": 66,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 165,
+      "type": "attack",
+      "timestamp": 1792013093829,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 1,
+        "r": 1,
+        "hit": false,
+        "aimQ": 1,
+        "aimR": 1,
+        "shape": "single",
+        "locked": false,
+        "targetId": null,
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 166,
+      "type": "attack",
+      "timestamp": 1792013093829,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "q": 1,
+        "r": 0,
+        "hit": false,
+        "aimQ": 1,
+        "aimR": 0,
+        "shape": "single",
+        "locked": false,
+        "targetId": null,
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 11
+      }
+    },
+    {
+      "seq": 167,
+      "type": "round_end",
+      "timestamp": 1792013093829,
+      "payload": {
+        "roundNumber": 11,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 168,
+      "type": "round_resolved",
+      "timestamp": 1792013093829,
+      "payload": {
+        "roundNumber": 11,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "f4589b92-2add-4883-89da-90d0dbbc4d6b",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "38bf89c0-11c8-4198-b67c-f0a2aabbd282",
+                "cost": 100
+              }
+            },
+            {
+              "actionId": "55c8aaa6-f032-4c4c-8827-501cf6482995",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 3,
+                "fromR": 0,
+                "toQ": 0,
+                "toR": 0
+              }
+            },
+            {
+              "actionId": "6eded312-c253-4eb7-98a5-d3976e88a283",
+              "type": "move",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "fromQ": 2,
+                "fromR": 2,
+                "toQ": 1,
+                "toR": 2
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "ce29d741-daaa-413b-acb0-15f6ddada410",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": 0,
+                "fromR": -2,
+                "toQ": 1,
+                "toR": -1
+              }
+            },
+            {
+              "actionId": "f9a47698-3e6f-4913-a41f-5f5ca1ca16ab",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": -3,
+                "fromR": 0,
+                "toQ": -1,
+                "toR": -1
+              }
+            },
+            {
+              "actionId": "cbd8c8e8-d694-476a-810e-d2408f0d2951",
+              "type": "heal",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "targets": [
+                  {
+                    "targetId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+                    "amount": 25
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "d04833d0-8c6b-474d-9620-07e97a383f62",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "missed",
+              "detail": {
+                "q": 1,
+                "r": 1,
+                "shape": "single",
+                "locked": false
+              }
+            },
+            {
+              "actionId": "3cb39618-df4f-4477-b170-b89505ba6dcb",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "missed",
+              "detail": {
+                "q": 1,
+                "r": 0,
+                "shape": "single",
+                "locked": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 169,
+      "type": "income",
+      "timestamp": 1792013093829,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 38,
+        "controlPoints": 5,
+        "amount": 46,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_center",
+            "name": "中心维修站",
+            "kind": "repair",
+            "amount": 6
+          }
+        ],
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 170,
+      "type": "income",
+      "timestamp": 1792013093829,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 171,
+      "type": "round_start",
+      "timestamp": 1792013093829,
+      "payload": {
+        "roundNumber": 12,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 172,
+      "type": "plan_committed",
+      "timestamp": 1792013217693,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 12,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 173,
+      "type": "plan_committed",
+      "timestamp": 1792013226263,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 12,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 174,
+      "type": "move",
+      "timestamp": 1792013226263,
+      "payload": {
+        "unitId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "owner": "player_b",
+        "fromQ": 0,
+        "fromR": -1,
+        "toQ": 0,
+        "toR": -2,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 175,
+      "type": "attack",
+      "timestamp": 1792013226263,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+        "q": 1,
+        "r": -1,
+        "hit": true,
+        "aimQ": 1,
+        "aimR": -1,
+        "shape": "single",
+        "locked": true,
+        "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "targetKind": "unit",
+        "damage": 27,
+        "actualDamage": 27,
+        "targetHp": 113,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 176,
+      "type": "attack",
+      "timestamp": 1792013226263,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "6e21301a-9b64-4a35-bc54-2939a4afd4a4",
+        "q": 1,
+        "r": -1,
+        "hit": true,
+        "aimQ": 1,
+        "aimR": -1,
+        "shape": "line",
+        "locked": false,
+        "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "targetKind": "unit",
+        "damage": 23,
+        "actualDamage": 23,
+        "targetHp": 90,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 177,
+      "type": "attack",
+      "timestamp": 1792013226263,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "82f758db-8985-4369-80e8-17aff7c64019",
+        "targetKind": "unit",
+        "damage": 35,
+        "actualDamage": 35,
+        "targetHp": 25,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 178,
+      "type": "attack",
+      "timestamp": 1792013226263,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "82f758db-8985-4369-80e8-17aff7c64019",
+        "targetKind": "unit",
+        "damage": 32,
+        "actualDamage": 25,
+        "targetHp": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 179,
+      "type": "attack",
+      "timestamp": 1792013226263,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "q": 0,
+        "r": 0,
+        "hit": true,
+        "aimQ": 0,
+        "aimR": 0,
+        "shape": "arc",
+        "locked": false,
+        "targetId": "82f758db-8985-4369-80e8-17aff7c64019",
+        "targetKind": "unit",
+        "damage": 35,
+        "actualDamage": 0,
+        "targetHp": 0,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 180,
+      "type": "unit_death",
+      "timestamp": 1792013226263,
+      "payload": {
+        "unitId": "82f758db-8985-4369-80e8-17aff7c64019",
+        "owner": "player_a",
+        "type": "scout",
+        "q": 0,
+        "r": 0,
+        "cause": "attack",
+        "roundNumber": 12
+      }
+    },
+    {
+      "seq": 181,
+      "type": "round_end",
+      "timestamp": 1792013226263,
+      "payload": {
+        "roundNumber": 12,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 182,
+      "type": "round_resolved",
+      "timestamp": 1792013226263,
+      "payload": {
+        "roundNumber": 12,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "f2c9acd5-831a-45b1-8cbe-c8bb39710b69",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "q": 1,
+                "r": -1,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+                    "kind": "unit",
+                    "damage": 27,
+                    "actualDamage": 27,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "c8df889f-a3f9-482d-92ec-b9d34c11bbbd",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "q": 1,
+                "r": -1,
+                "shape": "line",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+                    "kind": "unit",
+                    "damage": 23,
+                    "actualDamage": 23,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "2c339b67-d818-47b4-ab15-31bfe3a2df28",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": 0,
+                "fromR": -1,
+                "toQ": 0,
+                "toR": -2
+              }
+            },
+            {
+              "actionId": "b96a2fcd-ecb5-4167-9d39-6ad5060777d7",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "82f758db-8985-4369-80e8-17aff7c64019",
+                    "kind": "unit",
+                    "damage": 35,
+                    "actualDamage": 35,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "25f3e0c8-a1e3-4a0a-9d71-4d1bb88f9c85",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "82f758db-8985-4369-80e8-17aff7c64019",
+                    "kind": "unit",
+                    "damage": 32,
+                    "actualDamage": 25,
+                    "killed": true
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "736ab363-c7af-4fd3-a27b-12bec949e7fa",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 0,
+                "r": 0,
+                "shape": "arc",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "82f758db-8985-4369-80e8-17aff7c64019",
+                    "kind": "unit",
+                    "damage": 35,
+                    "actualDamage": 0,
+                    "killed": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 183,
+      "type": "income",
+      "timestamp": 1792013226264,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 38,
+        "controlPoints": 5,
+        "amount": 46,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_center",
+            "name": "中心维修站",
+            "kind": "repair",
+            "amount": 6
+          }
+        ],
+        "roundNumber": 13
+      }
+    },
+    {
+      "seq": 184,
+      "type": "income",
+      "timestamp": 1792013226264,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 13
+      }
+    },
+    {
+      "seq": 185,
+      "type": "round_start",
+      "timestamp": 1792013226264,
+      "payload": {
+        "roundNumber": 13,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 186,
+      "type": "plan_committed",
+      "timestamp": 1792013281871,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 13,
+        "committed": [
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 187,
+      "type": "plan_committed",
+      "timestamp": 1792013350664,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 13,
+        "committed": [
+          "player_a",
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 188,
+      "type": "deploy",
+      "timestamp": 1792013350664,
+      "payload": {
+        "unitId": "10783270-9371-4e52-9205-bd424c72d4bf",
+        "owner": "player_b",
+        "unitType": "infantry",
+        "fromId": "cp_4",
+        "q": -2,
+        "r": -1,
+        "cost": 55,
+        "unitCost": 55,
+        "discount": 0,
+        "hp": 90,
+        "attack": 31,
+        "defense": 7,
+        "moveRange": 2,
+        "attackRange": 2,
+        "canCapture": true,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 13
+      }
+    },
+    {
+      "seq": 189,
+      "type": "action_failed",
+      "timestamp": 1792013350664,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "5cd7e6f3-500a-479e-9e65-034ae5ca5189",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 13,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 190,
+      "type": "action_failed",
+      "timestamp": 1792013350664,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "98f5ec36-6d05-446b-b158-6658b861e935",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 13,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 191,
+      "type": "move",
+      "timestamp": 1792013350664,
+      "payload": {
+        "unitId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "owner": "player_b",
+        "fromQ": 0,
+        "fromR": -2,
+        "toQ": 1,
+        "toR": -2,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 13
+      }
+    },
+    {
+      "seq": 192,
+      "type": "attack",
+      "timestamp": 1792013350664,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+        "q": 1,
+        "r": -1,
+        "hit": true,
+        "aimQ": 1,
+        "aimR": -1,
+        "shape": "single",
+        "locked": true,
+        "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "targetKind": "unit",
+        "damage": 30,
+        "actualDamage": 30,
+        "targetHp": 60,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 13
+      }
+    },
+    {
+      "seq": 193,
+      "type": "attack",
+      "timestamp": 1792013350665,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "6e21301a-9b64-4a35-bc54-2939a4afd4a4",
+        "q": 1,
+        "r": -1,
+        "hit": true,
+        "aimQ": 1,
+        "aimR": -1,
+        "shape": "line",
+        "locked": false,
+        "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "targetKind": "unit",
+        "damage": 24,
+        "actualDamage": 24,
+        "targetHp": 36,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 13
+      }
+    },
+    {
+      "seq": 194,
+      "type": "attack",
+      "timestamp": 1792013350665,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 2,
+        "r": 0,
+        "hit": true,
+        "aimQ": 2,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "38bf89c0-11c8-4198-b67c-f0a2aabbd282",
+        "targetKind": "unit",
+        "damage": 26,
+        "actualDamage": 26,
+        "targetHp": 114,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 13
+      }
+    },
+    {
+      "seq": 195,
+      "type": "round_end",
+      "timestamp": 1792013350665,
+      "payload": {
+        "roundNumber": 13,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 196,
+      "type": "round_resolved",
+      "timestamp": 1792013350665,
+      "payload": {
+        "roundNumber": 13,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "5cd7e6f3-500a-479e-9e65-034ae5ca5189",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "ab1b7729-05ea-4d20-a8d5-7653b21d3600",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "q": 1,
+                "r": -1,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+                    "kind": "unit",
+                    "damage": 30,
+                    "actualDamage": 30,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "f7fd2ad1-5086-42dd-8ac9-154e4b0e7201",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "q": 1,
+                "r": -1,
+                "shape": "line",
+                "locked": false,
+                "hits": [
+                  {
+                    "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+                    "kind": "unit",
+                    "damage": 24,
+                    "actualDamage": 24,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "cd197eb9-8b7a-48c5-9054-d575ef534d48",
+              "type": "deploy",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "unitId": "10783270-9371-4e52-9205-bd424c72d4bf",
+                "cost": 55
+              }
+            },
+            {
+              "actionId": "98f5ec36-6d05-446b-b158-6658b861e935",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "bc3d9095-4f86-45db-bfad-3df7bbbc3310",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": 0,
+                "fromR": -2,
+                "toQ": 1,
+                "toR": -2
+              }
+            },
+            {
+              "actionId": "224830f9-086a-4d5e-aece-34dee736f052",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 2,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "38bf89c0-11c8-4198-b67c-f0a2aabbd282",
+                    "kind": "unit",
+                    "damage": 26,
+                    "actualDamage": 26,
+                    "killed": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 197,
+      "type": "income",
+      "timestamp": 1792013350665,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 38,
+        "controlPoints": 5,
+        "amount": 46,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_center",
+            "name": "中心维修站",
+            "kind": "repair",
+            "amount": 6
+          }
+        ],
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 198,
+      "type": "income",
+      "timestamp": 1792013350665,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 199,
+      "type": "round_start",
+      "timestamp": 1792013350665,
+      "payload": {
+        "roundNumber": 14,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 200,
+      "type": "plan_committed",
+      "timestamp": 1792013433432,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 14,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 201,
+      "type": "plan_committed",
+      "timestamp": 1792014094613,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 14,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 202,
+      "type": "deploy",
+      "timestamp": 1792014094613,
+      "payload": {
+        "unitId": "be1da300-0061-40a1-acde-f5a09a9a1b7e",
+        "owner": "player_a",
+        "unitType": "heavy",
+        "fromId": "cp_2",
+        "q": 0,
+        "r": 2,
+        "cost": 100,
+        "unitCost": 100,
+        "discount": 0,
+        "hp": 140,
+        "attack": 40,
+        "defense": 9,
+        "moveRange": 2,
+        "attackRange": 1,
+        "canCapture": false,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 203,
+      "type": "action_failed",
+      "timestamp": 1792014094613,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "5498760d-2a15-4db9-9e77-16a62f77e12f",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 14,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 204,
+      "type": "move",
+      "timestamp": 1792014094613,
+      "payload": {
+        "unitId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "owner": "player_b",
+        "fromQ": 1,
+        "fromR": -1,
+        "toQ": 0,
+        "toR": -2,
+        "actionsUsed": 1,
+        "actionsRemaining": 4,
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 205,
+      "type": "action_failed",
+      "timestamp": 1792014094613,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "7193cfcf-d5b7-4fcb-9c24-e6e0108e1e26",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 14,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 2
+      }
+    },
+    {
+      "seq": 206,
+      "type": "attack",
+      "timestamp": 1792014094613,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "b7cc99a6-44ac-471a-a435-84b256f7f1ae",
+        "q": 1,
+        "r": -1,
+        "hit": false,
+        "aimQ": 1,
+        "aimR": -1,
+        "shape": "single",
+        "locked": true,
+        "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 207,
+      "type": "attack",
+      "timestamp": 1792014094613,
+      "payload": {
+        "owner": "player_a",
+        "attackerId": "6e21301a-9b64-4a35-bc54-2939a4afd4a4",
+        "q": 1,
+        "r": -1,
+        "hit": false,
+        "aimQ": 1,
+        "aimR": -1,
+        "shape": "line",
+        "locked": false,
+        "targetId": null,
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 208,
+      "type": "attack",
+      "timestamp": 1792014094613,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 2,
+        "r": 0,
+        "hit": true,
+        "aimQ": 2,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "38bf89c0-11c8-4198-b67c-f0a2aabbd282",
+        "targetKind": "unit",
+        "damage": 32,
+        "actualDamage": 32,
+        "targetHp": 82,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 209,
+      "type": "attack",
+      "timestamp": 1792014094613,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "q": 1,
+        "r": 0,
+        "hit": false,
+        "aimQ": 1,
+        "aimR": 0,
+        "shape": "single",
+        "locked": false,
+        "targetId": null,
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 210,
+      "type": "attack",
+      "timestamp": 1792014094613,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "q": 1,
+        "r": 0,
+        "hit": false,
+        "aimQ": 1,
+        "aimR": 0,
+        "shape": "single",
+        "locked": false,
+        "targetId": null,
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 5,
+        "actionsRemaining": 0,
+        "roundNumber": 14
+      }
+    },
+    {
+      "seq": 211,
+      "type": "round_end",
+      "timestamp": 1792014094614,
+      "payload": {
+        "roundNumber": 14,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 212,
+      "type": "round_resolved",
+      "timestamp": 1792014094614,
+      "payload": {
+        "roundNumber": 14,
+        "gameOver": false,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "5a11eb47-1ea5-43af-9366-232223794004",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "be1da300-0061-40a1-acde-f5a09a9a1b7e",
+                "cost": 100
+              }
+            },
+            {
+              "actionId": "5498760d-2a15-4db9-9e77-16a62f77e12f",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "8db2d5bd-e9d2-4ae4-88ec-fb8725b8c415",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "missed",
+              "reason": "target_escaped",
+              "detail": {
+                "q": 1,
+                "r": -1,
+                "shape": "single",
+                "locked": true
+              }
+            },
+            {
+              "actionId": "0e3adc05-eb79-41e4-9d62-a1e549724cef",
+              "type": "attack",
+              "owner": "player_a",
+              "status": "missed",
+              "detail": {
+                "q": 1,
+                "r": -1,
+                "shape": "line",
+                "locked": false
+              }
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "4f75f80d-f2dd-4101-a185-41e5b8b41e49",
+              "type": "move",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "fromQ": 1,
+                "fromR": -1,
+                "toQ": 0,
+                "toR": -2
+              }
+            },
+            {
+              "actionId": "7193cfcf-d5b7-4fcb-9c24-e6e0108e1e26",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "4c1af004-088e-4caf-b4db-dfa5e473c8d0",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 2,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "38bf89c0-11c8-4198-b67c-f0a2aabbd282",
+                    "kind": "unit",
+                    "damage": 32,
+                    "actualDamage": 32,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "a5ebf41b-2f2b-41a1-8cea-f0164de7e85e",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "missed",
+              "detail": {
+                "q": 1,
+                "r": 0,
+                "shape": "single",
+                "locked": false
+              }
+            },
+            {
+              "actionId": "73543f3f-5203-495c-b051-21437c7cf64d",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "missed",
+              "detail": {
+                "q": 1,
+                "r": 0,
+                "shape": "single",
+                "locked": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 213,
+      "type": "income",
+      "timestamp": 1792014094614,
+      "payload": {
+        "owner": "player_a",
+        "base": 8,
+        "control": 38,
+        "controlPoints": 5,
+        "amount": 46,
+        "breakdown": [
+          {
+            "pointId": "cp_1",
+            "name": "东侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_2",
+            "name": "东南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_3",
+            "name": "西南哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_6",
+            "name": "东北哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_center",
+            "name": "中心维修站",
+            "kind": "repair",
+            "amount": 6
+          }
+        ],
+        "roundNumber": 15
+      }
+    },
+    {
+      "seq": 214,
+      "type": "income",
+      "timestamp": 1792014094614,
+      "payload": {
+        "owner": "player_b",
+        "base": 8,
+        "control": 16,
+        "controlPoints": 2,
+        "amount": 24,
+        "breakdown": [
+          {
+            "pointId": "cp_4",
+            "name": "西侧哨点",
+            "kind": "supply",
+            "amount": 8
+          },
+          {
+            "pointId": "cp_5",
+            "name": "西北哨点",
+            "kind": "supply",
+            "amount": 8
+          }
+        ],
+        "roundNumber": 15
+      }
+    },
+    {
+      "seq": 215,
+      "type": "round_start",
+      "timestamp": 1792014094614,
+      "payload": {
+        "roundNumber": 15,
+        "players": [
+          "player_a",
+          "player_b"
+        ],
+        "committed": []
+      }
+    },
+    {
+      "seq": 216,
+      "type": "plan_committed",
+      "timestamp": 1792014156017,
+      "payload": {
+        "playerId": "player_b",
+        "roundNumber": 15,
+        "committed": [
+          "player_b"
+        ]
+      }
+    },
+    {
+      "seq": 217,
+      "type": "plan_committed",
+      "timestamp": 1792014350035,
+      "payload": {
+        "playerId": "player_a",
+        "roundNumber": 15,
+        "committed": [
+          "player_b",
+          "player_a"
+        ]
+      }
+    },
+    {
+      "seq": 218,
+      "type": "deploy",
+      "timestamp": 1792014350035,
+      "payload": {
+        "unitId": "7f989162-f757-4984-af50-90f71df96e9c",
+        "owner": "player_a",
+        "unitType": "infantry",
+        "fromId": "cp_3",
+        "q": -3,
+        "r": 2,
+        "cost": 55,
+        "unitCost": 55,
+        "discount": 0,
+        "hp": 90,
+        "attack": 31,
+        "defense": 7,
+        "moveRange": 2,
+        "attackRange": 2,
+        "canCapture": true,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 15
+      }
+    },
+    {
+      "seq": 219,
+      "type": "action_failed",
+      "timestamp": 1792014350035,
+      "payload": {
+        "owner": "player_a",
+        "actionId": "69bfe19e-3fbc-4e16-a431-108a2676ec7b",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 15,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 220,
+      "type": "action_failed",
+      "timestamp": 1792014350035,
+      "payload": {
+        "owner": "player_b",
+        "actionId": "b25dded5-87b1-4cf4-a108-78fbf96f54bb",
+        "type": "move",
+        "reason": "destination_conflict",
+        "roundNumber": 15,
+        "q": 0,
+        "r": 0,
+        "actionsUsed": 1
+      }
+    },
+    {
+      "seq": 221,
+      "type": "heal",
+      "timestamp": 1792014350043,
+      "payload": {
+        "owner": "player_b",
+        "supportId": "ea548af5-6a89-4130-b232-0413d9924f56",
+        "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+        "amount": 20,
+        "targetHp": 56,
+        "actionsUsed": 4,
+        "actionsRemaining": 1,
+        "roundNumber": 15
+      }
+    },
+    {
+      "seq": 222,
+      "type": "attack",
+      "timestamp": 1792014350043,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "640be6d4-c545-4849-b50d-3d65b45c37ee",
+        "q": 2,
+        "r": 0,
+        "hit": true,
+        "aimQ": 2,
+        "aimR": 0,
+        "shape": "single",
+        "locked": true,
+        "targetId": "38bf89c0-11c8-4198-b67c-f0a2aabbd282",
+        "targetKind": "unit",
+        "damage": 28,
+        "actualDamage": 28,
+        "targetHp": 54,
+        "actionsUsed": 2,
+        "actionsRemaining": 3,
+        "roundNumber": 15
+      }
+    },
+    {
+      "seq": 223,
+      "type": "attack",
+      "timestamp": 1792014350043,
+      "payload": {
+        "owner": "player_b",
+        "attackerId": "3dec245c-16f4-4b99-b736-69f4749e0c9d",
+        "q": 0,
+        "r": 1,
+        "hit": false,
+        "aimQ": 0,
+        "aimR": 1,
+        "shape": "single",
+        "locked": false,
+        "targetId": null,
+        "targetKind": null,
+        "damage": 0,
+        "actualDamage": 0,
+        "actionsUsed": 3,
+        "actionsRemaining": 2,
+        "roundNumber": 15
+      }
+    },
+    {
+      "seq": 224,
+      "type": "round_end",
+      "timestamp": 1792014350043,
+      "payload": {
+        "roundNumber": 15,
+        "gameOver": false
+      }
+    },
+    {
+      "seq": 225,
+      "type": "game_over",
+      "timestamp": 1792014350044,
+      "payload": {
+        "winner": "player_a",
+        "reason": "turn_limit_score",
+        "scores": {
+          "player_a": {
+            "headquartersDamage": 0,
+            "ownHqHp": 200,
+            "controlPoints": 5,
+            "controlHold": 4.07,
+            "armyValue": 523,
+            "supplies": 29,
+            "killValue": 0,
+            "total": 643.99
+          },
+          "player_b": {
+            "headquartersDamage": 0,
+            "ownHqHp": 200,
+            "controlPoints": 2,
+            "controlHold": 1.93,
+            "armyValue": 405,
+            "supplies": 65,
+            "killValue": 194,
+            "total": 487.91
+          }
+        },
+        "rankings": [
+          {
+            "playerId": "player_a",
+            "rank": 1,
+            "status": "active",
+            "score": {
+              "headquartersDamage": 0,
+              "ownHqHp": 200,
+              "controlPoints": 5,
+              "controlHold": 4.07,
+              "armyValue": 523,
+              "supplies": 29,
+              "killValue": 0,
+              "total": 643.99
+            }
+          },
+          {
+            "playerId": "player_b",
+            "rank": 2,
+            "status": "active",
+            "score": {
+              "headquartersDamage": 0,
+              "ownHqHp": 200,
+              "controlPoints": 2,
+              "controlHold": 1.93,
+              "armyValue": 405,
+              "supplies": 65,
+              "killValue": 194,
+              "total": 487.91
+            }
+          }
+        ],
+        "roundNumber": 15
+      }
+    },
+    {
+      "seq": 226,
+      "type": "round_resolved",
+      "timestamp": 1792014350044,
+      "payload": {
+        "roundNumber": 15,
+        "gameOver": true,
+        "results": {
+          "player_a": [
+            {
+              "actionId": "22b2697f-2c30-4e33-9384-f5a6fc802508",
+              "type": "deploy",
+              "owner": "player_a",
+              "status": "executed",
+              "detail": {
+                "unitId": "7f989162-f757-4984-af50-90f71df96e9c",
+                "cost": 55
+              }
+            },
+            {
+              "actionId": "69bfe19e-3fbc-4e16-a431-108a2676ec7b",
+              "type": "move",
+              "owner": "player_a",
+              "status": "failed",
+              "reason": "destination_conflict"
+            }
+          ],
+          "player_b": [
+            {
+              "actionId": "b25dded5-87b1-4cf4-a108-78fbf96f54bb",
+              "type": "move",
+              "owner": "player_b",
+              "status": "failed",
+              "reason": "destination_conflict"
+            },
+            {
+              "actionId": "85fabe93-86a7-4f2f-afb8-a8b263bdcddb",
+              "type": "heal",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "targets": [
+                  {
+                    "targetId": "8394b948-4c5b-4739-8a0e-ededc1fe8b96",
+                    "amount": 20
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "d22a88bc-5620-4513-a276-258650c92513",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "executed",
+              "detail": {
+                "q": 2,
+                "r": 0,
+                "shape": "single",
+                "locked": true,
+                "hits": [
+                  {
+                    "targetId": "38bf89c0-11c8-4198-b67c-f0a2aabbd282",
+                    "kind": "unit",
+                    "damage": 28,
+                    "actualDamage": 28,
+                    "killed": false
+                  }
+                ]
+              }
+            },
+            {
+              "actionId": "1c0f5df2-14be-4951-803d-af763ee9f0e7",
+              "type": "attack",
+              "owner": "player_b",
+              "status": "missed",
+              "detail": {
+                "q": 0,
+                "r": 1,
+                "shape": "single",
+                "locked": false
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

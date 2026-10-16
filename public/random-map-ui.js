@@ -5,6 +5,12 @@
 
   const RANDOM_MAP_ID = 'random';
 
+  // 模式相关的参数适配：条目不带 modes 字段＝全模式适用。
+  // 歼灭系（annihilation/royale）不建总部（src/state/store.ts 按 isAnnihilationMode 分支），
+  // 故总部参数无意义；炮火（annihilation.artillery）只在歼灭系注入，故其余模式无此参数。
+  const ARTILLERY_MODES = ['annihilation', 'royale'];
+  const HEADQUARTERS_MODES = ['standard', 'simultaneous'];
+
   const PARAMS = [
     { key: 'radius', label: '地图半径', step: 1, defMin: 5, defMax: 10 },
     { key: 'waterDensity', label: '水域密度', step: 0.01, defMin: 0.01, defMax: 0.07 },
@@ -15,12 +21,12 @@
     { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, defMin: 0, defMax: 0.25 },
     { key: 'startingSupplies', label: '初始补给', step: 5, defMin: 20, defMax: 220 },
     { key: 'baseIncome', label: '基础收入', step: 1, defMin: 6, defMax: 14 },
-    { key: 'headquartersHp', label: '总部血量', step: 10, defMin: 80, defMax: 240 },
-    { key: 'headquartersDefense', label: '总部防御', step: 1, defMin: 3, defMax: 10 },
-    { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, defMin: 3, defMax: 8 },
-    { key: 'artilleryIntervalRounds', label: '炮击间隔', step: 1, defMin: 1, defMax: 2 },
-    { key: 'artilleryDamage', label: '炮击伤害', step: 1, defMin: 10, defMax: 25 },
-    { key: 'artilleryMinimumSafeRadius', label: '安全区最小半径', step: 1, defMin: 0, defMax: 1 },
+    { key: 'headquartersHp', label: '总部血量', step: 10, defMin: 80, defMax: 240, modes: HEADQUARTERS_MODES },
+    { key: 'headquartersDefense', label: '总部防御', step: 1, defMin: 3, defMax: 10, modes: HEADQUARTERS_MODES },
+    { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, defMin: 3, defMax: 8, modes: ARTILLERY_MODES },
+    { key: 'artilleryIntervalRounds', label: '炮击间隔', step: 1, defMin: 1, defMax: 2, modes: ARTILLERY_MODES },
+    { key: 'artilleryDamage', label: '炮击伤害', step: 1, defMin: 10, defMax: 25, modes: ARTILLERY_MODES },
+    { key: 'artilleryMinimumSafeRadius', label: '安全区最小半径', step: 1, defMin: 0, defMax: 1, modes: ARTILLERY_MODES },
   ];
 
   const GAME_MODES = [
@@ -30,6 +36,29 @@
     { value: 'simultaneous', label: '同时回合' },
     { value: 'royale', label: '大逃杀（同时×缩圈）' },
   ];
+
+  const MODE_HINTS = {
+    standard: '标准：逐人轮流，摧毁总部或按裁决分收尾；无炮火参数。',
+    annihilation: '歼灭：不建总部（无总部参数），出生即据点，炮火逐轮缩圈，打光即淘汰。',
+    simultaneous: '同时回合：全员并行下达指令、统一结算；无炮火参数。',
+    royale: '大逃杀：同时回合 + 歼灭缩圈（无总部参数），打光即淘汰。',
+  };
+
+  /** 模式下拉留空＝标准模式。 */
+  function effectiveMode(value) {
+    return value ? String(value) : 'standard';
+  }
+
+  /** 参数在给定模式下是否适用（无 modes 字段＝全模式适用）。 */
+  function paramAppliesToMode(param, mode) {
+    return !Array.isArray(param.modes) || param.modes.indexOf(mode) !== -1;
+  }
+
+  /** 某模式下应当显示并提交的参数键。 */
+  function paramsForMode(mode) {
+    const resolved = effectiveMode(mode);
+    return PARAMS.filter(param => paramAppliesToMode(param, resolved)).map(param => param.key);
+  }
 
   function esc(value) {
     return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -78,6 +107,7 @@
           <input id="rmo-seed" maxlength="64" placeholder="相同种子生成相同地图" autocomplete="off" />
         </div>
       </div>
+      <div class="rmo-mode-hint" id="rmo-mode-hint"></div>
       <div class="rmo-grid">
         ${PARAMS.map(paramRowHtml).join('')}
       </div>
@@ -121,6 +151,7 @@
     RANDOM_MAP_ID,
     PARAMS,
     renderRandomMapCard,
+    paramsForMode,
 
     previewRenderer: null,
     previewToken: 0,
@@ -136,6 +167,11 @@
     init(container) {
       if (!container) return;
       container.innerHTML = panelHtml();
+      RandomMapUI.applyModeVisibility(container);
+      document.getElementById('rmo-game-mode')?.addEventListener('change', () => {
+        RandomMapUI.applyModeVisibility(container);
+        RandomMapUI.schedulePreview();
+      });
       container.querySelectorAll('.rmo-param').forEach(row => {
         const mode = row.querySelector('.rmo-mode');
         const rangeInputs = row.querySelector('.rmo-range-inputs');
@@ -161,6 +197,23 @@
       });
       // 人数影响出生位数量；面板外的下拉也要联动预览。
       document.getElementById('max-players')?.addEventListener('change', () => RandomMapUI.schedulePreview());
+    },
+
+    /**
+     * 按当前游戏模式显隐参数行：标准 / 同时回合无炮火参数，歼灭 / 大逃杀无总部参数
+     * （歼灭系不建总部）。同时更新模式说明，让「参数为什么少了」有解释。
+     */
+    applyModeVisibility(container) {
+      const root = container || document.getElementById('random-map-options');
+      if (!root) return;
+      const mode = effectiveMode(document.getElementById('rmo-game-mode')?.value);
+      root.querySelectorAll('.rmo-param').forEach(row => {
+        const param = PARAMS.find(item => item.key === row.dataset.key);
+        if (!param) return;
+        row.classList.toggle('hidden', !paramAppliesToMode(param, mode));
+      });
+      const hint = document.getElementById('rmo-mode-hint');
+      if (hint) hint.textContent = MODE_HINTS[mode] || '';
     },
 
     setSelected(mapId) {
@@ -236,13 +289,18 @@
 
       const gameMode = document.getElementById('rmo-game-mode');
       const modeValue = gameMode ? gameMode.value : '';
+      const mode = effectiveMode(modeValue);
       if (modeValue) options.mode = modeValue;
 
       document.querySelectorAll('.rmo-param').forEach(row => {
         const key = row.dataset.key;
         if (!key) return;
-        const mode = row.querySelector('.rmo-mode')?.value || 'random';
-        if (mode === 'fixed') {
+        // 与当前模式无关的参数（如标准模式的炮火、歼灭模式的总部）不提交，
+        // 避免服务端收到用不上的字段、也避免隐藏后仍被误带出去。
+        const param = PARAMS.find(item => item.key === key);
+        if (param && !paramAppliesToMode(param, mode)) return;
+        const fill = row.querySelector('.rmo-mode')?.value || 'random';
+        if (fill === 'fixed') {
           const value = parseNumber(row.querySelector('.rmo-value'));
           if (value !== null) options[key] = value;
           return;

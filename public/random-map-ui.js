@@ -64,71 +64,17 @@
     return PARAMS.filter(param => paramAppliesToMode(param, resolved)).map(param => param.key);
   }
 
-  function paramOf(row) {
-    return (row && PARAMS.find(item => item.key === row.dataset.key)) || null;
-  }
-
   /** 与服务端 sanitizeParam 同口径：先钳到硬边界，整数参数再取整。 */
   function clampToBounds(value, param) {
     const clamped = Math.min(param.max, Math.max(param.min, value));
     return param.step >= 1 ? Math.round(clamped) : Number(clamped.toFixed(4));
   }
 
-  function readNumber(row, selector) {
-    return parseNumber(row.querySelector(selector));
-  }
-
-  function writeNumber(row, selector, value) {
-    const input = row.querySelector(selector);
-    if (input) input.value = value === null ? '' : String(value);
-  }
-
-  /**
-   * 刷新滑块与数字输入的双向一致。滑块始终显示「当前生效区间」：
-   * 数字为空时落在服务端默认区间并标为默认态（画面变暗 + 手柄空心），
-   * 一旦拖动或填数即转为自定义态（亮色）——所以滑块不会假装用户没填过。
-   */
-  function syncSlider(row) {
-    const param = paramOf(row);
-    const slider = row.querySelector('.rmo-slider');
-    if (!param || !slider) return;
-    const fixed = row.querySelector('.rmo-mode')?.value === 'fixed';
-    const thumbLo = slider.querySelector('.rmo-thumb-lo');
-    const thumbHi = slider.querySelector('.rmo-thumb-hi');
-    const fill = slider.querySelector('.rmo-slider-fill');
-    const explicitLo = fixed ? readNumber(row, '.rmo-value') : readNumber(row, '.rmo-min');
-    const explicitHi = fixed ? null : readNumber(row, '.rmo-max');
-    const isDefault = explicitLo === null && (fixed || explicitHi === null);
-    const start = clampToBounds(explicitLo ?? param.defMin, param);
-    const end = clampToBounds(explicitHi ?? param.defMax, param);
-    thumbLo.value = String(start);
-    thumbHi.value = String(fixed ? start : Math.max(start, end));
-    // 同一个手柄在固定模式下语义变成"固定值"，标签要跟着改，否则读屏会误报成"下限"。
-    thumbLo.setAttribute('aria-label', fixed ? `${param.label}固定值` : `${param.label}下限`);
-    slider.classList.toggle('is-default', isDefault);
-    slider.classList.toggle('is-fixed', fixed);
-    // 区间模式下两个手柄可能重叠，把贴到量程右端的下限手柄抬到上层，免得抓不住上限手柄。
-    thumbLo.style.zIndex = fixed || start >= param.max ? '3' : '1';
-    const span = param.max - param.min || 1;
-    const percent = value => ((value - param.min) / span) * 100;
-    const loPercent = percent(start);
-    const hiPercent = fixed ? loPercent : percent(Math.max(start, end));
-    // 固定模式画成「进度条」，区间模式画成「区间带」。
-    fill.style.left = `${fixed ? 0 : loPercent}%`;
-    fill.style.width = `${fixed ? loPercent : Math.max(0, hiPercent - loPercent)}%`;
-  }
-
-  /** 刷新容器内所有参数行的滑块（渲染后、批量变更后调用）。 */
-  function syncAllSliders(root) {
-    if (!root) return;
-    root.querySelectorAll('.rmo-param').forEach(syncSlider);
-  }
-
   function esc(value) {
     return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  /** 数字输入与滑块共用的量程/步长属性（量程＝服务端硬边界）。 */
+  /** 数字输入共用的量程/步长属性（量程＝服务端硬边界）。 */
   function boundsAttrs(param) {
     return `min="${param.min}" max="${param.max}" step="${param.step}"`;
   }
@@ -152,14 +98,7 @@
         <span class="rmo-fixed-input hidden">
           <input class="rmo-value" type="number" ${bounds} placeholder="默认" aria-label="${label}固定值" />
         </span>
-      </div>
-      <div class="rmo-slider" data-key="${esc(param.key)}" title="${esc(hint)}">
-        <span class="rmo-slider-rail">
-          <span class="rmo-slider-track"></span>
-          <span class="rmo-slider-fill"></span>
-        </span>
-        <input class="rmo-thumb rmo-thumb-lo" type="range" ${bounds} value="${param.defMin}" aria-label="${label}下限" />
-        <input class="rmo-thumb rmo-thumb-hi" type="range" ${bounds} value="${param.defMax}" aria-label="${label}上限" />
+        <span class="rmo-bounds">范围 ${param.min}–${param.max}</span>
       </div>
     </div>`;
   }
@@ -235,10 +174,11 @@
     GAME_MODES,
     renderRandomMapCard,
     paramsForMode,
-    /** 渲染后把容器内所有滑块与数字输入对齐（测试与外部重建面板时使用）。 */
-    refreshSliders(container) {
-      syncAllSliders(container || document.getElementById('random-map-options'));
-    },
+    /**
+     * 保留的兼容入口：滑块已移除，参数行只有数字输入，无需额外同步。
+     * 外部调用无副作用（测试与旧调用方可能仍引用此名字）。
+     */
+    refreshSliders() {},
 
     previewRenderer: null,
     previewToken: 0,
@@ -267,85 +207,13 @@
           const fixed = mode.value === 'fixed';
           rangeInputs?.classList.toggle('hidden', fixed);
           fixedInput?.classList.toggle('hidden', !fixed);
-          syncSlider(row);
           RandomMapUI.schedulePreview();
         });
-        const slider = row.querySelector('.rmo-slider');
-        const thumbLo = slider?.querySelector('.rmo-thumb-lo');
-        const thumbHi = slider?.querySelector('.rmo-thumb-hi');
-        /**
-         * 区间模式提交一次改动：先把「空着的那一端」按服务端默认值落实为显式值
-         * （避免出现半默认半自定义的模糊状态），再保证 lo ≤ hi。
-         */
-        const commitRange = change => {
-          const current = paramOf(row);
-          if (!current) return;
-          let lo = readNumber(row, '.rmo-min') ?? clampToBounds(current.defMin, current);
-          let hi = readNumber(row, '.rmo-max') ?? clampToBounds(current.defMax, current);
-          if (change.lo !== undefined) lo = change.lo;
-          if (change.hi !== undefined) hi = change.hi;
-          if (lo > hi) {
-            if (change.lo !== undefined) hi = lo;
-            else lo = hi;
-          }
-          writeNumber(row, '.rmo-min', lo);
-          writeNumber(row, '.rmo-max', hi);
-        };
-        // 拖动下限：区间模式写 .rmo-min，固定模式写 .rmo-value。
-        thumbLo?.addEventListener('input', () => {
-          const current = paramOf(row);
-          if (!current) return;
-          const value = clampToBounds(Number(thumbLo.value), current);
-          if (mode?.value === 'fixed') writeNumber(row, '.rmo-value', value);
-          else commitRange({ lo: value });
-          syncSlider(row);
-          RandomMapUI.schedulePreview();
-        });
-        // 拖动上限：越过下限时把下限一起顶走，保证 min ≤ max 恒成立。
-        thumbHi?.addEventListener('input', () => {
-          const current = paramOf(row);
-          if (!current) return;
-          commitRange({ hi: clampToBounds(Number(thumbHi.value), current) });
-          syncSlider(row);
-          RandomMapUI.schedulePreview();
-        });
-        // 点击轨道：把更近的那个手柄移过去（原生 range 不提供这个能力，而指针事件被
-        // 手柄独占，所以这里自己算位置）。
-        slider?.addEventListener('pointerdown', event => {
-          if (event.target?.closest?.('.rmo-thumb')) return;
-          const current = paramOf(row);
-          const rail = slider.querySelector('.rmo-slider-rail');
-          if (!current || !rail?.getBoundingClientRect) return;
-          const rect = rail.getBoundingClientRect();
-          if (!rect.width) return;
-          const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-          const value = clampToBounds(current.min + ratio * (current.max - current.min), current);
-          if (mode?.value === 'fixed') {
-            writeNumber(row, '.rmo-value', value);
-          } else {
-            const center = readNumber(row, '.rmo-min') ?? current.defMin;
-            const upper = readNumber(row, '.rmo-max') ?? current.defMax;
-            // 在比例空间（而非数值空间）里比距离：量程远大于默认区间时（如 0–9999
-            // 默认 20–220），数值差会被极值淹没，点区间附近也会把上限拽到几千。
-            const span = current.max - current.min || 1;
-            const loRatio = (center - current.min) / span;
-            const hiRatio = (upper - current.min) / span;
-            const nearer = Math.abs(ratio - hiRatio) < Math.abs(ratio - loRatio) ? { hi: value } : { lo: value };
-            commitRange(nearer);
-          }
-          syncSlider(row);
-          RandomMapUI.schedulePreview();
-        });
-        syncSlider(row);
       });
       container.querySelectorAll('input, select').forEach(input => {
         input.addEventListener('change', () => RandomMapUI.schedulePreview());
         if (input.tagName === 'INPUT' && input.type === 'number') {
-          // 数字改完立刻把滑块同步过来，两者始终一致。
-          input.addEventListener('input', () => {
-            syncSlider(input.closest('.rmo-param'));
-            RandomMapUI.schedulePreview();
-          });
+          input.addEventListener('input', () => RandomMapUI.schedulePreview());
         }
       });
       document.getElementById('rmo-preview-refresh')?.addEventListener('click', () => {

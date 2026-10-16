@@ -57,21 +57,8 @@ function stubElement(extra: Record<string, unknown> = {}) {
   return element;
 }
 
-/** 按参数行的真实 DOM 层级造桩：head（取值方式 + 数字输入）+ slider（轨道 + 双手柄）。 */
+/** 按参数行的真实 DOM 层级造桩：head 里是取值方式下拉 + 区间/固定两组数字输入。 */
 function makeRowStub(spec: RowSpec) {
-  const rail = stubElement({ tagName: 'SPAN', getBoundingClientRect: () => ({ left: 0, width: 100, top: 0, height: 4 }) });
-  const fill = stubElement({ tagName: 'SPAN' });
-  const thumbLo = stubElement({ tagName: 'INPUT', type: 'range', value: spec.min ?? '' });
-  const thumbHi = stubElement({ tagName: 'INPUT', type: 'range', value: spec.max ?? '' });
-  const slider = stubElement({
-    dataset: { key: spec.key },
-    querySelector: (selector: string) => ({
-      '.rmo-thumb-lo': thumbLo,
-      '.rmo-thumb-hi': thumbHi,
-      '.rmo-slider-fill': fill,
-      '.rmo-slider-rail': rail,
-    } as Record<string, unknown>)[selector] ?? null,
-  });
   const rangeGroup = stubElement({ tagName: 'SPAN' });
   const fixedGroup = stubElement({ tagName: 'SPAN' });
   fixedGroup.classList.add('hidden');
@@ -85,26 +72,20 @@ function makeRowStub(spec: RowSpec) {
   };
   const row = stubElement({
     dataset: { key: spec.key },
-    querySelector: (selector: string) => (selector === '.rmo-slider' ? slider : (inputs[selector] ?? null)),
+    querySelector: (selector: string) => inputs[selector] ?? null,
   });
-  row.closest = (selector: string) => (selector === '.rmo-param' ? row : null);
-  // 行内元素都能沿 closest('.rmo-param') 找到所属行（数字输入回写滑块时要用）；
-  // 两个手柄额外命中 .rmo-thumb，对应用户按在手柄上时不该触发"点轨道跳转"。
+  // 行内元素都能沿 closest('.rmo-param') 找到所属行，与真实 DOM 语义保持一致。
   const toRow = (selector: string) => (selector === '.rmo-param' ? row : null);
-  for (const element of [...Object.values(inputs), fill, rail, slider]) element.closest = toRow;
-  thumbLo.closest = (selector: string) => (selector === '.rmo-thumb' ? thumbLo : toRow(selector));
-  thumbHi.closest = (selector: string) => (selector === '.rmo-thumb' ? thumbHi : toRow(selector));
-  return { row, slider, rail, thumbLo, thumbHi, fill, inputs, rangeGroup, fixedGroup };
+  for (const element of Object.values(inputs)) element.closest = toRow;
+  return { row, inputs, rangeGroup, fixedGroup };
 }
 
-/** 带 DOM 桩加载模块并跑 init，用于真跑 applyModeVisibility / refreshSliders / collectRandomOptions / 事件接线。 */
+/** 带 DOM 桩加载模块并跑 init，用于真跑 applyModeVisibility / collectRandomOptions / 事件接线。 */
 function loadUIWithDom(mode: string, specs: RowSpec[]) {
   const hint = stubElement();
   const built = specs.map(makeRowStub);
   const rows = built.map(item => item.row);
-  const allInputs = built.flatMap(item => [
-    item.row, item.slider, item.rail, item.thumbLo, item.thumbHi, item.fill, ...Object.values(item.inputs),
-  ]);
+  const allInputs = built.flatMap(item => Object.values(item.inputs));
   const container = stubElement({
     innerHTML: '',
     querySelectorAll: (selector: string) => {
@@ -129,7 +110,7 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
   vm.createContext(context);
   vm.runInContext(read('public/random-map-ui.js'), context);
   const ui = (context.window as { RandomMapUI: any }).RandomMapUI;
-  // 真跑一次 init：事件接线（拖动、模式切换、轨道点击、数字回写）都在这里挂上。
+  // 真跑一次 init：事件接线（模式切换、数字输入变化）都在这里挂上。
   ui.init(container);
   const byKey = (key: string) => built.find(item => item.row.dataset.key === key)!;
   const hiddenOf = (key: string) => byKey(key).row.classList.contains('hidden');
@@ -262,110 +243,67 @@ describe('random map creation UI', () => {
     for (const key of ARTILLERY_KEYS) expect(simultaneousOptions).not.toHaveProperty(key);
   });
 
-  it('drives every parameter with a slider that shares the server bounds', async () => {
+  it('renders number inputs that show the server bounds on every parameter', async () => {
     const { RANDOM_PARAM_BOUNDS } = await import('../../src/config/randomMap.js');
     const ui = loadUI();
     const html = capturePanelHtml('standard');
     for (const param of ui.PARAMS as Array<{ key: string; min: number; max: number; step: number }>) {
-      // 每个参数都有滑块，量程/步长＝服务端硬边界，且数字输入带上同样的 min/max 约束。
-      expect(html, `${param.key} 缺滑块`).toContain(`class="rmo-slider" data-key="${param.key}"`);
+      // 每个参数一行数字输入，量程/步长＝服务端硬边界。
+      expect(html, `${param.key} 缺参数行`).toContain(`class="rmo-param" data-key="${param.key}"`);
       expect(html, `${param.key} 量程与服务端不一致`).toContain(`min="${param.min}" max="${param.max}" step="${param.step}"`);
       const bound = RANDOM_PARAM_BOUNDS[param.key];
       expect(bound, `${param.key} 服务端无此参数边界`).toBeDefined();
       expect({ min: param.min, max: param.max, integer: param.step >= 1 })
         .toEqual({ min: bound.min, max: bound.max, integer: bound.integer });
+      // 参数上限下限必须肉眼可见（不是只藏在输入框约束里）。
+      expect(html, `${param.key} 缺范围展示`).toContain(`<span class="rmo-bounds">范围 ${param.min}–${param.max}</span>`);
     }
-    // 滑块带下限与上限两个手柄（区间模式）。
-    expect(html).toContain('rmo-thumb rmo-thumb-lo');
-    expect(html).toContain('rmo-thumb rmo-thumb-hi');
+    // 兼容入口保留：滑块移除后 refreshSliders 仍是可调用的空操作。
     expect(typeof ui.refreshSliders).toBe('function');
+    // 滑块彻底退场：源码里不能再有滑块实现或 type="range" 残留。
+    const source = read('public/random-map-ui.js');
+    expect(source).not.toContain('rmo-slider');
+    expect(source).not.toContain('type="range"');
+    expect(source).not.toContain('syncSlider');
   });
 
-  it('keeps the slider and the number inputs in sync both ways', () => {
-    const ui = loadUI();
-    const radius = ui.PARAMS.find((param: { key: string }) => param.key === 'radius');
-    const span = radius.max - radius.min;
-    const built = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '9' }]);
-    built.ui.refreshSliders(built.container);
-    const item = built.byKey('radius');
-    // 数字 → 滑块：手柄落在显式值上，区间带覆盖 6–9，且不再是默认态。
-    expect(item.thumbLo.value).toBe('6');
-    expect(item.thumbHi.value).toBe('9');
-    expect(item.slider.classList.contains('is-default')).toBe(false);
-    expect(item.fill.style.left).toBe(`${((6 - radius.min) / span) * 100}%`);
-    expect(item.fill.style.width).toBe(`${((9 - 6) / span) * 100}%`);
+  it('collects the submitted range from the numeric inputs alone', () => {
+    // 区间模式：min/max 成对提交；只填一端时提交单值，留空＝服务端默认。
+    const ranged = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '9' }]);
+    expect(ranged.ui.collectRandomOptions().radius).toEqual([6, 9]);
+    const onlyMin = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '' }]);
+    expect(onlyMin.ui.collectRandomOptions().radius).toBe(6);
+    const empty = loadUIWithDom('standard', [{ key: 'radius' }]);
+    expect(empty.ui.collectRandomOptions()).not.toHaveProperty('radius');
 
-    // 清空数字 → 滑块回到服务端默认区间并标为默认态（滑块不会假装用户填过）。
-    item.inputs['.rmo-min'].value = '';
-    item.inputs['.rmo-max'].value = '';
-    built.ui.refreshSliders(built.container);
-    expect(item.thumbLo.value).toBe(String(radius.defMin));
-    expect(item.thumbHi.value).toBe(String(radius.defMax));
-    expect(item.slider.classList.contains('is-default')).toBe(true);
-
-    // 固定模式：只留一个手柄，填充画成进度条（0 → 当前值）。
-    const fixedRow = loadUIWithDom('standard', [{ key: 'radius', mode: 'fixed', value: '8' }]);
-    fixedRow.ui.refreshSliders(fixedRow.container);
-    const fixedItem = fixedRow.byKey('radius');
-    expect(fixedItem.slider.classList.contains('is-fixed')).toBe(true);
-    expect(fixedItem.thumbLo.value).toBe('8');
-    expect(fixedItem.fill.style.left).toBe('0%');
-    expect(fixedItem.fill.style.width).toBe(`${((8 - radius.min) / span) * 100}%`);
-  });
-
-  it('wires dragging, mode switching and track clicks to the number inputs', () => {
-    const ui = loadUI();
-    const radius = ui.PARAMS.find((param: { key: string }) => param.key === 'radius');
-    const span = radius.max - radius.min;
-
-    // 拖动下限：写 .rmo-min，并把空着的 .rmo-max 落实为服务端默认上限（不留半默认态）。
-    const drag = loadUIWithDom('standard', [{ key: 'radius' }]);
-    const item = drag.byKey('radius');
-    item.thumbLo.value = '7';
-    expect(item.thumbLo.fire('input'), '下限手柄没挂 input 监听').toBeGreaterThan(0);
-    expect(item.inputs['.rmo-min'].value).toBe('7');
-    expect(item.inputs['.rmo-max'].value).toBe(String(radius.defMax));
-    expect(item.fill.style.width).toBe(`${((radius.defMax - 7) / span) * 100}%`);
-    expect(item.slider.classList.contains('is-default')).toBe(false);
-    expect(item.thumbLo.attrs['aria-label']).toBe('地图半径下限');
-
-    // 上限被拖到下限之下：下限一起顶走，min ≤ max 恒成立。
-    item.thumbHi.value = '4';
-    item.thumbHi.fire('input');
-    expect(item.inputs['.rmo-min'].value).toBe('4');
-    expect(item.inputs['.rmo-max'].value).toBe('4');
-    expect(drag.ui.collectRandomOptions().radius).toEqual([4, 4]);
-
-    // 数字输入 → 滑块跟随（走 init 里挂的通用 input 监听）。
-    item.inputs['.rmo-min'].value = '9';
-    item.inputs['.rmo-min'].fire('input');
-    expect(item.thumbLo.value).toBe('9');
-
-    // 点击轨道：更近的手柄跳过去（轨道 0–100 → clientX=50 对应 8，离上限 10 更近）。
-    const click = loadUIWithDom('standard', [{ key: 'radius', min: '5', max: '10' }]);
-    const clickItem = click.byKey('radius');
-    clickItem.slider.fire('pointerdown', { target: clickItem.slider, clientX: 50 });
-    expect(clickItem.inputs['.rmo-max'].value).toBe('8');
-    expect(clickItem.inputs['.rmo-min'].value).toBe('5');
-    // 按在手柄上时不抢原生拖动。
-    clickItem.slider.fire('pointerdown', { target: clickItem.thumbHi, clientX: 0 });
-    expect(clickItem.inputs['.rmo-max'].value).toBe('8');
-
-    // 切到固定模式：区间输入隐藏、固定输入显示，滑块转进度条，拖手柄改写 .rmo-value。
-    const fixed = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '9' }]);
-    const fixedItem = fixed.byKey('radius');
-    fixedItem.inputs['.rmo-mode'].value = 'fixed';
-    expect(fixedItem.inputs['.rmo-mode'].fire('change'), '取值方式没挂 change 监听').toBeGreaterThan(0);
-    expect(fixedItem.rangeGroup.classList.contains('hidden')).toBe(true);
-    expect(fixedItem.fixedGroup.classList.contains('hidden')).toBe(false);
-    expect(fixedItem.slider.classList.contains('is-fixed')).toBe(true);
-    expect(fixedItem.thumbLo.attrs['aria-label']).toBe('地图半径固定值');
-    fixedItem.thumbLo.value = '7';
-    fixedItem.thumbLo.fire('input');
-    expect(fixedItem.inputs['.rmo-value'].value).toBe('7');
+    // 固定模式：只读 .rmo-value，区间输入即使仍挂着值也不参与提交。
+    const fixed = loadUIWithDom('standard', [{ key: 'radius', mode: 'fixed', min: '6', max: '9', value: '7' }]);
     expect(fixed.ui.collectRandomOptions().radius).toBe(7);
-    expect(fixedItem.fill.style.left).toBe('0%');
-    expect(fixedItem.fill.style.width).toBe(`${((7 - radius.min) / span) * 100}%`);
+
+    // 数字输入直接排程预览：change 与 input 都已接线（不再经过滑块同步）。
+    const item = ranged.byKey('radius');
+    expect(item.inputs['.rmo-min'].fire('change'), '数字输入没挂 change 监听').toBeGreaterThan(0);
+    expect(item.inputs['.rmo-min'].fire('input'), '数字输入没挂 input 监听').toBeGreaterThan(0);
+    // 兼容入口仍可安全调用（无副作用）。
+    expect(() => ranged.ui.refreshSliders()).not.toThrow();
+  });
+
+  it('switches between range inputs and the fixed input through the mode select', () => {
+    const scoped = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '9' }]);
+    const item = scoped.byKey('radius');
+    // 默认区间模式：区间输入可见、固定输入隐藏。
+    expect(item.rangeGroup.classList.contains('hidden')).toBe(false);
+    expect(item.fixedGroup.classList.contains('hidden')).toBe(true);
+    // 切到固定：区间输入隐藏、固定输入显示，收集走 .rmo-value。
+    item.inputs['.rmo-mode'].value = 'fixed';
+    expect(item.inputs['.rmo-mode'].fire('change'), '取值方式没挂 change 监听').toBeGreaterThan(0);
+    expect(item.rangeGroup.classList.contains('hidden')).toBe(true);
+    expect(item.fixedGroup.classList.contains('hidden')).toBe(false);
+    // 切回随机：两组显隐还原。
+    item.inputs['.rmo-mode'].value = 'random';
+    item.inputs['.rmo-mode'].fire('change');
+    expect(item.rangeGroup.classList.contains('hidden')).toBe(false);
+    expect(item.fixedGroup.classList.contains('hidden')).toBe(true);
   });
 
   it('clamps panel values to the server bounds before submitting', () => {

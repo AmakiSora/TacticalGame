@@ -1,0 +1,9 @@
+{
+  "version": "5.0.0",
+  "seed": 500000,
+  "mode": "standard",
+  "network": {"d_model": 128, "layers": 4, "heads": 8, "features_dim": 384},
+  "search": {"type": "gumbel_sequential_halving", "simulations": 8, "root_top_k": 32, "time_ms": 50},
+  "replay": {"capacity": 500000, "alpha": 0.6},
+  "curriculum": {"teacher_probability": 0.5, "self_play_probability": 0.2}
+}

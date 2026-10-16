@@ -557,14 +557,23 @@ body.player-m-shell .lobby-add-bot { min-height: 28px; }
   stroke-width: 1.2;
 }
 .preview-marker.cp { fill: #f0d77c; }
-.preview-marker.hq-slot-1 { fill: #66ccff; }
-.preview-marker.hq-slot-2 { fill: #ff9966; }
-.preview-marker.hq-slot-3 { fill: #8ee28e; }
-.preview-marker.hq-slot-4 { fill: #d6a3ff; }
-.preview-marker.hq-slot-5 { fill: #ffe17a; }
-.preview-marker.hq-slot-6 { fill: #ff7f9f; }
-.preview-marker.hq-slot-7 { fill: #70e0d0; }
-.preview-marker.hq-slot-8 { fill: #c7d0dc; }
+/* 槽位配色：总部方块（hq-slot-N）与歼灭系出生点圆圈（spawn-slot-N）共用同一色板。 */
+.preview-marker.hq-slot-1,
+.preview-marker.spawn-slot-1 { fill: #66ccff; }
+.preview-marker.hq-slot-2,
+.preview-marker.spawn-slot-2 { fill: #ff9966; }
+.preview-marker.hq-slot-3,
+.preview-marker.spawn-slot-3 { fill: #8ee28e; }
+.preview-marker.hq-slot-4,
+.preview-marker.spawn-slot-4 { fill: #d6a3ff; }
+.preview-marker.hq-slot-5,
+.preview-marker.spawn-slot-5 { fill: #ffe17a; }
+.preview-marker.hq-slot-6,
+.preview-marker.spawn-slot-6 { fill: #ff7f9f; }
+.preview-marker.hq-slot-7,
+.preview-marker.spawn-slot-7 { fill: #70e0d0; }
+.preview-marker.hq-slot-8,
+.preview-marker.spawn-slot-8 { fill: #c7d0dc; }
 .map-card-copy {
   display: flex;
   flex-direction: column;
@@ -2062,17 +2071,23 @@ body.player-m-shell .bot-prompt-textarea { min-height: 180px; font-size: 11px; }
 }
 .rmo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 8px;
 }
 .rmo-param {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px 10px;
   border: 1px solid #223342;
   border-radius: 6px;
   background: #101922;
+}
+.rmo-param-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .rmo-param-label {
   flex: none;
@@ -2082,7 +2097,7 @@ body.player-m-shell .bot-prompt-textarea { min-height: 180px; font-size: 11px; }
   font-weight: 600;
 }
 .rmo-param select,
-.rmo-param input {
+.rmo-param input:not([type="range"]) {
   background: #0b1218;
   border: 1px solid #2a3a4a;
   border-radius: 4px;
@@ -2097,7 +2112,7 @@ body.player-m-shell .bot-prompt-textarea { min-height: 180px; font-size: 11px; }
   align-items: center;
   gap: 4px;
   flex: 1;
-  min-width: 0;
+  min-width: 108px;
 }
 .rmo-range-inputs input,
 .rmo-fixed-input input {
@@ -2105,6 +2120,111 @@ body.player-m-shell .bot-prompt-textarea { min-height: 180px; font-size: 11px; }
   min-width: 0;
 }
 .rmo-sep { color: #668495; font-size: 12px; }
+
+/* 参数滑块（移动端把触摸目标放大到 20px 手柄 / 28px 行高，满足 ≥24px 的点按区域）。
+   颜色令牌同桌面端：填充渐变 #5db8e8→#7fd0ff、手柄 #eef6fb、默认态 #557a92。 */
+.rmo-slider {
+  --rmo-track: #0b1218;
+  --rmo-fill-from: #5db8e8;
+  --rmo-fill-to: #7fd0ff;
+  --rmo-thumb: 20px;
+  position: relative;
+  display: block;
+  height: 28px;
+}
+.rmo-slider-rail {
+  position: absolute;
+  left: calc(var(--rmo-thumb) / 2);
+  right: calc(var(--rmo-thumb) / 2);
+  top: 50%;
+  height: 6px;
+  transform: translateY(-50%);
+}
+.rmo-slider-track {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #24384a;
+  border-radius: 999px;
+  background: var(--rmo-track);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+.rmo-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--rmo-fill-from), var(--rmo-fill-to));
+  box-shadow: 0 0 6px rgba(127, 208, 255, 0.25);
+}
+.rmo-slider.is-default .rmo-slider-fill {
+  background: #557a92;
+  box-shadow: none;
+}
+.rmo-slider.is-fixed .rmo-thumb-hi { display: none; }
+/* 手柄层级：默认上限手柄在上层（范围收窄到重叠时仍抓得住）；下限手柄贴到量程右端时
+   由脚本把它抬到 3，否则到了右端就再也拖不回来。 */
+.rmo-thumb-lo { z-index: 1; }
+.rmo-thumb-hi { z-index: 2; }
+.rmo-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  appearance: none;
+  -webkit-appearance: none;
+  pointer-events: none;
+}
+.rmo-thumb:focus { outline: none; }
+.rmo-thumb::-webkit-slider-runnable-track { height: 100%; border: 0; background: none; }
+.rmo-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: var(--rmo-thumb);
+  height: var(--rmo-thumb);
+  border: 2px solid var(--rmo-fill-to);
+  border-radius: 50%;
+  background: #eef6fb;
+  box-shadow: 0 0 0 3px rgba(127, 208, 255, 0.16), 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  transition: box-shadow 0.15s ease;
+}
+.rmo-thumb::-moz-range-track { height: 100%; border: 0; background: none; }
+.rmo-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: calc(var(--rmo-thumb) - 4px);
+  height: calc(var(--rmo-thumb) - 4px);
+  border: 2px solid var(--rmo-fill-to);
+  border-radius: 50%;
+  background: #eef6fb;
+  box-shadow: 0 0 0 3px rgba(127, 208, 255, 0.16), 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  transition: box-shadow 0.15s ease;
+}
+.rmo-slider.is-default .rmo-thumb::-webkit-slider-thumb {
+  border-color: #557a92;
+  background: #101922;
+  box-shadow: 0 0 0 3px rgba(85, 122, 146, 0.18), 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.rmo-slider.is-default .rmo-thumb::-moz-range-thumb {
+  border-color: #557a92;
+  background: #101922;
+  box-shadow: 0 0 0 3px rgba(85, 122, 146, 0.18), 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.rmo-thumb:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  box-shadow: 0 0 0 4px rgba(127, 208, 255, 0.32), 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.rmo-thumb:active::-moz-range-thumb {
+  cursor: grabbing;
+  box-shadow: 0 0 0 4px rgba(127, 208, 255, 0.32), 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.rmo-slider:focus-within .rmo-slider-track {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(127, 208, 255, 0.35);
+}
 .map-card-random .map-preview {
   font-size: 34px;
   font-weight: 800;

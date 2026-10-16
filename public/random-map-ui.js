@@ -11,26 +11,30 @@
   const ARTILLERY_MODES = ['annihilation', 'royale'];
   const HEADQUARTERS_MODES = ['standard', 'simultaneous'];
 
+  // min/max = 服务端硬边界（src/config/randomMap.ts 的 PARAM_BOUNDS，滑块量程），
+  // defMin/defMax = 留空时服务端使用的默认区间（仅作提示与"默认态"回显）。
+  // 两份数值由 tests/public/random-map-bounds.test.ts 对齐校验，避免前后端漂移。
   const PARAMS = [
-    { key: 'radius', label: '地图半径', step: 1, defMin: 5, defMax: 10 },
-    { key: 'waterDensity', label: '水域密度', step: 0.01, defMin: 0.01, defMax: 0.07 },
-    { key: 'wallDensity', label: '阻挡密度', step: 0.01, defMin: 0.01, defMax: 0.05 },
-    { key: 'controlPointCount', label: '据点数量', step: 1, defMin: 2, defMax: 6 },
-    { key: 'maxTurns', label: '最大回合数', step: 1, defMin: 10, defMax: 30 },
-    { key: 'actionsPerTurn', label: '每回合行动点', step: 1, defMin: 1, defMax: 8 },
-    { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, defMin: 0, defMax: 0.25 },
-    { key: 'startingSupplies', label: '初始补给', step: 5, defMin: 20, defMax: 220 },
-    { key: 'baseIncome', label: '基础收入', step: 1, defMin: 6, defMax: 14 },
-    { key: 'headquartersHp', label: '总部血量', step: 10, defMin: 80, defMax: 240, modes: HEADQUARTERS_MODES },
-    { key: 'headquartersDefense', label: '总部防御', step: 1, defMin: 3, defMax: 10, modes: HEADQUARTERS_MODES },
-    { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, defMin: 3, defMax: 8, modes: ARTILLERY_MODES },
-    { key: 'artilleryIntervalRounds', label: '炮击间隔', step: 1, defMin: 1, defMax: 2, modes: ARTILLERY_MODES },
-    { key: 'artilleryDamage', label: '炮击伤害', step: 1, defMin: 10, defMax: 25, modes: ARTILLERY_MODES },
-    { key: 'artilleryMinimumSafeRadius', label: '安全区最小半径', step: 1, defMin: 0, defMax: 1, modes: ARTILLERY_MODES },
+    { key: 'radius', label: '地图半径', step: 1, min: 4, max: 12, defMin: 5, defMax: 10 },
+    { key: 'waterDensity', label: '水域密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.07 },
+    { key: 'wallDensity', label: '阻挡密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.05 },
+    { key: 'controlPointCount', label: '据点数量', step: 1, min: 1, max: 9, defMin: 2, defMax: 6 },
+    { key: 'maxTurns', label: '最大回合数', step: 1, min: 1, max: 99, defMin: 10, defMax: 30 },
+    { key: 'actionsPerTurn', label: '每回合行动点', step: 1, min: 1, max: 20, defMin: 1, defMax: 8 },
+    { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, min: 0, max: 0.5, defMin: 0, defMax: 0.25 },
+    { key: 'startingSupplies', label: '初始补给', step: 5, min: 0, max: 9999, defMin: 20, defMax: 220 },
+    { key: 'baseIncome', label: '基础收入', step: 1, min: 0, max: 999, defMin: 6, defMax: 14 },
+    { key: 'headquartersHp', label: '总部血量', step: 10, min: 1, max: 9999, defMin: 80, defMax: 240, modes: HEADQUARTERS_MODES },
+    { key: 'headquartersDefense', label: '总部防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 10, modes: HEADQUARTERS_MODES },
+    { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, min: 1, max: 10, defMin: 3, defMax: 8, modes: ARTILLERY_MODES },
+    { key: 'artilleryIntervalRounds', label: '炮击间隔', step: 1, min: 1, max: 3, defMin: 1, defMax: 2, modes: ARTILLERY_MODES },
+    { key: 'artilleryDamage', label: '炮击伤害', step: 1, min: 5, max: 30, defMin: 10, defMax: 25, modes: ARTILLERY_MODES },
+    { key: 'artilleryMinimumSafeRadius', label: '安全区最小半径', step: 1, min: 0, max: 3, defMin: 0, defMax: 1, modes: ARTILLERY_MODES },
   ];
 
+  // 模式取值与后端 GameMode 一一对应：每个模式只出现一次，不再保留「空值＝服务端默认标准」
+  // 的第二条标准项——两个选项指向同一模式会让用户以为有什么区别。
   const GAME_MODES = [
-    { value: '', label: '标准（默认）' },
     { value: 'standard', label: '标准' },
     { value: 'annihilation', label: '歼灭（炮火缩圈）' },
     { value: 'simultaneous', label: '同时回合' },
@@ -44,7 +48,7 @@
     royale: '大逃杀：同时回合 + 歼灭缩圈（无总部参数），打光即淘汰。',
   };
 
-  /** 模式下拉留空＝标准模式。 */
+  /** 模式下拉缺失（元素不存在）时回落到标准模式；正常路径下取值已是四个模式之一。 */
   function effectiveMode(value) {
     return value ? String(value) : 'standard';
   }
@@ -60,25 +64,103 @@
     return PARAMS.filter(param => paramAppliesToMode(param, resolved)).map(param => param.key);
   }
 
+  function paramOf(row) {
+    return (row && PARAMS.find(item => item.key === row.dataset.key)) || null;
+  }
+
+  /** 与服务端 sanitizeParam 同口径：先钳到硬边界，整数参数再取整。 */
+  function clampToBounds(value, param) {
+    const clamped = Math.min(param.max, Math.max(param.min, value));
+    return param.step >= 1 ? Math.round(clamped) : Number(clamped.toFixed(4));
+  }
+
+  function readNumber(row, selector) {
+    return parseNumber(row.querySelector(selector));
+  }
+
+  function writeNumber(row, selector, value) {
+    const input = row.querySelector(selector);
+    if (input) input.value = value === null ? '' : String(value);
+  }
+
+  /**
+   * 刷新滑块与数字输入的双向一致。滑块始终显示「当前生效区间」：
+   * 数字为空时落在服务端默认区间并标为默认态（画面变暗 + 手柄空心），
+   * 一旦拖动或填数即转为自定义态（亮色）——所以滑块不会假装用户没填过。
+   */
+  function syncSlider(row) {
+    const param = paramOf(row);
+    const slider = row.querySelector('.rmo-slider');
+    if (!param || !slider) return;
+    const fixed = row.querySelector('.rmo-mode')?.value === 'fixed';
+    const thumbLo = slider.querySelector('.rmo-thumb-lo');
+    const thumbHi = slider.querySelector('.rmo-thumb-hi');
+    const fill = slider.querySelector('.rmo-slider-fill');
+    const explicitLo = fixed ? readNumber(row, '.rmo-value') : readNumber(row, '.rmo-min');
+    const explicitHi = fixed ? null : readNumber(row, '.rmo-max');
+    const isDefault = explicitLo === null && (fixed || explicitHi === null);
+    const start = clampToBounds(explicitLo ?? param.defMin, param);
+    const end = clampToBounds(explicitHi ?? param.defMax, param);
+    thumbLo.value = String(start);
+    thumbHi.value = String(fixed ? start : Math.max(start, end));
+    // 同一个手柄在固定模式下语义变成"固定值"，标签要跟着改，否则读屏会误报成"下限"。
+    thumbLo.setAttribute('aria-label', fixed ? `${param.label}固定值` : `${param.label}下限`);
+    slider.classList.toggle('is-default', isDefault);
+    slider.classList.toggle('is-fixed', fixed);
+    // 区间模式下两个手柄可能重叠，把贴到量程右端的下限手柄抬到上层，免得抓不住上限手柄。
+    thumbLo.style.zIndex = fixed || start >= param.max ? '3' : '1';
+    const span = param.max - param.min || 1;
+    const percent = value => ((value - param.min) / span) * 100;
+    const loPercent = percent(start);
+    const hiPercent = fixed ? loPercent : percent(Math.max(start, end));
+    // 固定模式画成「进度条」，区间模式画成「区间带」。
+    fill.style.left = `${fixed ? 0 : loPercent}%`;
+    fill.style.width = `${fixed ? loPercent : Math.max(0, hiPercent - loPercent)}%`;
+  }
+
+  /** 刷新容器内所有参数行的滑块（渲染后、批量变更后调用）。 */
+  function syncAllSliders(root) {
+    if (!root) return;
+    root.querySelectorAll('.rmo-param').forEach(syncSlider);
+  }
+
   function esc(value) {
     return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  /** 数字输入与滑块共用的量程/步长属性（量程＝服务端硬边界）。 */
+  function boundsAttrs(param) {
+    return `min="${param.min}" max="${param.max}" step="${param.step}"`;
+  }
+
   function paramRowHtml(param) {
+    const label = esc(param.label);
+    const bounds = boundsAttrs(param);
+    const hint = `可选 ${param.min}–${param.max}；留空＝服务端默认 ${param.defMin}–${param.defMax}`;
     return `<div class="rmo-param" data-key="${esc(param.key)}">
-      <span class="rmo-param-label" title="留空使用服务端默认范围">${esc(param.label)}</span>
-      <select class="rmo-mode" aria-label="${esc(param.label)}模式">
-        <option value="random" selected>随机</option>
-        <option value="fixed">固定</option>
-      </select>
-      <span class="rmo-range-inputs">
-        <input class="rmo-min" type="number" step="${param.step}" placeholder="${param.defMin}" aria-label="${esc(param.label)}最小值" />
-        <span class="rmo-sep">–</span>
-        <input class="rmo-max" type="number" step="${param.step}" placeholder="${param.defMax}" aria-label="${esc(param.label)}最大值" />
-      </span>
-      <span class="rmo-fixed-input hidden">
-        <input class="rmo-value" type="number" step="${param.step}" placeholder="默认" aria-label="${esc(param.label)}固定值" />
-      </span>
+      <div class="rmo-param-head">
+        <span class="rmo-param-label" title="${esc(hint)}">${label}</span>
+        <select class="rmo-mode" aria-label="${label}取值方式">
+          <option value="random" selected>随机</option>
+          <option value="fixed">固定</option>
+        </select>
+        <span class="rmo-range-inputs">
+          <input class="rmo-min" type="number" ${bounds} placeholder="${param.defMin}" aria-label="${label}最小值" />
+          <span class="rmo-sep">–</span>
+          <input class="rmo-max" type="number" ${bounds} placeholder="${param.defMax}" aria-label="${label}最大值" />
+        </span>
+        <span class="rmo-fixed-input hidden">
+          <input class="rmo-value" type="number" ${bounds} placeholder="默认" aria-label="${label}固定值" />
+        </span>
+      </div>
+      <div class="rmo-slider" data-key="${esc(param.key)}" title="${esc(hint)}">
+        <span class="rmo-slider-rail">
+          <span class="rmo-slider-track"></span>
+          <span class="rmo-slider-fill"></span>
+        </span>
+        <input class="rmo-thumb rmo-thumb-lo" type="range" ${bounds} value="${param.defMin}" aria-label="${label}下限" />
+        <input class="rmo-thumb rmo-thumb-hi" type="range" ${bounds} value="${param.defMax}" aria-label="${label}上限" />
+      </div>
     </div>`;
   }
 
@@ -99,7 +181,7 @@
         <div class="field rmo-mode-field">
           <label for="rmo-game-mode">游戏模式</label>
           <select id="rmo-game-mode">
-            ${GAME_MODES.map(mode => `<option value="${mode.value}"${mode.value === '' ? ' selected' : ''}>${mode.label}</option>`).join('')}
+            ${GAME_MODES.map((mode, index) => `<option value="${mode.value}"${index === 0 ? ' selected' : ''}>${mode.label}</option>`).join('')}
           </select>
         </div>
         <div class="field rmo-seed-field">
@@ -150,8 +232,13 @@
   const RandomMapUI = {
     RANDOM_MAP_ID,
     PARAMS,
+    GAME_MODES,
     renderRandomMapCard,
     paramsForMode,
+    /** 渲染后把容器内所有滑块与数字输入对齐（测试与外部重建面板时使用）。 */
+    refreshSliders(container) {
+      syncAllSliders(container || document.getElementById('random-map-options'));
+    },
 
     previewRenderer: null,
     previewToken: 0,
@@ -180,13 +267,85 @@
           const fixed = mode.value === 'fixed';
           rangeInputs?.classList.toggle('hidden', fixed);
           fixedInput?.classList.toggle('hidden', !fixed);
+          syncSlider(row);
           RandomMapUI.schedulePreview();
         });
+        const slider = row.querySelector('.rmo-slider');
+        const thumbLo = slider?.querySelector('.rmo-thumb-lo');
+        const thumbHi = slider?.querySelector('.rmo-thumb-hi');
+        /**
+         * 区间模式提交一次改动：先把「空着的那一端」按服务端默认值落实为显式值
+         * （避免出现半默认半自定义的模糊状态），再保证 lo ≤ hi。
+         */
+        const commitRange = change => {
+          const current = paramOf(row);
+          if (!current) return;
+          let lo = readNumber(row, '.rmo-min') ?? clampToBounds(current.defMin, current);
+          let hi = readNumber(row, '.rmo-max') ?? clampToBounds(current.defMax, current);
+          if (change.lo !== undefined) lo = change.lo;
+          if (change.hi !== undefined) hi = change.hi;
+          if (lo > hi) {
+            if (change.lo !== undefined) hi = lo;
+            else lo = hi;
+          }
+          writeNumber(row, '.rmo-min', lo);
+          writeNumber(row, '.rmo-max', hi);
+        };
+        // 拖动下限：区间模式写 .rmo-min，固定模式写 .rmo-value。
+        thumbLo?.addEventListener('input', () => {
+          const current = paramOf(row);
+          if (!current) return;
+          const value = clampToBounds(Number(thumbLo.value), current);
+          if (mode?.value === 'fixed') writeNumber(row, '.rmo-value', value);
+          else commitRange({ lo: value });
+          syncSlider(row);
+          RandomMapUI.schedulePreview();
+        });
+        // 拖动上限：越过下限时把下限一起顶走，保证 min ≤ max 恒成立。
+        thumbHi?.addEventListener('input', () => {
+          const current = paramOf(row);
+          if (!current) return;
+          commitRange({ hi: clampToBounds(Number(thumbHi.value), current) });
+          syncSlider(row);
+          RandomMapUI.schedulePreview();
+        });
+        // 点击轨道：把更近的那个手柄移过去（原生 range 不提供这个能力，而指针事件被
+        // 手柄独占，所以这里自己算位置）。
+        slider?.addEventListener('pointerdown', event => {
+          if (event.target?.closest?.('.rmo-thumb')) return;
+          const current = paramOf(row);
+          const rail = slider.querySelector('.rmo-slider-rail');
+          if (!current || !rail?.getBoundingClientRect) return;
+          const rect = rail.getBoundingClientRect();
+          if (!rect.width) return;
+          const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+          const value = clampToBounds(current.min + ratio * (current.max - current.min), current);
+          if (mode?.value === 'fixed') {
+            writeNumber(row, '.rmo-value', value);
+          } else {
+            const center = readNumber(row, '.rmo-min') ?? current.defMin;
+            const upper = readNumber(row, '.rmo-max') ?? current.defMax;
+            // 在比例空间（而非数值空间）里比距离：量程远大于默认区间时（如 0–9999
+            // 默认 20–220），数值差会被极值淹没，点区间附近也会把上限拽到几千。
+            const span = current.max - current.min || 1;
+            const loRatio = (center - current.min) / span;
+            const hiRatio = (upper - current.min) / span;
+            const nearer = Math.abs(ratio - hiRatio) < Math.abs(ratio - loRatio) ? { hi: value } : { lo: value };
+            commitRange(nearer);
+          }
+          syncSlider(row);
+          RandomMapUI.schedulePreview();
+        });
+        syncSlider(row);
       });
       container.querySelectorAll('input, select').forEach(input => {
         input.addEventListener('change', () => RandomMapUI.schedulePreview());
         if (input.tagName === 'INPUT' && input.type === 'number') {
-          input.addEventListener('input', () => RandomMapUI.schedulePreview());
+          // 数字改完立刻把滑块同步过来，两者始终一致。
+          input.addEventListener('input', () => {
+            syncSlider(input.closest('.rmo-param'));
+            RandomMapUI.schedulePreview();
+          });
         }
       });
       document.getElementById('rmo-preview-refresh')?.addEventListener('click', () => {
@@ -299,17 +458,22 @@
         // 避免服务端收到用不上的字段、也避免隐藏后仍被误带出去。
         const param = PARAMS.find(item => item.key === key);
         if (param && !paramAppliesToMode(param, mode)) return;
+        // 与服务端 sanitizeParam 同口径地钳位：前端先钳，用户填的越界值不会「看着生效、
+        // 实际被服务端悄悄改掉」，提交内容与服务端结果始终一致。
+        const bound = value => (param ? clampToBounds(value, param) : value);
         const fill = row.querySelector('.rmo-mode')?.value || 'random';
         if (fill === 'fixed') {
           const value = parseNumber(row.querySelector('.rmo-value'));
-          if (value !== null) options[key] = value;
+          if (value !== null) options[key] = bound(value);
           return;
         }
         const min = parseNumber(row.querySelector('.rmo-min'));
         const max = parseNumber(row.querySelector('.rmo-max'));
         if (min === null && max === null) return;
         if (min !== null && max !== null) {
-          options[key] = [Math.min(min, max), Math.max(min, max)];
+          // 始终保持区间形态：服务端 resolveParam 对标量"提前返回、不消耗随机数"，把
+          // lo===hi 收成标量会让后续参数的随机数流整体错位（同种子出不同图）。
+          options[key] = [bound(Math.min(min, max)), bound(Math.max(min, max))];
         } else {
           options[key] = min !== null ? min : max;
         }

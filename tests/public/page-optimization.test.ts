@@ -75,6 +75,28 @@ describe('spectator and player page optimization', () => {
     expect(source).toContain('回合');
   });
 
+  it('marks spawn points on annihilation / royale map previews', () => {
+    // 回归：预览渲染曾按模式把出生位列表清空（`... ? [] : ...`），理由是「歼灭系没有总部」，
+    // 结果歼灭 / 大逃杀（含静态 artillery-zone / narrow-road / snowflake）看不到任何出生点。
+    for (const path of ['public/play.js', 'public/play-m.js']) {
+      const source = read(path);
+      expect(source, `${path} 不应按模式清空出生位`)
+        .not.toContain("preview.mode === 'annihilation' || preview.mode === 'royale' ? []");
+      expect(source, `${path} 缺歼灭系出生点标记`).toContain('preview-marker spawn spawn-slot-');
+      expect(source, `${path} 出生点未标出起始据点`).toContain('起始据点');
+      // 总部方块仍保留给标准 / 同时回合。
+      expect(source, `${path} 缺总部方块标记`).toContain('preview-marker hq hq-slot-');
+      expect(source, `${path} 缺旧版出生位兜底`).toContain('preview.headquarters');
+    }
+    for (const path of ['public/play.css', 'public/play-m.css']) {
+      const css = read(path);
+      for (let slot = 1; slot <= 8; slot++) {
+        expect(css, `${path} 缺 spawn-slot-${slot} 配色`).toContain(`.preview-marker.spawn-slot-${slot}`);
+        expect(css, `${path} 缺 hq-slot-${slot} 配色`).toContain(`.preview-marker.hq-slot-${slot}`);
+      }
+    }
+  });
+
   it('stacks create name above full-width map selection', () => {
     const html = read('public/play.html');
     const css = read('public/play.css');

@@ -25,10 +25,16 @@ describe('annihilation mode UI', () => {
     }
   });
 
-  it('hides headquarters markers and labels annihilation in map previews', () => {
+  it('marks spawn points and labels annihilation in map previews', () => {
     for (const file of ['public/play.js', 'public/play-m.js']) {
       const source = read(file);
-      expect(source).toContain("preview.mode === 'annihilation' || preview.mode === 'royale' ? []");
+      // 歼灭 / 大逃杀不建总部，但出生位仍决定初始单位落点：3.6.2 起不再按模式整段清空出生位，
+      // 改用圆形出生点标记（此前该模式下预览一个出生点都看不到）。
+      expect(source).not.toContain("preview.mode === 'annihilation' || preview.mode === 'royale' ? []");
+      expect(source).toContain('preview-marker spawn spawn-slot-');
+      expect(source).toContain('起始据点');
+      // 标准 / 同时回合仍画总部方块。
+      expect(source).toContain('preview-marker hq hq-slot-');
       expect(source).toContain("const modeLabel = map.preview?.mode === 'simultaneous' ? '同时'");
       expect(source).toContain("map.preview?.mode === 'annihilation' ? '歼灭'");
       expect(source).toContain("? '大逃杀' : '标准';");

@@ -425,15 +425,24 @@ function renderMapPreview(preview) {
     const p = point(cp);
     return `<circle class="preview-marker cp" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"><title>${esc(cp.name)}</title></circle>`;
   }).join('');
-  const spawnHeadquarters = (preview.mode === 'annihilation' || preview.mode === 'royale' ? [] : (preview.spawnSlots || [])).map((slot, index) => ({
+  // 出生点：歼灭 / 大逃杀不建总部，但出生位仍决定初始单位的落点，必须标出来；
+  // 这两种模式改用圆形「出生点」标记（区别于总部方块），标题带出它绑定的起始据点。
+  const annihilationMode = preview.mode === 'annihilation' || preview.mode === 'royale';
+  const spawnSlots = (preview.spawnSlots || []).map((slot, index) => ({
     id: slot.id,
     index,
+    controlPointId: slot.controlPointId,
     ...slot.headquarters,
   }));
-  const legacyHeadquarters = preview.mode === 'annihilation' || preview.mode === 'royale' ? [] : Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, ...pos }));
-  const headquarters = (spawnHeadquarters.length ? spawnHeadquarters : legacyHeadquarters).map(slot => {
+  const legacyHeadquarters = Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, controlPointId: undefined, ...pos }));
+  const starts = spawnSlots.length ? spawnSlots : legacyHeadquarters;
+  const headquarters = starts.map(slot => {
     const p = point(slot);
-    return `<rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"><title>${esc(slot.id)}</title></rect>`;
+    const title = esc(slot.controlPointId ? `${slot.id} · 起始据点 ${slot.controlPointId}` : slot.id);
+    if (annihilationMode) {
+      return `<circle class="preview-marker spawn spawn-slot-${slot.index + 1}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.2"><title>${title}</title></circle>`;
+    }
+    return `<rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"><title>${title}</title></rect>`;
   }).join('');
 
   return `<div class="map-preview" aria-hidden="true">

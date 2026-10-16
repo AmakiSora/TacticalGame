@@ -88,6 +88,12 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   artilleryMinimumSafeRadius: { min: 0, max: 3, integer: true },
 };
 
+/**
+ * 硬边界只读视图，供前端滑块量程等消费方对齐——`public/random-map-ui.js` 的
+ * `PARAMS[].min/max` 必须与此一致，由 `tests/public/random-map-bounds.test.ts` 校验，避免两份边界漂移。
+ */
+export const RANDOM_PARAM_BOUNDS: Readonly<Record<string, Readonly<ParamBound>>> = PARAM_BOUNDS;
+
 const DEFAULT_RANGES: Record<string, [number, number]> = {
   radius: [5, 10],
   // 水域 + 阻挡合计 ≈ 旧 terrainDensity 的 [0.02, 0.12]，保持默认地形总量不变。

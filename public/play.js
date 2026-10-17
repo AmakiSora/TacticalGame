@@ -42,10 +42,21 @@ const $ = id => document.getElementById(id);
 const els = {
   joinPanel: $('join-panel'), gameId: $('game-id'), createName: $('create-name'), joinName: $('join-name'),
   mapSelect: $('map-select'), mapPicker: $('map-picker'), maxPlayers: $('max-players'), hostParticipate: $('host-participate'),
+  randomMapOptions: $('random-map-options'),
+  createForm: $('create-form'), joinForm: $('join-form'),
+  btnChangeMap: $('btn-change-map'), lobbyMapThumb: $('lobby-map-thumb'), lobbyMapName: $('lobby-map-name'),
+  lobbyMapId: $('lobby-map-id'), lobbyMapTags: $('lobby-map-tags'), lobbyMapDesc: $('lobby-map-desc'),
+  mapFilterText: $('map-filter-text'), mapFilterMode: $('map-filter-mode'), mapDialogCount: $('map-dialog-count'),
+  mapDialog: $('map-dialog'), mapDialogBackdrop: $('map-dialog-backdrop'), btnMapDialogClose: $('btn-map-dialog-close'),
+  btnMapDialogCancel: $('btn-map-dialog-cancel'), btnMapDialogApply: $('btn-map-dialog-apply'),
+  mapDialogSelected: $('map-dialog-selected'), mapDialogRandomFacts: $('map-dialog-random-facts'),
+  btnMapRandomRefresh: $('btn-map-random-refresh'),
   btnCreate: $('btn-create'), btnJoin: $('btn-join'), btnConnectCreate: $('btn-connect-create'), btnConnectJoin: $('btn-connect-join'), btnStartGame: $('btn-start-game'),
+  btnCreateAgain: $('btn-create-again'), btnJoinAgain: $('btn-join-again'),
   connStatus: $('conn-status'), createResult: $('create-result'), createdGameId: $('created-game-id'),
   createdHostToken: $('created-host-token'), createdToken: $('created-token'), createdPlayerTokenRow: $('created-player-token-row'),
   lobbySummary: $('lobby-summary'), joinLobbySummary: $('join-lobby-summary'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
+  joinRoomStatus: $('join-room-status'),
   joinPlayerToken: $('join-player-token'), joinPlayerTokenRow: $('join-player-token-row'),
   availableGames: $('available-games'), btnRefreshGames: $('btn-refresh-games'),
   availableGamesModeFilter: $('available-games-mode-filter'), availableGamesMapFilter: $('available-games-map-filter'),
@@ -105,6 +116,14 @@ let interactionMode = 'idle';
 let rangeHighlights = [];
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
 let availableMaps = [];
+let pendingMapId = null;
+let mapDialogOpen = false;
+let mapDialogTab = 'builtin';
+let lastStaticMapId = null;
+let mapFilterText = '';
+let mapFilterMode = '';
+let mapDialogPreviewTimer = null;
+let mapDialogReturnFocus = null;
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function defaultPlayerNames() { return Object.fromEntries(PLAYER_IDS.map((id, index) => [id, `玩家 ${String.fromCharCode(65 + index)}`])); }
@@ -235,6 +254,7 @@ async function loadMapList() {
   // 默认仍选中第一张静态地图，保持原有创建习惯。
   if (maps[0]) els.mapSelect.value = maps[0].id;
   renderMapPicker(maps);
+  renderLobbyMapSummary();
   syncMaxPlayersOptions();
   window.RandomMapUI?.setSelected(els.mapSelect.value);
 }
@@ -322,6 +342,8 @@ function clearSavedSession() {
 function clearSessionFromSettings() {
   clearSavedSession();
   fillSettingsFromSession();
+  setCreateRoomVisible(false);
+  setJoinRoomVisible(false);
   toast('会话已清除', 'ok');
 }
 
@@ -425,6 +447,10 @@ function renderMapPreview(preview) {
   </div>`;
 }
 
+function mapModeLabel(mode) {
+  return mode === 'simultaneous' ? '同时' : mode === 'annihilation' ? '歼灭' : mode === 'royale' ? '大逃杀' : '标准';
+}
+
 function syncMapSelection() {
   if (!els.mapPicker) return;
   const selected = els.mapSelect.value || 'default';
@@ -436,10 +462,23 @@ function syncMapSelection() {
   });
 }
 
+function syncPendingSelection() {
+  if (!els.mapPicker) return;
+  const selected = pendingMapId || els.mapSelect.value || 'default';
+  els.mapPicker.querySelectorAll('.map-card').forEach(card => {
+    const isSelected = card.dataset.mapId === selected;
+    card.classList.toggle('selected-map', isSelected);
+    card.setAttribute('aria-checked', String(isSelected));
+    card.tabIndex = isSelected ? 0 : -1;
+  });
+}
+
 function selectMap(mapId) {
   els.mapSelect.value = mapId;
+  pendingMapId = mapId;
   syncMapSelection();
   syncMaxPlayersOptions();
+  renderLobbyMapSummary();
   window.RandomMapUI?.setSelected(mapId);
 }
 
@@ -458,24 +497,104 @@ function syncMaxPlayersOptions() {
   }
 }
 
-function renderMapPicker(maps) {
-  if (!els.mapPicker) return;
-  if (!maps.length) {
-    els.mapPicker.innerHTML = '<div class="map-picker-empty">暂无可用地图</div>';
+function mapTags(map) {
+  const preview = map.preview || {};
+  const counts = (preview.supportedPlayerCounts || [2]).join('/');
+  const maxTurns = preview.maxTurns === null ? '∞' : (preview.maxTurns ?? '-');
+  return [
+    `⊘${preview.radius ?? '-'}`,
+    `⬡${(preview.controlPoints || []).length}`,
+    `⚑${counts}`,
+    `♟${preview.actionsPerTurn ?? '-'}`,
+    `⏱${maxTurns}`,
+    mapModeLabel(preview.mode),
+  ];
+}
+
+function randomMapTags() {
+  const tags = ['⊘ 随机生成', '⚑ 2-8 人', '四种模式可选'];
+  const preview = window.RandomMapUI?.lastPreview;
+  if (preview) {
+    tags.splice(1, 0,
+      `⬡ ${(preview.controlPoints || []).length} 据点`,
+      `♟ ${preview.actionsPerTurn ?? '-'} 行动点`,
+      `⏱ ${preview.maxTurns === null ? '∞' : (preview.maxTurns ?? '-')} 回合`);
+  }
+  return tags;
+}
+
+/** 大厅首屏的「已选地图」摘要：静态图显示真实缩略图，随机图由 RandomMapUI 异步补预览。 */
+function renderLobbyMapSummary() {
+  if (!els.lobbyMapThumb) return;
+  const mapId = els.mapSelect?.value || '';
+  if (mapId === 'random') {
+    const preview = window.RandomMapUI?.lastPreview;
+    els.lobbyMapThumb.setAttribute('data-random-map-preview', '');
+    els.lobbyMapThumb.innerHTML = preview
+      ? renderMapPreview(preview)
+      : '<div class="map-preview empty">?</div>';
+    if (els.lobbyMapName) els.lobbyMapName.textContent = '随机地图';
+    if (els.lobbyMapId) els.lobbyMapId.textContent = 'random';
+    if (els.lobbyMapTags) {
+      els.lobbyMapTags.innerHTML = randomMapTags()
+        .map(tag => `<span class="lobby-map-tag">${esc(tag)}</span>`).join('');
+    }
+    if (els.lobbyMapDesc) {
+      els.lobbyMapDesc.textContent = '随机参数在「更换地图 → 随机地图」里调整；留空项由服务端默认。';
+      els.lobbyMapDesc.title = els.lobbyMapDesc.textContent;
+    }
     return;
   }
-  const selected = els.mapSelect.value || maps[0].id;
-  els.mapSelect.value = selected;
+
+  els.lobbyMapThumb.removeAttribute('data-random-map-preview');
+  const map = availableMaps.find(item => item.id === mapId);
+  if (!map) {
+    els.lobbyMapThumb.innerHTML = '<div class="map-preview empty">…</div>';
+    if (els.lobbyMapName) els.lobbyMapName.textContent = '地图加载中…';
+    if (els.lobbyMapId) els.lobbyMapId.textContent = '';
+    if (els.lobbyMapTags) els.lobbyMapTags.innerHTML = '';
+    if (els.lobbyMapDesc) els.lobbyMapDesc.textContent = '';
+    return;
+  }
+  els.lobbyMapThumb.innerHTML = renderMapPreview(map.preview);
+  if (els.lobbyMapName) els.lobbyMapName.textContent = map.name;
+  if (els.lobbyMapId) els.lobbyMapId.textContent = map.id;
+  if (els.lobbyMapTags) {
+    els.lobbyMapTags.innerHTML = mapTags(map)
+      .map(tag => `<span class="lobby-map-tag">${esc(tag)}</span>`).join('');
+  }
+  if (els.lobbyMapDesc) {
+    els.lobbyMapDesc.textContent = map.description || '';
+    els.lobbyMapDesc.title = map.description || '';
+  }
+}
+
+function renderMapPicker(maps) {
+  if (!els.mapPicker) return;
+  const list = Array.isArray(maps) ? maps : availableMaps;
+  if (!list.length) {
+    els.mapPicker.innerHTML = '<div class="map-picker-empty">暂无可用地图</div>';
+    if (els.mapDialogCount) els.mapDialogCount.textContent = '0 张';
+    return;
+  }
+  const text = mapFilterText.trim().toLowerCase();
+  const filtered = list.filter(map => {
+    const mode = map.preview?.mode || 'standard';
+    if (mapFilterMode && mode !== mapFilterMode) return false;
+    if (!text) return true;
+    return `${map.name} ${map.id} ${map.description || ''}`.toLowerCase().includes(text);
+  });
+  const selected = pendingMapId || els.mapSelect.value || list[0].id;
   const randomCard = window.RandomMapUI?.renderRandomMapCard(selected === 'random') || '';
-  els.mapPicker.innerHTML = randomCard + maps.map(map => {
+  const cards = filtered.map(map => {
     const isSelected = map.id === selected;
-	    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
-	    const radius = map.preview?.radius ?? '-';
-		    const maxTurns = map.preview?.maxTurns === null ? '∞' : map.preview?.maxTurns ?? '-';
-		    const actionsPerTurn = map.preview?.actionsPerTurn ?? '-';
-	    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
-	    const modeLabel = map.preview?.mode === 'simultaneous' ? '同时' : map.preview?.mode === 'annihilation' ? '歼灭' : map.preview?.mode === 'royale' ? '大逃杀' : '标准';
-    return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}" aria-label="${esc(map.name)} (${esc(map.id)})">
+    const controlPointCount = map.preview?.controlPoints?.length ?? 0;
+    const radius = map.preview?.radius ?? '-';
+    const maxTurns = map.preview?.maxTurns === null ? '∞' : map.preview?.maxTurns ?? '-';
+    const actionsPerTurn = map.preview?.actionsPerTurn ?? '-';
+    const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
+    const modeLabel = map.preview?.mode === 'simultaneous' ? '同时' : map.preview?.mode === 'annihilation' ? '歼灭' : map.preview?.mode === 'royale' ? '大逃杀' : '标准';
+    return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}" aria-label="${esc(map.name)} (${esc(map.id)})" title="${esc(map.name)} — ${esc(map.description || '')}">
       ${renderMapPreview(map.preview)}
       <span class="map-card-copy">
         <span class="map-card-name"><span class="map-card-name-zh">${esc(map.name)}</span><span class="map-card-name-en">${esc(map.id)}</span></span>
@@ -501,16 +620,150 @@ function renderMapPicker(maps) {
       </span>
     </button>`;
   }).join('');
+  els.mapPicker.innerHTML = randomCard + (cards || '<div class="map-picker-empty">没有匹配的地图</div>');
+  const lastRandomPreview = window.RandomMapUI?.lastPreview;
+  const randomCardPreview = els.mapPicker.querySelector('.map-card-random .map-preview');
+  if (lastRandomPreview && randomCardPreview) {
+    randomCardPreview.outerHTML = renderMapPreview(lastRandomPreview);
+  }
   els.mapPicker.querySelectorAll('.map-card').forEach(card => {
-    card.addEventListener('click', () => selectMap(card.dataset.mapId));
+    card.addEventListener('click', () => choosePendingMap(card.dataset.mapId));
     card.addEventListener('keydown', e => {
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
-        selectMap(card.dataset.mapId);
+        choosePendingMap(card.dataset.mapId);
       }
     });
   });
+  if (els.mapDialogCount) {
+    els.mapDialogCount.textContent = `${filtered.length + (randomCard ? 1 : 0)} 张可选`;
+  }
+  if (mapDialogOpen) syncPendingSelection();
+  else syncMapSelection();
+}
+
+function mapLabel(mapId) {
+  return mapId === 'random' ? '随机地图' : (availableMaps.find(map => map.id === mapId)?.name || mapId || '未选择');
+}
+
+function renderMapDialogFooter() {
+  if (!els.mapDialogSelected) return;
+  const label = mapLabel(pendingMapId || els.mapSelect.value);
+  els.mapDialogSelected.innerHTML = `已选：<b>${esc(label)}</b>`;
+}
+
+function randomFactsMarkup() {
+  const preview = window.RandomMapUI?.lastPreview;
+  if (!preview) return '<div class="rmo-fact"><span>状态</span><b>生成中…</b></div>';
+  const seed = window.RandomMapUI?.lastSeed || '';
+  const rows = [
+    ['地图半径', preview.radius ?? '—'],
+    ['据点数量', (preview.controlPoints || []).length],
+    ['模式', mapModeLabel(preview.mode)],
+    ['回合 / 行动点', `${preview.maxTurns === null ? '∞' : (preview.maxTurns ?? '—')} / ${preview.actionsPerTurn ?? '—'}`],
+    ['种子', seed || '—'],
+  ];
+  return rows.map(([key, value]) =>
+    `<div class="rmo-fact"><span>${esc(key)}</span><b>${esc(value)}</b></div>`).join('');
+}
+
+function renderMapDialogRandomFacts() {
+  if (els.mapDialogRandomFacts) els.mapDialogRandomFacts.innerHTML = randomFactsMarkup();
+}
+
+function showMapDialogTab(tab) {
+  mapDialogTab = tab === 'random' ? 'random' : 'builtin';
+  document.querySelectorAll('.map-dialog-tab').forEach(button => {
+    const active = button.dataset.mapTab === mapDialogTab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('.map-dialog-pane').forEach(pane => {
+    pane.classList.toggle('active', pane.dataset.mapPane === mapDialogTab);
+  });
+  if (mapDialogTab === 'random') {
+    pendingMapId = 'random';
+    els.randomMapOptions?.classList.remove('hidden');
+    const lastPreview = window.RandomMapUI?.lastPreview;
+    if (lastPreview) {
+      const rendered = renderMapPreview(lastPreview);
+      document.querySelectorAll('[data-random-preview]').forEach(el => {
+        el.classList.remove('rmo-preview-error');
+        el.innerHTML = rendered;
+      });
+    } else {
+      window.RandomMapUI?.refreshPreview(true);
+    }
+    renderMapDialogRandomFacts();
+  } else {
+    if (pendingMapId === 'random') {
+      pendingMapId = lastStaticMapId || els.mapSelect.value || availableMaps[0]?.id || 'default';
+    }
+    syncPendingSelection();
+  }
+  renderMapDialogFooter();
+}
+
+function choosePendingMap(mapId) {
+  if (!mapDialogOpen) return;
+  if (mapId === 'random') {
+    lastStaticMapId = lastStaticMapId || els.mapSelect.value;
+    showMapDialogTab('random');
+    return;
+  }
+  pendingMapId = mapId;
+  lastStaticMapId = mapId;
+  syncPendingSelection();
+  renderMapDialogFooter();
+}
+
+function openMapDialog() {
+  if (!els.mapDialog) return;
+  mapDialogReturnFocus = document.activeElement;
+  mapDialogOpen = true;
+  mapFilterText = '';
+  mapFilterMode = '';
+  if (els.mapFilterText) els.mapFilterText.value = '';
+  if (els.mapFilterMode) els.mapFilterMode.value = '';
+  pendingMapId = els.mapSelect.value || availableMaps[0]?.id || 'default';
+  lastStaticMapId = pendingMapId === 'random'
+    ? (availableMaps[0]?.id || 'default')
+    : pendingMapId;
+  els.mapDialog.classList.remove('hidden');
+  els.mapDialogBackdrop?.classList.remove('hidden');
+  document.body.classList.add('map-dialog-open');
+  renderMapPicker(availableMaps);
+  showMapDialogTab(pendingMapId === 'random' ? 'random' : 'builtin');
+  els.btnMapDialogClose?.focus();
+}
+
+function closeMapDialog() {
+  if (!mapDialogOpen) return;
+  mapDialogOpen = false;
+  els.mapDialog?.classList.add('hidden');
+  els.mapDialogBackdrop?.classList.add('hidden');
+  document.body.classList.remove('map-dialog-open');
+  pendingMapId = els.mapSelect.value;
   syncMapSelection();
+  const target = mapDialogReturnFocus && mapDialogReturnFocus.isConnected
+    ? mapDialogReturnFocus
+    : els.btnChangeMap;
+  target?.focus?.();
+  mapDialogReturnFocus = null;
+}
+
+function applyMapDialog() {
+  const mapId = pendingMapId || els.mapSelect.value;
+  closeMapDialog();
+  selectMap(mapId);
+}
+
+function scheduleMapDialogPreview() {
+  if (!mapDialogOpen || mapDialogTab !== 'random') return;
+  // 已选中随机地图时模块自己的 schedulePreview 会处理；这里只补「浏览随机页签但尚未选中」的情况。
+  if (window.RandomMapUI?.isSelected()) return;
+  clearTimeout(mapDialogPreviewTimer);
+  mapDialogPreviewTimer = setTimeout(() => window.RandomMapUI?.refreshPreview(true), 450);
 }
 
 function createEmptyState() {
@@ -2167,10 +2420,9 @@ function handleLobbyRemoval(lobby) {
   myToken = null;
   myPlayer = null;
   persistSession();
-  if (els.joinStatusText) els.joinStatusText.textContent = '你已被房主移出大厅';
   if (els.joinPlayerToken) els.joinPlayerToken.textContent = '';
   els.joinPlayerTokenRow?.classList.add('hidden');
-  els.joinResult?.classList.remove('hidden');
+  showJoinError('你已被房主移出大厅');
   statusBadge('已移出', 'err');
   toast('你已被房主移出大厅', 'err');
   return true;
@@ -2390,6 +2642,28 @@ els.botPromptSkill.addEventListener('change', renderBotPromptText);
 els.btnBotPromptCopy.addEventListener('click', copyBotPrompt);
 els.btnBotPromptClose.addEventListener('click', closeBotDialog);
 
+function setCreateRoomVisible(visible) {
+  els.createForm?.classList.toggle('hidden', visible);
+  els.createResult?.classList.toggle('hidden', !visible);
+}
+
+function setJoinRoomVisible(visible) {
+  els.joinForm?.classList.toggle('hidden', visible);
+  els.joinResult?.classList.toggle('hidden', !visible);
+  if (visible && els.joinStatusText) {
+    els.joinStatusText.textContent = '';
+    els.joinStatusText.classList.add('hidden');
+  }
+}
+
+function showJoinError(message) {
+  setJoinRoomVisible(false);
+  if (els.joinStatusText) {
+    els.joinStatusText.textContent = message;
+    els.joinStatusText.classList.remove('hidden');
+  }
+}
+
 async function startHostedGame() {
   if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
   const res = await fetch(`/api/games/${gameId}/start`, {
@@ -2447,7 +2721,7 @@ els.btnCreate.addEventListener('click', async () => {
     els.createdToken.textContent = myToken || '未参战';
     els.createdPlayerTokenRow.classList.toggle('hidden', !myToken);
     renderLobbySummary(data.lobby, els.lobbySummary, true);
-    els.createResult.classList.remove('hidden');
+    setCreateRoomVisible(true);
     statusBadge('大厅中', 'idle');
     startLobbyPolling();
     refreshAvailableGames();
@@ -2462,16 +2736,17 @@ els.btnJoin.addEventListener('click', async () => {
   stopLobbyPolling();
   const res = await fetch(`/api/games/${gid}/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: els.joinName.value.trim() || undefined }) });
   const data = await res.json();
-  if (!res.ok) { els.joinStatusText.textContent = `加入失败: ${data.error}`; els.joinResult.classList.remove('hidden'); refreshAvailableGames(); return; }
+  if (!res.ok) { showJoinError(`加入失败: ${data.error}`); refreshAvailableGames(); return; }
   myToken = data.player.token;
   myPlayer = data.player.id;
   gameId = gid;
   hostToken = null;
   persistSession();
-  els.joinStatusText.textContent = data.lobby?.phase === 'active' ? '加入成功，正在进入游戏…' : '加入成功，等待房主开始';
+  const roomStatus = data.lobby?.phase === 'active' ? '加入成功，正在进入游戏…' : '加入成功，等待房主开始';
+  if (els.joinRoomStatus) els.joinRoomStatus.textContent = roomStatus;
   els.joinPlayerToken.textContent = myToken;
   els.joinPlayerTokenRow.classList.remove('hidden');
-  els.joinResult.classList.remove('hidden');
+  setJoinRoomVisible(true);
   renderLobbySummary(data.lobby, els.joinLobbySummary);
   refreshAvailableGames();
   statusBadge(data.lobby?.phase === 'active' ? '正在进入' : '大厅中', 'idle');
@@ -2484,7 +2759,52 @@ els.btnJoin.addEventListener('click', async () => {
 els.btnStartGame.addEventListener('click', startHostedGame);
 els.btnConnectCreate.addEventListener('click', enterGame);
 els.btnConnectJoin?.addEventListener('click', enterGame);
+
+// 房间卡上的返回入口：只切换回表单，不隐式删除服务器上的等待房间。
+els.btnCreateAgain?.addEventListener('click', () => {
+  if (!window.confirm('当前房间仍在等待。返回设置后重新创建会新建另一局，旧房间仍会留在等待列表中。')) return;
+  setCreateRoomVisible(false);
+  els.createName?.focus();
+  toast('已返回设置：点「创建新游戏」会新建一局', 'ok');
+});
+els.btnJoinAgain?.addEventListener('click', () => {
+  if (!window.confirm('当前已加入房间。返回大厅重新加入会切换到新的对局。')) return;
+  setJoinRoomVisible(false);
+  refreshAvailableGames();
+});
+
+// 地图库弹层：摘要卡只负责打开，真正切图在弹层里确认。
+els.btnChangeMap?.addEventListener('click', openMapDialog);
+els.btnMapDialogClose?.addEventListener('click', closeMapDialog);
+els.btnMapDialogCancel?.addEventListener('click', closeMapDialog);
+els.mapDialogBackdrop?.addEventListener('click', closeMapDialog);
+els.btnMapDialogApply?.addEventListener('click', applyMapDialog);
+document.querySelectorAll('.map-dialog-tab').forEach(tab => {
+  tab.addEventListener('click', () => showMapDialogTab(tab.dataset.mapTab));
+});
+els.mapFilterText?.addEventListener('input', () => {
+  mapFilterText = els.mapFilterText.value;
+  renderMapPicker(availableMaps);
+});
+els.mapFilterMode?.addEventListener('change', () => {
+  mapFilterMode = els.mapFilterMode.value;
+  renderMapPicker(availableMaps);
+});
+els.btnMapRandomRefresh?.addEventListener('click', () => {
+  const seed = document.getElementById('rmo-seed');
+  if (seed) seed.value = '';
+  window.RandomMapUI?.refreshPreview(true);
+});
+els.randomMapOptions?.addEventListener('input', scheduleMapDialogPreview);
+els.randomMapOptions?.addEventListener('change', scheduleMapDialogPreview);
+els.maxPlayers?.addEventListener('change', () => {
+  // 浏览随机页签但尚未选中随机图时，人数变化也要刷新弹层预览。
+  if (mapDialogOpen && mapDialogTab === 'random' && !window.RandomMapUI?.isSelected()) {
+    scheduleMapDialogPreview();
+  }
+});
 async function enterGame() {
+  closeMapDialog();
   const ok = await loadFullState();
   if (!ok || !state.cells.length) {
     const lobby = await refreshLobbySummary();
@@ -2535,15 +2855,15 @@ function restoreLobbyView(lobby) {
     els.createdToken.textContent = myToken || '未参战';
     els.createdPlayerTokenRow?.classList.toggle('hidden', !myToken);
     renderLobbySummary(lobby, els.lobbySummary, true);
-    els.createResult?.classList.remove('hidden');
+    setCreateRoomVisible(true);
     statusBadge('大厅中', 'idle');
   } else if (myToken) {
     document.querySelector('.lobby-tab[data-tab="join"]')?.click();
-    if (els.joinStatusText) els.joinStatusText.textContent = '已恢复大厅，等待房主开始';
+    if (els.joinRoomStatus) els.joinRoomStatus.textContent = '已恢复大厅，等待房主开始';
     if (els.joinPlayerToken) els.joinPlayerToken.textContent = myToken;
     els.joinPlayerTokenRow?.classList.remove('hidden');
     renderLobbySummary(lobby, els.joinLobbySummary);
-    els.joinResult?.classList.remove('hidden');
+    setJoinRoomVisible(true);
     statusBadge('大厅中', 'idle');
   } else {
     return; // 只有 gameId 的观战会话：维持大厅页现状。
@@ -2644,7 +2964,7 @@ document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('clic
     toast('复制失败', 'err');
   }
 }));
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeBotDialog(); deselect(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMapDialog(); closeBotDialog(); deselect(); } });
 document.addEventListener('click', e => { const popup = $('map-popup'); if (!popup.classList.contains('hidden') && !popup.contains(e.target) && e.target !== els.canvas) closePopup(); });
 els.btnSettings?.addEventListener('click', e => {
   e.stopPropagation();
@@ -2677,6 +2997,10 @@ restoreSessionIntoMemory();
 fillSettingsFromSession();
 reconnectSavedSession();
 window.RandomMapUI?.setPreviewRenderer(renderMapPreview);
+if (window.RandomMapUI) {
+  window.RandomMapUI.onPreview = () => renderMapDialogRandomFacts();
+  renderMapDialogRandomFacts();
+}
 loadMapList();
 startAvailableGamesRefresh();
 requestAnimationFrame(renderLoop);

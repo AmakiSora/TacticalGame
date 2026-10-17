@@ -29,41 +29,65 @@
     </div>
 
     <div id="tab-create" class="lobby-tab-content active">
-      <div class="create-setup">
-        <div class="create-row">
-          <div class="field name-field">
-            <label>你的名称</label>
-            <input id="create-name" placeholder="留空使用默认名称" maxlength="50" />
+      <div id="create-form" class="create-form">
+        <div class="create-setup">
+          <div class="create-row">
+            <div class="field name-field">
+              <label>你的名称</label>
+              <input id="create-name" placeholder="留空使用默认名称" maxlength="50" />
+            </div>
+            <div class="field">
+              <label>最大玩家数</label>
+              <select id="max-players">
+                <option value="2">2 人</option>
+                <option value="3">3 人</option>
+                <option value="4">4 人</option>
+                <option value="5">5 人</option>
+                <option value="6">6 人</option>
+                <option value="7">7 人</option>
+                <option value="8">8 人</option>
+              </select>
+            </div>
+            <label class="field checkbox-field">
+              <span>房主参战</span>
+              <span class="switch">
+                <input id="host-participate" type="checkbox" checked />
+                <span class="switch-slider"></span>
+              </span>
+            </label>
           </div>
-          <div class="field">
-            <label>最大玩家数</label>
-            <select id="max-players">
-              <option value="2">2 人</option>
-              <option value="3">3 人</option>
-              <option value="4">4 人</option>
-              <option value="5">5 人</option>
-              <option value="6">6 人</option>
-              <option value="7">7 人</option>
-              <option value="8">8 人</option>
-            </select>
+          <div class="lobby-map-field">
+            <label class="lobby-map-label">选择地图</label>
+            <select id="map-select" hidden><option value="random">随机地图</option><option value="default">default</option></select>
+            <div id="lobby-map-summary" class="lobby-map-summary">
+              <div id="lobby-map-thumb" class="lobby-map-thumb" aria-hidden="true"></div>
+              <div class="lobby-map-copy">
+                <div class="lobby-map-name">
+                  <span id="lobby-map-name">地图加载中…</span>
+                  <span id="lobby-map-id"></span>
+                </div>
+                <div id="lobby-map-tags" class="lobby-map-tags"></div>
+                <div id="lobby-map-desc" class="lobby-map-desc"></div>
+              </div>
+              <button id="btn-change-map" class="btn" type="button">更换地图</button>
+            </div>
           </div>
-          <label class="field checkbox-field">
-            <span>房主参战</span>
-            <span class="switch">
-              <input id="host-participate" type="checkbox" checked />
-              <span class="switch-slider"></span>
-            </span>
-          </label>
         </div>
-        <div class="field map-field">
-          <label>选择地图</label>
-          <select id="map-select" hidden><option value="random">随机地图</option><option value="default">default</option></select>
-          <div id="map-picker" class="map-picker" role="radiogroup" aria-label="选择地图"></div>
-          <div id="random-map-options" class="random-map-options hidden"></div>
-        </div>
+        <button id="btn-create" class="btn primary lobby-create-btn" type="button">创建新游戏</button>
+        <p class="lobby-hint">地图与随机参数都在「更换地图」弹层里调整；创建成功后这里会直接变成房间信息。</p>
       </div>
-      <button id="btn-create" class="btn primary" style="margin-top:14px;width:100%">创建新游戏</button>
-      <div id="create-result" class="lobby-result hidden">
+      <div id="create-result" class="lobby-result lobby-room hidden">
+        <div class="lobby-room-head">
+          <div>
+            <div class="lobby-room-kicker">
+              <span class="badge ok">大厅中</span>
+              <span class="lobby-room-kicker-text">等待玩家加入</span>
+            </div>
+            <h3>房间已创建</h3>
+            <p>把 Game ID 发给其他玩家；人齐后点「开始游戏」。</p>
+          </div>
+          <button id="btn-create-again" class="btn lobby-room-edit" type="button">重新创建</button>
+        </div>
         <div class="info-row">
           <span class="info-label">Game ID</span>
           <code id="created-game-id" class="info-value"></code>
@@ -81,56 +105,130 @@
         </div>
         <p class="lobby-hint">请保存 Host Token，将 Game ID 发给其他玩家。</p>
         <div id="lobby-summary" class="lobby-summary"></div>
-        <button id="btn-start-game" class="btn success" style="width:100%;margin-top:10px">开始游戏</button>
-        <button id="btn-connect-create" class="btn success" style="width:100%;margin-top:10px">连接进入游戏</button>
+        <div class="lobby-room-actions">
+          <button id="btn-start-game" class="btn success" type="button">开始游戏</button>
+          <button id="btn-connect-create" class="btn success" type="button">连接进入游戏</button>
+        </div>
       </div>
     </div>
 
     <div id="tab-join" class="lobby-tab-content">
-      <div class="field">
-        <label>游戏 ID</label>
-        <input id="game-id" placeholder="粘贴 Game ID…" />
+      <div id="join-form" class="join-form">
+        <div class="field">
+          <label>游戏 ID</label>
+          <input id="game-id" placeholder="粘贴 Game ID…" />
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>你的名称</label>
+          <input id="join-name" placeholder="留空使用默认名称" maxlength="50" />
+        </div>
+        <button id="btn-join" class="btn primary lobby-create-btn" type="button">加入游戏</button>
+        <p class="lobby-status hidden" id="join-status-text"></p>
+        <section class="available-games-section" aria-labelledby="available-games-title">
+          <div class="available-games-head">
+            <h3 id="available-games-title">等待加入的对局</h3>
+            <button id="btn-refresh-games" class="available-games-refresh" type="button" title="刷新对局" aria-label="刷新对局">
+              <img src="/icons/lucide/rotate-ccw.svg" alt="" aria-hidden="true" />
+            </button>
+          </div>
+          <div class="available-games-filters">
+            <select id="available-games-mode-filter" aria-label="按模式筛选">
+              <option value="">全部模式</option>
+              <option value="standard">标准</option>
+              <option value="annihilation">歼灭</option>
+              <option value="simultaneous">同时</option>
+              <option value="royale">大逃杀</option>
+            </select>
+            <select id="available-games-map-filter" aria-label="按地图筛选">
+              <option value="">全部地图</option>
+            </select>
+          </div>
+          <div id="available-games" class="available-games" aria-live="polite">
+            <p class="available-games-state">正在检测…</p>
+          </div>
+        </section>
       </div>
-      <div class="field" style="margin-top:10px">
-        <label>你的名称</label>
-        <input id="join-name" placeholder="留空使用默认名称" maxlength="50" />
-      </div>
-      <button id="btn-join" class="btn primary" style="margin-top:14px;width:100%">加入游戏</button>
-      <section class="available-games-section" aria-labelledby="available-games-title">
-        <div class="available-games-head">
-          <h3 id="available-games-title">等待加入的对局</h3>
-          <button id="btn-refresh-games" class="available-games-refresh" type="button" title="刷新对局" aria-label="刷新对局">
-            <img src="/icons/lucide/rotate-ccw.svg" alt="" aria-hidden="true" />
-          </button>
+      <div id="join-result" class="lobby-result lobby-room hidden">
+        <div class="lobby-room-head">
+          <div>
+            <div class="lobby-room-kicker">
+              <span class="badge ok">大厅中</span>
+              <span class="lobby-room-kicker-text" id="join-room-status">等待房主开始</span>
+            </div>
+            <h3>已加入房间</h3>
+            <p>房主开始后会自动进入游戏，也可以手动点「进入游戏」。</p>
+          </div>
+          <button id="btn-join-again" class="btn lobby-room-edit" type="button">返回大厅</button>
         </div>
-        <div class="available-games-filters">
-          <select id="available-games-mode-filter" aria-label="按模式筛选">
-            <option value="">全部模式</option>
-            <option value="standard">标准</option>
-            <option value="annihilation">歼灭</option>
-            <option value="simultaneous">同时</option>
-            <option value="royale">大逃杀</option>
-          </select>
-          <select id="available-games-map-filter" aria-label="按地图筛选">
-            <option value="">全部地图</option>
-          </select>
-        </div>
-        <div id="available-games" class="available-games" aria-live="polite">
-          <p class="available-games-state">正在检测…</p>
-        </div>
-      </section>
-      <div id="join-result" class="lobby-result hidden">
-        <p class="lobby-status" id="join-status-text"></p>
         <div class="info-row" id="join-player-token-row">
           <span class="info-label">Player</span>
           <code id="join-player-token" class="info-value"></code>
           <button class="btn-copy" data-copy="join-player-token">复制</button>
         </div>
         <div id="join-lobby-summary" class="lobby-summary"></div>
-        <button id="btn-connect-join" class="btn success" style="width:100%;margin-top:10px">进入游戏</button>
+        <div class="lobby-room-actions">
+          <button id="btn-connect-join" class="btn success" type="button">进入游戏</button>
+        </div>
       </div>
     </div>
   </section>
+
+<!-- 地图库弹层：手机端全屏 -->
+<div id="map-dialog-backdrop" class="modal-backdrop hidden"></div>
+<div id="map-dialog" class="map-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="map-dialog-title">
+  <div class="map-dialog-head">
+    <div>
+      <h3 id="map-dialog-title">地图库</h3>
+      <p>内置地图与随机地图都在这里选；随机参数留空走服务端默认。</p>
+    </div>
+    <button id="btn-map-dialog-close" class="map-dialog-close" type="button" aria-label="关闭地图库">×</button>
+  </div>
+  <div class="map-dialog-tabs" role="tablist" aria-label="地图类型">
+    <button class="map-dialog-tab active" type="button" data-map-tab="builtin" role="tab" aria-selected="true">
+      地图列表 <span id="map-dialog-count" class="map-dialog-count">12 张</span>
+    </button>
+    <button class="map-dialog-tab" type="button" data-map-tab="random" role="tab" aria-selected="false">
+      随机参数 <span class="map-dialog-count">可调</span>
+    </button>
+  </div>
+  <div class="map-dialog-body">
+    <div id="map-dialog-builtin" class="map-dialog-pane active" data-map-pane="builtin">
+      <div class="map-dialog-toolbar">
+        <input id="map-filter-text" type="search" placeholder="搜索地图名 / ID / 描述…" autocomplete="off" aria-label="搜索地图" />
+        <select id="map-filter-mode" aria-label="按模式筛选">
+          <option value="">全部模式</option>
+          <option value="standard">标准</option>
+          <option value="annihilation">歼灭</option>
+          <option value="simultaneous">同时</option>
+          <option value="royale">大逃杀</option>
+        </select>
+      </div>
+      <div id="map-picker" class="map-picker" data-map-dialog-grid role="radiogroup" aria-label="选择地图"></div>
+    </div>
+    <div id="map-dialog-random" class="map-dialog-pane" data-map-pane="random">
+      <div class="map-dialog-random-layout">
+        <div class="map-dialog-params">
+          <div id="random-map-options" class="random-map-options hidden"></div>
+        </div>
+        <aside class="map-dialog-preview">
+          <div class="rmo-preview">
+            <div class="rmo-preview-head">
+              <span class="rmo-preview-title">地图预览</span>
+              <button id="btn-map-random-refresh" class="rmo-preview-refresh" type="button">↻ 换一张</button>
+            </div>
+            <div class="rmo-preview-canvas" data-random-preview>生成预览中…</div>
+            <div id="map-dialog-random-facts" class="rmo-facts"></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+  <div class="map-dialog-foot">
+    <span id="map-dialog-selected" class="map-dialog-selected">已选：<b>—</b></span>
+    <button id="btn-map-dialog-cancel" class="btn" type="button">取消</button>
+    <button id="btn-map-dialog-apply" class="btn primary" type="button">使用这张地图</button>
+  </div>
+</div>
 
   <main id="game-ui" class="hidden m-game">
     <div id="turn-strip" class="turn-strip" aria-label="对局状态">

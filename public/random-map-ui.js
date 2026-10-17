@@ -368,6 +368,11 @@
     previewToken: 0,
     previewTimer: null,
     suppressAutoPreview: false,
+    /** 最近一次生成的预览与种子：大厅摘要、弹层右侧预览与事实区共用。 */
+    lastPreview: null,
+    lastSeed: '',
+    /** 预览刷新后的外部钩子（play.js / play-m.js 用来更新弹层事实区）。 */
+    onPreview: null,
 
     /** 注入页面的地图预览渲染函数（与静态地图卡片同一套 SVG 渲染）。 */
     setPreviewRenderer(renderer) {
@@ -475,7 +480,10 @@
 
     setSelected(mapId) {
       const panel = document.getElementById('random-map-options');
-      if (panel) panel.classList.toggle('hidden', mapId !== RANDOM_MAP_ID);
+      // 地图库弹层里由页签控制显隐，不能再被"当前选中地图"覆盖；只处理旧的内联面板。
+      if (panel && !panel.closest('.map-dialog')) {
+        panel.classList.toggle('hidden', mapId !== RANDOM_MAP_ID);
+      }
       if (mapId === RANDOM_MAP_ID) RandomMapUI.refreshPreview();
     },
 
@@ -491,8 +499,8 @@
     },
 
     /** 按当前面板参数请求服务端生成预览；未填种子时回填服务端代抽的种子。 */
-    async refreshPreview() {
-      if (!RandomMapUI.isSelected()) return;
+    async refreshPreview(force = false) {
+      if (!force && !RandomMapUI.isSelected()) return;
       const canvas = document.getElementById('rmo-preview-canvas');
       if (!canvas) return;
       const token = ++RandomMapUI.previewToken;
@@ -515,11 +523,16 @@
           seedInput.value = data.seed;
           RandomMapUI.suppressAutoPreview = false;
         }
+        RandomMapUI.lastSeed = data.seed || '';
         RandomMapUI.renderPreview(data.preview);
       } catch (err) {
         if (token !== RandomMapUI.previewToken) return;
         canvas.classList.add('rmo-preview-error');
         canvas.textContent = `预览失败：${err.message || '网络错误'}`;
+        document.querySelectorAll('[data-random-preview]').forEach(el => {
+          el.classList.add('rmo-preview-error');
+          el.textContent = `预览失败：${err.message || '网络错误'}`;
+        });
       }
     },
 
@@ -527,11 +540,24 @@
       const canvas = document.getElementById('rmo-preview-canvas');
       if (!canvas || !RandomMapUI.previewRenderer) return;
       const rendered = RandomMapUI.previewRenderer(preview);
+      RandomMapUI.lastPreview = preview || null;
       canvas.innerHTML = rendered;
+      // 大厅摘要缩略图与弹层右侧大预览共用同一份渲染结果。
+      document.querySelectorAll('[data-random-preview]').forEach(el => {
+        el.innerHTML = rendered;
+      });
+      document.querySelectorAll('[data-random-map-preview]').forEach(el => {
+        el.innerHTML = rendered;
+      });
       // 同步更新地图选择器里随机卡片的小预览。
       const cardPreview = document.querySelector('.map-card-random .map-preview');
       if (cardPreview) {
         cardPreview.outerHTML = rendered;
+      }
+      try {
+        RandomMapUI.onPreview?.(preview);
+      } catch {
+        // 外部钩子只负责刷新说明文字，失败不应影响预览本身。
       }
     },
 

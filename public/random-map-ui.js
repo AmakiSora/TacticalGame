@@ -13,23 +13,65 @@
 
   // min/max = 服务端硬边界（src/config/randomMap.ts 的 PARAM_BOUNDS，数字输入量程），
   // defMin/defMax = 留空时服务端使用的默认区间（仅作提示与"默认态"回显；兵种权重默认是
-  // 标量 2/2/1/1，defMin=defMax）。两份数值由 tests/public/random-map-ui.test.ts 对齐校验，避免前后端漂移。
+  // 标量 2/2/1/1、战斗波动默认固定 3/6、兵种属性默认围绕基准值抖动，这些行 defMin=defMax
+  // 或不完全等于抖动区间，均只作提示）。两份数值由 tests/public/random-map-ui.test.ts 对齐校验，避免前后端漂移。
   const PARAMS = [
     { key: 'radius', label: '地图半径', step: 1, min: 4, max: 12, defMin: 5, defMax: 10 },
     { key: 'waterDensity', label: '水域密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.07 },
     { key: 'wallDensity', label: '阻挡密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.05 },
-    { key: 'controlPointCount', label: '据点数量', step: 1, min: 1, max: 9, defMin: 2, defMax: 6 },
+    { key: 'controlPointCount', label: '据点数量', step: 1, min: 1, max: 24, defMin: 2, defMax: 6 },
     { key: 'maxTurns', label: '最大回合数', step: 1, min: 1, max: 99, defMin: 10, defMax: 30 },
     { key: 'actionsPerTurn', label: '每回合行动点', step: 1, min: 1, max: 20, defMin: 1, defMax: 8 },
     { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, min: 0, max: 0.5, defMin: 0, defMax: 0.25 },
     { key: 'startingSupplies', label: '初始补给', step: 5, min: 0, max: 9999, defMin: 20, defMax: 220 },
     { key: 'baseIncome', label: '基础收入', step: 1, min: 0, max: 999, defMin: 6, defMax: 14 },
-    { key: 'startingUnitCount', label: '初始单位数', step: 1, min: 0, max: 4, defMin: 0, defMax: 4 },
+    // 经济：三类据点的每回合收入（前哨部署折扣 8、维修站修复量 10 仍固定，不开放）。
+    { key: 'supplyIncome', label: '补给站收入', step: 1, min: 0, max: 40, defMin: 8, defMax: 20 },
+    { key: 'forwardBaseIncome', label: '前哨基地收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8 },
+    { key: 'repairIncome', label: '维修站收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8 },
+    { key: 'startingUnitCount', label: '初始单位数', step: 1, min: 0, max: 6, defMin: 0, defMax: 4 },
     // 初始兵种权重（相对权重，0-10；留空＝默认 2/2/1/1；全 0 回退旧均匀池）。support 不设权重。
     { key: 'startingWeightInfantry', label: '步兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2 },
     { key: 'startingWeightScout', label: '侦察兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2 },
     { key: 'startingWeightHeavy', label: '重装权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1 },
     { key: 'startingWeightRanger', label: '远程兵权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1 },
+    // 兵种属性（按兵种覆盖）：标量＝精确值、区间＝区间内随机；留空＝围绕基准值按兵种数值浮动抖动。
+    // 两方共用同一套数值，改动对双方同时生效。
+    { key: 'infantryHp', label: '步兵血量', step: 1, min: 10, max: 999, defMin: 100, defMax: 100 },
+    { key: 'infantryAttack', label: '步兵攻击', step: 1, min: 1, max: 200, defMin: 30, defMax: 30 },
+    { key: 'infantryDefense', label: '步兵防御', step: 1, min: 0, max: 99, defMin: 8, defMax: 8 },
+    { key: 'infantryMoveRange', label: '步兵移动力', step: 1, min: 1, max: 10, defMin: 3, defMax: 3 },
+    { key: 'infantryAttackRange', label: '步兵射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1 },
+    { key: 'infantryCost', label: '步兵造价', step: 1, min: 5, max: 999, defMin: 45, defMax: 45 },
+    { key: 'scoutHp', label: '侦察兵血量', step: 1, min: 10, max: 999, defMin: 65, defMax: 65 },
+    { key: 'scoutAttack', label: '侦察兵攻击', step: 1, min: 1, max: 200, defMin: 16, defMax: 16 },
+    { key: 'scoutDefense', label: '侦察兵防御', step: 1, min: 0, max: 99, defMin: 4, defMax: 4 },
+    { key: 'scoutMoveRange', label: '侦察兵移动力', step: 1, min: 1, max: 10, defMin: 5, defMax: 5 },
+    { key: 'scoutAttackRange', label: '侦察兵射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1 },
+    { key: 'scoutCost', label: '侦察兵造价', step: 1, min: 5, max: 999, defMin: 38, defMax: 38 },
+    { key: 'heavyHp', label: '重装血量', step: 1, min: 10, max: 999, defMin: 150, defMax: 150 },
+    { key: 'heavyAttack', label: '重装攻击', step: 1, min: 1, max: 200, defMin: 38, defMax: 38 },
+    { key: 'heavyDefense', label: '重装防御', step: 1, min: 0, max: 99, defMin: 13, defMax: 13 },
+    { key: 'heavyMoveRange', label: '重装移动力', step: 1, min: 1, max: 10, defMin: 2, defMax: 2 },
+    { key: 'heavyAttackRange', label: '重装射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1 },
+    { key: 'heavyCost', label: '重装造价', step: 1, min: 5, max: 999, defMin: 92, defMax: 92 },
+    { key: 'rangerHp', label: '远程兵血量', step: 1, min: 10, max: 999, defMin: 72, defMax: 72 },
+    { key: 'rangerAttack', label: '远程兵攻击', step: 1, min: 1, max: 200, defMin: 44, defMax: 44 },
+    { key: 'rangerDefense', label: '远程兵防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 3 },
+    { key: 'rangerMoveRange', label: '远程兵移动力', step: 1, min: 1, max: 10, defMin: 2, defMax: 2 },
+    { key: 'rangerAttackRange', label: '远程兵射程', step: 1, min: 1, max: 10, defMin: 3, defMax: 3 },
+    { key: 'rangerCost', label: '远程兵造价', step: 1, min: 5, max: 999, defMin: 78, defMax: 78 },
+    { key: 'supportHp', label: '辅助血量', step: 1, min: 10, max: 999, defMin: 82, defMax: 82 },
+    { key: 'supportAttack', label: '辅助攻击', step: 1, min: 1, max: 200, defMin: 10, defMax: 10 },
+    { key: 'supportDefense', label: '辅助防御', step: 1, min: 0, max: 99, defMin: 5, defMax: 5 },
+    { key: 'supportMoveRange', label: '辅助移动力', step: 1, min: 1, max: 10, defMin: 3, defMax: 3 },
+    { key: 'supportAttackRange', label: '辅助射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1 },
+    { key: 'supportCost', label: '辅助造价', step: 1, min: 5, max: 999, defMin: 60, defMax: 60 },
+    { key: 'supportHealPower', label: '辅助治疗量', step: 1, min: 0, max: 99, defMin: 22, defMax: 22 },
+    // 战斗波动（省略＝固定 3/6）与裁决计分（只开放军队价值权重，补给恒 0）。
+    { key: 'damageVarianceRange', label: '伤害波动幅度', step: 1, min: 0, max: 20, defMin: 3, defMax: 3 },
+    { key: 'healVarianceRange', label: '治疗波动幅度', step: 1, min: 0, max: 20, defMin: 6, defMax: 6 },
+    { key: 'adjudicationArmyValue', label: '裁决军队分权重', step: 1, min: 0, max: 10, defMin: 1, defMax: 2 },
     { key: 'headquartersHp', label: '总部血量', step: 10, min: 1, max: 9999, defMin: 80, defMax: 240, modes: HEADQUARTERS_MODES },
     { key: 'headquartersDefense', label: '总部防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 10, modes: HEADQUARTERS_MODES },
     { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, min: 1, max: 10, defMin: 3, defMax: 8, modes: ARTILLERY_MODES },

@@ -173,7 +173,14 @@ describe('random map creation UI', () => {
     for (const key of [
       'radius', 'waterDensity', 'wallDensity', 'controlPointCount', 'maxTurns', 'actionsPerTurn',
       'unitStatVariation', 'startingSupplies', 'baseIncome',
+      'supplyIncome', 'forwardBaseIncome', 'repairIncome',
       'startingUnitCount', 'startingWeightInfantry', 'startingWeightScout', 'startingWeightHeavy', 'startingWeightRanger',
+      'infantryHp', 'infantryAttack', 'infantryDefense', 'infantryMoveRange', 'infantryAttackRange', 'infantryCost',
+      'scoutHp', 'scoutAttack', 'scoutDefense', 'scoutMoveRange', 'scoutAttackRange', 'scoutCost',
+      'heavyHp', 'heavyAttack', 'heavyDefense', 'heavyMoveRange', 'heavyAttackRange', 'heavyCost',
+      'rangerHp', 'rangerAttack', 'rangerDefense', 'rangerMoveRange', 'rangerAttackRange', 'rangerCost',
+      'supportHp', 'supportAttack', 'supportDefense', 'supportMoveRange', 'supportAttackRange', 'supportCost', 'supportHealPower',
+      'damageVarianceRange', 'healVarianceRange', 'adjudicationArmyValue',
       'headquartersHp', 'headquartersDefense',
       'artilleryStartRound', 'artilleryIntervalRounds', 'artilleryDamage', 'artilleryMinimumSafeRadius',
     ]) {
@@ -356,6 +363,13 @@ describe('random map creation UI', () => {
     expect(weight.ui.collectRandomOptions().startingWeightHeavy).toBe(1.5);
     const weightClamped = loadUIWithDom('standard', [{ key: 'startingWeightHeavy', mode: 'fixed', value: '99' }]);
     expect(weightClamped.ui.collectRandomOptions().startingWeightHeavy).toBe(10);
+    // 3.6.2 新增参数同样提交前钳位（战斗波动 / 据点收入 / 兵种属性）。
+    const variance = loadUIWithDom('standard', [{ key: 'damageVarianceRange', mode: 'fixed', value: '999' }]);
+    expect(variance.ui.collectRandomOptions().damageVarianceRange).toBe(20);
+    const income = loadUIWithDom('standard', [{ key: 'supplyIncome', min: '5', max: '999' }]);
+    expect(income.ui.collectRandomOptions().supplyIncome).toEqual([5, 40]);
+    const attack = loadUIWithDom('standard', [{ key: 'infantryAttack', mode: 'fixed', value: '0' }]);
+    expect(attack.ui.collectRandomOptions().infantryAttack).toBe(1);
   });
 
   it('submits starting army count and per-type weights together', () => {
@@ -375,6 +389,32 @@ describe('random map creation UI', () => {
       expect(options.startingWeightScout, `${mode} 侦察兵标量`).toBe(2);
       expect(options.startingWeightHeavy, `${mode} 重装标量`).toBe(0);
       expect(options, `${mode} 全空的远程兵权重不提交`).not.toHaveProperty('startingWeightRanger');
+    }
+  });
+
+  it('submits the new tuning rows in every game mode', () => {
+    // 战斗波动 / 裁决权重 / 据点收入 / 兵种属性都不限模式：四种模式下都可见、都按取值方式提交。
+    const specs: RowSpec[] = [
+      { key: 'damageVarianceRange', mode: 'fixed', value: '5' },
+      { key: 'healVarianceRange', min: '2', max: '8' },
+      { key: 'adjudicationArmyValue', mode: 'fixed', value: '3' },
+      { key: 'supplyIncome', min: '10', max: '20' },
+      { key: 'forwardBaseIncome', mode: 'fixed', value: '4' },
+      { key: 'repairIncome', mode: 'fixed', value: '0' },
+      { key: 'infantryAttack', mode: 'fixed', value: '45' },
+      { key: 'heavyMoveRange', min: '2', max: '3' },
+    ];
+    for (const mode of ['standard', 'annihilation', 'simultaneous', 'royale']) {
+      const scoped = loadUIWithDom(mode, specs);
+      const options = scoped.ui.collectRandomOptions();
+      expect(options.damageVarianceRange, `${mode} 伤害波动`).toBe(5);
+      expect(options.healVarianceRange, `${mode} 治疗波动`).toEqual([2, 8]);
+      expect(options.adjudicationArmyValue, `${mode} 裁决权重`).toBe(3);
+      expect(options.supplyIncome, `${mode} 补给站收入`).toEqual([10, 20]);
+      expect(options.forwardBaseIncome, `${mode} 前哨收入`).toBe(4);
+      expect(options.repairIncome, `${mode} 维修收入`).toBe(0);
+      expect(options.infantryAttack, `${mode} 步兵攻击`).toBe(45);
+      expect(options.heavyMoveRange, `${mode} 重装移动力`).toEqual([2, 3]);
     }
   });
 

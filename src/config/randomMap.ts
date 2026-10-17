@@ -42,12 +42,12 @@ export interface RandomMapOptions {
   headquartersHp?: RandomParam;
   headquartersDefense?: RandomParam;
   /**
-   * 初始单位数量（0-4）。省略=0-4 均匀随机（现行为）。
+   * 初始单位数量（0-6，留空＝仍按 0-4 均匀随机）。3.6.2 起硬边界放宽到 6，显式传参即可覆盖
+   * molten-throne（熔池王座，原 forge）3.5.11 起的每方 6 单位开局；默认随机域刻意保持 0-4
+   * （改动会让现有种子整体漂移）。
    * v3.3.0：RL 随机域联合边角重要性采样（RL_RANDOM_CORNER_BOOST）用它把
    * 低 HQ×多据点×满编开局的熔炉系图生态位组合提频——各维边缘分布
    * 虽已拓宽，联合命中率是边缘概率的乘积 <<1%（v3.1.1 起旧版 forge 连续 0:48）。
-   * 3.5.11 该图重做为 molten-throne（熔池王座，原 forge）：20 回合长局、24 据点、每方 6 单位起手，上述生态位
-   * 描述已过时，且覆盖缺口（上界 4 < 6）待 RL 域重校准时收口。
    */
   startingUnitCount?: RandomParam;
   /**
@@ -62,6 +62,62 @@ export interface RandomMapOptions {
   startingWeightHeavy?: RandomParam;
   /** 初始远程兵（游侠）权重（0-10，留空＝默认 1）。省略/标量不消耗随机数流。 */
   startingWeightRanger?: RandomParam;
+  /**
+   * 战斗波动：伤害 / 治疗的随机浮动幅度（0-20，省略＝固定默认 3 / 6）。省略或固定标量都不消耗
+   * 随机数流（默认路径与改动前逐位一致），只有显式区间才各抽一次。
+   */
+  damageVarianceRange?: RandomParam;
+  healVarianceRange?: RandomParam;
+  /**
+   * 裁决计分中军队价值的权重（0-10，省略＝按 1-2 随机，与旧内联采样逐位一致）。只暴露这一项，
+   * 补给权重恒为 0（杜绝囤补给/期末爆兵套利）；击杀分仍按军队价值权重的 25%~50% 推导。
+   */
+  adjudicationArmyValue?: RandomParam;
+  /**
+   * 据点类型每回合收入：补给站（0-40）/ 前哨基地（0-20）/ 维修站（0-20）。省略＝各按
+   * 8-20 / 0-8 / 0-8 随机（与旧内联采样逐位一致）。前哨部署折扣 8、维修站修复量 10 保持固定。
+   */
+  supplyIncome?: RandomParam;
+  forwardBaseIncome?: RandomParam;
+  repairIncome?: RandomParam;
+  /**
+   * 按兵种覆盖单位属性（每项均可用固定值或区间）：标量＝精确值（不消耗随机数流），区间＝区间内
+   * 均匀抽一个整数（消耗 1 次），留空＝围绕基准值按 unitStatVariation 抖动（旧路径）。两方始终
+   * 共用同一套单位数值。属性顺序即随机数消耗顺序（hp → attack → defense → moveRange →
+   * attackRange → cost，support 末尾 healPower）。
+   */
+  infantryHp?: RandomParam;
+  infantryAttack?: RandomParam;
+  infantryDefense?: RandomParam;
+  infantryMoveRange?: RandomParam;
+  infantryAttackRange?: RandomParam;
+  infantryCost?: RandomParam;
+  scoutHp?: RandomParam;
+  scoutAttack?: RandomParam;
+  scoutDefense?: RandomParam;
+  scoutMoveRange?: RandomParam;
+  scoutAttackRange?: RandomParam;
+  scoutCost?: RandomParam;
+  heavyHp?: RandomParam;
+  heavyAttack?: RandomParam;
+  heavyDefense?: RandomParam;
+  heavyMoveRange?: RandomParam;
+  heavyAttackRange?: RandomParam;
+  heavyCost?: RandomParam;
+  rangerHp?: RandomParam;
+  rangerAttack?: RandomParam;
+  rangerDefense?: RandomParam;
+  rangerMoveRange?: RandomParam;
+  rangerAttackRange?: RandomParam;
+  rangerCost?: RandomParam;
+  supportHp?: RandomParam;
+  supportAttack?: RandomParam;
+  supportDefense?: RandomParam;
+  supportMoveRange?: RandomParam;
+  supportAttackRange?: RandomParam;
+  supportCost?: RandomParam;
+  /** 辅助兵治疗量（单次治疗回复量，0-99；留空＝围绕基准 22 抖动）。 */
+  supportHealPower?: RandomParam;
   /** 歼灭/大逃杀：首次炮火回合（≥1）。 */
   artilleryStartRound?: RandomParam;
   /** 歼灭/大逃杀：炮火间隔回合数（≥1）。 */
@@ -78,14 +134,19 @@ interface ParamBound {
   integer: boolean;
 }
 
-/** 各参数的合法边界，同时是未指定时的默认随机范围。 */
+/**
+ * 各参数的合法边界（硬钳位，也是前端数字输入的量程）；多数参数同时是未指定时的默认随机范围
+ * （走 resolveParam，见 DEFAULT_RANGES），保留旧内联采样的参数见下方注释。
+ * 3.6.2 放宽两处硬边界以覆盖静态图极值（默认随机范围不变）：据点数 9→24（molten-throne）、
+ * 初始单位数 4→6（molten-throne 3.5.11 起每方 6 单位起手）。
+ */
 const PARAM_BOUNDS: Record<string, ParamBound> = {
   radius: { min: 4, max: 12, integer: true },
   waterDensity: { min: 0, max: 0.4, integer: false },
   wallDensity: { min: 0, max: 0.4, integer: false },
   // 仅用于兼容旧调用方：解析后立即按 60/40 拆进 waterDensity / wallDensity，不参与生成。
   terrainDensity: { min: 0, max: 0.4, integer: false },
-  controlPointCount: { min: 1, max: 9, integer: true },
+  controlPointCount: { min: 1, max: 24, integer: true },
   maxTurns: { min: 1, max: 99, integer: true },
   actionsPerTurn: { min: 1, max: 20, integer: true },
   unitStatVariation: { min: 0, max: 0.5, integer: false },
@@ -93,13 +154,53 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   baseIncome: { min: 0, max: 999, integer: true },
   headquartersHp: { min: 1, max: 9999, integer: true },
   headquartersDefense: { min: 0, max: 99, integer: true },
-  startingUnitCount: { min: 0, max: 4, integer: true },
+  startingUnitCount: { min: 0, max: 6, integer: true },
   // 初始兵种权重：0-10 的相对权重（非整数也合法），不进 DEFAULT_RANGES——省略时用标量默认 2/2/1/1
   // 且不消耗随机数流，见 STARTING_WEIGHT_DEFAULTS / resolveStartingWeights。
   startingWeightInfantry: { min: 0, max: 10, integer: false },
   startingWeightScout: { min: 0, max: 10, integer: false },
   startingWeightHeavy: { min: 0, max: 10, integer: false },
   startingWeightRanger: { min: 0, max: 10, integer: false },
+  // 战斗波动 / 裁决 armyValue / 据点收入 / 兵种属性覆盖：省略路径各自保留旧内联采样（不读
+  // DEFAULT_RANGES、随机数流位置不变），见 resolveFixedIntParam / resolveSampledIntParam /
+  // buildUnitSpecs。兵种属性上界按「再离谱也仍是合法数值」放宽，loader 只校验 ≥0。
+  damageVarianceRange: { min: 0, max: 20, integer: true },
+  healVarianceRange: { min: 0, max: 20, integer: true },
+  adjudicationArmyValue: { min: 0, max: 10, integer: true },
+  supplyIncome: { min: 0, max: 40, integer: true },
+  forwardBaseIncome: { min: 0, max: 20, integer: true },
+  repairIncome: { min: 0, max: 20, integer: true },
+  infantryHp: { min: 10, max: 999, integer: true },
+  infantryAttack: { min: 1, max: 200, integer: true },
+  infantryDefense: { min: 0, max: 99, integer: true },
+  infantryMoveRange: { min: 1, max: 10, integer: true },
+  infantryAttackRange: { min: 1, max: 10, integer: true },
+  infantryCost: { min: 5, max: 999, integer: true },
+  scoutHp: { min: 10, max: 999, integer: true },
+  scoutAttack: { min: 1, max: 200, integer: true },
+  scoutDefense: { min: 0, max: 99, integer: true },
+  scoutMoveRange: { min: 1, max: 10, integer: true },
+  scoutAttackRange: { min: 1, max: 10, integer: true },
+  scoutCost: { min: 5, max: 999, integer: true },
+  heavyHp: { min: 10, max: 999, integer: true },
+  heavyAttack: { min: 1, max: 200, integer: true },
+  heavyDefense: { min: 0, max: 99, integer: true },
+  heavyMoveRange: { min: 1, max: 10, integer: true },
+  heavyAttackRange: { min: 1, max: 10, integer: true },
+  heavyCost: { min: 5, max: 999, integer: true },
+  rangerHp: { min: 10, max: 999, integer: true },
+  rangerAttack: { min: 1, max: 200, integer: true },
+  rangerDefense: { min: 0, max: 99, integer: true },
+  rangerMoveRange: { min: 1, max: 10, integer: true },
+  rangerAttackRange: { min: 1, max: 10, integer: true },
+  rangerCost: { min: 5, max: 999, integer: true },
+  supportHp: { min: 10, max: 999, integer: true },
+  supportAttack: { min: 1, max: 200, integer: true },
+  supportDefense: { min: 0, max: 99, integer: true },
+  supportMoveRange: { min: 1, max: 10, integer: true },
+  supportAttackRange: { min: 1, max: 10, integer: true },
+  supportCost: { min: 5, max: 999, integer: true },
+  supportHealPower: { min: 0, max: 99, integer: true },
   artilleryStartRound: { min: 1, max: 10, integer: true },
   artilleryIntervalRounds: { min: 1, max: 3, integer: true },
   artilleryDamage: { min: 5, max: 30, integer: true },
@@ -112,6 +213,11 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
  */
 export const RANDOM_PARAM_BOUNDS: Readonly<Record<string, Readonly<ParamBound>>> = PARAM_BOUNDS;
 
+/**
+ * 各参数省略时的默认随机范围（仅 resolveParam 读取）。战斗波动、裁决 armyValue、据点收入、
+ * 兵种属性覆盖刻意不在此表：它们保留旧内联采样（省略时按各自的固定默认或旧公式，且随机数流
+ * 位置不变），见 resolveFixedIntParam / resolveSampledIntParam / buildUnitSpecs。
+ */
 const DEFAULT_RANGES: Record<string, [number, number]> = {
   radius: [5, 10],
   // 水域 + 阻挡合计 ≈ 旧 terrainDensity 的 [0.02, 0.12]，保持默认地形总量不变。
@@ -144,14 +250,41 @@ const STARTING_WEIGHT_DEFAULTS = { infantry: 2, scout: 2, heavy: 1, ranger: 1 };
 // dual-lanes 的 0 初始单位/208 补给、molten-throne（原 forge）的 100 血总部/24 据点等），让随机图
 // 本身就能覆盖全部静态图的规则空间——RL 侧 v3.0.2-v3.1.0 三代的 whack-a-mole
 // （某张静态图整图崩塌）根因即这些维度从未进过训练分布。
-// 已知缺口：3.5.11 molten-throne（原 forge）重做后每方起始 6 单位、据点 24，均超出本域
-// （startingUnitCount 上界 4、controlPointCount 上界 9），待 RL 域重校准收口。
+// 3.6.2 起硬边界放宽到初始单位 0-6、据点 1-24，molten-throne（3.5.11 重做后每方 6 单位、24 据点）
+// 的极值显式传参即可覆盖；默认随机域仍保持 0-4 / 2-6——改默认范围会让现有种子整体漂移，RL 域
+// 重校准另起一批处理。
+
+/** 整数区间均匀抽取：lo + floor(rng*(hi-lo+1))，与旧内联采样公式同分布。 */
+function drawIntInRange(lo: number, hi: number, rng: () => number): number {
+  return lo + Math.floor(rng() * (hi - lo + 1));
+}
+
+/**
+ * 省略＝固定默认值（零消耗）、标量＝直接用（零消耗）、区间＝均匀抽一个整数（1 次消耗）。
+ * 用于默认路径本身不消耗随机数的参数（战斗波动）：绝不能走 resolveParam——它的省略路径会
+ * 读取 DEFAULT_RANGES 并消耗 rng，导致默认地图整体漂移。
+ */
+function resolveFixedIntParam(param: RandomParam | undefined, def: number, rng: () => number): number {
+  if (param === undefined) return def;
+  if (typeof param === 'number') return param;
+  return drawIntInRange(param[0], param[1], rng);
+}
+
+/**
+ * 省略＝按默认区间抽一次（与旧内联公式逐位一致、随机数流位置不变）、标量＝直接用（零消耗）、
+ * 区间＝均匀抽一个整数（1 次消耗）。用于默认路径本来就抽一次的参数（裁决 armyValue、据点收入）。
+ */
+function resolveSampledIntParam(param: RandomParam | undefined, defLo: number, defHi: number, rng: () => number): number {
+  if (param === undefined) return drawIntInRange(defLo, defHi, rng);
+  if (typeof param === 'number') return param;
+  return drawIntInRange(param[0], param[1], rng);
+}
 
 /** 裁决权重在静态图包线内随机：danger-close(20/1/30/1/0+kill0.25) ~ default(5/2/90/2/0+kill0.5)。
  *  3.6.0 起补给恒不计分（supplies: 0，杜绝囤补给/期末爆兵套利），
- *  击杀分按军队价值权重的 25%~50% 随机。 */
-function sampleAdjudicationWeights(rng: () => number) {
-  const armyValue = 1 + Math.floor(rng() * 2);
+ *  击杀分按军队价值权重的 25%~50% 随机。armyValue 可由外部覆盖（省略时仍按旧公式抽 1-2）。 */
+function sampleAdjudicationWeights(rng: () => number, armyValueParam?: RandomParam) {
+  const armyValue = resolveSampledIntParam(armyValueParam, 1, 2, rng);
   return {
     enemyHqDamage: 3 + Math.floor(rng() * 18),
     ownHqHp: 1 + Math.floor(rng() * 2),
@@ -162,19 +295,23 @@ function sampleAdjudicationWeights(rng: () => number) {
   };
 }
 
-/** 据点类型收入随机：danger-close(8/0/0) ~ breach(20/8/8)。折扣/维修量保持基准。 */
-function sampleControlPointTypes(rng: () => number) {
+/** 据点类型收入随机：danger-close(8/0/0) ~ breach(20/8/8)。收入可由外部覆盖（省略时仍按旧公式
+ *  各抽一次：补给站 8-20、前哨/维修 0-8）；部署折扣 8、维修量 10 保持基准。 */
+function sampleControlPointTypes(
+  rng: () => number,
+  incomes: { supply?: RandomParam; forwardBase?: RandomParam; repair?: RandomParam } = {},
+) {
   return {
-    supply: { income: 8 + Math.floor(rng() * 13), deployDiscount: 0, repairAmount: 0, canDeploy: true },
-    forward_base: { income: Math.floor(rng() * 9), deployDiscount: 8, repairAmount: 0, canDeploy: true },
-    repair: { income: Math.floor(rng() * 9), deployDiscount: 0, repairAmount: 10, canDeploy: true },
+    supply: { income: resolveSampledIntParam(incomes.supply, 8, 20, rng), deployDiscount: 0, repairAmount: 0, canDeploy: true },
+    forward_base: { income: resolveSampledIntParam(incomes.forwardBase, 0, 8, rng), deployDiscount: 8, repairAmount: 0, canDeploy: true },
+    repair: { income: resolveSampledIntParam(incomes.repair, 0, 8, rng), deployDiscount: 0, repairAmount: 10, canDeploy: true },
   };
 }
 
 /** 初始单位构成抽取池：现仅作全 0 权重回退（均匀抽）与文档用；基础兵种权重高，覆盖 breach(2 heavy) 等开局（molten-throne 3.5.11 起为斥候群开局，不在池内）。 */
 const STARTING_UNIT_POOL: UnitType[] = ['infantry', 'infantry', 'scout', 'scout', 'heavy', 'ranger'];
 
-/** 每方初始单位数量：默认 0-4 均匀随机（dual-lanes(0) 起，其余静态图 ≤3）；可用 options.startingUnitCount 收窄/固定。molten-throne 3.5.11 起为 6，超出本域。 */
+/** 每方初始单位数量：默认 0-4 均匀随机（dual-lanes(0) 起，其余静态图 ≤3）；可用 options.startingUnitCount 收窄/固定。molten-throne 3.5.11 起每方 6 单位：3.6.2 起硬边界放宽到 6，显式传参可取到（默认随机域仍是 0-4）。 */
 function sampleStartingUnits(
   rng: () => number,
   count: number,
@@ -595,18 +732,23 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
     spawnSlots,
     layouts: { [playerCount]: spawnSlots.map(slot => slot.id) },
     supportedPlayerCounts: [playerCount],
-    units: buildUnitSpecs(variation, rng),
+    units: buildUnitSpecs(variation, options, rng),
     headquartersSpec: { hp: headquartersHp, defense: headquartersDefense },
     balance: {
       startingSupplies,
       baseIncome,
-      damageVarianceRange: 3,
+      // 战斗波动省略＝固定 3/6（零消耗）；只有显式区间才在此各抽一次。
+      damageVarianceRange: resolveFixedIntParam(options.damageVarianceRange, 3, rng),
       minimumDamage: 1,
-      healVarianceRange: 6,
+      healVarianceRange: resolveFixedIntParam(options.healVarianceRange, 6, rng),
       actionsPerTurn,
       maxTurns,
-      adjudicationWeights: sampleAdjudicationWeights(rng),
-      controlPointTypes: sampleControlPointTypes(rng),
+      adjudicationWeights: sampleAdjudicationWeights(rng, options.adjudicationArmyValue),
+      controlPointTypes: sampleControlPointTypes(rng, {
+        supply: options.supplyIncome,
+        forwardBase: options.forwardBaseIncome,
+        repair: options.repairIncome,
+      }),
     },
     // 歼灭/大逃杀注入炮火收缩圈配置；minimumSafeRadius < radius 已由边界表保证（radius ≥ 5）。
     ...(isAnnihilationMode(mode) ? { annihilation: { artillery } } : {}),
@@ -1074,21 +1216,75 @@ function buildSpawnSlots(
   return slots;
 }
 
-function buildUnitSpecs(variation: number, rng: () => number): Record<UnitType, UnitSpec> {
+/** 兵种属性键（＝UNIT_BASE 的属性顺序，也是随机数消耗顺序）。 */
+type UnitStatKey = 'hp' | 'attack' | 'defense' | 'moveRange' | 'attackRange' | 'cost' | 'healPower';
+
+function buildUnitSpecs(variation: number, options: RandomMapOptions, rng: () => number): Record<UnitType, UnitSpec> {
   const jitter = (value: number, floor: number): number =>
     Math.max(floor, Math.round(value * (1 + (rng() * 2 - 1) * variation)));
+  // 每个属性至多消耗 1 次随机数：留空＝围绕基准值抖动（与旧实现逐位一致），标量＝精确值（零消耗），
+  // 区间＝区间内均匀抽一个整数（1 次）。全部留空时随机数序列与改动前完全相同。
+  const stat = (override: RandomParam | undefined, base: number, floor: number): number => {
+    if (override === undefined) return jitter(base, floor);
+    if (typeof override === 'number') return override;
+    return drawIntInRange(override[0], override[1], rng);
+  };
+  const overrides: Record<UnitType, Partial<Record<UnitStatKey, RandomParam>>> = {
+    infantry: {
+      hp: options.infantryHp,
+      attack: options.infantryAttack,
+      defense: options.infantryDefense,
+      moveRange: options.infantryMoveRange,
+      attackRange: options.infantryAttackRange,
+      cost: options.infantryCost,
+    },
+    scout: {
+      hp: options.scoutHp,
+      attack: options.scoutAttack,
+      defense: options.scoutDefense,
+      moveRange: options.scoutMoveRange,
+      attackRange: options.scoutAttackRange,
+      cost: options.scoutCost,
+    },
+    heavy: {
+      hp: options.heavyHp,
+      attack: options.heavyAttack,
+      defense: options.heavyDefense,
+      moveRange: options.heavyMoveRange,
+      attackRange: options.heavyAttackRange,
+      cost: options.heavyCost,
+    },
+    ranger: {
+      hp: options.rangerHp,
+      attack: options.rangerAttack,
+      defense: options.rangerDefense,
+      moveRange: options.rangerMoveRange,
+      attackRange: options.rangerAttackRange,
+      cost: options.rangerCost,
+    },
+    support: {
+      hp: options.supportHp,
+      attack: options.supportAttack,
+      defense: options.supportDefense,
+      moveRange: options.supportMoveRange,
+      attackRange: options.supportAttackRange,
+      cost: options.supportCost,
+      healPower: options.supportHealPower,
+    },
+  };
   const result = {} as Record<UnitType, UnitSpec>;
   for (const [type, base] of Object.entries(UNIT_BASE) as [UnitType, UnitSpec][]) {
+    const override = overrides[type];
     const spec: UnitSpec = {
-      hp: jitter(base.hp, 10),
-      attack: jitter(base.attack, 1),
-      defense: jitter(base.defense, 0),
-      moveRange: jitter(base.moveRange, 1),
-      attackRange: jitter(base.attackRange, 1),
-      cost: jitter(base.cost, 5),
+      hp: stat(override.hp, base.hp, 10),
+      attack: stat(override.attack, base.attack, 1),
+      defense: stat(override.defense, base.defense, 0),
+      moveRange: stat(override.moveRange, base.moveRange, 1),
+      attackRange: stat(override.attackRange, base.attackRange, 1),
+      cost: stat(override.cost, base.cost, 5),
       canCapture: base.canCapture,
     };
-    if (base.healPower !== undefined) spec.healPower = jitter(base.healPower, 5);
+    if (base.healPower !== undefined) spec.healPower = stat(override.healPower, base.healPower, 5);
     result[type] = spec;
   }
   return result;

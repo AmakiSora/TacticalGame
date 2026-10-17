@@ -464,6 +464,83 @@ describe('random map generator', () => {
     expect(JSON.stringify(rangedAgain)).toBe(JSON.stringify(ranged));
   });
 
+  it('keeps fixed combat variance rng-neutral and ranged variance reproducible', () => {
+    // 伤害/治疗波动默认是固定 3/6：显式固定为 3/6 与省略逐位一致（固定标量零消耗路径）。
+    const base = generateRandomMapConfig({ seed: 'variance-neutral' }, 4);
+    const scalars = generateRandomMapConfig(
+      { seed: 'variance-neutral', damageVarianceRange: 3, healVarianceRange: 6 }, 4,
+    );
+    expect(JSON.stringify(scalars)).toBe(JSON.stringify(base));
+    // 区间形态是显式非默认路径（各消耗 1 次 rng）：同种子可复现、取值为区间内整数。
+    const ranged = generateRandomMapConfig(
+      { seed: 'variance-range', damageVarianceRange: [0, 20], healVarianceRange: [0, 20] }, 4,
+    );
+    const rangedAgain = generateRandomMapConfig(
+      { seed: 'variance-range', damageVarianceRange: [0, 20], healVarianceRange: [0, 20] }, 4,
+    );
+    expect(JSON.stringify(rangedAgain)).toBe(JSON.stringify(ranged));
+    for (const value of [ranged.balance.damageVarianceRange, ranged.balance.healVarianceRange]) {
+      expect(Number.isInteger(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it('overrides adjudication army value and per-kind control point income', () => {
+    const config = generateRandomMapConfig({
+      seed: 'adjudication', adjudicationArmyValue: 5, supplyIncome: 12, forwardBaseIncome: 3, repairIncome: 0,
+    }, 2);
+    expect(config.balance.adjudicationWeights.armyValue).toBe(5);
+    // 补给权重恒 0（不开放）；击杀分仍按军队价值权重的 25%~50% 推导（5 → 1.25~2.5）。
+    expect(config.balance.adjudicationWeights.supplies).toBe(0);
+    expect(config.balance.adjudicationWeights.killValue).toBeGreaterThanOrEqual(1.25);
+    expect(config.balance.adjudicationWeights.killValue).toBeLessThanOrEqual(2.5);
+    expect(config.balance.controlPointTypes.supply.income).toBe(12);
+    expect(config.balance.controlPointTypes.forward_base.income).toBe(3);
+    expect(config.balance.controlPointTypes.repair.income).toBe(0);
+    // 部署折扣 / 维修量保持基准，不随收入参数漂移。
+    expect(config.balance.controlPointTypes.forward_base.deployDiscount).toBe(8);
+    expect(config.balance.controlPointTypes.repair.repairAmount).toBe(10);
+    // armyValue=0：击杀分随之归零。
+    const zero = generateRandomMapConfig({ seed: 'adjudication-zero', adjudicationArmyValue: 0 }, 2);
+    expect(zero.balance.adjudicationWeights.armyValue).toBe(0);
+    expect(zero.balance.adjudicationWeights.killValue).toBe(0);
+    // 区间形态：同种子可复现、落在区间内。
+    const ranged = generateRandomMapConfig(
+      { seed: 'adjudication-range', adjudicationArmyValue: [2, 6], supplyIncome: [10, 30] }, 2,
+    );
+    expect(ranged.balance.adjudicationWeights.armyValue).toBeGreaterThanOrEqual(2);
+    expect(ranged.balance.adjudicationWeights.armyValue).toBeLessThanOrEqual(6);
+    expect(ranged.balance.controlPointTypes.supply.income).toBeGreaterThanOrEqual(10);
+    expect(ranged.balance.controlPointTypes.supply.income).toBeLessThanOrEqual(30);
+  });
+
+  it('overrides per-type unit stats exactly and keeps ranges reproducible', () => {
+    // 标量＝精确值（不再抖动）；未覆盖的属性仍围绕基准值抖动（默认浮动区间 0-0.25 → 100 血落在 75-125）。
+    const fixed = generateRandomMapConfig({
+      seed: 'unit-stats', infantryAttack: 40, rangerMoveRange: 6, supportHealPower: 30,
+    }, 2);
+    expect(fixed.units.infantry.attack).toBe(40);
+    expect(fixed.units.ranger.moveRange).toBe(6);
+    expect(fixed.units.support.healPower).toBe(30);
+    expect(fixed.units.infantry.hp).toBeGreaterThanOrEqual(75);
+    expect(fixed.units.infantry.hp).toBeLessThanOrEqual(125);
+    // 区间形态：同种子可复现、落在区间内。
+    const ranged = generateRandomMapConfig(
+      { seed: 'unit-stats-range', infantryHp: [120, 140], scoutCost: [40, 50], heavyMoveRange: [2, 4] }, 2,
+    );
+    const rangedAgain = generateRandomMapConfig(
+      { seed: 'unit-stats-range', infantryHp: [120, 140], scoutCost: [40, 50], heavyMoveRange: [2, 4] }, 2,
+    );
+    expect(JSON.stringify(rangedAgain)).toBe(JSON.stringify(ranged));
+    expect(ranged.units.infantry.hp).toBeGreaterThanOrEqual(120);
+    expect(ranged.units.infantry.hp).toBeLessThanOrEqual(140);
+    expect(ranged.units.scout.cost).toBeGreaterThanOrEqual(40);
+    expect(ranged.units.scout.cost).toBeLessThanOrEqual(50);
+    expect(ranged.units.heavy.moveRange).toBeGreaterThanOrEqual(2);
+    expect(ranged.units.heavy.moveRange).toBeLessThanOrEqual(4);
+  });
+
   it('keeps the deprecated terrainDensity as a 60/40 alias for water/wall', () => {
     const sanitized = sanitizeRandomOptions({ terrainDensity: 0.1 });
     expect(sanitized.terrainDensity).toBeUndefined();
@@ -549,7 +626,19 @@ describe('sanitizeRandomOptions', () => {
       .toEqual({ startingWeightInfantry: 2, startingWeightScout: [1, 3] });
     expect(sanitizeRandomOptions({ startingWeightHeavy: 10.5 }).startingWeightHeavy).toBe(10);
     expect(sanitizeRandomOptions({ startingWeightRanger: -2 }).startingWeightRanger).toBe(0);
-    expect(sanitizeRandomOptions({ startingUnitCount: 7 }).startingUnitCount).toBe(4);
+    expect(sanitizeRandomOptions({ startingUnitCount: 7 }).startingUnitCount).toBe(6);
+    // 3.6.2 放宽后的硬边界与新增参数同样走钳位。
+    expect(sanitizeRandomOptions({ controlPointCount: 99 }).controlPointCount).toBe(24);
+    expect(sanitizeRandomOptions({ damageVarianceRange: 999 }).damageVarianceRange).toBe(20);
+    expect(sanitizeRandomOptions({ healVarianceRange: -3 }).healVarianceRange).toBe(0);
+    expect(sanitizeRandomOptions({ adjudicationArmyValue: 99 }).adjudicationArmyValue).toBe(10);
+    expect(sanitizeRandomOptions({ supplyIncome: [5, 999] }).supplyIncome).toEqual([5, 40]);
+    expect(sanitizeRandomOptions({ forwardBaseIncome: 33 }).forwardBaseIncome).toBe(20);
+    expect(sanitizeRandomOptions({ repairIncome: -1 }).repairIncome).toBe(0);
+    expect(sanitizeRandomOptions({ infantryAttack: 999 }).infantryAttack).toBe(200);
+    expect(sanitizeRandomOptions({ supportHealPower: -5 }).supportHealPower).toBe(0);
+    // 整数参数非整数输入按四舍五入（与 resolveParam 的整数口径一致）。
+    expect(sanitizeRandomOptions({ heavyMoveRange: 2.6 }).heavyMoveRange).toBe(3);
   });
 
   it('rejects malformed options', () => {

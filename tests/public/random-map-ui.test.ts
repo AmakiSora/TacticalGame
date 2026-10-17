@@ -388,9 +388,12 @@ describe('random map creation UI', () => {
       expect(bound, `${param.key} 服务端无此参数边界`).toBeDefined();
       expect({ min: param.min, max: param.max, integer: param.step >= 1 })
         .toEqual({ min: bound.min, max: bound.max, integer: bound.integer });
-      // 参数上限下限必须肉眼可见（不是只藏在输入框约束里）。
-      expect(html, `${param.key} 缺范围展示`).toContain(`<span class="rmo-bounds">范围 ${param.min}–${param.max}</span>`);
+      // 可选上下限作为输入框灰字（placeholder）直接可见，不再单独占一列「范围」。
+      expect(html, `${param.key} 缺下限灰字`).toContain(`placeholder="≥${param.min}"`);
+      expect(html, `${param.key} 缺上限灰字`).toContain(`placeholder="≤${param.max}"`);
     }
+    // 独立的「范围」标签已移除：上下限只以输入框灰字呈现。
+    expect(html).not.toContain('class="rmo-bounds"');
     // 兼容入口保留：滑块移除后 refreshSliders 仍是可调用的空操作。
     expect(typeof ui.refreshSliders).toBe('function');
     // 滑块彻底退场：源码里不能再有滑块实现或 type="range" 残留。
@@ -560,10 +563,13 @@ describe('random map creation UI', () => {
       // 分组折叠块与兵种小标题两端都要有样式，否则其中一端会退化成一条长列表。
       expect(css, `${path} 缺 .rmo-group 样式`).toContain('.rmo-group');
       expect(css, `${path} 缺 .rmo-subgroup-label 样式`).toContain('.rmo-subgroup-label');
-      // 参数行固定两行网格（名称/开关/范围 + 输入框）、范围提示不换行：
-      // 防止回退到 flex-wrap 后「范围」被挤到第二行、输入框被内容长度拉成不等宽。
-      expect(css, `${path} 缺参数行两行网格布局`).toContain('grid-template-areas');
-      expect(css, `${path} 缺范围提示不换行`).toContain('white-space: nowrap');
+      // 参数行固定单行网格（名称 / 开关 / 输入框），输入框等宽、上下限收进灰字；
+      // 防止回退成两行或 flex 换行的参差布局，也防止「范围」列重新长出来。
+      expect(css, `${path} 缺参数行单行网格布局`).toContain('grid-template-columns: 88px auto minmax(0, 1fr)');
+      expect(css, `${path} 不应再有独立范围列样式`).not.toContain('.rmo-bounds');
+      // 窄屏档：压缩名称列与间距，保证四位数上限（≤9999）的灰字在 360px 下完整可见。
+      expect(css, `${path} 缺窄屏压缩档`).toContain('@media (max-width: 420px)');
+      expect(css, `${path} 缺窄屏名称列压缩`).toContain('grid-template-columns: 68px auto minmax(0, 1fr)');
     }
   });
 

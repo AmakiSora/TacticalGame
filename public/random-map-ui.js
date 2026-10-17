@@ -149,6 +149,10 @@
     const label = esc(param.label);
     const bounds = boundsAttrs(param);
     const hint = `可选 ${param.min}–${param.max}；留空＝服务端默认 ${param.defMin}–${param.defMax}`;
+    // 可选上下限直接写进输入框的灰字（placeholder）：不再单占一列「范围 x–y」，
+    // 参数行因此保持单行，行高与列宽都更紧凑。悬停仍给出「可选 / 默认」完整提示。
+    const minHint = esc(`≥${param.min}`);
+    const maxHint = esc(`≤${param.max}`);
     return `<div class="rmo-param" data-key="${esc(param.key)}">
       <div class="rmo-param-head">
         <span class="rmo-param-label" title="${esc(hint)}">${label}</span>
@@ -158,14 +162,13 @@
           <span class="rmo-mode-thumb" aria-hidden="true"></span>
         </span>
         <span class="rmo-range-inputs">
-          <input class="rmo-min" type="number" ${bounds} placeholder="${param.defMin}" aria-label="${label}最小值" />
+          <input class="rmo-min" type="number" ${bounds} placeholder="${minHint}" title="${esc(hint)}" aria-label="${label}最小值（可选 ${param.min}–${param.max}）" />
           <span class="rmo-sep">–</span>
-          <input class="rmo-max" type="number" ${bounds} placeholder="${param.defMax}" aria-label="${label}最大值" />
+          <input class="rmo-max" type="number" ${bounds} placeholder="${maxHint}" title="${esc(hint)}" aria-label="${label}最大值（可选 ${param.min}–${param.max}）" />
         </span>
         <span class="rmo-fixed-input hidden">
-          <input class="rmo-value" type="number" ${bounds} placeholder="默认" aria-label="${label}固定值" />
+          <input class="rmo-value" type="number" ${bounds} placeholder="默认" title="${esc(hint)}" aria-label="${label}固定值" />
         </span>
-        <span class="rmo-bounds">范围 ${param.min}–${param.max}</span>
       </div>
     </div>`;
   }

@@ -560,6 +560,10 @@ describe('random map creation UI', () => {
       // 分组折叠块与兵种小标题两端都要有样式，否则其中一端会退化成一条长列表。
       expect(css, `${path} 缺 .rmo-group 样式`).toContain('.rmo-group');
       expect(css, `${path} 缺 .rmo-subgroup-label 样式`).toContain('.rmo-subgroup-label');
+      // 参数行固定两行网格（名称/开关/范围 + 输入框）、范围提示不换行：
+      // 防止回退到 flex-wrap 后「范围」被挤到第二行、输入框被内容长度拉成不等宽。
+      expect(css, `${path} 缺参数行两行网格布局`).toContain('grid-template-areas');
+      expect(css, `${path} 缺范围提示不换行`).toContain('white-space: nowrap');
     }
   });
 

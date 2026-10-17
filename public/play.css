@@ -1558,6 +1558,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 .rmo-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 10px;
   margin-bottom: 10px;
@@ -1566,6 +1567,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   color: #e4edf4;
   font-size: 14px;
   font-weight: 800;
+  white-space: nowrap;
 }
 .rmo-hint {
   color: #668495;
@@ -1605,18 +1607,26 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   border-radius: 6px;
   background: #101922;
 }
+/* 参数行固定两行网格（名称 / 取值开关 / 范围提示 + 输入框），不再 flex-wrap：
+   内容长短不同的行也严格对齐——输入框等宽、范围提示始终在右上角、不换行。 */
 .rmo-param-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "label toggle bounds"
+    "value value value";
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
 }
 .rmo-param-label {
-  flex: none;
-  width: 88px;
+  grid-area: label;
+  min-width: 0;
   color: #a9bdc9;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rmo-param input {
   background: #0b1218;
@@ -1625,9 +1635,11 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   color: #d8e0e8;
   font-size: 12px;
   padding: 3px 6px;
+  box-sizing: border-box;
 }
 /* 取值方式左右滑动开关：随机 ⇄ 固定，滑块停在当前档一侧。 */
 .rmo-mode-toggle {
+  grid-area: toggle;
   position: relative;
   flex: none;
   display: inline-flex;
@@ -1673,11 +1685,21 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 .rmo-range-inputs,
 .rmo-fixed-input {
-  display: flex;
+  grid-area: value;
+  justify-self: start;
+  width: 100%;
+  max-width: 260px;
+  min-width: 0;
+}
+.rmo-range-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 4px;
-  flex: 1;
-  min-width: 108px;
+}
+.rmo-fixed-input {
+  display: flex;
+  align-items: center;
 }
 .rmo-range-inputs input,
 .rmo-fixed-input input {
@@ -1686,9 +1708,11 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 .rmo-sep { color: #668495; font-size: 12px; }
 .rmo-bounds {
-  flex: none;
+  grid-area: bounds;
+  justify-self: end;
   color: #668495;
   font-size: 12px;
+  white-space: nowrap;
 }
 /* 参数分组折叠块：组标题可点，组体沿用 .rmo-grid 的列规则；「全部展开/收起」按钮在面板头部。 */
 .rmo-groups {

@@ -1642,6 +1642,9 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   .rmo-param-label {
     font-size: 11px;
   }
+  .rmo-toggle-row .rmo-param-label {
+    width: 68px;
+  }
   .rmo-param input {
     padding: 3px 4px;
     font-size: 11px;
@@ -1791,6 +1794,33 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+/* 布尔开关行（「允许总部部署」「无回合上限」）：与数字参数同卡片，整行名称 + 说明 + 开关。 */
+.rmo-param-toggle {
+  grid-column: 1 / -1;
+}
+.rmo-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+  cursor: pointer;
+}
+.rmo-toggle-row .rmo-param-label {
+  flex: none;
+  width: 88px;
+}
+.rmo-toggle-hint {
+  flex: 1;
+  min-width: 0;
+  color: #668495;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rmo-toggle-row .switch {
+  flex: none;
 }
 .map-card-random .map-preview {
   font-size: 34px;

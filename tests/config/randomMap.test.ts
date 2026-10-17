@@ -541,6 +541,89 @@ describe('random map generator', () => {
     expect(ranged.units.heavy.moveRange).toBeLessThanOrEqual(4);
   });
 
+  it('keeps the new combat/economy knobs rng-neutral at their default scalars', () => {
+    // 这些标量就是旧硬编码值：显式给出与省略逐位一致（零消耗路径）。
+    const base = generateRandomMapConfig({ seed: 'knob-neutral' }, 4);
+    const explicit = generateRandomMapConfig({
+      seed: 'knob-neutral',
+      minimumDamage: 1,
+      forwardBaseDeployDiscount: 8,
+      repairPointRepairAmount: 10,
+      deployFromHq: true,
+      noTurnLimit: false,
+    }, 4);
+    expect(JSON.stringify(explicit)).toBe(JSON.stringify(base));
+  });
+
+  it('applies combat floor, kill value and control-point flow overrides', () => {
+    const config = generateRandomMapConfig({
+      seed: 'combat-knobs', minimumDamage: 0, adjudicationKillValue: 0.8, adjudicationControlPointFlowRatio: 0.4,
+    }, 2);
+    expect(config.balance.minimumDamage).toBe(0);
+    expect(config.balance.adjudicationWeights.killValue).toBe(0.8);
+    expect(config.balance.adjudicationWeights.controlPointFlowRatio).toBe(0.4);
+    // 未给流量占比时不写该字段（引擎默认 0.7）；击杀权重仍按 armyValue 的 25%~50% 推导。
+    const base = generateRandomMapConfig({ seed: 'combat-knobs' }, 2);
+    expect(base.balance.adjudicationWeights).not.toHaveProperty('controlPointFlowRatio');
+    expect(base.balance.adjudicationWeights.killValue)
+      .toBeGreaterThanOrEqual(base.balance.adjudicationWeights.armyValue * 0.25 - 1e-9);
+    // 区间形态：同种子可复现、落在边界内。
+    const rangedOptions = {
+      seed: 'combat-knobs-range',
+      minimumDamage: [0, 5] as [number, number],
+      adjudicationKillValue: [0.5, 1.5] as [number, number],
+      adjudicationControlPointFlowRatio: [0.2, 0.8] as [number, number],
+    };
+    const ranged = generateRandomMapConfig(rangedOptions, 2);
+    expect(JSON.stringify(generateRandomMapConfig(rangedOptions, 2))).toBe(JSON.stringify(ranged));
+    expect(ranged.balance.minimumDamage).toBeGreaterThanOrEqual(0);
+    expect(ranged.balance.minimumDamage).toBeLessThanOrEqual(5);
+    expect(ranged.balance.adjudicationWeights.killValue).toBeGreaterThanOrEqual(0.5);
+    expect(ranged.balance.adjudicationWeights.killValue).toBeLessThanOrEqual(1.5);
+    expect(ranged.balance.adjudicationWeights.controlPointFlowRatio).toBeGreaterThanOrEqual(0.2);
+    expect(ranged.balance.adjudicationWeights.controlPointFlowRatio).toBeLessThanOrEqual(0.8);
+  });
+
+  it('injects comeback supplies only when requested', () => {
+    const base = generateRandomMapConfig({ seed: 'comeback' }, 2);
+    expect(base.balance).not.toHaveProperty('comebackSupply');
+    // 只给一项时其余按 4 / 30 / 14 补齐。
+    const partial = generateRandomMapConfig({ seed: 'comeback', comebackStartRound: 5 }, 2);
+    expect(partial.balance.comebackSupply).toEqual({ startRound: 5, scoreGapPercent: 30, amountPerRound: 14 });
+    // 区间形态：同种子可复现、落在区间内。
+    const rangedOptions = {
+      seed: 'comeback-range',
+      comebackScoreGapPercent: [10, 50] as [number, number],
+      comebackAmountPerRound: [5, 25] as [number, number],
+    };
+    const ranged = generateRandomMapConfig(rangedOptions, 2);
+    expect(JSON.stringify(generateRandomMapConfig(rangedOptions, 2))).toBe(JSON.stringify(ranged));
+    expect(ranged.balance.comebackSupply!.startRound).toBe(4);
+    expect(ranged.balance.comebackSupply!.scoreGapPercent).toBeGreaterThanOrEqual(10);
+    expect(ranged.balance.comebackSupply!.scoreGapPercent).toBeLessThanOrEqual(50);
+    expect(ranged.balance.comebackSupply!.amountPerRound).toBeGreaterThanOrEqual(5);
+    expect(ranged.balance.comebackSupply!.amountPerRound).toBeLessThanOrEqual(25);
+  });
+
+  it('applies the deploy-from-hq and no-turn-limit toggles', () => {
+    const pointsOnly = generateRandomMapConfig({ seed: 'deploy-toggle', deployFromHq: false }, 2);
+    expect(pointsOnly.balance.deployFromHq).toBe(false);
+    expect(generateRandomMapConfig({ seed: 'deploy-toggle' }, 2).balance).not.toHaveProperty('deployFromHq');
+    const unlimited = generateRandomMapConfig({ seed: 'unlimited', noTurnLimit: true }, 2);
+    expect(unlimited.balance.maxTurns).toBeNull();
+    // 开关只改 maxTurns：maxTurns 的抽取保留（只丢弃结果），其余字段与正常局逐位一致。
+    const normal = generateRandomMapConfig({ seed: 'unlimited' }, 2);
+    expect(JSON.stringify({ ...unlimited, balance: { ...unlimited.balance, maxTurns: normal.balance.maxTurns } }))
+      .toBe(JSON.stringify(normal));
+  });
+
+  it('writes an explicit support heal range only when provided', () => {
+    const base = generateRandomMapConfig({ seed: 'heal-range' }, 2);
+    expect(base.units.support).not.toHaveProperty('healRange');
+    const config = generateRandomMapConfig({ seed: 'heal-range', supportHealRange: 3 }, 2);
+    expect(config.units.support.healRange).toBe(3);
+  });
+
   it('keeps the deprecated terrainDensity as a 60/40 alias for water/wall', () => {
     const sanitized = sanitizeRandomOptions({ terrainDensity: 0.1 });
     expect(sanitized.terrainDensity).toBeUndefined();
@@ -639,6 +722,21 @@ describe('sanitizeRandomOptions', () => {
     expect(sanitizeRandomOptions({ supportHealPower: -5 }).supportHealPower).toBe(0);
     // 整数参数非整数输入按四舍五入（与 resolveParam 的整数口径一致）。
     expect(sanitizeRandomOptions({ heavyMoveRange: 2.6 }).heavyMoveRange).toBe(3);
+    // 3.6.2 第二批参数同样走钳位。
+    expect(sanitizeRandomOptions({ minimumDamage: 99 }).minimumDamage).toBe(20);
+    expect(sanitizeRandomOptions({ forwardBaseDeployDiscount: 99 }).forwardBaseDeployDiscount).toBe(20);
+    expect(sanitizeRandomOptions({ repairPointRepairAmount: -1 }).repairPointRepairAmount).toBe(0);
+    expect(sanitizeRandomOptions({ comebackStartRound: 0 }).comebackStartRound).toBe(1);
+    expect(sanitizeRandomOptions({ comebackScoreGapPercent: 101 }).comebackScoreGapPercent).toBe(100);
+    expect(sanitizeRandomOptions({ comebackAmountPerRound: 0 }).comebackAmountPerRound).toBe(1);
+    expect(sanitizeRandomOptions({ adjudicationKillValue: 9 }).adjudicationKillValue).toBe(2);
+    expect(sanitizeRandomOptions({ adjudicationControlPointFlowRatio: 2 }).adjudicationControlPointFlowRatio).toBe(1);
+    expect(sanitizeRandomOptions({ supportHealRange: 99 }).supportHealRange).toBe(10);
+    // 布尔开关只接受布尔值：默认态（允许总部部署 / 有回合上限）不写入 random 字段。
+    expect(sanitizeRandomOptions({ deployFromHq: false, noTurnLimit: true }))
+      .toEqual({ deployFromHq: false, noTurnLimit: true });
+    expect(() => sanitizeRandomOptions({ deployFromHq: 'yes' })).toThrow('deployFromHq');
+    expect(() => sanitizeRandomOptions({ noTurnLimit: 1 })).toThrow('noTurnLimit');
   });
 
   it('rejects malformed options', () => {

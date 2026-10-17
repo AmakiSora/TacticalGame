@@ -115,6 +115,15 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
     return { group, section, head, body };
   });
   const sections = groupStubs.map(item => item.section);
+  const toggleStubs = (bootstrap.TOGGLES as Array<{ key: string; default: boolean }>).map(toggle => {
+    const input = stubElement({
+      tagName: 'INPUT',
+      type: 'checkbox',
+      checked: toggle.default,
+      dataset: { toggle: toggle.key, default: String(toggle.default) },
+    });
+    return { toggle, input };
+  });
   const groupsToggle = stubElement({ tagName: 'BUTTON', textContent: '全部展开' });
   const container = stubElement({
     innerHTML: '',
@@ -139,7 +148,11 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
   };
   const documentStub = {
     getElementById: (id: string) => elements[id] ?? null,
-    querySelectorAll: (selector: string) => (selector === '.rmo-param' ? rows : []),
+    querySelectorAll: (selector: string) => {
+      if (selector === '.rmo-param') return rows;
+      if (selector === 'input[data-toggle]') return toggleStubs.map(item => item.input);
+      return [];
+    },
   };
   const context: Record<string, unknown> = { console, window: {}, document: documentStub };
   context.globalThis = context;
@@ -151,7 +164,8 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
   const byKey = (key: string) => built.find(item => item.row.dataset.key === key)!;
   const hiddenOf = (key: string) => byKey(key).row.classList.contains('hidden');
   const groupOf = (key: string) => groupStubs.find(item => item.group.key === key)!;
-  return { ui, container, hint, rows, byKey, hiddenOf, groupOf, allGroups: groupStubs, groupsToggle };
+  const byToggle = (key: string) => toggleStubs.find(item => item.toggle.key === key)!;
+  return { ui, container, hint, rows, byKey, hiddenOf, groupOf, allGroups: groupStubs, groupsToggle, byToggle };
 }
 
 /** 带最小 DOM 桩加载模块并渲染面板，返回面板 HTML。 */
@@ -195,13 +209,16 @@ describe('random map creation UI', () => {
       'radius', 'waterDensity', 'wallDensity', 'controlPointCount', 'maxTurns', 'actionsPerTurn',
       'unitStatVariation', 'startingSupplies', 'baseIncome',
       'supplyIncome', 'forwardBaseIncome', 'repairIncome',
+      'forwardBaseDeployDiscount', 'repairPointRepairAmount',
+      'comebackStartRound', 'comebackScoreGapPercent', 'comebackAmountPerRound',
       'startingUnitCount', 'startingWeightInfantry', 'startingWeightScout', 'startingWeightHeavy', 'startingWeightRanger',
       'infantryHp', 'infantryAttack', 'infantryDefense', 'infantryMoveRange', 'infantryAttackRange', 'infantryCost',
       'scoutHp', 'scoutAttack', 'scoutDefense', 'scoutMoveRange', 'scoutAttackRange', 'scoutCost',
       'heavyHp', 'heavyAttack', 'heavyDefense', 'heavyMoveRange', 'heavyAttackRange', 'heavyCost',
       'rangerHp', 'rangerAttack', 'rangerDefense', 'rangerMoveRange', 'rangerAttackRange', 'rangerCost',
-      'supportHp', 'supportAttack', 'supportDefense', 'supportMoveRange', 'supportAttackRange', 'supportCost', 'supportHealPower',
-      'damageVarianceRange', 'healVarianceRange', 'adjudicationArmyValue',
+      'supportHp', 'supportAttack', 'supportDefense', 'supportMoveRange', 'supportAttackRange', 'supportCost', 'supportHealPower', 'supportHealRange',
+      'damageVarianceRange', 'healVarianceRange', 'minimumDamage',
+      'adjudicationArmyValue', 'adjudicationKillValue', 'adjudicationControlPointFlowRatio',
       'headquartersHp', 'headquartersDefense',
       'artilleryStartRound', 'artilleryIntervalRounds', 'artilleryDamage', 'artilleryMinimumSafeRadius',
     ]) {
@@ -294,9 +311,14 @@ describe('random map creation UI', () => {
     expect(groups.map(group => group.key)).toEqual([
       'map', 'economy', 'army', 'stats', 'combat', 'headquarters', 'artillery',
     ]);
-    // 每项参数恰好属于一组（不重不漏），组内项数与设计一致（57 项）。
+    // 每项参数恰好属于一组（不重不漏）：66 个数字参数 + 2 个布尔开关。
+    const members: Array<{ key: string; group?: string }> = [
+      ...(ui.PARAMS as Array<{ key: string; group?: string }>),
+      ...(ui.TOGGLES as Array<{ key: string; group?: string }>),
+    ];
+    expect(members).toHaveLength(68);
     const membership = new Map<string, string>();
-    for (const param of ui.PARAMS as Array<{ key: string; group?: string }>) {
+    for (const param of members) {
       expect(param.group, `${param.key} 缺分组`).toBeTruthy();
       expect(membership.has(param.key), `${param.key} 重复参数`).toBe(false);
       membership.set(param.key, param.group as string);
@@ -304,10 +326,9 @@ describe('random map creation UI', () => {
     expect(new Set(membership.values())).toEqual(new Set(groups.map(group => group.key)));
     const counts: Record<string, number> = {};
     for (const group of groups) {
-      counts[group.key] = (ui.PARAMS as Array<{ group: string }>)
-        .filter(param => param.group === group.key).length;
+      counts[group.key] = members.filter(param => param.group === group.key).length;
     }
-    expect(counts).toEqual({ map: 4, economy: 7, army: 5, stats: 32, combat: 3, headquarters: 2, artillery: 4 });
+    expect(counts).toEqual({ map: 4, economy: 14, army: 5, stats: 33, combat: 6, headquarters: 2, artillery: 4 });
 
     // 面板 HTML：每组一个折叠块，块头带 aria 属性与项数，参数行都渲染在自己组内。
     const html = capturePanelHtml('standard');
@@ -330,6 +351,27 @@ describe('random map creation UI', () => {
     for (const label of ['步兵', '侦察兵', '重装', '远程兵', '辅助']) {
       expect(html, `缺 ${label} 小标题`).toContain(`class="rmo-subgroup-label" data-subgroup="${label}"`);
     }
+  });
+
+  it('renders boolean toggles that submit only when flipped from the default', () => {
+    const ui = loadUI();
+    const toggles = ui.TOGGLES as Array<{ key: string; label: string; group: string; default: boolean }>;
+    expect(toggles.map(toggle => toggle.key)).toEqual(['deployFromHq', 'noTurnLimit']);
+    for (const toggle of toggles) expect(toggle.label, `${toggle.key} 缺标签`).toBeTruthy();
+    const html = capturePanelHtml('standard');
+    for (const toggle of toggles) {
+      expect(html, `${toggle.key} 缺开关行`).toContain(`class="rmo-param rmo-param-toggle" data-key="${toggle.key}"`);
+      expect(html, `${toggle.key} 缺开关输入`).toContain(`data-toggle="${toggle.key}"`);
+    }
+    expect(html).toContain('data-default="true"');
+    expect(html).toContain('data-default="false"');
+    // 默认态（允许总部部署 / 有回合上限）不写入 random 字段；翻动后只提交翻动的那一项。
+    const scoped = loadUIWithDom('standard', []);
+    expect(scoped.ui.collectRandomOptions()).toEqual({ mode: 'standard' });
+    scoped.byToggle('deployFromHq').input.checked = false;
+    expect(scoped.ui.collectRandomOptions()).toEqual({ mode: 'standard', deployFromHq: false });
+    scoped.byToggle('noTurnLimit').input.checked = true;
+    expect(scoped.ui.collectRandomOptions()).toEqual({ mode: 'standard', deployFromHq: false, noTurnLimit: true });
   });
 
   it('collapses and expands parameter groups without dropping their values', () => {

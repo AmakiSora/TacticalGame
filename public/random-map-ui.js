@@ -28,6 +28,13 @@
     { key: 'supplyIncome', label: '补给站收入', step: 1, min: 0, max: 40, defMin: 8, defMax: 20, group: 'economy' },
     { key: 'forwardBaseIncome', label: '前哨基地收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8, group: 'economy' },
     { key: 'repairIncome', label: '维修站收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8, group: 'economy' },
+    // 部署与修复的经济旋钮：留空＝旧基准（前哨折扣 8、维修量 10）。
+    { key: 'forwardBaseDeployDiscount', label: '前哨部署折扣', step: 1, min: 0, max: 20, defMin: 8, defMax: 8, group: 'economy' },
+    { key: 'repairPointRepairAmount', label: '维修站修复量', step: 1, min: 0, max: 50, defMin: 10, defMax: 10, group: 'economy' },
+    // 追赶补给：落后头名 ≥分差比例 的玩家每回合 +补给量；三项都给默认值时整块才注入。
+    { key: 'comebackStartRound', label: '追赶起始轮', step: 1, min: 1, max: 20, defMin: 4, defMax: 4, group: 'economy' },
+    { key: 'comebackScoreGapPercent', label: '追赶分差%', step: 1, min: 0, max: 100, defMin: 30, defMax: 30, group: 'economy' },
+    { key: 'comebackAmountPerRound', label: '追赶补给量', step: 1, min: 1, max: 100, defMin: 14, defMax: 14, group: 'economy' },
     { key: 'startingUnitCount', label: '初始单位数', step: 1, min: 0, max: 6, defMin: 0, defMax: 4, group: 'army' },
     // 初始兵种权重（相对权重，0-10；留空＝默认 2/2/1/1；全 0 回退旧均匀池）。support 不设权重。
     { key: 'startingWeightInfantry', label: '步兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2, group: 'army' },
@@ -68,10 +75,14 @@
     { key: 'supportAttackRange', label: '辅助射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1, group: 'stats', subgroup: '辅助' },
     { key: 'supportCost', label: '辅助造价', step: 1, min: 5, max: 999, defMin: 60, defMax: 60, group: 'stats', subgroup: '辅助' },
     { key: 'supportHealPower', label: '辅助治疗量', step: 1, min: 0, max: 99, defMin: 22, defMax: 22, group: 'stats', subgroup: '辅助' },
+    { key: 'supportHealRange', label: '辅助治疗射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1, group: 'stats', subgroup: '辅助' },
     // 战斗波动（省略＝固定 3/6）与裁决计分（只开放军队价值权重，补给恒 0）。
     { key: 'damageVarianceRange', label: '伤害波动幅度', step: 1, min: 0, max: 20, defMin: 3, defMax: 3, group: 'combat' },
     { key: 'healVarianceRange', label: '治疗波动幅度', step: 1, min: 0, max: 20, defMin: 6, defMax: 6, group: 'combat' },
+    { key: 'minimumDamage', label: '最低伤害', step: 1, min: 0, max: 20, defMin: 1, defMax: 1, group: 'combat' },
     { key: 'adjudicationArmyValue', label: '裁决军队分权重', step: 1, min: 0, max: 10, defMin: 1, defMax: 2, group: 'combat' },
+    { key: 'adjudicationKillValue', label: '裁决击杀权重', step: 0.05, min: 0, max: 2, defMin: 0.25, defMax: 0.5, group: 'combat' },
+    { key: 'adjudicationControlPointFlowRatio', label: '据点流量占比', step: 0.05, min: 0, max: 1, defMin: 0.7, defMax: 0.7, group: 'combat' },
     { key: 'headquartersHp', label: '总部血量', step: 10, min: 1, max: 9999, defMin: 80, defMax: 240, group: 'headquarters', modes: HEADQUARTERS_MODES },
     { key: 'headquartersDefense', label: '总部防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 10, group: 'headquarters', modes: HEADQUARTERS_MODES },
     { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, min: 1, max: 10, defMin: 3, defMax: 8, group: 'artillery', modes: ARTILLERY_MODES },
@@ -96,6 +107,36 @@
   /** 某分组下的参数（顺序与 PARAMS 一致）。 */
   function groupParams(groupKey) {
     return PARAMS.filter(param => param.group === groupKey);
+  }
+
+  // 布尔开关（非数字参数）：与数字参数同卡片样式，单独一行渲染；collect 只在偏离默认值时提交。
+  const TOGGLES = [
+    {
+      key: 'deployFromHq', label: '允许总部部署', group: 'economy', default: true,
+      hint: '关闭后只能从已占领的据点出兵',
+    },
+    {
+      key: 'noTurnLimit', label: '无回合上限', group: 'economy', default: false,
+      hint: '开启后忽略最大回合数，靠淘汰或强制裁决收尾',
+    },
+  ];
+
+  function groupToggles(groupKey) {
+    return TOGGLES.filter(toggle => toggle.group === groupKey);
+  }
+
+  function toggleRowHtml(toggle) {
+    const label = esc(toggle.label);
+    return `<div class="rmo-param rmo-param-toggle" data-key="${esc(toggle.key)}">
+      <label class="rmo-toggle-row" title="${esc(toggle.hint)}">
+        <span class="rmo-param-label">${label}</span>
+        <span class="rmo-toggle-hint">${esc(toggle.hint)}</span>
+        <span class="switch">
+          <input type="checkbox" ${toggle.default ? 'checked' : ''} data-toggle="${esc(toggle.key)}" data-default="${toggle.default ? 'true' : 'false'}" aria-label="${label}" />
+          <span class="switch-slider"></span>
+        </span>
+      </label>
+    </div>`;
   }
 
   // 模式取值与后端 GameMode 一一对应：每个模式只出现一次，不再保留「空值＝服务端默认标准」
@@ -190,7 +231,7 @@
   /** 一个折叠块：标题行（按钮，可点）＋ 组体（沿用 .rmo-grid 的列规则）。 */
   function groupSectionHtml(group) {
     const expanded = group.defaultOpen !== false;
-    const count = groupParams(group.key).length;
+    const count = groupParams(group.key).length + groupToggles(group.key).length;
     return `<section class="rmo-group" data-group="${esc(group.key)}">
       <button type="button" class="rmo-group-head" aria-expanded="${expanded}" aria-controls="rmo-group-${esc(group.key)}">
         <span class="rmo-group-title">${esc(group.label)}</span>
@@ -198,7 +239,7 @@
         <span class="rmo-group-chevron" aria-hidden="true"></span>
       </button>
       <div class="rmo-group-body rmo-grid${expanded ? '' : ' hidden'}" id="rmo-group-${esc(group.key)}">
-        ${groupRowsHtml(group.key)}
+        ${groupRowsHtml(group.key)}${groupToggles(group.key).map(toggleRowHtml).join('')}
       </div>
     </section>`;
   }
@@ -277,6 +318,7 @@
     RANDOM_MAP_ID,
     PARAMS,
     GROUPS,
+    TOGGLES,
     GAME_MODES,
     renderRandomMapCard,
     paramsForMode,
@@ -512,6 +554,12 @@
         } else {
           options[key] = min !== null ? min : max;
         }
+      });
+      // 布尔开关：只有偏离默认值时才写进 random 字段（默认态不提交，服务端行为不变）。
+      document.querySelectorAll('input[data-toggle]').forEach(input => {
+        const key = input.dataset.toggle;
+        if (!key) return;
+        if (input.checked !== (input.dataset.default === 'true')) options[key] = input.checked;
       });
       return options;
     },

@@ -18,6 +18,13 @@ export interface RandomMapOptions {
   /** 游戏模式：standard（默认）/ annihilation / simultaneous / royale。 */
   mode?: GameMode;
   /**
+   * 是否允许从总部部署（默认 true）。false = 只能从已占领的据点出兵——whirlpool / molten-throne
+   * 这类「必须扩张」的静态图就是关掉总部部署的。省略或 true 时不写该字段，默认路径不变。
+   */
+  deployFromHq?: boolean;
+  /** 无回合上限（默认 false）。true = 只靠淘汰或强制裁决收尾；省略时按 maxTurns 正常裁定。 */
+  noTurnLimit?: boolean;
+  /**
    * 旋转对称公平模式，默认 true。取 360/n 与六边形网格自映射角（60° 整数倍）的最小公倍角：
    * 2/4/8 人 → 180°、3 人 → 120°、6 人 → 60°；5/7 人无对称解，如实降级为非对称。
    */
@@ -68,11 +75,16 @@ export interface RandomMapOptions {
    */
   damageVarianceRange?: RandomParam;
   healVarianceRange?: RandomParam;
+  /** 每次攻击的最低伤害（0-20，省略＝1）。0 会让高防单位真正扛得住，高位则保证每次都能磨血。 */
+  minimumDamage?: RandomParam;
   /**
-   * 裁决计分中军队价值的权重（0-10，省略＝按 1-2 随机，与旧内联采样逐位一致）。只暴露这一项，
-   * 补给权重恒为 0（杜绝囤补给/期末爆兵套利）；击杀分仍按军队价值权重的 25%~50% 推导。
+   * 裁决计分权重：军队价值（0-10，省略＝按 1-2 随机，与旧内联采样逐位一致）与击杀分
+   * （0-2，省略＝仍按军队价值的 25%~50% 推导）。补给权重恒为 0（杜绝囤补给/期末爆兵套利）。
    */
   adjudicationArmyValue?: RandomParam;
+  adjudicationKillValue?: RandomParam;
+  /** 裁决据点分中「每轮平均持有」的占比（0-1，省略＝引擎默认 0.7，其余按期末持有计）。 */
+  adjudicationControlPointFlowRatio?: RandomParam;
   /**
    * 据点类型每回合收入：补给站（0-40）/ 前哨基地（0-20）/ 维修站（0-20）。省略＝各按
    * 8-20 / 0-8 / 0-8 随机（与旧内联采样逐位一致）。前哨部署折扣 8、维修站修复量 10 保持固定。
@@ -80,6 +92,17 @@ export interface RandomMapOptions {
   supplyIncome?: RandomParam;
   forwardBaseIncome?: RandomParam;
   repairIncome?: RandomParam;
+  /** 前哨基地的部署折扣（0-20，省略＝8）与维修站每回合修复量（0-50，省略＝10）。 */
+  forwardBaseDeployDiscount?: RandomParam;
+  repairPointRepairAmount?: RandomParam;
+  /**
+   * 追赶补给：落后头名 ≥ scoreGapPercent% 的玩家每回合 +amountPerRound 补给（引擎
+   * grantComebackSupplies 实现）。三项都不给则整块不注入（默认随机图没有追赶机制）；
+   * 只给其中一项时其余按 4 / 30 / 14 补齐。
+   */
+  comebackStartRound?: RandomParam;
+  comebackScoreGapPercent?: RandomParam;
+  comebackAmountPerRound?: RandomParam;
   /**
    * 按兵种覆盖单位属性（每项均可用固定值或区间）：标量＝精确值（不消耗随机数流），区间＝区间内
    * 均匀抽一个整数（消耗 1 次），留空＝围绕基准值按 unitStatVariation 抖动（旧路径）。两方始终
@@ -118,6 +141,8 @@ export interface RandomMapOptions {
   supportCost?: RandomParam;
   /** 辅助兵治疗量（单次治疗回复量，0-99；留空＝围绕基准 22 抖动）。 */
   supportHealPower?: RandomParam;
+  /** 辅助兵治疗射程（1-10；留空＝不写该字段，引擎回退到攻击射程）。 */
+  supportHealRange?: RandomParam;
   /** 歼灭/大逃杀：首次炮火回合（≥1）。 */
   artilleryStartRound?: RandomParam;
   /** 歼灭/大逃杀：炮火间隔回合数（≥1）。 */
@@ -201,6 +226,18 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   supportAttackRange: { min: 1, max: 10, integer: true },
   supportCost: { min: 5, max: 999, integer: true },
   supportHealPower: { min: 0, max: 99, integer: true },
+  supportHealRange: { min: 1, max: 10, integer: true },
+  // 战斗保底 / 裁决权重 / 据点折扣与修复 / 追赶补给：省略路径各自保留旧硬编码或旧内联采样
+  // （不读 DEFAULT_RANGES、随机数流位置不变），见 resolveFixedIntParam / resolveFixedFloatParam /
+  // resolveSampledIntParam。
+  minimumDamage: { min: 0, max: 20, integer: true },
+  adjudicationKillValue: { min: 0, max: 2, integer: false },
+  adjudicationControlPointFlowRatio: { min: 0, max: 1, integer: false },
+  forwardBaseDeployDiscount: { min: 0, max: 20, integer: true },
+  repairPointRepairAmount: { min: 0, max: 50, integer: true },
+  comebackStartRound: { min: 1, max: 20, integer: true },
+  comebackScoreGapPercent: { min: 0, max: 100, integer: true },
+  comebackAmountPerRound: { min: 1, max: 100, integer: true },
   artilleryStartRound: { min: 1, max: 10, integer: true },
   artilleryIntervalRounds: { min: 1, max: 3, integer: true },
   artilleryDamage: { min: 5, max: 30, integer: true },
@@ -280,31 +317,58 @@ function resolveSampledIntParam(param: RandomParam | undefined, defLo: number, d
   return drawIntInRange(param[0], param[1], rng);
 }
 
-/** 裁决权重在静态图包线内随机：danger-close(20/1/30/1/0+kill0.25) ~ default(5/2/90/2/0+kill0.5)。
- *  3.6.0 起补给恒不计分（supplies: 0，杜绝囤补给/期末爆兵套利），
- *  击杀分按军队价值权重的 25%~50% 随机。armyValue 可由外部覆盖（省略时仍按旧公式抽 1-2）。 */
-function sampleAdjudicationWeights(rng: () => number, armyValueParam?: RandomParam) {
-  const armyValue = resolveSampledIntParam(armyValueParam, 1, 2, rng);
-  return {
-    enemyHqDamage: 3 + Math.floor(rng() * 18),
-    ownHqHp: 1 + Math.floor(rng() * 2),
-    controlPoint: 30 + Math.floor(rng() * 61),
-    armyValue,
-    supplies: 0,
-    killValue: Math.round(armyValue * (0.25 + rng() * 0.25) * 100) / 100,
-  };
+/**
+ * 同 resolveFixedIntParam，用于小数参数（裁决击杀权重、据点流量占比）：省略＝固定默认（零消耗）、
+ * 标量＝直接用（零消耗）、区间＝均匀抽一个值并四舍五入到两位小数（1 次消耗）。
+ */
+function resolveFixedFloatParam(param: RandomParam | undefined, def: number, rng: () => number): number {
+  if (param === undefined) return def;
+  if (typeof param === 'number') return param;
+  return Math.round((param[0] + rng() * (param[1] - param[0])) * 100) / 100;
 }
 
-/** 据点类型收入随机：danger-close(8/0/0) ~ breach(20/8/8)。收入可由外部覆盖（省略时仍按旧公式
- *  各抽一次：补给站 8-20、前哨/维修 0-8）；部署折扣 8、维修量 10 保持基准。 */
+/** 裁决权重在静态图包线内随机：danger-close(20/1/30/1/0+kill0.25) ~ default(5/2/90/2/0+kill0.5)。
+ *  3.6.0 起补给恒不计分（supplies: 0，杜绝囤补给/期末爆兵套利），
+ *  击杀分默认按军队价值权重的 25%~50% 随机；armyValue / killValue 可由外部覆盖
+ *  （省略时仍按旧公式，抽取次数与顺序不变）。 */
+function sampleAdjudicationWeights(rng: () => number, armyValueParam?: RandomParam, killValueParam?: RandomParam) {
+  const armyValue = resolveSampledIntParam(armyValueParam, 1, 2, rng);
+  const enemyHqDamage = 3 + Math.floor(rng() * 18);
+  const ownHqHp = 1 + Math.floor(rng() * 2);
+  const controlPoint = 30 + Math.floor(rng() * 61);
+  // 击杀分：留空＝旧公式（消耗 1 次）；给定则用固定值 / 区间。
+  const killValue = killValueParam === undefined
+    ? Math.round(armyValue * (0.25 + rng() * 0.25) * 100) / 100
+    : resolveFixedFloatParam(killValueParam, 0, rng);
+  return { enemyHqDamage, ownHqHp, controlPoint, armyValue, supplies: 0, killValue };
+}
+
+/** 据点类型收入随机：danger-close(8/0/0) ~ breach(20/8/8)。收入、前哨部署折扣与维修站修复量
+ *  均可由外部覆盖（省略时仍按旧公式/旧基准：收入各抽一次、折扣 8、修复 10 且零消耗）。 */
 function sampleControlPointTypes(
   rng: () => number,
-  incomes: { supply?: RandomParam; forwardBase?: RandomParam; repair?: RandomParam } = {},
+  config: {
+    supply?: RandomParam;
+    forwardBase?: RandomParam;
+    repair?: RandomParam;
+    forwardBaseDeployDiscount?: RandomParam;
+    repairAmount?: RandomParam;
+  } = {},
 ) {
   return {
-    supply: { income: resolveSampledIntParam(incomes.supply, 8, 20, rng), deployDiscount: 0, repairAmount: 0, canDeploy: true },
-    forward_base: { income: resolveSampledIntParam(incomes.forwardBase, 0, 8, rng), deployDiscount: 8, repairAmount: 0, canDeploy: true },
-    repair: { income: resolveSampledIntParam(incomes.repair, 0, 8, rng), deployDiscount: 0, repairAmount: 10, canDeploy: true },
+    supply: { income: resolveSampledIntParam(config.supply, 8, 20, rng), deployDiscount: 0, repairAmount: 0, canDeploy: true },
+    forward_base: {
+      income: resolveSampledIntParam(config.forwardBase, 0, 8, rng),
+      deployDiscount: resolveFixedIntParam(config.forwardBaseDeployDiscount, 8, rng),
+      repairAmount: 0,
+      canDeploy: true,
+    },
+    repair: {
+      income: resolveSampledIntParam(config.repair, 0, 8, rng),
+      deployDiscount: 0,
+      repairAmount: resolveFixedIntParam(config.repairAmount, 10, rng),
+      canDeploy: true,
+    },
   };
 }
 
@@ -354,9 +418,11 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
       throw new Error('random.seed must be a number or string');
     }
   }
-  if (raw.symmetric !== undefined) {
-    if (typeof raw.symmetric !== 'boolean') throw new Error('random.symmetric must be boolean');
-    options.symmetric = raw.symmetric;
+  for (const key of ['symmetric', 'deployFromHq', 'noTurnLimit'] as const) {
+    const value = raw[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'boolean') throw new Error(`random.${key} must be boolean`);
+    options[key] = value;
   }
   if (raw.mode !== undefined) {
     const MODES = ['standard', 'annihilation', 'simultaneous', 'royale'];
@@ -369,13 +435,13 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
   for (const [key, bound] of Object.entries(PARAM_BOUNDS)) {
     const value = raw[key];
     if (value === undefined) continue;
-    options[key as Exclude<keyof RandomMapOptions, 'seed' | 'symmetric' | 'mode'>] = sanitizeParam(key, value, bound);
+    options[key as Exclude<keyof RandomMapOptions, 'seed' | 'symmetric' | 'mode' | 'deployFromHq' | 'noTurnLimit'>] = sanitizeParam(key, value, bound);
   }
 
   // 兼容旧的合并地形密度：仅在未显式给出 waterDensity / wallDensity 时生效，按 60/40 拆分。
   splitLegacyTerrainDensity(options);
 
-  const known = new Set(['seed', 'symmetric', 'mode', ...Object.keys(PARAM_BOUNDS)]);
+  const known = new Set(['seed', 'symmetric', 'deployFromHq', 'noTurnLimit', 'mode', ...Object.keys(PARAM_BOUNDS)]);
   for (const key of Object.keys(raw)) {
     if (!known.has(key)) throw new Error(`unknown random option "${key}"`);
   }
@@ -679,7 +745,9 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
   }
 
   // 回合/行动点/经济/总部参数。
-  const maxTurns = Math.round(resolveParam(options.maxTurns, 'maxTurns', rng));
+  // 无回合上限：maxTurns 仍照常抽一次（结果丢弃），保证打开开关不改变其余参数与地形。
+  const maxTurnsRoll = Math.round(resolveParam(options.maxTurns, 'maxTurns', rng));
+  const maxTurns = options.noTurnLimit === true ? null : maxTurnsRoll;
   const actionsPerTurn = Math.round(resolveParam(options.actionsPerTurn, 'actionsPerTurn', rng));
   const startingSupplies = Math.round(resolveParam(options.startingSupplies, 'startingSupplies', rng));
   const baseIncome = Math.round(resolveParam(options.baseIncome, 'baseIncome', rng));
@@ -710,6 +778,10 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
   const startingWeights = resolveStartingWeights(options, rng);
   const startingUnits = sampleStartingUnits(rng, startingUnitCount, startingWeights);
   const spawnSlots = buildSpawnSlots(mode, spawnPositions, playableSet, controlPoints, symmetry, startingUnits);
+  // 追赶补给：三项都不给则整块不注入（默认随机图没有追赶机制，与改动前逐位一致）。
+  const comebackRequested = options.comebackStartRound !== undefined
+    || options.comebackScoreGapPercent !== undefined
+    || options.comebackAmountPerRound !== undefined;
 
   const config = {
     mode,
@@ -739,15 +811,35 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
       baseIncome,
       // 战斗波动省略＝固定 3/6（零消耗）；只有显式区间才在此各抽一次。
       damageVarianceRange: resolveFixedIntParam(options.damageVarianceRange, 3, rng),
-      minimumDamage: 1,
+      minimumDamage: resolveFixedIntParam(options.minimumDamage, 1, rng),
       healVarianceRange: resolveFixedIntParam(options.healVarianceRange, 6, rng),
       actionsPerTurn,
       maxTurns,
-      adjudicationWeights: sampleAdjudicationWeights(rng, options.adjudicationArmyValue),
+      // 「只能从据点部署」仅在显式关闭时写入，默认路径不产生该字段。
+      ...(options.deployFromHq === false ? { deployFromHq: false } : {}),
+      // 追赶补给：三项都不给则不注入整块（默认路径无该字段）。
+      ...(comebackRequested
+        ? {
+            comebackSupply: {
+              startRound: resolveFixedIntParam(options.comebackStartRound, 4, rng),
+              scoreGapPercent: resolveFixedIntParam(options.comebackScoreGapPercent, 30, rng),
+              amountPerRound: resolveFixedIntParam(options.comebackAmountPerRound, 14, rng),
+            },
+          }
+        : {}),
+      adjudicationWeights: {
+        ...sampleAdjudicationWeights(rng, options.adjudicationArmyValue, options.adjudicationKillValue),
+        // 流量占比留空＝不写该字段（引擎默认 0.7）；显式给出时才写入。
+        ...(options.adjudicationControlPointFlowRatio === undefined
+          ? {}
+          : { controlPointFlowRatio: resolveFixedFloatParam(options.adjudicationControlPointFlowRatio, 0.7, rng) }),
+      },
       controlPointTypes: sampleControlPointTypes(rng, {
         supply: options.supplyIncome,
         forwardBase: options.forwardBaseIncome,
         repair: options.repairIncome,
+        forwardBaseDeployDiscount: options.forwardBaseDeployDiscount,
+        repairAmount: options.repairPointRepairAmount,
       }),
     },
     // 歼灭/大逃杀注入炮火收缩圈配置；minimumSafeRadius < radius 已由边界表保证（radius ≥ 5）。
@@ -1284,7 +1376,13 @@ function buildUnitSpecs(variation: number, options: RandomMapOptions, rng: () =>
       cost: stat(override.cost, base.cost, 5),
       canCapture: base.canCapture,
     };
-    if (base.healPower !== undefined) spec.healPower = stat(override.healPower, base.healPower, 5);
+    if (base.healPower !== undefined) {
+      spec.healPower = stat(override.healPower, base.healPower, 5);
+      // 治疗射程留空＝不写该字段（引擎回退攻击射程）；显式给出时才写入。
+      if (options.supportHealRange !== undefined) {
+        spec.healRange = resolveFixedIntParam(options.supportHealRange, base.attackRange, rng);
+      }
+    }
     result[type] = spec;
   }
   return result;

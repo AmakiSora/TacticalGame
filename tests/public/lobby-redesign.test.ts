@@ -107,4 +107,22 @@ describe('lobby map dialog and room state', () => {
     // 弹层内的面板显隐由页签负责，避免 setSelected 把随机面板重新藏起来。
     expect(ui).toContain("panel.closest('.map-dialog')");
   });
+
+  it('keeps create and join sessions mutually exclusive', () => {
+    for (const path of CLIENTS) {
+      const source = read(path);
+      // 切换到另一局前必须确认；成功后清掉另一页签的旧凭证 / 摘要，避免两套房间混显。
+      expect(source, `${path} 缺切局确认`).toContain('function confirmLobbySwitch(');
+      expect(source, `${path} 缺创建房间清理`).toContain('function clearCreateRoomView(');
+      expect(source, `${path} 缺加入房间清理`).toContain('function clearJoinRoomView(');
+      expect(source, `${path} 创建前未确认切局`).toContain("confirmLobbySwitch('create')");
+      expect(source, `${path} 加入前未确认切局`).toContain("confirmLobbySwitch('join', gid)");
+      expect(source, `${path} 创建成功后未清理加入房间`).toContain('clearJoinRoomView();');
+      expect(source, `${path} 加入成功后未清理创建房间`).toContain('clearCreateRoomView();');
+      // 轮询只刷新当前身份对应的房间摘要；两份同时刷新会让创建页签显示别人的成员与地图。
+      expect(source, `${path} 房主轮询应只刷新创建摘要`).toContain('if (hostToken) renderLobbySummary(data, els.lobbySummary, true);');
+      expect(source, `${path} 加入者轮询应只刷新加入摘要`).toContain('else if (myToken) renderLobbySummary(data, els.joinLobbySummary);');
+      expect(source, `${path} 清会话应清干净两套房间视图`).toMatch(/clearCreateRoomView\(\);\s+clearJoinRoomView\(\);/);
+    }
+  });
 });

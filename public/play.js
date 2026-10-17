@@ -342,8 +342,8 @@ function clearSavedSession() {
 function clearSessionFromSettings() {
   clearSavedSession();
   fillSettingsFromSession();
-  setCreateRoomVisible(false);
-  setJoinRoomVisible(false);
+  clearCreateRoomView();
+  clearJoinRoomView();
   toast('会话已清除', 'ok');
 }
 
@@ -2406,8 +2406,10 @@ async function refreshLobbySummary() {
   const res = await fetch(`/api/games/${gameId}/lobby`);
   const data = await res.json();
   if (res.ok) {
-    renderLobbySummary(data, els.lobbySummary, Boolean(hostToken));
-    renderLobbySummary(data, els.joinLobbySummary);
+    // 只更新当前身份对应的房间卡：房主 / 加入者共用同一 gameId，两份摘要同时刷新会让
+    // 「创建」页签显示别人房间的成员与地图（旧 bug 的根源）。
+    if (hostToken) renderLobbySummary(data, els.lobbySummary, true);
+    else if (myToken) renderLobbySummary(data, els.joinLobbySummary);
   }
   return res.ok ? data : null;
 }
@@ -2656,6 +2658,47 @@ function setJoinRoomVisible(visible) {
   }
 }
 
+function clearCreateRoomView() {
+  setCreateRoomVisible(false);
+  if (els.createdGameId) els.createdGameId.textContent = '';
+  if (els.createdHostToken) els.createdHostToken.textContent = '';
+  if (els.createdToken) els.createdToken.textContent = '';
+  els.createdPlayerTokenRow?.classList.add('hidden');
+  if (els.lobbySummary) els.lobbySummary.innerHTML = '';
+}
+
+function clearJoinRoomView() {
+  setJoinRoomVisible(false);
+  if (els.joinPlayerToken) els.joinPlayerToken.textContent = '';
+  els.joinPlayerTokenRow?.classList.add('hidden');
+  if (els.joinRoomStatus) els.joinRoomStatus.textContent = '';
+  if (els.joinLobbySummary) els.joinLobbySummary.innerHTML = '';
+  if (els.joinStatusText) {
+    els.joinStatusText.textContent = '';
+    els.joinStatusText.classList.add('hidden');
+  }
+}
+
+/**
+ * 创建和加入共用同一份 gameId / token 会话，切到另一局前必须让用户知道
+ * 自己正在离开哪个大厅：房主加入别人会丢房主视图，加入者再建/再加入会离开原房间。
+ * 只做提示，不删除服务器上的等待房间（服务端没有房主取消大厅的接口）。
+ */
+function confirmLobbySwitch(target, nextGameId = '') {
+  if (hostToken && target === 'join') {
+    return window.confirm(`你正在自己创建的房间（${gameId}）里等待。加入其他房间会离开该房间，原房间仍会留在等待列表中。继续？`);
+  }
+  if (myToken && !hostToken) {
+    if (target === 'create') {
+      return window.confirm(`你已加入房间（${gameId}）。创建新房间会离开当前房间，原房间仍会保留。继续？`);
+    }
+    if (target === 'join' && nextGameId && nextGameId !== gameId) {
+      return window.confirm(`你已加入房间（${gameId}）。加入其他房间会离开当前房间，原房间仍会保留。继续？`);
+    }
+  }
+  return true;
+}
+
 function showJoinError(message) {
   setJoinRoomVisible(false);
   if (els.joinStatusText) {
@@ -2693,6 +2736,8 @@ els.btnSkipReplay?.addEventListener('click', () => playback.skip());
 const rulesSheet = window.RulesSheet?.attach({ triggerEl: els.btnRules, getConfig: () => gameConfig });
 els.btnRefresh.addEventListener('click', async () => { await loadFullState(); drawBoard(); renderSidebar(); toast('状态已刷新', 'ok'); });
 els.btnCreate.addEventListener('click', async () => {
+  if (!confirmLobbySwitch('create')) return;
+  const hadJoinedRoom = Boolean(myToken && !hostToken && gameId);
   els.btnCreate.disabled = true;
   try {
     const res = await fetch('/api/games', {
@@ -2716,12 +2761,14 @@ els.btnCreate.addEventListener('click', async () => {
     myToken = data.player?.token || null;
     myPlayer = data.player?.id || null;
     persistSession();
+    clearJoinRoomView();
     els.createdGameId.textContent = gameId;
     els.createdHostToken.textContent = hostToken;
     els.createdToken.textContent = myToken || '未参战';
     els.createdPlayerTokenRow.classList.toggle('hidden', !myToken);
     renderLobbySummary(data.lobby, els.lobbySummary, true);
     setCreateRoomVisible(true);
+    if (hadJoinedRoom) toast('已创建新房间，离开此前加入的房间（原房间仍保留）', 'info');
     statusBadge('大厅中', 'idle');
     startLobbyPolling();
     refreshAvailableGames();
@@ -2733,15 +2780,23 @@ els.btnCreate.addEventListener('click', async () => {
 });
 els.btnJoin.addEventListener('click', async () => {
   const gid = els.gameId.value.trim(); if (!gid) return;
-  stopLobbyPolling();
+  if (!confirmLobbySwitch('join', gid)) return;
+  const hadHostedRoom = Boolean(hostToken);
+  const hadJoinedRoom = Boolean(myToken && !hostToken && gameId);
+  const previousGameId = gameId;
   const res = await fetch(`/api/games/${gid}/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: els.joinName.value.trim() || undefined }) });
   const data = await res.json();
   if (!res.ok) { showJoinError(`加入失败: ${data.error}`); refreshAvailableGames(); return; }
+  stopLobbyPolling();
   myToken = data.player.token;
   myPlayer = data.player.id;
   gameId = gid;
   hostToken = null;
   persistSession();
+  // 加入成功后清掉创建页签里旧房间的凭证与摘要，避免两套房间信息混在一起。
+  clearCreateRoomView();
+  if (hadHostedRoom) toast('已加入新房间，离开自己创建的房间（原房间仍留在等待列表）', 'info');
+  else if (hadJoinedRoom && gid !== previousGameId) toast('已切换到新房间，离开此前加入的房间（原房间仍保留）', 'info');
   const roomStatus = data.lobby?.phase === 'active' ? '加入成功，正在进入游戏…' : '加入成功，等待房主开始';
   if (els.joinRoomStatus) els.joinRoomStatus.textContent = roomStatus;
   els.joinPlayerToken.textContent = myToken;
@@ -2768,7 +2823,6 @@ els.btnCreateAgain?.addEventListener('click', () => {
   toast('已返回设置：点「创建新游戏」会新建一局', 'ok');
 });
 els.btnJoinAgain?.addEventListener('click', () => {
-  if (!window.confirm('当前已加入房间。返回大厅重新加入会切换到新的对局。')) return;
   setJoinRoomVisible(false);
   refreshAvailableGames();
 });
@@ -2850,6 +2904,7 @@ async function reconnectSavedSession() {
 
 function restoreLobbyView(lobby) {
   if (hostToken) {
+    clearJoinRoomView();
     els.createdGameId.textContent = gameId;
     els.createdHostToken.textContent = hostToken;
     els.createdToken.textContent = myToken || '未参战';
@@ -2858,6 +2913,7 @@ function restoreLobbyView(lobby) {
     setCreateRoomVisible(true);
     statusBadge('大厅中', 'idle');
   } else if (myToken) {
+    clearCreateRoomView();
     document.querySelector('.lobby-tab[data-tab="join"]')?.click();
     if (els.joinRoomStatus) els.joinRoomStatus.textContent = '已恢复大厅，等待房主开始';
     if (els.joinPlayerToken) els.joinPlayerToken.textContent = myToken;

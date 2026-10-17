@@ -391,6 +391,8 @@ describe('random map creation UI', () => {
       // 可选上下限作为输入框灰字（placeholder）直接可见，不再单独占一列「范围」。
       expect(html, `${param.key} 缺下限灰字`).toContain(`placeholder="≥${param.min}"`);
       expect(html, `${param.key} 缺上限灰字`).toContain(`placeholder="≤${param.max}"`);
+      // 固定挡的单个输入框灰字显示整段可选范围。
+      expect(html, `${param.key} 固定值缺范围灰字`).toContain(`placeholder="范围 ${param.min}–${param.max}"`);
     }
     // 独立的「范围」标签已移除：上下限只以输入框灰字呈现。
     expect(html).not.toContain('class="rmo-bounds"');

@@ -153,6 +153,8 @@
     // 参数行因此保持单行，行高与列宽都更紧凑。悬停仍给出「可选 / 默认」完整提示。
     const minHint = esc(`≥${param.min}`);
     const maxHint = esc(`≤${param.max}`);
+    // 固定挡只有一个输入框：灰字直接给出整段可选范围，避免只剩一个「默认」看不出能填多少。
+    const fixedHint = esc(`范围 ${param.min}–${param.max}`);
     return `<div class="rmo-param" data-key="${esc(param.key)}">
       <div class="rmo-param-head">
         <span class="rmo-param-label" title="${esc(hint)}">${label}</span>
@@ -167,7 +169,7 @@
           <input class="rmo-max" type="number" ${bounds} placeholder="${maxHint}" title="${esc(hint)}" aria-label="${label}最大值（可选 ${param.min}–${param.max}）" />
         </span>
         <span class="rmo-fixed-input hidden">
-          <input class="rmo-value" type="number" ${bounds} placeholder="默认" title="${esc(hint)}" aria-label="${label}固定值" />
+          <input class="rmo-value" type="number" ${bounds} placeholder="${fixedHint}" title="${esc(hint)}" aria-label="${label}固定值（可选 ${param.min}–${param.max}）" />
         </span>
       </div>
     </div>`;

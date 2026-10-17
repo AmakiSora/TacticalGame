@@ -99,10 +99,29 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
   const built = specs.map(makeRowStub);
   const rows = built.map(item => item.row);
   const allInputs = built.flatMap(item => Object.values(item.inputs));
+  // 先用同一份源码取分组定义，再按组造 section 桩（head 可点、body 记录展开态的 hidden）。
+  const bootstrap = loadUI();
+  const groupStubs = (bootstrap.GROUPS as Array<{ key: string; defaultOpen?: boolean }>).map(group => {
+    const expanded = group.defaultOpen !== false;
+    const head = stubElement({ tagName: 'BUTTON', dataset: { group: group.key } });
+    head.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    const body = stubElement({ tagName: 'DIV' });
+    if (!expanded) body.classList.add('hidden');
+    const section = stubElement({
+      dataset: { group: group.key },
+      querySelector: (selector: string) =>
+        selector === '.rmo-group-head' ? head : selector === '.rmo-group-body' ? body : null,
+    });
+    return { group, section, head, body };
+  });
+  const sections = groupStubs.map(item => item.section);
+  const groupsToggle = stubElement({ tagName: 'BUTTON', textContent: '全部展开' });
   const container = stubElement({
     innerHTML: '',
     querySelectorAll: (selector: string) => {
       if (selector === '.rmo-param') return rows;
+      if (selector === '.rmo-group') return sections;
+      if (selector === '.rmo-group-head') return groupStubs.map(item => item.head);
       // 与真实 DOM 口径一致：input, select 只命中表单元素，开关 SPAN 不在内。
       if (selector === 'input, select') {
         return allInputs.filter(el => el.tagName === 'INPUT' || el.tagName === 'SELECT');
@@ -115,6 +134,7 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
     'rmo-seed': stubElement({ value: '' }),
     'rmo-game-mode': stubElement({ value: mode }),
     'rmo-mode-hint': hint,
+    'rmo-groups-toggle': groupsToggle,
     'random-map-options': container,
   };
   const documentStub = {
@@ -126,11 +146,12 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
   vm.createContext(context);
   vm.runInContext(read('public/random-map-ui.js'), context);
   const ui = (context.window as { RandomMapUI: any }).RandomMapUI;
-  // 真跑一次 init：事件接线（模式切换、数字输入变化）都在这里挂上。
+  // 真跑一次 init：事件接线（折叠块、模式切换、数字输入变化）都在这里挂上。
   ui.init(container);
   const byKey = (key: string) => built.find(item => item.row.dataset.key === key)!;
   const hiddenOf = (key: string) => byKey(key).row.classList.contains('hidden');
-  return { ui, container, hint, rows, byKey, hiddenOf };
+  const groupOf = (key: string) => groupStubs.find(item => item.group.key === key)!;
+  return { ui, container, hint, rows, byKey, hiddenOf, groupOf, allGroups: groupStubs, groupsToggle };
 }
 
 /** 带最小 DOM 桩加载模块并渲染面板，返回面板 HTML。 */
@@ -265,6 +286,94 @@ describe('random map creation UI', () => {
     const simultaneousOptions = simultaneous.ui.collectRandomOptions();
     expect(simultaneousOptions.mode).toBe('simultaneous');
     for (const key of ARTILLERY_KEYS) expect(simultaneousOptions).not.toHaveProperty(key);
+  });
+
+  it('groups every parameter into collapsible sections', () => {
+    const ui = loadUI();
+    const groups = ui.GROUPS as Array<{ key: string; label: string; defaultOpen?: boolean }>;
+    expect(groups.map(group => group.key)).toEqual([
+      'map', 'economy', 'army', 'stats', 'combat', 'headquarters', 'artillery',
+    ]);
+    // 每项参数恰好属于一组（不重不漏），组内项数与设计一致（57 项）。
+    const membership = new Map<string, string>();
+    for (const param of ui.PARAMS as Array<{ key: string; group?: string }>) {
+      expect(param.group, `${param.key} 缺分组`).toBeTruthy();
+      expect(membership.has(param.key), `${param.key} 重复参数`).toBe(false);
+      membership.set(param.key, param.group as string);
+    }
+    expect(new Set(membership.values())).toEqual(new Set(groups.map(group => group.key)));
+    const counts: Record<string, number> = {};
+    for (const group of groups) {
+      counts[group.key] = (ui.PARAMS as Array<{ group: string }>)
+        .filter(param => param.group === group.key).length;
+    }
+    expect(counts).toEqual({ map: 4, economy: 7, army: 5, stats: 32, combat: 3, headquarters: 2, artillery: 4 });
+
+    // 面板 HTML：每组一个折叠块，块头带 aria 属性与项数，参数行都渲染在自己组内。
+    const html = capturePanelHtml('standard');
+    const sections = html.split('<section class="rmo-group"');
+    for (const group of groups) {
+      expect(html, `${group.key} 缺分组块`).toContain(`class="rmo-group" data-group="${group.key}"`);
+      expect(html, `${group.key} 缺 aria-controls`).toContain(`aria-controls="rmo-group-${group.key}"`);
+      const block = sections.find(part => part.startsWith(` data-group="${group.key}"`)) ?? '';
+      for (const param of (ui.PARAMS as Array<{ key: string; group: string }>)
+        .filter(item => item.group === group.key)) {
+        expect(block, `${param.key} 不在 ${group.key} 组内`).toContain(`data-key="${param.key}"`);
+      }
+    }
+    expect(html).toContain('id="rmo-groups-toggle"');
+    // 只有 32 项的「兵种属性」默认收起，其余组默认展开。
+    expect(html).toContain('class="rmo-group-body rmo-grid hidden" id="rmo-group-stats"');
+    expect(html).toContain('aria-expanded="true" aria-controls="rmo-group-map"');
+    expect(html).toContain('aria-expanded="false" aria-controls="rmo-group-stats"');
+    // 兵种属性组内按兵种分小标题。
+    for (const label of ['步兵', '侦察兵', '重装', '远程兵', '辅助']) {
+      expect(html, `缺 ${label} 小标题`).toContain(`class="rmo-subgroup-label" data-subgroup="${label}"`);
+    }
+  });
+
+  it('collapses and expands parameter groups without dropping their values', () => {
+    const scoped = loadUIWithDom('standard', [
+      { key: 'radius', min: '6', max: '9' },
+      { key: 'damageVarianceRange', mode: 'fixed', value: '5' },
+    ]);
+    const stats = scoped.groupOf('stats');
+    // 兵种属性默认收起；点组头展开，再点一次收起。
+    expect(stats.head.getAttribute('aria-expanded')).toBe('false');
+    expect(stats.body.classList.contains('hidden')).toBe(true);
+    expect(stats.head.fire('click'), '组标题没挂 click 监听').toBeGreaterThan(0);
+    expect(stats.head.getAttribute('aria-expanded')).toBe('true');
+    expect(stats.body.classList.contains('hidden')).toBe(false);
+    stats.head.fire('click');
+    expect(stats.head.getAttribute('aria-expanded')).toBe('false');
+    // 收起只是视图状态：组内参数照常提交。
+    expect(scoped.ui.collectRandomOptions().damageVarianceRange).toBe(5);
+    // 「全部展开 / 全部收起」：按钮文案跟随状态，所有组同步切换。
+    expect(scoped.groupsToggle.textContent).toBe('全部展开');
+    expect(scoped.groupsToggle.fire('click'), '全部展开按钮没挂 click 监听').toBeGreaterThan(0);
+    for (const item of scoped.allGroups) {
+      expect(item.head.getAttribute('aria-expanded'), `${item.group.key} 未展开`).toBe('true');
+      expect(item.body.classList.contains('hidden'), `${item.group.key} 仍收起`).toBe(false);
+    }
+    expect(scoped.groupsToggle.textContent).toBe('全部收起');
+    scoped.groupsToggle.fire('click');
+    expect(scoped.groupsToggle.textContent).toBe('全部展开');
+    for (const item of scoped.allGroups) {
+      expect(item.head.getAttribute('aria-expanded'), `${item.group.key} 未收起`).toBe('false');
+    }
+  });
+
+  it('hides whole mode-specific groups instead of leaving empty headers', () => {
+    const groupHidden = (scoped: ReturnType<typeof loadUIWithDom>, key: string) =>
+      scoped.groupOf(key).section.classList.contains('hidden');
+    const standard = loadUIWithDom('standard', []);
+    expect(groupHidden(standard, 'artillery'), '标准模式不应出现炮火组').toBe(true);
+    expect(groupHidden(standard, 'headquarters')).toBe(false);
+    expect(groupHidden(standard, 'stats')).toBe(false);
+    const annihilation = loadUIWithDom('annihilation', []);
+    expect(groupHidden(annihilation, 'artillery')).toBe(false);
+    expect(groupHidden(annihilation, 'headquarters'), '歼灭模式不应出现总部组').toBe(true);
+    expect(groupHidden(annihilation, 'map')).toBe(false);
   });
 
   it('renders number inputs that show the server bounds on every parameter', async () => {
@@ -448,6 +557,9 @@ describe('random map creation UI', () => {
       const css = read(path);
       expect(css, `${path} 缺 .rmo-mode-hint 样式`).toContain('.rmo-mode-hint');
       expect(css, `${path} 缺 .hidden 工具类`).toContain('.hidden');
+      // 分组折叠块与兵种小标题两端都要有样式，否则其中一端会退化成一条长列表。
+      expect(css, `${path} 缺 .rmo-group 样式`).toContain('.rmo-group');
+      expect(css, `${path} 缺 .rmo-subgroup-label 样式`).toContain('.rmo-subgroup-label');
     }
   });
 

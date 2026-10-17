@@ -16,69 +16,87 @@
   // 标量 2/2/1/1、战斗波动默认固定 3/6、兵种属性默认围绕基准值抖动，这些行 defMin=defMax
   // 或不完全等于抖动区间，均只作提示）。两份数值由 tests/public/random-map-ui.test.ts 对齐校验，避免前后端漂移。
   const PARAMS = [
-    { key: 'radius', label: '地图半径', step: 1, min: 4, max: 12, defMin: 5, defMax: 10 },
-    { key: 'waterDensity', label: '水域密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.07 },
-    { key: 'wallDensity', label: '阻挡密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.05 },
-    { key: 'controlPointCount', label: '据点数量', step: 1, min: 1, max: 24, defMin: 2, defMax: 6 },
-    { key: 'maxTurns', label: '最大回合数', step: 1, min: 1, max: 99, defMin: 10, defMax: 30 },
-    { key: 'actionsPerTurn', label: '每回合行动点', step: 1, min: 1, max: 20, defMin: 1, defMax: 8 },
-    { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, min: 0, max: 0.5, defMin: 0, defMax: 0.25 },
-    { key: 'startingSupplies', label: '初始补给', step: 5, min: 0, max: 9999, defMin: 20, defMax: 220 },
-    { key: 'baseIncome', label: '基础收入', step: 1, min: 0, max: 999, defMin: 6, defMax: 14 },
+    { key: 'radius', label: '地图半径', step: 1, min: 4, max: 12, defMin: 5, defMax: 10, group: 'map' },
+    { key: 'waterDensity', label: '水域密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.07, group: 'map' },
+    { key: 'wallDensity', label: '阻挡密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.05, group: 'map' },
+    { key: 'controlPointCount', label: '据点数量', step: 1, min: 1, max: 24, defMin: 2, defMax: 6, group: 'map' },
+    { key: 'maxTurns', label: '最大回合数', step: 1, min: 1, max: 99, defMin: 10, defMax: 30, group: 'economy' },
+    { key: 'actionsPerTurn', label: '每回合行动点', step: 1, min: 1, max: 20, defMin: 1, defMax: 8, group: 'economy' },
+    { key: 'startingSupplies', label: '初始补给', step: 5, min: 0, max: 9999, defMin: 20, defMax: 220, group: 'economy' },
+    { key: 'baseIncome', label: '基础收入', step: 1, min: 0, max: 999, defMin: 6, defMax: 14, group: 'economy' },
     // 经济：三类据点的每回合收入（前哨部署折扣 8、维修站修复量 10 仍固定，不开放）。
-    { key: 'supplyIncome', label: '补给站收入', step: 1, min: 0, max: 40, defMin: 8, defMax: 20 },
-    { key: 'forwardBaseIncome', label: '前哨基地收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8 },
-    { key: 'repairIncome', label: '维修站收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8 },
-    { key: 'startingUnitCount', label: '初始单位数', step: 1, min: 0, max: 6, defMin: 0, defMax: 4 },
+    { key: 'supplyIncome', label: '补给站收入', step: 1, min: 0, max: 40, defMin: 8, defMax: 20, group: 'economy' },
+    { key: 'forwardBaseIncome', label: '前哨基地收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8, group: 'economy' },
+    { key: 'repairIncome', label: '维修站收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8, group: 'economy' },
+    { key: 'startingUnitCount', label: '初始单位数', step: 1, min: 0, max: 6, defMin: 0, defMax: 4, group: 'army' },
     // 初始兵种权重（相对权重，0-10；留空＝默认 2/2/1/1；全 0 回退旧均匀池）。support 不设权重。
-    { key: 'startingWeightInfantry', label: '步兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2 },
-    { key: 'startingWeightScout', label: '侦察兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2 },
-    { key: 'startingWeightHeavy', label: '重装权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1 },
-    { key: 'startingWeightRanger', label: '远程兵权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1 },
+    { key: 'startingWeightInfantry', label: '步兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2, group: 'army' },
+    { key: 'startingWeightScout', label: '侦察兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2, group: 'army' },
+    { key: 'startingWeightHeavy', label: '重装权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1, group: 'army' },
+    { key: 'startingWeightRanger', label: '远程兵权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1, group: 'army' },
     // 兵种属性（按兵种覆盖）：标量＝精确值、区间＝区间内随机；留空＝围绕基准值按兵种数值浮动抖动。
-    // 两方共用同一套数值，改动对双方同时生效。
-    { key: 'infantryHp', label: '步兵血量', step: 1, min: 10, max: 999, defMin: 100, defMax: 100 },
-    { key: 'infantryAttack', label: '步兵攻击', step: 1, min: 1, max: 200, defMin: 30, defMax: 30 },
-    { key: 'infantryDefense', label: '步兵防御', step: 1, min: 0, max: 99, defMin: 8, defMax: 8 },
-    { key: 'infantryMoveRange', label: '步兵移动力', step: 1, min: 1, max: 10, defMin: 3, defMax: 3 },
-    { key: 'infantryAttackRange', label: '步兵射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1 },
-    { key: 'infantryCost', label: '步兵造价', step: 1, min: 5, max: 999, defMin: 45, defMax: 45 },
-    { key: 'scoutHp', label: '侦察兵血量', step: 1, min: 10, max: 999, defMin: 65, defMax: 65 },
-    { key: 'scoutAttack', label: '侦察兵攻击', step: 1, min: 1, max: 200, defMin: 16, defMax: 16 },
-    { key: 'scoutDefense', label: '侦察兵防御', step: 1, min: 0, max: 99, defMin: 4, defMax: 4 },
-    { key: 'scoutMoveRange', label: '侦察兵移动力', step: 1, min: 1, max: 10, defMin: 5, defMax: 5 },
-    { key: 'scoutAttackRange', label: '侦察兵射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1 },
-    { key: 'scoutCost', label: '侦察兵造价', step: 1, min: 5, max: 999, defMin: 38, defMax: 38 },
-    { key: 'heavyHp', label: '重装血量', step: 1, min: 10, max: 999, defMin: 150, defMax: 150 },
-    { key: 'heavyAttack', label: '重装攻击', step: 1, min: 1, max: 200, defMin: 38, defMax: 38 },
-    { key: 'heavyDefense', label: '重装防御', step: 1, min: 0, max: 99, defMin: 13, defMax: 13 },
-    { key: 'heavyMoveRange', label: '重装移动力', step: 1, min: 1, max: 10, defMin: 2, defMax: 2 },
-    { key: 'heavyAttackRange', label: '重装射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1 },
-    { key: 'heavyCost', label: '重装造价', step: 1, min: 5, max: 999, defMin: 92, defMax: 92 },
-    { key: 'rangerHp', label: '远程兵血量', step: 1, min: 10, max: 999, defMin: 72, defMax: 72 },
-    { key: 'rangerAttack', label: '远程兵攻击', step: 1, min: 1, max: 200, defMin: 44, defMax: 44 },
-    { key: 'rangerDefense', label: '远程兵防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 3 },
-    { key: 'rangerMoveRange', label: '远程兵移动力', step: 1, min: 1, max: 10, defMin: 2, defMax: 2 },
-    { key: 'rangerAttackRange', label: '远程兵射程', step: 1, min: 1, max: 10, defMin: 3, defMax: 3 },
-    { key: 'rangerCost', label: '远程兵造价', step: 1, min: 5, max: 999, defMin: 78, defMax: 78 },
-    { key: 'supportHp', label: '辅助血量', step: 1, min: 10, max: 999, defMin: 82, defMax: 82 },
-    { key: 'supportAttack', label: '辅助攻击', step: 1, min: 1, max: 200, defMin: 10, defMax: 10 },
-    { key: 'supportDefense', label: '辅助防御', step: 1, min: 0, max: 99, defMin: 5, defMax: 5 },
-    { key: 'supportMoveRange', label: '辅助移动力', step: 1, min: 1, max: 10, defMin: 3, defMax: 3 },
-    { key: 'supportAttackRange', label: '辅助射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1 },
-    { key: 'supportCost', label: '辅助造价', step: 1, min: 5, max: 999, defMin: 60, defMax: 60 },
-    { key: 'supportHealPower', label: '辅助治疗量', step: 1, min: 0, max: 99, defMin: 22, defMax: 22 },
+    // 两方共用同一套数值，改动对双方同时生效。组内按兵种分小标题。
+    { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, min: 0, max: 0.5, defMin: 0, defMax: 0.25, group: 'stats' },
+    { key: 'infantryHp', label: '步兵血量', step: 1, min: 10, max: 999, defMin: 100, defMax: 100, group: 'stats', subgroup: '步兵' },
+    { key: 'infantryAttack', label: '步兵攻击', step: 1, min: 1, max: 200, defMin: 30, defMax: 30, group: 'stats', subgroup: '步兵' },
+    { key: 'infantryDefense', label: '步兵防御', step: 1, min: 0, max: 99, defMin: 8, defMax: 8, group: 'stats', subgroup: '步兵' },
+    { key: 'infantryMoveRange', label: '步兵移动力', step: 1, min: 1, max: 10, defMin: 3, defMax: 3, group: 'stats', subgroup: '步兵' },
+    { key: 'infantryAttackRange', label: '步兵射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1, group: 'stats', subgroup: '步兵' },
+    { key: 'infantryCost', label: '步兵造价', step: 1, min: 5, max: 999, defMin: 45, defMax: 45, group: 'stats', subgroup: '步兵' },
+    { key: 'scoutHp', label: '侦察兵血量', step: 1, min: 10, max: 999, defMin: 65, defMax: 65, group: 'stats', subgroup: '侦察兵' },
+    { key: 'scoutAttack', label: '侦察兵攻击', step: 1, min: 1, max: 200, defMin: 16, defMax: 16, group: 'stats', subgroup: '侦察兵' },
+    { key: 'scoutDefense', label: '侦察兵防御', step: 1, min: 0, max: 99, defMin: 4, defMax: 4, group: 'stats', subgroup: '侦察兵' },
+    { key: 'scoutMoveRange', label: '侦察兵移动力', step: 1, min: 1, max: 10, defMin: 5, defMax: 5, group: 'stats', subgroup: '侦察兵' },
+    { key: 'scoutAttackRange', label: '侦察兵射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1, group: 'stats', subgroup: '侦察兵' },
+    { key: 'scoutCost', label: '侦察兵造价', step: 1, min: 5, max: 999, defMin: 38, defMax: 38, group: 'stats', subgroup: '侦察兵' },
+    { key: 'heavyHp', label: '重装血量', step: 1, min: 10, max: 999, defMin: 150, defMax: 150, group: 'stats', subgroup: '重装' },
+    { key: 'heavyAttack', label: '重装攻击', step: 1, min: 1, max: 200, defMin: 38, defMax: 38, group: 'stats', subgroup: '重装' },
+    { key: 'heavyDefense', label: '重装防御', step: 1, min: 0, max: 99, defMin: 13, defMax: 13, group: 'stats', subgroup: '重装' },
+    { key: 'heavyMoveRange', label: '重装移动力', step: 1, min: 1, max: 10, defMin: 2, defMax: 2, group: 'stats', subgroup: '重装' },
+    { key: 'heavyAttackRange', label: '重装射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1, group: 'stats', subgroup: '重装' },
+    { key: 'heavyCost', label: '重装造价', step: 1, min: 5, max: 999, defMin: 92, defMax: 92, group: 'stats', subgroup: '重装' },
+    { key: 'rangerHp', label: '远程兵血量', step: 1, min: 10, max: 999, defMin: 72, defMax: 72, group: 'stats', subgroup: '远程兵' },
+    { key: 'rangerAttack', label: '远程兵攻击', step: 1, min: 1, max: 200, defMin: 44, defMax: 44, group: 'stats', subgroup: '远程兵' },
+    { key: 'rangerDefense', label: '远程兵防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 3, group: 'stats', subgroup: '远程兵' },
+    { key: 'rangerMoveRange', label: '远程兵移动力', step: 1, min: 1, max: 10, defMin: 2, defMax: 2, group: 'stats', subgroup: '远程兵' },
+    { key: 'rangerAttackRange', label: '远程兵射程', step: 1, min: 1, max: 10, defMin: 3, defMax: 3, group: 'stats', subgroup: '远程兵' },
+    { key: 'rangerCost', label: '远程兵造价', step: 1, min: 5, max: 999, defMin: 78, defMax: 78, group: 'stats', subgroup: '远程兵' },
+    { key: 'supportHp', label: '辅助血量', step: 1, min: 10, max: 999, defMin: 82, defMax: 82, group: 'stats', subgroup: '辅助' },
+    { key: 'supportAttack', label: '辅助攻击', step: 1, min: 1, max: 200, defMin: 10, defMax: 10, group: 'stats', subgroup: '辅助' },
+    { key: 'supportDefense', label: '辅助防御', step: 1, min: 0, max: 99, defMin: 5, defMax: 5, group: 'stats', subgroup: '辅助' },
+    { key: 'supportMoveRange', label: '辅助移动力', step: 1, min: 1, max: 10, defMin: 3, defMax: 3, group: 'stats', subgroup: '辅助' },
+    { key: 'supportAttackRange', label: '辅助射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1, group: 'stats', subgroup: '辅助' },
+    { key: 'supportCost', label: '辅助造价', step: 1, min: 5, max: 999, defMin: 60, defMax: 60, group: 'stats', subgroup: '辅助' },
+    { key: 'supportHealPower', label: '辅助治疗量', step: 1, min: 0, max: 99, defMin: 22, defMax: 22, group: 'stats', subgroup: '辅助' },
     // 战斗波动（省略＝固定 3/6）与裁决计分（只开放军队价值权重，补给恒 0）。
-    { key: 'damageVarianceRange', label: '伤害波动幅度', step: 1, min: 0, max: 20, defMin: 3, defMax: 3 },
-    { key: 'healVarianceRange', label: '治疗波动幅度', step: 1, min: 0, max: 20, defMin: 6, defMax: 6 },
-    { key: 'adjudicationArmyValue', label: '裁决军队分权重', step: 1, min: 0, max: 10, defMin: 1, defMax: 2 },
-    { key: 'headquartersHp', label: '总部血量', step: 10, min: 1, max: 9999, defMin: 80, defMax: 240, modes: HEADQUARTERS_MODES },
-    { key: 'headquartersDefense', label: '总部防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 10, modes: HEADQUARTERS_MODES },
-    { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, min: 1, max: 10, defMin: 3, defMax: 8, modes: ARTILLERY_MODES },
-    { key: 'artilleryIntervalRounds', label: '炮击间隔', step: 1, min: 1, max: 3, defMin: 1, defMax: 2, modes: ARTILLERY_MODES },
-    { key: 'artilleryDamage', label: '炮击伤害', step: 1, min: 5, max: 30, defMin: 10, defMax: 25, modes: ARTILLERY_MODES },
-    { key: 'artilleryMinimumSafeRadius', label: '安全区最小半径', step: 1, min: 0, max: 3, defMin: 0, defMax: 1, modes: ARTILLERY_MODES },
+    { key: 'damageVarianceRange', label: '伤害波动幅度', step: 1, min: 0, max: 20, defMin: 3, defMax: 3, group: 'combat' },
+    { key: 'healVarianceRange', label: '治疗波动幅度', step: 1, min: 0, max: 20, defMin: 6, defMax: 6, group: 'combat' },
+    { key: 'adjudicationArmyValue', label: '裁决军队分权重', step: 1, min: 0, max: 10, defMin: 1, defMax: 2, group: 'combat' },
+    { key: 'headquartersHp', label: '总部血量', step: 10, min: 1, max: 9999, defMin: 80, defMax: 240, group: 'headquarters', modes: HEADQUARTERS_MODES },
+    { key: 'headquartersDefense', label: '总部防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 10, group: 'headquarters', modes: HEADQUARTERS_MODES },
+    { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, min: 1, max: 10, defMin: 3, defMax: 8, group: 'artillery', modes: ARTILLERY_MODES },
+    { key: 'artilleryIntervalRounds', label: '炮击间隔', step: 1, min: 1, max: 3, defMin: 1, defMax: 2, group: 'artillery', modes: ARTILLERY_MODES },
+    { key: 'artilleryDamage', label: '炮击伤害', step: 1, min: 5, max: 30, defMin: 10, defMax: 25, group: 'artillery', modes: ARTILLERY_MODES },
+    { key: 'artilleryMinimumSafeRadius', label: '安全区最小半径', step: 1, min: 0, max: 3, defMin: 0, defMax: 1, group: 'artillery', modes: ARTILLERY_MODES },
   ];
+
+  // 折叠块分组：顺序即面板显示顺序；组与参数的 modes 同源（整组随参数自动显隐，不留空标题）。
+  // defaultOpen 只决定首屏展开态——32 项的「兵种属性」默认收起，其余常用组展开。
+  // 折叠只是视图状态：收起组里的参数照常提交，不影响预览与建局。
+  const GROUPS = [
+    { key: 'map', label: '地图与据点', defaultOpen: true },
+    { key: 'economy', label: '对局与经济', defaultOpen: true },
+    { key: 'army', label: '初始军队', defaultOpen: true },
+    { key: 'stats', label: '兵种属性', defaultOpen: false },
+    { key: 'combat', label: '战斗与裁决', defaultOpen: true },
+    { key: 'headquarters', label: '总部', defaultOpen: true },
+    { key: 'artillery', label: '炮火', defaultOpen: true },
+  ];
+
+  /** 某分组下的参数（顺序与 PARAMS 一致）。 */
+  function groupParams(groupKey) {
+    return PARAMS.filter(param => param.group === groupKey);
+  }
 
   // 模式取值与后端 GameMode 一一对应：每个模式只出现一次，不再保留「空值＝服务端默认标准」
   // 的第二条标准项——两个选项指向同一模式会让用户以为有什么区别。
@@ -152,11 +170,40 @@
     </div>`;
   }
 
+  /** 组内参数行；带 subgroup 的参数在兵种切换处插入一条小标题。 */
+  function groupRowsHtml(groupKey) {
+    const params = groupParams(groupKey);
+    return params.map((param, index) => {
+      const previous = params[index - 1];
+      const label = param.subgroup && param.subgroup !== (previous && previous.subgroup)
+        ? `<div class="rmo-subgroup-label" data-subgroup="${esc(param.subgroup)}">${esc(param.subgroup)}</div>`
+        : '';
+      return label + paramRowHtml(param);
+    }).join('');
+  }
+
+  /** 一个折叠块：标题行（按钮，可点）＋ 组体（沿用 .rmo-grid 的列规则）。 */
+  function groupSectionHtml(group) {
+    const expanded = group.defaultOpen !== false;
+    const count = groupParams(group.key).length;
+    return `<section class="rmo-group" data-group="${esc(group.key)}">
+      <button type="button" class="rmo-group-head" aria-expanded="${expanded}" aria-controls="rmo-group-${esc(group.key)}">
+        <span class="rmo-group-title">${esc(group.label)}</span>
+        <span class="rmo-group-count">${count} 项</span>
+        <span class="rmo-group-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="rmo-group-body rmo-grid${expanded ? '' : ' hidden'}" id="rmo-group-${esc(group.key)}">
+        ${groupRowsHtml(group.key)}
+      </div>
+    </section>`;
+  }
+
   function panelHtml() {
     return `
       <div class="rmo-head">
         <span class="rmo-title">随机地图参数</span>
         <span class="rmo-hint">留空项由服务端在默认范围内随机</span>
+        <button type="button" id="rmo-groups-toggle" class="rmo-groups-toggle">全部展开</button>
       </div>
       <div class="rmo-row">
         <label class="field checkbox-field rmo-symmetric-field">
@@ -178,8 +225,8 @@
         </div>
       </div>
       <div class="rmo-mode-hint" id="rmo-mode-hint"></div>
-      <div class="rmo-grid">
-        ${PARAMS.map(paramRowHtml).join('')}
+      <div class="rmo-groups">
+        ${GROUPS.map(groupSectionHtml).join('')}
       </div>
       <div class="rmo-preview">
         <div class="rmo-preview-head">
@@ -224,6 +271,7 @@
   const RandomMapUI = {
     RANDOM_MAP_ID,
     PARAMS,
+    GROUPS,
     GAME_MODES,
     renderRandomMapCard,
     paramsForMode,
@@ -232,6 +280,24 @@
      * 外部调用无副作用（测试与旧调用方可能仍引用此名字）。
      */
     refreshSliders() {},
+
+    /** 展开/收起单个分组（折叠只是视图状态，收起组里的参数仍照常提交）。 */
+    setGroupExpanded(section, expanded) {
+      if (!section) return;
+      const head = section.querySelector('.rmo-group-head');
+      const body = section.querySelector('.rmo-group-body');
+      if (head) head.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      if (body) body.classList.toggle('hidden', !expanded);
+    },
+
+    /** 同步「全部展开/收起」按钮文案：还有收起的分组时显示「全部展开」。 */
+    syncGroupsToggle(container) {
+      const button = document.getElementById('rmo-groups-toggle');
+      if (!button) return;
+      const heads = container ? container.querySelectorAll('.rmo-group-head') : [];
+      const anyCollapsed = Array.from(heads).some(head => head.getAttribute('aria-expanded') === 'false');
+      button.textContent = anyCollapsed ? '全部展开' : '全部收起';
+    },
 
     previewRenderer: null,
     previewToken: 0,
@@ -252,6 +318,23 @@
       initializedPanels.add(container);
       container.innerHTML = panelHtml();
       RandomMapUI.applyModeVisibility(container);
+      // 折叠块接线：组标题按钮切换本组展开态，「全部展开/收起」统一切换所有组。
+      container.querySelectorAll('.rmo-group').forEach(section => {
+        const head = section.querySelector('.rmo-group-head');
+        head?.addEventListener('click', () => {
+          const expanded = head.getAttribute('aria-expanded') !== 'false';
+          RandomMapUI.setGroupExpanded(section, !expanded);
+          RandomMapUI.syncGroupsToggle(container);
+        });
+      });
+      document.getElementById('rmo-groups-toggle')?.addEventListener('click', () => {
+        const sections = Array.from(container.querySelectorAll('.rmo-group'));
+        const anyCollapsed = sections.some(section =>
+          section.querySelector('.rmo-group-head')?.getAttribute('aria-expanded') === 'false');
+        sections.forEach(section => RandomMapUI.setGroupExpanded(section, anyCollapsed));
+        RandomMapUI.syncGroupsToggle(container);
+      });
+      RandomMapUI.syncGroupsToggle(container);
       document.getElementById('rmo-game-mode')?.addEventListener('change', () => {
         RandomMapUI.applyModeVisibility(container);
         RandomMapUI.schedulePreview();
@@ -304,6 +387,15 @@
       const root = container || document.getElementById('random-map-options');
       if (!root) return;
       const mode = effectiveMode(document.getElementById('rmo-game-mode')?.value);
+      // 组级显隐：整组参数都不适用于当前模式时收起整块，避免只剩一个空标题
+      // （例如标准模式没有炮火组）。组与行共用同一份 modes 判断，不会两份口径漂移。
+      root.querySelectorAll('.rmo-group').forEach(section => {
+        const group = GROUPS.find(item => item.key === section.dataset.group);
+        const applicable = group
+          ? groupParams(group.key).some(param => paramAppliesToMode(param, mode))
+          : true;
+        section.classList.toggle('hidden', !applicable);
+      });
       root.querySelectorAll('.rmo-param').forEach(row => {
         const param = PARAMS.find(item => item.key === row.dataset.key);
         if (!param) return;

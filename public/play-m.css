@@ -2173,6 +2173,86 @@ body.player-m-shell .bot-prompt-textarea { min-height: 180px; font-size: 11px; }
   color: #668495;
   font-size: 12px;
 }
+/* 参数分组折叠块：组标题可点，组体沿用 .rmo-grid 的列规则；「全部展开/收起」按钮在面板头部。 */
+.rmo-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rmo-group {
+  border: 1px solid #223342;
+  border-radius: 8px;
+  background: #0c151d;
+  overflow: hidden;
+}
+.rmo-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  background: #121d27;
+  color: #d8e0e8;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.rmo-group-head:hover {
+  background: #16232e;
+}
+.rmo-group-head:focus-visible {
+  outline: 1px solid #d6b34a;
+  outline-offset: -1px;
+}
+.rmo-group-title {
+  flex: 1;
+}
+.rmo-group-count {
+  color: #668495;
+  font-size: 11px;
+  font-weight: 400;
+}
+.rmo-group-chevron {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #668495;
+  border-bottom: 2px solid #668495;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.rmo-group-head[aria-expanded='false'] .rmo-group-chevron {
+  transform: rotate(-45deg);
+}
+.rmo-group-body {
+  padding: 9px;
+}
+.rmo-groups-toggle {
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid #2a3a4a;
+  border-radius: 5px;
+  background: #0b1218;
+  color: #a9bdc9;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.rmo-groups-toggle:hover {
+  border-color: #d6b34a;
+  color: #e4edf4;
+}
+.rmo-subgroup-label {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  color: #668495;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
 .map-card-random .map-preview {
   font-size: 34px;
   font-weight: 800;

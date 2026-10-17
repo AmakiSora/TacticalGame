@@ -97,6 +97,26 @@ describe('spectator and player page optimization', () => {
     }
   });
 
+  it('renders initial units on map previews', () => {
+    // 回归：预览数据一直带着 spawnSlots[].startingUnits（type/q/r），但渲染器从未画出来，
+    // 看地图预览时不知道初始单位落在哪里。小圆点标在单位实际落格（总部邻格）上，按兵种配色。
+    for (const path of ['public/play.js', 'public/play-m.js']) {
+      const source = read(path);
+      // spawnSlots 组装要携带 startingUnits（`...slot.headquarters` 会覆盖同名键，单位数据必须先展开进去）。
+      expect(source, `${path} 未携带初始单位数据`).toContain('startingUnits: slot.startingUnits');
+      expect(source, `${path} 缺初始单位标记`).toContain('preview-marker unit unit-');
+      expect(source, `${path} 初始单位未标兵种`).toContain('初始单位');
+      // support 兵种不会作为初始单位产出，渲染时要过滤掉。
+      expect(source, `${path} 缺兵种过滤`).toContain("unit.type !== 'infantry' && unit.type !== 'scout'");
+    }
+    for (const path of ['public/play.css', 'public/play-m.css']) {
+      const css = read(path);
+      for (const unitType of ['infantry', 'scout', 'heavy', 'ranger']) {
+        expect(css, `${path} 缺 unit-${unitType} 配色`).toContain(`.preview-marker.unit-${unitType}`);
+      }
+    }
+  });
+
   it('stacks create name above full-width map selection', () => {
     const html = read('public/play.html');
     const css = read('public/play.css');

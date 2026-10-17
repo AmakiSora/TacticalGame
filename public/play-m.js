@@ -432,6 +432,7 @@ function renderMapPreview(preview) {
     id: slot.id,
     index,
     controlPointId: slot.controlPointId,
+    startingUnits: slot.startingUnits,
     ...slot.headquarters,
   }));
   const legacyHeadquarters = Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, controlPointId: undefined, ...pos }));
@@ -444,10 +445,23 @@ function renderMapPreview(preview) {
     }
     return `<rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"><title>${title}</title></rect>`;
   }).join('');
+  // 初始单位：预览数据一直带着 spawnSlots[].startingUnits（type/q/r），此前没画出来；
+  // 小圆点标在单位实际落格（总部邻格）上，颜色按兵种区分，悬停看兵种与所属出生位。
+  // 旧版 headquarters 兜底路径没有单位数据，自然为空。
+  const startingUnits = starts
+    .flatMap(slot => (slot.startingUnits || []).map(unit => ({ slot, unit })))
+    .map(({ slot, unit }) => {
+      // 只画初始兵种（步兵 / 侦察兵 / 重装 / 远程兵），support 等不会作为初始单位出现。
+      if (unit.type !== 'infantry' && unit.type !== 'scout' && unit.type !== 'heavy' && unit.type !== 'ranger') return '';
+      const p = point(unit);
+      const title = esc(`${slot.id} · 初始单位 ${UNIT_NAMES[unit.type] || unit.type}`);
+      return `<circle class="preview-marker unit unit-${unit.type}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.2"><title>${title}</title></circle>`;
+    })
+    .join('');
 
   return `<div class="map-preview" aria-hidden="true">
     <svg viewBox="0 0 ${width} ${height}" role="img" focusable="false">
-      ${hexes}${controlPoints}${headquarters}
+      ${hexes}${controlPoints}${headquarters}${startingUnits}
     </svg>
   </div>`;
 }

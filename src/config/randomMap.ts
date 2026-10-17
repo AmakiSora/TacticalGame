@@ -25,6 +25,13 @@ export interface RandomMapOptions {
   /** 无回合上限（默认 false）。true = 只靠淘汰或强制裁决收尾；省略时按 maxTurns 正常裁定。 */
   noTurnLimit?: boolean;
   /**
+   * 补给站 / 前哨基地 / 维修站能否作为部署起点（默认 true）。false = 该类据点不可部署，
+   * 与静态图 `controlPointTypes.<kind>.canDeploy` 同义（molten-throne 就禁掉了补给站与维修站）。
+   */
+  supplyCanDeploy?: boolean;
+  forwardBaseCanDeploy?: boolean;
+  repairCanDeploy?: boolean;
+  /**
    * 旋转对称公平模式，默认 true。取 360/n 与六边形网格自映射角（60° 整数倍）的最小公倍角：
    * 2/4/8 人 → 180°、3 人 → 120°、6 人 → 60°；5/7 人无对称解，如实降级为非对称。
    */
@@ -353,21 +360,24 @@ function sampleControlPointTypes(
     repair?: RandomParam;
     forwardBaseDeployDiscount?: RandomParam;
     repairAmount?: RandomParam;
+    supplyCanDeploy?: boolean;
+    forwardBaseCanDeploy?: boolean;
+    repairCanDeploy?: boolean;
   } = {},
 ) {
   return {
-    supply: { income: resolveSampledIntParam(config.supply, 8, 20, rng), deployDiscount: 0, repairAmount: 0, canDeploy: true },
+    supply: { income: resolveSampledIntParam(config.supply, 8, 20, rng), deployDiscount: 0, repairAmount: 0, canDeploy: config.supplyCanDeploy !== false },
     forward_base: {
       income: resolveSampledIntParam(config.forwardBase, 0, 8, rng),
       deployDiscount: resolveFixedIntParam(config.forwardBaseDeployDiscount, 8, rng),
       repairAmount: 0,
-      canDeploy: true,
+      canDeploy: config.forwardBaseCanDeploy !== false,
     },
     repair: {
       income: resolveSampledIntParam(config.repair, 0, 8, rng),
       deployDiscount: 0,
       repairAmount: resolveFixedIntParam(config.repairAmount, 10, rng),
-      canDeploy: true,
+      canDeploy: config.repairCanDeploy !== false,
     },
   };
 }
@@ -418,7 +428,7 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
       throw new Error('random.seed must be a number or string');
     }
   }
-  for (const key of ['symmetric', 'deployFromHq', 'noTurnLimit'] as const) {
+  for (const key of ['symmetric', 'deployFromHq', 'noTurnLimit', 'supplyCanDeploy', 'forwardBaseCanDeploy', 'repairCanDeploy'] as const) {
     const value = raw[key];
     if (value === undefined) continue;
     if (typeof value !== 'boolean') throw new Error(`random.${key} must be boolean`);
@@ -435,13 +445,17 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
   for (const [key, bound] of Object.entries(PARAM_BOUNDS)) {
     const value = raw[key];
     if (value === undefined) continue;
-    options[key as Exclude<keyof RandomMapOptions, 'seed' | 'symmetric' | 'mode' | 'deployFromHq' | 'noTurnLimit'>] = sanitizeParam(key, value, bound);
+    options[key as Exclude<keyof RandomMapOptions, 'seed' | 'symmetric' | 'mode' | 'deployFromHq' | 'noTurnLimit' | 'supplyCanDeploy' | 'forwardBaseCanDeploy' | 'repairCanDeploy'>] = sanitizeParam(key, value, bound);
   }
 
   // 兼容旧的合并地形密度：仅在未显式给出 waterDensity / wallDensity 时生效，按 60/40 拆分。
   splitLegacyTerrainDensity(options);
 
-  const known = new Set(['seed', 'symmetric', 'deployFromHq', 'noTurnLimit', 'mode', ...Object.keys(PARAM_BOUNDS)]);
+  const known = new Set([
+    'seed', 'symmetric', 'deployFromHq', 'noTurnLimit',
+    'supplyCanDeploy', 'forwardBaseCanDeploy', 'repairCanDeploy',
+    'mode', ...Object.keys(PARAM_BOUNDS),
+  ]);
   for (const key of Object.keys(raw)) {
     if (!known.has(key)) throw new Error(`unknown random option "${key}"`);
   }
@@ -840,6 +854,9 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
         repair: options.repairIncome,
         forwardBaseDeployDiscount: options.forwardBaseDeployDiscount,
         repairAmount: options.repairPointRepairAmount,
+        supplyCanDeploy: options.supplyCanDeploy,
+        forwardBaseCanDeploy: options.forwardBaseCanDeploy,
+        repairCanDeploy: options.repairCanDeploy,
       }),
     },
     // 歼灭/大逃杀注入炮火收缩圈配置；minimumSafeRadius < radius 已由边界表保证（radius ≥ 5）。

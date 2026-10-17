@@ -624,6 +624,22 @@ describe('random map generator', () => {
     expect(config.units.support.healRange).toBe(3);
   });
 
+  it('applies per-kind control point canDeploy switches', () => {
+    const base = generateRandomMapConfig({ seed: 'can-deploy' }, 2);
+    for (const kind of ['supply', 'forward_base', 'repair'] as const) {
+      expect(base.balance.controlPointTypes[kind].canDeploy).toBe(true);
+    }
+    const config = generateRandomMapConfig({ seed: 'can-deploy', supplyCanDeploy: false, repairCanDeploy: false }, 2);
+    expect(config.balance.controlPointTypes.supply.canDeploy).toBe(false);
+    expect(config.balance.controlPointTypes.forward_base.canDeploy).toBe(true);
+    expect(config.balance.controlPointTypes.repair.canDeploy).toBe(false);
+    // 显式打开（true）与省略逐位一致：零消耗、输出不变。
+    const explicit = generateRandomMapConfig({
+      seed: 'can-deploy', supplyCanDeploy: true, forwardBaseCanDeploy: true, repairCanDeploy: true,
+    }, 2);
+    expect(JSON.stringify(explicit)).toBe(JSON.stringify(base));
+  });
+
   it('keeps the deprecated terrainDensity as a 60/40 alias for water/wall', () => {
     const sanitized = sanitizeRandomOptions({ terrainDensity: 0.1 });
     expect(sanitized.terrainDensity).toBeUndefined();
@@ -737,6 +753,10 @@ describe('sanitizeRandomOptions', () => {
       .toEqual({ deployFromHq: false, noTurnLimit: true });
     expect(() => sanitizeRandomOptions({ deployFromHq: 'yes' })).toThrow('deployFromHq');
     expect(() => sanitizeRandomOptions({ noTurnLimit: 1 })).toThrow('noTurnLimit');
+    // 据点可部署开关：只接受布尔值。
+    expect(sanitizeRandomOptions({ supplyCanDeploy: false, forwardBaseCanDeploy: false, repairCanDeploy: false }))
+      .toEqual({ supplyCanDeploy: false, forwardBaseCanDeploy: false, repairCanDeploy: false });
+    expect(() => sanitizeRandomOptions({ supplyCanDeploy: 'no' })).toThrow('supplyCanDeploy');
   });
 
   it('rejects malformed options', () => {

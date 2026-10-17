@@ -311,12 +311,12 @@ describe('random map creation UI', () => {
     expect(groups.map(group => group.key)).toEqual([
       'map', 'economy', 'army', 'stats', 'combat', 'headquarters', 'artillery',
     ]);
-    // 每项参数恰好属于一组（不重不漏）：66 个数字参数 + 2 个布尔开关。
+    // 每项参数恰好属于一组（不重不漏）：66 个数字参数 + 5 个布尔开关。
     const members: Array<{ key: string; group?: string }> = [
       ...(ui.PARAMS as Array<{ key: string; group?: string }>),
       ...(ui.TOGGLES as Array<{ key: string; group?: string }>),
     ];
-    expect(members).toHaveLength(68);
+    expect(members).toHaveLength(71);
     const membership = new Map<string, string>();
     for (const param of members) {
       expect(param.group, `${param.key} 缺分组`).toBeTruthy();
@@ -328,7 +328,7 @@ describe('random map creation UI', () => {
     for (const group of groups) {
       counts[group.key] = members.filter(param => param.group === group.key).length;
     }
-    expect(counts).toEqual({ map: 4, economy: 14, army: 5, stats: 33, combat: 6, headquarters: 2, artillery: 4 });
+    expect(counts).toEqual({ map: 4, economy: 17, army: 5, stats: 33, combat: 6, headquarters: 2, artillery: 4 });
 
     // 面板 HTML：每组一个折叠块，块头带 aria 属性与项数，参数行都渲染在自己组内。
     const html = capturePanelHtml('standard');
@@ -356,7 +356,9 @@ describe('random map creation UI', () => {
   it('renders boolean toggles that submit only when flipped from the default', () => {
     const ui = loadUI();
     const toggles = ui.TOGGLES as Array<{ key: string; label: string; group: string; default: boolean }>;
-    expect(toggles.map(toggle => toggle.key)).toEqual(['deployFromHq', 'noTurnLimit']);
+    expect(toggles.map(toggle => toggle.key)).toEqual([
+      'deployFromHq', 'supplyCanDeploy', 'forwardBaseCanDeploy', 'repairCanDeploy', 'noTurnLimit',
+    ]);
     for (const toggle of toggles) expect(toggle.label, `${toggle.key} 缺标签`).toBeTruthy();
     const html = capturePanelHtml('standard');
     for (const toggle of toggles) {
@@ -371,7 +373,12 @@ describe('random map creation UI', () => {
     scoped.byToggle('deployFromHq').input.checked = false;
     expect(scoped.ui.collectRandomOptions()).toEqual({ mode: 'standard', deployFromHq: false });
     scoped.byToggle('noTurnLimit').input.checked = true;
-    expect(scoped.ui.collectRandomOptions()).toEqual({ mode: 'standard', deployFromHq: false, noTurnLimit: true });
+    scoped.byToggle('supplyCanDeploy').input.checked = false;
+    scoped.byToggle('repairCanDeploy').input.checked = false;
+    expect(scoped.ui.collectRandomOptions()).toEqual({
+      mode: 'standard', deployFromHq: false, noTurnLimit: true,
+      supplyCanDeploy: false, repairCanDeploy: false,
+    });
   });
 
   it('collapses and expands parameter groups without dropping their values', () => {

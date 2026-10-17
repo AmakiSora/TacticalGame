@@ -116,6 +116,18 @@
       hint: '关闭后只能从已占领的据点出兵',
     },
     {
+      key: 'supplyCanDeploy', label: '补给站可部署', group: 'economy', default: true,
+      hint: '关闭后补给站不能作为部署起点',
+    },
+    {
+      key: 'forwardBaseCanDeploy', label: '前哨可部署', group: 'economy', default: true,
+      hint: '关闭后前哨基地不能作为部署起点',
+    },
+    {
+      key: 'repairCanDeploy', label: '维修站可部署', group: 'economy', default: true,
+      hint: '关闭后维修站不能作为部署起点',
+    },
+    {
       key: 'noTurnLimit', label: '无回合上限', group: 'economy', default: false,
       hint: '开启后忽略最大回合数，靠淘汰或强制裁决收尾',
     },

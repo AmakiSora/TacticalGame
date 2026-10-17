@@ -12,8 +12,8 @@
   const HEADQUARTERS_MODES = ['standard', 'simultaneous'];
 
   // min/max = 服务端硬边界（src/config/randomMap.ts 的 PARAM_BOUNDS，数字输入量程），
-  // defMin/defMax = 留空时服务端使用的默认区间（仅作提示与"默认态"回显）。
-  // 两份数值由 tests/public/random-map-bounds.test.ts 对齐校验，避免前后端漂移。
+  // defMin/defMax = 留空时服务端使用的默认区间（仅作提示与"默认态"回显；兵种权重默认是
+  // 标量 2/2/1/1，defMin=defMax）。两份数值由 tests/public/random-map-ui.test.ts 对齐校验，避免前后端漂移。
   const PARAMS = [
     { key: 'radius', label: '地图半径', step: 1, min: 4, max: 12, defMin: 5, defMax: 10 },
     { key: 'waterDensity', label: '水域密度', step: 0.01, min: 0, max: 0.4, defMin: 0.01, defMax: 0.07 },
@@ -24,6 +24,12 @@
     { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, min: 0, max: 0.5, defMin: 0, defMax: 0.25 },
     { key: 'startingSupplies', label: '初始补给', step: 5, min: 0, max: 9999, defMin: 20, defMax: 220 },
     { key: 'baseIncome', label: '基础收入', step: 1, min: 0, max: 999, defMin: 6, defMax: 14 },
+    { key: 'startingUnitCount', label: '初始单位数', step: 1, min: 0, max: 4, defMin: 0, defMax: 4 },
+    // 初始兵种权重（相对权重，0-10；留空＝默认 2/2/1/1；全 0 回退旧均匀池）。support 不设权重。
+    { key: 'startingWeightInfantry', label: '步兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2 },
+    { key: 'startingWeightScout', label: '侦察兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2 },
+    { key: 'startingWeightHeavy', label: '重装权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1 },
+    { key: 'startingWeightRanger', label: '远程兵权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1 },
     { key: 'headquartersHp', label: '总部血量', step: 10, min: 1, max: 9999, defMin: 80, defMax: 240, modes: HEADQUARTERS_MODES },
     { key: 'headquartersDefense', label: '总部防御', step: 1, min: 0, max: 99, defMin: 3, defMax: 10, modes: HEADQUARTERS_MODES },
     { key: 'artilleryStartRound', label: '炮击开始回合', step: 1, min: 1, max: 10, defMin: 3, defMax: 8, modes: ARTILLERY_MODES },

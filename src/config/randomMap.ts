@@ -50,6 +50,18 @@ export interface RandomMapOptions {
    * 描述已过时，且覆盖缺口（上界 4 < 6）待 RL 域重校准时收口。
    */
   startingUnitCount?: RandomParam;
+  /**
+   * 初始单位兵种权重（步兵/侦察/重装/远程，0-10，留空＝默认 2/2/1/1）。省略或固定标量都不消耗
+   * 随机数流——加权抽样按「权重比例展开成等价池」与旧 `POOL[floor(rng()*6)]` 逐位同分布，
+   * 默认 2/2/1/1 恰好展开成旧的 6 格池，默认路径生成的地图完全不变。support 不给权重（奶妈不适合开局硬给）。
+   */
+  startingWeightInfantry?: RandomParam;
+  /** 初始侦察兵权重（0-10，留空＝默认 2）。省略/标量不消耗随机数流。 */
+  startingWeightScout?: RandomParam;
+  /** 初始重装权重（0-10，留空＝默认 1）。省略/标量不消耗随机数流。 */
+  startingWeightHeavy?: RandomParam;
+  /** 初始远程兵（游侠）权重（0-10，留空＝默认 1）。省略/标量不消耗随机数流。 */
+  startingWeightRanger?: RandomParam;
   /** 歼灭/大逃杀：首次炮火回合（≥1）。 */
   artilleryStartRound?: RandomParam;
   /** 歼灭/大逃杀：炮火间隔回合数（≥1）。 */
@@ -82,6 +94,12 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   headquartersHp: { min: 1, max: 9999, integer: true },
   headquartersDefense: { min: 0, max: 99, integer: true },
   startingUnitCount: { min: 0, max: 4, integer: true },
+  // 初始兵种权重：0-10 的相对权重（非整数也合法），不进 DEFAULT_RANGES——省略时用标量默认 2/2/1/1
+  // 且不消耗随机数流，见 STARTING_WEIGHT_DEFAULTS / resolveStartingWeights。
+  startingWeightInfantry: { min: 0, max: 10, integer: false },
+  startingWeightScout: { min: 0, max: 10, integer: false },
+  startingWeightHeavy: { min: 0, max: 10, integer: false },
+  startingWeightRanger: { min: 0, max: 10, integer: false },
   artilleryStartRound: { min: 1, max: 10, integer: true },
   artilleryIntervalRounds: { min: 1, max: 3, integer: true },
   artilleryDamage: { min: 5, max: 30, integer: true },
@@ -90,7 +108,7 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
 
 /**
  * 硬边界只读视图，供前端滑块量程等消费方对齐——`public/random-map-ui.js` 的
- * `PARAMS[].min/max` 必须与此一致，由 `tests/public/random-map-bounds.test.ts` 校验，避免两份边界漂移。
+ * `PARAMS[].min/max` 必须与此一致，由 `tests/public/random-map-ui.test.ts` 校验，避免两份边界漂移。
  */
 export const RANDOM_PARAM_BOUNDS: Readonly<Record<string, Readonly<ParamBound>>> = PARAM_BOUNDS;
 
@@ -113,6 +131,14 @@ const DEFAULT_RANGES: Record<string, [number, number]> = {
   artilleryDamage: [10, 25],
   artilleryMinimumSafeRadius: [0, 1],
 };
+
+/**
+ * 初始兵种权重默认值（步兵/侦察/重装/远程 = 2/2/1/1）：加权抽样展开后恰好是旧的 6 格
+ * STARTING_UNIT_POOL（步×2 侦×2 重×1 远×1），默认路径与旧实现逐位同分布。
+ * 刻意不进 DEFAULT_RANGES——resolveParam 的省略路径会消耗随机数流，而权重省略/固定标量
+ * 时必须零消耗，否则默认地图的 rng 流会整体错位、现有种子全部漂移。
+ */
+const STARTING_WEIGHT_DEFAULTS = { infantry: 2, scout: 2, heavy: 1, ranger: 1 };
 
 // 默认域包线按 6 张静态图的极值校准（danger-close 的 1 行动点/20 补给/零据点收入、
 // dual-lanes 的 0 初始单位/208 补给、molten-throne（原 forge）的 100 血总部/24 据点等），让随机图
@@ -145,12 +171,30 @@ function sampleControlPointTypes(rng: () => number) {
   };
 }
 
-/** 初始单位构成抽取池：基础兵种权重高，覆盖 breach(2 heavy) 等开局（molten-throne 3.5.11 起为斥候群开局，不在池内）。 */
+/** 初始单位构成抽取池：现仅作全 0 权重回退（均匀抽）与文档用；基础兵种权重高，覆盖 breach(2 heavy) 等开局（molten-throne 3.5.11 起为斥候群开局，不在池内）。 */
 const STARTING_UNIT_POOL: UnitType[] = ['infantry', 'infantry', 'scout', 'scout', 'heavy', 'ranger'];
 
 /** 每方初始单位数量：默认 0-4 均匀随机（dual-lanes(0) 起，其余静态图 ≤3）；可用 options.startingUnitCount 收窄/固定。molten-throne 3.5.11 起为 6，超出本域。 */
-function sampleStartingUnits(rng: () => number, count: number): UnitType[] {
-  return Array.from({ length: count }, () => STARTING_UNIT_POOL[Math.floor(rng() * STARTING_UNIT_POOL.length)]);
+function sampleStartingUnits(
+  rng: () => number,
+  count: number,
+  weights: typeof STARTING_WEIGHT_DEFAULTS = STARTING_WEIGHT_DEFAULTS,
+): UnitType[] {
+  const total = weights.infantry + weights.scout + weights.heavy + weights.ranger;
+  if (total <= 0) {
+    // 全 0 权重＝没有有意义的比例，回退旧池（每单位仍恰好消耗 1 次 rng，流稳定）。
+    return Array.from({ length: count }, () => STARTING_UNIT_POOL[Math.floor(rng() * STARTING_UNIT_POOL.length)]);
+  }
+  // 加权抽样：`pick = rng()*总权重` 落累积区间选桶。默认 2/2/1/1 时总权重 6、阈值 2/4/5
+  // 皆为精确整数，与旧 `POOL[floor(rng()*6)]` 的 6 格池逐位同分布（含 u*6 恰落在边界的情形），
+  // 默认路径生成的地图与旧实现完全一致。
+  return Array.from({ length: count }, () => {
+    const pick = rng() * total;
+    if (pick < weights.infantry) return 'infantry';
+    if (pick < weights.infantry + weights.scout) return 'scout';
+    if (pick < weights.infantry + weights.scout + weights.heavy) return 'heavy';
+    return 'ranger';
+  });
 }
 
 /** 校验并收敛前端/RL 传入的随机参数；非法结构直接抛错（API 返回 400）。 */
@@ -292,6 +336,26 @@ function resolveParam(
   }
   const value = lo + rng() * (hi - lo);
   return bound.integer ? Math.round(value) : value;
+}
+
+/**
+ * 解析初始兵种权重：省略＝标量默认（零消耗）、固定标量直接用（零消耗）——这两条路径不碰
+ * 随机数流，保证默认地图与旧实现逐位一致；区间形态按均匀分布抽一个权重（显式非默认路径，
+ * 允许消耗 1 次 rng，四条权重按接口字段顺序依次解析，流稳定）。绝不能整表走 resolveParam——
+ * 它的省略路径会消耗 rng，导致默认地图整体错位、现有种子全部漂移。
+ */
+function resolveStartingWeights(options: RandomMapOptions, rng: () => number): typeof STARTING_WEIGHT_DEFAULTS {
+  const resolve = (param: RandomParam | undefined, def: number): number => {
+    if (param === undefined) return def;
+    if (typeof param === 'number') return param;
+    return param[0] + rng() * (param[1] - param[0]);
+  };
+  return {
+    infantry: resolve(options.startingWeightInfantry, STARTING_WEIGHT_DEFAULTS.infantry),
+    scout: resolve(options.startingWeightScout, STARTING_WEIGHT_DEFAULTS.scout),
+    heavy: resolve(options.startingWeightHeavy, STARTING_WEIGHT_DEFAULTS.heavy),
+    ranger: resolve(options.startingWeightRanger, STARTING_WEIGHT_DEFAULTS.ranger),
+  };
 }
 
 function shuffleInPlace<T>(items: T[], rng: () => number): T[] {
@@ -504,8 +568,10 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
 
   // 出生位配置（总部 + 初始单位）。初始单位数量/构成全局抽一次、全员共享（公平性）。
   // startingUnitCount 收窄/固定数量（v3.3.0 边角采样用），省略时走默认范围 [0,4] 均匀随机。
+  // 兵种权重省略/固定标量时零消耗 rng（见 resolveStartingWeights），默认路径与旧池逐位一致。
   const startingUnitCount = Math.round(resolveParam(options.startingUnitCount, 'startingUnitCount', rng));
-  const startingUnits = sampleStartingUnits(rng, startingUnitCount);
+  const startingWeights = resolveStartingWeights(options, rng);
+  const startingUnits = sampleStartingUnits(rng, startingUnitCount, startingWeights);
   const spawnSlots = buildSpawnSlots(mode, spawnPositions, playableSet, controlPoints, symmetry, startingUnits);
 
   const config = {

@@ -413,6 +413,57 @@ describe('random map generator', () => {
     expect(tiny.terrainCells.some(cell => cell.terrain === 'blocker')).toBe(true);
   });
 
+  it('lets starting unit weights steer the unit mix and exclude types', () => {
+    // startingUnitCount 固定 4（硬边界内），50 个种子 × 2 出生位 × 4 单位 = 400 个样本足够统计；
+    // support 刻意不设权重，任何路径都不应产出。
+    const collect = (options: Omit<Parameters<typeof generateRandomMapConfig>[0], 'seed'> & { seed: string }) => {
+      const types: string[] = [];
+      for (let seed = 0; seed < 50; seed++) {
+        const config = generateRandomMapConfig({ ...options, seed: `${options.seed}-${seed}` }, 2);
+        for (const slot of config.spawnSlots) {
+          for (const unit of slot.startingUnits) types.push(unit.type);
+        }
+      }
+      return types;
+    };
+
+    // 权重 0 排除兵种：重装/远程权重为 0 时两者绝迹，步兵/侦察兵 50/50 都出现。
+    const noHeavyRanger = collect({ seed: 'weight-zero', startingUnitCount: 4, startingWeightHeavy: 0, startingWeightRanger: 0 });
+    expect(noHeavyRanger).toHaveLength(400);
+    expect(new Set(noHeavyRanger)).toEqual(new Set(['infantry', 'scout']));
+
+    // 单一权重：其余全 0 时只出该兵种。
+    const onlyHeavy = collect({ seed: 'weight-only', startingUnitCount: 4, startingWeightInfantry: 0, startingWeightScout: 0, startingWeightHeavy: 3, startingWeightRanger: 0 });
+    expect(new Set(onlyHeavy)).toEqual(new Set(['heavy']));
+
+    // 全 0 权重回退旧均匀池：400 单位下池中全部 4 类都该出现。
+    const allZero = collect({ seed: 'weight-fallback', startingUnitCount: 4, startingWeightInfantry: 0, startingWeightScout: 0, startingWeightHeavy: 0, startingWeightRanger: 0 });
+    expect(new Set(allZero)).toEqual(new Set(['infantry', 'scout', 'heavy', 'ranger']));
+
+    // 比例生效：步兵 1 vs 重装 9（10% vs 90%），400 次抽样按大数定律卡宽区间（期望 40，±5σ≈30）。
+    const infantry = collect({ seed: 'weight-ratio', startingUnitCount: 4, startingWeightInfantry: 1, startingWeightScout: 0, startingWeightRanger: 0, startingWeightHeavy: 9 });
+    const infantryCount = infantry.filter(type => type === 'infantry').length;
+    expect(infantryCount, `步兵占比应约 10%（实测 ${infantryCount}/400）`).toBeGreaterThan(10);
+    expect(infantryCount).toBeLessThan(70);
+  });
+
+  it('keeps fixed scalar starting weights rng-neutral and bit-identical to the default path', () => {
+    // 标量权重（含显式默认值 2/2/1/1）不消耗随机数流：地图其余部分与省略权重的默认路径逐位一致。
+    const base = generateRandomMapConfig({ seed: 'weight-neutral' }, 4);
+    const scalars = generateRandomMapConfig(
+      { seed: 'weight-neutral', startingWeightInfantry: 2, startingWeightScout: 2, startingWeightHeavy: 1, startingWeightRanger: 1 }, 4,
+    );
+    expect(JSON.stringify(scalars)).toBe(JSON.stringify(base));
+    // 区间形态是显式非默认路径（各消耗 1 次 rng），只要求同种子可复现。
+    const ranged = generateRandomMapConfig(
+      { seed: 'weight-range', startingWeightInfantry: [1, 3], startingWeightScout: [1, 3], startingWeightHeavy: [0.5, 1.5], startingWeightRanger: [0.5, 1.5] }, 4,
+    );
+    const rangedAgain = generateRandomMapConfig(
+      { seed: 'weight-range', startingWeightInfantry: [1, 3], startingWeightScout: [1, 3], startingWeightHeavy: [0.5, 1.5], startingWeightRanger: [0.5, 1.5] }, 4,
+    );
+    expect(JSON.stringify(rangedAgain)).toBe(JSON.stringify(ranged));
+  });
+
   it('keeps the deprecated terrainDensity as a 60/40 alias for water/wall', () => {
     const sanitized = sanitizeRandomOptions({ terrainDensity: 0.1 });
     expect(sanitized.terrainDensity).toBeUndefined();
@@ -493,6 +544,12 @@ describe('sanitizeRandomOptions', () => {
     expect(sanitizeRandomOptions({ artilleryDamage: 999 })).toEqual({ artilleryDamage: 30 });
     expect(sanitizeRandomOptions({ artilleryStartRound: [0, 99] }).artilleryStartRound).toEqual([1, 10]);
     expect(sanitizeRandomOptions({ artilleryMinimumSafeRadius: -1 })).toEqual({ artilleryMinimumSafeRadius: 0 });
+    // 初始兵种权重：0-10、允许小数（step 0.5 只是 UI 步长，不是硬约束）。
+    expect(sanitizeRandomOptions({ startingWeightInfantry: 2, startingWeightScout: [1, 3] }))
+      .toEqual({ startingWeightInfantry: 2, startingWeightScout: [1, 3] });
+    expect(sanitizeRandomOptions({ startingWeightHeavy: 10.5 }).startingWeightHeavy).toBe(10);
+    expect(sanitizeRandomOptions({ startingWeightRanger: -2 }).startingWeightRanger).toBe(0);
+    expect(sanitizeRandomOptions({ startingUnitCount: 7 }).startingUnitCount).toBe(4);
   });
 
   it('rejects malformed options', () => {

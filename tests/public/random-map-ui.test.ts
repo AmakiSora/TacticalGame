@@ -173,6 +173,7 @@ describe('random map creation UI', () => {
     for (const key of [
       'radius', 'waterDensity', 'wallDensity', 'controlPointCount', 'maxTurns', 'actionsPerTurn',
       'unitStatVariation', 'startingSupplies', 'baseIncome',
+      'startingUnitCount', 'startingWeightInfantry', 'startingWeightScout', 'startingWeightHeavy', 'startingWeightRanger',
       'headquartersHp', 'headquartersDefense',
       'artilleryStartRound', 'artilleryIntervalRounds', 'artilleryDamage', 'artilleryMinimumSafeRadius',
     ]) {
@@ -348,7 +349,35 @@ describe('random map creation UI', () => {
     // 小数参数的钳位与取整（waterDensity 边界 0–0.4）。
     const density = loadUIWithDom('standard', [{ key: 'waterDensity', mode: 'fixed', value: '9' }]);
     expect(density.ui.collectRandomOptions().waterDensity).toBe(0.4);
+    // 初始军队：数量按整数取整，权重允许 0.5 步长的小数、越界钳回 0-10。
+    const count = loadUIWithDom('standard', [{ key: 'startingUnitCount', mode: 'fixed', value: '2.6' }]);
+    expect(count.ui.collectRandomOptions().startingUnitCount).toBe(3);
+    const weight = loadUIWithDom('standard', [{ key: 'startingWeightHeavy', mode: 'fixed', value: '1.5' }]);
+    expect(weight.ui.collectRandomOptions().startingWeightHeavy).toBe(1.5);
+    const weightClamped = loadUIWithDom('standard', [{ key: 'startingWeightHeavy', mode: 'fixed', value: '99' }]);
+    expect(weightClamped.ui.collectRandomOptions().startingWeightHeavy).toBe(10);
   });
+
+  it('submits starting army count and per-type weights together', () => {
+    // 初始单位数是首次暴露的面板行；兵种权重 4 行与其同组，全部模式可见。
+    const specs: RowSpec[] = [
+      { key: 'startingUnitCount', min: '3', max: '' },
+      { key: 'startingWeightInfantry', min: '4', max: '8' },
+      { key: 'startingWeightScout', mode: 'fixed', value: '2' },
+      { key: 'startingWeightHeavy', mode: 'fixed', value: '0' },
+      { key: 'startingWeightRanger', min: '', max: '' },
+    ];
+    for (const mode of ['standard', 'annihilation', 'simultaneous', 'royale']) {
+      const scoped = loadUIWithDom(mode, specs);
+      const options = scoped.ui.collectRandomOptions();
+      expect(options.startingUnitCount, `${mode} 数量单值`).toBe(3);
+      expect(options.startingWeightInfantry, `${mode} 步兵区间`).toEqual([4, 8]);
+      expect(options.startingWeightScout, `${mode} 侦察兵标量`).toBe(2);
+      expect(options.startingWeightHeavy, `${mode} 重装标量`).toBe(0);
+      expect(options, `${mode} 全空的远程兵权重不提交`).not.toHaveProperty('startingWeightRanger');
+    }
+  });
+
 
   it('renders exactly one option per game mode', () => {
     // 回归：模式下拉曾同时有「标准（默认）」(value '') 与「标准」('standard') 两条等价项。

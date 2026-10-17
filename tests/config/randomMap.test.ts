@@ -473,17 +473,16 @@ describe('random map generator', () => {
     expect(JSON.stringify(scalars)).toBe(JSON.stringify(base));
     // 区间形态是显式非默认路径（各消耗 1 次 rng）：同种子可复现、取值为区间内整数。
     const ranged = generateRandomMapConfig(
-      { seed: 'variance-range', damageVarianceRange: [0, 20], healVarianceRange: [0, 20] }, 4,
+      { seed: 'variance-range', damageVarianceRange: [0, 8], healVarianceRange: [0, 10] }, 4,
     );
     const rangedAgain = generateRandomMapConfig(
-      { seed: 'variance-range', damageVarianceRange: [0, 20], healVarianceRange: [0, 20] }, 4,
+      { seed: 'variance-range', damageVarianceRange: [0, 8], healVarianceRange: [0, 10] }, 4,
     );
     expect(JSON.stringify(rangedAgain)).toBe(JSON.stringify(ranged));
-    for (const value of [ranged.balance.damageVarianceRange, ranged.balance.healVarianceRange]) {
-      expect(Number.isInteger(value)).toBe(true);
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThanOrEqual(20);
-    }
+    expect(ranged.balance.damageVarianceRange).toBeGreaterThanOrEqual(0);
+    expect(ranged.balance.damageVarianceRange).toBeLessThanOrEqual(8);
+    expect(ranged.balance.healVarianceRange).toBeGreaterThanOrEqual(0);
+    expect(ranged.balance.healVarianceRange).toBeLessThanOrEqual(10);
   });
 
   it('overrides adjudication army value and per-kind control point income', () => {
@@ -570,14 +569,14 @@ describe('random map generator', () => {
     // 区间形态：同种子可复现、落在边界内。
     const rangedOptions = {
       seed: 'combat-knobs-range',
-      minimumDamage: [0, 5] as [number, number],
+      minimumDamage: [0, 3] as [number, number],
       adjudicationKillValue: [0.5, 1.5] as [number, number],
       adjudicationControlPointFlowRatio: [0.2, 0.8] as [number, number],
     };
     const ranged = generateRandomMapConfig(rangedOptions, 2);
     expect(JSON.stringify(generateRandomMapConfig(rangedOptions, 2))).toBe(JSON.stringify(ranged));
     expect(ranged.balance.minimumDamage).toBeGreaterThanOrEqual(0);
-    expect(ranged.balance.minimumDamage).toBeLessThanOrEqual(5);
+    expect(ranged.balance.minimumDamage).toBeLessThanOrEqual(3);
     expect(ranged.balance.adjudicationWeights.killValue).toBeGreaterThanOrEqual(0.5);
     expect(ranged.balance.adjudicationWeights.killValue).toBeLessThanOrEqual(1.5);
     expect(ranged.balance.adjudicationWeights.controlPointFlowRatio).toBeGreaterThanOrEqual(0.2);
@@ -728,7 +727,8 @@ describe('sanitizeRandomOptions', () => {
     expect(sanitizeRandomOptions({ startingUnitCount: 7 }).startingUnitCount).toBe(6);
     // 3.6.2 放宽后的硬边界与新增参数同样走钳位。
     expect(sanitizeRandomOptions({ controlPointCount: 99 }).controlPointCount).toBe(24);
-    expect(sanitizeRandomOptions({ damageVarianceRange: 999 }).damageVarianceRange).toBe(20);
+    expect(sanitizeRandomOptions({ damageVarianceRange: 999 }).damageVarianceRange).toBe(8);
+    expect(sanitizeRandomOptions({ healVarianceRange: 999 }).healVarianceRange).toBe(10);
     expect(sanitizeRandomOptions({ healVarianceRange: -3 }).healVarianceRange).toBe(0);
     expect(sanitizeRandomOptions({ adjudicationArmyValue: 99 }).adjudicationArmyValue).toBe(10);
     expect(sanitizeRandomOptions({ supplyIncome: [5, 999] }).supplyIncome).toEqual([5, 40]);
@@ -738,8 +738,8 @@ describe('sanitizeRandomOptions', () => {
     expect(sanitizeRandomOptions({ supportHealPower: -5 }).supportHealPower).toBe(0);
     // 整数参数非整数输入按四舍五入（与 resolveParam 的整数口径一致）。
     expect(sanitizeRandomOptions({ heavyMoveRange: 2.6 }).heavyMoveRange).toBe(3);
-    // 3.6.2 第二批参数同样走钳位。
-    expect(sanitizeRandomOptions({ minimumDamage: 99 }).minimumDamage).toBe(20);
+    // 3.6.2 第二批参数同样走钳位。战斗三参数上限按「不得盖过兵种攻击差」收紧：波动 8、治疗 10、保底 3。
+    expect(sanitizeRandomOptions({ minimumDamage: 99 }).minimumDamage).toBe(3);
     expect(sanitizeRandomOptions({ forwardBaseDeployDiscount: 99 }).forwardBaseDeployDiscount).toBe(20);
     expect(sanitizeRandomOptions({ repairPointRepairAmount: -1 }).repairPointRepairAmount).toBe(0);
     expect(sanitizeRandomOptions({ comebackStartRound: 0 }).comebackStartRound).toBe(1);

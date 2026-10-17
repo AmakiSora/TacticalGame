@@ -196,8 +196,11 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   // 战斗波动 / 裁决 armyValue / 据点收入 / 兵种属性覆盖：省略路径各自保留旧内联采样（不读
   // DEFAULT_RANGES、随机数流位置不变），见 resolveFixedIntParam / resolveSampledIntParam /
   // buildUnitSpecs。兵种属性上界按「再离谱也仍是合法数值」放宽，loader 只校验 ≥0。
-  damageVarianceRange: { min: 0, max: 20, integer: true },
-  healVarianceRange: { min: 0, max: 20, integer: true },
+  // 战斗保底与波动是「兵种差异」的护栏：区间上限刻意压得比攻击差小
+  // （现役攻击差 14~26 点），否则随机区间会把攻击属性抹平。默认值本身固定。
+  damageVarianceRange: { min: 0, max: 8, integer: true },
+  healVarianceRange: { min: 0, max: 10, integer: true },
+  minimumDamage: { min: 0, max: 3, integer: true },
   adjudicationArmyValue: { min: 0, max: 10, integer: true },
   supplyIncome: { min: 0, max: 40, integer: true },
   forwardBaseIncome: { min: 0, max: 20, integer: true },
@@ -234,10 +237,9 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   supportCost: { min: 5, max: 999, integer: true },
   supportHealPower: { min: 0, max: 99, integer: true },
   supportHealRange: { min: 1, max: 10, integer: true },
-  // 战斗保底 / 裁决权重 / 据点折扣与修复 / 追赶补给：省略路径各自保留旧硬编码或旧内联采样
+  // 裁决权重 / 据点折扣与修复 / 追赶补给：省略路径各自保留旧硬编码或旧内联采样
   // （不读 DEFAULT_RANGES、随机数流位置不变），见 resolveFixedIntParam / resolveFixedFloatParam /
   // resolveSampledIntParam。
-  minimumDamage: { min: 0, max: 20, integer: true },
   adjudicationKillValue: { min: 0, max: 2, integer: false },
   adjudicationControlPointFlowRatio: { min: 0, max: 1, integer: false },
   forwardBaseDeployDiscount: { min: 0, max: 20, integer: true },

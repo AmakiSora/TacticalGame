@@ -29,18 +29,18 @@
     { key: 'forwardBaseIncome', label: '前哨基地收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8, group: 'economy' },
     { key: 'repairIncome', label: '维修站收入', step: 1, min: 0, max: 20, defMin: 0, defMax: 8, group: 'economy' },
     // 部署与修复的经济旋钮：留空＝旧基准（前哨折扣 8、维修量 10）。
-    { key: 'forwardBaseDeployDiscount', label: '前哨部署折扣', step: 1, min: 0, max: 20, defMin: 8, defMax: 8, group: 'economy' },
-    { key: 'repairPointRepairAmount', label: '维修站修复量', step: 1, min: 0, max: 50, defMin: 10, defMax: 10, group: 'economy' },
+    { key: 'forwardBaseDeployDiscount', label: '前哨部署折扣', step: 1, min: 0, max: 20, defMin: 8, defMax: 8, group: 'economy', defaultMode: 'fixed' },
+    { key: 'repairPointRepairAmount', label: '维修站修复量', step: 1, min: 0, max: 50, defMin: 10, defMax: 10, group: 'economy', defaultMode: 'fixed' },
     // 追赶补给：落后头名 ≥分差比例 的玩家每回合 +补给量；三项都给默认值时整块才注入。
     { key: 'comebackStartRound', label: '追赶起始轮', step: 1, min: 1, max: 20, defMin: 4, defMax: 4, group: 'economy' },
     { key: 'comebackScoreGapPercent', label: '追赶分差%', step: 1, min: 0, max: 100, defMin: 30, defMax: 30, group: 'economy' },
     { key: 'comebackAmountPerRound', label: '追赶补给量', step: 1, min: 1, max: 100, defMin: 14, defMax: 14, group: 'economy' },
     { key: 'startingUnitCount', label: '初始单位数', step: 1, min: 0, max: 6, defMin: 0, defMax: 4, group: 'army' },
     // 初始兵种权重（相对权重，0-10；留空＝默认 2/2/1/1；全 0 回退旧均匀池）。support 不设权重。
-    { key: 'startingWeightInfantry', label: '步兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2, group: 'army' },
-    { key: 'startingWeightScout', label: '侦察兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2, group: 'army' },
-    { key: 'startingWeightHeavy', label: '重装权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1, group: 'army' },
-    { key: 'startingWeightRanger', label: '远程兵权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1, group: 'army' },
+    { key: 'startingWeightInfantry', label: '步兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2, group: 'army', defaultMode: 'fixed' },
+    { key: 'startingWeightScout', label: '侦察兵权重', step: 0.5, min: 0, max: 10, defMin: 2, defMax: 2, group: 'army', defaultMode: 'fixed' },
+    { key: 'startingWeightHeavy', label: '重装权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1, group: 'army', defaultMode: 'fixed' },
+    { key: 'startingWeightRanger', label: '远程兵权重', step: 0.5, min: 0, max: 10, defMin: 1, defMax: 1, group: 'army', defaultMode: 'fixed' },
     // 兵种属性（按兵种覆盖）：标量＝精确值、区间＝区间内随机；留空＝围绕基准值按兵种数值浮动抖动。
     // 两方共用同一套数值，改动对双方同时生效。组内按兵种分小标题。
     { key: 'unitStatVariation', label: '兵种数值浮动', step: 0.05, min: 0, max: 0.5, defMin: 0, defMax: 0.25, group: 'stats' },
@@ -77,9 +77,9 @@
     { key: 'supportHealPower', label: '辅助治疗量', step: 1, min: 0, max: 99, defMin: 22, defMax: 22, group: 'stats', subgroup: '辅助' },
     { key: 'supportHealRange', label: '辅助治疗射程', step: 1, min: 1, max: 10, defMin: 1, defMax: 1, group: 'stats', subgroup: '辅助' },
     // 战斗波动（省略＝固定 3/6）与裁决计分（只开放军队价值权重，补给恒 0）。
-    { key: 'damageVarianceRange', label: '伤害波动幅度', step: 1, min: 0, max: 20, defMin: 3, defMax: 3, group: 'combat' },
-    { key: 'healVarianceRange', label: '治疗波动幅度', step: 1, min: 0, max: 20, defMin: 6, defMax: 6, group: 'combat' },
-    { key: 'minimumDamage', label: '最低伤害', step: 1, min: 0, max: 20, defMin: 1, defMax: 1, group: 'combat' },
+    { key: 'damageVarianceRange', label: '伤害波动幅度', step: 1, min: 0, max: 8, defMin: 3, defMax: 3, group: 'combat', defaultMode: 'fixed', warnRandom: '随机区间会盖过兵种攻击差，建议保持固定' },
+    { key: 'healVarianceRange', label: '治疗波动幅度', step: 1, min: 0, max: 10, defMin: 6, defMax: 6, group: 'combat', defaultMode: 'fixed', warnRandom: '随机区间会放大治疗波动，建议保持固定' },
+    { key: 'minimumDamage', label: '最低伤害', step: 1, min: 0, max: 3, defMin: 1, defMax: 1, group: 'combat', defaultMode: 'fixed', warnRandom: '随机区间会抹平兵种攻击差，建议保持固定' },
     { key: 'adjudicationArmyValue', label: '裁决军队分权重', step: 1, min: 0, max: 10, defMin: 1, defMax: 2, group: 'combat' },
     { key: 'adjudicationKillValue', label: '裁决击杀权重', step: 0.05, min: 0, max: 2, defMin: 0.25, defMax: 0.5, group: 'combat' },
     { key: 'adjudicationControlPointFlowRatio', label: '据点流量占比', step: 0.05, min: 0, max: 1, defMin: 0.7, defMax: 0.7, group: 'combat' },
@@ -206,25 +206,31 @@
     // 参数行因此保持单行，行高与列宽都更紧凑。悬停仍给出「可选 / 默认」完整提示。
     const minHint = esc(`≥${param.min}`);
     const maxHint = esc(`≤${param.max}`);
-    // 固定挡只有一个输入框：灰字直接给出整段可选范围，避免只剩一个「默认」看不出能填多少。
+    // 固定挡只有一个输入框：灰字直接给出整段可选范围。
     const fixedHint = esc(`范围 ${param.min}–${param.max}`);
-    return `<div class="rmo-param" data-key="${esc(param.key)}">
+    // 默认固定挡：首屏落在「固定」挡（留空＝服务端默认、不提交），用户切到随机才提交区间。
+    const fixed = param.defaultMode === 'fixed';
+    const warn = param.warnRandom
+      ? `<span class="rmo-warn${fixed ? ' hidden' : ''}">${esc(param.warnRandom)}</span>`
+      : '';
+    return `<div class="rmo-param" data-key="${esc(param.key)}" data-default-mode="${fixed ? 'fixed' : 'random'}">
       <div class="rmo-param-head">
         <span class="rmo-param-label" title="${esc(hint)}">${label}</span>
-        <span class="rmo-mode-toggle" data-value="random" role="switch" aria-checked="false" tabindex="0" aria-label="${label}取值方式">
-          <span class="rmo-mode-option is-active" data-value="random">随机</span>
-          <span class="rmo-mode-option" data-value="fixed">固定</span>
+        <span class="rmo-mode-toggle" data-value="${fixed ? 'fixed' : 'random'}" role="switch" aria-checked="${fixed ? 'true' : 'false'}" tabindex="0" aria-label="${label}取值方式">
+          <span class="rmo-mode-option${fixed ? '' : ' is-active'}" data-value="random">随机</span>
+          <span class="rmo-mode-option${fixed ? ' is-active' : ''}" data-value="fixed">固定</span>
           <span class="rmo-mode-thumb" aria-hidden="true"></span>
         </span>
-        <span class="rmo-range-inputs">
+        <span class="rmo-range-inputs${fixed ? ' hidden' : ''}">
           <input class="rmo-min" type="number" ${bounds} placeholder="${minHint}" title="${esc(hint)}" aria-label="${label}最小值（可选 ${param.min}–${param.max}）" />
           <span class="rmo-sep">–</span>
           <input class="rmo-max" type="number" ${bounds} placeholder="${maxHint}" title="${esc(hint)}" aria-label="${label}最大值（可选 ${param.min}–${param.max}）" />
         </span>
-        <span class="rmo-fixed-input hidden">
+        <span class="rmo-fixed-input${fixed ? '' : ' hidden'}">
           <input class="rmo-value" type="number" ${bounds} placeholder="${fixedHint}" title="${esc(hint)}" aria-label="${label}固定值（可选 ${param.min}–${param.max}）" />
         </span>
       </div>
+      ${warn}
     </div>`;
   }
 
@@ -403,6 +409,7 @@
         if (!toggle) return;
         const rangeInputs = row.querySelector('.rmo-range-inputs');
         const fixedInput = row.querySelector('.rmo-fixed-input');
+        const warn = row.querySelector('.rmo-warn');
         // 左右滑动开关：点开关任意处即切换到另一档，随机↔固定。
         const applyMode = fixed => {
           toggle.dataset.value = fixed ? 'fixed' : 'random';
@@ -412,6 +419,8 @@
           });
           rangeInputs?.classList.toggle('hidden', fixed);
           fixedInput?.classList.toggle('hidden', !fixed);
+          // 「建议固定」参数切到随机挡时亮出护栏提示。
+          warn?.classList.toggle('hidden', fixed);
           RandomMapUI.schedulePreview();
         };
         toggle.addEventListener('click', () => applyMode(toggle.dataset.value !== 'fixed'));

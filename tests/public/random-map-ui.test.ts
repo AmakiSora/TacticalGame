@@ -20,6 +20,8 @@ interface RowSpec {
   min?: string;
   max?: string;
   value?: string;
+  /** 护栏提示文案（真实面板只给「建议固定」参数渲染该元素）。 */
+  warn?: string;
 }
 
 /** 可触发事件的元素桩：虚拟 DOM 够用即可，重点是把 addEventListener 真的记下来。 */
@@ -82,7 +84,10 @@ function makeRowStub(spec: RowSpec) {
     '.rmo-value': stubElement({ tagName: 'INPUT', type: 'number', value: spec.value ?? '' }),
     '.rmo-range-inputs': rangeGroup,
     '.rmo-fixed-input': fixedGroup,
+    // 「建议固定」参数的护栏提示：固定挡隐藏、随机挡显示（与真实渲染同口径）。
+    '.rmo-warn': stubElement({ tagName: 'SPAN' }),
   };
+  if (spec.mode === 'fixed' || !spec.warn) inputs['.rmo-warn'].classList.add('hidden');
   const row = stubElement({
     dataset: { key: spec.key },
     querySelector: (selector: string) => inputs[selector] ?? null,
@@ -381,6 +386,39 @@ describe('random map creation UI', () => {
     });
   });
 
+  it('opens playability-critical rows in fixed mode and warns on random ranges', () => {
+    const ui = loadUI();
+    const fixedKeys = (ui.PARAMS as Array<{ key: string; defaultMode?: string }>)
+      .filter(param => param.defaultMode === 'fixed')
+      .map(param => param.key);
+    expect(fixedKeys).toEqual([
+      'forwardBaseDeployDiscount', 'repairPointRepairAmount',
+      'startingWeightInfantry', 'startingWeightScout', 'startingWeightHeavy', 'startingWeightRanger',
+      'damageVarianceRange', 'healVarianceRange', 'minimumDamage',
+    ]);
+    const html = capturePanelHtml('standard');
+    for (const key of fixedKeys) {
+      expect(html, `${key} 未默认固定挡`).toContain(`data-key="${key}" data-default-mode="fixed"`);
+    }
+    expect(html, '默认随机参数不该被改成固定挡').toContain('data-key="radius" data-default-mode="random"');
+    // 三个战斗参数带随机挡护栏提示（默认固定挡下隐藏）。
+    expect(html).toContain('class="rmo-warn hidden"');
+    expect(html).toContain('随机区间会抹平兵种攻击差');
+    expect(html).toContain('随机区间会盖过兵种攻击差');
+    // 切挡：固定→随机时提示亮出，随机→固定时收起。
+    const scoped = loadUIWithDom('standard', [
+      { key: 'minimumDamage', mode: 'fixed', warn: '随机区间会抹平兵种攻击差，建议保持固定' },
+    ]);
+    const item = scoped.byKey('minimumDamage');
+    const warn = item.inputs['.rmo-warn'];
+    expect(warn.classList.contains('hidden')).toBe(true);
+    item.inputs['.rmo-mode-toggle'].fire('click');
+    expect(item.inputs['.rmo-mode-toggle'].dataset.value).toBe('random');
+    expect(warn.classList.contains('hidden')).toBe(false);
+    item.inputs['.rmo-mode-toggle'].fire('click');
+    expect(warn.classList.contains('hidden')).toBe(true);
+  });
+
   it('collapses and expands parameter groups without dropping their values', () => {
     const scoped = loadUIWithDom('standard', [
       { key: 'radius', min: '6', max: '9' },
@@ -528,7 +566,7 @@ describe('random map creation UI', () => {
     expect(weightClamped.ui.collectRandomOptions().startingWeightHeavy).toBe(10);
     // 3.6.2 新增参数同样提交前钳位（战斗波动 / 据点收入 / 兵种属性）。
     const variance = loadUIWithDom('standard', [{ key: 'damageVarianceRange', mode: 'fixed', value: '999' }]);
-    expect(variance.ui.collectRandomOptions().damageVarianceRange).toBe(20);
+    expect(variance.ui.collectRandomOptions().damageVarianceRange).toBe(8);
     const income = loadUIWithDom('standard', [{ key: 'supplyIncome', min: '5', max: '999' }]);
     expect(income.ui.collectRandomOptions().supplyIncome).toEqual([5, 40]);
     const attack = loadUIWithDom('standard', [{ key: 'infantryAttack', mode: 'fixed', value: '0' }]);

@@ -1613,7 +1613,6 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   font-size: 12px;
   font-weight: 600;
 }
-.rmo-param select,
 .rmo-param input {
   background: #0b1218;
   border: 1px solid #2a3a4a;
@@ -1622,7 +1621,51 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   font-size: 12px;
   padding: 3px 6px;
 }
-.rmo-param select { flex: none; }
+/* 取值方式左右滑动开关：随机 ⇄ 固定，滑块停在当前档一侧。 */
+.rmo-mode-toggle {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  border: 1px solid #2a3a4a;
+  border-radius: 11px;
+  background: #0b1218;
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+}
+.rmo-mode-toggle:focus-visible {
+  border-color: #d6b34a;
+  outline: none;
+}
+.rmo-mode-option {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  text-align: center;
+  color: #668495;
+  font-size: 11px;
+  line-height: 20px;
+  transition: color 0.15s ease;
+}
+.rmo-mode-option.is-active {
+  color: #10202b;
+  font-weight: 700;
+}
+.rmo-mode-thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: 32px;
+  border-radius: 9px;
+  background: #d6b34a;
+  transition: transform 0.18s ease;
+}
+.rmo-mode-toggle[data-value='fixed'] .rmo-mode-thumb {
+  transform: translateX(34px);
+}
 .rmo-range-inputs,
 .rmo-fixed-input {
   display: flex;

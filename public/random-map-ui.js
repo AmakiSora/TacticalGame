@@ -11,7 +11,7 @@
   const ARTILLERY_MODES = ['annihilation', 'royale'];
   const HEADQUARTERS_MODES = ['standard', 'simultaneous'];
 
-  // min/max = 服务端硬边界（src/config/randomMap.ts 的 PARAM_BOUNDS，滑块量程），
+  // min/max = 服务端硬边界（src/config/randomMap.ts 的 PARAM_BOUNDS，数字输入量程），
   // defMin/defMax = 留空时服务端使用的默认区间（仅作提示与"默认态"回显）。
   // 两份数值由 tests/public/random-map-bounds.test.ts 对齐校验，避免前后端漂移。
   const PARAMS = [
@@ -86,10 +86,11 @@
     return `<div class="rmo-param" data-key="${esc(param.key)}">
       <div class="rmo-param-head">
         <span class="rmo-param-label" title="${esc(hint)}">${label}</span>
-        <select class="rmo-mode" aria-label="${label}取值方式">
-          <option value="random" selected>随机</option>
-          <option value="fixed">固定</option>
-        </select>
+        <span class="rmo-mode-toggle" data-value="random" role="switch" aria-checked="false" tabindex="0" aria-label="${label}取值方式">
+          <span class="rmo-mode-option is-active" data-value="random">随机</span>
+          <span class="rmo-mode-option" data-value="fixed">固定</span>
+          <span class="rmo-mode-thumb" aria-hidden="true"></span>
+        </span>
         <span class="rmo-range-inputs">
           <input class="rmo-min" type="number" ${bounds} placeholder="${param.defMin}" aria-label="${label}最小值" />
           <span class="rmo-sep">–</span>
@@ -168,6 +169,10 @@
     return Number.isFinite(value) ? value : null;
   }
 
+  // 已初始化过的面板容器：防重复 init（模块尾自动 boot 与外部显式调用撞车时，
+  // 会给同一批控件挂两份监听）。
+  const initializedPanels = new WeakSet();
+
   const RandomMapUI = {
     RANDOM_MAP_ID,
     PARAMS,
@@ -193,6 +198,10 @@
     /** 将配置面板渲染进容器（各页面在 #random-map-options 容器上调用一次）。 */
     init(container) {
       if (!container) return;
+      // 面板只初始化一次：模块尾部的自动 boot 与外部显式调用可能撞在一起，
+      // 重复 init 会把同一批开关/输入挂上两份监听（滑动开关连翻两次等于没翻）。
+      if (initializedPanels.has(container)) return;
+      initializedPanels.add(container);
       container.innerHTML = panelHtml();
       RandomMapUI.applyModeVisibility(container);
       document.getElementById('rmo-game-mode')?.addEventListener('change', () => {
@@ -200,14 +209,27 @@
         RandomMapUI.schedulePreview();
       });
       container.querySelectorAll('.rmo-param').forEach(row => {
-        const mode = row.querySelector('.rmo-mode');
+        const toggle = row.querySelector('.rmo-mode-toggle');
+        if (!toggle) return;
         const rangeInputs = row.querySelector('.rmo-range-inputs');
         const fixedInput = row.querySelector('.rmo-fixed-input');
-        mode?.addEventListener('change', () => {
-          const fixed = mode.value === 'fixed';
+        // 左右滑动开关：点开关任意处即切换到另一档，随机↔固定。
+        const applyMode = fixed => {
+          toggle.dataset.value = fixed ? 'fixed' : 'random';
+          toggle.setAttribute('aria-checked', fixed ? 'true' : 'false');
+          toggle.querySelectorAll('.rmo-mode-option').forEach(option => {
+            option.classList.toggle('is-active', option.dataset.value === toggle.dataset.value);
+          });
           rangeInputs?.classList.toggle('hidden', fixed);
           fixedInput?.classList.toggle('hidden', !fixed);
           RandomMapUI.schedulePreview();
+        };
+        toggle.addEventListener('click', () => applyMode(toggle.dataset.value !== 'fixed'));
+        toggle.addEventListener('keydown', event => {
+          if (event && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault?.();
+            applyMode(toggle.dataset.value !== 'fixed');
+          }
         });
       });
       container.querySelectorAll('input, select').forEach(input => {
@@ -329,7 +351,7 @@
         // 与服务端 sanitizeParam 同口径地钳位：前端先钳，用户填的越界值不会「看着生效、
         // 实际被服务端悄悄改掉」，提交内容与服务端结果始终一致。
         const bound = value => (param ? clampToBounds(value, param) : value);
-        const fill = row.querySelector('.rmo-mode')?.value || 'random';
+        const fill = row.querySelector('.rmo-mode-toggle')?.dataset.value || 'random';
         if (fill === 'fixed') {
           const value = parseNumber(row.querySelector('.rmo-value'));
           if (value !== null) options[key] = bound(value);

@@ -35,6 +35,7 @@ function stubElement(extra: Record<string, unknown> = {}) {
     style: {} as Record<string, string>,
     attrs: {} as Record<string, string>,
     setAttribute: (name: string, value: string) => { element.attrs[name] = value; },
+    getAttribute: (name: string) => element.attrs[name] ?? null,
     classList: {
       toggle: (name: string, on?: boolean) => { if (on) classes.add(name); else classes.delete(name); },
       contains: (name: string) => classes.has(name),
@@ -57,13 +58,25 @@ function stubElement(extra: Record<string, unknown> = {}) {
   return element;
 }
 
-/** 按参数行的真实 DOM 层级造桩：head 里是取值方式下拉 + 区间/固定两组数字输入。 */
+/** 按参数行的真实 DOM 层级造桩：head 里是取值方式滑动开关 + 区间/固定两组数字输入。 */
 function makeRowStub(spec: RowSpec) {
   const rangeGroup = stubElement({ tagName: 'SPAN' });
   const fixedGroup = stubElement({ tagName: 'SPAN' });
   fixedGroup.classList.add('hidden');
+  // 开关内的两半档位文字（随机/固定），is-active 跟随当前档。
+  const optionRandom = stubElement({ tagName: 'SPAN', dataset: { value: 'random' } });
+  const optionFixed = stubElement({ tagName: 'SPAN', dataset: { value: 'fixed' } });
+  const toggle = stubElement({
+    tagName: 'SPAN',
+    dataset: { value: spec.mode ?? 'random' },
+    querySelectorAll: (selector: string) =>
+      selector === '.rmo-mode-option' ? [optionRandom, optionFixed] : [],
+  });
+  toggle.setAttribute('aria-checked', spec.mode === 'fixed' ? 'true' : 'false');
+  if (spec.mode === 'fixed') optionFixed.classList.add('is-active');
+  else optionRandom.classList.add('is-active');
   const inputs: Record<string, ReturnType<typeof stubElement>> = {
-    '.rmo-mode': stubElement({ tagName: 'SELECT', value: spec.mode ?? 'random' }),
+    '.rmo-mode-toggle': toggle,
     '.rmo-min': stubElement({ tagName: 'INPUT', type: 'number', value: spec.min ?? '' }),
     '.rmo-max': stubElement({ tagName: 'INPUT', type: 'number', value: spec.max ?? '' }),
     '.rmo-value': stubElement({ tagName: 'INPUT', type: 'number', value: spec.value ?? '' }),
@@ -77,7 +90,7 @@ function makeRowStub(spec: RowSpec) {
   // 行内元素都能沿 closest('.rmo-param') 找到所属行，与真实 DOM 语义保持一致。
   const toRow = (selector: string) => (selector === '.rmo-param' ? row : null);
   for (const element of Object.values(inputs)) element.closest = toRow;
-  return { row, inputs, rangeGroup, fixedGroup };
+  return { row, inputs, rangeGroup, fixedGroup, optionRandom, optionFixed };
 }
 
 /** 带 DOM 桩加载模块并跑 init，用于真跑 applyModeVisibility / collectRandomOptions / 事件接线。 */
@@ -90,7 +103,10 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
     innerHTML: '',
     querySelectorAll: (selector: string) => {
       if (selector === '.rmo-param') return rows;
-      if (selector === 'input, select') return allInputs;
+      // 与真实 DOM 口径一致：input, select 只命中表单元素，开关 SPAN 不在内。
+      if (selector === 'input, select') {
+        return allInputs.filter(el => el.tagName === 'INPUT' || el.tagName === 'SELECT');
+      }
       return [];
     },
   });
@@ -288,21 +304,36 @@ describe('random map creation UI', () => {
     expect(() => ranged.ui.refreshSliders()).not.toThrow();
   });
 
-  it('switches between range inputs and the fixed input through the mode select', () => {
+  it('switches between range inputs and the fixed input through the sliding toggle', () => {
     const scoped = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '9' }]);
     const item = scoped.byKey('radius');
-    // 默认区间模式：区间输入可见、固定输入隐藏。
+    const toggle = item.inputs['.rmo-mode-toggle'];
+    // 默认随机档：区间输入可见、固定输入隐藏，滑块停在左半。
     expect(item.rangeGroup.classList.contains('hidden')).toBe(false);
     expect(item.fixedGroup.classList.contains('hidden')).toBe(true);
-    // 切到固定：区间输入隐藏、固定输入显示，收集走 .rmo-value。
-    item.inputs['.rmo-mode'].value = 'fixed';
-    expect(item.inputs['.rmo-mode'].fire('change'), '取值方式没挂 change 监听').toBeGreaterThan(0);
+    expect(toggle.dataset.value).toBe('random');
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    expect(item.optionRandom.classList.contains('is-active')).toBe(true);
+    expect(item.optionFixed.classList.contains('is-active')).toBe(false);
+    // 点一下滑到固定：区间输入隐藏、固定输入显示，收集走 .rmo-value。
+    expect(toggle.fire('click'), '取值方式开关没挂 click 监听').toBeGreaterThan(0);
+    expect(toggle.dataset.value).toBe('fixed');
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(item.optionFixed.classList.contains('is-active')).toBe(true);
+    expect(item.optionRandom.classList.contains('is-active')).toBe(false);
     expect(item.rangeGroup.classList.contains('hidden')).toBe(true);
     expect(item.fixedGroup.classList.contains('hidden')).toBe(false);
-    // 切回随机：两组显隐还原。
-    item.inputs['.rmo-mode'].value = 'random';
-    item.inputs['.rmo-mode'].fire('change');
+    // 再点一下滑回随机：两组显隐还原。
+    toggle.fire('click');
+    expect(toggle.dataset.value).toBe('random');
     expect(item.rangeGroup.classList.contains('hidden')).toBe(false);
+    expect(item.fixedGroup.classList.contains('hidden')).toBe(true);
+    // 键盘同样可切换（role="switch" 的可达性要求）。
+    toggle.fire('keydown', { key: 'Enter' });
+    expect(toggle.dataset.value).toBe('fixed');
+    expect(item.fixedGroup.classList.contains('hidden')).toBe(false);
+    toggle.fire('keydown', { key: ' ' });
+    expect(toggle.dataset.value).toBe('random');
     expect(item.fixedGroup.classList.contains('hidden')).toBe(true);
   });
 

@@ -1,4 +1,5 @@
 import './version.js';
+import './error-text.js';
 
 /* Static stats dashboard — reads /data/stats.json only. */
 (() => {
@@ -784,7 +785,7 @@ import './version.js';
       applyAndRender();
     } catch (err) {
       console.error(err);
-      setStatus(`失败: ${err.message}`, 'err');
+      setStatus(`失败: ${window.ErrorText.describe(err)}`, 'err');
       el.kpiGrid.innerHTML = '';
       el.matchupBody.className = 'empty-block';
       el.matchupBody.textContent =

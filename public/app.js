@@ -1,5 +1,7 @@
 // 共享依赖经 ESM import 保证执行顺序（替代原 classic script 标签的文档顺序）。
 import './version.js';
+import './ui-dialog.js';
+import './error-text.js';
 import './board-animation.js';
 import './board-inspect.js';
 import './rules-sheet.js';
@@ -1716,7 +1718,7 @@ async function selectRecord(id) {
     closeRecordPicker();
     statusEl.textContent = `已载入回放 ${allEvents.length} 事件`;
   } catch (err) {
-    statusEl.textContent = `载入回放失败: ${err.message}`;
+    statusEl.textContent = `载入回放失败: ${window.ErrorText.describe(err)}`;
   }
 }
 
@@ -1789,7 +1791,12 @@ async function forceAdjudicateCurrentGame() {
     .sort(([, a], [, b]) => (b.total ?? 0) - (a.total ?? 0))
     .map(([owner, score], index) => `${index + 1}. ${playerName(owner)}：${score.total ?? 0}`)
     .join('\n');
-  const confirmed = confirm(`确定强制裁决当前对局？\n\n${standings || '将按当前分数结算'}\n\n裁决后对局立即结束，无法继续行动。`);
+  const confirmed = await window.UIDialog.confirm({
+    title: '确定强制裁决当前对局？',
+    message: `裁决后对局立即结束，无法继续行动。\n\n当前排名：\n${standings || '暂无分数，将按当前分数结算'}`,
+    confirmText: '强制裁决',
+    tone: 'danger',
+  });
   if (!confirmed) return;
 
   forceAdjudicateBtn.disabled = true;
@@ -1822,7 +1829,12 @@ async function deleteCurrentGame() {
   const game = gamesList.find(g => g.id === id);
   const phase = phaseLabel(game?.phase) || '未知';
   const turnNumber = game?.turnNumber ?? '未知';
-  const ok = confirm(`确定删除对局 ${id}？\n阶段：${phase}\n回合：${turnNumber}\n\n该操作会删除内存与持久化文件中的对局，不能撤销。`);
+  const ok = await window.UIDialog.confirm({
+    title: '删除这局对局？',
+    message: `对局 ${id}\n阶段：${phase} · 回合：${turnNumber}\n\n该操作会删除内存与持久化文件中的对局，不能撤销。`,
+    confirmText: '删除对局',
+    tone: 'danger',
+  });
   if (!ok) return;
 
   const headers = {};
@@ -1908,7 +1920,12 @@ async function renamePlayer(playerId) {
     return;
   }
   const current = playerName(playerId);
-  const next = prompt(`更改${current}的名字`, current);
+  const next = await window.UIDialog.prompt({
+    title: '更改玩家名字',
+    message: `当前名字：${current}`,
+    value: current,
+    confirmText: '保存',
+  });
   if (next === null) return;
   const name = next.trim();
   if (!name) {
@@ -2086,7 +2103,7 @@ importFile.addEventListener('change', e => {
       loadImportedReplay(replay);
       statusEl.textContent = `已导入 ${allEvents.length} 事件`;
     } catch (err) {
-      statusEl.textContent = `导入失败: ${err.message}`;
+      statusEl.textContent = `导入失败: ${window.ErrorText.describe(err)}`;
     } finally {
       importFile.value = '';
     }

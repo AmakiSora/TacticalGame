@@ -24,6 +24,19 @@ describe('lobby map dialog and room state', () => {
       expect(html, `${path} 缺地图卡片容器`).toContain('id="map-picker" class="map-picker"');
       expect(html, `${path} 缺随机参数容器`).toContain('id="random-map-options"');
       expect(html, `${path} 缺隐藏 select 兼容层`).toContain('id="map-select" hidden');
+      // 摘要卡是「地图预览 + 左下角图例 + 右侧简略信息」，不是只有一个小缩略图。
+      expect(html, `${path} 缺地图预览台`).toContain('class="lobby-map-stage"');
+      expect(html, `${path} 缺图例容器`).toContain('id="lobby-map-legend"');
+      expect(html, `${path} 图例不在预览台内`).toMatch(/lobby-map-stage[\s\S]*id="lobby-map-thumb"[\s\S]*id="lobby-map-legend"[\s\S]*lobby-map-copy/);
+      // 数值行是纯文字，排在简介下方（不再是一排带符号的标签）。
+      expect(html, `${path} 缺数值文字行`).toContain('id="lobby-map-meta"');
+      expect(html, `${path} 数值行不在简介下方`).toMatch(/id="lobby-map-desc"[\s\S]*id="lobby-map-meta"[\s\S]*id="btn-change-map"/);
+      // 英文 id 单独占第二行，不跟中文名挤在一行。
+      expect(html, `${path} 英文 id 未单独成行`).toMatch(/id="lobby-map-name"[^<]*<\/span>\s*<\/div>\s*<div id="lobby-map-id"/);
+      // 简介挂在名称块里：鼠标移到名称（含英文名）上才展开。
+      expect(html, `${path} 简介未挂在名称块上`).toMatch(/class="lobby-map-title"[\s\S]*id="lobby-map-name"[\s\S]*id="lobby-map-desc"/);
+      // 名称与数值表包在同一个信息块里，共用一条中轴。
+      expect(html, `${path} 缺名称 + 数值表的信息块`).toMatch(/class="lobby-map-info"[\s\S]*class="lobby-map-title"[\s\S]*id="lobby-map-meta"/);
       // 创建/加入成功后原地变房间卡，而不是在下方追加一截。
       expect(html, `${path} 创建结果缺房间样式`).toMatch(/id="create-result"[^>]*lobby-room/);
       expect(html, `${path} 加入结果缺房间样式`).toMatch(/id="join-result"[^>]*lobby-room/);
@@ -31,6 +44,9 @@ describe('lobby map dialog and room state', () => {
       // 房间卡保留返回设置 / 返回大厅的入口，不把「重新创建」能力锁死。
       expect(html, `${path} 缺重新创建入口`).toContain('id="btn-create-again"');
       expect(html, `${path} 缺返回大厅入口`).toContain('id="btn-join-again"');
+      // 加入别人房间后同样要看到地图：预览卡插在加入表单与房间卡之间。
+      expect(html, `${path} 缺加入房间的地图预览`).toContain('id="join-map-summary"');
+      expect(html, `${path} 加入地图预览位置不对`).toMatch(/id="join-form"[\s\S]*id="join-map-summary"[\s\S]*id="join-result"/);
     }
   });
 
@@ -51,8 +67,18 @@ describe('lobby map dialog and room state', () => {
       const css = read(path);
       for (const marker of [
         '.lobby-map-summary',
+        '.lobby-map-stage',
         '.lobby-map-thumb',
-        '.lobby-map-tag',
+        '.lobby-map-legend',
+        '.lobby-map-swatch-hex',
+        '.lobby-map-swatch-unit',
+        '.lobby-map-meta',
+        '.lobby-map-info',
+        '.lobby-map-title',
+        '.lobby-map-stat-key',
+        '.lobby-map-stat-label',
+        '.lobby-map-id',
+        '.lobby-map-change',
         '.lobby-room',
         '.lobby-room-actions',
         '.map-dialog',
@@ -64,6 +90,32 @@ describe('lobby map dialog and room state', () => {
       ]) {
         expect(css, `${path} 缺 ${marker} 样式`).toContain(marker);
       }
+      // 排版契约：图例竖排在预览左下角，信息写在右上角、整块右对齐，地图居中且给信息留出宽度。
+      const rule = (selector: string) => css.match(new RegExp(`${selector} \\{[^}]*\\}`))?.[0] || '';
+      expect(rule('\\.lobby-map-legend'), `${path} 图例未竖排`).toContain('flex-direction: column');
+      expect(rule('\\.lobby-map-legend'), `${path} 图例未贴预览左下角`).toContain('position: absolute');
+      // 图例与右上角信息都不带框，直接压在预览上。
+      expect(rule('\\.lobby-map-legend'), `${path} 图例仍带边框/底色`).not.toContain('border:');
+      expect(rule('\\.lobby-map-legend'), `${path} 图例仍带底色`).not.toContain('background:');
+      expect(rule('\\.lobby-map-copy'), `${path} 信息未嵌在预览右上角`).toContain('position: absolute');
+      expect(rule('\\.lobby-map-copy'), `${path} 信息未贴右`).toContain('align-items: flex-end');
+      // 数值表是整块 grid（两列由容器统一），行与行不会参差；名称块与它同宽共轴。
+      expect(rule('\\.lobby-map-meta'), `${path} 数值表未共用列宽`)
+        .toContain('grid-template-columns: auto auto');
+      expect(rule('\\.lobby-map-info'), `${path} 名称与数值表未共轴`).toContain('width: fit-content');
+      expect(rule('\\.lobby-map-title'), `${path} 名称未居中到数值表中轴`).toContain('text-align: center');
+      // 简介默认收起，悬停名称才展开。
+      expect(css, `${path} 简介未默认收起`).toContain('visibility: hidden');
+      expect(css, `${path} 简介未在悬停名称时展开`).toContain('.lobby-map-title:hover .lobby-map-desc');
+      expect(rule('\\.lobby-map-thumb \\.map-preview'), `${path} 预览未给信息留位`)
+        .toContain('calc(100% - 2 * (var(--lobby-map-panel) + 20px))');
+      // 创建成功后不换页：地图收小、更换地图退场、房间卡在下方带过渡展开。
+      expect(css, `${path} 房态未收小地图`).toContain('#create-form.room-active .lobby-map-stage');
+      expect(css, `${path} 房态未隐藏更换地图`).toContain('#create-form.room-active .lobby-map-change');
+      expect(css, `${path} 房间卡展开缺过渡`).toContain('#create-result.lobby-room');
+      expect(css, `${path} 房间卡展开态缺样式`).toContain('#create-result.lobby-room.room-open');
+      expect(css, `${path} 加入房间的地图预览缺入场动画`).toContain('#join-map-summary:not(.hidden)');
+      expect(css, `${path} 加入房间卡未接入展开动画`).toContain('#join-result.lobby-room.room-open');
     }
   });
 
@@ -76,8 +128,21 @@ describe('lobby map dialog and room state', () => {
         'function applyMapDialog()',
         'function choosePendingMap(',
         'function renderLobbyMapSummary()',
+        'function renderLobbyMapStage(',
+        'function lobbyMapLegendMarkup(',
+        'function lobbyMapStatRows(',
+        'function randomMapStatRows(',
+        'function lobbyMapStatsMarkup(',
+        'function renderJoinMapCard(',
+        'function hydrateRandomJoinMapCard(',
+        'renderJoinMapCard(data.lobby);',
+        'els.lobbyMapLegend',
+        'els.lobbyMapMeta',
         'function renderMapDialogRandomFacts()',
         'function setCreateRoomVisible(',
+        'function animateRoomCard(',
+        'room-active',
+        'room-open',
         'function setJoinRoomVisible(',
         'function showJoinError(',
         'pendingMapId',
@@ -88,6 +153,13 @@ describe('lobby map dialog and room state', () => {
       ]) {
         expect(source, `${path} 缺 ${marker}`).toContain(marker);
       }
+      // 图例只列这张图上真实出现的地形，不能把水域/障碍这些无关图例都挂上去。
+      expect(source, `${path} 图例未按地形过滤`).toContain('if (terrains.has(key))');
+      // 初始单位按兵种分开列，但不再标数量。
+      expect(source, `${path} 初始单位未按兵种拆分`).toContain('lobby-map-swatch-unit ${type}');
+      expect(source, `${path} 初始单位不应再标数量`).not.toContain('×${units.get(type)}');
+      // 弹层里改随机参数后，大厅摘要的预览和图例要跟着刷新。
+      expect(source, `${path} 随机预览未回写大厅`).toContain("if (els.mapSelect?.value === 'random') renderLobbyMapSummary();");
       // 弹层里切页签不改变已应用的地图；只有「使用这张地图」才 selectMap。
       expect(source, `${path} 页签切换不应直接 selectMap`).not.toContain("showMapDialogTab(tab.dataset.mapTab));\n  selectMap");
       // 创建/加入成功走原地房间态。

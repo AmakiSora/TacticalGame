@@ -654,9 +654,9 @@ describe('random map generator', () => {
     expect(JSON.stringify(legacy)).toBe(JSON.stringify(explicit));
     // 与新细分参数同给则报错，避免静默忽略其中一边。
     expect(() => sanitizeRandomOptions({ terrainDensity: 0.1, waterDensity: 0.02 }))
-      .toThrow('terrainDensity is deprecated');
+      .toThrow('terrainDensity 已废弃');
     expect(() => generateRandomMapConfig({ seed: 'x', terrainDensity: 0.1, wallDensity: 0.02 }, 4))
-      .toThrow('terrainDensity is deprecated');
+      .toThrow('terrainDensity 已废弃');
   });
 
   it('generates varied unit stats within the requested variation', () => {
@@ -766,8 +766,8 @@ describe('sanitizeRandomOptions', () => {
     expect(() => sanitizeRandomOptions({ maxTurns: Number.NaN })).toThrow();
     expect(() => sanitizeRandomOptions({ symmetric: 'yes' })).toThrow('symmetric');
     expect(() => sanitizeRandomOptions({ seed: '' })).toThrow('seed');
-    expect(() => sanitizeRandomOptions({ mode: 'chaos' })).toThrow('random.mode must be one of');
-    expect(() => sanitizeRandomOptions({ mode: 42 })).toThrow('random.mode must be one of');
-    expect(() => sanitizeRandomOptions({ bogus: 1 })).toThrow('unknown random option');
+    expect(() => sanitizeRandomOptions({ mode: 'chaos' })).toThrow('random.mode 只能是');
+    expect(() => sanitizeRandomOptions({ mode: 42 })).toThrow('random.mode 只能是');
+    expect(() => sanitizeRandomOptions({ bogus: 1 })).toThrow('未知的随机参数');
   });
 });

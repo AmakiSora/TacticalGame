@@ -21,7 +21,7 @@ type Plan = NonNullable<GameState['plan']>;
 
 function plan(game: GameState): Result<Plan> {
   if (!isSimultaneous(game)) {
-    return { ok: false, code: 'not_simultaneous_game', message: 'game is not in simultaneous mode' };
+    return { ok: false, code: 'not_simultaneous_game', message: '该对局不是同时回合模式' };
   }
   if (!game.plan) game.plan = { queues: {}, committed: [] };
   return { ok: true, data: game.plan };
@@ -31,13 +31,13 @@ function plan(game: GameState): Result<Plan> {
 function requirePlanning(game: GameState, owner: PlayerId, options: { allowCommitted?: boolean } = {}): Result<Plan> {
   const resolved = plan(game);
   if (!resolved.ok) return resolved;
-  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
-  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: 'game not in play' };
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: '对局已结束' };
+  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
   if (game.players[owner]?.status !== 'active') {
-    return { ok: false, code: 'player_eliminated', message: 'player eliminated' };
+    return { ok: false, code: 'player_eliminated', message: '该玩家已被淘汰' };
   }
   if (!options.allowCommitted && game.plan!.committed.includes(owner)) {
-    return { ok: false, code: 'not_your_turn', message: 'plan already committed this round' };
+    return { ok: false, code: 'not_your_turn', message: '本轮计划已提交' };
   }
   return { ok: true, data: game.plan! };
 }
@@ -69,7 +69,7 @@ function checkBudget(game: GameState, owner: PlayerId): Failure | null {
   // simultaneous 模式下每个排队动作恰好消耗 1 点行动点，队列长度即用量。
   const limit = game.config.balance.actionsPerTurn;
   if (queueOf(game, owner).length >= limit) {
-    return { ok: false, code: 'action_limit_reached', message: `only ${limit} actions allowed per round` };
+    return { ok: false, code: 'action_limit_reached', message: `每轮最多行动 ${limit} 次` };
   }
   return null;
 }
@@ -182,29 +182,29 @@ export function queueDeployAction(
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
   const unitSpec: UnitSpec | undefined = game.config.units[unitType];
-  if (!unitSpec) return { ok: false, code: 'invalid_deploy', message: 'unknown unit type' };
+  if (!unitSpec) return { ok: false, code: 'invalid_deploy', message: '未知兵种' };
   const origin = deployOriginFor(game, owner, fromId);
-  if (!origin) return { ok: false, code: 'invalid_deploy', message: 'invalid deploy origin' };
+  if (!origin) return { ok: false, code: 'invalid_deploy', message: '部署起点无效' };
   if (isArtilleryDanger(game, origin) || isArtilleryDanger(game, { q, r })) {
-    return { ok: false, code: 'invalid_deploy', message: 'cannot deploy inside the artillery zone' };
+    return { ok: false, code: 'invalid_deploy', message: '炮火区内无法部署' };
   }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
   if (hexDistance(origin, { q, r }) !== 1) {
-    return { ok: false, code: 'out_of_deploy_range', message: 'deploy target must be adjacent' };
+    return { ok: false, code: 'out_of_deploy_range', message: '部署目标必须相邻' };
   }
   if (!isDeployable(game, q, r)) {
-    return { ok: false, code: 'invalid_terrain', message: 'deploy target is not empty plain terrain' };
+    return { ok: false, code: 'invalid_terrain', message: '部署目标必须是空的平原地形' };
   }
   if (claimedCells(queueOf(game, owner)).has(`${q},${r}`)) {
-    return { ok: false, code: 'cell_occupied', message: 'target already claimed by your own planned action' };
+    return { ok: false, code: 'cell_occupied', message: '该格已被你本轮的另一条计划占用' };
   }
   const discount = Math.min(unitSpec.cost, deployDiscountForOrigin(game, owner, fromId));
   const actualCost = unitSpec.cost - discount;
   const resources = game.resources[owner];
-  if (!resources) return { ok: false, code: 'player_eliminated', message: 'player has no resources' };
+  if (!resources) return { ok: false, code: 'player_eliminated', message: '资源不足' };
   if (resources.supplies - plannedDeploySpend(game, owner) < actualCost) {
-    return { ok: false, code: 'insufficient_supplies', message: `need ${actualCost} supplies` };
+    return { ok: false, code: 'insufficient_supplies', message: `需要 ${actualCost} 补给` };
   }
   return enqueue(game, owner, { id: randomUUID(), type: 'deploy', unitType, fromId, q, r });
 }
@@ -221,21 +221,21 @@ export function queueMoveAction(
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
   const unit = findOwnUnit(game, owner, unitId);
-  if (!unit) return { ok: false, code: 'unit_not_found', message: 'unit not found' };
+  if (!unit) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
   const queue = queueOf(game, owner);
   if (unitAlreadyPlanned(queue, unitId)) {
-    return { ok: false, code: 'invalid_move', message: 'unit already has a planned action this round' };
+    return { ok: false, code: 'invalid_move', message: '该单位本轮已有计划动作' };
   }
-  if (unit.q === q && unit.r === r) return { ok: false, code: 'invalid_move', message: 'same cell' };
+  if (unit.q === q && unit.r === r) return { ok: false, code: 'invalid_move', message: '目标格就是当前所在格' };
   const budget = checkBudget(game, owner);
   if (budget) return budget;
   // 路径按计划时刻棋盘计算：所有单位（含敌方）都视为障碍，BFS 天然排除被占用格。
   const reachable = findReachableCells(game, unit);
   if (!reachable.some(pos => pos.q === q && pos.r === r)) {
-    return { ok: false, code: 'invalid_move', message: 'target is not reachable' };
+    return { ok: false, code: 'invalid_move', message: '目标格无法到达' };
   }
   if (claimedCells(queue).has(`${q},${r}`)) {
-    return { ok: false, code: 'cell_occupied', message: 'target already claimed by your own planned action' };
+    return { ok: false, code: 'cell_occupied', message: '该格已被你本轮的另一条计划占用' };
   }
   return enqueue(game, owner, { id: randomUUID(), type: 'move', unitId, q, r });
 }
@@ -252,20 +252,20 @@ export function queueAttackAction(
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
   const attacker = findOwnUnit(game, owner, attackerId);
-  if (!attacker) return { ok: false, code: 'unit_not_found', message: 'attacker not found' };
+  if (!attacker) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
   const queue = queueOf(game, owner);
   if (unitAlreadyPlanned(queue, attackerId)) {
-    return { ok: false, code: 'invalid_attack', message: 'unit already has a planned action this round' };
+    return { ok: false, code: 'invalid_attack', message: '该单位本轮已有计划动作' };
   }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
   // 攻击瞄准一个格子/方向：射程内任选一格；未配置形状 = 单格预测射击。
   if (!isInBounds(game, q, r)) {
-    return { ok: false, code: 'invalid_attack', message: 'target cell is outside the board' };
+    return { ok: false, code: 'invalid_attack', message: '目标格在地图之外' };
   }
   const aim = coveredCellsFor(attacker, game.config.units[attacker.type], 'attackShape', { q, r }, attacker.attackRange);
   if (!aim) {
-    return { ok: false, code: 'invalid_attack', message: `cannot aim at (${q},${r}) with this unit's attack shape` };
+    return { ok: false, code: 'invalid_attack', message: `该单位的攻击范围打不到 (${q},${r})` };
   }
   return enqueue(game, owner, { id: randomUUID(), type: 'attack', attackerId, q, r, direction: aim.direction });
 }
@@ -286,28 +286,28 @@ export function queueHealAction(
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
   const support = findOwnUnit(game, owner, supportId);
-  if (!support) return { ok: false, code: 'unit_not_found', message: 'support not found' };
-  if (support.type !== 'support') return { ok: false, code: 'invalid_heal', message: 'unit is not support' };
+  if (!support) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
+  if (support.type !== 'support') return { ok: false, code: 'invalid_heal', message: '该单位不是支援兵' };
   const queue = queueOf(game, owner);
   if (unitAlreadyPlanned(queue, supportId)) {
-    return { ok: false, code: 'invalid_heal', message: 'unit already has a planned action this round' };
+    return { ok: false, code: 'invalid_heal', message: '该单位本轮已有计划动作' };
   }
   if (!isInBounds(game, q, r)) {
-    return { ok: false, code: 'invalid_heal', message: 'target cell is outside the board' };
+    return { ok: false, code: 'invalid_heal', message: '目标格在地图之外' };
   }
   const aim = coveredCellsFor(support, game.config.units[support.type], 'healShape', { q, r }, healRangeFor(game, support));
   if (!aim) {
-    return { ok: false, code: 'invalid_heal', message: `cannot aim at (${q},${r}) with this unit's heal shape` };
+    return { ok: false, code: 'invalid_heal', message: `该单位的治疗范围覆盖不到 (${q},${r})` };
   }
   const spec = game.config.units[support.type];
   if (spec && (isArtilleryDanger(game, support)
     || aim.cells.some(cell => isInBounds(game, cell.q, cell.r) && isArtilleryDanger(game, cell)))) {
-    return { ok: false, code: 'invalid_heal', message: 'cannot heal inside the artillery zone' };
+    return { ok: false, code: 'invalid_heal', message: '炮火区内无法治疗' };
   }
   const coveredFriend = aim.cells.some(cell =>
     game.units.some(unit => unit.alive && unit.owner === owner && unit.q === cell.q && unit.r === cell.r));
   if (!coveredFriend) {
-    return { ok: false, code: 'invalid_heal', message: 'no friendly unit in the covered cells' };
+    return { ok: false, code: 'invalid_heal', message: '覆盖范围内没有友方单位' };
   }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
@@ -326,27 +326,27 @@ export function queueDemolishAction(
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
   const unit = findOwnUnit(game, owner, unitId);
-  if (!unit) return { ok: false, code: 'unit_not_found', message: 'unit not found' };
+  if (!unit) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
   if (unit.type !== 'heavy') {
-    return { ok: false, code: 'invalid_demolish', message: 'only heavy units can demolish terrain' };
+    return { ok: false, code: 'invalid_demolish', message: '只有重装单位可以拆除地形' };
   }
   const queue = queueOf(game, owner);
   if (unitAlreadyPlanned(queue, unitId)) {
-    return { ok: false, code: 'invalid_demolish', message: 'unit already has a planned action this round' };
+    return { ok: false, code: 'invalid_demolish', message: '该单位本轮已有计划动作' };
   }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
   if (hexDistance(unit, { q, r }) > 1) {
-    return { ok: false, code: 'invalid_demolish', message: 'target must be adjacent' };
+    return { ok: false, code: 'invalid_demolish', message: '目标必须相邻' };
   }
   if (!isInBounds(game, q, r)) {
-    return { ok: false, code: 'invalid_demolish', message: 'target must be in bounds' };
+    return { ok: false, code: 'invalid_demolish', message: '目标必须在地图范围内' };
   }
   if (getTerrain(game, q, r) !== 'blocker') {
-    return { ok: false, code: 'invalid_demolish', message: 'target terrain is not blocker' };
+    return { ok: false, code: 'invalid_demolish', message: '目标地形不是障碍' };
   }
   if (getCellOccupant(game, q, r) !== null) {
-    return { ok: false, code: 'invalid_demolish', message: 'target cell is occupied' };
+    return { ok: false, code: 'invalid_demolish', message: '目标格已有单位' };
   }
   return enqueue(game, owner, { id: randomUUID(), type: 'demolish', unitId, q, r });
 }
@@ -358,7 +358,7 @@ export function revokePlanAction(game: GameState, owner: PlayerId, actionId: str
   if (!ready.ok) return ready;
   const queue = queueOf(game, owner);
   const index = queue.findIndex(action => action.id === actionId);
-  if (index < 0) return { ok: false, code: 'invalid_move', message: 'planned action not found' };
+  if (index < 0) return { ok: false, code: 'invalid_move', message: '找不到这条计划' };
   queue.splice(index, 1);
   return { ok: true, data: [...queue] };
 }
@@ -374,7 +374,7 @@ export function markCommitted(game: GameState, bus: EventBus, owner: PlayerId): 
   const ready = requirePlanning(game, owner, { allowCommitted: true });
   if (!ready.ok) return ready;
   if (game.plan!.committed.includes(owner)) {
-    return { ok: false, code: 'already_committed', message: 'plan already committed this round' };
+    return { ok: false, code: 'already_committed', message: '本轮计划已提交' };
   }
   game.plan!.committed.push(owner);
   appendEvent(game, bus, 'plan_committed', {

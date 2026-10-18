@@ -1,6 +1,8 @@
 // 布局编辑器：玩家页 / 观战页共用
 // 通过右上角「设置 → 改变布局」进入编辑模式，卡片可在 左侧 / 右侧 / 底部 区域间拖放，
 // 并可拖动地图框右下角手柄调整地图框整体大小。布局仅保存在浏览器 localStorage。
+import './ui-dialog.js';
+
 (() => {
   'use strict';
 
@@ -353,11 +355,14 @@
   // ── 设置入口 ──
   const btnEditLayout = document.getElementById('btn-edit-layout');
   const settingsPopover = document.getElementById('settings-popover');
-  btnEditLayout?.addEventListener('click', e => {
+  btnEditLayout?.addEventListener('click', async e => {
     e.stopPropagation();
     settingsPopover?.classList.remove('open');
     if (container.offsetParent === null) {
-      window.alert('请先进入游戏后再调整布局');
+      await window.UIDialog.alert({
+        title: '请先进入游戏',
+        message: '布局调整只在进入对局后可操作：先创建或加入一局，再打开右上角设置。',
+      });
       return;
     }
     enterEdit();

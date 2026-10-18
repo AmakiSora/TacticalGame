@@ -41,7 +41,7 @@ export interface PlanOutcome {
 }
 
 function notSimultaneous(): Failure {
-  return { ok: false, code: 'not_simultaneous_game', message: 'game is not in simultaneous mode' };
+  return { ok: false, code: 'not_simultaneous_game', message: '该对局不是同时回合模式' };
 }
 
 export function shouldAutoResolve(game: GameState): boolean {
@@ -63,8 +63,8 @@ export function commitAndMaybeResolve(game: GameState, bus: EventBus, owner: Pla
 /** 房主强制结算：未确认的玩家按其当前队列（可能为空）参与结算。 */
 export function forceResolveRound(game: GameState, bus: EventBus): Result<{ roundNumber: number }> {
   if (!isSimultaneous(game)) return notSimultaneous();
-  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
-  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: 'game not in play' };
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: '对局已结束' };
+  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
   const roundNumber = game.turn.roundNumber;
   resolveRound(game, bus);
   return { ok: true, data: { roundNumber } };

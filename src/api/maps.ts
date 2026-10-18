@@ -15,7 +15,7 @@ export async function mapsRoutes(app: FastifyInstance): Promise<void> {
     '/api/maps/random/preview', async (req, reply) => {
       const maxPlayers = Number(req.body?.maxPlayers ?? 2);
       if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8) {
-        return reply.code(400).send({ error: 'unsupported player count', code: 'unsupported_player_count' });
+        return reply.code(400).send({ error: '不支持该玩家人数', code: 'unsupported_player_count' });
       }
       try {
         const options = sanitizeRandomOptions(req.body?.random);
@@ -23,8 +23,8 @@ export async function mapsRoutes(app: FastifyInstance): Promise<void> {
         const config = generateRandomMapConfig({ ...options, seed }, maxPlayers);
         return { seed, preview: previewForConfig(config) };
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'invalid random options';
-        return reply.code(400).send({ error: `random map: ${message}`, code: 'invalid_move' });
+        const message = err instanceof Error ? err.message : '随机地图参数无效';
+        return reply.code(400).send({ error: `随机地图：${message}`, code: 'invalid_move' });
       }
     },
   );

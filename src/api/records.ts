@@ -176,7 +176,7 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
   }
 
   app.get('/api/records', async (_req, reply) => {
-    if (!entries) return reply.code(503).send({ error: 'records unavailable', code: 'records_unavailable' });
+    if (!entries) return reply.code(503).send({ error: '回放库暂不可用', code: 'records_unavailable' });
     const list = [...entries.values()].map(metadata).sort(sortEntries);
     return { records: list, total: list.length };
   });
@@ -184,10 +184,10 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
   // 通配路由承接 "V2/tg_0001_....json" 这类带斜杠的 id；
   // 命中失败即 404，靠白名单查找天然拒绝路径穿越（与 /api/skill/files/:name 同法）。
   app.get<{ Params: { '*': string } }>('/api/records/*', async (req, reply) => {
-    if (!entries) return reply.code(503).send({ error: 'records unavailable', code: 'records_unavailable' });
+    if (!entries) return reply.code(503).send({ error: '回放库暂不可用', code: 'records_unavailable' });
     const id = req.params['*'];
     const entry = entries.get(id);
-    if (!entry) return reply.code(404).send({ error: 'unknown record', code: 'record_not_found' });
+    if (!entry) return reply.code(404).send({ error: '找不到该回放', code: 'record_not_found' });
     return sendFile(reply, entry, req.headers['if-none-match']);
   });
 }

@@ -1,4 +1,6 @@
 import './version.js';
+import './ui-dialog.js';
+import './error-text.js';
 
 /* AI 竞技场排行榜 — reads /data/arena-leaderboard.json only. */
 (() => {
@@ -419,7 +421,7 @@ import './version.js';
         setStatus('已加载', 'ok');
       }
     } catch (err) {
-      setStatus(`加载失败：${err.message}`, 'err');
+      setStatus(`加载失败：${window.ErrorText.describe(err)}`, 'err');
     }
   }
 
@@ -570,7 +572,7 @@ import './version.js';
       evalEl['eval-models'].addEventListener('change', updateModelCount);
       updateModelCount();
     } catch (err) {
-      evalEl['eval-model-count'].textContent = `参与者列表加载失败：${err.message}`;
+      evalEl['eval-model-count'].textContent = `参与者列表加载失败：${window.ErrorText.describe(err)}`;
     }
   }
 
@@ -658,7 +660,7 @@ import './version.js';
       evalEl['eval-mini-strip'].hidden = true;
       evalMsg(unauthorized
         ? '状态获取被拒绝：已配置 AUTO_CONTROL_TOKEN 或非本机访问，请在对局/观战页设置中保存控制令牌'
-        : `状态获取失败：${err.message}`, 'err');
+        : `状态获取失败：${window.ErrorText.describe(err)}`, 'err');
     }
   }
 
@@ -692,20 +694,26 @@ import './version.js';
         renderEvalStatus(data.status);
       }
     } catch (err) {
-      evalMsg(`启动失败：${err.message}`, 'err');
+      evalMsg(`启动失败：${window.ErrorText.describe(err)}`, 'err');
     } finally {
       evalEl['eval-start'].disabled = evalStatus?.status === 'running';
     }
   });
 
   evalEl['eval-stop'].addEventListener('click', async () => {
-    if (!window.confirm('确定停止当前跑批？已完成的局数已写入 JSONL，同参数重跑可断点续跑。')) return;
+    const ok = await window.UIDialog.confirm({
+      title: '停止当前跑批？',
+      message: '已完成的局数已写入 JSONL，同参数重跑可断点续跑。',
+      confirmText: '停止跑批',
+      tone: 'warning',
+    });
+    if (!ok) return;
     try {
       const res = await fetch('/api/arena/eval/stop', { method: 'POST', headers: controlHeaders() });
       const data = await res.json().catch(() => ({}));
       evalMsg(res.ok ? '停止指令已发送，等待进程退出…' : `停止失败：${data.error || res.status}`, res.ok ? undefined : 'err');
     } catch (err) {
-      evalMsg(`停止失败：${err.message}`, 'err');
+      evalMsg(`停止失败：${window.ErrorText.describe(err)}`, 'err');
     }
   });
 
@@ -722,7 +730,7 @@ import './version.js';
         loadData();
       }
     } catch (err) {
-      evalMsg(`重算失败：${err.message}`, 'err');
+      evalMsg(`重算失败：${window.ErrorText.describe(err)}`, 'err');
     } finally {
       evalEl['eval-regen'].disabled = false;
     }

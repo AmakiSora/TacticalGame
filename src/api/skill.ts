@@ -70,12 +70,12 @@ export async function skillRoutes(app: FastifyInstance): Promise<void> {
   // 最短引导路径：裸 agent 只需 prompt 里这一个 URL。
   app.get('/api/skill', async (req, reply) => {
     const file = files?.get('SKILL.md');
-    if (!file) return reply.code(503).send({ error: 'skill unavailable', code: 'skill_unavailable' });
+    if (!file) return reply.code(503).send({ error: '技能文件暂不可用', code: 'skill_unavailable' });
     return sendFile(reply, file, req.headers['if-none-match']);
   });
 
   app.get('/api/skill/manifest', async (_req, reply) => {
-    if (!files) return reply.code(503).send({ error: 'skill unavailable', code: 'skill_unavailable' });
+    if (!files) return reply.code(503).send({ error: '技能文件暂不可用', code: 'skill_unavailable' });
     return {
       appVersion,
       files: [...files.values()].map(f => ({ name: f.name, bytes: f.content.length, sha256: f.sha256 })),
@@ -87,8 +87,8 @@ export async function skillRoutes(app: FastifyInstance): Promise<void> {
     // 白名单校验：只接受启动时扫到的文件名，天然拒绝路径穿越。
     const file = files?.get(name);
     if (!file) {
-      if (!files) return reply.code(503).send({ error: 'skill unavailable', code: 'skill_unavailable' });
-      return reply.code(404).send({ error: 'unknown skill file', code: 'skill_file_not_found' });
+      if (!files) return reply.code(503).send({ error: '技能文件暂不可用', code: 'skill_unavailable' });
+      return reply.code(404).send({ error: '未知的技能文件', code: 'skill_file_not_found' });
     }
     return sendFile(reply, file, req.headers['if-none-match']);
   });

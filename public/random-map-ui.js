@@ -1,5 +1,7 @@
 // public/random-map-ui.js
 // 随机地图创建面板：桌面端与移动端共用。参数支持「随机区间 / 固定值 / 留空用服务端默认」三种填法。
+import './error-text.js';
+
 (function () {
   'use strict';
 
@@ -516,7 +518,7 @@
         });
         const data = await res.json();
         if (token !== RandomMapUI.previewToken) return;
-        if (!res.ok) throw new Error(data.error || 'preview failed');
+        if (!res.ok) throw new Error(data.error || '生成预览失败');
         const seedInput = document.getElementById('rmo-seed');
         if (seedInput && !seedInput.value.trim() && data.seed) {
           RandomMapUI.suppressAutoPreview = true;
@@ -528,10 +530,10 @@
       } catch (err) {
         if (token !== RandomMapUI.previewToken) return;
         canvas.classList.add('rmo-preview-error');
-        canvas.textContent = `预览失败：${err.message || '网络错误'}`;
+        canvas.textContent = `预览失败：${window.ErrorText.describe(err, '网络错误')}`;
         document.querySelectorAll('[data-random-preview]').forEach(el => {
           el.classList.add('rmo-preview-error');
-          el.textContent = `预览失败：${err.message || '网络错误'}`;
+          el.textContent = `预览失败：${window.ErrorText.describe(err, '网络错误')}`;
         });
       }
     },

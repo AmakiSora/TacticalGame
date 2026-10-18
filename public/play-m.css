@@ -2452,70 +2452,230 @@ body.player-m-shell .bot-prompt-textarea { min-height: 180px; font-size: 11px; }
   letter-spacing: .5px;
 }
 .lobby-map-summary {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 12px;
+  --lobby-map-panel: 220px;
+  position: relative;
+  overflow: hidden;
   border: 1px solid #2a4658;
   border-radius: 9px;
-  background: linear-gradient(120deg, #101c26 0%, #0d161e 100%);
+  background: #0b141b;
+}
+/* 预览台：地图在整卡居中，竖排图例贴左下角，信息面板嵌在右侧——图例和面板都浮在预览上。 */
+.lobby-map-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 310px;
+  min-width: 0;
+  background: radial-gradient(66% 96% at 50% 48%, #101c26 0%, #0a131a 62%, #060c11 100%);
 }
 .lobby-map-thumb {
-  flex: none;
-  width: 104px;
-  height: 66px;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid #223342;
-  border-radius: 6px;
-  background: #090f15;
+  padding: 14px 0;
 }
+/* 大厅预览比地图卡大一号，同色板压暗会糊成一片，这里单独提亮地形。 */
+.lobby-map-thumb svg { filter: drop-shadow(0 6px 18px rgba(64, 148, 190, .18)); }
+.lobby-map-thumb .preview-hex { stroke: #2c4050; stroke-width: .8; }
+.lobby-map-thumb .preview-hex.plain { fill: #1b2a37; }
+.lobby-map-thumb .preview-hex.water { fill: #22688a; }
+.lobby-map-thumb .preview-hex.blocker { fill: #64707c; }
 .lobby-map-thumb .map-preview {
   width: 100%;
   height: 100%;
+  /* 地图按整卡居中；宽度上限让出右侧信息面板，宽图也不会钻到面板底下。 */
+  max-width: calc(100% - 2 * (var(--lobby-map-panel) + 20px));
+  margin: 0 auto;
   border: none;
   border-radius: 0;
   background: transparent;
 }
 .lobby-map-thumb .map-preview.empty {
-  color: #d6b34a;
-  font-size: 28px;
-  font-weight: 800;
+  color: #7d97a6;
+  font-size: 12px;
+  font-weight: 600;
 }
-.lobby-map-copy { flex: 1; min-width: 0; }
-.lobby-map-name {
+/* 图例：贴预览左下角，不加框，直接写在预览上 */
+.lobby-map-legend {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  bottom: 12px;
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 3px;
+  color: #9db3c0;
+  font-size: 10px;
+  line-height: 1.1;
+  text-shadow: 0 1px 4px rgba(3, 8, 12, .9);
+}
+.lobby-map-legend:empty { display: none; }
+.lobby-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.lobby-map-legend-item i { flex: none; display: block; }
+.lobby-map-swatch-hex {
+  width: 9px;
+  height: 10px;
+  background: #1b2a37;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.lobby-map-swatch-hex.water { background: #22688a; }
+.lobby-map-swatch-hex.blocker { background: #64707c; }
+.lobby-map-swatch-cp { width: 7px; height: 7px; border-radius: 50%; background: #f0d77c; }
+.lobby-map-swatch-hq { width: 8px; height: 8px; border-radius: 2px; background: #66ccff; }
+.lobby-map-swatch-spawn { width: 8px; height: 8px; border-radius: 50%; background: #66ccff; }
+/* 初始单位按兵种分开列，颜色与预览里的小圆点一致。 */
+.lobby-map-swatch-unit { width: 7px; height: 7px; border-radius: 50%; }
+.lobby-map-swatch-unit.infantry { background: #66ccff; }
+.lobby-map-swatch-unit.scout { background: #8ee28e; }
+.lobby-map-swatch-unit.heavy { background: #ff9966; }
+.lobby-map-swatch-unit.ranger { background: #d6a3ff; }
+/* 右上角信息：不加框，直接把名称 / 英文 / 数值表写在预览上；名称与数值表共用一条中轴 */
+.lobby-map-copy {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 16px;
+  bottom: 14px;
+  width: var(--lobby-map-panel);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
+  text-shadow: 0 1px 4px rgba(3, 8, 12, .9);
+}
+/* 名称块与数值表共用一个「恰好包住内容」的宽度，两边的中轴才会重合 */
+.lobby-map-info {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lobby-map-title {
+  width: 100%;
+  position: relative;
+  text-align: center;
+  cursor: help;
+}
+.lobby-map-name {
   color: #e4edf4;
   font-size: 15px;
   font-weight: 800;
   line-height: 1.25;
+  text-align: center;
 }
-.lobby-map-name #lobby-map-id { color: #668495; font-size: 11px; font-weight: 500; }
-.lobby-map-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
-.lobby-map-tag {
-  padding: 1px 6px;
-  border: 1px solid #2a3a4a;
-  border-radius: 4px;
-  background: #101922;
-  color: #a9bdc9;
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.lobby-map-desc {
-  margin-top: 5px;
+.lobby-map-title:hover .lobby-map-name { color: #fff; }
+.lobby-map-id {
+  margin-top: -3px;
   overflow: hidden;
-  color: #668495;
-  font-size: 10px;
-  line-height: 1.4;
+  color: #7f97a7;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.lobby-map-summary .btn { flex: none; }
+.lobby-map-desc {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 236px;
+  padding: 9px 11px;
+  border: 1px solid #2f4a5d;
+  border-radius: 7px;
+  background: rgba(10, 17, 24, .97);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .55);
+  color: #b8c8d4;
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: left;
+  text-shadow: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-2px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.lobby-map-title:hover .lobby-map-desc,
+.lobby-map-title:focus-within .lobby-map-desc,
+.lobby-map-title:focus-visible .lobby-map-desc {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+.lobby-map-desc:empty { display: none; }
+/* 数值表：图标 + 数值（金色）在前，中文名在后；两列由整块 grid 统一宽度，行与行必定对齐 */
+.lobby-map-meta {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  column-gap: 10px;
+  row-gap: 1px;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.lobby-map-meta:empty { display: none; }
+.lobby-map-stat-key { color: #e8c766; font-weight: 700; text-align: right; white-space: nowrap; }
+.lobby-map-stat-label { color: #8fa5b5; text-align: left; }
+.lobby-map-change {
+  align-self: flex-end;
+  margin-top: auto;
+  padding: 6px 16px;
+  font-size: 12px;
+  width: auto;
+  transition: opacity .2s ease;
+}
+/* 创建成功后不换页：地图预览慢慢收小，创建按钮 / 提示 / 更换地图退场，房间卡在预览下方展开 */
+#create-form .lobby-map-stage { transition: height .4s cubic-bezier(.22, .8, .3, 1); }
+#create-form.room-active .lobby-map-stage { height: 246px; }
+#create-form.room-active #btn-create,
+#create-form.room-active > .lobby-hint { display: none; }
+#create-form.room-active .lobby-map-change {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .2s ease, visibility 0s linear .2s;
+}
+
+#create-result.lobby-room,
+#join-result.lobby-room {
+  max-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: max-height .4s cubic-bezier(.22, .8, .3, 1), margin-top .4s cubic-bezier(.22, .8, .3, 1),
+    padding .4s ease, border-width .4s ease, opacity .25s ease, transform .4s ease;
+}
+#create-result.lobby-room.room-open,
+#join-result.lobby-room.room-open {
+  margin-top: 16px;
+  padding: 16px;
+  border-width: 1px;
+  opacity: 1;
+  transform: none;
+}
+/* 量高度时临时关掉过渡，避免量到中途值 */
+#create-result.lobby-room.room-measure,
+#join-result.lobby-room.room-measure { transition: none !important; }
+/* 加入房间的地图预览：整卡淡入 + 轻微上移 */
+#join-map-summary:not(.hidden) { animation: lobby-join-map-in .34s cubic-bezier(.22, .8, .3, 1); }
+@keyframes lobby-join-map-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
 .lobby-create-btn { width: 100%; margin-top: 14px; justify-content: center; }
 .create-form .lobby-hint { margin-top: 8px; }
 .lobby-room-head {
@@ -2676,15 +2836,70 @@ body.map-dialog-open .lobby-panel { overflow: hidden; }
 .map-dialog-selected { flex: 1; min-width: 0; color: #7f97a7; font-size: 11px; }
 .map-dialog-selected b { color: #d6b34a; }
 
-/* 手机：弹层变全屏，摘要按钮占满一行，随机预览置顶、参数区独立滚动 */
+/* 手机：弹层变全屏；摘要卡预览在上（图例浮在左下角）、信息与按钮在下回到普通流；随机预览置顶、参数区独立滚动 */
 body.player-m-shell .lobby-map-summary {
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
 }
-body.player-m-shell .lobby-map-thumb { width: 84px; height: 54px; }
-body.player-m-shell .lobby-map-summary .btn { grid-column: 1 / -1; width: 100%; min-height: 40px; }
+body.player-m-shell .lobby-map-stage { height: 168px; }
+body.player-m-shell #create-form.room-active .lobby-map-stage { height: 138px; }
+body.player-m-shell .lobby-map-thumb { padding: 8px 0; }
+body.player-m-shell .lobby-map-thumb .map-preview { max-width: 100%; }
+body.player-m-shell .lobby-map-legend {
+  left: 8px;
+  bottom: 8px;
+  gap: 2px;
+  font-size: 9px;
+}
+body.player-m-shell .lobby-map-copy {
+  position: static;
+  width: auto;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 11px 10px;
+  border: none;
+  border-top: 1px solid #223342;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-shadow: none;
+  backdrop-filter: none;
+}
+body.player-m-shell .lobby-map-info { width: auto; max-width: none; gap: 3px; }
+body.player-m-shell .lobby-map-title { text-align: left; cursor: default; }
+body.player-m-shell .lobby-map-name { text-align: left; }
+body.player-m-shell .lobby-map-id { text-align: left; }
+/* 手机没有悬停：简介直接展开成普通段落 */
+body.player-m-shell .lobby-map-desc {
+  position: static;
+  width: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: #a9bdc9;
+  font-size: 10px;
+  line-height: 1.55;
+  text-align: left;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: none;
+}
+/* 手机上信息块横着排一行放不下，数值表排两列（每组两格），避免把创建按钮顶出首屏 */
+body.player-m-shell .lobby-map-meta {
+  grid-template-columns: auto auto auto auto;
+  justify-content: start;
+  column-gap: 10px;
+}
+body.player-m-shell .lobby-map-stat-key { text-align: left; }
+body.player-m-shell .lobby-map-change { width: 100%; align-self: stretch; min-height: 40px; }
 body.player-m-shell .lobby-create-btn { margin-top: 12px; }
 body.player-m-shell .map-dialog {
   top: 0;

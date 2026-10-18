@@ -86,7 +86,7 @@ export function consumeAction(game: GameState, unit: Unit): Result {
   if (unit.actionSpent) return { ok: true };
   const limit = game.config.balance.actionsPerTurn;
   if (game.turn.actionsUsed >= limit) {
-    return { ok: false, code: 'action_limit_reached', message: `only ${limit} actions allowed per turn` };
+    return { ok: false, code: 'action_limit_reached', message: `每回合最多行动 ${limit} 次` };
   }
   game.turn.actionsUsed += 1;
   const stats = game.players[unit.owner]?.stats;

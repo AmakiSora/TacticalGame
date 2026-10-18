@@ -459,7 +459,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       const game = authenticateHost(req, reply);
       if (!game) return;
       if (game.phase !== 'lobby') {
-        return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
+        return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
       }
       if (game.maxPlayers !== 2 || isSimultaneousMode(game.config.mode)) {
         return reply.code(400).send({
@@ -470,7 +470,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       const model = req.body?.model?.trim();
       const known = refreshRlModels().find(info => info.file === model);
       if (!model || !known) {
-        return reply.code(400).send({ error: `model "${model ?? ''}" not found`, code: 'model_not_found' });
+        return reply.code(400).send({ error: `找不到模型「${model ?? ''}」`, code: 'model_not_found' });
       }
       // 未能可靠识别动作空间的模型也拒绝加入：否则它会在开局后才由
       // 当前运行器的版本守卫抛错，留下一个无人控制的 AI 座位。
@@ -484,7 +484,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       }
       const name = uniqueLobbyName(game, req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || DEFAULT_BOT_NAME);
       const joined = addLobbyPlayer(game, name);
-      if (!joined) return reply.code(409).send({ error: 'game already full', code: 'game_already_full' });
+      if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
       globalStore.persist(game);
       const records = botsByGame.get(game.id) ?? [];
@@ -503,13 +503,13 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       const game = authenticateHost(req, reply);
       if (!game) return;
       if (game.phase !== 'lobby') {
-        return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
+        return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
       }
       const botType = req.body?.botType?.trim();
       const config = botType ? ALGORITHM_BOTS[botType] : undefined;
       if (!botType || !config) {
         return reply.code(400).send({
-          error: `unknown algorithm bot type: "${botType ?? ''}"`,
+          error: `未知的算法类型「${botType ?? ''}」`,
           code: 'bot_not_found',
         });
       }
@@ -523,7 +523,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       }
       const name = uniqueLobbyName(game, req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || config.name);
       const joined = addLobbyPlayer(game, name);
-      if (!joined) return reply.code(409).send({ error: 'game already full', code: 'game_already_full' });
+      if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
       globalStore.persist(game);
       const records = algorithmBotsByGame.get(game.id) ?? [];

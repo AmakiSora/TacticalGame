@@ -49,16 +49,16 @@ export function attackTarget(
   targetId: string,
 ): Result {
   const attacker = game.units.find(u => u.id === attackerId && u.owner === owner && u.alive);
-  if (!attacker) return { ok: false, code: 'unit_not_found', message: 'attacker not found' };
-  if (attacker.hasActed) return { ok: false, code: 'invalid_attack', message: 'already acted this turn' };
+  if (!attacker) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
+  if (attacker.hasActed) return { ok: false, code: 'invalid_attack', message: '该单位本回合已经行动过' };
 
   const target = findTarget(game, targetId);
-  if (!target) return { ok: false, code: 'target_not_found', message: 'target not found' };
-  if (target.entity.owner === owner) return { ok: false, code: 'invalid_attack', message: 'cannot attack friendly target' };
+  if (!target) return { ok: false, code: 'target_not_found', message: '找不到目标' };
+  if (target.entity.owner === owner) return { ok: false, code: 'invalid_attack', message: '不能攻击友方目标' };
 
   const distance = hexDistance(attacker, targetPosition(target));
   if (distance > attacker.attackRange) {
-    return { ok: false, code: 'invalid_attack', message: `out of range (${distance} > ${attacker.attackRange})` };
+    return { ok: false, code: 'invalid_attack', message: `超出射程（${distance} > ${attacker.attackRange}）` };
   }
 
   const spent = consumeAction(game, attacker);
@@ -121,18 +121,18 @@ export function healTarget(
   targetId: string,
 ): Result {
   const support = game.units.find(u => u.id === supportId && u.owner === owner && u.alive);
-  if (!support) return { ok: false, code: 'unit_not_found', message: 'support not found' };
-  if (support.type !== 'support') return { ok: false, code: 'invalid_heal', message: 'unit is not support' };
-  if (support.hasActed) return { ok: false, code: 'invalid_heal', message: 'already acted this turn' };
+  if (!support) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
+  if (support.type !== 'support') return { ok: false, code: 'invalid_heal', message: '该单位不是支援兵' };
+  if (support.hasActed) return { ok: false, code: 'invalid_heal', message: '该单位本回合已经行动过' };
 
   const target = game.units.find(u => u.id === targetId && u.owner === owner && u.alive);
-  if (!target) return { ok: false, code: 'invalid_heal', message: 'target is not a friendly unit' };
+  if (!target) return { ok: false, code: 'invalid_heal', message: '目标不是友方单位' };
   if (isArtilleryDanger(game, support) || isArtilleryDanger(game, target)) {
-    return { ok: false, code: 'invalid_heal', message: 'cannot heal inside the artillery zone' };
+    return { ok: false, code: 'invalid_heal', message: '炮火区内无法治疗' };
   }
   const distance = hexDistance(support, target);
   const healRange = game.config.units[support.type]?.healRange ?? support.attackRange;
-  if (distance > healRange) return { ok: false, code: 'invalid_heal', message: 'target out of range' };
+  if (distance > healRange) return { ok: false, code: 'invalid_heal', message: '目标超出射程' };
 
   const spent = consumeAction(game, support);
   if (!spent.ok) return spent;

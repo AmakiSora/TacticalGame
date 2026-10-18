@@ -1,0 +1,158 @@
+/* 统一确认框：替代原生 confirm / alert / prompt，沿用项目暗色面板风格。
+   结构与配色对齐地图库弹层（#141c26 / #2a3a4a / 10px 圆角），按钮对齐 .btn 配色。 */
+.ui-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(3, 8, 12, .62);
+  opacity: 0;
+  transition: opacity .16s ease;
+}
+.ui-dialog-backdrop.open { opacity: 1; }
+
+.ui-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 1010;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  /* 移动端地址栏伸缩时按可视高度收，避免面板被裁掉 */
+  max-height: calc(100dvh - 32px);
+  padding: 18px 20px 16px;
+  border: 1px solid #2a3a4a;
+  border-radius: 10px;
+  background: #141c26;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+  color: #d8e0e8;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.97);
+  transition: opacity .18s ease, transform .2s cubic-bezier(.22, .8, .3, 1);
+  --ui-dialog-tone: #4a8aaa;
+}
+.ui-dialog[data-tone="warning"] { --ui-dialog-tone: #c9a24a; }
+.ui-dialog[data-tone="danger"] { --ui-dialog-tone: #d65a4a; }
+.ui-dialog.open {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+/* 打开时焦点落在面板本身（只为了键盘与读屏有落点），不画焦点环；
+   焦点进到按钮上时才出环，避免每次弹框都把确认键描一圈。 */
+.ui-dialog:focus { outline: none; }
+/* 顶部细光带：用主色/警示色区分「普通确认」与「不可撤销操作」 */
+.ui-dialog::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 18px;
+  right: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--ui-dialog-tone), transparent);
+  opacity: .55;
+  pointer-events: none;
+}
+
+.ui-dialog-title {
+  flex: none;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #e4edf4;
+}
+.ui-dialog-title:empty { display: none; }
+
+.ui-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+.ui-dialog-message {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: #93a9ba;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.ui-dialog-message:empty { display: none; }
+
+.ui-dialog-input {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  background: #0f1820;
+  color: #e4edf4;
+  font-family: inherit;
+  font-size: 13px;
+}
+.ui-dialog-input:focus {
+  outline: none;
+  border-color: #4a8aaa;
+  box-shadow: 0 0 0 2px rgba(74, 138, 170, .18);
+}
+
+.ui-dialog-actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.ui-dialog-btn {
+  box-sizing: border-box;
+  min-width: 78px;
+  padding: 8px 18px;
+  border: 1px solid #2a3a4a;
+  border-radius: 6px;
+  background: #1e2e3e;
+  color: #b0c8d8;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.ui-dialog-btn:hover { background: #26384a; color: #d8e0e8; }
+.ui-dialog-btn[data-variant="primary"] { background: #1a4a7a; border-color: #2a6aaa; color: #cce; }
+.ui-dialog-btn[data-variant="primary"]:hover { background: #2460a0; }
+.ui-dialog-btn[data-variant="warning"] { background: #5a4a1a; border-color: #8a7a2a; color: #eed; }
+.ui-dialog-btn[data-variant="warning"]:hover { background: #7a6a24; }
+.ui-dialog-btn[data-variant="danger"] { background: #5a1a1a; border-color: #8a2a2a; color: #eaa; }
+.ui-dialog-btn[data-variant="danger"]:hover { background: #7a2424; }
+.ui-dialog-btn:focus-visible { outline: 2px solid #80c7df; outline-offset: 2px; }
+
+body.ui-dialog-open { overflow: hidden; }
+
+/* 移动端：单行铺满、按钮加大到可点区域 */
+body.player-m-shell .ui-dialog,
+body.spectator-m-shell .ui-dialog {
+  width: calc(100vw - 24px);
+  padding: 16px 16px 14px;
+}
+body.player-m-shell .ui-dialog-body,
+body.spectator-m-shell .ui-dialog-body { margin-top: 7px; }
+body.player-m-shell .ui-dialog-message,
+body.spectator-m-shell .ui-dialog-message { font-size: 13px; }
+body.player-m-shell .ui-dialog-input,
+body.spectator-m-shell .ui-dialog-input { font-size: 16px; min-height: 42px; }
+body.player-m-shell .ui-dialog-btn,
+body.spectator-m-shell .ui-dialog-btn {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-dialog,
+  .ui-dialog-backdrop { transition: none; }
+}

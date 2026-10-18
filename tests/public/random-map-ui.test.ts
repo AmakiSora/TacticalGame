@@ -6,11 +6,16 @@ function read(path: string): string {
   return readFileSync(path, 'utf8');
 }
 
+// 页面模块头部是 ESM import（版本号 / 错误文案转换），VM Script 模式不支持，执行前剥离。
+function loadSource(): string {
+  return read('public/random-map-ui.js').replace(/^import\s+'[^']+';\s*$/gm, '');
+}
+
 function loadUI() {
   const context: Record<string, unknown> = { console, window: {} };
   context.globalThis = context;
   vm.createContext(context);
-  vm.runInContext(read('public/random-map-ui.js'), context);
+  vm.runInContext(loadSource(), context);
   return (context.window as { RandomMapUI: any }).RandomMapUI;
 }
 
@@ -162,7 +167,7 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
   const context: Record<string, unknown> = { console, window: {}, document: documentStub };
   context.globalThis = context;
   vm.createContext(context);
-  vm.runInContext(read('public/random-map-ui.js'), context);
+  vm.runInContext(loadSource(), context);
   const ui = (context.window as { RandomMapUI: any }).RandomMapUI;
   // 真跑一次 init：事件接线（折叠块、模式切换、数字输入变化）都在这里挂上。
   ui.init(container);
@@ -196,7 +201,7 @@ function capturePanelHtml(mode: string) {
   };
   context.globalThis = context;
   vm.createContext(context);
-  vm.runInContext(read('public/random-map-ui.js'), context);
+  vm.runInContext(loadSource(), context);
   return html;
 }
 

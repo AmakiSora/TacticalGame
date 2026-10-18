@@ -53,7 +53,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       const mapId = req.body?.mapId || 'default';
       const maxPlayers = Number(req.body?.maxPlayers ?? 2);
       if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8) {
-        return reply.code(400).send({ error: 'unsupported player count', code: 'unsupported_player_count' });
+        return reply.code(400).send({ error: '不支持该玩家人数', code: 'unsupported_player_count' });
       }
       const lobbyOptions = {
         maxPlayers,
@@ -68,14 +68,14 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
           const config = generateRandomMapConfig(options, maxPlayers);
           game = createLobbyWithConfig(randomUUID(), 'random', config, lobbyOptions);
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'invalid random options';
-          return reply.code(400).send({ error: `random map: ${message}`, code: 'invalid_move' });
+          const message = err instanceof Error ? err.message : '随机地图参数无效';
+          return reply.code(400).send({ error: `随机地图：${message}`, code: 'invalid_move' });
         }
       } else {
         const map = listMaps().find(item => item.id === mapId);
-        if (!map) return reply.code(400).send({ error: `Map "${mapId}" not found`, code: 'invalid_move' });
+        if (!map) return reply.code(400).send({ error: `找不到地图「${mapId}」`, code: 'invalid_move' });
         if (!map.preview.supportedPlayerCounts.includes(maxPlayers)) {
-          return reply.code(400).send({ error: 'unsupported player count', code: 'unsupported_player_count' });
+          return reply.code(400).send({ error: '不支持该玩家人数', code: 'unsupported_player_count' });
         }
         game = createLobby(randomUUID(), mapId, lobbyOptions);
       }
@@ -92,16 +92,16 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { id: string } }>('/api/games/:id/lobby', async (req, reply) => {
     const game = globalStore.get(req.params.id);
-    if (!game) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    if (!game) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
     return lobbySummary(game);
   });
 
   app.post<{ Params: { id: string }; Body: { name?: string } }>('/api/games/:id/join', async (req, reply) => {
     const game = globalStore.get(req.params.id);
-    if (!game) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
-    if (game.phase !== 'lobby') return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
+    if (!game) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
+    if (game.phase !== 'lobby') return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
     const joined = addLobbyPlayer(game, req.body?.name);
-    if (!joined) return reply.code(409).send({ error: 'game already full', code: 'game_already_full' });
+    if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
     appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
     globalStore.persist(game);
     return { player: joined, lobby: lobbySummary(game) };
@@ -123,7 +123,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string } }>('/api/games/:id/leave', async (req, reply) => {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
-    if (ctx.game.phase !== 'lobby') return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
+    if (ctx.game.phase !== 'lobby') return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
     removeLobbyPlayer(ctx.game, ctx.player);
     appendEvent(ctx.game, globalEventBus, 'player_left', { playerId: ctx.player, reason: 'self' });
     globalStore.persist(ctx.game);
@@ -134,10 +134,10 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const game = authenticateHost(req, reply);
     if (!game) return;
     if (game.phase !== 'lobby') {
-      return reply.code(409).send({ error: 'game already started', code: 'game_already_started' });
+      return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
     }
     if (!isPlayerId(req.params.playerId) || !game.players[req.params.playerId] || !removeLobbyPlayer(game, req.params.playerId)) {
-      return reply.code(400).send({ error: 'invalid lobby player', code: 'invalid_move' });
+      return reply.code(400).send({ error: '该成员不在大厅中', code: 'invalid_move' });
     }
     removeBotRecord(game.id, req.params.playerId as PlayerId);
     appendEvent(game, globalEventBus, 'player_left', { playerId: req.params.playerId, reason: 'host' });
@@ -157,7 +157,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: { playerId?: string } }>('/api/games/:id/host/eliminate', async (req, reply) => {
     const game = authenticateHost(req, reply);
     if (!game) return;
-    if (!isPlayerId(req.body?.playerId)) return reply.code(400).send({ error: 'valid playerId required', code: 'invalid_move' });
+    if (!isPlayerId(req.body?.playerId)) return reply.code(400).send({ error: '需要有效的玩家 ID', code: 'invalid_move' });
     const result = eliminatePlayer(game, globalEventBus, req.body.playerId, 'host_eliminated', null);
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     // simultaneous 模式下计划期淘汰：清出其计划状态；若其余玩家均已确认则立即结算。
@@ -180,7 +180,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
     const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN);
-    if (!name) return reply.code(400).send({ error: 'name is required', code: 'invalid_move' });
+    if (!name) return reply.code(400).send({ error: '名字不能为空', code: 'invalid_move' });
     ctx.game.players[ctx.player]!.name = name;
     ctx.game.playerNames[ctx.player] = name;
     appendEvent(ctx.game, globalEventBus, 'name_rename', { playerId: ctx.player, name });
@@ -191,13 +191,13 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string }; Body: { playerId?: string; name?: string } }>('/api/games/:id/rename', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     const game = globalStore.get(req.params.id);
-    if (!game) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    if (!game) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
     const playerId = req.body?.playerId;
     if (!isPlayerId(playerId) || !game.players[playerId]) {
-      return reply.code(400).send({ error: 'valid playerId required', code: 'invalid_move' });
+      return reply.code(400).send({ error: '需要有效的玩家 ID', code: 'invalid_move' });
     }
     const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN);
-    if (!name) return reply.code(400).send({ error: 'name is required', code: 'invalid_move' });
+    if (!name) return reply.code(400).send({ error: '名字不能为空', code: 'invalid_move' });
     game.players[playerId]!.name = name;
     game.playerNames[playerId] = name;
     appendEvent(game, globalEventBus, 'name_rename', { playerId, name });
@@ -208,7 +208,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string } }>('/api/games/:id/force-adjudicate', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     const game = globalStore.get(req.params.id);
-    if (!game) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    if (!game) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
     const result = forceAdjudication(game, globalEventBus);
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     globalStore.persist(game);
@@ -217,7 +217,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: { id: string }; Querystring: { token?: string } }>('/api/games/:id', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
-    if (!globalStore.get(req.params.id)) return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    if (!globalStore.get(req.params.id)) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
     globalStore.delete(req.params.id);
     globalEventBus.clear(req.params.id);
     clearBotsForGame(req.params.id);

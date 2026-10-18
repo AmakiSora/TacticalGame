@@ -13,11 +13,11 @@ export function authorizeControlRequest(req: FastifyRequest, reply: FastifyReply
 
   if (configured) {
     if (supplied === configured) return true;
-    reply.code(401).send({ error: 'invalid admin token', code: 'invalid_control_token' });
+    reply.code(401).send({ error: '管理凭证无效', code: 'invalid_control_token' });
     return false;
   }
 
   if (isLocalRequest(req)) return true;
-  reply.code(401).send({ error: 'AUTO_CONTROL_TOKEN is required for remote admin access', code: 'control_token_required' });
+  reply.code(401).send({ error: '远程管理需要服务端配置 AUTO_CONTROL_TOKEN', code: 'control_token_required' });
   return false;
 }

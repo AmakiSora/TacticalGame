@@ -14,13 +14,13 @@ export function moveUnit(
   r: number,
 ): Result {
   const unit = game.units.find(u => u.id === unitId && u.owner === owner && u.alive);
-  if (!unit) return { ok: false, code: 'unit_not_found', message: 'unit not found' };
-  if (unit.hasMoved) return { ok: false, code: 'invalid_move', message: 'already moved this turn' };
-  if (unit.q === q && unit.r === r) return { ok: false, code: 'invalid_move', message: 'same cell' };
+  if (!unit) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
+  if (unit.hasMoved) return { ok: false, code: 'invalid_move', message: '该单位本回合已经移动过' };
+  if (unit.q === q && unit.r === r) return { ok: false, code: 'invalid_move', message: '目标格就是当前所在格' };
 
   const reachable = findReachableCells(game, unit);
   if (!reachable.some(pos => pos.q === q && pos.r === r)) {
-    return { ok: false, code: 'invalid_move', message: 'target is not reachable' };
+    return { ok: false, code: 'invalid_move', message: '目标格无法到达' };
   }
 
   const spent = consumeAction(game, unit);

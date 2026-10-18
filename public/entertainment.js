@@ -1,4 +1,5 @@
 import './version.js';
+import './error-text.js';
 
 /* 娱乐数据页 — reads /data/fun-stats.json only. 视觉复用 stats.css 站点体系。 */
 (() => {
@@ -728,9 +729,9 @@ import './version.js';
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       renderAll(await response.json());
     } catch (error) {
-      setStatus(`失败: ${error.message}`, 'err');
+      setStatus(`失败: ${window.ErrorText.describe(error)}`, 'err');
       el.leadTitle.textContent = '战报暂时无法读取';
-      el.leadSummary.innerHTML = `请先运行 <code>npm run fun-stats</code> 生成数据。（${escapeHtml(error.message)}）`;
+      el.leadSummary.innerHTML = `请先运行 <code>npm run fun-stats</code> 生成数据。（${escapeHtml(window.ErrorText.describe(error))}）`;
     } finally {
       el.btnReload.disabled = false;
     }

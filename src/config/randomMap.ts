@@ -414,32 +414,32 @@ function sampleStartingUnits(
 export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
   if (input === undefined || input === null) return {};
   if (typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error('random options must be an object');
+    throw new Error('随机地图参数必须是对象');
   }
   const raw = input as Record<string, unknown>;
   const options: RandomMapOptions = {};
 
   if (raw.seed !== undefined) {
     if (typeof raw.seed === 'number') {
-      if (!Number.isFinite(raw.seed)) throw new Error('random.seed must be finite');
+      if (!Number.isFinite(raw.seed)) throw new Error('random.seed 必须是有限数值');
       options.seed = raw.seed;
     } else if (typeof raw.seed === 'string') {
-      if (raw.seed.length === 0 || raw.seed.length > 64) throw new Error('random.seed must be 1-64 chars');
+      if (raw.seed.length === 0 || raw.seed.length > 64) throw new Error('random.seed 长度需为 1-64 个字符');
       options.seed = raw.seed;
     } else {
-      throw new Error('random.seed must be a number or string');
+      throw new Error('random.seed 必须是数字或字符串');
     }
   }
   for (const key of ['symmetric', 'deployFromHq', 'noTurnLimit', 'supplyCanDeploy', 'forwardBaseCanDeploy', 'repairCanDeploy'] as const) {
     const value = raw[key];
     if (value === undefined) continue;
-    if (typeof value !== 'boolean') throw new Error(`random.${key} must be boolean`);
+    if (typeof value !== 'boolean') throw new Error(`random.${key} 必须是布尔值`);
     options[key] = value;
   }
   if (raw.mode !== undefined) {
     const MODES = ['standard', 'annihilation', 'simultaneous', 'royale'];
     if (typeof raw.mode !== 'string' || !MODES.includes(raw.mode)) {
-      throw new Error('random.mode must be one of standard/annihilation/simultaneous/royale');
+      throw new Error('random.mode 只能是 standard / annihilation / simultaneous / royale');
     }
     options.mode = raw.mode as GameMode;
   }
@@ -459,7 +459,7 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
     'mode', ...Object.keys(PARAM_BOUNDS),
   ]);
   for (const key of Object.keys(raw)) {
-    if (!known.has(key)) throw new Error(`unknown random option "${key}"`);
+    if (!known.has(key)) throw new Error(`未知的随机参数「${key}」`);
   }
   return options;
 }
@@ -472,7 +472,7 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
 function splitLegacyTerrainDensity(options: RandomMapOptions): void {
   if (options.terrainDensity === undefined) return;
   if (options.waterDensity !== undefined || options.wallDensity !== undefined) {
-    throw new Error('random.terrainDensity is deprecated and cannot be combined with waterDensity/wallDensity');
+    throw new Error('random.terrainDensity 已废弃，不能与 waterDensity / wallDensity 同时使用');
   }
   const share = (param: RandomParam, ratio: number): RandomParam => {
     const round = (value: number): number => Number(value.toFixed(4));
@@ -489,16 +489,16 @@ function sanitizeParam(key: string, value: unknown, bound: ParamBound): RandomPa
     return bound.integer ? Math.round(clamped) : Number(clamped.toFixed(4));
   };
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error(`random.${key} must be finite`);
+    if (!Number.isFinite(value)) throw new Error(`random.${key} 必须是有限数值`);
     return clamp(value);
   }
   if (Array.isArray(value) && value.length === 2 && typeof value[0] === 'number' && typeof value[1] === 'number') {
-    if (!Number.isFinite(value[0]) || !Number.isFinite(value[1])) throw new Error(`random.${key} range must be finite`);
+    if (!Number.isFinite(value[0]) || !Number.isFinite(value[1])) throw new Error(`random.${key} 的区间必须是有限数值`);
     const lo = clamp(Math.min(value[0], value[1]));
     const hi = clamp(Math.max(value[0], value[1]));
     return lo === hi ? lo : [lo, hi];
   }
-  throw new Error(`random.${key} must be a number or [min, max]`);
+  throw new Error(`random.${key} 必须是数字或 [min, max] 区间`);
 }
 
 // ---------- 种子化 PRNG ----------
@@ -704,7 +704,7 @@ const HEX_OFFSETS: Position[] = [
  */
 export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCount: number): MapConfig {
   if (!Number.isInteger(playerCount) || playerCount < 2 || playerCount > 8) {
-    throw new Error('playerCount must be an integer between 2 and 8');
+    throw new Error('玩家人数必须是 2-8 的整数');
   }
   // 本函数可被直接调用（RL/测试）而绕过 sanitize，故旧地形密度在这里也要归一化；
   // 用浅拷贝避免改写调用方传入的对象。
@@ -887,7 +887,7 @@ function findFreeCell(ideal: Position, playableSet: Set<string>, taken: Set<stri
     }
     candidates.length = 0;
   }
-  throw new Error('no free cell available for spawn slot');
+  throw new Error('没有可用的空格放置出生位');
 }
 
 interface GeneratedControlPoint {

@@ -38,7 +38,7 @@ function safeEqual(a: string | undefined, b: string): boolean {
 function findGame(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply): GameState | null {
   const game = globalStore.get(req.params.id);
   if (!game) {
-    reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+    reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
     return null;
   }
   return game;
@@ -51,12 +51,12 @@ export function authenticate(
   if (!game) return null;
   const token = req.headers['x-player-token'];
   if (typeof token !== 'string' || token.length === 0) {
-    reply.code(401).send({ error: 'missing token', code: 'invalid_token' });
+    reply.code(401).send({ error: '缺少玩家凭证', code: 'invalid_token' });
     return null;
   }
   const player = PLAYER_IDS.find(id => safeEqual(game.tokens[id], token));
   if (!player) {
-    reply.code(401).send({ error: 'invalid token', code: 'invalid_token' });
+    reply.code(401).send({ error: '玩家凭证无效', code: 'invalid_token' });
     return null;
   }
   return { game, player };
@@ -69,7 +69,7 @@ export function authenticateHost(
   if (!game) return null;
   const token = req.headers['x-host-token'];
   if (typeof token !== 'string' || !safeEqual(game.hostToken, token)) {
-    reply.code(401).send({ error: 'invalid host token', code: 'invalid_host_token' });
+    reply.code(401).send({ error: '房主凭证无效', code: 'invalid_host_token' });
     return null;
   }
   return game;

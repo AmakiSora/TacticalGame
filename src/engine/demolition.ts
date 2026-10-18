@@ -26,13 +26,13 @@ export function demolishTerrain(
   r: number,
 ): Result {
   const unit = game.units.find(u => u.id === unitId && u.owner === owner && u.alive);
-  if (!unit) return { ok: false, code: 'unit_not_found', message: 'unit not found' };
-  if (unit.type !== 'heavy') return { ok: false, code: 'invalid_demolish', message: 'only heavy units can demolish terrain' };
-  if (unit.hasActed) return { ok: false, code: 'invalid_demolish', message: 'already acted this turn' };
-  if (hexDistance(unit, { q, r }) > 1) return { ok: false, code: 'invalid_demolish', message: 'target must be adjacent' };
-  if (!isInBounds(game, q, r)) return { ok: false, code: 'invalid_demolish', message: 'target must be in bounds' };
-  if (getTerrain(game, q, r) !== 'blocker') return { ok: false, code: 'invalid_demolish', message: 'target terrain is not blocker' };
-  if (getCellOccupant(game, q, r) !== null) return { ok: false, code: 'invalid_demolish', message: 'target cell is occupied' };
+  if (!unit) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
+  if (unit.type !== 'heavy') return { ok: false, code: 'invalid_demolish', message: '只有重装单位可以拆除地形' };
+  if (unit.hasActed) return { ok: false, code: 'invalid_demolish', message: '该单位本回合已经行动过' };
+  if (hexDistance(unit, { q, r }) > 1) return { ok: false, code: 'invalid_demolish', message: '目标必须相邻' };
+  if (!isInBounds(game, q, r)) return { ok: false, code: 'invalid_demolish', message: '目标必须在地图范围内' };
+  if (getTerrain(game, q, r) !== 'blocker') return { ok: false, code: 'invalid_demolish', message: '目标地形不是障碍' };
+  if (getCellOccupant(game, q, r) !== null) return { ok: false, code: 'invalid_demolish', message: '目标格已有单位' };
 
   const spent = consumeAction(game, unit);
   if (!spent.ok) return spent;

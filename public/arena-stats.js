@@ -1,4 +1,5 @@
 import './version.js';
+import './error-text.js';
 
 /* 竞技场玩法统计 + 参与者档案 — reads /data/arena-stats.json only. */
 (() => {
@@ -340,7 +341,7 @@ import './version.js';
         setStatus('已加载', 'ok');
       }
     } catch (err) {
-      setStatus(`加载失败：${err.message}`, 'err');
+      setStatus(`加载失败：${window.ErrorText.describe(err)}`, 'err');
     }
   }
 

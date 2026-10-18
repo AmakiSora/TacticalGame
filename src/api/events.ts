@@ -28,7 +28,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const game = globalStore.get(req.params.id);
       if (!game) {
-        return reply.code(404).send({ error: 'game not found', code: 'game_not_found' });
+        return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
       }
 
       const wantsSse = (req.headers.accept ?? '').includes('text/event-stream');
@@ -40,7 +40,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         if (typeof token === 'string' && token.length > 0) {
           const isValid = Object.values(game.tokens).includes(token);
           if (!isValid) {
-            return reply.code(401).send({ error: 'invalid token', code: 'invalid_token' });
+            return reply.code(401).send({ error: '玩家凭证无效', code: 'invalid_token' });
           }
         }
       }
@@ -55,7 +55,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       // Rate limit SSE connections per game
       const currentCount = sseCounts.get(game.id) ?? 0;
       if (currentCount >= MAX_SSE_PER_GAME) {
-        return reply.code(429).send({ error: 'too many SSE connections for this game', code: 'rate_limit' });
+        return reply.code(429).send({ error: '该对局的观战连接过多，请稍后再试', code: 'rate_limit' });
       }
       sseCounts.set(game.id, currentCount + 1);
 

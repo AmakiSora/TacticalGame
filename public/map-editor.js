@@ -1,4 +1,6 @@
 import './version.js';
+import './ui-dialog.js';
+import './error-text.js';
 
 (function initMapEditor(global) {
   const SQRT3 = Math.sqrt(3);
@@ -1741,10 +1743,16 @@ import './version.js';
         renderSelection();
         drawBoard();
       });
-      row.querySelector('.spawn-delete').addEventListener('click', () => {
+      row.querySelector('.spawn-delete').addEventListener('click', async () => {
         if (config.spawnSlots.length <= 2) return setStatus('至少保留 2 个出生槽', 'err');
         const removed = config.spawnSlots[index].id;
-        if (!confirm(`删除出生槽 ${removed} 及其初始单位，并关闭引用它的人数布局，是否继续？`)) return;
+        const ok = await window.UIDialog.confirm({
+          title: `删除出生槽 ${removed}？`,
+          message: '该出生槽的初始单位会一并删除，引用它的人数布局会被关闭。',
+          confirmText: '删除',
+          tone: 'danger',
+        });
+        if (!ok) return;
         config.spawnSlots.splice(index, 1);
         for (const [count, slots] of Object.entries(config.layouts || {})) {
           if (Array.isArray(slots) && slots.includes(removed)) delete config.layouts[count];
@@ -1948,7 +1956,7 @@ import './version.js';
         syncAll();
         setStatus(`已导入 ${file.name}`, 'ok');
       } catch (err) {
-        setStatus(`导入失败：${err.message}`, 'err');
+        setStatus(`导入失败：${window.ErrorText.describe(err)}`, 'err');
       } finally {
         els.importFile.value = '';
       }
@@ -1986,19 +1994,33 @@ import './version.js';
       setStatus(isAnnihilationMode(nextMode) ? `已切换为${modeName}模式，请配置出生据点与炮火参数` : `已切换为${modeName}模式`, 'ok');
     });
   });
-  els.mapRadius.addEventListener('change', () => {
+  els.mapRadius.addEventListener('change', async () => {
     const next = Number(els.mapRadius.value);
     const preview = resizeMapRadius(config, next, false);
-    if (preview.requiresConfirmation && !confirm(`半径缩小会移除 ${preview.removed} 个半径外格子、对象或地形，是否继续？`)) {
-      els.mapRadius.value = config.radius;
-      return;
+    if (preview.requiresConfirmation) {
+      const ok = await window.UIDialog.confirm({
+        title: '缩小地图半径？',
+        message: `会移除 ${preview.removed} 个半径外的格子、对象或地形。`,
+        confirmText: '继续缩小',
+        tone: 'danger',
+      });
+      if (!ok) {
+        els.mapRadius.value = config.radius;
+        return;
+      }
     }
     config = resizeMapRadius(config, next, true).config;
     selected = null;
     syncAll();
   });
-  $('btn-new').addEventListener('click', () => {
-    if (!confirm('新建会清空当前编辑内容，是否继续？')) return;
+  $('btn-new').addEventListener('click', async () => {
+    const ok = await window.UIDialog.confirm({
+      title: '新建地图？',
+      message: '当前编辑内容会被清空，未导出的改动无法恢复。',
+      confirmText: '新建',
+      tone: 'danger',
+    });
+    if (!ok) return;
     config = createDefaultMapConfig();
     comebackSupplyDraft = null;
     annihilationDraft = null;

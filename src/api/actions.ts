@@ -29,15 +29,15 @@ function isUnitType(value: unknown): value is UnitType {
 /** 返回 false 表示已写出错误响应。 */
 function basicGate(ctx: AuthContext, reply: FastifyReply): boolean {
   if (ctx.game.phase === 'game_over') {
-    reply.code(statusForCode('game_over')).send({ error: 'game over', code: 'game_over' });
+    reply.code(statusForCode('game_over')).send({ error: '对局已结束', code: 'game_over' });
     return false;
   }
   if (ctx.game.phase !== 'active') {
-    reply.code(statusForCode('game_not_started')).send({ error: 'game not started', code: 'game_not_started' });
+    reply.code(statusForCode('game_not_started')).send({ error: '对局尚未开始', code: 'game_not_started' });
     return false;
   }
   if (ctx.game.players[ctx.player]?.status !== 'active') {
-    reply.code(statusForCode('player_eliminated')).send({ error: 'player eliminated', code: 'player_eliminated' });
+    reply.code(statusForCode('player_eliminated')).send({ error: '该玩家已被淘汰', code: 'player_eliminated' });
     return false;
   }
   return true;
@@ -58,7 +58,7 @@ async function dispatchAction(
   if (!basicGate(ctx, reply)) return;
   if (isSimultaneousMode(ctx.game.config.mode)) {
     if (ctx.game.plan?.committed.includes(ctx.player)) {
-      return reply.code(statusForCode('not_your_turn')).send({ error: 'plan already committed', code: 'not_your_turn' });
+      return reply.code(statusForCode('not_your_turn')).send({ error: '本轮计划已提交', code: 'not_your_turn' });
     }
     const result = planAction(ctx);
     if (!result.ok) {
@@ -72,7 +72,7 @@ async function dispatchAction(
     };
   }
   if (ctx.game.turn.currentPlayerId !== ctx.player) {
-    return reply.code(statusForCode('not_your_turn')).send({ error: 'not your turn', code: 'not_your_turn' });
+    return reply.code(statusForCode('not_your_turn')).send({ error: '还没轮到你', code: 'not_your_turn' });
   }
   const result = sequentialAction(ctx);
   if (!result.ok) {
@@ -93,7 +93,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: DeployBody }>('/api/games/:id/deploy', async (req, reply) => {
     const { unitType, fromId, q, r } = req.body || {};
     if (!isUnitType(unitType) || !fromId || typeof q !== 'number' || typeof r !== 'number') {
-      return badRequest(reply, 'unitType, fromId, q, r required');
+      return badRequest(reply, '需要提供 unitType、fromId、q、r');
     }
     return dispatchAction(req, reply,
       ({ game, player }) => deployUnit(game, globalEventBus, player, unitType, fromId, q, r),
@@ -103,7 +103,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: MoveBody }>('/api/games/:id/move', async (req, reply) => {
     const { unitId, q, r } = req.body || {};
     if (!unitId || typeof q !== 'number' || typeof r !== 'number') {
-      return badRequest(reply, 'unitId, q, r required');
+      return badRequest(reply, '需要提供 unitId、q、r');
     }
     return dispatchAction(req, reply,
       ({ game, player }) => moveUnit(game, globalEventBus, player, unitId, q, r),
@@ -112,17 +112,17 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { id: string }; Body: AttackBody }>('/api/games/:id/attack', async (req, reply) => {
     const { attackerId, targetId, q, r } = req.body || {};
-    if (!attackerId) return badRequest(reply, 'attackerId required');
+    if (!attackerId) return badRequest(reply, '需要提供 attackerId');
     // 两种模式的请求体不同：顺序模式指定目标实体 targetId，
     // 同时模式改为指定目标格子 q/r（预测性开火，不要求格内有敌）。
     return dispatchAction(req, reply,
       ({ game, player }) => {
-        if (!targetId) return { ok: false, code: 'invalid_move', message: 'attackerId and targetId required' };
+        if (!targetId) return { ok: false, code: 'invalid_move', message: '需要提供 attackerId 与 targetId' };
         return attackTarget(game, globalEventBus, player, attackerId, targetId);
       },
       ({ game, player }) => {
         if (typeof q !== 'number' || typeof r !== 'number') {
-          return { ok: false, code: 'invalid_attack', message: 'attackerId, q, r required' };
+          return { ok: false, code: 'invalid_attack', message: '需要提供 attackerId、q、r' };
         }
         return queueAttackAction(game, player, attackerId, q, r);
       });
@@ -130,16 +130,16 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { id: string }; Body: HealBody }>('/api/games/:id/heal', async (req, reply) => {
     const { supportId, targetId, q, r } = req.body || {};
-    if (!supportId) return badRequest(reply, 'supportId required');
+    if (!supportId) return badRequest(reply, '需要提供 supportId');
     // 顺序模式指定友方单位 targetId；同时模式改为指定格子/方向 q/r（区域治疗）。
     return dispatchAction(req, reply,
       ({ game, player }) => {
-        if (!targetId) return { ok: false, code: 'invalid_move', message: 'supportId and targetId required' };
+        if (!targetId) return { ok: false, code: 'invalid_move', message: '需要提供 supportId 与 targetId' };
         return healTarget(game, globalEventBus, player, supportId, targetId);
       },
       ({ game, player }) => {
         if (typeof q !== 'number' || typeof r !== 'number') {
-          return { ok: false, code: 'invalid_heal', message: 'supportId, q, r required' };
+          return { ok: false, code: 'invalid_heal', message: '需要提供 supportId、q、r' };
         }
         return queueHealAction(game, player, supportId, q, r);
       });
@@ -148,7 +148,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: DemolishBody }>('/api/games/:id/demolish', async (req, reply) => {
     const { unitId, q, r } = req.body || {};
     if (!unitId || typeof q !== 'number' || typeof r !== 'number') {
-      return badRequest(reply, 'unitId, q, r required');
+      return badRequest(reply, '需要提供 unitId、q、r');
     }
     return dispatchAction(req, reply,
       ({ game, player }) => demolishTerrain(game, globalEventBus, player, unitId, q, r),
@@ -176,7 +176,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
       };
     }
     if (ctx.game.turn.currentPlayerId !== ctx.player) {
-      return reply.code(statusForCode('not_your_turn')).send({ error: 'not your turn', code: 'not_your_turn' });
+      return reply.code(statusForCode('not_your_turn')).send({ error: '还没轮到你', code: 'not_your_turn' });
     }
     const result = endTurn(ctx.game, globalEventBus, ctx.player);
     if (!result.ok) {
@@ -190,12 +190,12 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
     if (!isSimultaneousMode(ctx.game.config.mode)) {
-      return reply.code(statusForCode('not_simultaneous_game')).send({ error: 'game is not in simultaneous mode', code: 'not_simultaneous_game' });
+      return reply.code(statusForCode('not_simultaneous_game')).send({ error: '该对局不是同时回合模式', code: 'not_simultaneous_game' });
     }
     if (!basicGate(ctx, reply)) return;
     const actionId = req.body?.actionId;
     if (typeof actionId !== 'string' || actionId.length === 0) {
-      return badRequest(reply, 'actionId required');
+      return badRequest(reply, '需要提供 actionId');
     }
     const result = revokePlanAction(ctx.game, ctx.player, actionId);
     if (!result.ok) {
@@ -209,7 +209,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
     if (!isSimultaneousMode(ctx.game.config.mode)) {
-      return reply.code(statusForCode('not_simultaneous_game')).send({ error: 'game is not in simultaneous mode', code: 'not_simultaneous_game' });
+      return reply.code(statusForCode('not_simultaneous_game')).send({ error: '该对局不是同时回合模式', code: 'not_simultaneous_game' });
     }
     if (!basicGate(ctx, reply)) return;
     const result = clearPlanActions(ctx.game, ctx.player);

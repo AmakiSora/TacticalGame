@@ -68,11 +68,11 @@ function fullReplayPayload(game: GameState) {
 }
 
 export function startGame(game: GameState, bus: EventBus, random: () => number = Math.random): Result {
-  if (game.phase !== 'lobby') return { ok: false, code: 'game_already_started', message: 'game already started' };
+  if (game.phase !== 'lobby') return { ok: false, code: 'game_already_started', message: '对局已经开始' };
   const count = joinedPlayerIds(game).length;
-  if (count < 2) return { ok: false, code: 'lobby_not_ready', message: 'at least 2 players required' };
+  if (count < 2) return { ok: false, code: 'lobby_not_ready', message: '至少需要 2 名玩家' };
   if (!game.config.supportedPlayerCounts.includes(count)) {
-    return { ok: false, code: 'unsupported_player_count', message: `map does not support ${count} players` };
+    return { ok: false, code: 'unsupported_player_count', message: `该地图不支持 ${count} 名玩家` };
   }
   initializeLobbyGame(game, random);
   appendEvent(game, bus, 'game_start', fullReplayPayload(game));
@@ -81,9 +81,9 @@ export function startGame(game: GameState, bus: EventBus, random: () => number =
 
 // 保留旧双人测试和旧内部调用所需的加入即开局行为。
 export function joinGame(game: GameState, bus: EventBus, playerName?: string): Result {
-  if (game.players.player_b) return { ok: false, code: 'game_already_full', message: 'game already has 2 players' };
+  if (game.players.player_b) return { ok: false, code: 'game_already_full', message: '该对局已有 2 名玩家' };
   const joined = addLobbyPlayer(game, playerName);
-  if (!joined) return { ok: false, code: 'game_already_full', message: 'game already full' };
+  if (!joined) return { ok: false, code: 'game_already_full', message: '房间已满' };
   for (const id of ['player_a', 'player_b'] as PlayerId[]) {
     const player = game.players[id]!;
     player.status = 'active';
@@ -275,8 +275,8 @@ export function endGame(game: GameState, bus: EventBus, winner: PlayerId | null,
 
 /** Ends an active match immediately using the current adjudication scores. */
 export function forceAdjudication(game: GameState, bus: EventBus): Result {
-  if (game.phase === 'lobby') return { ok: false, code: 'game_not_started', message: 'game has not started' };
-  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
+  if (game.phase === 'lobby') return { ok: false, code: 'game_not_started', message: '对局尚未开始' };
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: '对局已结束' };
 
   const snapshot = buildAdjudicationSnapshot(game);
   const winner = snapshot.leaders.length === 1 ? snapshot.leaders[0]! : null;
@@ -496,10 +496,10 @@ export function eliminatePlayer(
 ): Result {
   const player = game.players[playerId];
   if (!player || player.status !== 'active') {
-    return { ok: false, code: 'player_eliminated', message: 'player is not active' };
+    return { ok: false, code: 'player_eliminated', message: '该玩家已不在场上' };
   }
   if (activePlayerIds(game).length <= 1) {
-    return { ok: false, code: 'invalid_move', message: 'cannot eliminate the last active player' };
+    return { ok: false, code: 'invalid_move', message: '不能淘汰最后一名在场玩家' };
   }
   markPlayerEliminated(game, bus, playerId, reason, eliminatedBy);
 
@@ -515,10 +515,10 @@ export function eliminatePlayer(
 
 export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result {
   syncLegacyTurnAliases(game);
-  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: 'game has ended' };
-  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: 'game not in play' };
-  if (game.players[owner]?.status !== 'active') return { ok: false, code: 'player_eliminated', message: 'player eliminated' };
-  if (game.turn.currentPlayerId !== owner) return { ok: false, code: 'not_your_turn', message: 'not your turn' };
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: '对局已结束' };
+  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
+  if (game.players[owner]?.status !== 'active') return { ok: false, code: 'player_eliminated', message: '该玩家已被淘汰' };
+  if (game.turn.currentPlayerId !== owner) return { ok: false, code: 'not_your_turn', message: '还没轮到你' };
 
   captureControlPoints(game, bus, owner);
   resetActions(game, owner);
@@ -531,7 +531,7 @@ export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result
 export function skipTurn(game: GameState, bus: EventBus): Result {
   syncLegacyTurnAliases(game);
   const owner = game.turn.currentPlayerId;
-  if (!owner) return { ok: false, code: 'game_not_started', message: 'game not in play' };
+  if (!owner) return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
   appendEvent(game, bus, 'turn_skipped', { playerId: owner, roundNumber: game.turn.roundNumber });
   return endTurn(game, bus, owner);
 }

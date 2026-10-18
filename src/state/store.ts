@@ -153,7 +153,7 @@ function shuffle<T>(items: T[], random: () => number): T[] {
 export function initializeLobbyGame(game: GameState, random: () => number = Math.random): void {
   const playerIds = PLAYER_IDS.filter(id => game.players[id]);
   const layoutIds = game.config.layouts[String(playerIds.length)];
-  if (!layoutIds) throw new Error('unsupported player count');
+  if (!layoutIds) throw new Error('不支持该玩家人数');
   const slots = layoutIds.map(id => game.config.spawnSlots.find(slot => slot.id === id)!);
   const assignedPlayers = shuffle(playerIds, random);
 

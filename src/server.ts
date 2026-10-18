@@ -119,7 +119,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
     entry.count += 1;
     if (entry.count > protectedRateLimit) {
-      reply.code(429).send({ error: 'too many requests', code: 'rate_limit' });
+      reply.code(429).send({ error: '请求过于频繁，请稍后再试', code: 'rate_limit' });
     }
   });
 

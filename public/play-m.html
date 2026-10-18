@@ -6,6 +6,7 @@
   <title>TacticalGame — 玩家（手机）</title>
   <link rel="stylesheet" href="/play-m.css" />
   <link rel="stylesheet" href="/mobile-icons.css" />
+  <link rel="stylesheet" href="/ui-dialog.css" />
 </head>
 <body class="player-m-shell">
 
@@ -60,16 +61,23 @@
             <label class="lobby-map-label">选择地图</label>
             <select id="map-select" hidden><option value="random">随机地图</option><option value="default">default</option></select>
             <div id="lobby-map-summary" class="lobby-map-summary">
-              <div id="lobby-map-thumb" class="lobby-map-thumb" aria-hidden="true"></div>
-              <div class="lobby-map-copy">
-                <div class="lobby-map-name">
-                  <span id="lobby-map-name">地图加载中…</span>
-                  <span id="lobby-map-id"></span>
-                </div>
-                <div id="lobby-map-tags" class="lobby-map-tags"></div>
-                <div id="lobby-map-desc" class="lobby-map-desc"></div>
+              <div class="lobby-map-stage">
+                <div id="lobby-map-thumb" class="lobby-map-thumb" aria-hidden="true"></div>
+                <div id="lobby-map-legend" class="lobby-map-legend" aria-label="地图图例"></div>
               </div>
-              <button id="btn-change-map" class="btn" type="button">更换地图</button>
+              <div class="lobby-map-copy">
+                <div class="lobby-map-info">
+                  <div class="lobby-map-title">
+                    <div class="lobby-map-name">
+                      <span id="lobby-map-name">地图加载中…</span>
+                    </div>
+                    <div id="lobby-map-id" class="lobby-map-id"></div>
+                    <div id="lobby-map-desc" class="lobby-map-desc"></div>
+                  </div>
+                  <div id="lobby-map-meta" class="lobby-map-meta"></div>
+                </div>
+                <button id="btn-change-map" class="btn lobby-map-change" type="button">更换地图</button>
+              </div>
             </div>
           </div>
         </div>
@@ -147,6 +155,24 @@
             <p class="available-games-state">正在检测…</p>
           </div>
         </section>
+      </div>
+      <div id="join-map-summary" class="lobby-map-summary hidden">
+        <div class="lobby-map-stage">
+          <div id="join-map-thumb" class="lobby-map-thumb" aria-hidden="true"></div>
+          <div id="join-map-legend" class="lobby-map-legend" aria-label="地图图例"></div>
+        </div>
+        <div class="lobby-map-copy">
+          <div class="lobby-map-info">
+            <div class="lobby-map-title">
+              <div class="lobby-map-name">
+                <span id="join-map-name"></span>
+              </div>
+              <div id="join-map-id" class="lobby-map-id"></div>
+              <div id="join-map-desc" class="lobby-map-desc"></div>
+            </div>
+            <div id="join-map-meta" class="lobby-map-meta"></div>
+          </div>
+        </div>
       </div>
       <div id="join-result" class="lobby-result lobby-room hidden">
         <div class="lobby-room-head">

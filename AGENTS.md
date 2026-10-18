@@ -28,6 +28,7 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 - **版本号由当前分支决定**：`release/x.y.z` 分支上版本必须等于 `x.y.z`，新建 release 分支后先 `npm run version x.y.z` 对齐（脚本会同步 package.json/README/skill 等全部引用处）；feature 等开发分支不主动 bump 版本。交付前可 `npm run check-version` 校验一致性。
 - **发版日志**：`RELEASE_NOTES.md` 按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写（SemVer 分类：新增/变更/修复/移除/测试与验证）；`## x.y.z` 标题格式不可改，bump 脚本依赖它插入占位小节。**只写相对上一个已发布版本的对外变化**：读者视角是「上一版本 → 本版本」，开发分支上的内部反复（未发布过的文件/地图被替换、返工、措辞更名、测试内部适配）不进日志，这类产物一律按最终形态写成新增/变更；配套的内部动作不写，仍然成立的测试事实可进「测试与验证」。
 - 分支：发布用 `release/x.y.z`，中文 conventional commits。
+- **提交与推送必须先经用户明确同意**：只有用户明确说出「提交」「推送」「commit」「push」或等价指令时，才可执行 `git commit` / `git push`（含 amend、force push、新建分支后顺手推送）。改完代码 / 文档先把改动与验证结果汇报给用户，待确认后再提交；用户未发话时改动一律留在工作区。
 - **Windows `/tmp` 陷阱**：Git Bash 的 `/tmp` 是 `AppData\Local\Temp`，node 却把 `/tmp/x` 解析成 `C:\tmp\x`（旧会话残留处），`curl > /tmp/a.json` 后 node 读它会拿到陈旧数据，看似服务端状态交替。快照用 `curl | node` 管道直读；落盘用 `temp/` 相对路径或 `C:/` 绝对路径，读回前校验 gameId。
 
 ## 玩游戏（agent 对战）

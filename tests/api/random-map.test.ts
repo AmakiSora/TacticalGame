@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { startTestServer } from '../helpers.js';
 import { globalStore } from '../../src/state/store.js';
+import { RANDOM_PARAM_BOUNDS } from '../../src/config/randomMap.js';
 
 describe('random map game creation API', () => {
   let app: FastifyInstance;
@@ -217,6 +218,38 @@ describe('random map preview API', () => {
       payload: { maxPlayers: 4 },
     });
     expect(second.json().seed).not.toBe(firstBody.seed);
+  });
+
+  it('returns the resolved value of every random parameter', async () => {
+    app = await startTestServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/maps/random/preview',
+      payload: {
+        maxPlayers: 3,
+        random: { seed: 'preview-values', radius: [6, 9], infantryHp: [90, 130] },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      seed: string;
+      preview: any;
+      values: Record<string, number | null>;
+    };
+    // 每个可调参数都要带实际取值：参数行内的「本图 X」全靠这份回传。
+    for (const key of Object.keys(RANDOM_PARAM_BOUNDS)) {
+      if (key === 'terrainDensity') continue; // 已废弃别名，不参与生成
+      expect(body.values, `${key} 缺实际取值`).toHaveProperty(key);
+    }
+    expect(body.values.radius).toBeGreaterThanOrEqual(6);
+    expect(body.values.radius).toBeLessThanOrEqual(9);
+    expect(body.values.radius).toBe(body.preview.radius);
+    expect(body.values.controlPointCount).toBe(body.preview.controlPoints.length);
+    expect(body.values.maxTurns).toBe(body.preview.maxTurns);
+    expect(body.values.actionsPerTurn).toBe(body.preview.actionsPerTurn);
+    expect(body.values.infantryHp).toBe(body.preview.units.infantry.hp);
+    // 未注入的追赶补给用 null 表示「本图没有这一项」。
+    expect(body.values.comebackStartRound).toBeNull();
   });
 
   it('rejects malformed preview options', async () => {

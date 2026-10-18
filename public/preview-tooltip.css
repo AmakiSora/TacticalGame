@@ -1,0 +1,248 @@
+/* 大厅 / 地图卡预览的悬停详单：鼠标停在据点、总部（出生点）或初始单位上时显示该对象数值。
+   面板语汇与 ui-dialog、地图库弹层一致（#141c26 底 / #2a3a4a 边 / 9px 圆角 / 顶部细光带），
+   内容结构照抄局内详情卡：对象图标 + 名称 → 生命条 → 两列数值格 → 特性。
+   卡片 fixed 挂在 body 上（由 preview-tooltip.js 定位），避免被预览容器的 overflow 裁切。 */
+.preview-tip {
+  position: fixed;
+  /* 页头 / 大厅内容之上，地图库卡片（105）里悬停也要露出来；仍在 toast（999）与确认框（1000）之下。 */
+  z-index: 980;
+  box-sizing: border-box;
+  width: 190px;
+  padding: 9px 10px 10px;
+  border: 1px solid #2a3a4a;
+  border-radius: 9px;
+  background: #141c26;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .55);
+  color: #d8e0e8;
+  font-size: 11px;
+  line-height: 1.3;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity .12s ease, transform .14s cubic-bezier(.22, .8, .3, 1);
+  --preview-tip-accent: #4a8aaa;
+  --preview-tip-tone: #8fa5b5;
+}
+.preview-tip.open {
+  opacity: 1;
+  transform: none;
+}
+/* 顶部细光带：按兵种配色，和确认框的主色调区分同一套哑光面板 */
+.preview-tip::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--preview-tip-accent), transparent);
+  opacity: .6;
+  pointer-events: none;
+}
+.preview-tip svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* —— 头部：兵种图标 + 名称 / 副标题 —— */
+.preview-tip-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preview-tip-token {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #34546a;
+  border-radius: 7px;
+  background: rgba(80, 170, 220, .12);
+  color: #9de3ff;
+}
+.preview-tip-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.preview-tip-name {
+  color: #e9f1f7;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.preview-tip-sub {
+  overflow: hidden;
+  color: #7f97a7;
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* —— 生命：数值 + 细血条（配色同局内详情卡） —— */
+.preview-tip-hp {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.preview-tip-hp-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: #8fa5b5;
+  font-size: 10px;
+}
+.preview-tip-hp-label span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.preview-tip-hp-label svg {
+  width: 11px;
+  height: 11px;
+  color: #e0787a;
+}
+.preview-tip-hp-label strong {
+  color: #e4edf4;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.preview-tip-hp-bar {
+  height: 5px;
+  overflow: hidden;
+  border: 1px solid #3b2428;
+  border-radius: 999px;
+  background: #291619;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .45);
+}
+.preview-tip-hp-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #48a96b, #77d08d);
+}
+.preview-tip-hp-bar i.wounded { background: linear-gradient(90deg, #b9892b, #f0c65a); }
+.preview-tip-hp-bar i.critical { background: linear-gradient(90deg, #b84b43, #ef7464); }
+
+/* —— 数值格：图标 + 名称 + 数字，两列 —— */
+.preview-tip-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 8px;
+  margin-top: 8px;
+}
+.preview-tip-cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.preview-tip-cell svg {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  color: var(--preview-tip-tone);
+}
+.preview-tip-cell i {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: #7f97a7;
+  font-size: 10px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview-tip-cell b {
+  color: #e4edf4;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.preview-tip-cell.attack { --preview-tip-tone: #e08c8c; }
+.preview-tip-cell.defense { --preview-tip-tone: #7fa8dc; }
+.preview-tip-cell.move { --preview-tip-tone: #79cf9b; }
+.preview-tip-cell.range { --preview-tip-tone: #d3c083; }
+.preview-tip-cell.cost { --preview-tip-tone: #e8c766; }
+.preview-tip-cell.heal { --preview-tip-tone: #7fd0a6; }
+/* 据点 / 总部（出生点）用到的行 */
+.preview-tip-cell.income { --preview-tip-tone: #e8c766; }
+.preview-tip-cell.discount { --preview-tip-tone: #b9a6e8; }
+.preview-tip-cell.repair { --preview-tip-tone: #7fd0a6; }
+.preview-tip-cell.units { --preview-tip-tone: #9db3c4; }
+.preview-tip-cell.deploy { --preview-tip-tone: #8fb8d8; }
+
+/* —— 特性：可占点 / 锁定目标等，与数值区分开 —— */
+.preview-tip-traits {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #243343;
+  color: #9bb3c4;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+/* —— 兵种配色：顶部光带 + 图标底色调成该兵种颜色 —— */
+.preview-tip.unit-infantry { --preview-tip-accent: #66ccff; }
+.preview-tip.unit-scout { --preview-tip-accent: #8ee28e; }
+.preview-tip.unit-heavy { --preview-tip-accent: #ff9966; }
+.preview-tip.unit-ranger { --preview-tip-accent: #d6a3ff; }
+.preview-tip.unit-support { --preview-tip-accent: #78c8a0; }
+.preview-tip.unit-infantry .preview-tip-token {
+  border-color: rgba(102, 204, 255, .5);
+  background: rgba(102, 204, 255, .14);
+  color: #9de3ff;
+}
+.preview-tip.unit-scout .preview-tip-token {
+  border-color: rgba(142, 226, 142, .5);
+  background: rgba(142, 226, 142, .14);
+  color: #b7f0b7;
+}
+.preview-tip.unit-heavy .preview-tip-token {
+  border-color: rgba(255, 153, 102, .5);
+  background: rgba(255, 153, 102, .14);
+  color: #ffc29e;
+}
+.preview-tip.unit-ranger .preview-tip-token {
+  border-color: rgba(214, 163, 255, .5);
+  background: rgba(214, 163, 255, .14);
+  color: #e2c6ff;
+}
+.preview-tip.unit-support .preview-tip-token {
+  border-color: rgba(120, 200, 160, .5);
+  background: rgba(120, 200, 160, .14);
+  color: #a6e4c6;
+}
+
+/* —— 据点 / 总部 / 出生点：沿用棋盘上的金 / 蓝 / 绿三种标记色 —— */
+.preview-tip.marker-control-point { --preview-tip-accent: #f0d77c; }
+.preview-tip.marker-headquarters { --preview-tip-accent: #66ccff; }
+.preview-tip.marker-spawn { --preview-tip-accent: #8ee28e; }
+.preview-tip.marker-control-point .preview-tip-token {
+  border-color: rgba(240, 215, 124, .55);
+  background: rgba(240, 215, 124, .14);
+  color: #f0d77c;
+}
+.preview-tip.marker-headquarters .preview-tip-token {
+  border-color: rgba(102, 204, 255, .5);
+  background: rgba(102, 204, 255, .14);
+  color: #9de3ff;
+}
+.preview-tip.marker-spawn .preview-tip-token {
+  border-color: rgba(142, 226, 142, .5);
+  background: rgba(142, 226, 142, .14);
+  color: #b7f0b7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-tip { transition: none; }
+}

@@ -22,6 +22,8 @@ function loadUI() {
 interface RowSpec {
   key: string;
   mode?: 'random' | 'fixed';
+  /** data-default-mode：重置时回到哪一挡（缺省 random）。 */
+  defaultMode?: 'random' | 'fixed';
   min?: string;
   max?: string;
   value?: string;
@@ -91,10 +93,15 @@ function makeRowStub(spec: RowSpec) {
     '.rmo-fixed-input': fixedGroup,
     // 「建议固定」参数的护栏提示：固定挡隐藏、随机挡显示（与真实渲染同口径）。
     '.rmo-warn': stubElement({ tagName: 'SPAN' }),
+    // 参数行内的「现值 X」回显位：服务端回传取值后由 applyPreviewValues 写入。
+    '[data-param-value]': stubElement({ tagName: 'SPAN', hidden: true }),
   };
+  // 真实输入框带 rmo-min / rmo-max 类：只填一端时按类名判断补哪一边。
+  inputs['.rmo-min'].classList.add('rmo-min');
+  inputs['.rmo-max'].classList.add('rmo-max');
   if (spec.mode === 'fixed' || !spec.warn) inputs['.rmo-warn'].classList.add('hidden');
   const row = stubElement({
-    dataset: { key: spec.key },
+    dataset: { key: spec.key, defaultMode: spec.defaultMode ?? 'random' },
     querySelector: (selector: string) => inputs[selector] ?? null,
   });
   // 行内元素都能沿 closest('.rmo-param') 找到所属行，与真实 DOM 语义保持一致。
@@ -151,6 +158,9 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
   const elements: Record<string, unknown> = {
     'rmo-symmetric': stubElement({ checked: true }),
     'rmo-seed': stubElement({ value: '' }),
+    'rmo-seed-lock': stubElement({ tagName: 'BUTTON', textContent: '锁定' }),
+    'rmo-preview-refresh': stubElement({ tagName: 'BUTTON', textContent: '换一张' }),
+    'rmo-reset': stubElement({ tagName: 'BUTTON', textContent: '重置' }),
     'rmo-game-mode': stubElement({ value: mode }),
     'rmo-mode-hint': hint,
     'rmo-groups-toggle': groupsToggle,
@@ -164,7 +174,15 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
       return [];
     },
   };
-  const context: Record<string, unknown> = { console, window: {}, document: documentStub };
+  // applyPreviewValues 的换值高亮用定时器清类名：VM 里给个不排队的最小实现即可。
+  const timers: Array<() => void> = [];
+  const context: Record<string, unknown> = {
+    console,
+    window: {},
+    document: documentStub,
+    setTimeout: (fn: () => void) => { timers.push(fn); return timers.length; },
+    clearTimeout: () => {},
+  };
   context.globalThis = context;
   vm.createContext(context);
   vm.runInContext(loadSource(), context);
@@ -175,7 +193,14 @@ function loadUIWithDom(mode: string, specs: RowSpec[]) {
   const hiddenOf = (key: string) => byKey(key).row.classList.contains('hidden');
   const groupOf = (key: string) => groupStubs.find(item => item.group.key === key)!;
   const byToggle = (key: string) => toggleStubs.find(item => item.toggle.key === key)!;
-  return { ui, container, hint, rows, byKey, hiddenOf, groupOf, allGroups: groupStubs, groupsToggle, byToggle };
+  const seedInput = elements['rmo-seed'] as ReturnType<typeof stubElement>;
+  const seedLock = elements['rmo-seed-lock'] as ReturnType<typeof stubElement>;
+  const panelRefresh = elements['rmo-preview-refresh'] as ReturnType<typeof stubElement>;
+  const resetButton = elements['rmo-reset'] as ReturnType<typeof stubElement>;
+  return {
+    ui, container, hint, rows, byKey, hiddenOf, groupOf, allGroups: groupStubs, groupsToggle, byToggle,
+    seedInput, seedLock, panelRefresh, resetButton, timers,
+  };
 }
 
 /** 带最小 DOM 桩加载模块并渲染面板，返回面板 HTML。 */
@@ -498,13 +523,23 @@ describe('random map creation UI', () => {
   });
 
   it('collects the submitted range from the numeric inputs alone', () => {
-    // 区间模式：min/max 成对提交；只填一端时提交单值，留空＝服务端默认。
+    // 区间模式：min/max 成对提交；只填一端时另一端按默认范围补上（仍是区间，不会变成固定值）；
+    // 两端都留空＝不提交、由服务端按默认范围随机。
     const ranged = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '9' }]);
     expect(ranged.ui.collectRandomOptions().radius).toEqual([6, 9]);
     const onlyMin = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '' }]);
-    expect(onlyMin.ui.collectRandomOptions().radius).toBe(6);
+    expect(onlyMin.ui.collectRandomOptions().radius).toEqual([6, 10]); // 10 = 默认范围上界
+    const onlyMax = loadUIWithDom('standard', [{ key: 'radius', min: '', max: '8' }]);
+    expect(onlyMax.ui.collectRandomOptions().radius).toEqual([5, 8]); // 5 = 默认范围下界
     const empty = loadUIWithDom('standard', [{ key: 'radius' }]);
     expect(empty.ui.collectRandomOptions()).not.toHaveProperty('radius');
+
+    // 只填一端后失焦：另一端自动填进输入框，用户看得见这段区间。
+    const fillSibling = loadUIWithDom('standard', [{ key: 'radius', min: '6', max: '' }]);
+    const radiusItem = fillSibling.byKey('radius');
+    radiusItem.inputs['.rmo-min'].fire('change');
+    expect(radiusItem.inputs['.rmo-max'].value).toBe('10');
+    expect(fillSibling.ui.collectRandomOptions().radius).toEqual([6, 10]);
 
     // 固定模式：只读 .rmo-value，区间输入即使仍挂着值也不参与提交。
     const fixed = loadUIWithDom('standard', [{ key: 'radius', mode: 'fixed', min: '6', max: '9', value: '7' }]);
@@ -590,7 +625,7 @@ describe('random map creation UI', () => {
     for (const mode of ['standard', 'annihilation', 'simultaneous', 'royale']) {
       const scoped = loadUIWithDom(mode, specs);
       const options = scoped.ui.collectRandomOptions();
-      expect(options.startingUnitCount, `${mode} 数量单值`).toBe(3);
+      expect(options.startingUnitCount, `${mode} 数量区间（上限按默认范围补 4）`).toEqual([3, 4]);
       expect(options.startingWeightInfantry, `${mode} 步兵区间`).toEqual([4, 8]);
       expect(options.startingWeightScout, `${mode} 侦察兵标量`).toBe(2);
       expect(options.startingWeightHeavy, `${mode} 重装标量`).toBe(0);
@@ -639,6 +674,182 @@ describe('random map creation UI', () => {
     expect(html).toContain('<option value="standard" selected>标准</option>');
   });
 
+  it('echoes every parameter’s resolved value inside its own row', () => {
+    const html = capturePanelHtml('standard');
+    // 参数行里有「现值 X」回显位，种子行里有锁定按钮。
+    expect(html).toContain('data-param-value');
+    expect(html).toContain('class="rmo-param-name"');
+    expect(html).toContain('id="rmo-seed-lock"');
+    expect(html).toContain('id="rmo-reset"');
+
+    const scoped = loadUIWithDom('standard', [
+      { key: 'radius', min: '6', max: '9' },
+      { key: 'waterDensity' },
+      { key: 'maxTurns' },
+      { key: 'unitStatVariation' },
+      { key: 'infantryHp' },
+      { key: 'supplyIncome' },
+      { key: 'startingWeightHeavy', mode: 'fixed', value: '1.5' },
+      { key: 'artilleryDamage' },
+      { key: 'comebackStartRound' },
+      { key: 'scoutDefense' },
+    ]);
+    const slotOf = (key: string) => scoped.byKey(key).inputs['[data-param-value]'];
+    expect(slotOf('radius').hidden).toBe(true);
+
+    scoped.ui.applyPreviewValues({
+      radius: 8,
+      waterDensity: 0.0625,
+      maxTurns: null,
+      unitStatVariation: 0.183,
+      infantryHp: 118,
+      supplyIncome: 12,
+      startingWeightHeavy: 1.5,
+      artilleryDamage: null,
+      comebackStartRound: null,
+    });
+    // 整数取整、小数一律四位（与服务端同精度），显示值就是地图实际用的值。
+    expect(slotOf('radius').textContent).toBe('现值 8');
+    expect(slotOf('waterDensity').textContent).toBe('现值 0.0625');
+    expect(slotOf('unitStatVariation').textContent).toBe('现值 0.183');
+    expect(slotOf('infantryHp').textContent).toBe('现值 118');
+    expect(slotOf('supplyIncome').textContent).toBe('现值 12');
+    expect(slotOf('startingWeightHeavy').textContent).toBe('现值 1.5');
+    // 无回合上限＝∞；未注入的追赶补给 / 当前模式没有的炮火＝未启用。
+    expect(slotOf('maxTurns').textContent).toBe('现值 ∞');
+    expect(slotOf('comebackStartRound').textContent).toBe('现值 未启用');
+    expect(slotOf('artilleryDamage').textContent).toBe('现值 未启用');
+    // 服务端没回传取值的行保持隐藏，不编造数字。
+    expect(slotOf('scoutDefense').hidden).toBe(true);
+    expect(slotOf('radius').hidden).toBe(false);
+    expect(slotOf('radius').title).toContain('地图半径');
+
+    // 换一张后变化过的值闪一下，没变的行不动。
+    scoped.ui.applyPreviewValues({
+      radius: 9,
+      waterDensity: 0.0625,
+      maxTurns: null,
+      unitStatVariation: 0.183,
+      infantryHp: 118,
+      supplyIncome: 12,
+      startingWeightHeavy: 1.5,
+      artilleryDamage: null,
+      comebackStartRound: null,
+    });
+    expect(slotOf('radius').classList.contains('is-changed')).toBe(true);
+    expect(slotOf('infantryHp').classList.contains('is-changed')).toBe(false);
+    expect(slotOf('radius').textContent).toBe('现值 9');
+  });
+
+  it('locks the seed so 换一张 stops reshuffling a reproducible map', () => {
+    const scoped = loadUIWithDom('standard', [{ key: 'radius' }]);
+    // 还没生成过预览：没有可锁的种子，锁按钮不可用。
+    expect(scoped.seedLock.disabled).toBe(true);
+    scoped.ui.lastSeed = 'abc123';
+    scoped.ui.syncSeedLockState();
+    expect(scoped.seedLock.disabled).toBe(false);
+    expect(scoped.seedLock.getAttribute('aria-pressed')).toBe('false');
+
+    // 锁定：种子回填进输入框并转只读，换一张按钮禁用。
+    expect(scoped.seedLock.fire('click'), '种子锁没挂 click 监听').toBeGreaterThan(0);
+    expect(scoped.ui.seedLocked).toBe(true);
+    expect(scoped.seedInput.value).toBe('abc123');
+    expect(scoped.seedInput.readOnly).toBe(true);
+    expect(scoped.seedLock.getAttribute('aria-pressed')).toBe('true');
+    expect(scoped.seedLock.textContent).toBe('已锁定');
+    expect(scoped.panelRefresh.disabled).toBe(true);
+    expect(scoped.seedLock.title).toContain('解锁');
+
+    // 锁定时「换一张」被挡住：种子保持不动，这张图仍可复现。
+    expect(scoped.ui.reroll()).toBe(false);
+    expect(scoped.seedInput.value).toBe('abc123');
+
+    // 解锁后恢复原行为：换一张清空种子重新抽。
+    scoped.seedLock.fire('click');
+    expect(scoped.ui.seedLocked).toBe(false);
+    expect(scoped.seedInput.readOnly).toBe(false);
+    expect(scoped.panelRefresh.disabled).toBe(false);
+    expect(scoped.ui.reroll()).toBe(true);
+    expect(scoped.seedInput.value).toBe('');
+  });
+
+  it('backfills the current value when a row is switched to 固定, so it really locks', () => {
+    const scoped = loadUIWithDom('standard', [
+      { key: 'infantryHp', min: '80', max: '120' },
+      { key: 'waterDensity' },
+      { key: 'comebackStartRound' },
+      { key: 'damageVarianceRange', mode: 'fixed', value: '5' },
+    ]);
+    scoped.ui.applyPreviewValues({
+      infantryHp: 118,
+      waterDensity: 0.0241697,
+      comebackStartRound: null,
+      damageVarianceRange: 3,
+    });
+    // 默认固定挡、用户已经填过的值不被覆盖。
+    expect(scoped.byKey('damageVarianceRange').inputs['.rmo-value'].value).toBe('5');
+
+    // 随机 → 固定：把当前现值填进固定输入框，这一行才会真的作为常量提交。
+    const hp = scoped.byKey('infantryHp');
+    expect(scoped.ui.collectRandomOptions().infantryHp).toEqual([80, 120]);
+    hp.inputs['.rmo-mode-toggle'].fire('click');
+    expect(hp.inputs['.rmo-mode-toggle'].dataset.value).toBe('fixed');
+    expect(hp.inputs['.rmo-value'].value).toBe('118');
+    expect(scoped.ui.collectRandomOptions().infantryHp).toBe(118);
+
+    // 小数参数按服务端钳位精度回填（四位小数），回填值就是提交值。
+    const water = scoped.byKey('waterDensity');
+    water.inputs['.rmo-mode-toggle'].fire('click');
+    expect(water.inputs['.rmo-value'].value).toBe('0.0242');
+    expect(scoped.ui.collectRandomOptions().waterDensity).toBe(0.0242);
+
+    // 本图没有这一项（未启用）时没有可回填的数值，保持留空。
+    const comeback = scoped.byKey('comebackStartRound');
+    comeback.inputs['.rmo-mode-toggle'].fire('click');
+    expect(comeback.inputs['.rmo-value'].value).toBe('');
+    expect(scoped.ui.collectRandomOptions()).not.toHaveProperty('comebackStartRound');
+
+    // 用户手动填过的值优先：切挡不会把它改成新掷出来的数。
+    const typed = loadUIWithDom('standard', [{ key: 'infantryHp' }]);
+    typed.ui.applyPreviewValues({ infantryHp: 118 });
+    typed.byKey('infantryHp').inputs['.rmo-value'].value = '90';
+    typed.byKey('infantryHp').inputs['.rmo-mode-toggle'].fire('click');
+    expect(typed.byKey('infantryHp').inputs['.rmo-value'].value).toBe('90');
+    expect(typed.ui.collectRandomOptions().infantryHp).toBe(90);
+  });
+
+  it('resets every parameter back to its default empty state in one click', () => {
+    const scoped = loadUIWithDom('standard', [
+      { key: 'radius', min: '6', max: '9' },
+      { key: 'infantryHp', min: '90', max: '130' },
+      { key: 'damageVarianceRange', mode: 'random', defaultMode: 'fixed', value: '5', warn: '随机区间会抹平兵种攻击差，建议保持固定' },
+    ]);
+    scoped.ui.applyPreviewValues({ radius: 8, infantryHp: 100, damageVarianceRange: 3 });
+    const radius = scoped.byKey('radius');
+    const variance = scoped.byKey('damageVarianceRange');
+    expect(variance.inputs['.rmo-warn'].classList.contains('hidden')).toBe(false);
+    scoped.byToggle('deployFromHq').input.checked = false;
+    scoped.byToggle('noTurnLimit').input.checked = true;
+
+    expect(scoped.resetButton.fire('click'), '重置按钮没挂 click 监听').toBeGreaterThan(0);
+    // 所有输入清空、现值收起。
+    expect(radius.inputs['.rmo-min'].value).toBe('');
+    expect(radius.inputs['.rmo-max'].value).toBe('');
+    expect(radius.inputs['.rmo-value'].value).toBe('');
+    expect(radius.inputs['[data-param-value]'].hidden).toBe(true);
+    expect(radius.inputs['[data-param-value]'].textContent).toBe('');
+    // 取值方式回到各自的默认挡，对应的输入组 / 护栏提示一起归位。
+    expect(variance.inputs['.rmo-mode-toggle'].dataset.value).toBe('fixed');
+    expect(variance.inputs['.rmo-range-inputs'].classList.contains('hidden')).toBe(true);
+    expect(variance.inputs['.rmo-fixed-input'].classList.contains('hidden')).toBe(false);
+    expect(variance.inputs['.rmo-warn'].classList.contains('hidden')).toBe(true);
+    // 布尔开关回到默认值。
+    expect(scoped.byToggle('deployFromHq').input.checked).toBe(true);
+    expect(scoped.byToggle('noTurnLimit').input.checked).toBe(false);
+    // 全部回到「留空＝默认」：提交的 random 字段只剩模式。
+    expect(scoped.ui.collectRandomOptions()).toEqual({ mode: 'standard' });
+  });
+
   it('builds a preview panel that fetches server-side generated previews', () => {
     const source = read('public/random-map-ui.js');
     expect(source).toContain('id="rmo-preview-canvas"');
@@ -661,6 +872,12 @@ describe('random map creation UI', () => {
       // 防止回退成两行或 flex 换行的参差布局，也防止「范围」列重新长出来。
       expect(css, `${path} 缺参数行单行网格布局`).toContain('grid-template-columns: 88px auto minmax(0, 1fr)');
       expect(css, `${path} 不应再有独立范围列样式`).not.toContain('.rmo-bounds');
+      // 「本图 X」回显与种子锁：桌面/手机两端样式表都要有，否则其中一端会退化成隐形数字。
+      expect(css, `${path} 缺本图取值样式`).toContain('.rmo-param-value');
+      expect(css, `${path} 缺换值高亮样式`).toContain('.rmo-param-value.is-changed');
+      expect(css, `${path} 缺种子锁样式`).toContain('.rmo-seed-lock');
+      expect(css, `${path} 缺重置按钮样式`).toContain('.rmo-reset');
+      expect(css, `${path} 缺换一张禁用样式`).toContain('.rmo-preview-refresh:disabled');
       // 窄屏档：压缩名称列与间距，保证四位数上限（≤9999）的灰字在 360px 下完整可见。
       expect(css, `${path} 缺窄屏压缩档`).toContain('@media (max-width: 420px)');
       expect(css, `${path} 缺窄屏名称列压缩`).toContain('grid-template-columns: 68px auto minmax(0, 1fr)');
@@ -673,6 +890,9 @@ describe('random map creation UI', () => {
 
     expect(html).toContain('id="random-map-options"');
     expect(html).toContain('<option value="random">随机地图</option>');
+    // 弹层右侧的「换一张」也走模块入口（种子锁定时同步禁用）。
+    expect(html).toContain('data-random-refresh');
+    expect(source).toContain('window.RandomMapUI?.reroll(true)');
     // random-map-ui 由客户端入口以 ESM import 引入（不再直接以 script 标签加载）。
     expect(source).toContain("import './random-map-ui.js';");
     expect(source).toContain('window.RandomMapUI?.renderRandomMapCard');
@@ -688,6 +908,9 @@ describe('random map creation UI', () => {
 
     expect(html).toContain('id="random-map-options"');
     expect(html).toContain('<option value="random">随机地图</option>');
+    // 弹层右侧的「换一张」也走模块入口（种子锁定时同步禁用）。
+    expect(html).toContain('data-random-refresh');
+    expect(source).toContain('window.RandomMapUI?.reroll(true)');
     // random-map-ui 由客户端入口以 ESM import 引入（不再直接以 script 标签加载）。
     expect(source).toContain("import './random-map-ui.js';");
     expect(source).toContain('window.RandomMapUI?.renderRandomMapCard');

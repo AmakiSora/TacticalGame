@@ -32,7 +32,8 @@ describe('annihilation mode UI', () => {
       // 改用圆形出生点标记（此前该模式下预览一个出生点都看不到）。
       expect(source).not.toContain("preview.mode === 'annihilation' || preview.mode === 'royale' ? []");
       expect(source).toContain('preview-marker spawn spawn-slot-');
-      expect(source).toContain('起始据点');
+      // 出生点详单带出它绑定的起始据点（cpNames 查表拿据点名）。
+      expect(source).toContain('cpNames.get(slot.controlPointId)');
       // 标准 / 同时回合仍画总部方块。
       expect(source).toContain('preview-marker hq hq-slot-');
       expect(source).toContain("const modeLabel = map.preview?.mode === 'simultaneous' ? '同时'");

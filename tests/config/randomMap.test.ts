@@ -659,6 +659,106 @@ describe('random map generator', () => {
       .toThrow('terrainDensity 已废弃');
   });
 
+  it('reports every resolved parameter value without changing the generated map', () => {
+    const options = {
+      seed: 'resolved-values',
+      mode: 'annihilation' as const,
+      radius: [6, 9] as [number, number],
+      controlPointCount: [3, 6] as [number, number],
+      maxTurns: [10, 20] as [number, number],
+      waterDensity: [0.02, 0.08] as [number, number],
+      unitStatVariation: [0.05, 0.2] as [number, number],
+      infantryHp: [90, 130] as [number, number],
+      supplyIncome: [10, 30] as [number, number],
+      artilleryDamage: [12, 25] as [number, number],
+    };
+    const values: Record<string, number | null> = {};
+    const config = generateRandomMapConfig(options, 4, values);
+    // 回传取值是纯输出：同一份参数再生成一次，地图逐位一致（随机数流不受影响）。
+    expect(JSON.stringify(generateRandomMapConfig(options, 4))).toBe(JSON.stringify(config));
+
+    // 每个数值都能在最终配置里对上号——面板里显示的就是这张图的真实数值。
+    expect(values.radius).toBe(config.radius);
+    expect(values.controlPointCount).toBe(config.controlPoints.length);
+    expect(values.maxTurns).toBe(config.balance.maxTurns);
+    expect(values.actionsPerTurn).toBe(config.balance.actionsPerTurn);
+    expect(values.startingSupplies).toBe(config.balance.startingSupplies);
+    expect(values.baseIncome).toBe(config.balance.baseIncome);
+    expect(values.supplyIncome).toBe(config.balance.controlPointTypes!.supply.income);
+    expect(values.forwardBaseIncome).toBe(config.balance.controlPointTypes!.forward_base.income);
+    expect(values.forwardBaseDeployDiscount).toBe(config.balance.controlPointTypes!.forward_base.deployDiscount);
+    expect(values.repairPointRepairAmount).toBe(config.balance.controlPointTypes!.repair.repairAmount);
+    expect(values.startingUnitCount).toBe(config.spawnSlots[0].startingUnits.length);
+    expect(values.infantryHp).toBe(config.units.infantry.hp);
+    expect(values.scoutMoveRange).toBe(config.units.scout.moveRange);
+    expect(values.supportHealPower).toBe(config.units.support.healPower);
+    // 治疗射程留空时引擎回退攻击射程，回显的也是真正生效的那个值。
+    expect(values.supportHealRange).toBe(config.units.support.attackRange);
+    expect(values.headquartersHp).toBe(config.headquartersSpec.hp);
+    expect(values.headquartersDefense).toBe(config.headquartersSpec.defense);
+    expect(values.adjudicationArmyValue).toBe(config.balance.adjudicationWeights.armyValue);
+    expect(values.adjudicationKillValue).toBe(config.balance.adjudicationWeights.killValue);
+    expect(values.adjudicationControlPointFlowRatio).toBe(0.7);
+    expect(values.artilleryDamage).toBe(config.annihilation!.artillery!.damage);
+
+    // 掷出来的是区间内的实际值，而不是区间端点。
+    expect(values.radius as number).toBeGreaterThanOrEqual(6);
+    expect(values.radius as number).toBeLessThanOrEqual(9);
+    expect(values.infantryHp as number).toBeGreaterThanOrEqual(90);
+    expect(values.infantryHp as number).toBeLessThanOrEqual(130);
+    // 未注入的参数用 null 表示「本图没有这一项」（面板显示「未启用」/「∞」）。
+    expect(values.comebackStartRound).toBeNull();
+    expect(values.comebackScoreGapPercent).toBeNull();
+    expect(values.comebackAmountPerRound).toBeNull();
+
+    const standardValues: Record<string, number | null> = {};
+    const standard = generateRandomMapConfig(
+      { seed: 'resolved-standard', noTurnLimit: true }, 2, standardValues,
+    );
+    expect(standardValues.maxTurns).toBeNull();
+    // 标准模式不注入炮火：四个炮火参数都是 null（面板里这几行本来就不显示）。
+    expect(standardValues.artilleryStartRound).toBeNull();
+    expect(standardValues.artilleryIntervalRounds).toBeNull();
+    expect(standardValues.artilleryDamage).toBeNull();
+    expect(standardValues.artilleryMinimumSafeRadius).toBeNull();
+    expect(standard.balance.maxTurns).toBeNull();
+  });
+
+  it('gives every parameter its own stream, so locking one leaves the rest untouched', () => {
+    // 3.6.3：每个参数从「种子 + 参数名」派生自己的随机流，改一项不再把其余参数整体重排。
+    const baseValues: Record<string, number | null> = {};
+    const base = generateRandomMapConfig({ seed: 'independent', mode: 'annihilation' }, 4, baseValues);
+    const patches: Array<{ key: string; patch: Record<string, unknown>; expect?: number }> = [
+      { key: 'infantryHp', patch: { infantryHp: 120 }, expect: 120 },
+      { key: 'infantryHp', patch: { infantryHp: [90, 130] } },
+      { key: 'supplyIncome', patch: { supplyIncome: 15 }, expect: 15 },
+      { key: 'startingWeightScout', patch: { startingWeightScout: 5 }, expect: 5 },
+      { key: 'damageVarianceRange', patch: { damageVarianceRange: 5 }, expect: 5 },
+      { key: 'artilleryDamage', patch: { artilleryDamage: 20 }, expect: 20 },
+      { key: 'startingUnitCount', patch: { startingUnitCount: 2 }, expect: 2 },
+      { key: 'headquartersHp', patch: { headquartersHp: 150 }, expect: 150 },
+      { key: 'adjudicationKillValue', patch: { adjudicationKillValue: 0.8 }, expect: 0.8 },
+    ];
+    for (const { key, patch, expect: expected } of patches) {
+      const values: Record<string, number | null> = {};
+      generateRandomMapConfig({ seed: 'independent', mode: 'annihilation', ...patch }, 4, values);
+      const unexpected = Object.keys(values)
+        .filter(name => name !== key && values[name] !== baseValues[name]);
+      expect(unexpected, `改 ${key} 牵动了其他参数`).toEqual([]);
+      if (expected !== undefined) expect(values[key], `${key} 没生效`).toBe(expected);
+    }
+
+    // 只改兵种属性：地形 / 据点 / 出生位 / 初始单位构成一个字节都不变，只有兵种数值那一段不同。
+    const patched = generateRandomMapConfig({ seed: 'independent', mode: 'annihilation', infantryHp: 120 }, 4);
+    expect(patched.units.infantry.hp).toBe(120);
+    expect(JSON.stringify({ ...patched, units: null })).toBe(JSON.stringify({ ...base, units: null }));
+    // 只改经济参数：除了那一格收入，整份配置逐位一致。
+    const economy = generateRandomMapConfig({ seed: 'independent', mode: 'annihilation', supplyIncome: 15 }, 4);
+    expect(economy.balance.controlPointTypes!.supply.income).toBe(15);
+    expect(JSON.stringify({ ...economy, balance: { ...economy.balance, controlPointTypes: null } }))
+      .toBe(JSON.stringify({ ...base, balance: { ...base.balance, controlPointTypes: null } }));
+  });
+
   it('generates varied unit stats within the requested variation', () => {
     const config = generateRandomMapConfig({ seed: 'units', unitStatVariation: 0.5 }, 2);
     const infantry = config.units.infantry;

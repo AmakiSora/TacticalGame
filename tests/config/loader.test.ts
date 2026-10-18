@@ -2,7 +2,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getMapConfig, listMaps, loadMaps, resetConfig } from '../../src/config/loader.js';
+import { getMapConfig, listMaps, loadMaps, previewForConfig, resetConfig } from '../../src/config/loader.js';
+import { generateRandomMapConfig } from '../../src/config/randomMap.js';
 import { hexDistance } from '../../src/engine/hex.js';
 
 function validMap() {
@@ -330,6 +331,53 @@ describe('map config loader', () => {
     expect(map.preview.controlPoints).toContainEqual(expect.objectContaining({ name: '中央阵地', q: 0, r: 0 }));
     expect(map.preview.headquarters.player_a).toEqual({ q: -8, r: 0 });
     expect(map.preview.headquarters.player_b).toEqual({ q: 8, r: 0 });
+    resetConfig();
+  });
+
+  it('carries this map unit stats into previews for the lobby hover card', () => {
+    resetConfig();
+    loadMaps();
+
+    // 大厅预览的悬停详单直接用预览里的数值，前端不再维护一份兵种表；
+    // 各图数值不同（standoff 的侦察兵血更少），所以必须逐图带到 preview 上。
+    const standard = listMaps().find(item => item.id === 'default')!.preview;
+    expect(standard.units.infantry).toMatchObject({
+      hp: 100, attack: 30, defense: 8, moveRange: 3, attackRange: 1, cost: 45, canCapture: true,
+    });
+    expect(standard.units.ranger.attackRange).toBe(3);
+
+    const simultaneous = listMaps().find(item => item.id === 'standoff')!.preview;
+    expect(simultaneous.units.scout).toMatchObject({ hp: 60, attack: 16, moveRange: 3, cost: 42 });
+
+    // 随机地图预览与静态图同构：同一条 previewForConfig 路径，也要有 units。
+    const generated = previewForConfig(generateRandomMapConfig({ seed: 'preview-units' }, 2));
+    expect(generated.units.infantry.hp).toBeGreaterThan(0);
+    expect(Object.keys(generated.units).sort()).toEqual(['heavy', 'infantry', 'ranger', 'scout', 'support']);
+    resetConfig();
+  });
+
+  it('carries control point and headquarters stats into previews', () => {
+    resetConfig();
+    loadMaps();
+
+    // 悬停据点 / 总部要看到本图真实数值，而不是前端写死的一份。
+    const standard = listMaps().find(item => item.id === 'default')!.preview;
+    expect(standard.controlPointTypes.supply).toMatchObject({ income: 12, deployDiscount: 0, repairAmount: 0 });
+    expect(standard.controlPointTypes.forward_base.deployDiscount).toBe(8);
+    expect(standard.controlPointTypes.repair.repairAmount).toBe(10);
+    expect(standard.headquartersSpec).toEqual({ hp: 180, defense: 6 });
+    expect(standard.deployFromHq).toBe(true);
+
+    // 总部不可部署的图要如实带出，详单才能显示「不可部署」。
+    expect(listMaps().find(item => item.id === 'whirlpool')!.preview.deployFromHq).toBe(false);
+    // 个别据点类型不可作为部署入口。
+    const throne = listMaps().find(item => item.id === 'molten-throne')!.preview;
+    expect(Object.values(throne.controlPointTypes).some(spec => spec.canDeploy === false)).toBe(true);
+
+    // 随机地图预览同样带这两组数值。
+    const generated = previewForConfig(generateRandomMapConfig({ seed: 'preview-points' }, 2));
+    expect(generated.headquartersSpec.hp).toBeGreaterThan(0);
+    expect(Object.keys(generated.controlPointTypes).sort()).toEqual(['forward_base', 'repair', 'supply']);
     resetConfig();
   });
 

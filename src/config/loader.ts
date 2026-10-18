@@ -173,6 +173,14 @@ export interface MapPreview {
   spawnSlots: SpawnSlotConfig[];
   supportedPlayerCounts: number[];
   artillery?: ArtilleryConfig;
+  /** 本图兵种数值：大厅预览悬停初始单位时展示，避免前端硬编码一套与地图脱节的数值。 */
+  units: Record<UnitType, UnitSpec>;
+  /** 本图据点数值（收入 / 部署折扣 / 维修 / 是否可部署），悬停据点时展示。 */
+  controlPointTypes: Record<ControlPointKind, ControlPointTypeSpec>;
+  /** 本图总部的血量与防御，悬停总部时展示。 */
+  headquartersSpec: HeadquartersSpec;
+  /** false = 本图总部不可作为部署起点。 */
+  deployFromHq: boolean;
 }
 
 export interface MapListItem {
@@ -598,6 +606,14 @@ export function previewForConfig(cfg: MapConfig): MapPreview {
     })),
     supportedPlayerCounts: [...cfg.supportedPlayerCounts],
     artillery: cfg.annihilation?.artillery ? { ...cfg.annihilation.artillery } : undefined,
+    units: Object.fromEntries(
+      Object.entries(cfg.units).map(([type, spec]) => [type, { ...spec }]),
+    ) as Record<UnitType, UnitSpec>,
+    controlPointTypes: Object.fromEntries(
+      Object.entries(cfg.balance.controlPointTypes ?? {}).map(([kind, spec]) => [kind, { ...spec }]),
+    ) as Record<ControlPointKind, ControlPointTypeSpec>,
+    headquartersSpec: { ...cfg.headquartersSpec },
+    deployFromHq: cfg.balance.deployFromHq !== false,
   };
 }
 

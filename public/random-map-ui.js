@@ -195,6 +195,21 @@ import './error-text.js';
     return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  /**
+   * 参数值的显示口径：整数取整，小数保留四位小数——与服务端生成/钳位同精度，
+   * 所以参数行里显示的数、锁进固定框的数、地图实际用的数三者完全一致（不做额外取整）。
+   * null 是服务端明确表示本图没有这一项：无回合上限＝∞，未注入的参数＝未启用。
+   */
+  function formatValue(param, value) {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+      if (param.key === 'maxTurns') return '∞';
+      if (param.key.indexOf('comeback') === 0 || param.group === 'artillery') return '未启用';
+      return '—';
+    }
+    const number = Number(value);
+    return param.step >= 1 ? String(Math.round(number)) : String(Number(number.toFixed(4)));
+  }
+
   /** 数字输入共用的量程/步长属性（量程＝服务端硬边界）。 */
   function boundsAttrs(param) {
     return `min="${param.min}" max="${param.max}" step="${param.step}"`;
@@ -217,7 +232,7 @@ import './error-text.js';
       : '';
     return `<div class="rmo-param" data-key="${esc(param.key)}" data-default-mode="${fixed ? 'fixed' : 'random'}">
       <div class="rmo-param-head">
-        <span class="rmo-param-label" title="${esc(hint)}">${label}</span>
+        <span class="rmo-param-label" title="${esc(hint)}"><span class="rmo-param-name">${label}</span><span class="rmo-param-value" data-param-value hidden></span></span>
         <span class="rmo-mode-toggle" data-value="${fixed ? 'fixed' : 'random'}" role="switch" aria-checked="${fixed ? 'true' : 'false'}" tabindex="0" aria-label="${label}取值方式">
           <span class="rmo-mode-option${fixed ? '' : ' is-active'}" data-value="random">随机</span>
           <span class="rmo-mode-option${fixed ? ' is-active' : ''}" data-value="fixed">固定</span>
@@ -270,6 +285,7 @@ import './error-text.js';
         <span class="rmo-title">随机地图参数</span>
         <span class="rmo-hint">留空项由服务端在默认范围内随机</span>
         <button type="button" id="rmo-groups-toggle" class="rmo-groups-toggle">全部展开</button>
+        <button type="button" id="rmo-reset" class="rmo-reset" title="清空所有参数输入并恢复默认取值方式与服务模式（种子保留，可再点「换一张」）">重置</button>
       </div>
       <div class="rmo-row">
         <label class="field checkbox-field rmo-symmetric-field">
@@ -287,7 +303,10 @@ import './error-text.js';
         </div>
         <div class="field rmo-seed-field">
           <label for="rmo-seed">种子（留空每次随机）</label>
-          <input id="rmo-seed" maxlength="64" placeholder="相同种子生成相同地图" autocomplete="off" />
+          <div class="rmo-seed-row">
+            <input id="rmo-seed" maxlength="64" placeholder="相同种子生成相同地图" autocomplete="off" />
+            <button type="button" id="rmo-seed-lock" class="rmo-seed-lock" aria-pressed="false" title="锁定种子：锁定后「换一张」不再改变这张图">锁定</button>
+          </div>
         </div>
       </div>
       <div class="rmo-mode-hint" id="rmo-mode-hint"></div>
@@ -370,15 +389,210 @@ import './error-text.js';
     previewToken: 0,
     previewTimer: null,
     suppressAutoPreview: false,
-    /** 最近一次生成的预览与种子：大厅摘要、弹层右侧预览与事实区共用。 */
+    /** 最近一次生成的预览、种子与每个参数的实际取值：大厅摘要、弹层预览与参数行回显共用。 */
     lastPreview: null,
     lastSeed: '',
+    lastValues: null,
+    /** 上一轮的实际取值：用于「换一张」后让变化过的数值闪一下。 */
+    previousValues: null,
+    /** 种子锁：锁住后「换一张」不再清空种子，这张图仍可复现、可继续微调。 */
+    seedLocked: false,
     /** 预览刷新后的外部钩子（play.js / play-m.js 用来更新弹层事实区）。 */
     onPreview: null,
 
     /** 注入页面的地图预览渲染函数（与静态地图卡片同一套 SVG 渲染）。 */
     setPreviewRenderer(renderer) {
       RandomMapUI.previewRenderer = renderer;
+    },
+
+    /**
+     * 把服务端回传的「现值」写进每个参数行：掷出来的数值就在参数名下面，
+     * 不用再靠看地图形状猜。换一张后变化过的值闪一下，便于看清这一轮换掉了什么。
+     */
+    applyPreviewValues(values) {
+      const map = values && typeof values === 'object' ? values : {};
+      const previous = RandomMapUI.previousValues || {};
+      const has = (source, key) => Object.prototype.hasOwnProperty.call(source, key);
+      const rows = typeof document !== 'undefined' && document.querySelectorAll
+        ? document.querySelectorAll('.rmo-param')
+        : [];
+      Array.from(rows).forEach(row => {
+        const key = row?.dataset?.key;
+        const param = PARAMS.find(item => item.key === key);
+        const slot = row?.querySelector?.('[data-param-value]');
+        if (!param || !slot) return;
+        if (!has(map, key)) {
+          slot.hidden = true;
+          slot.textContent = '';
+          return;
+        }
+        const text = `现值 ${formatValue(param, map[key])}`;
+        const changed = has(previous, key) && text !== `现值 ${formatValue(param, previous[key])}`;
+        slot.hidden = false;
+        slot.textContent = text;
+        slot.title = `${param.label}：${text}`;
+        slot.classList.toggle('is-changed', changed);
+        // 闪烁只做一次：定时清掉类名，避免下一次换一张时残留。
+        if (changed) {
+          clearTimeout(slot.__flashTimer);
+          slot.__flashTimer = setTimeout(() => slot.classList.remove('is-changed'), 1400);
+        }
+      });
+      RandomMapUI.previousValues = map;
+      RandomMapUI.lastValues = map;
+    },
+
+    /**
+     * 重置：清空所有参数输入、恢复各自的默认取值方式与开关状态、模式回到标准、对称公平回到开启；
+     * 种子保留（想换图点「换一张」），随后按默认参数重跑一次预览。
+     */
+    resetOptions() {
+      const root = document.getElementById('random-map-options');
+      if (!root) return false;
+      root.querySelectorAll('.rmo-param').forEach(row => {
+        const fixed = row.dataset.defaultMode === 'fixed';
+        ['.rmo-min', '.rmo-max', '.rmo-value'].forEach(selector => {
+          const input = row.querySelector(selector);
+          if (input) input.value = '';
+        });
+        const toggle = row.querySelector('.rmo-mode-toggle');
+        if (toggle) {
+          toggle.dataset.value = fixed ? 'fixed' : 'random';
+          toggle.setAttribute('aria-checked', fixed ? 'true' : 'false');
+          toggle.querySelectorAll('.rmo-mode-option').forEach(option => {
+            option.classList.toggle('is-active', option.dataset.value === toggle.dataset.value);
+          });
+          row.querySelector('.rmo-range-inputs')?.classList.toggle('hidden', fixed);
+          row.querySelector('.rmo-fixed-input')?.classList.toggle('hidden', !fixed);
+          // 「建议固定」参数在默认固定挡下不显示护栏提示。
+          row.querySelector('.rmo-warn')?.classList.toggle('hidden', fixed);
+        }
+        // 现值回显一并收起：参数都清空了，不把上一张图的数字留在这一张上。
+        const slot = row.querySelector('[data-param-value]');
+        if (slot) {
+          slot.textContent = '';
+          slot.hidden = true;
+          slot.classList.remove('is-changed');
+        }
+      });
+      document.querySelectorAll('input[data-toggle]').forEach(input => {
+        input.checked = input.dataset.default === 'true';
+      });
+      const symmetric = document.getElementById('rmo-symmetric');
+      if (symmetric) symmetric.checked = true;
+      const modeSelect = document.getElementById('rmo-game-mode');
+      if (modeSelect) {
+        modeSelect.value = 'standard';
+        RandomMapUI.applyModeVisibility(root);
+      }
+      // 清掉上一轮的取值快照：重置后的第一帧不该整片闪烁。
+      RandomMapUI.previousValues = null;
+      RandomMapUI.refreshPreview(true);
+      return true;
+    },
+
+    /** 换一张：清掉种子重新抽（种子锁定时不生效，先解锁）。 */
+    reroll(force = false) {
+      if (RandomMapUI.seedLocked) return false;
+      const seed = document.getElementById('rmo-seed');
+      if (seed) seed.value = '';
+      RandomMapUI.refreshPreview(force);
+      return true;
+    },
+
+    /**
+     * 从「随机」切到「固定」时，把这一行当前的现值填进固定输入框（与参数行显示的数字完全一致）。
+     * 不填的话这一行等于「留空＝服务端默认」，换一张照样重掷——看起来就是根本没锁住。
+     * 用户已经填过的值不覆盖；本图没有这一项（∞ / 未启用）时留空。
+     */
+    fillFixedFromPreview(row) {
+      const key = row?.dataset?.key;
+      const param = PARAMS.find(item => item.key === key);
+      const input = row?.querySelector?.('.rmo-value');
+      if (!param || !input) return false;
+      if (String(input.value).trim() !== '') return false;
+      const values = RandomMapUI.lastValues;
+      if (!values || !Object.prototype.hasOwnProperty.call(values, key)) return false;
+      const raw = values[key];
+      if (raw === null || raw === undefined || !Number.isFinite(Number(raw))) return false;
+      input.value = formatValue(param, Number(raw));
+      return true;
+    },
+
+    /**
+     * 随机挡只填了一端时，把另一端按默认范围补上（并写进输入框）：
+     * 只填下限就用默认上界，只填上限就用默认下界——这一行仍是随机区间，
+     * 不会因为另一端空着就悄悄变成固定值。
+     */
+    fillRangeSibling(row, input) {
+      const key = row?.dataset?.key;
+      const param = PARAMS.find(item => item.key === key);
+      if (!param || !input) return false;
+      const toggle = row.querySelector('.rmo-mode-toggle');
+      if (toggle && toggle.dataset.value === 'fixed') return false;
+      const raw = String(input.value).trim();
+      if (raw === '' || !Number.isFinite(Number(raw))) return false;
+      const value = Number(raw);
+      const isMin = input.classList.contains('rmo-min');
+      const sibling = row.querySelector(isMin ? '.rmo-max' : '.rmo-min');
+      if (!sibling || String(sibling.value).trim() !== '') return false;
+      const filled = isMin ? Math.max(value, param.defMax) : Math.min(value, param.defMin);
+      sibling.value = String(filled);
+      return true;
+    },
+
+    toggleSeedLock() {
+      RandomMapUI.setSeedLocked(!RandomMapUI.seedLocked);
+    },
+
+    /** 锁定种子：优先用输入框里已有的值，其次用最近一次预览代抽的种子。 */
+    setSeedLocked(locked) {
+      const seedInput = document.getElementById('rmo-seed');
+      if (locked) {
+        const current = seedInput ? seedInput.value.trim() : '';
+        const seed = current || RandomMapUI.lastSeed || '';
+        // 还没生成过预览时没有可锁的种子，保持未锁定（按钮此时也打不开）。
+        if (!seed) return;
+        if (seedInput && !current) seedInput.value = seed;
+      }
+      RandomMapUI.seedLocked = !!locked;
+      RandomMapUI.syncSeedLockState();
+    },
+
+    /** 同步种子锁的外观：输入框只读、锁按钮文案/状态、「换一张」按钮禁用。 */
+    syncSeedLockState() {
+      const locked = RandomMapUI.seedLocked;
+      const seedInput = document.getElementById('rmo-seed');
+      if (seedInput) {
+        seedInput.readOnly = locked;
+        seedInput.title = locked ? '种子已锁定：解开锁定后才会重新抽取' : '';
+      }
+      const lockButton = document.getElementById('rmo-seed-lock');
+      if (lockButton) {
+        const hasSeed = !!(seedInput && seedInput.value.trim()) || !!RandomMapUI.lastSeed;
+        lockButton.textContent = locked ? '已锁定' : '锁定';
+        lockButton.setAttribute('aria-pressed', locked ? 'true' : 'false');
+        lockButton.disabled = !locked && !hasSeed;
+        lockButton.classList.toggle('is-locked', locked);
+        lockButton.title = locked
+          ? '种子已锁定：换一张不会改变这张图；点这里解锁'
+          : hasSeed
+            ? '锁定种子：锁定后「换一张」不再改变这张图'
+            : '先生成预览，再锁定种子';
+      }
+      const rerollTitle = locked ? '种子已锁定，解锁后才能换一张' : '重新随机一张预览';
+      const panelRefresh = document.getElementById('rmo-preview-refresh');
+      if (panelRefresh) {
+        panelRefresh.disabled = locked;
+        panelRefresh.title = rerollTitle;
+      }
+      // 地图库弹层右侧的「换一张」在页面侧渲染，模块不持有引用：按 data 标记统一同步。
+      if (typeof document !== 'undefined' && document.querySelectorAll) {
+        document.querySelectorAll('[data-random-refresh]').forEach(button => {
+          button.disabled = locked;
+          button.title = rerollTitle;
+        });
+      }
     },
 
     /** 将配置面板渲染进容器（各页面在 #random-map-options 容器上调用一次）。 */
@@ -426,6 +640,9 @@ import './error-text.js';
           });
           rangeInputs?.classList.toggle('hidden', fixed);
           fixedInput?.classList.toggle('hidden', !fixed);
+          // 切到「固定」＝锁定这一行：先把本图当前取值填进输入框。
+          // 空着不填等于「留空＝服务端默认」，换一张仍会重掷，锁不住。
+          if (fixed) RandomMapUI.fillFixedFromPreview(row);
           // 「建议固定」参数切到随机挡时亮出护栏提示。
           warn?.classList.toggle('hidden', fixed);
           RandomMapUI.schedulePreview();
@@ -442,14 +659,23 @@ import './error-text.js';
         input.addEventListener('change', () => RandomMapUI.schedulePreview());
         if (input.tagName === 'INPUT' && input.type === 'number') {
           input.addEventListener('input', () => RandomMapUI.schedulePreview());
+          // 只填一端时把另一端按默认范围补上，让这一行保持「区间」而不是变成固定值。
+          input.addEventListener('change', () => {
+            const row = input.closest ? input.closest('.rmo-param') : null;
+            if (row && RandomMapUI.fillRangeSibling(row, input)) RandomMapUI.schedulePreview();
+          });
         }
       });
       document.getElementById('rmo-preview-refresh')?.addEventListener('click', () => {
-        // 换一张：清掉种子重新抽一张，并把新种子回填保证预览即所得。
-        const seed = document.getElementById('rmo-seed');
-        if (seed) seed.value = '';
-        RandomMapUI.refreshPreview();
+        // 换一张：清掉种子重新抽一张（种子锁定时不生效），新种子随之回填保证预览即所得。
+        RandomMapUI.reroll();
       });
+      // 种子锁：锁住后「换一张」不再清空种子，输入框转只读——这张图仍可复现、可继续微调。
+      document.getElementById('rmo-seed-lock')?.addEventListener('click', () => RandomMapUI.toggleSeedLock());
+      document.getElementById('rmo-seed')?.addEventListener('input', () => RandomMapUI.syncSeedLockState());
+      // 重置：一键清空所有参数输入、回到默认值。
+      document.getElementById('rmo-reset')?.addEventListener('click', () => RandomMapUI.resetOptions());
+      RandomMapUI.syncSeedLockState();
       // 人数影响出生位数量；面板外的下拉也要联动预览。
       document.getElementById('max-players')?.addEventListener('change', () => RandomMapUI.schedulePreview());
     },
@@ -526,9 +752,12 @@ import './error-text.js';
           RandomMapUI.suppressAutoPreview = false;
         }
         RandomMapUI.lastSeed = data.seed || '';
-        RandomMapUI.renderPreview(data.preview);
+        RandomMapUI.syncSeedLockState();
+        RandomMapUI.renderPreview(data.preview, data.values);
       } catch (err) {
         if (token !== RandomMapUI.previewToken) return;
+        // 预览失败时收起所有「本图 X」：宁可空着，也不把上一张图的数值留在这一张上。
+        RandomMapUI.applyPreviewValues(null);
         canvas.classList.add('rmo-preview-error');
         canvas.textContent = `预览失败：${window.ErrorText.describe(err, '网络错误')}`;
         document.querySelectorAll('[data-random-preview]').forEach(el => {
@@ -538,11 +767,13 @@ import './error-text.js';
       }
     },
 
-    renderPreview(preview) {
+    renderPreview(preview, values) {
       const canvas = document.getElementById('rmo-preview-canvas');
       if (!canvas || !RandomMapUI.previewRenderer) return;
       const rendered = RandomMapUI.previewRenderer(preview);
       RandomMapUI.lastPreview = preview || null;
+      // 参数行内的「本图 X」与地图预览同源：一次响应里一起更新。
+      RandomMapUI.applyPreviewValues(values);
       canvas.innerHTML = rendered;
       // 大厅摘要缩略图与弹层右侧大预览共用同一份渲染结果。
       document.querySelectorAll('[data-random-preview]').forEach(el => {
@@ -597,9 +828,13 @@ import './error-text.js';
         const max = parseNumber(row.querySelector('.rmo-max'));
         if (min === null && max === null) return;
         if (min !== null && max !== null) {
-          // 始终保持区间形态：服务端 resolveParam 对标量"提前返回、不消耗随机数"，把
-          // lo===hi 收成标量会让后续参数的随机数流整体错位（同种子出不同图）。
+          // 上下限都填就保持区间形态（lo===hi 也是）。
           options[key] = [bound(Math.min(min, max)), bound(Math.max(min, max))];
+        } else if (param) {
+          // 只填一端：另一端按默认范围补上，仍然是随机区间——不会悄悄变成固定值。
+          options[key] = min !== null
+            ? [bound(min), bound(Math.max(min, param.defMax))]
+            : [bound(Math.min(max, param.defMin)), bound(max)];
         } else {
           options[key] = min !== null ? min : max;
         }

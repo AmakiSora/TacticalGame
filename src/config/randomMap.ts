@@ -58,27 +58,27 @@ export interface RandomMapOptions {
   /**
    * 初始单位数量（0-6，留空＝仍按 0-4 均匀随机）。3.6.2 起硬边界放宽到 6，显式传参即可覆盖
    * molten-throne（熔池王座，原 forge）3.5.11 起的每方 6 单位开局；默认随机域刻意保持 0-4
-   * （改动会让现有种子整体漂移）。
+   * （改默认域会让同种子的这一项整体重排，RL 域重校准另起一批处理）。
    * v3.3.0：RL 随机域联合边角重要性采样（RL_RANDOM_CORNER_BOOST）用它把
    * 低 HQ×多据点×满编开局的熔炉系图生态位组合提频——各维边缘分布
    * 虽已拓宽，联合命中率是边缘概率的乘积 <<1%（v3.1.1 起旧版 forge 连续 0:48）。
    */
   startingUnitCount?: RandomParam;
   /**
-   * 初始单位兵种权重（步兵/侦察/重装/远程，0-10，留空＝默认 2/2/1/1）。省略或固定标量都不消耗
-   * 随机数流——加权抽样按「权重比例展开成等价池」与旧 `POOL[floor(rng()*6)]` 逐位同分布，
-   * 默认 2/2/1/1 恰好展开成旧的 6 格池，默认路径生成的地图完全不变。support 不给权重（奶妈不适合开局硬给）。
+   * 初始单位兵种权重（步兵/侦察/重装/远程，0-10，留空＝默认 2/2/1/1）。省略或固定标量都不抽随机数，
+   * 区间形态各用自己的参数流抽一个权重；加权抽样按「权重比例展开成等价池」，
+   * 默认 2/2/1/1 恰好展开成旧的 6 格池。support 不给权重（奶妈不适合开局硬给）。
    */
   startingWeightInfantry?: RandomParam;
-  /** 初始侦察兵权重（0-10，留空＝默认 2）。省略/标量不消耗随机数流。 */
+  /** 初始侦察兵权重（0-10，留空＝默认 2）。省略/标量不抽随机数。 */
   startingWeightScout?: RandomParam;
-  /** 初始重装权重（0-10，留空＝默认 1）。省略/标量不消耗随机数流。 */
+  /** 初始重装权重（0-10，留空＝默认 1）。省略/标量不抽随机数。 */
   startingWeightHeavy?: RandomParam;
-  /** 初始远程兵（游侠）权重（0-10，留空＝默认 1）。省略/标量不消耗随机数流。 */
+  /** 初始远程兵（游侠）权重（0-10，留空＝默认 1）。省略/标量不抽随机数。 */
   startingWeightRanger?: RandomParam;
   /**
    * 战斗波动：伤害 / 治疗的随机浮动幅度（0-20，省略＝固定默认 3 / 6）。省略或固定标量都不消耗
-   * 随机数流（默认路径与改动前逐位一致），只有显式区间才各抽一次。
+   * 随机数，只有显式区间才在自己那条参数流上抽一次。
    */
   damageVarianceRange?: RandomParam;
   healVarianceRange?: RandomParam;
@@ -160,6 +160,13 @@ export interface RandomMapOptions {
   artilleryMinimumSafeRadius?: RandomParam;
 }
 
+/**
+ * 生成结果里每个随机参数的实际取值（键与 RandomMapOptions 一致），供前端在参数行内回显
+ * 「本图 X」——随机区间掷出来到底是多少，不再靠看图猜。
+ * null = 本图没有这一项（无回合上限 / 未注入追赶补给 / 非歼灭模式无炮火）。
+ */
+export type RandomParamValues = Record<string, number | null>;
+
 interface ParamBound {
   min: number;
   max: number;
@@ -188,14 +195,14 @@ const PARAM_BOUNDS: Record<string, ParamBound> = {
   headquartersDefense: { min: 0, max: 99, integer: true },
   startingUnitCount: { min: 0, max: 6, integer: true },
   // 初始兵种权重：0-10 的相对权重（非整数也合法），不进 DEFAULT_RANGES——省略时用标量默认 2/2/1/1
-  // 且不消耗随机数流，见 STARTING_WEIGHT_DEFAULTS / resolveStartingWeights。
+  // 且不消耗随机数，见 STARTING_WEIGHT_DEFAULTS / resolveStartingWeights。
   startingWeightInfantry: { min: 0, max: 10, integer: false },
   startingWeightScout: { min: 0, max: 10, integer: false },
   startingWeightHeavy: { min: 0, max: 10, integer: false },
   startingWeightRanger: { min: 0, max: 10, integer: false },
-  // 战斗波动 / 裁决 armyValue / 据点收入 / 兵种属性覆盖：省略路径各自保留旧内联采样（不读
-  // DEFAULT_RANGES、随机数流位置不变），见 resolveFixedIntParam / resolveSampledIntParam /
-  // buildUnitSpecs。兵种属性上界按「再离谱也仍是合法数值」放宽，loader 只校验 ≥0。
+  // 战斗波动 / 裁决 armyValue / 据点收入 / 兵种属性覆盖：省略路径各自用固定默认或旧公式（不读
+  // DEFAULT_RANGES），见 resolveFixedIntParam / resolveSampledIntParam / buildUnitSpecs。
+  // 兵种属性上界按「再离谱也仍是合法数值」放宽，loader 只校验 ≥0。
   // 战斗保底与波动是「兵种差异」的护栏：区间上限刻意压得比攻击差小
   // （现役攻击差 14~26 点），否则随机区间会把攻击属性抹平。默认值本身固定。
   damageVarianceRange: { min: 0, max: 8, integer: true },
@@ -261,8 +268,8 @@ export const RANDOM_PARAM_BOUNDS: Readonly<Record<string, Readonly<ParamBound>>>
 
 /**
  * 各参数省略时的默认随机范围（仅 resolveParam 读取）。战斗波动、裁决 armyValue、据点收入、
- * 兵种属性覆盖刻意不在此表：它们保留旧内联采样（省略时按各自的固定默认或旧公式，且随机数流
- * 位置不变），见 resolveFixedIntParam / resolveSampledIntParam / buildUnitSpecs。
+ * 兵种属性覆盖刻意不在此表：省略时按各自的固定默认或旧公式取（不抽随机数），
+ * 见 resolveFixedIntParam / resolveSampledIntParam / buildUnitSpecs。
  */
 const DEFAULT_RANGES: Record<string, [number, number]> = {
   radius: [5, 10],
@@ -286,9 +293,8 @@ const DEFAULT_RANGES: Record<string, [number, number]> = {
 
 /**
  * 初始兵种权重默认值（步兵/侦察/重装/远程 = 2/2/1/1）：加权抽样展开后恰好是旧的 6 格
- * STARTING_UNIT_POOL（步×2 侦×2 重×1 远×1），默认路径与旧实现逐位同分布。
- * 刻意不进 DEFAULT_RANGES——resolveParam 的省略路径会消耗随机数流，而权重省略/固定标量
- * 时必须零消耗，否则默认地图的 rng 流会整体错位、现有种子全部漂移。
+ * STARTING_UNIT_POOL（步×2 侦×2 重×1 远×1）。刻意不进 DEFAULT_RANGES——权重省略/固定标量时
+ * 不消耗随机数，区间形态才从自己的参数流里抽一次。
  */
 const STARTING_WEIGHT_DEFAULTS = { infantry: 2, scout: 2, heavy: 1, ranger: 1 };
 
@@ -297,8 +303,8 @@ const STARTING_WEIGHT_DEFAULTS = { infantry: 2, scout: 2, heavy: 1, ranger: 1 };
 // 本身就能覆盖全部静态图的规则空间——RL 侧 v3.0.2-v3.1.0 三代的 whack-a-mole
 // （某张静态图整图崩塌）根因即这些维度从未进过训练分布。
 // 3.6.2 起硬边界放宽到初始单位 0-6、据点 1-24，molten-throne（3.5.11 重做后每方 6 单位、24 据点）
-// 的极值显式传参即可覆盖；默认随机域仍保持 0-4 / 2-6——改默认范围会让现有种子整体漂移，RL 域
-// 重校准另起一批处理。
+// 的极值显式传参即可覆盖；默认随机域仍保持 0-4 / 2-6——改默认域等于改这批种子这一项的分布，
+// RL 域重校准另起一批处理。
 
 /** 整数区间均匀抽取：lo + floor(rng*(hi-lo+1))，与旧内联采样公式同分布。 */
 function drawIntInRange(lo: number, hi: number, rng: () => number): number {
@@ -306,9 +312,8 @@ function drawIntInRange(lo: number, hi: number, rng: () => number): number {
 }
 
 /**
- * 省略＝固定默认值（零消耗）、标量＝直接用（零消耗）、区间＝均匀抽一个整数（1 次消耗）。
- * 用于默认路径本身不消耗随机数的参数（战斗波动）：绝不能走 resolveParam——它的省略路径会
- * 读取 DEFAULT_RANGES 并消耗 rng，导致默认地图整体漂移。
+ * 省略＝固定默认值、标量＝直接用（两者都不消耗随机数）、区间＝在自己那条参数流上均匀抽一个整数。
+ * 用于默认路径本身不抽随机数的参数（战斗波动）；不需要走 resolveParam——它会给省略路径也抽一次。
  */
 function resolveFixedIntParam(param: RandomParam | undefined, def: number, rng: () => number): number {
   if (param === undefined) return def;
@@ -317,8 +322,8 @@ function resolveFixedIntParam(param: RandomParam | undefined, def: number, rng: 
 }
 
 /**
- * 省略＝按默认区间抽一次（与旧内联公式逐位一致、随机数流位置不变）、标量＝直接用（零消耗）、
- * 区间＝均匀抽一个整数（1 次消耗）。用于默认路径本来就抽一次的参数（裁决 armyValue、据点收入）。
+ * 省略＝在传入的参数流上按默认区间抽一次、标量＝直接用（不消耗）、区间＝均匀抽一个整数。
+ * 用于默认路径本来就抽一次的参数（裁决 armyValue、据点收入）。
  */
 function resolveSampledIntParam(param: RandomParam | undefined, defLo: number, defHi: number, rng: () => number): number {
   if (param === undefined) return drawIntInRange(defLo, defHi, rng);
@@ -327,8 +332,8 @@ function resolveSampledIntParam(param: RandomParam | undefined, defLo: number, d
 }
 
 /**
- * 同 resolveFixedIntParam，用于小数参数（裁决击杀权重、据点流量占比）：省略＝固定默认（零消耗）、
- * 标量＝直接用（零消耗）、区间＝均匀抽一个值并四舍五入到两位小数（1 次消耗）。
+ * 同 resolveFixedIntParam，用于小数参数（裁决击杀权重、据点流量占比）：省略＝固定默认、
+ * 标量＝直接用（两者不消耗）、区间＝均匀抽一个值并四舍五入到两位小数。
  */
 function resolveFixedFloatParam(param: RandomParam | undefined, def: number, rng: () => number): number {
   if (param === undefined) return def;
@@ -338,24 +343,28 @@ function resolveFixedFloatParam(param: RandomParam | undefined, def: number, rng
 
 /** 裁决权重在静态图包线内随机：danger-close(20/1/30/1/0+kill0.25) ~ default(5/2/90/2/0+kill0.5)。
  *  3.6.0 起补给恒不计分（supplies: 0，杜绝囤补给/期末爆兵套利），
- *  击杀分默认按军队价值权重的 25%~50% 随机；armyValue / killValue 可由外部覆盖
- *  （省略时仍按旧公式，抽取次数与顺序不变）。 */
-function sampleAdjudicationWeights(rng: () => number, armyValueParam?: RandomParam, killValueParam?: RandomParam) {
-  const armyValue = resolveSampledIntParam(armyValueParam, 1, 2, rng);
-  const enemyHqDamage = 3 + Math.floor(rng() * 18);
-  const ownHqHp = 1 + Math.floor(rng() * 2);
-  const controlPoint = 30 + Math.floor(rng() * 61);
-  // 击杀分：留空＝旧公式（消耗 1 次）；给定则用固定值 / 区间。
+ *  击杀分默认按军队价值权重的 25%~50% 随机；armyValue / killValue 可由外部覆盖。
+ *  3.6.3 起每一项各用自己的参数流：改一个权重不会牵动其他权重。 */
+function sampleAdjudicationWeights(
+  streams: RandomStreams,
+  armyValueParam?: RandomParam,
+  killValueParam?: RandomParam,
+) {
+  const armyValue = resolveSampledIntParam(armyValueParam, 1, 2, streams.param('adjudicationArmyValue'));
+  const enemyHqDamage = 3 + Math.floor(streams.param('adjudicationEnemyHqDamage')() * 18);
+  const ownHqHp = 1 + Math.floor(streams.param('adjudicationOwnHqHp')() * 2);
+  const controlPoint = 30 + Math.floor(streams.param('adjudicationControlPoint')() * 61);
+  // 击杀分：留空＝按军队价值推导（独立流，不受其他权重影响）；给定则用固定值 / 区间。
   const killValue = killValueParam === undefined
-    ? Math.round(armyValue * (0.25 + rng() * 0.25) * 100) / 100
-    : resolveFixedFloatParam(killValueParam, 0, rng);
+    ? Math.round(armyValue * (0.25 + streams.param('adjudicationKillRatio')() * 0.25) * 100) / 100
+    : resolveFixedFloatParam(killValueParam, 0, streams.param('adjudicationKillValue'));
   return { enemyHqDamage, ownHqHp, controlPoint, armyValue, supplies: 0, killValue };
 }
 
 /** 据点类型收入随机：danger-close(8/0/0) ~ breach(20/8/8)。收入、前哨部署折扣与维修站修复量
- *  均可由外部覆盖（省略时仍按旧公式/旧基准：收入各抽一次、折扣 8、修复 10 且零消耗）。 */
+ *  均可由外部覆盖；3.6.3 起每项各用自己的参数流，改一项收入不影响其他项。 */
 function sampleControlPointTypes(
-  rng: () => number,
+  streams: RandomStreams,
   config: {
     supply?: RandomParam;
     forwardBase?: RandomParam;
@@ -368,17 +377,22 @@ function sampleControlPointTypes(
   } = {},
 ) {
   return {
-    supply: { income: resolveSampledIntParam(config.supply, 8, 20, rng), deployDiscount: 0, repairAmount: 0, canDeploy: config.supplyCanDeploy !== false },
+    supply: {
+      income: resolveSampledIntParam(config.supply, 8, 20, streams.param('supplyIncome')),
+      deployDiscount: 0,
+      repairAmount: 0,
+      canDeploy: config.supplyCanDeploy !== false,
+    },
     forward_base: {
-      income: resolveSampledIntParam(config.forwardBase, 0, 8, rng),
-      deployDiscount: resolveFixedIntParam(config.forwardBaseDeployDiscount, 8, rng),
+      income: resolveSampledIntParam(config.forwardBase, 0, 8, streams.param('forwardBaseIncome')),
+      deployDiscount: resolveFixedIntParam(config.forwardBaseDeployDiscount, 8, streams.param('forwardBaseDeployDiscount')),
       repairAmount: 0,
       canDeploy: config.forwardBaseCanDeploy !== false,
     },
     repair: {
-      income: resolveSampledIntParam(config.repair, 0, 8, rng),
+      income: resolveSampledIntParam(config.repair, 0, 8, streams.param('repairIncome')),
       deployDiscount: 0,
-      repairAmount: resolveFixedIntParam(config.repairAmount, 10, rng),
+      repairAmount: resolveFixedIntParam(config.repairAmount, 10, streams.param('repairPointRepairAmount')),
       canDeploy: config.repairCanDeploy !== false,
     },
   };
@@ -501,6 +515,19 @@ function sanitizeParam(key: string, value: unknown, bound: ParamBound): RandomPa
   throw new Error(`random.${key} 必须是数字或 [min, max] 区间`);
 }
 
+/**
+ * 一张随机图的随机源。两类流严格分开：
+ * - `rng`：结构性随机——地形抽样、出生位角度、据点摆放、初始单位构成、未开放为参数的内部权重。
+ * - `param(key)`：每个参数自己的独立流，只由「种子 + 参数名」决定。
+ * 因此改一个参数的取值（或把它设成固定值）不会牵动其他参数：它们各自从自己的流里取值，
+ * 互不消耗、互不错位。`param(key)` 每次调用都返回一条从头开始的新流（每个参数只取一次值）。
+ */
+export interface RandomStreams {
+  seedText: string;
+  rng: () => number;
+  param: (key: string) => () => number;
+}
+
 // ---------- 种子化 PRNG ----------
 
 function xmur3(str: string): () => number {
@@ -526,11 +553,15 @@ function mulberry32(a: number): () => number {
   };
 }
 
-function createRng(seed: number | string | undefined): { rng: () => number; seedText: string } {
+function createRng(seed: number | string | undefined): RandomStreams {
   const seedText = seed === undefined
     ? Math.floor(Math.random() * 1e12).toString(36)
     : String(seed);
-  return { rng: mulberry32(xmur3(`random-map:${seedText}`)()), seedText };
+  return {
+    seedText,
+    rng: mulberry32(xmur3(`random-map:${seedText}`)()),
+    param: (key: string) => mulberry32(xmur3(`random-map:${seedText}:param:${key}`)()),
+  };
 }
 
 // ---------- 参数解析 ----------
@@ -538,7 +569,7 @@ function createRng(seed: number | string | undefined): { rng: () => number; seed
 function resolveParam(
   param: RandomParam | undefined,
   key: string,
-  rng: () => number,
+  streams: RandomStreams,
 ): number {
   const bound = PARAM_BOUNDS[key];
   const [defMin, defMax] = DEFAULT_RANGES[key];
@@ -553,27 +584,30 @@ function resolveParam(
     lo = param[0];
     hi = param[1];
   }
-  const value = lo + rng() * (hi - lo);
-  return bound.integer ? Math.round(value) : value;
+  const value = lo + streams.param(key)() * (hi - lo);
+  if (bound.integer) return Math.round(value);
+  // 小数参数与提交口径同精度（四位）：生成出来的值就是能原样提交回来的值，
+  // 面板显示的现值、锁进固定框的数、地图实际用的数三者完全一致。
+  return Number(value.toFixed(4));
 }
 
 /**
- * 解析初始兵种权重：省略＝标量默认（零消耗）、固定标量直接用（零消耗）——这两条路径不碰
- * 随机数流，保证默认地图与旧实现逐位一致；区间形态按均匀分布抽一个权重（显式非默认路径，
- * 允许消耗 1 次 rng，四条权重按接口字段顺序依次解析，流稳定）。绝不能整表走 resolveParam——
- * 它的省略路径会消耗 rng，导致默认地图整体错位、现有种子全部漂移。
+ * 解析初始兵种权重：省略＝标量默认、固定标量直接用——这两条路径不消耗随机数；
+ * 区间形态各用自己的参数流抽一个权重，改一条权重不影响其余三条。
  */
-function resolveStartingWeights(options: RandomMapOptions, rng: () => number): typeof STARTING_WEIGHT_DEFAULTS {
-  const resolve = (param: RandomParam | undefined, def: number): number => {
+function resolveStartingWeights(options: RandomMapOptions, streams: RandomStreams): typeof STARTING_WEIGHT_DEFAULTS {
+  const resolve = (key: string, param: RandomParam | undefined, def: number): number => {
     if (param === undefined) return def;
     if (typeof param === 'number') return param;
-    return param[0] + rng() * (param[1] - param[0]);
+    const rng = streams.param(key);
+    // 与提交口径同精度（四位），锁进固定框的权重可以原样复现。
+    return Number((param[0] + rng() * (param[1] - param[0])).toFixed(4));
   };
   return {
-    infantry: resolve(options.startingWeightInfantry, STARTING_WEIGHT_DEFAULTS.infantry),
-    scout: resolve(options.startingWeightScout, STARTING_WEIGHT_DEFAULTS.scout),
-    heavy: resolve(options.startingWeightHeavy, STARTING_WEIGHT_DEFAULTS.heavy),
-    ranger: resolve(options.startingWeightRanger, STARTING_WEIGHT_DEFAULTS.ranger),
+    infantry: resolve('startingWeightInfantry', options.startingWeightInfantry, STARTING_WEIGHT_DEFAULTS.infantry),
+    scout: resolve('startingWeightScout', options.startingWeightScout, STARTING_WEIGHT_DEFAULTS.scout),
+    heavy: resolve('startingWeightHeavy', options.startingWeightHeavy, STARTING_WEIGHT_DEFAULTS.heavy),
+    ranger: resolve('startingWeightRanger', options.startingWeightRanger, STARTING_WEIGHT_DEFAULTS.ranger),
   };
 }
 
@@ -702,7 +736,12 @@ const HEX_OFFSETS: Position[] = [
  * 内部会反复重试地形抽样直到所有出生位/据点经可通行格互相连通，
  * 因此返回值始终可玩；失败兜底是清空障碍地形。
  */
-export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCount: number): MapConfig {
+export function generateRandomMapConfig(
+  rawOptions: RandomMapOptions,
+  playerCount: number,
+  /** 传入即回填每个参数的实际取值（预览接口用它回显「本图 X」）；纯输出，不影响随机数流。 */
+  resolved?: RandomParamValues,
+): MapConfig {
   if (!Number.isInteger(playerCount) || playerCount < 2 || playerCount > 8) {
     throw new Error('玩家人数必须是 2-8 的整数');
   }
@@ -710,7 +749,10 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
   // 用浅拷贝避免改写调用方传入的对象。
   const options = { ...rawOptions };
   splitLegacyTerrainDensity(options);
-  const { rng, seedText } = createRng(options.seed);
+  const streams = createRng(options.seed);
+  // 结构性随机源：地形、出生位、据点摆放、初始单位构成。参数一律从各自独立的流里取值，
+  // 所以把某个参数改区间或改成固定值，不会让别的参数跟着变。
+  const { rng, seedText } = streams;
   const requestedSymmetric = options.symmetric ?? true;
   const mode: GameMode = options.mode ?? 'standard';
   // 实际生效的对称：请求对称但该人数在六边形网格上无解时（5、7 人）如实降级为非对称，
@@ -719,7 +761,7 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
   const symmetric = symmetry !== null;
 
   // 半径：多人局保证足够空间。
-  let radius = Math.round(resolveParam(options.radius, 'radius', rng));
+  let radius = Math.round(resolveParam(options.radius, 'radius', streams));
   radius = Math.max(radius, playerCount <= 4 ? 5 : playerCount <= 6 ? 6 : 7);
 
   const playableCells = createRadiusPlayableCells(radius);
@@ -749,7 +791,7 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
   }
 
   // 据点：中心（数量为奇数时）+ 环形分布；对称模式按旋转轨道整体放置。
-  let cpCount = Math.round(resolveParam(options.controlPointCount, 'controlPointCount', rng));
+  let cpCount = Math.round(resolveParam(options.controlPointCount, 'controlPointCount', streams));
   // 歼灭/大逃杀：每个出生位必须绑定唯一据点（loader 硬约束），请求量至少与出生位数持平。
   if (isAnnihilationMode(mode)) cpCount = Math.max(cpCount, playerCount);
   let controlPoints = placeControlPoints(cpCount, radius, symmetry, rng, spawnPositions, playableSet, taken);
@@ -760,28 +802,28 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
     );
   }
 
-  // 回合/行动点/经济/总部参数。
-  // 无回合上限：maxTurns 仍照常抽一次（结果丢弃），保证打开开关不改变其余参数与地形。
-  const maxTurnsRoll = Math.round(resolveParam(options.maxTurns, 'maxTurns', rng));
+  // 回合/行动点/经济/总部参数：每项从自己的参数流取值，互不影响。
+  // 无回合上限时 maxTurns 抽到的值直接丢弃（它只影响自己的流，不会波及别的参数）。
+  const maxTurnsRoll = Math.round(resolveParam(options.maxTurns, 'maxTurns', streams));
   const maxTurns = options.noTurnLimit === true ? null : maxTurnsRoll;
-  const actionsPerTurn = Math.round(resolveParam(options.actionsPerTurn, 'actionsPerTurn', rng));
-  const startingSupplies = Math.round(resolveParam(options.startingSupplies, 'startingSupplies', rng));
-  const baseIncome = Math.round(resolveParam(options.baseIncome, 'baseIncome', rng));
-  const headquartersHp = Math.round(resolveParam(options.headquartersHp, 'headquartersHp', rng));
-  const headquartersDefense = Math.round(resolveParam(options.headquartersDefense, 'headquartersDefense', rng));
-  const variation = resolveParam(options.unitStatVariation, 'unitStatVariation', rng);
+  const actionsPerTurn = Math.round(resolveParam(options.actionsPerTurn, 'actionsPerTurn', streams));
+  const startingSupplies = Math.round(resolveParam(options.startingSupplies, 'startingSupplies', streams));
+  const baseIncome = Math.round(resolveParam(options.baseIncome, 'baseIncome', streams));
+  const headquartersHp = Math.round(resolveParam(options.headquartersHp, 'headquartersHp', streams));
+  const headquartersDefense = Math.round(resolveParam(options.headquartersDefense, 'headquartersDefense', streams));
+  const variation = resolveParam(options.unitStatVariation, 'unitStatVariation', streams);
 
-  // 炮火参数（仅歼灭/大逃杀注入配置）：固定序消费 rng 保证确定性。
+  // 炮火参数（仅歼灭/大逃杀注入配置）：各用自己的参数流。
   const artillery = {
-    startRound: Math.round(resolveParam(options.artilleryStartRound, 'artilleryStartRound', rng)),
-    intervalRounds: Math.round(resolveParam(options.artilleryIntervalRounds, 'artilleryIntervalRounds', rng)),
-    damage: Math.round(resolveParam(options.artilleryDamage, 'artilleryDamage', rng)),
-    minimumSafeRadius: Math.round(resolveParam(options.artilleryMinimumSafeRadius, 'artilleryMinimumSafeRadius', rng)),
+    startRound: Math.round(resolveParam(options.artilleryStartRound, 'artilleryStartRound', streams)),
+    intervalRounds: Math.round(resolveParam(options.artilleryIntervalRounds, 'artilleryIntervalRounds', streams)),
+    damage: Math.round(resolveParam(options.artilleryDamage, 'artilleryDamage', streams)),
+    minimumSafeRadius: Math.round(resolveParam(options.artilleryMinimumSafeRadius, 'artilleryMinimumSafeRadius', streams)),
   };
 
   // 地形：水域与阻挡各自独立密度（旧 terrainDensity 已在 sanitize 时按 60/40 拆开）。
-  const waterDensity = resolveParam(options.waterDensity, 'waterDensity', rng);
-  const wallDensity = resolveParam(options.wallDensity, 'wallDensity', rng);
+  const waterDensity = resolveParam(options.waterDensity, 'waterDensity', streams);
+  const wallDensity = resolveParam(options.wallDensity, 'wallDensity', streams);
   const terrainCells = sampleTerrain(
     waterDensity, wallDensity, symmetry, rng, playableCells, playableSet, spawnPositions,
     controlPoints.map(cp => ({ q: cp.q, r: cp.r })),
@@ -789,9 +831,8 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
 
   // 出生位配置（总部 + 初始单位）。初始单位数量/构成全局抽一次、全员共享（公平性）。
   // startingUnitCount 收窄/固定数量（v3.3.0 边角采样用），省略时走默认范围 [0,4] 均匀随机。
-  // 兵种权重省略/固定标量时零消耗 rng（见 resolveStartingWeights），默认路径与旧池逐位一致。
-  const startingUnitCount = Math.round(resolveParam(options.startingUnitCount, 'startingUnitCount', rng));
-  const startingWeights = resolveStartingWeights(options, rng);
+  const startingUnitCount = Math.round(resolveParam(options.startingUnitCount, 'startingUnitCount', streams));
+  const startingWeights = resolveStartingWeights(options, streams);
   const startingUnits = sampleStartingUnits(rng, startingUnitCount, startingWeights);
   const spawnSlots = buildSpawnSlots(mode, spawnPositions, playableSet, controlPoints, symmetry, startingUnits);
   // 追赶补给：三项都不给则整块不注入（默认随机图没有追赶机制，与改动前逐位一致）。
@@ -820,15 +861,15 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
     spawnSlots,
     layouts: { [playerCount]: spawnSlots.map(slot => slot.id) },
     supportedPlayerCounts: [playerCount],
-    units: buildUnitSpecs(variation, options, rng),
+    units: buildUnitSpecs(variation, options, streams),
     headquartersSpec: { hp: headquartersHp, defense: headquartersDefense },
     balance: {
       startingSupplies,
       baseIncome,
-      // 战斗波动省略＝固定 3/6（零消耗）；只有显式区间才在此各抽一次。
-      damageVarianceRange: resolveFixedIntParam(options.damageVarianceRange, 3, rng),
-      minimumDamage: resolveFixedIntParam(options.minimumDamage, 1, rng),
-      healVarianceRange: resolveFixedIntParam(options.healVarianceRange, 6, rng),
+      // 战斗波动：省略＝固定 3/6，只有显式区间才在自己那条参数流上抽一次。
+      damageVarianceRange: resolveFixedIntParam(options.damageVarianceRange, 3, streams.param('damageVarianceRange')),
+      minimumDamage: resolveFixedIntParam(options.minimumDamage, 1, streams.param('minimumDamage')),
+      healVarianceRange: resolveFixedIntParam(options.healVarianceRange, 6, streams.param('healVarianceRange')),
       actionsPerTurn,
       maxTurns,
       // 「只能从据点部署」仅在显式关闭时写入，默认路径不产生该字段。
@@ -837,20 +878,24 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
       ...(comebackRequested
         ? {
             comebackSupply: {
-              startRound: resolveFixedIntParam(options.comebackStartRound, 4, rng),
-              scoreGapPercent: resolveFixedIntParam(options.comebackScoreGapPercent, 30, rng),
-              amountPerRound: resolveFixedIntParam(options.comebackAmountPerRound, 14, rng),
+              startRound: resolveFixedIntParam(options.comebackStartRound, 4, streams.param('comebackStartRound')),
+              scoreGapPercent: resolveFixedIntParam(options.comebackScoreGapPercent, 30, streams.param('comebackScoreGapPercent')),
+              amountPerRound: resolveFixedIntParam(options.comebackAmountPerRound, 14, streams.param('comebackAmountPerRound')),
             },
           }
         : {}),
       adjudicationWeights: {
-        ...sampleAdjudicationWeights(rng, options.adjudicationArmyValue, options.adjudicationKillValue),
+        ...sampleAdjudicationWeights(streams, options.adjudicationArmyValue, options.adjudicationKillValue),
         // 流量占比留空＝不写该字段（引擎默认 0.7）；显式给出时才写入。
         ...(options.adjudicationControlPointFlowRatio === undefined
           ? {}
-          : { controlPointFlowRatio: resolveFixedFloatParam(options.adjudicationControlPointFlowRatio, 0.7, rng) }),
+          : {
+              controlPointFlowRatio: resolveFixedFloatParam(
+                options.adjudicationControlPointFlowRatio, 0.7, streams.param('adjudicationControlPointFlowRatio'),
+              ),
+            }),
       },
-      controlPointTypes: sampleControlPointTypes(rng, {
+      controlPointTypes: sampleControlPointTypes(streams, {
         supply: options.supplyIncome,
         forwardBase: options.forwardBaseIncome,
         repair: options.repairIncome,
@@ -866,7 +911,85 @@ export function generateRandomMapConfig(rawOptions: RandomMapOptions, playerCoun
   };
 
   // 最终兜底校验：任何生成结果都必须通过与静态地图相同的验证。
-  return validateGeneratedMap(config, 'random') as MapConfig;
+  const validated = validateGeneratedMap(config, 'random') as MapConfig;
+  if (resolved) {
+    Object.assign(resolved, resolveParamValues(validated, {
+      waterDensity, wallDensity, variation, startingWeights,
+    }));
+  }
+  return validated;
+}
+
+/** 配置里不落字段、只能从生成时局部变量带出的几个参数。 */
+interface ResolvedLocals {
+  waterDensity: number;
+  wallDensity: number;
+  variation: number;
+  startingWeights: typeof STARTING_WEIGHT_DEFAULTS;
+}
+
+/**
+ * 反推每个随机参数的实际取值（键与 RandomMapOptions / 前端 PARAMS 一致）。
+ * 纯读取、不消耗随机数：预览接口用它把「掷出来的数值」回传给前端参数行。
+ */
+function resolveParamValues(cfg: MapConfig, locals: ResolvedLocals): RandomParamValues {
+  const balance = cfg.balance;
+  const points = balance.controlPointTypes;
+  const comeback = balance.comebackSupply;
+  const adjudication = balance.adjudicationWeights;
+  const artillery = cfg.annihilation?.artillery;
+  const values: RandomParamValues = {
+    radius: cfg.radius,
+    waterDensity: locals.waterDensity,
+    wallDensity: locals.wallDensity,
+    // 据点数是实际落成的数量（歼灭系会被出生位数抬升，才是本图真实值）。
+    controlPointCount: cfg.controlPoints.length,
+    maxTurns: balance.maxTurns,
+    actionsPerTurn: balance.actionsPerTurn,
+    startingSupplies: balance.startingSupplies,
+    baseIncome: balance.baseIncome,
+    supplyIncome: points?.supply.income ?? null,
+    forwardBaseIncome: points?.forward_base.income ?? null,
+    repairIncome: points?.repair.income ?? null,
+    forwardBaseDeployDiscount: points?.forward_base.deployDiscount ?? null,
+    repairPointRepairAmount: points?.repair.repairAmount ?? null,
+    comebackStartRound: comeback?.startRound ?? null,
+    comebackScoreGapPercent: comeback?.scoreGapPercent ?? null,
+    comebackAmountPerRound: comeback?.amountPerRound ?? null,
+    startingUnitCount: cfg.spawnSlots[0]?.startingUnits.length ?? 0,
+    startingWeightInfantry: locals.startingWeights.infantry,
+    startingWeightScout: locals.startingWeights.scout,
+    startingWeightHeavy: locals.startingWeights.heavy,
+    startingWeightRanger: locals.startingWeights.ranger,
+    unitStatVariation: locals.variation,
+    damageVarianceRange: balance.damageVarianceRange,
+    healVarianceRange: balance.healVarianceRange,
+    minimumDamage: balance.minimumDamage,
+    adjudicationArmyValue: adjudication.armyValue,
+    adjudicationKillValue: adjudication.killValue ?? null,
+    // 留空＝引擎默认 0.7，这里回显真正生效的占比。
+    adjudicationControlPointFlowRatio: adjudication.controlPointFlowRatio ?? 0.7,
+    headquartersHp: cfg.headquartersSpec.hp,
+    headquartersDefense: cfg.headquartersSpec.defense,
+    artilleryStartRound: artillery?.startRound ?? null,
+    artilleryIntervalRounds: artillery?.intervalRounds ?? null,
+    artilleryDamage: artillery?.damage ?? null,
+    artilleryMinimumSafeRadius: artillery?.minimumSafeRadius ?? null,
+  };
+  // 兵种属性：键＝兵种 + 属性名（infantryHp / scoutMoveRange …），与面板 PARAMS 同名。
+  const STAT_SUFFIX: Record<string, string> = {
+    hp: 'Hp', attack: 'Attack', defense: 'Defense', moveRange: 'MoveRange',
+    attackRange: 'AttackRange', cost: 'Cost', healPower: 'HealPower',
+  };
+  for (const [type, spec] of Object.entries(cfg.units) as [UnitType, UnitSpec][]) {
+    for (const [stat, suffix] of Object.entries(STAT_SUFFIX)) {
+      const value = (spec as unknown as Record<string, unknown>)[stat];
+      if (typeof value === 'number') values[`${type}${suffix}`] = value;
+    }
+  }
+  // 治疗射程留空时引擎回退攻击射程，这里回显真正生效的射程。
+  values.supportHealRange = cfg.units.support.healRange ?? cfg.units.support.attackRange;
+  return values;
 }
 
 function findFreeCell(ideal: Position, playableSet: Set<string>, taken: Set<string>, radius: number): Position {
@@ -1327,17 +1450,25 @@ function buildSpawnSlots(
   return slots;
 }
 
-/** 兵种属性键（＝UNIT_BASE 的属性顺序，也是随机数消耗顺序）。 */
+/** 兵种属性键（＝UNIT_BASE 的属性顺序）。 */
 type UnitStatKey = 'hp' | 'attack' | 'defense' | 'moveRange' | 'attackRange' | 'cost' | 'healPower';
 
-function buildUnitSpecs(variation: number, options: RandomMapOptions, rng: () => number): Record<UnitType, UnitSpec> {
-  const jitter = (value: number, floor: number): number =>
-    Math.max(floor, Math.round(value * (1 + (rng() * 2 - 1) * variation)));
-  // 每个属性至多消耗 1 次随机数：留空＝围绕基准值抖动（与旧实现逐位一致），标量＝精确值（零消耗），
-  // 区间＝区间内均匀抽一个整数（1 次）。全部留空时随机数序列与改动前完全相同。
-  const stat = (override: RandomParam | undefined, base: number, floor: number): number => {
-    if (override === undefined) return jitter(base, floor);
+/**
+ * 兵种数值：每一项（如 infantryHp / scoutCost）都从自己的参数流取值——
+ * 留空＝围绕基准值按 unitStatVariation 抖动，标量＝精确值（不抽随机数），区间＝区间内均匀抽一个整数。
+ * 因此固定「步兵血量」不会改变步兵攻击，也不会改变其他兵种。
+ */
+function buildUnitSpecs(
+  variation: number,
+  options: RandomMapOptions,
+  streams: RandomStreams,
+): Record<UnitType, UnitSpec> {
+  const stat = (key: string, override: RandomParam | undefined, base: number, floor: number): number => {
     if (typeof override === 'number') return override;
+    const rng = streams.param(key);
+    if (override === undefined) {
+      return Math.max(floor, Math.round(base * (1 + (rng() * 2 - 1) * variation)));
+    }
     return drawIntInRange(override[0], override[1], rng);
   };
   const overrides: Record<UnitType, Partial<Record<UnitStatKey, RandomParam>>> = {
@@ -1387,19 +1518,19 @@ function buildUnitSpecs(variation: number, options: RandomMapOptions, rng: () =>
   for (const [type, base] of Object.entries(UNIT_BASE) as [UnitType, UnitSpec][]) {
     const override = overrides[type];
     const spec: UnitSpec = {
-      hp: stat(override.hp, base.hp, 10),
-      attack: stat(override.attack, base.attack, 1),
-      defense: stat(override.defense, base.defense, 0),
-      moveRange: stat(override.moveRange, base.moveRange, 1),
-      attackRange: stat(override.attackRange, base.attackRange, 1),
-      cost: stat(override.cost, base.cost, 5),
+      hp: stat(`${type}Hp`, override.hp, base.hp, 10),
+      attack: stat(`${type}Attack`, override.attack, base.attack, 1),
+      defense: stat(`${type}Defense`, override.defense, base.defense, 0),
+      moveRange: stat(`${type}MoveRange`, override.moveRange, base.moveRange, 1),
+      attackRange: stat(`${type}AttackRange`, override.attackRange, base.attackRange, 1),
+      cost: stat(`${type}Cost`, override.cost, base.cost, 5),
       canCapture: base.canCapture,
     };
     if (base.healPower !== undefined) {
-      spec.healPower = stat(override.healPower, base.healPower, 5);
+      spec.healPower = stat('supportHealPower', override.healPower, base.healPower, 5);
       // 治疗射程留空＝不写该字段（引擎回退攻击射程）；显式给出时才写入。
       if (options.supportHealRange !== undefined) {
-        spec.healRange = resolveFixedIntParam(options.supportHealRange, base.attackRange, rng);
+        spec.healRange = resolveFixedIntParam(options.supportHealRange, base.attackRange, streams.param('supportHealRange'));
       }
     }
     result[type] = spec;

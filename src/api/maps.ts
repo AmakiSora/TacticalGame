@@ -2,6 +2,7 @@
 import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import { listMaps, previewForConfig } from '../config/loader.js';
+import type { RandomParamValues } from '../config/randomMap.js';
 import { generateRandomMapConfig, sanitizeRandomOptions } from '../config/randomMap.js';
 
 export async function mapsRoutes(app: FastifyInstance): Promise<void> {
@@ -20,8 +21,10 @@ export async function mapsRoutes(app: FastifyInstance): Promise<void> {
       try {
         const options = sanitizeRandomOptions(req.body?.random);
         const seed = options.seed ?? randomBytes(6).toString('hex');
-        const config = generateRandomMapConfig({ ...options, seed }, maxPlayers);
-        return { seed, preview: previewForConfig(config) };
+        // values = 每个随机参数这次实际掷出的值，前端在参数行内回显「本图 X」。
+        const values: RandomParamValues = {};
+        const config = generateRandomMapConfig({ ...options, seed }, maxPlayers, values);
+        return { seed, preview: previewForConfig(config), values };
       } catch (err) {
         const message = err instanceof Error ? err.message : '随机地图参数无效';
         return reply.code(400).send({ error: `随机地图：${message}`, code: 'invalid_move' });

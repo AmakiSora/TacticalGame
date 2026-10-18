@@ -1,6 +1,7 @@
 // 共享依赖经 ESM import 保证执行顺序（替代原 classic script 标签的文档顺序）。
 import './version.js';
 import './ui-dialog.js';
+import './preview-tooltip.js';
 import './board-animation.js';
 import './playback.js';
 import './board-inspect.js';
@@ -423,6 +424,24 @@ function previewHexCornersRaw(q, r, size) {
   });
 }
 
+// 单位详单数值：挂到 marker 的 data-stat-* 上，只带本图实际配置的字段（support 才带 heal）。
+// 源头是服务端 preview.units，随机地图改数值时前端不用动。
+function previewUnitStatAttrs(spec) {
+  if (!spec) return '';
+  return [
+    ['hp', spec.hp],
+    ['attack', spec.attack],
+    ['defense', spec.defense],
+    ['move', spec.moveRange],
+    ['range', spec.attackRange],
+    ['cost', spec.cost],
+    ['heal', spec.healPower],
+  ]
+    .filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
+    .map(([key, value]) => ` data-stat-${key}="${value}"`)
+    .join('');
+}
+
 function renderMapPreview(preview) {
   if (!preview || !Array.isArray(preview.cells) || preview.cells.length === 0) {
     return '<div class="map-preview empty">暂无预览</div>';
@@ -449,12 +468,25 @@ function renderMapPreview(preview) {
     const terrainClass = cell.terrain || 'plain';
     return `<polygon class="preview-hex ${terrainClass}" points="${polygon(cell)}"></polygon>`;
   }).join('');
+  // 据点：颜色沿用金色圆点；整格命中区，悬停看类型 / 收入 / 部署折扣 / 维修 / 能否部署。
+  const cpNames = new Map((preview.controlPoints || []).map(cp => [cp.id, cp.name]));
   const controlPoints = (preview.controlPoints || []).map(cp => {
     const p = point(cp);
-    return `<circle class="preview-marker cp" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"><title>${esc(cp.name)}</title></circle>`;
+    const spec = preview.controlPointTypes?.[cp.kind] || null;
+    const kindLabel = cp.kind ? (CONTROL_POINT_NAMES[cp.kind] || cp.kind) : '普通据点';
+    const stats = [
+      spec ? ` data-stat-income="+${spec.income}"` : '',
+      spec?.deployDiscount ? ` data-stat-discount="-${spec.deployDiscount}"` : '',
+      spec?.repairAmount ? ` data-stat-repair="+${spec.repairAmount}"` : '',
+      ` data-stat-deploy="${spec?.canDeploy === false ? '不可部署' : '可用'}"`,
+    ].join('');
+    return `<g class="preview-point" data-preview-marker data-marker-kind="control-point" data-marker-title="${esc(cp.name)}" data-marker-sub="${esc(kindLabel)}" data-marker-token="${esc(cp.kind || 'supply')}"${stats}>
+      <polygon class="preview-marker-hit" points="${polygon(cp)}"></polygon>
+      <circle class="preview-marker cp" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4"></circle>
+    </g>`;
   }).join('');
-  // 出生点：歼灭 / 大逃杀不建总部，但出生位仍决定初始单位的落点，必须标出来；
-  // 这两种模式改用圆形「出生点」标记（区别于总部方块），标题带出它绑定的起始据点。
+  // 出生位：歼灭 / 大逃杀不建总部，但出生位仍决定初始单位的落点，必须标出来；
+  // 这两种模式改用圆形「出生点」标记（区别于总部方块），详单里带出它绑定的起始据点与初始单位数。
   const annihilationMode = preview.mode === 'annihilation' || preview.mode === 'royale';
   const spawnSlots = (preview.spawnSlots || []).map((slot, index) => ({
     id: slot.id,
@@ -467,14 +499,29 @@ function renderMapPreview(preview) {
   const starts = spawnSlots.length ? spawnSlots : legacyHeadquarters;
   const headquarters = starts.map(slot => {
     const p = point(slot);
-    const title = esc(slot.controlPointId ? `${slot.id} · 起始据点 ${slot.controlPointId}` : slot.id);
+    const cpName = slot.controlPointId ? cpNames.get(slot.controlPointId) : '';
+    const sub = `出生位 ${slot.index + 1}${cpName ? ` · ${cpName}` : ''}`;
     if (annihilationMode) {
-      return `<circle class="preview-marker spawn spawn-slot-${slot.index + 1}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.2"><title>${title}</title></circle>`;
+      return `<g class="preview-point" data-preview-marker data-marker-kind="spawn" data-marker-title="出生点" data-marker-sub="${esc(sub)}" data-marker-token="spawn" data-stat-units="${(slot.startingUnits || []).length}">
+        <polygon class="preview-marker-hit" points="${polygon(slot)}"></polygon>
+        <circle class="preview-marker spawn spawn-slot-${slot.index + 1}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.2"></circle>
+      </g>`;
     }
-    return `<rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"><title>${title}</title></rect>`;
+    // 总部：血量 / 防御来自本图 headquartersSpec，是否可部署来自 balance.deployFromHq。
+    const hq = preview.headquartersSpec;
+    const stats = [
+      hq ? ` data-stat-hp="${hq.hp}" data-stat-defense="${hq.defense}"` : '',
+      ` data-stat-deploy="${preview.deployFromHq === false ? '不可部署' : '可用'}"`,
+    ].join('');
+    return `<g class="preview-point" data-preview-marker data-marker-kind="headquarters" data-marker-title="总部" data-marker-sub="${esc(sub)}" data-marker-token="headquarters"${stats}>
+      <polygon class="preview-marker-hit" points="${polygon(slot)}"></polygon>
+      <rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"></rect>
+    </g>`;
   }).join('');
   // 初始单位：预览数据一直带着 spawnSlots[].startingUnits（type/q/r），此前没画出来；
-  // 小圆点标在单位实际落格（总部邻格）上，颜色按兵种区分，悬停看兵种与所属出生位。
+  // 小圆点标在单位实际落格（总部邻格）上，颜色按兵种区分。
+  // 圆点本身只有 2.2 单位半径，卡片缩小时几乎指不中，所以整格盖一层透明命中区
+  //（与小圆点同格，悬停单位所在格子即算悬停单位）；详单由 preview-tooltip.js 弹出。
   // 旧版 headquarters 兜底路径没有单位数据，自然为空。
   const startingUnits = starts
     .flatMap(slot => (slot.startingUnits || []).map(unit => ({ slot, unit })))
@@ -482,8 +529,12 @@ function renderMapPreview(preview) {
       // 只画初始兵种（步兵 / 侦察兵 / 重装 / 远程兵），support 等不会作为初始单位出现。
       if (unit.type !== 'infantry' && unit.type !== 'scout' && unit.type !== 'heavy' && unit.type !== 'ranger') return '';
       const p = point(unit);
-      const title = esc(`${slot.id} · 初始单位 ${UNIT_NAMES[unit.type] || unit.type}`);
-      return `<circle class="preview-marker unit unit-${unit.type}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.2"><title>${title}</title></circle>`;
+      const spec = preview.units?.[unit.type];
+      const trait = [spec?.canCapture ? '可占点' : '', spec?.attackLock ? '锁定目标' : ''].filter(Boolean).join(' · ');
+      return `<g class="preview-unit" data-preview-marker data-marker-kind="unit" data-marker-title="${esc(UNIT_NAMES[unit.type] || unit.type)}" data-marker-sub="初始单位 · 出生位 ${slot.index + 1}" data-marker-token="${unit.type}"${trait ? ` data-marker-trait="${trait}"` : ''}${previewUnitStatAttrs(spec)}>
+        <polygon class="preview-marker-hit" points="${polygon(unit)}"></polygon>
+        <circle class="preview-marker unit unit-${unit.type}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.2"></circle>
+      </g>`;
     })
     .join('');
 
@@ -719,6 +770,11 @@ async function hydrateRandomJoinMapCard() {
         maxTurns: config.balance?.maxTurns,
         actionsPerTurn: config.balance?.actionsPerTurn,
         supportedPlayerCounts: config.supportedPlayerCounts,
+        // 悬停详单要的数值：随机图大厅摘要里没有，直接从对局配置补齐。
+        units: config.units,
+        controlPointTypes: config.balance?.controlPointTypes,
+        headquartersSpec: config.headquartersSpec,
+        deployFromHq: config.balance?.deployFromHq !== false,
       },
     });
   } catch {
@@ -876,6 +932,8 @@ function choosePendingMap(mapId) {
 
 function openMapDialog() {
   if (!els.mapDialog) return;
+  // 弹层会盖住大厅预览，悬停详单先收起，免得浮在弹层上面。
+  window.PreviewTooltip?.hide();
   mapDialogReturnFocus = document.activeElement;
   mapDialogOpen = true;
   mapFilterText = '';
@@ -3314,9 +3372,8 @@ els.mapFilterMode?.addEventListener('change', () => {
   renderMapPicker(availableMaps);
 });
 els.btnMapRandomRefresh?.addEventListener('click', () => {
-  const seed = document.getElementById('rmo-seed');
-  if (seed) seed.value = '';
-  window.RandomMapUI?.refreshPreview(true);
+  // 换一张走模块统一入口：种子锁定时模块会拒绝并保持这张图。
+  window.RandomMapUI?.reroll(true);
 });
 els.randomMapOptions?.addEventListener('input', scheduleMapDialogPreview);
 els.randomMapOptions?.addEventListener('change', scheduleMapDialogPreview);

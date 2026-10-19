@@ -56,7 +56,7 @@ describe('layout editor', () => {
     expect(read('public/style.css')).toContain('var(--tg-grid');
   });
 
-  it('ships the spectator default layout as 资源/查看单位 left, 当前事件/事件流 under the board, 回合/排行榜 right', () => {
+  it('ships the spectator default layout as 资源/查看单位 left, 当前事件/事件流 under the board, 回合/排行榜/对局操作 right', () => {
     const source = read('public/layout-editor.js');
     const block = source.slice(source.indexOf('spectator: {'), source.indexOf('function detectConfig'));
     // defaultState() 按 cards 声明顺序填充各分区，声明顺序即分区内的上下顺序
@@ -69,6 +69,8 @@ describe('layout editor', () => {
       'bottom:event-log',
       'right:turn-info',
       'right:score-panel',
+      // 对局操作卡片固定排在分数排行榜之下
+      'right:game-meta',
     ]);
   });
 

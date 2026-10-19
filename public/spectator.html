@@ -19,7 +19,7 @@
       <h1>战棋对战观战 <span class="version-badge"></span></h1>
       <div class="page-subtitle">实时局势与回放复盘</div>
     </div>
-    <div id="game-meta">
+    <div class="header-right">
       <nav class="page-nav" aria-label="站点导航">
         <a href="/">首页</a>
         <a href="/play.html">玩家</a>
@@ -28,36 +28,6 @@
         <a href="/arena.html">AI 竞技场</a>
         <a href="/entertainment.html">娱乐数据</a>
       </nav>
-      <span class="toolbar-group primary-tools">
-        <span class="game-picker">
-          <select id="game-select" class="native-game-select" tabindex="-1" aria-hidden="true"><option value="">-- 选择对局 --</option></select>
-          <button id="game-picker-button" type="button" aria-haspopup="listbox" aria-expanded="false">
-            <span id="game-picker-label">-- 选择对局 --</span>
-          </button>
-          <div id="game-picker-menu" role="listbox" aria-label="选择对局">
-            <input type="search" id="game-filter" class="record-filter" placeholder="筛选：短码 / 地图 / 玩家 / 模式" autocomplete="off" />
-            <div id="game-option-list"></div>
-          </div>
-        </span>
-        <span class="game-picker record-picker" id="record-picker">
-          <button id="record-picker-button" type="button" aria-haspopup="listbox" aria-expanded="false">
-            <span id="record-picker-label">回放库</span>
-          </button>
-          <div id="record-picker-menu" role="listbox" aria-label="选择回放">
-            <input type="search" id="record-filter" class="record-filter" placeholder="筛选：编号 / 地图 / 玩家" autocomplete="off" />
-            <div id="record-list"></div>
-          </div>
-        </span>
-        <button id="refresh-list">刷新列表</button>
-        <button id="force-adjudicate" class="adjudicate" type="button" title="按当前分数结束对局" disabled>强制裁决</button>
-        <button id="delete-game" class="danger" title="删除当前对局">删除</button>
-        <span id="status"></span>
-      </span>
-      <span id="file-actions" class="toolbar-group file-tools">
-        <button id="btn-export-json" title="导出为 JSON 文件">导出 JSON</button>
-        <button id="btn-import" title="从 JSON 文件导入对局">导入</button>
-        <input type="file" id="import-file" accept=".json" hidden />
-      </span>
       <div id="settings-wrap" class="toolbar-group settings-tools">
         <button id="btn-rules" title="本局规则速查" aria-label="本局规则速查">?</button>
         <button id="btn-settings" title="设置">&#9881;</button>
@@ -119,6 +89,38 @@
     <aside id="sidebar">
       <section id="resources"></section>
       <section id="score-panel"></section>
+      <section id="game-meta" class="game-actions">
+        <div class="ga-head">
+          <h3>对局</h3>
+          <button id="refresh-list" type="button" class="ga-refresh" title="刷新当前列表">刷新</button>
+        </div>
+        <button id="picker-current" type="button" class="ga-current" aria-expanded="false" aria-controls="picker-panel">
+          <span id="picker-current-body" class="ga-current-body">
+            <span class="ga-current-empty">未选择对局</span>
+          </span>
+          <span class="ga-caret" aria-hidden="true"></span>
+        </button>
+        <div id="picker-panel" class="ga-panel" hidden>
+          <input id="picker-filter" class="ga-search" type="search" placeholder="筛选：短码 / 地图 / 玩家" autocomplete="off" />
+          <div class="ga-tabs" role="tablist" aria-label="对局来源">
+            <button id="tab-games" type="button" class="ga-tab active" role="tab" aria-selected="true">进行中 <span id="tab-games-count">0</span></button>
+            <button id="tab-records" type="button" class="ga-tab" role="tab" aria-selected="false">回放 <span id="tab-records-count">0</span></button>
+          </div>
+          <div id="game-option-list" class="ga-list" role="listbox" aria-label="在线对局"></div>
+          <div id="record-list" class="ga-list" role="listbox" aria-label="回放" hidden></div>
+        </div>
+        <select id="game-select" hidden aria-hidden="true" tabindex="-1"><option value="">-- 选择对局 --</option></select>
+        <div class="ga-actions">
+          <button id="force-adjudicate" class="ga-warn" type="button" title="按当前分数结束对局" disabled>强制裁决</button>
+          <button id="delete-game" class="ga-danger" type="button" title="删除当前对局">删除</button>
+        </div>
+        <div class="ga-actions">
+          <button id="btn-export-json" type="button" title="导出为 JSON 文件">导出 JSON</button>
+          <button id="btn-import" type="button" title="从 JSON 文件导入对局">导入</button>
+          <input type="file" id="import-file" accept=".json" hidden />
+        </div>
+        <div id="status"></div>
+      </section>
       <section id="turn-info"></section>
       <section id="event-detail">
         <h3>当前事件</h3>

@@ -11,10 +11,23 @@ describe('spectator and player page optimization', () => {
     const play = read('public/play.html');
 
     expect(spectator).toContain('class="spectator-shell"');
-    expect(spectator).toContain('class="toolbar-group primary-tools"');
-    expect(spectator).toContain('class="toolbar-group file-tools"');
+    expect(spectator).toContain('class="game-actions"');
+    expect(spectator).toContain('class="ga-actions"');
     expect(play).toContain('class="player-shell"');
     expect(play).toContain('class="board-panel"');
+  });
+
+  it('collapses the spectator picker into one card with merged game / replay tabs', () => {
+    const html = read('public/spectator.html');
+    const source = read('public/app.js');
+
+    expect(html).toContain('id="picker-panel"');
+    expect(html).toContain('id="tab-games"');
+    expect(html).toContain('id="tab-records"');
+    expect(source).toContain('function setPickerTab');
+    expect(source).toContain('function syncPickerCurrent');
+    // 回放页签下删除按钮灰掉，避免误删当前载入的在线对局。
+    expect(source).toContain('deleteGameBtn.disabled = isRecordTab()');
   });
 
   it('renders spectator status sections with optimized card classes', () => {

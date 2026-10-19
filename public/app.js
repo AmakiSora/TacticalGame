@@ -84,18 +84,16 @@ const boardAnimation = window.BoardAnimation.create({
   unitSpec: type => gameConfig?.units?.[type],
 });
 const gameSelect = document.getElementById('game-select');
-const gamePicker = document.querySelector('.game-picker');
-const gamePickerButton = document.getElementById('game-picker-button');
-const gamePickerLabel = document.getElementById('game-picker-label');
-const gamePickerMenu = document.getElementById('game-picker-menu');
+const pickerCurrentBtn = document.getElementById('picker-current');
+const pickerCurrentBody = document.getElementById('picker-current-body');
+const pickerPanel = document.getElementById('picker-panel');
+const pickerFilterInput = document.getElementById('picker-filter');
+const tabGamesBtn = document.getElementById('tab-games');
+const tabRecordsBtn = document.getElementById('tab-records');
+const tabGamesCount = document.getElementById('tab-games-count');
+const tabRecordsCount = document.getElementById('tab-records-count');
 const gameOptionList = document.getElementById('game-option-list');
-const gameFilterInput = document.getElementById('game-filter');
-const recordPicker = document.getElementById('record-picker');
-const recordPickerButton = document.getElementById('record-picker-button');
-const recordPickerLabel = document.getElementById('record-picker-label');
-const recordPickerMenu = document.getElementById('record-picker-menu');
 const recordListEl = document.getElementById('record-list');
-const recordFilterInput = document.getElementById('record-filter');
 const refreshBtn = document.getElementById('refresh-list');
 const forceAdjudicateBtn = document.getElementById('force-adjudicate');
 const deleteGameBtn = document.getElementById('delete-game');
@@ -1489,40 +1487,27 @@ function buildTimelineMarkers() {
   });
 }
 
-// 选中后胶囊：短码 + 阶段（进行中/等待中才有意义，已结束显示回合数）。
-function gameOptionText(game) {
-  const parts = [game.id.slice(0, 8)];
-  if (game.phase === 'game_over') parts.push(`回合${game.turnNumber}`);
-  else parts.push(phaseLabel(game.phase));
-  return parts.join(' · ');
-}
-
-// 对局选择器条目与回放库同款标签化：顶部标签行（模式/地图/回合/人数 + 右侧阶段徽标），
-// 下行玩家名与胜者双栏排布。
-function gameBadgesHtml(game) {
-  const modeLabel = MODE_LABELS[game.mode] || game.mode || '';
-  const modeBadge = modeLabel ? `<span class="record-map">${esc(modeLabel)}</span>` : '';
-  const mapBadge = game.mapId ? `<span class="record-map">${esc(game.mapId)}</span>` : '';
-  const turnBadge = game.phase !== 'lobby'
-    ? `<span class="record-date">回合 ${esc(game.turnNumber)}</span>` : '';
-  const countBadge = `<span class="record-date">${esc(game.playerCount ?? (game.players || []).length)}/${esc(game.maxPlayers ?? '?')}人</span>`;
-  return `<span class="record-top">
-      <span class="record-badges">${modeBadge}${mapBadge}${turnBadge}${countBadge}</span>
-      <span class="phase-badge phase-${esc(game.phase || 'unknown')}">${esc(phaseLabel(game.phase))}</span>
-    </span>
-    <span class="game-id">${esc(game.id.slice(0, 8))}</span>`;
-}
-
-function gamePlayersLineHtml(game) {
+// 卡片列表行：第一行 状态点 + 短码 + 阶段徽标，第二行 模式/地图/人数/回合，第三行 玩家与胜者。
+function gameRowHtml(game) {
+  const active = game.phase === 'active';
+  const badgeClass = active ? 'run' : (game.phase === 'lobby' ? 'wait' : 'over');
   const names = game.playerNames || {};
-  const players = (game.players || []);
-  const playerLine = players.length
-    ? players.map(p => names[p.id] || p.name || playerName(p.id)).filter(Boolean).join(' / ')
-    : Object.values(names).filter(Boolean).join(' / ');
+  const players = (game.players || []).map(p => names[p.id] || p.name || playerName(p.id)).filter(Boolean);
   const winnerId = game.phase === 'game_over' ? game.winner : null;
-  const winnerName = winnerId ? (names[winnerId] || playerName(winnerId)) : null;
-  const winner = winnerName ? `胜者 ${esc(winnerName)}` : '';
-  return `<span class="game-meta-line"><span class="record-players">${esc(playerLine || '暂无玩家')}</span><span class="record-winner">${winner}</span></span>`;
+  const winner = winnerId ? (names[winnerId] || playerName(winnerId)) : '';
+  const meta = [
+    MODE_LABELS[game.mode] || game.mode,
+    game.mapName || game.mapId,
+    `${game.playerCount ?? players.length}/${game.maxPlayers ?? '?'} 人`,
+    game.phase === 'lobby' ? '' : `回合 ${game.turnNumber}`,
+  ].filter(Boolean).join(' · ');
+  return `<span class="ga-item-top">
+      <span class="ga-dot ${active ? 'live' : 'wait'}"></span>
+      <b>${esc(game.id.slice(0, 8))}</b>
+      <span class="ga-badge ${badgeClass}">${esc(phaseLabel(game.phase))}</span>
+    </span>
+    <span class="ga-item-meta">${esc(meta)}</span>
+    <span class="ga-item-players">${esc(players.join(' / ') || '暂无玩家')}${winner ? ` · 胜者 ${esc(winner)}` : ''}</span>`;
 }
 
 function normalizeListedGame(game) {
@@ -1539,25 +1524,99 @@ function sortGamesByLatest(games) {
   return [...games].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
 }
 
-function closeGamePicker() {
-  gamePicker.classList.remove('open');
-  gamePickerButton.setAttribute('aria-expanded', 'false');
+// ---- 对局选择卡片：折叠时只显示当前选中项，展开后是「进行中 / 回放」两个列表 ----
+let pickerTab = 'games';
+
+function isRecordTab() {
+  return pickerTab === 'records';
 }
 
-function toggleGamePicker() {
-  const open = !gamePicker.classList.contains('open');
-  gamePicker.classList.toggle('open', open);
-  gamePickerButton.setAttribute('aria-expanded', String(open));
-  if (open) gameFilterInput?.focus();
+function openPicker() {
+  if (!pickerPanel) return;
+  pickerPanel.hidden = false;
+  pickerCurrentBtn?.setAttribute('aria-expanded', 'true');
+  if (isRecordTab() && recordsList.length === 0) fetchRecordList();
+  pickerFilterInput?.focus();
 }
 
-function syncGamePickerLabel() {
-  const selected = gamesList.find(g => g.id === gameSelect.value);
-  gamePickerLabel.textContent = selected ? gameOptionText(selected) : '-- 选择对局 --';
-  gamePickerMenu.querySelectorAll('.game-picker-option').forEach(option => {
-    option.classList.toggle('active', option.dataset.gameId === gameSelect.value);
-    option.setAttribute('aria-selected', String(option.dataset.gameId === gameSelect.value));
-  });
+function closePicker() {
+  if (!pickerPanel) return;
+  pickerPanel.hidden = true;
+  pickerCurrentBtn?.setAttribute('aria-expanded', 'false');
+}
+
+function togglePicker() {
+  if (!pickerPanel) return;
+  if (pickerPanel.hidden) openPicker();
+  else closePicker();
+}
+
+function updateTabCounts() {
+  if (tabGamesCount) tabGamesCount.textContent = String(gamesList.length);
+  if (tabRecordsCount) tabRecordsCount.textContent = String(recordsList.length);
+}
+
+// 回放页签下「删除」只针对在线对局，灰掉避免误删当前载入的在线局。
+function updateActionAvailability() {
+  if (deleteGameBtn) deleteGameBtn.disabled = isRecordTab();
+}
+
+function renderActivePickerList() {
+  if (isRecordTab()) renderRecordPickerMenu();
+  else renderGamePickerMenu();
+  updateTabCounts();
+}
+
+function setPickerTab(tab) {
+  pickerTab = tab === 'records' ? 'records' : 'games';
+  const records = isRecordTab();
+  tabGamesBtn?.classList.toggle('active', !records);
+  tabGamesBtn?.setAttribute('aria-selected', String(!records));
+  tabRecordsBtn?.classList.toggle('active', records);
+  tabRecordsBtn?.setAttribute('aria-selected', String(records));
+  if (gameOptionList) gameOptionList.hidden = records;
+  if (recordListEl) recordListEl.hidden = !records;
+  updateActionAvailability();
+  if (records && recordsList.length === 0) fetchRecordList();
+  else renderActivePickerList();
+  pickerFilterInput?.focus();
+}
+
+function pickerCurrentHtml() {
+  const game = gamesList.find(g => g.id === gameSelect.value);
+  if (game) {
+    const active = game.phase === 'active';
+    const meta = [
+      MODE_LABELS[game.mode] || game.mode,
+      game.mapName || game.mapId,
+      `${game.playerCount ?? (game.players || []).length}/${game.maxPlayers ?? '?'} 人`,
+    ].filter(Boolean).join(' · ');
+    return `<span class="ga-current-top">
+        <span class="ga-dot ${active ? 'live' : 'wait'}"></span>
+        <b>${esc(game.id.slice(0, 8))}</b>
+        <span class="ga-badge ${active ? 'run' : 'wait'}">${esc(phaseLabel(game.phase))}</span>
+      </span>
+      <span class="ga-current-meta">${esc(meta)}</span>`;
+  }
+  const record = activeRecordId ? recordsList.find(r => r.id === activeRecordId) : null;
+  if (record) {
+    const modeLabel = RECORD_MODE_LABELS[record.mode] || record.mode || '回放';
+    const title = record.seq ? `#${record.seq}` : String(record.gameId || record.fileName || '').slice(0, 8);
+    const meta = [recordDateText(record) || record.exportedAt || '', record.mapId || ''].filter(Boolean).join(' · ');
+    return `<span class="ga-current-top">
+        <span class="ga-dot archive"></span>
+        <b>${esc(title)}</b>
+        <span class="ga-badge mode">${esc(modeLabel)}</span>
+      </span>
+      <span class="ga-current-meta">${esc(meta || '回放')}</span>`;
+  }
+  return '<span class="ga-current-empty">未选择对局</span>';
+}
+
+function syncPickerCurrent() {
+  if (pickerCurrentBody) pickerCurrentBody.innerHTML = pickerCurrentHtml();
+  updateTabCounts();
+  updateActionAvailability();
   updateForceAdjudicateButton();
 }
 
@@ -1581,35 +1640,43 @@ function gameMatches(game, query) {
 
 function renderGamePickerMenu() {
   if (!gameOptionList) return;
+  // 自动刷新每 5 秒重建列表，保留滚动位置，避免正在挑对局时跳回顶部。
+  const scrollTop = gameOptionList.scrollTop;
   gameOptionList.replaceChildren();
-  const query = (gameFilterInput?.value || '').trim().toLowerCase();
+  const query = (pickerFilterInput?.value || '').trim().toLowerCase();
   const matches = gamesList.filter(game => gameMatches(game, query));
   if (matches.length === 0) {
     const empty = document.createElement('div');
-    empty.className = 'game-picker-empty';
+    empty.className = 'ga-empty';
     empty.textContent = gamesList.length === 0 ? '暂无在线对局' : '无匹配对局';
     gameOptionList.append(empty);
-    syncGamePickerLabel();
+    updateTabCounts();
+    syncPickerCurrent();
     return;
   }
   for (const game of matches) {
     const option = document.createElement('button');
     option.type = 'button';
-    option.className = `game-picker-option phase-${game.phase || 'unknown'}`;
+    option.className = 'ga-item';
     option.dataset.gameId = game.id;
     option.setAttribute('role', 'option');
-    option.innerHTML = `${gameBadgesHtml(game)}${gamePlayersLineHtml(game)}`;
+    option.classList.toggle('active', game.id === gameSelect.value);
+    option.setAttribute('aria-selected', String(game.id === gameSelect.value));
+    option.innerHTML = gameRowHtml(game);
     option.addEventListener('click', () => selectGame(game.id));
     gameOptionList.append(option);
   }
-  syncGamePickerLabel();
+  gameOptionList.scrollTop = scrollTop;
+  updateTabCounts();
+  syncPickerCurrent();
 }
 
 async function selectGame(id) {
   if (!id) return;
+  activeRecordId = null;
   gameSelect.value = id;
-  syncGamePickerLabel();
-  closeGamePicker();
+  syncPickerCurrent();
+  closePicker();
   await loadGameState(id);
   subscribeSse(id);
 }
@@ -1620,12 +1687,6 @@ const RECORD_MODE_LABELS = MODE_LABELS;
 function recordDateText(record) {
   const d = record.date;
   return d && d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : '';
-}
-
-// 选中后胶囊只显示「#序号 · 日期」，完整信息在弹层条目里。
-function recordOptionText(record) {
-  const parts = [record.seq ? `#${record.seq}` : '', recordDateText(record) || record.exportedAt || ''];
-  return parts.filter(Boolean).join(' · ') || record.fileName;
 }
 
 async function fetchRecordList() {
@@ -1641,21 +1702,6 @@ async function fetchRecordList() {
   return recordsList;
 }
 
-function closeRecordPicker() {
-  recordPicker.classList.remove('open');
-  recordPickerButton.setAttribute('aria-expanded', 'false');
-}
-
-function toggleRecordPicker() {
-  const open = !recordPicker.classList.contains('open');
-  recordPicker.classList.toggle('open', open);
-  recordPickerButton.setAttribute('aria-expanded', String(open));
-  if (open) {
-    if (recordsList.length === 0) fetchRecordList();
-    recordFilterInput?.focus();
-  }
-}
-
 function recordMatches(record, query) {
   if (!query) return true;
   const hay = [record.gameId, record.mapId, record.fileName, record.date, ...(record.players || [])]
@@ -1663,43 +1709,57 @@ function recordMatches(record, query) {
   return hay.includes(query);
 }
 
+// 回放列表行：第一行 状态点 + 序号 + 模式，第二行 日期/地图/人数，第三行 玩家与胜者。
+function recordRowHtml(record) {
+  const modeLabel = RECORD_MODE_LABELS[record.mode] || record.mode || '回放';
+  const title = record.seq ? `#${record.seq}` : String(record.gameId || record.fileName || '').slice(0, 8);
+  const players = (record.players || []);
+  const winnerName = record.winnerName || record.winner;
+  const meta = [
+    recordDateText(record) || record.exportedAt || '',
+    record.mapId || '',
+    players.length ? `${players.length} 人` : '',
+  ].filter(Boolean).join(' · ');
+  const tail = winnerName ? ` · 胜者 ${esc(winnerName)}` : (record.reason ? ` · ${esc(record.reason)}` : '');
+  return `<span class="ga-item-top">
+      <span class="ga-dot archive"></span>
+      <b>${esc(title)}</b>
+      <span class="ga-badge mode">${esc(modeLabel)}</span>
+    </span>
+    <span class="ga-item-meta">${esc(meta || '归档回放')}</span>
+    <span class="ga-item-players">${esc(players.join(' / ') || '未知玩家')}${tail}</span>`;
+}
+
 function renderRecordPickerMenu() {
   if (!recordListEl) return;
+  const scrollTop = recordListEl.scrollTop;
   recordListEl.replaceChildren();
-  const query = (recordFilterInput?.value || '').trim().toLowerCase();
+  const query = (pickerFilterInput?.value || '').trim().toLowerCase();
   const matches = recordsList.filter(record => recordMatches(record, query));
   if (matches.length === 0) {
     const empty = document.createElement('div');
-    empty.className = 'game-picker-empty';
+    empty.className = 'ga-empty';
     empty.textContent = recordsList.length === 0 ? '暂无归档回放' : '无匹配回放';
     recordListEl.append(empty);
+    updateTabCounts();
+    syncPickerCurrent();
     return;
   }
   for (const record of matches) {
     const option = document.createElement('button');
     option.type = 'button';
-    option.className = 'game-picker-option record-picker-option';
+    option.className = 'ga-item';
     option.dataset.recordId = record.id;
     option.setAttribute('role', 'option');
     option.classList.toggle('active', record.id === activeRecordId);
-    const mode = record.mode || 'standard';
-    const modeLabel = RECORD_MODE_LABELS[mode] || esc(mode);
-    const players = (record.players || []).join(' / ');
-    const winnerName = record.winnerName || record.winner;
-    const winner = winnerName ? `胜者 ${esc(winnerName)}` : (record.reason ? esc(record.reason) : '—');
-    const seqBadge = record.seq ? `<span class="record-seq">#${esc(record.seq)}</span>` : '';
-    const dateBadge = (recordDateText(record) || record.exportedAt || '')
-      ? `<span class="record-date">${esc(recordDateText(record) || record.exportedAt)}</span>` : '';
-    const mapBadge = record.mapId ? `<span class="record-map">${esc(record.mapId)}</span>` : '';
-    option.innerHTML = `<span class="record-top">
-        <span class="record-badges">${seqBadge}${dateBadge}${mapBadge}</span>
-        <span class="record-version">${esc(modeLabel)}</span>
-      </span>
-      <span class="game-id">${esc(record.gameId ? record.gameId.slice(0, 8) : record.fileName)}</span>
-      <span class="game-meta-line"><span class="record-players">${esc(players || '未知玩家')}</span><span class="record-winner">${winner}</span></span>`;
+    option.setAttribute('aria-selected', String(record.id === activeRecordId));
+    option.innerHTML = recordRowHtml(record);
     option.addEventListener('click', () => selectRecord(record.id));
     recordListEl.append(option);
   }
+  recordListEl.scrollTop = scrollTop;
+  updateTabCounts();
+  syncPickerCurrent();
 }
 
 async function selectRecord(id) {
@@ -1712,10 +1772,10 @@ async function selectRecord(id) {
     const replay = normalizeImportedReplay(data);
     loadImportedReplay(replay);
     activeRecordId = id;
-    const record = recordsList.find(r => r.id === id);
-    recordPickerLabel.textContent = record ? recordOptionText(record) : id;
+    gameSelect.value = '';
     renderRecordPickerMenu();
-    closeRecordPicker();
+    syncPickerCurrent();
+    closePicker();
     statusEl.textContent = `已载入回放 ${allEvents.length} 事件`;
   } catch (err) {
     statusEl.textContent = `载入回放失败: ${window.ErrorText.describe(err)}`;
@@ -2132,51 +2192,32 @@ function startAutoRefresh() {
 gameSelect.addEventListener('change', async () => {
   await selectGame(gameSelect.value);
 });
-gamePickerButton.addEventListener('click', e => { e.stopPropagation(); toggleGamePicker(); });
-gamePickerButton.addEventListener('keydown', e => {
-  e.stopPropagation();
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    toggleGamePicker();
-  }
-  if (e.key === 'Escape') closeGamePicker();
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    gamePicker.classList.add('open');
-    gamePickerButton.setAttribute('aria-expanded', 'true');
-    gameOptionList?.querySelector('.game-picker-option')?.focus();
-  }
+pickerCurrentBtn?.addEventListener('click', e => { e.stopPropagation(); togglePicker(); });
+pickerCurrentBtn?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePicker(); }
+  if (e.key === 'Escape') closePicker();
 });
-gamePickerMenu.addEventListener('click', e => e.stopPropagation());
-gamePickerMenu.addEventListener('keydown', e => e.stopPropagation());
-gameFilterInput?.addEventListener('input', renderGamePickerMenu);
-recordPickerButton.addEventListener('click', e => { e.stopPropagation(); toggleRecordPicker(); });
-recordPickerButton.addEventListener('keydown', e => {
-  e.stopPropagation();
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRecordPicker(); }
-  if (e.key === 'Escape') closeRecordPicker();
-});
-recordFilterInput?.addEventListener('input', renderRecordPickerMenu);
-recordFilterInput?.addEventListener('keydown', e => {
-  e.stopPropagation();
+tabGamesBtn?.addEventListener('click', () => setPickerTab('games'));
+tabRecordsBtn?.addEventListener('click', () => setPickerTab('records'));
+pickerFilterInput?.addEventListener('input', renderActivePickerList);
+pickerFilterInput?.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  if (recordFilterInput.value) {
-    recordFilterInput.value = '';
-    renderRecordPickerMenu();
-    recordFilterInput.focus();
-  } else closeRecordPicker();
+  if (pickerFilterInput.value) {
+    pickerFilterInput.value = '';
+    renderActivePickerList();
+  } else {
+    closePicker();
+  }
 });
-gameFilterInput?.addEventListener('keydown', e => {
-  e.stopPropagation();
-  if (e.key !== 'Escape') return;
-  if (gameFilterInput.value) {
-    gameFilterInput.value = '';
-    renderGamePickerMenu();
-    gameFilterInput.focus();
-  } else closeGamePicker();
+document.addEventListener('click', e => {
+  if (!pickerPanel || pickerPanel.hidden) return;
+  if (pickerCurrentBtn?.contains(e.target) || pickerPanel.contains(e.target)) return;
+  closePicker();
 });
-recordPickerMenu.addEventListener('click', e => e.stopPropagation());
-refreshBtn.addEventListener('click', fetchGameList);
+refreshBtn.addEventListener('click', () => {
+  if (isRecordTab()) fetchRecordList();
+  else fetchGameList();
+});
 forceAdjudicateBtn?.addEventListener('click', forceAdjudicateCurrentGame);
 deleteGameBtn.addEventListener('click', deleteCurrentGame);
 btnStart.addEventListener('click', goToStart);
@@ -2230,8 +2271,6 @@ function saveControlTokenFromSettings() {
   }
 }
 
-document.addEventListener('click', e => { if (!gamePicker.contains(e.target)) closeGamePicker(); });
-document.addEventListener('click', e => { if (!recordPicker.contains(e.target)) closeRecordPicker(); });
 document.addEventListener('click', e => {
   const target = e.target.closest('[data-rename-player]');
   if (!target) return;
@@ -2246,6 +2285,8 @@ document.addEventListener('keydown', e => {
 
 async function initializeApp() {
   const games = await fetchGameList();
+  // 回放数量在页签上直接可见，进页面就后台拉一次，免得「回放 0」误导。
+  fetchRecordList();
   const params = new URLSearchParams(window.location.search);
   const requestedRecordId = params.get('record');
   const requestedGameId = params.get('gameId') || params.get('game');

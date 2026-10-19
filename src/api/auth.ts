@@ -30,7 +30,7 @@ export function statusForCode(code: string): number { return errorStatus[code] ?
 
 export interface AuthContext { game: GameState; player: PlayerId }
 
-function safeEqual(a: string | undefined, b: string): boolean {
+export function safeEqual(a: string | undefined, b: string): boolean {
   if (!a || a.length !== b.length) return false;
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }

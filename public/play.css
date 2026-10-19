@@ -164,6 +164,9 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .row { display: flex; gap: 14px; flex-wrap: wrap; }
 .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 120px; }
 .field label { font-size: 12px; color: #7a9aaa; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+/* 加入游戏：你的名称在左、房间号在右，同一行。 */
+.join-fields-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.join-fields-row .field { min-width: 0; }
 .field input, select {
   padding: 8px 12px;
   background: #0f1820;
@@ -175,6 +178,21 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   transition: border-color .15s;
 }
 .field input:focus, select:focus { border-color: #4a8aaa; }
+.field-static {
+  display: block;
+  min-height: 37px;
+  padding: 8px 2px;
+  color: #e4edf4;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.checkbox-field.is-room-static { cursor: default; }
+.checkbox-field.is-room-static > span:first-child { color: #6f8798; }
+.checkbox-field.is-room-static .switch { opacity: .55; }
 .checkbox-field {
   flex-direction: column;
   align-items: center;
@@ -383,6 +401,17 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   font-size: 13px;
   font-weight: 700;
 }
+.lobby-count-edit {
+  padding: 2px 8px;
+  border: 1px dashed #3f5f75;
+  border-radius: 5px;
+  background: #121d26;
+  color: #d8e0e8;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.lobby-count-edit:hover { border-color: #6aa8c8; color: #eaf4fa; }
 .lobby-summary-meta {
   margin-top: 4px;
   color: #668495;
@@ -415,6 +444,16 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   cursor: pointer;
 }
 .lobby-kick:hover { border-color: #a44e5c; background: #3a1d24; color: #f0b0b8; }
+.lobby-rename {
+  padding: 1px 5px;
+  border: 1px solid #2f4a5f;
+  border-radius: 3px;
+  background: #16232e;
+  color: #9cc3d8;
+  font-size: 11px;
+  cursor: pointer;
+}
+.lobby-rename:hover { border-color: #4a7a9a; background: #1d3040; color: #d0e8f4; }
 
 .lobby-add-bot {
   cursor: pointer;
@@ -467,17 +506,17 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   font-size: 12px;
   color: #9bb3c4;
 }
-.available-games { display: grid; gap: 7px; }
+.available-games { display: grid; gap: 8px; }
 .available-game {
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px 14px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 8px 10px;
   border: 1px solid #273a4a;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #101922;
   color: #d8e0e8;
   text-align: left;
@@ -486,43 +525,114 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 .available-game:hover, .available-game:focus-visible { border-color: #4a8aaa; background: #142431; outline: none; }
 .available-game.selected { border-color: #6aaf8a; background: #13281f; }
-.available-game-id {
+
+/* 左：地图预览，尺寸与地图库卡片里的 .map-preview 一致（118×90），
+   据点 / 出生位 / 初始单位与悬停详单都跟地图库同一套渲染。 */
+.available-game-thumb {
+  display: flex;
+  flex: none;
+  width: 118px;
+  height: 90px;
+}
+.available-game-thumb .map-preview {
+  width: 100%;
+  height: 100%;
+}
+.available-game-thumb-empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 1px solid #223342;
+  border-radius: 6px;
+  background: #090f15;
+  color: #668495;
+  font-size: 12px;
+}
+
+/* 中：三行固定起点 —— 地图名 / 模式·人数·房主 / 房间号·时间。
+   房主名不定长，单独占一个可截断的格子；时间靠右，行首信息不会被推歪。 */
+.available-game-main { display: grid; gap: 6px; min-width: 0; align-content: center; }
+.available-game-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.available-game-mapname {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #a8d7c2;
-  font: 600 12px "SF Mono", "Consolas", monospace;
   white-space: nowrap;
+  color: #e4edf4;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.25;
 }
-.available-game-badges {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  justify-self: end;
+.available-game-mapalias {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #668495;
+  font: 500 11px/1.25 "SF Mono", "Consolas", monospace;
 }
+/* 按文字基线对齐：徽标、人数、房主名的字号 / 行高不同，居中会把文字错开 1~2px。 */
+.available-game-meta { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .available-game-mode {
+  flex: none;
   padding: 1px 8px;
   border: 1px solid #33506a;
   border-radius: 999px;
   color: #9bb3c4;
   font-size: 10px;
   font-weight: 700;
+  white-space: nowrap;
 }
 .available-game-mode[data-mode="annihilation"] { border-color: #5a4634; color: #e0a878; }
 .available-game-mode[data-mode="simultaneous"] { border-color: #2f5462; color: #7fc9db; }
 .available-game-mode[data-mode="royale"] { border-color: #315440; color: #8ecfae; }
-.available-game-seats { color: #d8e0e8; font-size: 12px; font-weight: 700; }
-.available-game-meta { color: #668495; font-size: 11px; }
-.available-game-players {
-  grid-column: 1 / -1;
+.available-game-seats { flex: none; color: #d8e0e8; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.available-game-host {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  color: #8fa5b5;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.available-game-host::before { content: '·'; flex: none; margin-right: 2px; color: #3f5869; }
+.available-game-host-label { flex: none; color: #668495; }
+.available-game-host-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a9bdc9; }
+.available-game-foot { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.available-game-id {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #8fa5b5;
-  font-size: 11px;
   white-space: nowrap;
+  color: #5f7c90;
+  font: 500 11px/1.4 "SF Mono", "Consolas", monospace;
 }
-.available-game-action { color: #70a7c4; font-size: 11px; font-weight: 700; }
+.available-game-age { flex: none; color: #668495; font-size: 11px; }
+
+/* 右：选择动作（整卡可点，这里只作暗示）。 */
+.available-game-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 9px;
+  border: 1px solid #2b4560;
+  border-radius: 999px;
+  background: #12202c;
+  color: #86bcd8;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.available-game:hover .available-game-action { border-color: #4a8aaa; background: #16293a; color: #c3e7f7; }
+.available-game.selected .available-game-action { border-color: #3f7a5c; background: #122a20; color: #9fe0bd; }
+.available-game-chevron { font-size: 13px; line-height: 1; }
 .available-games-pager {
   display: flex;
   align-items: center;
@@ -995,7 +1105,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .lobby-room-head h3 { color: #e4edf4; font-size: 16px; }
 .lobby-room-head p { margin-top: 4px; color: #6f8798; font-size: 11px; line-height: 1.5; }
 .lobby-room-actions { display: flex; gap: 8px; margin-top: 12px; }
-.lobby-room-actions .btn { flex: 1; justify-content: center; }
+.lobby-room-actions .btn { flex: 1; justify-content: center; padding: 8px 10px; font-size: 13px; white-space: nowrap; }
 
 #join-form .lobby-status { margin-top: 10px; }
 

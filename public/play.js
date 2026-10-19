@@ -43,6 +43,7 @@ function entityTokenMarkup(type, ownerClass, title) {
 const $ = id => document.getElementById(id);
 const els = {
   joinPanel: $('join-panel'), gameId: $('game-id'), createName: $('create-name'), joinName: $('join-name'),
+  createNameStatic: $('create-name-static'), createMaxPlayersStatic: $('create-max-players-static'),
   mapSelect: $('map-select'), mapPicker: $('map-picker'), maxPlayers: $('max-players'), hostParticipate: $('host-participate'),
   randomMapOptions: $('random-map-options'),
   createForm: $('create-form'), joinForm: $('join-form'),
@@ -55,9 +56,10 @@ const els = {
   mapDialogSelected: $('map-dialog-selected'), mapDialogRandomFacts: $('map-dialog-random-facts'),
   btnMapRandomRefresh: $('btn-map-random-refresh'),
   btnCreate: $('btn-create'), btnJoin: $('btn-join'), btnConnectCreate: $('btn-connect-create'), btnConnectJoin: $('btn-connect-join'), btnStartGame: $('btn-start-game'),
-  btnCreateAgain: $('btn-create-again'), btnJoinAgain: $('btn-join-again'),
+  btnHostParticipate: $('btn-host-participate'), btnCreateAgain: $('btn-create-again'), btnJoinAgain: $('btn-join-again'),
   connStatus: $('conn-status'), createResult: $('create-result'), createdGameId: $('created-game-id'),
-  createdHostToken: $('created-host-token'), createdToken: $('created-token'), createdPlayerTokenRow: $('created-player-token-row'),
+  createdHostToken: $('created-host-token'), createdToken: $('created-token'), createdTokenCopy: $('created-token-copy'),
+  createdPlayerTokenRow: $('created-player-token-row'), createRoomStatus: $('create-room-status'),
   lobbySummary: $('lobby-summary'), joinLobbySummary: $('join-lobby-summary'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
   joinMapSummary: $('join-map-summary'), joinMapThumb: $('join-map-thumb'), joinMapLegend: $('join-map-legend'),
   joinMapName: $('join-map-name'), joinMapId: $('join-map-id'), joinMapMeta: $('join-map-meta'), joinMapDesc: $('join-map-desc'),
@@ -95,6 +97,8 @@ let gameId = null;
 let myToken = null;
 let hostToken = null;
 let myPlayer = null;
+// 本地会话记住的昵称：刷新后创建表单 / 加入表单仍能显示同一个名字。
+let sessionName = null;
 let sse = null;
 
 // 结算回放：SSE 事件入队，按阶段分组按序播放；「跳过结算」直达终态。
@@ -108,11 +112,17 @@ const playback = window.PlaybackQueue.create({
   onActiveChange: active => { els.btnSkipReplay?.classList.toggle('hidden', !active); },
 });
 let lobbyPollTimer = null;
+// 房主房间卡的最新大厅摘要：只有它决定「加入战斗」是否因满员而禁用。
+let hostLobbySnapshot = null;
+// 当前房间的最新摘要（房主 / 加入者共用），改名弹窗用它取当前显示名。
+let latestLobby = null;
+// 席位切换请求进行中：避免轮询重绘期间重复点击发出第二次 join/leave。
+let hostSeatBusy = false;
 let availableGamesTimer = null;
 let availableGamesLoading = false;
 let availableGamesData = [];
 let availableGamesPage = 1;
-const AVAILABLE_GAMES_PAGE_SIZE = 5;
+const AVAILABLE_GAMES_PAGE_SIZE = 4;
 let hoverCell = null;
 let selectedUnitId = null;
 let selectedOriginId = null;
@@ -259,6 +269,8 @@ async function loadMapList() {
   // 默认仍选中第一张静态地图，保持原有创建习惯。
   if (maps[0]) els.mapSelect.value = maps[0].id;
   renderMapPicker(maps);
+  // 地图表与可用对局是两条并发请求：列表先到时先按 mapId 画，地图表到位后补缩略图和中文名。
+  if (availableGamesData.length) renderAvailableGames(availableGamesData);
   renderLobbyMapSummary();
   // 恢复会话可能早于地图表加载完成，等地图表到位后把加入房间的预览补画一次。
   if (joinMapLobby && els.joinMapSummary && !els.joinMapSummary.classList.contains('hidden')) renderJoinMapCard(joinMapLobby);
@@ -267,7 +279,7 @@ async function loadMapList() {
 }
 function persistSession() {
   try {
-    localStorage.setItem('tacticalGame.session', JSON.stringify({ gameId, myToken, myPlayer, hostToken }));
+    localStorage.setItem('tacticalGame.session', JSON.stringify({ gameId, myToken, myPlayer, hostToken, name: sessionName }));
   } catch {
     // 浏览器禁用本地存储时不影响本局操作。
   }
@@ -284,6 +296,7 @@ function readStoredSession() {
       myToken: parsed.myToken || null,
       myPlayer: parsed.myPlayer || null,
       hostToken: parsed.hostToken || null,
+      name: parsed.name || null,
     };
   } catch {
     return null;
@@ -339,6 +352,7 @@ function clearSavedSession() {
   myToken = null;
   hostToken = null;
   myPlayer = null;
+  sessionName = null;
   try {
     localStorage.removeItem('tacticalGame.session');
   } catch {
@@ -368,6 +382,11 @@ function restoreSessionIntoMemory() {
   myToken = session.myToken;
   myPlayer = session.myPlayer;
   hostToken = session.hostToken;
+  sessionName = session.name;
+  if (sessionName) {
+    if (els.createName) els.createName.value = sessionName;
+    if (els.joinName) els.joinName.value = sessionName;
+  }
   if (els.gameId) els.gameId.value = gameId;
 }
 
@@ -2445,22 +2464,88 @@ function subscribeLobbyStart() {
 function lobbySummaryMarkup(lobby, canKick = false) {
   const players = lobby.players || [];
   const supported = (lobby.supportedPlayerCounts || []).join('/');
-  const canAddBot = canKick && lobby.phase === 'lobby' && players.length < lobby.maxPlayers;
+  const canManage = canKick && lobby.phase === 'lobby';
+  const canAddBot = canManage && players.length < lobby.maxPlayers;
+  const playerChip = player => {
+    const isSelf = player.id === myPlayer;
+    // 改名只能改自己：自己的名字旁出现入口，别人的名字旁只有房主可见的「踢出」。
+    const rename = isSelf && lobby.phase === 'lobby' && Boolean(myToken)
+      ? '<button type="button" class="lobby-rename" data-rename-self="1" title="更改我的名字">改名</button>' : '';
+    const kick = canManage && !isSelf
+      ? `<button type="button" class="lobby-kick" data-kick-player="${esc(player.id)}">踢出</button>` : '';
+    return `<span class="lobby-player" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}"><span>${esc(player.name || player.id)}</span>${rename}${kick}</span>`;
+  };
+  const editableCounts = (lobby.supportedPlayerCounts || []).filter(count => count >= players.length);
+  const canEditMax = canManage && editableCounts.length > 1;
+  const countMarkup = canEditMax
+    ? `<button type="button" class="lobby-count-edit" data-edit-max-players="1" title="更改最大玩家数"><strong>${players.length}/${lobby.maxPlayers}</strong></button>`
+    : `<strong>${players.length}/${lobby.maxPlayers}</strong>`;
   return `<div class="lobby-summary-head">
     <span>${esc(lobby.phase === 'active' ? '已开始' : '等待开局')}</span>
-    <strong>${players.length}/${lobby.maxPlayers}</strong>
+    ${countMarkup}
   </div>
   <div class="lobby-summary-meta">地图 ${esc(lobby.mapId)} · 支持 ${esc(supported)} 人</div>
-  <div class="lobby-player-list">${players.map(player => `<span class="lobby-player" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}"><span>${esc(player.name || player.id)}</span>${canKick && lobby.phase === 'lobby' && player.id !== myPlayer ? `<button type="button" class="lobby-kick" data-kick-player="${esc(player.id)}">踢出</button>` : ''}</span>`).join('')}${canAddBot ? `<button type="button" class="lobby-player lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="lobby-add-bot-plus">+</span><span>添加 AI</span></button>` : ''}</div>`;
+  <div class="lobby-player-list">${players.map(playerChip).join('')}${canAddBot ? `<button type="button" class="lobby-player lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="lobby-add-bot-plus">+</span><span>添加 AI</span></button>` : ''}</div>`;
+}
+
+/** 房间创建后：名称 / 最大玩家数改为只读展示，参战开关跟随实际席位并禁用。 */
+function syncCreateFormStatic() {
+  const inRoom = Boolean(els.createForm?.classList.contains('room-active'));
+  const participating = Boolean(myToken);
+  els.hostParticipate?.closest('.checkbox-field')?.classList.toggle('is-room-static', inRoom);
+  if (els.hostParticipate) els.hostParticipate.disabled = inRoom;
+  if (!inRoom) return;
+  if (els.hostParticipate) els.hostParticipate.checked = participating;
+  const actualName = participating ? lobbyPlayerName(myPlayer) : '';
+  // 参与后把真实名字写回隐藏输入，退出 / 再加入时沿用。
+  if (actualName && els.createName) els.createName.value = actualName;
+  const name = actualName || els.createName?.value.trim() || '未设置';
+  if (els.createNameStatic) {
+    els.createNameStatic.textContent = name;
+    els.createNameStatic.title = name;
+  }
+  const maxPlayers = latestLobby?.maxPlayers ?? Number(els.maxPlayers?.value || 2);
+  if (latestLobby?.maxPlayers && els.maxPlayers) els.maxPlayers.value = String(latestLobby.maxPlayers);
+  if (els.createMaxPlayersStatic) els.createMaxPlayersStatic.textContent = `${maxPlayers} 人`;
+}
+
+/** 房主席位卡：参战与否决定显示 token 还是「未参战」，并切换加入 / 退出战斗按钮。 */
+function syncHostSeatUi() {
+  const participating = Boolean(myToken);
+  els.createdPlayerTokenRow?.classList.remove('hidden');
+  if (els.createdToken) els.createdToken.textContent = participating ? myToken : '未参战';
+  els.createdTokenCopy?.classList.toggle('hidden', !participating);
+  if (els.createRoomStatus) {
+    els.createRoomStatus.textContent = participating ? '等待玩家加入 · 房主参战' : '等待玩家加入 · 房主未参战';
+  }
+  if (els.btnHostParticipate) {
+    els.btnHostParticipate.textContent = participating ? '退出战斗' : '加入战斗';
+    els.btnHostParticipate.classList.toggle('warning', participating);
+    const full = !participating && Boolean(hostLobbySnapshot)
+      && hostLobbySnapshot.phase === 'lobby'
+      && hostLobbySnapshot.playerCount >= hostLobbySnapshot.maxPlayers;
+    els.btnHostParticipate.disabled = hostSeatBusy || full;
+    els.btnHostParticipate.title = full
+      ? '房间已满，无法加入战斗'
+      : participating ? '退出战斗（保留房主身份）' : '以玩家身份加入战斗';
+  }
+  // 未参战就没有可操作的对局席位，隐藏「连接进入游戏」，避免点进去才发现无权操作。
+  els.btnConnectCreate?.classList.toggle('hidden', !participating);
+  syncCreateFormStatic();
 }
 
 function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target === els.lobbySummary && Boolean(hostToken)) {
   if (!target || !lobby) return;
+  latestLobby = lobby;
   // 记录大厅元信息，供「对战提示词」页签自动填充地图与人数、算法清单按模式过滤。
   if (lobby.mapId) botLobbyMapId = lobby.mapId;
   if (lobby.maxPlayers) botLobbyMaxPlayers = lobby.maxPlayers;
   if (lobby.mode) botLobbyMode = lobby.mode;
   target.innerHTML = lobbySummaryMarkup(lobby, canKick);
+  if (target === els.lobbySummary) {
+    hostLobbySnapshot = lobby;
+    syncHostSeatUi();
+  }
 }
 
 function availableGameModeLabel(mode) {
@@ -2478,16 +2563,32 @@ function availableGameAge(createdAt) {
   return `${Math.floor(hours / 24)} 天前`;
 }
 
+// 可用对局里的地图展示：中文名（以配置名为准，随机地图是「随机战场」）+ mapId 作英文辅名。
+// 缩略图来自 /api/maps 的 preview；随机地图没有静态预览，用占位块代替。
+function availableGameMapInfo(game) {
+  const mapId = game.mapId || 'default';
+  const map = availableMaps.find(item => item.id === mapId) || null;
+  return {
+    id: mapId,
+    name: game.mapName || map?.name || (mapId === 'random' ? '随机战场' : mapId),
+    preview: map?.preview || null,
+  };
+}
+
 function syncAvailableGamesMapOptions(games) {
   if (!els.availableGamesMapFilter) return;
-  const maps = [...new Set(games.map(game => game.mapId || 'default'))].sort();
-  const signature = maps.join(',');
+  const mapIds = [...new Set(games.map(game => game.mapId || 'default'))];
+  const mapOptions = mapIds
+    .map(mapId => availableGameMapInfo({ mapId }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+  // 地图表是异步加载的：签名带上中文名，地图表到位后筛选下拉才会从 id 换成名字。
+  const signature = mapOptions.map(item => `${item.id}:${item.name}`).join(',');
   if (els.availableGamesMapFilter.dataset.options === signature) return;
   els.availableGamesMapFilter.dataset.options = signature;
   els.availableGamesMapFilter.innerHTML = ['<option value="">全部地图</option>']
-    .concat(maps.map(map => `<option value="${esc(map)}">${esc(map)}</option>`)).join('');
+    .concat(mapOptions.map(item => `<option value="${esc(item.id)}">${esc(item.name)}${item.name === item.id ? '' : ` · ${esc(item.id)}`}</option>`)).join('');
   const current = els.availableGamesMapFilter.value;
-  els.availableGamesMapFilter.value = maps.includes(current) ? current : '';
+  els.availableGamesMapFilter.value = mapOptions.some(item => item.id === current) ? current : '';
 }
 
 function renderAvailableGames(games) {
@@ -2520,14 +2621,36 @@ function renderAvailableGames(games) {
   const listHtml = pageGames.map(game => {
     const id = String(game.gameId || '');
     const selected = id === selectedId;
-    const names = (game.players || []).map(player => player?.name || player?.id).filter(Boolean);
+    const hostName = String(game.hostName || '').trim();
     const age = availableGameAge(game.createdAt);
+    const map = availableGameMapInfo(game);
+    const thumbnail = map.preview
+      ? renderMapPreview(map.preview)
+      : `<span class="available-game-thumb-empty">${map.id === 'random' ? '随机地图' : '暂无预览'}</span>`;
+    const mapAlias = map.name === map.id
+      ? ''
+      : `<span class="available-game-mapalias">${esc(map.id)}</span>`;
+    // 「房主：」标签不参与截断，长名字只截名字本身，列表里的房主信息不会缩成「房主：一…」。
+    const hostMarkup = hostName
+      ? `<span class="available-game-host"><span class="available-game-host-label">房主：</span><span class="available-game-host-name">${esc(hostName)}</span></span>`
+      : '<span class="available-game-host"><span class="available-game-host-label">房主</span></span>';
     return `<button type="button" class="available-game${selected ? ' selected' : ''}" data-available-game-id="${esc(id)}" aria-pressed="${selected}" title="${esc(id)}">
-      <span class="available-game-id">${esc(id)}</span>
-      <span class="available-game-badges"><span class="available-game-mode" data-mode="${esc(game.mode || 'standard')}">${esc(availableGameModeLabel(game.mode))}</span><span class="available-game-seats">${esc(game.playerCount)}/${esc(game.maxPlayers)} 人</span></span>
-      <span class="available-game-meta">地图 ${esc(game.mapId || 'default')}${age ? ` · ${esc(age)}` : ''}</span>
-      <span class="available-game-action">选择</span>
-      <span class="available-game-players">${names.length ? `玩家：${esc(names.join('、'))}` : '暂无玩家'}</span>
+      <span class="available-game-thumb" aria-hidden="true">${thumbnail}</span>
+      <span class="available-game-main">
+        <span class="available-game-head">
+          <span class="available-game-mapname">${esc(map.name)}</span>${mapAlias}
+        </span>
+        <span class="available-game-meta">
+          <span class="available-game-mode" data-mode="${esc(game.mode || 'standard')}">${esc(availableGameModeLabel(game.mode))}</span>
+          <span class="available-game-seats">${esc(game.playerCount)}/${esc(game.maxPlayers)} 人</span>
+          ${hostMarkup}
+        </span>
+        <span class="available-game-foot">
+          <span class="available-game-id">房间号 ${esc(id)}</span>
+          ${age ? `<span class="available-game-age">${esc(age)}</span>` : ''}
+        </span>
+      </span>
+      <span class="available-game-action"><span class="available-game-action-label">${selected ? '已选' : '选择'}</span><span class="available-game-chevron" aria-hidden="true">›</span></span>
     </button>`;
   }).join('');
   els.availableGames.innerHTML = `${listHtml}
@@ -2591,11 +2714,18 @@ async function refreshLobbySummary() {
 function handleLobbyRemoval(lobby) {
   if (!myPlayer || !lobby || lobby.phase !== 'lobby') return false;
   if ((lobby.players || []).some(player => player.id === myPlayer)) return false;
-  stopLobbyPolling();
-  if (sse) { sse.close(); sse = null; }
   myToken = null;
   myPlayer = null;
   persistSession();
+  if (hostToken) {
+    // 房主自己的席位被移除（例如在另一标签页退出战斗）：保留房主视图与轮询。
+    hostLobbySnapshot = lobby;
+    syncHostSeatUi();
+    toast('已退出战斗，房主身份保留', 'info');
+    return false;
+  }
+  stopLobbyPolling();
+  if (sse) { sse.close(); sse = null; }
   if (els.joinPlayerToken) els.joinPlayerToken.textContent = '';
   els.joinPlayerTokenRow?.classList.add('hidden');
   showJoinError('你已被房主移出大厅');
@@ -2642,6 +2772,93 @@ async function kickLobbyPlayer(playerId) {
   if (!res.ok) return toast(data.error || '踢出失败', 'err');
   renderLobbySummary(data.lobby, els.lobbySummary, true);
   toast('玩家已移出大厅', 'ok');
+}
+
+/** 房主点击「等待开局」右上角的人数，修改大厅最大玩家数。 */
+async function changeLobbyMaxPlayers() {
+  if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
+  const lobby = latestLobby;
+  if (!lobby) return;
+  const joined = (lobby.players || []).length;
+  const options = (lobby.supportedPlayerCounts || []).filter(count => count >= joined);
+  if (options.length <= 1) return toast('该地图没有其他可选人数', 'info');
+  const current = lobby.maxPlayers;
+  const next = await window.UIDialog.prompt({
+    title: '更改最大玩家数',
+    message: `地图支持 ${options.join(' / ')} 人，当前已加入 ${joined} 人。`,
+    value: String(current),
+    confirmText: '保存',
+    maxLength: 1,
+  });
+  if (next === null) return;
+  const maxPlayers = Number(next.trim());
+  if (!Number.isInteger(maxPlayers) || !options.includes(maxPlayers)) {
+    return toast(`最大玩家数只能是 ${options.join(' / ')} 人`, 'err');
+  }
+  if (maxPlayers === current) return;
+  const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/host/max-players`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-Host-Token': hostToken },
+    body: JSON.stringify({ maxPlayers }),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error || '修改最大玩家数失败', 'err');
+  if (data.lobby) renderLobbySummary(data.lobby, els.lobbySummary, true);
+  else await refreshLobbySummary();
+  toast(`最大玩家数已改为 ${maxPlayers} 人`, 'ok');
+}
+
+function lobbyPlayerName(playerId) {
+  if (!playerId) return '';
+  return (latestLobby?.players || []).find(player => player.id === playerId)?.name || '';
+}
+
+async function promptLobbyName(current) {
+  const next = await window.UIDialog.prompt({
+    title: '更改名字',
+    message: current ? `当前名字：${current}` : '输入大厅中显示的新名字',
+    value: current,
+    confirmText: '保存',
+    maxLength: 50,
+  });
+  if (next === null) return null;
+  const name = next.trim();
+  if (!name) {
+    toast('名字不能为空', 'err');
+    return null;
+  }
+  return name;
+}
+
+/** 自己改自己的大厅显示名；房主与加入者都用各自的 player token。 */
+async function renameSelf() {
+  if (!gameId || !myToken) return toast('缺少玩家凭证', 'err');
+  const name = await promptLobbyName(lobbyPlayerName(myPlayer));
+  if (!name) return;
+  const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/player`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Player-Token': myToken,
+      // 房主自己改名时带上房主凭证，服务端同步大厅列表里的房主名。
+      ...(hostToken ? { 'X-Host-Token': hostToken } : {}),
+    },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error || '改名失败', 'err');
+  // 之后重新加入 / 创建时沿用新名字。
+  sessionName = name;
+  if (els.createName) els.createName.value = name;
+  if (els.joinName) els.joinName.value = name;
+  persistSession();
+  if (hostToken) {
+    if (data.lobby) renderLobbySummary(data.lobby, els.lobbySummary, true);
+  } else {
+    if (data.lobby) renderLobbySummary(data.lobby, els.joinLobbySummary);
+  }
+  if (!data.lobby) await refreshLobbySummary();
+  toast('名字已更新', 'ok');
 }
 
 // —— 强化学习 AI：房主在大厅中一键添加 ——
@@ -2868,8 +3085,21 @@ function animateRoomCard(card, visible) {
 
 function setCreateRoomVisible(visible) {
   if (!els.createResult) return;
-  // 不整页切换：创建表单留在原地，房态只把地图收小、按钮退场，房间卡在预览下方展开。
+  // 不整页切换：创建表单留在原地，房态把名称 / 人数换成只读值、地图收小、按钮退场。
   els.createForm?.classList.toggle('room-active', visible);
+  els.createName?.classList.toggle('hidden', visible);
+  els.createNameStatic?.classList.toggle('hidden', !visible);
+  els.maxPlayers?.classList.toggle('hidden', visible);
+  els.createMaxPlayersStatic?.classList.toggle('hidden', !visible);
+  if (!visible) {
+    // 返回设置时恢复可编辑，并回到默认「房主不参战」。
+    if (els.hostParticipate) {
+      els.hostParticipate.disabled = false;
+      els.hostParticipate.checked = false;
+    }
+    els.hostParticipate?.closest('.checkbox-field')?.classList.remove('is-room-static');
+  }
+  syncCreateFormStatic();
   animateRoomCard(els.createResult, visible);
 }
 
@@ -2889,9 +3119,11 @@ function setJoinRoomVisible(visible) {
 
 function clearCreateRoomView() {
   setCreateRoomVisible(false);
+  hostLobbySnapshot = null;
   if (els.createdGameId) els.createdGameId.textContent = '';
   if (els.createdHostToken) els.createdHostToken.textContent = '';
   if (els.createdToken) els.createdToken.textContent = '';
+  if (els.createRoomStatus) els.createRoomStatus.textContent = '等待玩家加入';
   els.createdPlayerTokenRow?.classList.add('hidden');
   if (els.lobbySummary) els.lobbySummary.innerHTML = '';
 }
@@ -2951,6 +3183,63 @@ function showJoinError(message) {
   }
 }
 
+/** 房主在大厅里切换自己的参战席位：已参战 → 退出战斗；未参战 → 加入战斗。 */
+async function toggleHostSeat() {
+  if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
+  if (hostSeatBusy) return;
+  const joining = !myToken;
+  if (!joining) {
+    const ok = await window.UIDialog.confirm({
+      title: '退出战斗？',
+      message: '退出后本局不再有你参战，房主身份仍保留，可随时点「加入战斗」回到席位。',
+      confirmText: '退出战斗',
+      tone: 'warning',
+    });
+    if (!ok) return;
+  }
+  hostSeatBusy = true;
+  syncHostSeatUi();
+  try {
+    if (joining) {
+      // 复用房主创建时的名称；留空则由服务端分配默认名。
+      const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Host-Token': hostToken },
+        body: JSON.stringify({ name: els.createName?.value.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) return toast(data.error || '加入战斗失败', 'err');
+      myToken = data.player.token;
+      myPlayer = data.player.id;
+      sessionName = data.lobby?.players?.find(player => player.id === myPlayer)?.name
+        || els.createName?.value.trim() || null;
+      if (sessionName && els.createName) els.createName.value = sessionName;
+      persistSession();
+      renderLobbySummary(data.lobby, els.lobbySummary, true);
+      toast('已加入战斗', 'ok');
+    } else {
+      // 用玩家凭证退出自己的席位；房主凭证与服务端房间都不受影响。
+      const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/leave`, {
+        method: 'POST',
+        headers: { 'X-Player-Token': myToken },
+      });
+      const data = await res.json();
+      if (!res.ok) return toast(data.error || '退出战斗失败', 'err');
+      myToken = null;
+      myPlayer = null;
+      persistSession();
+      await refreshLobbySummary();
+      syncHostSeatUi();
+      toast('已退出战斗，房主身份保留', 'ok');
+    }
+  } catch {
+    toast(`${joining ? '加入' : '退出'}战斗失败：无法连接服务器`, 'err');
+  } finally {
+    hostSeatBusy = false;
+    syncHostSeatUi();
+  }
+}
+
 async function startHostedGame() {
   if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
   const res = await fetch(`/api/games/${gameId}/start`, {
@@ -2961,10 +3250,6 @@ async function startHostedGame() {
   if (!res.ok) return toast(data.error || '开始失败', 'err');
   toast('对局已开始', 'ok');
   stopLobbyPolling();
-  if (!myToken && !hostToken) {
-    window.location.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
-    return;
-  }
   await enterGame();
 }
 
@@ -3010,12 +3295,13 @@ els.btnCreate.addEventListener('click', async () => {
     hostToken = data.hostToken;
     myToken = data.player?.token || null;
     myPlayer = data.player?.id || null;
+    sessionName = data.lobby?.players?.find(player => player.id === myPlayer)?.name
+      || els.createName.value.trim() || null;
+    if (sessionName) els.createName.value = sessionName;
     persistSession();
     clearJoinRoomView();
     els.createdGameId.textContent = gameId;
     els.createdHostToken.textContent = hostToken;
-    els.createdToken.textContent = myToken || '未参战';
-    els.createdPlayerTokenRow.classList.toggle('hidden', !myToken);
     renderLobbySummary(data.lobby, els.lobbySummary, true);
     setCreateRoomVisible(true);
     if (hadJoinedRoom) toast('已创建新房间，离开此前加入的房间（原房间仍保留）', 'info');
@@ -3042,6 +3328,9 @@ els.btnJoin.addEventListener('click', async () => {
   myPlayer = data.player.id;
   gameId = gid;
   hostToken = null;
+  sessionName = data.lobby?.players?.find(player => player.id === myPlayer)?.name
+    || els.joinName.value.trim() || null;
+  if (sessionName) els.joinName.value = sessionName;
   persistSession();
   // 加入成功后清掉创建页签里旧房间的凭证与摘要，避免两套房间信息混在一起。
   clearCreateRoomView();
@@ -3063,6 +3352,7 @@ els.btnJoin.addEventListener('click', async () => {
   }
 });
 els.btnStartGame.addEventListener('click', startHostedGame);
+els.btnHostParticipate?.addEventListener('click', toggleHostSeat);
 els.btnConnectCreate.addEventListener('click', enterGame);
 els.btnConnectJoin?.addEventListener('click', enterGame);
 
@@ -3079,10 +3369,50 @@ els.btnCreateAgain?.addEventListener('click', async () => {
   els.createName?.focus();
   toast('已返回设置：点「创建新游戏」会新建一局', 'ok');
 });
-els.btnJoinAgain?.addEventListener('click', () => {
-  setJoinRoomVisible(false);
-  refreshAvailableGames();
-});
+/** 返回大厅 = 退出当前加入的房间：释放席位、清会话，再回到加入表单。 */
+async function leaveJoinedRoom() {
+  if (!gameId || !myToken) {
+    clearJoinRoomView();
+    refreshAvailableGames();
+    return;
+  }
+  const ok = await window.UIDialog.confirm({
+    title: '返回大厅？',
+    message: '返回大厅会退出当前房间并释放席位，需要重新加入才能继续等待。',
+    confirmText: '退出房间',
+    tone: 'warning',
+  });
+  if (!ok) return;
+  if (els.btnJoinAgain) els.btnJoinAgain.disabled = true;
+  try {
+    const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/leave`, {
+      method: 'POST',
+      headers: { 'X-Player-Token': myToken },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok && res.status !== 401 && res.status !== 404) {
+      if (data.code === 'game_already_started') {
+        // 对局已经开始，席位已锁定：直接进入对局。
+        await enterGame();
+        return;
+      }
+      return toast(data.error || '退出房间失败', 'err');
+    }
+    stopLobbyPolling();
+    if (sse) { sse.close(); sse = null; }
+    clearSavedSession();
+    clearJoinRoomView();
+    statusBadge('未加入', 'idle');
+    refreshAvailableGames();
+    toast(res.ok ? '已退出房间' : '席位已不存在，已返回大厅', res.ok ? 'ok' : 'info');
+  } catch {
+    toast('退出房间失败：无法连接服务器', 'err');
+  } finally {
+    if (els.btnJoinAgain) els.btnJoinAgain.disabled = false;
+  }
+}
+// 返回大厅必须真正退出房间，否则再次加入同一房间会多出一个同名席位。
+els.btnJoinAgain?.addEventListener('click', leaveJoinedRoom);
 
 // 地图库弹层：摘要卡只负责打开，真正切图在弹层里确认。
 els.btnChangeMap?.addEventListener('click', openMapDialog);
@@ -3121,7 +3451,8 @@ async function enterGame() {
     if (handleLobbyRemoval(lobby)) return;
     return toast('对局尚未开始', 'info');
   }
-  if (!myToken && !hostToken) {
+  if (!myToken) {
+    // 未参战（房主默认旁观）或只有观战会话：对局开始后转到观战页。
     window.location.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
     return;
   }
@@ -3163,8 +3494,6 @@ function restoreLobbyView(lobby) {
     clearJoinRoomView();
     els.createdGameId.textContent = gameId;
     els.createdHostToken.textContent = hostToken;
-    els.createdToken.textContent = myToken || '未参战';
-    els.createdPlayerTokenRow?.classList.toggle('hidden', !myToken);
     renderLobbySummary(lobby, els.lobbySummary, true);
     setCreateRoomVisible(true);
     statusBadge('大厅中', 'idle');
@@ -3229,6 +3558,8 @@ document.addEventListener('click', e => {
       const selected = button === availableGame;
       button.classList.toggle('selected', selected);
       button.setAttribute('aria-pressed', String(selected));
+      const label = button.querySelector('.available-game-action-label');
+      if (label) label.textContent = selected ? '已选' : '选择';
     });
     return;
   }
@@ -3236,6 +3567,18 @@ document.addEventListener('click', e => {
   if (addBot) {
     e.preventDefault();
     openBotDialog();
+    return;
+  }
+  const renameSelfButton = e.target.closest?.('[data-rename-self]');
+  if (renameSelfButton) {
+    e.preventDefault();
+    renameSelf();
+    return;
+  }
+  const maxPlayersButton = e.target.closest?.('[data-edit-max-players]');
+  if (maxPlayersButton) {
+    e.preventDefault();
+    changeLobbyMaxPlayers();
     return;
   }
   const button = e.target.closest?.('[data-kick-player]');

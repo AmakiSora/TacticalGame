@@ -18,7 +18,7 @@
 
   <header>
     <div class="brand-block">
-      <h1>六边形战棋 <span class="sub">玩家控制台</span> <span class="version-badge"></span></h1>
+      <h1>六边形战棋 <span class="version-badge"></span></h1>
       <div class="page-subtitle">回合指令与战场状态</div>
     </div>
     <div class="header-actions">
@@ -80,6 +80,7 @@
           <div class="field name-field">
             <label>你的名称</label>
             <input id="create-name" placeholder="留空使用默认名称" maxlength="50" />
+            <span id="create-name-static" class="field-static hidden"></span>
           </div>
           <div class="field">
             <label>最大玩家数</label>
@@ -92,11 +93,12 @@
               <option value="7">7 人</option>
               <option value="8">8 人</option>
             </select>
+            <span id="create-max-players-static" class="field-static hidden"></span>
           </div>
           <label class="field checkbox-field">
             <span>房主参战</span>
             <span class="switch">
-              <input id="host-participate" type="checkbox" checked />
+              <input id="host-participate" type="checkbox" />
               <span class="switch-slider"></span>
             </span>
           </label>
@@ -126,14 +128,14 @@
         </div>
       </div>
       <button id="btn-create" class="btn primary lobby-create-btn" type="button">创建新游戏</button>
-      <p class="lobby-hint">地图与随机参数都在「更换地图」弹层里调整；创建成功后这里会直接变成房间信息。</p>
+      <p class="lobby-hint">地图与随机参数都在「更换地图」弹层里调整；房主默认不参战，创建后可在房间卡里加入或退出战斗。</p>
     </div>
     <div id="create-result" class="lobby-result lobby-room hidden">
       <div class="lobby-room-head">
         <div>
           <div class="lobby-room-kicker">
             <span class="badge ok">大厅中</span>
-            <span class="lobby-room-kicker-text">等待玩家加入</span>
+            <span class="lobby-room-kicker-text" id="create-room-status">等待玩家加入</span>
           </div>
           <h3>房间已创建</h3>
           <p>把 Game ID 发给其他玩家；人齐后点「开始游戏」。</p>
@@ -153,26 +155,29 @@
       <div class="info-row" id="created-player-token-row">
         <span class="info-label">Player</span>
         <code id="created-token" class="info-value"></code>
-        <button class="btn-copy" data-copy="created-token">复制</button>
+        <button class="btn-copy" data-copy="created-token" id="created-token-copy">复制</button>
       </div>
       <p class="lobby-hint">请保存 Host Token，将 Game ID 发给其他玩家。</p>
       <div id="lobby-summary" class="lobby-summary"></div>
       <div class="lobby-room-actions">
         <button id="btn-start-game" class="btn success" type="button">开始游戏</button>
         <button id="btn-connect-create" class="btn success" type="button">连接进入游戏</button>
+        <button id="btn-host-participate" class="btn" type="button">加入战斗</button>
       </div>
     </div>
   </div>
 
   <div id="tab-join" class="lobby-tab-content">
     <div id="join-form" class="join-form">
-      <div class="field">
-        <label>游戏 ID</label>
-        <input id="game-id" placeholder="粘贴 Game ID…" />
-      </div>
-      <div class="field" style="margin-top:10px">
-        <label>你的名称</label>
-        <input id="join-name" placeholder="留空使用默认名称" maxlength="50" />
+      <div class="join-fields-row">
+        <div class="field">
+          <label>你的名称</label>
+          <input id="join-name" placeholder="留空使用默认名称" maxlength="50" />
+        </div>
+        <div class="field">
+          <label>房间号</label>
+          <input id="game-id" placeholder="粘贴房间号…" />
+        </div>
       </div>
       <button id="btn-join" class="btn primary lobby-create-btn" type="button">加入游戏</button>
       <p class="lobby-status hidden" id="join-status-text"></p>

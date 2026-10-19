@@ -97,7 +97,7 @@ export function createLobby(id: string, mapId = 'default', options: CreateLobbyO
 export function createLobbyWithConfig(id: string, mapId: string, config: MapConfig, options: CreateLobbyOptions): GameState {
   const maxPlayers = Math.max(2, Math.min(8, Math.trunc(options.maxPlayers)));
   const game: GameState = {
-    id, mapId, config, phase: 'lobby', maxPlayers, hostToken: generateToken(),
+    id, mapId, config, createdAt: Date.now(), phase: 'lobby', maxPlayers, hostToken: generateToken(),
     players: {},
     map: {
       grid: 'hex', orientation: 'pointy', radius: config.radius,
@@ -115,7 +115,15 @@ export function createLobbyWithConfig(id: string, mapId: string, config: MapConf
     artillery: null,
   };
   game.artillery = artilleryStateForRound(game, 1);
-  if (options.participate !== false) addLobbyPlayer(game, options.playerName);
+  // 大厅列表要显示房主名：参战时取房主席位名（留空由服务端分配默认名），
+  // 未参战时用创建表单填的名字（可能为空，界面会只显示「房主」）。
+  const hostNameInput = options.playerName?.trim().slice(0, MAX_PLAYER_NAME_LEN) || '';
+  let hostName = hostNameInput;
+  if (options.participate !== false) {
+    const joined = addLobbyPlayer(game, hostNameInput);
+    if (joined) hostName = game.players[joined.id]!.name;
+  }
+  game.hostName = hostName;
   return game;
 }
 

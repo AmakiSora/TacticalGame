@@ -278,6 +278,13 @@ export interface GameState {
   id: string;
   mapId: string;
   config: MapConfig;
+  /** 大厅创建时间（毫秒时间戳）。旧版持久化档案没有这个字段，读取时按首个事件兜底。 */
+  createdAt?: number;
+  /**
+   * 房主名（大厅列表展示用）。参战建房时取房主席位名，未参战时取创建表单填的名字；
+   * 房主之后加入战斗 / 改名会同步到这里。旧版持久化档案没有这个字段。
+   */
+  hostName?: string;
   phase: GamePhase;
   maxPlayers: number;
   hostToken: string;

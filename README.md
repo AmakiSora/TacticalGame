@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`（对峙之地）地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）与 `narrow-road`（狭路相逢）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则。
 
-当前版本：`3.6.3`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`3.6.4`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -149,15 +149,18 @@ TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
 | `POST` | `/api/games/:id/join` | `{ name? }` | `{ player: { id, token }, lobby }` |
 | `POST` | `/api/games/:id/start` | host token header | `{ ok: true, game }` |
 | `GET` | `/api/games/:id` | token header | 完整状态，不含 token |
-| `PATCH` | `/api/games/:id/player` | `{ name }` | `{ ok: true }` |
+| `PATCH` | `/api/games/:id/player` | `{ name }` | `{ ok: true, lobby }` |
 | `POST` | `/api/games/:id/leave` | player token header | `{ ok: true }` |
 | `DELETE` | `/api/games/:id/players/:playerId` | host token header | `{ ok: true, lobby }` |
+| `PATCH` | `/api/games/:id/host/max-players` | `{ maxPlayers }` + host token header | `{ ok: true, lobby }` |
 | `POST` | `/api/games/:id/host/skip-turn` | host token header | `{ ok: true }` |
 | `POST` | `/api/games/:id/host/eliminate` | `{ playerId }` + host token header | `{ ok: true }` |
 | `POST` | `/api/games/:id/force-adjudicate` | control token | `{ ok: true, result }` |
 | `DELETE` | `/api/games/:id` | control token | `{ ok: true }` |
 
 强制裁决仅适用于进行中的对局，按请求时存活玩家的裁决总分决定胜者；最高分并列则平局。删除、强制裁决和管理员改名接口使用控制权限：设置 `AUTO_CONTROL_TOKEN` 后需要 `X-Control-Token: <token>` 或 `?token=<token>`；未设置时仅允许本机请求。删除对局会同时删除内存状态和持久化文件中的记录。
+
+`GET /api/games` 的每一项带 `gameId`、`mapId`、`mapName`（地图配置里的中文名，随机地图为「随机战场」）、`hostName`（房主名，房主未参战也有）、`createdAt`（建房时间）与 `phase` / `mode` / `maxPlayers` / `playerCount` / `players` 等字段，大厅页按「`mapName` 为主、`mapId` 为辅」展示。
 
 ### 操作
 

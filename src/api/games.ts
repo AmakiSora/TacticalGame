@@ -7,7 +7,7 @@ import { appendEvent } from '../engine/events.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
 import { eliminateFromPlanAndMaybeResolve, forceResolveRound } from '../engine/simultaneous.js';
 import {
-  authenticate, authenticateHost, sanitizeGameForResponse, statusForCode,
+  authenticate, authenticateHost, safeEqual, sanitizeGameForResponse, statusForCode,
 } from './auth.js';
 import { authorizeControlRequest } from './controlAuth.js';
 import { listMaps } from '../config/loader.js';
@@ -30,22 +30,31 @@ export function lobbySummary(game: GameState) {
 
 export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/games', async () => ({
-    // Keep the newest lobbies/games at the top.  Use the first event when
-    // available (it is the authoritative server timestamp), and fall back to
-    // the earliest player's join time for an empty lobby.
+    // Keep the newest lobbies/games at the top.  New lobbies carry createdAt;
+    // older persisted games fall back to the first event (the authoritative
+    // server timestamp) and then to the earliest player's join time.
     games: globalStore.list().map(id => {
       const game = globalStore.get(id)!;
-      const createdAt = game.events[0]?.timestamp
-        ?? Math.min(...Object.values(game.players).map(player => player.joinedAt));
+      // 房主不参战的空房间既没有事件也没有玩家：用建房时间兜底，否则列表既没有
+      // 「创建于」文案，排序里 null 又会当成 0，新房间反而沉到列表底部。
+      const createdAt = game.createdAt
+        ?? game.events[0]?.timestamp
+        ?? (Object.keys(game.players).length
+          ? Math.min(...Object.values(game.players).map(player => player.joinedAt))
+          : null);
       return {
         ...lobbySummary(game),
+        // 大厅列表按「中文名为主、mapId 为辅」展示地图，随机地图的配置名由服务端现给。
+        mapName: game.config.name,
+        // 列表卡片只显示房主名（不列全部玩家），未参战 / 旧房间也可能没有名字。
+        hostName: game.hostName || '',
         roundNumber: game.turn.roundNumber,
         currentPlayerId: game.turn.currentPlayerId,
         winner: game.winner,
         playerNames: game.playerNames,
         createdAt,
       };
-    }).sort((a, b) => b.createdAt - a.createdAt),
+    }).sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
   }));
 
   app.post<{ Body: { mapId?: string; maxPlayers?: number; participate?: boolean; playerName?: string; random?: unknown } }>(
@@ -100,8 +109,12 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const game = globalStore.get(req.params.id);
     if (!game) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
     if (game.phase !== 'lobby') return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
+    // 房主带房主凭证参战时，顺带把列表里的房主名同步成这个席位名。
+    const hostHeader = req.headers['x-host-token'];
+    const hostJoining = typeof hostHeader === 'string' && safeEqual(hostHeader, game.hostToken);
     const joined = addLobbyPlayer(game, req.body?.name);
     if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
+    if (hostJoining) game.hostName = game.players[joined.id]!.name;
     appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
     globalStore.persist(game);
     return { player: joined, lobby: lobbySummary(game) };
@@ -154,6 +167,36 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // 大厅内修改最大玩家数：须为地图支持的人数，且不少于当前已加入人数。
+  app.patch<{ Params: { id: string }; Body: { maxPlayers?: number } }>(
+    '/api/games/:id/host/max-players', async (req, reply) => {
+      const game = authenticateHost(req, reply);
+      if (!game) return;
+      if (game.phase !== 'lobby') {
+        return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
+      }
+      const maxPlayers = Number(req.body?.maxPlayers);
+      if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8) {
+        return reply.code(400).send({ error: '不支持该玩家人数', code: 'unsupported_player_count' });
+      }
+      if (!game.config.supportedPlayerCounts.includes(maxPlayers)) {
+        return reply.code(400).send({
+          error: `该地图不支持 ${maxPlayers} 名玩家`,
+          code: 'unsupported_player_count',
+        });
+      }
+      const joined = joinedPlayerIds(game).length;
+      if (maxPlayers < joined) {
+        return reply.code(400).send({
+          error: `不能少于当前已加入的 ${joined} 名玩家`,
+          code: 'invalid_move',
+        });
+      }
+      game.maxPlayers = maxPlayers;
+      globalStore.persist(game);
+      return { ok: true, lobby: lobbySummary(game) };
+    });
+
   app.post<{ Params: { id: string }; Body: { playerId?: string } }>('/api/games/:id/host/eliminate', async (req, reply) => {
     const game = authenticateHost(req, reply);
     if (!game) return;
@@ -183,9 +226,14 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!name) return reply.code(400).send({ error: '名字不能为空', code: 'invalid_move' });
     ctx.game.players[ctx.player]!.name = name;
     ctx.game.playerNames[ctx.player] = name;
+    // 房主自己改名：带房主凭证时同步列表里的房主名，免得大厅列表还显示旧名字。
+    const hostHeader = req.headers['x-host-token'];
+    if (typeof hostHeader === 'string' && safeEqual(hostHeader, ctx.game.hostToken)) {
+      ctx.game.hostName = name;
+    }
     appendEvent(ctx.game, globalEventBus, 'name_rename', { playerId: ctx.player, name });
     globalStore.persist(ctx.game);
-    return { ok: true };
+    return { ok: true, lobby: lobbySummary(ctx.game) };
   });
 
   app.patch<{ Params: { id: string }; Body: { playerId?: string; name?: string } }>('/api/games/:id/rename', async (req, reply) => {

@@ -69,6 +69,7 @@ PASSWORD = env.get("DEPLOY_PASSWORD", "")
 KEY_PATH = env.get("DEPLOY_KEY_PATH", "").strip()
 REMOTE_BASE = env.get("DEPLOY_REMOTE_BASE", "/srv/tactical-game")
 LOG_LEVEL = env.get("LOG_LEVEL", "info")
+METRICS_TOKEN = env.get("METRICS_TOKEN", "").strip()
 PRUNE_REMOTE = env.get("DEPLOY_PRUNE", "0").strip() == "1"
 LOCAL_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -428,6 +429,8 @@ def run_deploy(log):
     log.stage("写入 .env")
     # 远端 .env 由部署脚本统一管理：每次部署按 .env.deploy 重写，服务器上手工改动不保留
     env_content = f"AUTO_CONTROL_TOKEN={CONTROL_TOKEN}\nLOG_LEVEL={LOG_LEVEL}\n"
+    if METRICS_TOKEN:
+        env_content += f"METRICS_TOKEN={METRICS_TOKEN}\n"
     run_cmd(client, log,
             f"cat > {q(REMOTE_BASE)}/.env << 'ENVEOF'\n{env_content}ENVEOF\n"
             f"chmod 600 {q(REMOTE_BASE)}/.env")

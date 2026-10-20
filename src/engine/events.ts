@@ -28,6 +28,8 @@ export function appendEvent(
     payload: cloned,
   };
   game.events.push(event);
+  // 派生索引/缓存按这个版本失效；放在 push 之后，索引重建时能看到新事件。
+  game.stateVersion = (game.stateVersion ?? 0) + 1;
   bus.emit(game.id, event);
   return event;
 }

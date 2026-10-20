@@ -490,7 +490,8 @@ describe('map config loader', () => {
   it('keeps engine boundary checks independent from radius geometry', () => {
     const validationSource = readFileSync('src/engine/validation.ts', 'utf8');
     expect(validationSource).not.toContain('isValidHex');
-    expect(validationSource).toContain('game.cells.some');
+    // 边界仍来自棋盘 cells（派生索引），不是 radius 几何。
+    expect(validationSource).toContain('getGameIndex(game).cells.has');
   });
 
   it('keeps dual-lanes lane roles mirrored around the center axis', () => {

@@ -6,7 +6,25 @@
 
 ## 3.6.5
 
-- TODO 补充本版本改动
+### 变更
+
+- **持久化写入改为可恢复轮转**：状态文件先写临时文件并 `fsync`，再把上一份完整文件轮转为 `games.json.bak` 后原子替换；启动时主文件损坏或不兼容会归档为 `.corrupt-*` / `.schema-*` 并尝试 `.bak`，不再静默清空内存对局（`src/state/store.ts`）。`/readyz` 现在会检查地图表与状态目录可写性，异常时返回 503，正常时仍保持 `{"status":"ready"}`（`src/server.ts`、`src/config/loader.ts`）。
+- **引擎查询改用派生索引**：新增 `GameIndex`（棋盘/地形/占位/炮火区/单位与总部 ID），按 `GameState.stateVersion` 惰性重建；可达格与攻击/治疗形状增加按版本缓存，索引不进入持久化，旧存档加载后自动重建（`src/engine/gameIndex.ts`、`validation.ts`、`units.ts`、`combat.ts`、`planning.ts`、`simultaneous.ts`、`events.ts`、`types.ts`）。
+- **回放库启动只读索引、详情懒加载**：元数据落到 `runtime/records-index.json`，按 `mtime/size` 只重建变化条目；列表不再把整份回放原文常驻内存，详情仍按需读取并保持 ETag/304（`src/api/records.ts`）。
+- **RL 模型列表按文件指纹缓存并支持 ETag/304**：只在模型文件 `mtime/size` 变化时重新解压/探测动作空间，大厅与评估控制台轮询未变化时返回 304（`src/api/bots.ts`）。
+- **随机地图预览与创建共享缓存**：以“参数 + 人数 + 种子 + 生成器版本”为键复用生成结果，返回深拷贝，`demolish` 不会污染后续同种子对局（`src/config/randomMapCache.ts`、`src/config/randomMap.ts`、`src/api/maps.ts`、`src/api/games.ts`）。
+- **统计流水线共享解析缓存、单次采集**：`stats-all` 改为编排进程，`generateStats` 把 matches 落到 `temp/stats-matches.json`，`generateFunStats` 直接复用；回放解析结果按 `(路径, mtime, size, 复盘签名)` 缓存，`--full` 可绕过（`script/statsAll.mjs`、`script/generateStats.mjs`、`script/generateFunStats.mjs`、`package.json`）。
+- **新增内部指标端点**：`/metrics` 输出 Prometheus 文本，设置 `METRICS_TOKEN` 时要求 `x-metrics-token` 或 Bearer；记录 HTTP、动作、持久化、SSE 连接、随机地图等低基数指标（`src/utils/metrics.ts`、`src/server.ts`、`src/api/actions.ts`、`src/api/events.ts`、`src/api/maps.ts`）。
+
+### 修复
+
+- **损坏状态文件导致对局静默丢失**：此前 `loadFromDisk` 遇到 JSON 解析错误会直接 `games.clear()`；现在先归档现场并尝试 `.bak`，备份也不可用时才以空存储启动，且不覆盖坏文件证据（`src/state/store.ts`、`tests/state/persistence-recovery.test.ts`）。
+
+### 测试与验证
+
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 99 文件 / 857 例全绿。新增 12 例：持久化恢复 3、引擎索引等价 2、随机地图缓存深拷贝 2、统计缓存复用/失效 2、回放索引 1、`/metrics` 与 `METRICS_TOKEN` 1、模型列表 ETag 1。
+- `npm run bench` 新增本地基准：8 局 × 500 事件的全量 flush p95 约 20–80ms（首次含目录创建/备份轮转，样本波动大；后续 01 会改增量落盘），状态响应（含事件）约 82KB，随机地图 8 人同种子 p95 ≈ 6ms，最大回放 `JSON.parse` p95 ≈ 5ms；基线落 `temp/perf/latest.json`（`script/bench.mjs`）。
+
 
 ## 3.6.4
 

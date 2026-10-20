@@ -3,6 +3,7 @@ import type { GameState, PlayerId } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { findReachableCells, consumeAction, actionsRemaining } from './validation.js';
+import { getGameIndex } from './gameIndex.js';
 import { appendEvent } from './events.js';
 
 export function moveUnit(
@@ -13,8 +14,10 @@ export function moveUnit(
   q: number,
   r: number,
 ): Result {
-  const unit = game.units.find(u => u.id === unitId && u.owner === owner && u.alive);
-  if (!unit) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
+  const unit = getGameIndex(game).unitById.get(unitId);
+  if (!unit || unit.owner !== owner || !unit.alive) {
+    return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
+  }
   if (unit.hasMoved) return { ok: false, code: 'invalid_move', message: '该单位本回合已经移动过' };
   if (unit.q === q && unit.r === r) return { ok: false, code: 'invalid_move', message: '目标格就是当前所在格' };
 

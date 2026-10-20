@@ -4,7 +4,7 @@ import fastifyCompress from '@fastify/compress';
 import fastifyCors from '@fastify/cors';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { loadMaps } from './config/loader.js';
+import { loadMaps, mapCount } from './config/loader.js';
 import { gamesRoutes } from './api/games.js';
 import { botsRoutes } from './api/bots.js';
 import { arenaEvalRoutes } from './api/arenaEval.js';
@@ -15,6 +15,7 @@ import { skillRoutes } from './api/skill.js';
 import { recordsRoutes } from './api/records.js';
 import { globalStore } from './state/store.js';
 import { logger } from './utils/logger.js';
+import { inc, observe, renderMetrics } from './utils/metrics.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // dev（tsx 跑 src/）托管源目录 public/；生产（node dist/server.js）托管 Vite 产物 dist-public/。
@@ -123,10 +124,39 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
   });
 
+  app.addHook('onResponse', async (req, reply) => {
+    // 路由模板而非原始 URL：避免把 gameId 等动态段带进指标标签。
+    const route = req.routeOptions?.url ?? 'unknown';
+    const labels = { method: req.method, route, status: String(reply.statusCode) };
+    observe('tactical_http_duration_ms', reply.elapsedTime, labels);
+    inc('tactical_http_requests_total', labels);
+  });
+
   app.get('/healthz', async () => ({ status: 'ok' }));
   app.get('/readyz', async (_req, reply) => {
     if (!ready) return reply.code(503).send({ status: 'starting' });
+    // 成功响应必须保持 CI smoke 精确断言的 {"status":"ready"}；降级时才附带 checks。
+    const checks = {
+      maps: mapCount() > 0 ? 'ok' : 'missing',
+      persistence: globalStore.isPersistenceWritable() ? 'ok' : 'unwritable',
+    };
+    if (checks.maps !== 'ok' || checks.persistence !== 'ok') {
+      return reply.code(503).send({ status: 'degraded', checks });
+    }
     return { status: 'ready' };
+  });
+  app.get('/metrics', async (req, reply) => {
+    const expected = process.env.METRICS_TOKEN;
+    if (expected) {
+      const provided = req.headers['x-metrics-token']
+        ?? (typeof req.headers.authorization === 'string'
+          ? req.headers.authorization.replace(/^Bearer\s+/i, '')
+          : undefined);
+      if (provided !== expected) {
+        return reply.code(401).send({ error: '指标凭证无效', code: 'invalid_metrics_token' });
+      }
+    }
+    return reply.type('text/plain; version=0.0.4; charset=utf-8').send(renderMetrics());
   });
   await app.register(mapsRoutes);
   await app.register(gamesRoutes);

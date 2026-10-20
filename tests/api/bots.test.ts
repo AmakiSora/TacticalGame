@@ -49,6 +49,20 @@ describe('RL bot endpoints', () => {
     expect(typeof data.python).toBe('string');
   });
 
+  it('supports ETag/304 for the model list', async () => {
+    const first = await app.inject({ method: 'GET', url: '/api/rl/models' });
+    expect(first.statusCode).toBe(200);
+    const etag = first.headers.etag;
+    expect(typeof etag).toBe('string');
+    const second = await app.inject({
+      method: 'GET',
+      url: '/api/rl/models',
+      headers: { 'if-none-match': etag as string },
+    });
+    expect(second.statusCode).toBe(304);
+    expect(second.body).toBe('');
+  });
+
   it('rejects bot creation without host token', async () => {
     const created = await createTwoPlayerLobby(app);
     const res = await app.inject({

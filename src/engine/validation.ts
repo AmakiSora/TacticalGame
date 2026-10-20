@@ -2,6 +2,7 @@
 import type { GameState, PlayerId, Position, Unit, Headquarters, TerrainType } from '../types.js';
 import type { Result } from './result.js';
 import { hexDistance, hexKey, hexNeighbors } from './hex.js';
+import { cacheReachableText, getGameIndex } from './gameIndex.js';
 import { kindAllowsDeploy } from './controlPoints.js';
 
 export type Occupant =
@@ -11,13 +12,11 @@ export type Occupant =
 export { hexDistance };
 
 export function getTerrain(game: GameState, q: number, r: number): TerrainType {
-  const override = game.map.terrainCells.find(c => c.q === q && c.r === r);
-  if (override) return override.terrain;
-  return game.cells.find(c => c.q === q && c.r === r)?.terrain ?? 'blocker';
+  return getGameIndex(game).terrain.get(hexKey({ q, r })) ?? 'blocker';
 }
 
 export function isInBounds(game: GameState, q: number, r: number): boolean {
-  return game.cells.some(cell => cell.q === q && cell.r === r);
+  return getGameIndex(game).cells.has(hexKey({ q, r }));
 }
 
 export function isPassable(game: GameState, q: number, r: number): boolean {
@@ -29,33 +28,35 @@ export function isDeployable(game: GameState, q: number, r: number): boolean {
 }
 
 export function getCellOccupant(game: GameState, q: number, r: number): Occupant | null {
-  const unit = game.units.find(u => u.alive && u.q === q && u.r === r);
-  if (unit) return { kind: 'unit', entity: unit };
-  const hq = Object.values(game.headquarters).find(h => h.alive && h.q === q && h.r === r);
-  if (hq) return { kind: 'headquarters', entity: hq };
-  return null;
+  return getGameIndex(game).occupants.get(hexKey({ q, r })) ?? null;
 }
 
 export function findReachableCells(game: GameState, unit: Unit): Position[] {
+  const index = getGameIndex(game);
+  const cacheKey = `${unit.id}:${unit.q},${unit.r}:${unit.moveRange}`;
+  const cached = index.reachable.get(cacheKey);
+  if (cached) return cached;
+
   const visited = new Set<string>([hexKey(unit)]);
   const result: Position[] = [];
   const queue: { pos: Position; distance: number }[] = [{ pos: { q: unit.q, r: unit.r }, distance: 0 }];
 
-  for (let index = 0; index < queue.length; index++) {
-    const current = queue[index];
+  for (let index2 = 0; index2 < queue.length; index2++) {
+    const current = queue[index2];
     if (current.distance >= unit.moveRange) continue;
     for (const next of hexNeighbors(current.pos)) {
       const key = hexKey(next);
       if (visited.has(key)) continue;
       visited.add(key);
-      if (!isPassable(game, next.q, next.r)) continue;
-      if (getCellOccupant(game, next.q, next.r) !== null) continue;
+      if (!index.cells.has(key)) continue;
+      if ((index.terrain.get(key) ?? 'blocker') !== 'plain') continue;
+      if (index.occupants.has(key)) continue;
       result.push(next);
       queue.push({ pos: next, distance: current.distance + 1 });
     }
   }
 
-  return result;
+  return cacheReachableText(index, cacheKey, result);
 }
 
 export function findAdjacentDeployCell(game: GameState, origin: Position): Position | null {

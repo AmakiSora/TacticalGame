@@ -300,6 +300,11 @@ export interface GameState {
   turn: TurnState;
   plan: PlanState | null;
   events: GameEvent[];
+  /**
+   * 派生索引/缓存的失效版本：每次成功追加事件 +1。不参与游戏规则，
+   * 旧存档缺省时按 0 处理。不要用它做客户端协议版本（公开 revision 是另一件事）。
+   */
+  stateVersion?: number;
   winner: PlayerId | null;
   result: GameResult | null;
   artillery: ArtilleryState | null;

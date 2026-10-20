@@ -3,6 +3,7 @@
 // 强化学习 AI 玩家：房主在大厅中添加 AI 座位，开始对局时由服务器自动启动
 // rl/runners/run_model.py，让训练好的模型作为普通玩家参与 REST 对局。
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { inflateRawSync } from 'node:zlib';
 import { createInterface } from 'node:readline';
@@ -141,6 +142,9 @@ const defaultSpawner: NonNullable<BotDeps['spawner']> = (cmd, args, cwd) => {
 let activeSpawner: NonNullable<BotDeps['spawner']> = defaultSpawner;
 
 let modelsCache: RlModelInfo[] = [];
+// 模型解析结果按 (file, mtimeMs, size) 缓存：目录扫描仍每次做，但 ZIP 解压/动作空间
+// 探测只在文件变化时执行。过期名单是独立过滤条件，不参与缓存键。
+const modelInfoCache = new Map<string, { mtimeMs: number; size: number; info: RlModelInfo }>();
 
 /** 可用的算法 AI 配置。由 algorithms/registry.mjs 的展示元数据生成：
  * 注册表是唯一来源，勿在此另立清单（历史上双份清单出过前后端选项不一致）。 */
@@ -255,33 +259,55 @@ function expiredVersionSet(): Set<string> {
 
 /** 扫描 rl/models 目录下的 .zip 模型文件（新者优先）。目录不存在时返回空列表。 */
 export function refreshRlModels(): RlModelInfo[] {
-  modelsCache = [];
   const expired = expiredVersionSet();
+  let files: string[];
   try {
-    modelsCache = readdirSync(MODELS_DIR)
-      .filter(file => file.toLowerCase().endsWith('.zip'))
-      // 过期模型从「可添加的 AI」列表里隐去：大厅「添加 AI」与竞技场评估控制台都由本函数
-      // 供数，过滤在这里做一次即可覆盖两处前端（模型文件本身仍在 rl/models/，不物理归档）。
-      .filter(file => {
-        const version = versionOfModelFile(file);
-        return version === null || !expired.has(version);
-      })
-      .map(file => ({ file, mtimeMs: statSync(join(MODELS_DIR, file)).mtimeMs }))
-      .sort((a, b) => b.mtimeMs - a.mtimeMs)
-      .map(info => {
-        const actionSpace = readActionSpace(join(MODELS_DIR, info.file));
-        const route = routeModel(actionSpace, info.file);
-        return {
-          ...info,
-          actionSpace,
-          runner: route?.runner ?? RUNNER_SCRIPT,
-          label: route?.label ?? '',
-          supported: route !== undefined,
-        };
-      });
+    files = readdirSync(MODELS_DIR).filter(file => file.toLowerCase().endsWith('.zip'));
   } catch {
     // 目录缺失或不可读：视为没有可用模型。
+    modelsCache = [];
+    modelInfoCache.clear();
+    return modelsCache;
   }
+
+  const seen = new Set<string>();
+  const next: RlModelInfo[] = [];
+  for (const file of files) {
+    const version = versionOfModelFile(file);
+    if (version !== null && expired.has(version)) continue;
+    const full = join(MODELS_DIR, file);
+    let stat;
+    try {
+      stat = statSync(full);
+      if (!stat.isFile()) continue;
+    } catch {
+      continue;
+    }
+    seen.add(file);
+    const cached = modelInfoCache.get(file);
+    if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+      next.push(cached.info);
+      continue;
+    }
+    const actionSpace = readActionSpace(full);
+    const route = routeModel(actionSpace, file);
+    const info: RlModelInfo = {
+      file,
+      mtimeMs: stat.mtimeMs,
+      actionSpace,
+      runner: route?.runner ?? RUNNER_SCRIPT,
+      label: route?.label ?? '',
+      supported: route !== undefined,
+    };
+    modelInfoCache.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, info });
+    next.push(info);
+  }
+  // 删除已不存在的模型缓存，避免目录清理后旧条目常驻。
+  for (const file of modelInfoCache.keys()) {
+    if (!seen.has(file)) modelInfoCache.delete(file);
+  }
+  next.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  modelsCache = next;
   return modelsCache;
 }
 
@@ -436,13 +462,22 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
 
   app.addHook('onClose', async () => killAllBotProcesses());
 
-  app.get('/api/rl/models', async () => ({
-    models: refreshRlModels(),
-    python: resolvePython(),
-    runner: RUNNER_SCRIPT,
-    requiredActionSpace: REQUIRED_ACTION_SPACE,
-    supportedActionSpaces: SUPPORTED_ACTION_SPACES,
-  }));
+  app.get('/api/rl/models', async (req, reply) => {
+    const models = refreshRlModels();
+    const body = {
+      models,
+      python: resolvePython(),
+      runner: RUNNER_SCRIPT,
+      requiredActionSpace: REQUIRED_ACTION_SPACE,
+      supportedActionSpaces: SUPPORTED_ACTION_SPACES,
+    };
+    // 模型列表只在文件/动作空间变化时改变；304 让大厅和评估控制台的轮询不再
+    // 每次都传输整张模型表。
+    const etag = `"rl-models-${createHash('sha256').update(JSON.stringify(models)).digest('hex').slice(0, 16)}"`;
+    reply.header('ETag', etag);
+    if (req.headers['if-none-match'] === etag) return reply.code(304).send();
+    return body;
+  });
 
   app.get('/api/algorithms', async () => ({
     algorithms: Object.entries(ALGORITHM_BOTS).map(([key, config]) => ({

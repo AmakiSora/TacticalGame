@@ -49,11 +49,12 @@ npm run stats-all
 # 依次刷新回放统计两份 + 竞技场榜单与玩法统计
 ```
 
-新增或更新回放后运行 `npm run stats-all` 即可同时刷新两个看板。竞技场数据独立成链：
-对战记录在 `arena/matches.jsonl`（由 `rl/evaluation/round_robin.py` 累积，页面内评估控制台可网页发起跑批——
+新增或更新回放后运行 `npm run stats-all` 即可同时刷新两个看板。竞技场数据独立成链：对战记录在 `arena/matches.jsonl`（由 `rl/evaluation/round_robin.py` 累积，页面内评估控制台可网页发起跑批——
 跑批依赖仓库里的 `round_robin.py`、`script/generateArena*.mjs` 与本地模型，属本地开发功能，Docker 镜像不携带，
 线上相关写接口返回 `501 arena_eval_unavailable`），
 榜单与统计由 `npm run arena-leaderboard` / `npm run arena-stats` 生成（详见 `rl/README.md`「AI 竞技场」节）。
+
+性能基线可用 `npm run bench` 重跑，覆盖持久化全量写、状态响应、引擎可达格、随机地图与回放解析；结果写入 `temp/perf/latest.json`（`temp/` 不入库）。
 
 远程使用删除对局、强制裁决、管理员改名等管理接口时建议设置：
 

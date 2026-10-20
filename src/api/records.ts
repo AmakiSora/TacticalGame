@@ -5,11 +5,14 @@
 // 回放 JSON 是自包含的事件日志（地图/配置全在首个 game_start 事件里），
 // 前端拿到文件后复用现有的 normalizeImportedReplay → loadImportedReplay 管线，
 // 因此本接口只负责“列出元数据”与“按名取原文”两件事。
+//
+// 3.6.5 起元数据索引落到 runtime/records-index.json：启动只读索引，详情按需读文件；
+// 索引按 (mtimeMs, size) 校验，文件变化时只重建对应条目。
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // dev: <repo>/src/api -> <repo>/records；prod: /app/dist/api -> /app/records
@@ -17,6 +20,7 @@ const APP_ROOT = join(__dirname, '..', '..');
 const RECORDS_DIR = join(APP_ROOT, 'records');
 // 只暴露当前两版：V1 命名与结构均过旧，前端回放管线不保证可读。
 const VERSIONS = ['V2', 'V3'] as const;
+const INDEX_VERSION = 1;
 
 interface RecordEntry {
   id: string; // "V3/tg_0036_20260721.json"，Map 键与 URL 参数
@@ -35,10 +39,19 @@ interface RecordEntry {
   exportedAt: string | null;
   bytes: number;
   sha256: string;
-  content: Buffer;
 }
 
-type RecordMeta = Omit<RecordEntry, 'content'>;
+/** 索引里额外保存文件指纹，避免把 mtime/size 暴露给前端。 */
+interface IndexedRecord extends RecordEntry {
+  mtimeMs: number;
+  size: number;
+}
+
+interface RecordsIndexFile {
+  version: number;
+  savedAt: string;
+  records: IndexedRecord[];
+}
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value ? value : null;
@@ -84,7 +97,7 @@ function seqFromFileName(fileName: string): string | null {
   return m ? m[1] : null;
 }
 
-function summarize(id: string, version: string, fileName: string, content: Buffer, data: any): RecordMeta { // eslint-disable-line @typescript-eslint/no-explicit-any
+function summarize(id: string, version: string, fileName: string, content: Buffer, data: any): RecordEntry { // eslint-disable-line @typescript-eslint/no-explicit-any
   const events: any[] = Array.isArray(data?.events) ? data.events : []; // eslint-disable-line @typescript-eslint/no-explicit-any
   const start = events.find(ev => ev?.type === 'game_start')?.payload ?? {};
   const cfg = start.config ?? {};
@@ -112,10 +125,56 @@ function summarize(id: string, version: string, fileName: string, content: Buffe
   };
 }
 
-// 启动时一次性读入内存：归档目录只在开发/发布时更新，重启即生效，无需文件监听。
+function indexFilePath(): string | null {
+  if (process.env.TACTICAL_GAME_RECORDS_INDEX_FILE) return process.env.TACTICAL_GAME_RECORDS_INDEX_FILE;
+  if (process.env.VITEST) return null;
+  return join(APP_ROOT, 'runtime', 'records-index.json');
+}
+
+function readIndexFile(log: (msg: string) => void): Map<string, IndexedRecord> {
+  const out = new Map<string, IndexedRecord>();
+  const file = indexFilePath();
+  if (!file || !existsSync(file)) return out;
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8')) as Partial<RecordsIndexFile>;
+    if (parsed.version !== INDEX_VERSION || !Array.isArray(parsed.records)) return out;
+    for (const entry of parsed.records) {
+      if (entry && typeof entry.id === 'string' && typeof entry.sha256 === 'string'
+        && typeof entry.mtimeMs === 'number' && typeof entry.size === 'number') {
+        out.set(entry.id, entry);
+      }
+    }
+  } catch (err) {
+    log(`ignore unreadable records index: ${(err as Error).message}`);
+  }
+  return out;
+}
+
+function writeIndexFile(records: IndexedRecord[], log: (msg: string) => void): void {
+  const file = indexFilePath();
+  if (!file) return;
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    const payload: RecordsIndexFile = { version: INDEX_VERSION, savedAt: new Date().toISOString(), records };
+    const tmp = `${file}.tmp`;
+    writeFileSync(tmp, `${JSON.stringify(payload)}\n`);
+    renameSync(tmp, file);
+  } catch (err) {
+    log(`failed to write records index: ${(err as Error).message}`);
+  }
+}
+
+function metaOf(entry: IndexedRecord): RecordEntry {
+  const { mtimeMs: _mtimeMs, size: _size, ...meta } = entry;
+  return meta;
+}
+
+// 扫描 V2/V3：命中索引且 (mtime, size) 未变的条目不再读文件/解析；变化的条目重建。
 // 单条坏文件（未导出完成/手工编辑）只跳过并告警，不影响其余接口启动。
 function loadRecords(log: (msg: string) => void): Map<string, RecordEntry> {
+  const cached = readIndexFile(log);
   const entries = new Map<string, RecordEntry>();
+  const nextIndex: IndexedRecord[] = [];
   for (const version of VERSIONS) {
     const dir = join(RECORDS_DIR, version);
     let names: string[];
@@ -126,28 +185,39 @@ function loadRecords(log: (msg: string) => void): Map<string, RecordEntry> {
     }
     for (const fileName of names.sort()) {
       if (!fileName.endsWith('.json')) continue;
-      if (!statSync(join(dir, fileName)).isFile()) continue;
-      const id = `${version}/${fileName}`;
+      const full = join(dir, fileName);
+      let stat;
       try {
-        const content = readFileSync(join(dir, fileName));
+        stat = statSync(full);
+        if (!stat.isFile()) continue;
+      } catch {
+        continue;
+      }
+      const id = `${version}/${fileName}`;
+      const previous = cached.get(id);
+      if (previous && previous.mtimeMs === stat.mtimeMs && previous.size === stat.size) {
+        entries.set(id, metaOf(previous));
+        nextIndex.push(previous);
+        continue;
+      }
+      try {
+        const content = readFileSync(full);
         const data = JSON.parse(content.toString('utf8'));
-        entries.set(id, { ...summarize(id, version, fileName, content, data), content });
+        const meta = summarize(id, version, fileName, content, data);
+        entries.set(id, meta);
+        nextIndex.push({ ...meta, mtimeMs: stat.mtimeMs, size: stat.size });
       } catch {
         log(`skip malformed record: ${id}`);
       }
     }
   }
+  writeIndexFile(nextIndex, log);
   return entries;
-}
-
-function metadata(entry: RecordEntry): RecordMeta {
-  const { content: _content, ...meta } = entry;
-  return meta;
 }
 
 // 最新在前：主序为文件名里的对局顺序号（跨版本连续，序号即完整时间线），
 // 无序号兑底排最后，再按日期、gameId 区分同序条目。
-function sortEntries(a: RecordMeta, b: RecordMeta): number {
+function sortEntries(a: RecordEntry, b: RecordEntry): number {
   const seqA = a.seq ? Number(a.seq) : -1;
   const seqB = b.seq ? Number(b.seq) : -1;
   if (seqA !== seqB) return seqB - seqA;
@@ -169,15 +239,15 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
     app.log.warn(err, 'records directory unavailable; /api/records* will respond 503');
   }
 
-  function sendFile(reply: FastifyReply, entry: RecordEntry, ifNoneMatch?: string) {
-    reply.header('Cache-Control', 'no-cache').header('ETag', `"${entry.sha256}"`);
-    if (ifNoneMatch === `"${entry.sha256}"`) return reply.code(304).send();
-    return reply.type('application/json; charset=utf-8').send(entry.content);
+  function sendFile(reply: FastifyReply, content: Buffer, sha256: string, ifNoneMatch?: string) {
+    reply.header('Cache-Control', 'no-cache').header('ETag', `"${sha256}"`);
+    if (ifNoneMatch === `"${sha256}"`) return reply.code(304).send();
+    return reply.type('application/json; charset=utf-8').send(content);
   }
 
   app.get('/api/records', async (_req, reply) => {
     if (!entries) return reply.code(503).send({ error: '回放库暂不可用', code: 'records_unavailable' });
-    const list = [...entries.values()].map(metadata).sort(sortEntries);
+    const list = [...entries.values()].sort(sortEntries);
     return { records: list, total: list.length };
   });
 
@@ -188,6 +258,18 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
     const id = req.params['*'];
     const entry = entries.get(id);
     if (!entry) return reply.code(404).send({ error: '找不到该回放', code: 'record_not_found' });
-    return sendFile(reply, entry, req.headers['if-none-match']);
+    let content: Buffer;
+    try {
+      content = readFileSync(join(RECORDS_DIR, id));
+    } catch {
+      return reply.code(404).send({ error: '找不到该回放', code: 'record_not_found' });
+    }
+    // 文件可能在索引生成后被替换：详情请求以磁盘内容为准，ETag 用实际内容 hash。
+    const sha256 = createHash('sha256').update(content).digest('hex');
+    if (sha256 !== entry.sha256 || content.length !== entry.bytes) {
+      entry.sha256 = sha256;
+      entry.bytes = content.length;
+    }
+    return sendFile(reply, content, sha256, req.headers['if-none-match']);
   });
 }

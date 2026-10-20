@@ -1,6 +1,7 @@
 import type { ArtilleryState, GameState, Position } from '../types.js';
 import { isAnnihilationMode } from '../types.js';
-import { hexDistance } from './hex.js';
+import { hexDistance, hexKey } from './hex.js';
+import { getGameIndex } from './gameIndex.js';
 
 export function artilleryStateForRound(game: GameState, roundNumber: number): ArtilleryState | null {
   const config = game.config.annihilation?.artillery;
@@ -31,5 +32,5 @@ export function artilleryStateForRound(game: GameState, roundNumber: number): Ar
 }
 
 export function isArtilleryDanger(game: GameState, position: Position): boolean {
-  return Boolean(game.artillery?.dangerCells.some(cell => cell.q === position.q && cell.r === position.r));
+  return getGameIndex(game).danger.has(hexKey(position));
 }

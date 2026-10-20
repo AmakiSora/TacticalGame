@@ -36,6 +36,7 @@ Copy `deploy/.env.deploy.example` to `deploy/.env.deploy` and fill in the values
 | `DEPLOY_REMOTE_BASE` | no | Remote project directory, default `/srv/tactical-game`. |
 | `CONTROL_TOKEN` | yes | Value written to the remote `.env` as `AUTO_CONTROL_TOKEN`. Must stay stable across deploys so scripts/agents calling admin endpoints keep working. Generate with `openssl rand -hex 32`. |
 | `LOG_LEVEL` | no | Written to the remote `.env` (default `info`). |
+| `METRICS_TOKEN` | no | When set, `/metrics` requires `x-metrics-token` (or `Authorization: Bearer`). Leave unset only on trusted networks. |
 | `DEPLOY_PRUNE` | no | Set `1` to delete remote files under the project directory that no longer exist locally. |
 
 Host keys are verified against `~/.ssh/known_hosts`. On the first connect (or when the known_hosts file has no entry for the host) the script prompts to accept and save the fingerprint (TOFU); in non-interactive environments an unknown host key aborts the deploy. A changed fingerprint always fails the connection.
@@ -70,7 +71,9 @@ The 30 most recent logs are kept; `deploy/logs/` is gitignored and excluded from
 
 ## State, Backups, And Restarts
 
-Game state is written to `/app/runtime/games.json`, backed by the named `tactical-game-runtime` Docker volume. A normal app-container restart restores that file, but immediately disconnects every SSE client. A process crash can lose only changes that have not completed their synchronous file write.
+Game state is written to `/app/runtime/games.json`, backed by the named `tactical-game-runtime` Docker volume. Writes go to a temporary file, are `fsync`ed, and replace the previous file atomically; the previous complete file is kept as `games.json.bak`. On startup a corrupt/incompatible main file is archived as `games.json.corrupt-*` / `games.json.schema-*`, and the server tries `games.json.bak` instead of silently starting empty. The same volume also holds `runtime/records-index.json`. A normal app-container restart restores state, but immediately disconnects every SSE client. A process crash can lose only changes that have not completed their synchronous file write.
+
+`/readyz` now performs a light deep check: map table loaded and the state directory writable. It still returns exactly `{"status":"ready"}` on success; a write-permission or map-load failure returns `503` with `status: degraded`, so a deploy that cannot persist state fails its health check instead of running half-broken.
 
 Back up the volume before upgrades and regularly thereafter (run on the VPS, from the project directory):
 

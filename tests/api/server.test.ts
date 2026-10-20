@@ -44,4 +44,31 @@ describe('production server configuration', () => {
     expect(ready.json()).toEqual({ status: 'ready' });
     await app.close();
   });
+
+  it('exposes Prometheus metrics and honors METRICS_TOKEN', async () => {
+    const previous = process.env.METRICS_TOKEN;
+    const app = await buildServer();
+    try {
+      const open = await app.inject({ method: 'GET', url: '/healthz' });
+      expect(open.statusCode).toBe(200);
+      const metrics = await app.inject({ method: 'GET', url: '/metrics' });
+      expect(metrics.statusCode).toBe(200);
+      expect(metrics.headers['content-type']).toContain('text/plain');
+      expect(metrics.body).toContain('tactical_http_requests_total');
+
+      process.env.METRICS_TOKEN = 'metrics-secret';
+      const rejected = await app.inject({ method: 'GET', url: '/metrics' });
+      expect(rejected.statusCode).toBe(401);
+      const accepted = await app.inject({
+        method: 'GET',
+        url: '/metrics',
+        headers: { 'x-metrics-token': 'metrics-secret' },
+      });
+      expect(accepted.statusCode).toBe(200);
+    } finally {
+      if (previous === undefined) delete process.env.METRICS_TOKEN;
+      else process.env.METRICS_TOKEN = previous;
+      await app.close();
+    }
+  });
 });

@@ -9,6 +9,7 @@ import type { Result, Failure } from './result.js';
 import { appendEvent } from './events.js';
 import { hexDistance, HEX_DIRECTIONS } from './hex.js';
 import { findReachableCells, isDeployable, isInBounds, getCellOccupant, getTerrain, deployOriginFor } from './validation.js';
+import { getGameIndex } from './gameIndex.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import { isArtilleryDanger } from './artillery.js';
 import type { UnitSpec } from '../config/loader.js';
@@ -75,7 +76,8 @@ function checkBudget(game: GameState, owner: PlayerId): Failure | null {
 }
 
 function findOwnUnit(game: GameState, owner: PlayerId, unitId: string) {
-  return game.units.find(u => u.id === unitId && u.owner === owner && u.alive) ?? null;
+  const unit = getGameIndex(game).unitById.get(unitId);
+  return unit && unit.owner === owner && unit.alive ? unit : null;
 }
 
 function healRangeFor(game: GameState, support: { type: UnitType; attackRange: number }): number {
@@ -101,6 +103,9 @@ export interface ShapeAim {
   cells: Position[];
 }
 
+const coveredCellsCache = new Map<string, ShapeAim | null>();
+const COVERED_CELLS_CACHE_LIMIT = 1024;
+
 export function shapeSpecFor(spec: UnitSpec | undefined, kind: 'attackShape' | 'healShape'): { type: ShapeType; length: number } {
   const shape = spec?.[kind];
   if (!shape) return { type: 'single', length: 1 };
@@ -113,14 +118,13 @@ export function shapeSpecFor(spec: UnitSpec | undefined, kind: 'attackShape' | '
  * 由施放者位置与点击格推导形状方向与覆盖格。瞄准不合法（超出射程、不在正六方向
  * 射线上、非相邻格等）返回 null。攻击者/支援本回合不会移动，计划与结算结果一致。
  */
-export function coveredCellsFor(
+function computeCoveredCells(
   from: Position,
-  spec: UnitSpec | undefined,
+  shape: ReturnType<typeof shapeSpecFor>,
   kind: 'attackShape' | 'healShape',
   target: Position,
   range: number,
 ): ShapeAim | null {
-  const shape = shapeSpecFor(spec, kind);
   const dq = target.q - from.q;
   const dr = target.r - from.r;
   if (shape.type === 'single') {
@@ -155,6 +159,29 @@ export function coveredCellsFor(
     return { type: 'line', direction, cells };
   }
   return null;
+}
+
+/**
+ * 形状覆盖的纯函数缓存：同一 (施放者位置, 形状, 目标, 射程) 的重复计算在 MCTS 里
+ * 非常频繁；结果只依赖参数，与对局状态无关，因此可以跨局面安全复用。
+ */
+export function coveredCellsFor(
+  from: Position,
+  spec: UnitSpec | undefined,
+  kind: 'attackShape' | 'healShape',
+  target: Position,
+  range: number,
+): ShapeAim | null {
+  const shape = shapeSpecFor(spec, kind);
+  const key = `${from.q},${from.r}|${kind}|${target.q},${target.r}|${range}|${shape.type}:${shape.length}`;
+  if (coveredCellsCache.has(key)) return coveredCellsCache.get(key) ?? null;
+  const aim = computeCoveredCells(from, shape, kind, target, range);
+  if (coveredCellsCache.size >= COVERED_CELLS_CACHE_LIMIT) {
+    const oldest = coveredCellsCache.keys().next().value;
+    if (oldest !== undefined) coveredCellsCache.delete(oldest);
+  }
+  coveredCellsCache.set(key, aim);
+  return aim;
 }
 
 // ---------------------------------------------------------------- deploy

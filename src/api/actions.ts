@@ -17,6 +17,7 @@ import type { AuthContext } from './auth.js';
 import type { UnitType } from '../types.js';
 import { isSimultaneousMode } from '../types.js';
 import { globalStore } from '../state/store.js';
+import { inc, observe } from '../utils/metrics.js';
 
 function badRequest(reply: FastifyReply, msg: string) {
   return reply.code(400).send({ error: msg, code: 'invalid_move' });
@@ -56,30 +57,42 @@ async function dispatchAction(
   const ctx = authenticate(req, reply);
   if (!ctx) return;
   if (!basicGate(ctx, reply)) return;
-  if (isSimultaneousMode(ctx.game.config.mode)) {
-    if (ctx.game.plan?.committed.includes(ctx.player)) {
-      return reply.code(statusForCode('not_your_turn')).send({ error: '本轮计划已提交', code: 'not_your_turn' });
+  const action = req.url.split('?')[0]!.split('/').pop() ?? 'unknown';
+  const mode = ctx.game.config.mode;
+  const started = Date.now();
+  inc('tactical_action_total', { action, mode });
+  try {
+    if (isSimultaneousMode(mode)) {
+      if (ctx.game.plan?.committed.includes(ctx.player)) {
+        inc('tactical_action_failed_total', { action, mode, code: 'not_your_turn' });
+        return reply.code(statusForCode('not_your_turn')).send({ error: '本轮计划已提交', code: 'not_your_turn' });
+      }
+      const result = planAction(ctx);
+      if (!result.ok) {
+        inc('tactical_action_failed_total', { action, mode, code: result.code });
+        return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
+      }
+      globalStore.persist(ctx.game);
+      return {
+        ok: true,
+        queued: result.data ?? null,
+        queue: [...(ctx.game.plan?.queues[ctx.player] ?? [])],
+      };
     }
-    const result = planAction(ctx);
+    if (ctx.game.turn.currentPlayerId !== ctx.player) {
+      inc('tactical_action_failed_total', { action, mode, code: 'not_your_turn' });
+      return reply.code(statusForCode('not_your_turn')).send({ error: '还没轮到你', code: 'not_your_turn' });
+    }
+    const result = sequentialAction(ctx);
     if (!result.ok) {
+      inc('tactical_action_failed_total', { action, mode, code: result.code });
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
     globalStore.persist(ctx.game);
-    return {
-      ok: true,
-      queued: result.data ?? null,
-      queue: [...(ctx.game.plan?.queues[ctx.player] ?? [])],
-    };
+    return { ok: true };
+  } finally {
+    observe('tactical_action_duration_ms', Date.now() - started, { action, mode });
   }
-  if (ctx.game.turn.currentPlayerId !== ctx.player) {
-    return reply.code(statusForCode('not_your_turn')).send({ error: '还没轮到你', code: 'not_your_turn' });
-  }
-  const result = sequentialAction(ctx);
-  if (!result.ok) {
-    return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
-  }
-  globalStore.persist(ctx.game);
-  return { ok: true };
 }
 
 interface DeployBody { unitType: UnitType; fromId: string; q: number; r: number }

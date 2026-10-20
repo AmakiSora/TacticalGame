@@ -19,6 +19,7 @@ import { appendEvent } from './events.js';
 import { hexDistance } from './hex.js';
 import { computeDamage } from './combat.js';
 import { getCellOccupant, getTerrain } from './validation.js';
+import { getGameIndex } from './gameIndex.js';
 import { createUnitFromConfig } from '../state/store.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import {
@@ -185,8 +186,8 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       if (action.type !== 'move') continue;
       const used = actionsUsedOf(id, action);
       chargeActionPoint(game, id);
-      const unit = game.units.find(u => u.id === action.unitId && u.owner === id && u.alive);
-      if (!unit) {
+      const unit = getGameIndex(game).unitById.get(action.unitId!);
+      if (!unit || unit.owner !== id || !unit.alive) {
         recordFailure(id, action, 'unit_gone');
         continue;
       }
@@ -214,8 +215,12 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       if (action.type !== 'demolish') continue;
       const used = actionsUsedOf(id, action);
       chargeActionPoint(game, id);
-      const unit = game.units.find(u => u.id === action.unitId && u.owner === id && u.alive);
-      if (!unit || unit.type !== 'heavy'
+      const unit = getGameIndex(game).unitById.get(action.unitId!);
+      if (!unit || unit.owner !== id || !unit.alive) {
+        recordFailure(id, action, 'unit_gone');
+        continue;
+      }
+      if (unit.type !== 'heavy'
         || hexDistance(unit, { q: action.q!, r: action.r! }) > 1
         || getTerrain(game, action.q!, action.r!) !== 'blocker') {
         recordFailure(id, action, 'invalid_target', { q: action.q, r: action.r });
@@ -252,8 +257,8 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     for (const action of queues.get(id)!) {
       if (action.type !== 'attack') continue;
       chargeActionPoint(game, id);
-      const attacker = game.units.find(u => u.id === action.attackerId && u.owner === id && u.alive);
-      if (!attacker) {
+      const attacker = getGameIndex(game).unitById.get(action.attackerId!);
+      if (!attacker || attacker.owner !== id || !attacker.alive) {
         recordFailure(id, action, 'unit_gone');
         continue;
       }
@@ -280,8 +285,17 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     for (const action of queues.get(id)!) {
       if (action.type !== 'heal') continue;
       chargeActionPoint(game, id);
-      const support = game.units.find(u => u.id === action.supportId && u.owner === id && u.alive);
-      const aim = support && support.type === 'support'
+      const support = getGameIndex(game).unitById.get(action.supportId!);
+      if (!support || support.owner !== id || !support.alive) {
+        outcomes[id]!.push({ actionId: action.id, type: 'heal', owner: id, status: 'fizzled', reason: 'out_of_range' });
+        appendEvent(game, bus, 'action_failed', {
+          owner: id, actionId: action.id, type: 'heal', reason: 'out_of_range',
+          supportId: action.supportId, q: action.q, r: action.r, roundNumber,
+          actionsUsed: actionsUsedOf(id, action),
+        });
+        continue;
+      }
+      const aim = support.type === 'support'
         ? coveredCellsFor(
           support,
           game.config.units[support.type],
@@ -290,7 +304,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
           game.config.units[support.type]?.healRange ?? support.attackRange,
         )
         : null;
-      if (!support || !aim) {
+      if (!aim) {
         outcomes[id]!.push({ actionId: action.id, type: 'heal', owner: id, status: 'fizzled', reason: 'out_of_range' });
         appendEvent(game, bus, 'action_failed', {
           owner: id, actionId: action.id, type: 'heal', reason: 'out_of_range',

@@ -12,6 +12,8 @@ import {
 import { authorizeControlRequest } from './controlAuth.js';
 import { listMaps } from '../config/loader.js';
 import { generateRandomMapConfig, sanitizeRandomOptions } from '../config/randomMap.js';
+import type { RandomParamValues } from '../config/randomMap.js';
+import { getCachedRandomMap, setCachedRandomMap } from '../config/randomMapCache.js';
 import { isPlayerId, MAX_PLAYER_NAME_LEN } from '../types.js';
 import type { GameState, PlayerId } from '../types.js';
 import { launchBotsForGame, removeBotRecord, clearBotsForGame } from './bots.js';
@@ -74,8 +76,15 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         // 随机地图：服务端按参数现生成完整配置，不写入静态地图表。
         try {
           const options = sanitizeRandomOptions(req.body?.random);
-          const config = generateRandomMapConfig(options, maxPlayers);
-          game = createLobbyWithConfig(randomUUID(), 'random', config, lobbyOptions);
+          const cached = options.seed === undefined ? null : getCachedRandomMap(options, maxPlayers);
+          if (cached) {
+            game = createLobbyWithConfig(randomUUID(), 'random', cached.config, lobbyOptions);
+          } else {
+            const values: RandomParamValues = {};
+            const config = generateRandomMapConfig(options, maxPlayers, values);
+            if (options.seed !== undefined) setCachedRandomMap(options, maxPlayers, config, values);
+            game = createLobbyWithConfig(randomUUID(), 'random', config, lobbyOptions);
+          }
         } catch (err) {
           const message = err instanceof Error ? err.message : '随机地图参数无效';
           return reply.code(400).send({ error: `随机地图：${message}`, code: 'invalid_move' });

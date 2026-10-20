@@ -1,6 +1,9 @@
 // src/state/store.ts
 import { randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  accessSync, closeSync, constants, existsSync, fsyncSync, mkdirSync, openSync, readFileSync,
+  renameSync, writeSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
@@ -14,6 +17,7 @@ import { artilleryStateForRound } from '../engine/artillery.js';
 import { actionMeritForEvent } from '../engine/actionScore.js';
 import { seedGameRandom } from '../engine/random.js';
 import { logger } from '../utils/logger.js';
+import { inc, observe } from '../utils/metrics.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -405,51 +409,110 @@ export class GameStore {
   loadFromDisk(): void {
     const file = this.persistenceFile();
     if (!file) return;
-    if (!existsSync(file)) { this.games.clear(); return; }
-    try {
-      const parsed = JSON.parse(readFileSync(file, 'utf8')) as Partial<PersistedGamesFile>;
-      if (parsed.schemaVersion !== PERSISTENCE_SCHEMA_VERSION || !Array.isArray(parsed.games)) {
-        const archived = `${file}.schema-${parsed.schemaVersion ?? 'unknown'}-${Date.now()}.bak`;
-        renameSync(file, archived);
-        logger.warn(`已归档不兼容状态文件 ${archived}`, { tag: 'game:persist' });
-        this.games.clear();
-        return;
-      }
-      this.games.clear();
-      for (const game of parsed.games) {
-        if (!game || typeof game.id !== 'string') continue;
-        // 旧版本持久化档案没有 plan 字段，统一补默认值。
-        if (game.plan === undefined) game.plan = null;
-        // maxTurns 的 null 是合法的「无回合上限」；损坏或降级档案里的非法值回落有限默认，
-        // 否则 `roundNumber < undefined` 恒 false，会在下一个回合边界把对局误裁定。
-        const balance = game.config?.balance as { maxTurns?: unknown } | undefined;
-        if (balance && balance.maxTurns !== null
-          && (typeof balance.maxTurns !== 'number' || !Number.isFinite(balance.maxTurns) || balance.maxTurns < 1)) {
-          logger.warn(`对局 ${game.id} 的 balance.maxTurns 非法（${String(balance.maxTurns)}），回落为有限默认 15`, { tag: 'game:persist' });
-          balance.maxTurns = 15;
+    if (!existsSync(file) && !existsSync(`${file}.bak`)) {
+      return;
+    }
+
+    // 主文件损坏时保留现场，再尝试上一份完整备份；绝不静默清空。
+    for (const candidate of [file, `${file}.bak`]) {
+      if (!existsSync(candidate)) continue;
+      try {
+        const parsed = JSON.parse(readFileSync(candidate, 'utf8')) as Partial<PersistedGamesFile>;
+        if (parsed.schemaVersion !== PERSISTENCE_SCHEMA_VERSION || !Array.isArray(parsed.games)) {
+          this.archiveStateFile(candidate, `schema-${parsed.schemaVersion ?? 'unknown'}`);
+          continue;
         }
-        restoreActionStats(game);
-        this.games.set(game.id, game);
+        const loaded = new Map<string, GameState>();
+        for (const game of parsed.games) {
+          if (!game || typeof game.id !== 'string') continue;
+          // 旧版本持久化档案没有 plan 字段，统一补默认值。
+          if (game.plan === undefined) game.plan = null;
+          // maxTurns 的 null 是合法的「无回合上限」；损坏或降级档案里的非法值回落有限默认，
+          // 否则 `roundNumber < undefined` 恒 false，会在下一个回合边界把对局误裁定。
+          const balance = game.config?.balance as { maxTurns?: unknown } | undefined;
+          if (balance && balance.maxTurns !== null
+            && (typeof balance.maxTurns !== 'number' || !Number.isFinite(balance.maxTurns) || balance.maxTurns < 1)) {
+            logger.warn(`对局 ${game.id} 的 balance.maxTurns 非法（${String(balance.maxTurns)}），回落为有限默认 15`, { tag: 'game:persist' });
+            balance.maxTurns = 15;
+          }
+          restoreActionStats(game);
+          loaded.set(game.id, game);
+        }
+        this.games = loaded;
+        if (candidate !== file) {
+          logger.warn(`主状态文件不可用，已从备份 ${candidate} 恢复`, { tag: 'game:persist' });
+        }
+        logger.info(`loaded ${this.games.size} games from ${candidate}`, { tag: 'game:persist' });
+        return;
+      } catch (err) {
+        this.archiveStateFile(candidate, 'corrupt');
+        logger.error(`failed to load ${candidate}`, err);
       }
-      logger.info(`loaded ${this.games.size} games from ${file}`, { tag: 'game:persist' });
+    }
+    // 主文件与备份都不可用：启动时内存本来就是空的；若此前已有内存对局则保留，
+    // 不因一次加载失败丢弃仍在运行的状态。
+  }
+
+  /** 状态文件所在目录可写（/readyz 深检用）；未启用持久化时视为可写。 */
+  isPersistenceWritable(): boolean {
+    const file = this.persistenceFile();
+    if (!file) return true;
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      accessSync(dirname(file), constants.W_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private archiveStateFile(file: string, reason: string): void {
+    const archived = `${file}.${reason}-${Date.now()}.bak`;
+    try {
+      renameSync(file, archived);
+      logger.warn(`已归档不可用状态文件 ${archived}`, { tag: 'game:persist' });
     } catch (err) {
-      this.games.clear();
-      logger.error(`failed to load ${file}`, err);
+      logger.error(`归档状态文件失败 ${file}`, err);
     }
   }
 
   flush(): void {
     const file = this.persistenceFile();
     if (!file) return;
-    mkdirSync(dirname(file), { recursive: true });
-    const payload: PersistedGamesFile = {
-      schemaVersion: PERSISTENCE_SCHEMA_VERSION,
-      savedAt: new Date().toISOString(),
-      games: [...this.games.values()],
-    };
-    const tmp = `${file}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify(payload, null, 2)}\n`);
-    renameSync(tmp, file);
+    const started = Date.now();
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      const payload: PersistedGamesFile = {
+        schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+        savedAt: new Date().toISOString(),
+        games: [...this.games.values()],
+      };
+      const json = `${JSON.stringify(payload, null, 2)}\n`;
+      const tmp = `${file}.tmp`;
+      // 先写临时文件并 fsync，再把上一份完整文件轮转为 .bak；任一步崩溃都能从
+      // 主文件或 .bak 恢复。
+      const fd = openSync(tmp, 'w');
+      try {
+        writeSync(fd, json);
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+      if (existsSync(file)) {
+        try {
+          renameSync(file, `${file}.bak`);
+        } catch {
+          // 备份轮转失败不阻塞主写入；主文件仍会被下面的 rename 原子替换。
+        }
+      }
+      renameSync(tmp, file);
+      inc('tactical_persist_total', { result: 'ok' });
+    } catch (err) {
+      inc('tactical_persist_total', { result: 'error' });
+      throw err;
+    } finally {
+      observe('tactical_persist_duration_ms', Date.now() - started);
+    }
   }
 
   private persistenceFile(): string | null {

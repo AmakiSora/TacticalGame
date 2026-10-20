@@ -626,6 +626,11 @@ export function listMaps(): MapListItem[] {
   }));
 }
 
+/** 已加载的静态地图数量（/readyz 深检用，避免为了探针构造全部 preview）。 */
+export function mapCount(): number {
+  return maps.size;
+}
+
 export function getDefaultMapConfig(): MapConfig {
   return getMapConfig('default');
 }

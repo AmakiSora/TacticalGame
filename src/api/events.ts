@@ -3,15 +3,19 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { globalStore } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import type { GameEvent } from '../types.js';
+import { inc, setGauge } from '../utils/metrics.js';
 
 const MAX_SSE_PER_GAME = 20;
 const HEARTBEAT_MS = 25_000;
 const sseCounts = new Map<string, number>();
 const activeConnections = new Set<() => void>();
+let activeSseTotal = 0;
 
-function writeSseEvent(reply: FastifyReply, event: GameEvent): void {
+function writeSseEvent(reply: FastifyReply, event: GameEvent): boolean {
   const payload = JSON.stringify(event);
-  reply.raw.write(`data: ${payload}\n\n`);
+  const ok = reply.raw.write(`data: ${payload}\n\n`);
+  if (!ok) inc('tactical_sse_backpressure_total');
+  return ok;
 }
 
 function writeHeartbeat(reply: FastifyReply): void {
@@ -58,6 +62,8 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(429).send({ error: '该对局的观战连接过多，请稍后再试', code: 'rate_limit' });
       }
       sseCounts.set(game.id, currentCount + 1);
+      activeSseTotal += 1;
+      setGauge('tactical_sse_connections', activeSseTotal);
 
       reply.raw.writeHead(200, {
         'content-type': 'text/event-stream',
@@ -89,6 +95,8 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         clearInterval(heartbeat);
         unsubscribe();
         activeConnections.delete(close);
+        activeSseTotal = Math.max(0, activeSseTotal - 1);
+        setGauge('tactical_sse_connections', activeSseTotal);
         const count = sseCounts.get(game.id) ?? 1;
         if (count <= 1) sseCounts.delete(game.id);
         else sseCounts.set(game.id, count - 1);

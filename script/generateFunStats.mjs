@@ -12,12 +12,13 @@
  *   node script/generateFunStats.mjs --out public/data/fun-stats.json
  *   node script/generateFunStats.mjs --records records
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   collectMatches,
+  decodeMatchFromCache,
   parseArgs,
   round1,
   round2,
@@ -977,7 +978,16 @@ function main() {
     out: join(PROJECT_DIR, 'public', 'data', 'fun-stats.json'),
     usage: 'node script/generateFunStats.mjs [--records dir] [--out file]',
   });
-  const { matches, warnings } = collectMatches(opts);
+  const collected = opts.matchesFile
+    ? (() => {
+      const parsed = JSON.parse(readFileSync(opts.matchesFile, 'utf8'));
+      return {
+        matches: (parsed.matches || []).map(decodeMatchFromCache),
+        warnings: parsed.warnings || [],
+      };
+    })()
+    : collectMatches(opts);
+  const { matches, warnings } = collected;
 
   const valid = matches.filter((m) => !m.error);
   const overview = buildOverview(matches);

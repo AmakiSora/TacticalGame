@@ -12,6 +12,9 @@ import { validateGeneratedMap } from './loader.js';
 /** 单个随机参数：省略=默认范围随机，数字=固定值，[min, max]=区间随机。 */
 export type RandomParam = number | [number, number];
 
+/** 生成器算法版本；生成逻辑发生影响输出的变化时必须 +1，使旧缓存键失效。 */
+export const RANDOM_MAP_GENERATOR_VERSION = 1;
+
 export interface RandomMapOptions {
   /** 随机种子（数字或字符串）；同种子产出完全相同的地图。 */
   seed?: number | string;

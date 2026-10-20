@@ -5,6 +5,7 @@ import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { hexDistance } from './hex.js';
 import { consumeAction, actionsRemaining } from './validation.js';
+import { getGameIndex } from './gameIndex.js';
 import { appendEvent } from './events.js';
 import { eliminatePlayer, creditKill } from './engine.js';
 import { isArtilleryDanger } from './artillery.js';
@@ -28,10 +29,11 @@ function targetPosition(target: Target): { q: number; r: number } {
 }
 
 function findTarget(game: GameState, targetId: string): Target | null {
-  const unit = game.units.find(u => u.id === targetId && u.alive);
-  if (unit) return { kind: 'unit', entity: unit };
-  const hq = Object.values(game.headquarters).find(h => h.id === targetId && h.alive);
-  return hq ? { kind: 'headquarters', entity: hq } : null;
+  const index = getGameIndex(game);
+  const unit = index.unitById.get(targetId);
+  if (unit?.alive) return { kind: 'unit', entity: unit };
+  const hq = index.hqById.get(targetId);
+  return hq?.alive ? { kind: 'headquarters', entity: hq } : null;
 }
 
 export function computeDamage(game: GameState, attack: number, defense: number): number {
@@ -48,8 +50,10 @@ export function attackTarget(
   attackerId: string,
   targetId: string,
 ): Result {
-  const attacker = game.units.find(u => u.id === attackerId && u.owner === owner && u.alive);
-  if (!attacker) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
+  const attacker = getGameIndex(game).unitById.get(attackerId);
+  if (!attacker || attacker.owner !== owner || !attacker.alive) {
+    return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
+  }
   if (attacker.hasActed) return { ok: false, code: 'invalid_attack', message: '该单位本回合已经行动过' };
 
   const target = findTarget(game, targetId);
@@ -120,13 +124,17 @@ export function healTarget(
   supportId: string,
   targetId: string,
 ): Result {
-  const support = game.units.find(u => u.id === supportId && u.owner === owner && u.alive);
-  if (!support) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
+  const support = getGameIndex(game).unitById.get(supportId);
+  if (!support || support.owner !== owner || !support.alive) {
+    return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
+  }
   if (support.type !== 'support') return { ok: false, code: 'invalid_heal', message: '该单位不是支援兵' };
   if (support.hasActed) return { ok: false, code: 'invalid_heal', message: '该单位本回合已经行动过' };
 
-  const target = game.units.find(u => u.id === targetId && u.owner === owner && u.alive);
-  if (!target) return { ok: false, code: 'invalid_heal', message: '目标不是友方单位' };
+  const target = getGameIndex(game).unitById.get(targetId);
+  if (!target || target.owner !== owner || !target.alive) {
+    return { ok: false, code: 'invalid_heal', message: '目标不是友方单位' };
+  }
   if (isArtilleryDanger(game, support) || isArtilleryDanger(game, target)) {
     return { ok: false, code: 'invalid_heal', message: '炮火区内无法治疗' };
   }

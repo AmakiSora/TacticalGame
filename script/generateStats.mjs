@@ -13,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);
+export const DEFAULT_STATS_CACHE = join(PROJECT_DIR, 'temp', 'stats-cache.json');
 
 /**
  * Agent 简写 → 展示全名。复盘文件名（tg_xxx_rank01_QD@model.md）与对局玩家名
@@ -89,11 +90,20 @@ export function parseArgs(argv, { out = join(PROJECT_DIR, 'public', 'data', 'sta
     records: join(PROJECT_DIR, 'records'),
     out,
     versions: ['V2', 'V3'],
+    cacheFile: DEFAULT_STATS_CACHE,
+    full: false,
+    dumpMatches: null,
+    matchesFile: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--out') opts.out = resolve(argv[++i]);
     else if (a === '--records') opts.records = resolve(argv[++i]);
+    else if (a === '--cache') opts.cacheFile = resolve(argv[++i]);
+    else if (a === '--no-cache') opts.cacheFile = false;
+    else if (a === '--full') opts.full = true;
+    else if (a === '--dump-matches') opts.dumpMatches = resolve(argv[++i]);
+    else if (a === '--matches-file') opts.matchesFile = resolve(argv[++i]);
     else if (a === '--help' || a === '-h') {
       console.log(`Usage: ${usage}`);
       process.exit(0);
@@ -1083,13 +1093,73 @@ export function collectReviews(versionDir) {
   return byRecord;
 }
 
+const STATS_CACHE_VERSION = 2;
+
+/** 磁盘缓存只存 JSON：把 match.unitOwner（Map）编码成普通对象，读回时还原。 */
+export function encodeMatchForCache(match) {
+  if (!match || !(match.unitOwner instanceof Map)) return match;
+  return { ...match, unitOwner: Object.fromEntries(match.unitOwner) };
+}
+
+export function decodeMatchFromCache(match) {
+  if (!match || match.unitOwner instanceof Map) return match;
+  return { ...match, unitOwner: new Map(Object.entries(match.unitOwner ?? {})) };
+}
+
+function loadStatsCache(file) {
+  if (!file) return { version: STATS_CACHE_VERSION, records: {} };
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8'));
+    if (parsed?.version !== STATS_CACHE_VERSION || !parsed.records || typeof parsed.records !== 'object') {
+      return { version: STATS_CACHE_VERSION, records: {} };
+    }
+    return parsed;
+  } catch {
+    return { version: STATS_CACHE_VERSION, records: {} };
+  }
+}
+
+function saveStatsCache(file, cache) {
+  if (!file) return;
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, `${JSON.stringify(cache)}\n`);
+  } catch {
+    // 缓存写失败只影响下一次运行速度，不阻断统计产物。
+  }
+}
+
+/** 复盘 MD 的变化也影响 match.review 字段；用文件名+mtime+size 做版本签名。 */
+function reviewSignature(dir, files) {
+  const parts = [];
+  for (const file of files) {
+    if (!file.endsWith('.md')) continue;
+    try {
+      const st = statSync(join(dir, file));
+      parts.push(`${file}:${st.mtimeMs}:${st.size}`);
+    } catch {
+      // 文件在扫描过程中消失：不加入签名，下一次运行会重建。
+    }
+  }
+  return parts.sort().join('|');
+}
+
 /**
  * 扫描 opts.versions 下的回放 JSON（含对应复盘 MD），返回按日期/recordId
  * 升序排列的 match 数组与目录级警告。两个统计脚本共用同一采集层。
+ *
+ * 解析结果按 (绝对路径, mtime, size, 复盘签名) 缓存到 temp/stats-cache.json；
+ * 第二次运行只 stat 文件，不重复 JSON.parse/extractMatch。`--full` 绕过缓存。
  */
 export function collectMatches(opts) {
   const matches = [];
   const warnings = [];
+  const cacheFile = opts.cacheFile === undefined ? DEFAULT_STATS_CACHE : opts.cacheFile;
+  const useCache = !opts.full && cacheFile !== false;
+  const cache = useCache ? loadStatsCache(cacheFile) : { version: STATS_CACHE_VERSION, records: {} };
+  const seen = new Set();
+  let dirty = !useCache;
+
   for (const version of opts.versions) {
     const dir = join(opts.records, version);
     let files;
@@ -1100,19 +1170,46 @@ export function collectMatches(opts) {
       continue;
     }
     const reviews = collectReviews(dir);
+    const reviewKey = reviewSignature(dir, files);
     for (const f of files) {
       if (!REPLAY_JSON_RE.test(f)) continue;
       const full = join(dir, f);
+      let st;
       try {
-        const st = statSync(full);
+        st = statSync(full);
         if (!st.isFile()) continue;
       } catch {
         continue;
       }
+      seen.add(full);
+      const cached = useCache ? cache.records[full] : null;
+      if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size
+        && cached.reviewSignature === reviewKey) {
+        matches.push(decodeMatchFromCache(structuredClone(cached.match)));
+        continue;
+      }
       const match = extractMatch(full, version, f, reviews);
-      if (match) matches.push(match);
+      if (!match) continue;
+      matches.push(match);
+      cache.records[full] = {
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+        reviewSignature: reviewKey,
+        match: structuredClone(encodeMatchForCache(match)),
+      };
+      dirty = true;
     }
   }
+
+  // 删除已不存在的回放缓存，防止 records 清理后缓存常驻。
+  for (const key of Object.keys(cache.records)) {
+    if (!seen.has(key)) {
+      delete cache.records[key];
+      dirty = true;
+    }
+  }
+  if (useCache && dirty) saveStatsCache(cacheFile, cache);
+
   matches.sort((a, b) => {
     const da = a.date || '';
     const db = b.date || '';
@@ -1125,6 +1222,14 @@ export function collectMatches(opts) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const { matches, warnings } = collectMatches(opts);
+
+  if (opts.dumpMatches) {
+    mkdirSync(dirname(opts.dumpMatches), { recursive: true });
+    writeFileSync(opts.dumpMatches, `${JSON.stringify({
+      matches: matches.map(encodeMatchForCache),
+      warnings,
+    })}\n`);
+  }
 
   const agg = aggregate(matches);
 

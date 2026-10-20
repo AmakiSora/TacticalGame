@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`（对峙之地）地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）与 `narrow-road`（狭路相逢）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则。
 
-当前版本：`3.6.5`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`3.7.0`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -80,15 +80,15 @@ AUTO_CONTROL_TOKEN=<your-token> npm run dev
 
 ## 对局持久化
 
-服务会把当前对局保存到 `runtime/games.json`，启动时自动恢复。`runtime/` 已在 `.gitignore` 中，不会上传 git。
+服务会把每个对局写到 `runtime/store/<gameId>.json`（临时文件 + `fsync` + 原子替换），启动时自动恢复；`runtime/games.json` 是旧版单文件格式，只在首次升级时导入、创建/删除/退出时导出。`runtime/` 已在 `.gitignore` 中，不会上传 git。
 
-如需改保存位置：
+需要回滚或迁移到旧格式时：
 
 ```bash
-TACTICAL_GAME_STATE_FILE=/path/to/games.json npm run dev
+npm run export-state
 ```
 
-测试环境默认不启用持久化，除非显式设置 `TACTICAL_GAME_STATE_FILE`。
+`TACTICAL_GAME_STATE_FILE` 仍可改状态根文件位置；快照目录会放在同一目录的 `store/` 下。测试环境默认不启用持久化，除非显式设置 `TACTICAL_GAME_STATE_FILE`。
 
 ## 核心规则
 

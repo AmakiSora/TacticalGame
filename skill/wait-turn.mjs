@@ -97,13 +97,30 @@ function sleep(ms) {
 }
 
 async function fetchState(baseUrl, gameId, token) {
-  const res = await fetch(`${baseUrl}/api/games/${gameId}`, {
+  const res = await fetch(`${baseUrl}/api/games/${gameId}?include=state,config`, {
     headers: { 'X-Player-Token': token },
   });
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
   if (!res.ok) {
     const err = new Error(`GET /api/games/${gameId} failed (${res.status})${data?.code ? ` ${data.code}` : ''}`);
+    err.status = res.status;
+    err.code = data?.code;
+    throw err;
+  }
+  return data;
+}
+
+/** 长轮询：有事件/轮次变化立即返回；旧服务器返回 404 时由调用方回退到轮询。 */
+async function waitForChange(baseUrl, gameId, token, afterSeq, timeoutS) {
+  const res = await fetch(
+    `${baseUrl}/api/games/${gameId}/wait?afterSeq=${encodeURIComponent(afterSeq)}&timeout=${timeoutS}`,
+    { headers: { 'X-Player-Token': token } },
+  );
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!res.ok) {
+    const err = new Error(`GET /api/games/${gameId}/wait failed (${res.status})`);
     err.status = res.status;
     err.code = data?.code;
     throw err;
@@ -155,7 +172,21 @@ async function main() {
       backoffMs = 2000;
       const outcome = classifyState(game, args.player);
       if (outcome) finish(outcome);
-      await sleep(args.intervalS * 1000);
+
+      const lastSeq = Number(game.lastEventSeq ?? game.events?.at?.(-1)?.seq ?? 0);
+      const remainingS = Math.max(0.2, (deadline - Date.now()) / 1000);
+      try {
+        const waited = await waitForChange(
+          args.url, args.game, args.token, lastSeq, Math.min(25, Math.round(remainingS * 10) / 10),
+        );
+        // changed=false 即一次超时；继续下一轮拿状态，仍保留 interval 作为旧服务器回退。
+        if (waited.changed) continue;
+        if (Date.now() >= deadline) break;
+        await sleep(args.intervalS * 1000);
+      } catch (waitErr) {
+        if (waitErr.status !== 404) console.error(`wait error: ${waitErr.message}; falling back to polling`);
+        await sleep(args.intervalS * 1000);
+      }
     } catch (err) {
       if (err.status === 403 && err.code === 'player_eliminated') {
         finish({ result: 'eliminated', status: 'player_eliminated', exit: EXIT.ELIMINATED });

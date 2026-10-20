@@ -1,5 +1,6 @@
 // src/api/actions.ts
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import { globalEventBus } from '../events/bus.js';
 import { authenticate, statusForCode } from './auth.js';
 import { moveUnit } from '../engine/units.js';
@@ -21,6 +22,54 @@ import { inc, observe } from '../utils/metrics.js';
 
 function badRequest(reply: FastifyReply, msg: string) {
   return reply.code(400).send({ error: msg, code: 'invalid_move' });
+}
+
+/**
+ * 动作已改内存后持久化失败：明确告诉客户端“已生效但未落盘”，不要用 500 诱发盲目重试。
+ * 返回 false 表示已写出 503 响应。
+ */
+function persistWithDegraded(reply: FastifyReply, game: Parameters<typeof globalStore.persist>[0]): boolean {
+  try {
+    globalStore.persist(game);
+    return true;
+  } catch {
+    const requestId = randomUUID();
+    reply.code(503).send({
+      error: '状态已生效但持久化失败，请稍后重试或重新读取状态',
+      code: 'persistence_degraded',
+      applied: true,
+      requestId,
+    });
+    return false;
+  }
+}
+
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+const IDEMPOTENCY_MAX_KEYS = 100;
+
+function canonicalValue(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalValue).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalValue(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function actionBodyHash(action: string, body: unknown): string {
+  return `${action}|${canonicalValue(body ?? null)}`;
+}
+
+function pruneIdempotency(records: NonNullable<AuthContext['game']['idempotency']>, now: number): void {
+  for (const [key, record] of Object.entries(records)) {
+    if (record.expiresAt <= now) delete records[key];
+  }
+  const keys = Object.keys(records);
+  if (keys.length <= IDEMPOTENCY_MAX_KEYS) return;
+  keys.sort((a, b) => records[a]!.expiresAt - records[b]!.expiresAt);
+  for (const key of keys.slice(0, keys.length - IDEMPOTENCY_MAX_KEYS)) delete records[key];
 }
 
 function isUnitType(value: unknown): value is UnitType {
@@ -59,6 +108,34 @@ async function dispatchAction(
   if (!basicGate(ctx, reply)) return;
   const action = req.url.split('?')[0]!.split('/').pop() ?? 'unknown';
   const mode = ctx.game.config.mode;
+  const rawKey = req.headers['idempotency-key'];
+  const idempotencyKey = typeof rawKey === 'string' && rawKey.trim() ? rawKey.trim() : null;
+  if (idempotencyKey && idempotencyKey.length > 200) {
+    return reply.code(400).send({ error: 'Idempotency-Key 不能超过 200 个字符', code: 'invalid_idempotency_key' });
+  }
+  const bodyHash = idempotencyKey ? actionBodyHash(action, req.body) : null;
+  if (idempotencyKey && bodyHash) {
+    const records = ctx.game.idempotency ?? {};
+    const existing = records[idempotencyKey];
+    if (existing) {
+      if (existing.expiresAt > Date.now()) {
+        if (existing.bodyHash !== bodyHash) {
+          return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
+        }
+        reply.header('Idempotent-Replay', 'true');
+        return existing.response;
+      }
+      delete records[idempotencyKey];
+    }
+  }
+  const remember = (response: unknown): void => {
+    if (!idempotencyKey || !bodyHash) return;
+    const records = ctx.game.idempotency ?? {};
+    const now = Date.now();
+    records[idempotencyKey] = { bodyHash, response, expiresAt: now + IDEMPOTENCY_TTL_MS };
+    pruneIdempotency(records, now);
+    ctx.game.idempotency = records;
+  };
   const started = Date.now();
   inc('tactical_action_total', { action, mode });
   try {
@@ -72,12 +149,14 @@ async function dispatchAction(
         inc('tactical_action_failed_total', { action, mode, code: result.code });
         return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
       }
-      globalStore.persist(ctx.game);
-      return {
+      const response = {
         ok: true,
         queued: result.data ?? null,
         queue: [...(ctx.game.plan?.queues[ctx.player] ?? [])],
       };
+      remember(response);
+      if (!persistWithDegraded(reply, ctx.game)) return;
+      return response;
     }
     if (ctx.game.turn.currentPlayerId !== ctx.player) {
       inc('tactical_action_failed_total', { action, mode, code: 'not_your_turn' });
@@ -88,8 +167,10 @@ async function dispatchAction(
       inc('tactical_action_failed_total', { action, mode, code: result.code });
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
-    globalStore.persist(ctx.game);
-    return { ok: true };
+    const response = { ok: true };
+    remember(response);
+    if (!persistWithDegraded(reply, ctx.game)) return;
+    return response;
   } finally {
     observe('tactical_action_duration_ms', Date.now() - started, { action, mode });
   }
@@ -174,19 +255,49 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
     if (!basicGate(ctx, reply)) return;
+    const rawKey = req.headers['idempotency-key'];
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.trim() ? rawKey.trim() : null;
+    if (idempotencyKey && idempotencyKey.length > 200) {
+      return reply.code(400).send({ error: 'Idempotency-Key 不能超过 200 个字符', code: 'invalid_idempotency_key' });
+    }
+    const bodyHash = idempotencyKey ? actionBodyHash('end-turn', req.body) : null;
+    if (idempotencyKey && bodyHash) {
+      const records = ctx.game.idempotency ?? {};
+      const existing = records[idempotencyKey];
+      if (existing) {
+        if (existing.expiresAt > Date.now()) {
+          if (existing.bodyHash !== bodyHash) {
+            return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
+          }
+          reply.header('Idempotent-Replay', 'true');
+          return existing.response;
+        }
+        delete records[idempotencyKey];
+      }
+    }
+    const remember = (response: unknown): void => {
+      if (!idempotencyKey || !bodyHash) return;
+      const records = ctx.game.idempotency ?? {};
+      const now = Date.now();
+      records[idempotencyKey] = { bodyHash, response, expiresAt: now + IDEMPOTENCY_TTL_MS };
+      pruneIdempotency(records, now);
+      ctx.game.idempotency = records;
+    };
     if (isSimultaneousMode(ctx.game.config.mode)) {
       const result = commitAndMaybeResolve(ctx.game, globalEventBus, ctx.player);
       if (!result.ok) {
         return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
       }
-      globalStore.persist(ctx.game);
-      return {
+      const response = {
         ok: true,
         committed: true,
         resolved: result.data ? result.data.resolved : false,
         roundNumber: ctx.game.turn.roundNumber,
         phase: ctx.game.phase,
       };
+      remember(response);
+      if (!persistWithDegraded(reply, ctx.game)) return;
+      return response;
     }
     if (ctx.game.turn.currentPlayerId !== ctx.player) {
       return reply.code(statusForCode('not_your_turn')).send({ error: '还没轮到你', code: 'not_your_turn' });
@@ -195,8 +306,10 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     if (!result.ok) {
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
-    globalStore.persist(ctx.game);
-    return { ok: true };
+    const response = { ok: true };
+    remember(response);
+    if (!persistWithDegraded(reply, ctx.game)) return;
+    return response;
   });
 
   app.post<{ Params: { id: string }; Body: RevokeBody }>('/api/games/:id/plan/revoke', async (req, reply) => {
@@ -214,7 +327,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     if (!result.ok) {
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
-    globalStore.persist(ctx.game);
+    if (!persistWithDegraded(reply, ctx.game)) return;
     return { ok: true, queue: result.data };
   });
 
@@ -229,7 +342,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     if (!result.ok) {
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
-    globalStore.persist(ctx.game);
+    if (!persistWithDegraded(reply, ctx.game)) return;
     return { ok: true, queue: result.data };
   });
 }

@@ -1,8 +1,8 @@
 // src/state/store.ts
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   accessSync, closeSync, constants, existsSync, fsyncSync, mkdirSync, openSync, readFileSync,
-  renameSync, writeSync,
+  readdirSync, renameSync, unlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,9 @@ import { actionMeritForEvent } from '../engine/actionScore.js';
 import { seedGameRandom } from '../engine/random.js';
 import { logger } from '../utils/logger.js';
 import { inc, observe } from '../utils/metrics.js';
+import { generateToken, hashToken, migrateToken } from './tokens.js';
+
+export { generateToken } from './tokens.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -33,6 +36,37 @@ interface PersistedGamesFile {
   games: GameState[];
 }
 
+function safeGameId(id: string): string {
+  return id.replace(/[^\w.-]/g, '_');
+}
+
+/** 测试/运维可见的每局快照路径；与 GameStore 内部布局保持一致。 */
+export function gameSnapshotPath(persistenceFile: string, gameId: string): string {
+  return join(dirname(persistenceFile), 'store', `${safeGameId(gameId)}.json`);
+}
+
+interface PersistedGameSnapshot {
+  schemaVersion: number;
+  savedAt: string;
+  game: GameState;
+}
+
+interface RawSecrets {
+  hostToken: string;
+  tokens: Partial<Record<PlayerId, string>>;
+}
+
+// 原始 token 只在创建/加入响应里返回一次；不写进 GameState，避免落盘。
+const rawSecrets = new WeakMap<GameState, RawSecrets>();
+
+export function getRawHostToken(game: GameState): string | null {
+  return rawSecrets.get(game)?.hostToken ?? null;
+}
+
+export function getRawPlayerToken(game: GameState, playerId: PlayerId): string | null {
+  return rawSecrets.get(game)?.tokens[playerId] ?? null;
+}
+
 export interface CreateLobbyOptions {
   maxPlayers: number;
   participate?: boolean;
@@ -44,11 +78,6 @@ function defaultPersistenceFile(): string | null {
   if (process.env.VITEST) return null;
   return join(PROJECT_ROOT, 'runtime', 'games.json');
 }
-
-export function generateToken(): string {
-  return randomBytes(16).toString('hex');
-}
-
 
 export function createPlayer(id: PlayerId, name?: string): PlayerState {
   return {
@@ -100,8 +129,9 @@ export function createLobby(id: string, mapId = 'default', options: CreateLobbyO
 /** 用完整地图配置建大厅；随机地图等运行时生成的配置不注册进全局地图表，直接传入。 */
 export function createLobbyWithConfig(id: string, mapId: string, config: MapConfig, options: CreateLobbyOptions): GameState {
   const maxPlayers = Math.max(2, Math.min(8, Math.trunc(options.maxPlayers)));
+  const hostToken = generateToken();
   const game: GameState = {
-    id, mapId, config, createdAt: Date.now(), phase: 'lobby', maxPlayers, hostToken: generateToken(),
+    id, mapId, config, createdAt: Date.now(), phase: 'lobby', maxPlayers, hostToken: hashToken(hostToken),
     players: {},
     map: {
       grid: 'hex', orientation: 'pointy', radius: config.radius,
@@ -118,6 +148,7 @@ export function createLobbyWithConfig(id: string, mapId: string, config: MapConf
     events: [], winner: null, result: null,
     artillery: null,
   };
+  rawSecrets.set(game, { hostToken, tokens: {} });
   game.artillery = artilleryStateForRound(game, 1);
   // 大厅列表要显示房主名：参战时取房主席位名（留空由服务端分配默认名），
   // 未参战时用创建表单填的名字（可能为空，界面会只显示「房主」）。
@@ -140,8 +171,11 @@ export function addLobbyPlayer(game: GameState, name?: string): { id: PlayerId; 
   const player = createPlayer(id, name);
   const token = generateToken();
   game.players[id] = player;
-  game.tokens[id] = token;
+  game.tokens[id] = hashToken(token);
   game.playerNames[id] = player.name;
+  const secrets = rawSecrets.get(game) ?? { hostToken: '', tokens: {} };
+  secrets.tokens[id] = token;
+  rawSecrets.set(game, secrets);
   return { id, token };
 }
 
@@ -150,6 +184,8 @@ export function removeLobbyPlayer(game: GameState, playerId: PlayerId): boolean 
   delete game.players[playerId];
   delete game.tokens[playerId];
   delete game.playerNames[playerId];
+  const secrets = rawSecrets.get(game);
+  if (secrets) delete secrets.tokens[playerId];
   return true;
 }
 
@@ -392,6 +428,35 @@ function restoreActionStats(game: GameState): void {
   }
 }
 
+function normalizeLoadedGame(game: GameState): void {
+  // 旧版本持久化档案没有 plan 字段，统一补默认值。
+  if (game.plan === undefined) game.plan = null;
+  // maxTurns 的 null 是合法的「无回合上限」；损坏或降级档案里的非法值回落有限默认，
+  // 否则 `roundNumber < undefined` 恒 false，会在下一个回合边界把对局误裁定。
+  const balance = game.config?.balance as { maxTurns?: unknown } | undefined;
+  if (balance && balance.maxTurns !== null
+    && (typeof balance.maxTurns !== 'number' || !Number.isFinite(balance.maxTurns) || balance.maxTurns < 1)) {
+    logger.warn(`对局 ${game.id} 的 balance.maxTurns 非法（${String(balance.maxTurns)}），回落为有限默认 15`, { tag: 'game:persist' });
+    balance.maxTurns = 15;
+  }
+  // 旧存档的明文 token 一次性迁移为 HMAC；原 token 仍可继续认证，无需用户重新加入。
+  let migratedTokens = false;
+  const migratedHost = migrateToken(game.hostToken);
+  if (migratedHost && migratedHost !== game.hostToken) {
+    game.hostToken = migratedHost;
+    migratedTokens = true;
+  }
+  for (const id of PLAYER_IDS) {
+    const migrated = migrateToken(game.tokens[id]);
+    if (migrated && migrated !== game.tokens[id]) {
+      game.tokens[id] = migrated;
+      migratedTokens = true;
+    }
+  }
+  if (migratedTokens) logger.info(`对局 ${game.id} 的凭证明文已迁移为哈希`, { tag: 'game:persist' });
+  restoreActionStats(game);
+}
+
 export class GameStore {
   private games: Map<string, GameState> = new Map();
   private persistenceFileOverride: string | null | undefined;
@@ -400,57 +465,150 @@ export class GameStore {
     if ('persistenceFile' in options) this.persistenceFileOverride = options.persistenceFile;
   }
 
-  save(game: GameState): void { this.games.set(game.id, game); this.flush(); }
+  save(game: GameState): void {
+    game.lastActivityAt = Date.now();
+    this.games.set(game.id, game);
+    this.writeSnapshot(game);
+    this.flush();
+  }
   get(id: string): GameState | undefined { return this.games.get(id); }
   list(): string[] { return [...this.games.keys()]; }
-  delete(id: string): void { this.games.delete(id); this.flush(); }
-  persist(game: GameState): void { this.games.set(game.id, game); this.flush(); }
+  delete(id: string): void {
+    this.games.delete(id);
+    this.removeSnapshot(id);
+    this.flush();
+  }
+  persist(game: GameState): void {
+    game.lastActivityAt = Date.now();
+    this.games.set(game.id, game);
+    // 每个动作只写这一局的快照，不再序列化全部对局；games.json 只作为导出/兼容格式。
+    this.writeSnapshot(game);
+  }
 
   loadFromDisk(): void {
     const file = this.persistenceFile();
     if (!file) return;
-    if (!existsSync(file) && !existsSync(`${file}.bak`)) {
-      return;
-    }
+    const loaded = new Map<string, GameState>();
+    const imported = new Set<string>();
+    let sawValid = false;
+    let sawSnapshot = false;
 
-    // 主文件损坏时保留现场，再尝试上一份完整备份；绝不静默清空。
-    for (const candidate of [file, `${file}.bak`]) {
-      if (!existsSync(candidate)) continue;
+    // 1) 每局快照（新格式，优先）。
+    const dir = this.storeDir();
+    if (dir && existsSync(dir)) {
+      let names: string[] = [];
       try {
-        const parsed = JSON.parse(readFileSync(candidate, 'utf8')) as Partial<PersistedGamesFile>;
-        if (parsed.schemaVersion !== PERSISTENCE_SCHEMA_VERSION || !Array.isArray(parsed.games)) {
-          this.archiveStateFile(candidate, `schema-${parsed.schemaVersion ?? 'unknown'}`);
-          continue;
-        }
-        const loaded = new Map<string, GameState>();
-        for (const game of parsed.games) {
-          if (!game || typeof game.id !== 'string') continue;
-          // 旧版本持久化档案没有 plan 字段，统一补默认值。
-          if (game.plan === undefined) game.plan = null;
-          // maxTurns 的 null 是合法的「无回合上限」；损坏或降级档案里的非法值回落有限默认，
-          // 否则 `roundNumber < undefined` 恒 false，会在下一个回合边界把对局误裁定。
-          const balance = game.config?.balance as { maxTurns?: unknown } | undefined;
-          if (balance && balance.maxTurns !== null
-            && (typeof balance.maxTurns !== 'number' || !Number.isFinite(balance.maxTurns) || balance.maxTurns < 1)) {
-            logger.warn(`对局 ${game.id} 的 balance.maxTurns 非法（${String(balance.maxTurns)}），回落为有限默认 15`, { tag: 'game:persist' });
-            balance.maxTurns = 15;
-          }
-          restoreActionStats(game);
-          loaded.set(game.id, game);
-        }
-        this.games = loaded;
-        if (candidate !== file) {
-          logger.warn(`主状态文件不可用，已从备份 ${candidate} 恢复`, { tag: 'game:persist' });
-        }
-        logger.info(`loaded ${this.games.size} games from ${candidate}`, { tag: 'game:persist' });
-        return;
+        names = readdirSync(dir).filter(name => name.endsWith('.json'));
       } catch (err) {
-        this.archiveStateFile(candidate, 'corrupt');
-        logger.error(`failed to load ${candidate}`, err);
+        logger.error(`无法读取状态目录 ${dir}`, err);
+      }
+      for (const name of names.sort()) {
+        const snapshotFile = join(dir, name);
+        try {
+          const parsed = JSON.parse(readFileSync(snapshotFile, 'utf8')) as Partial<PersistedGameSnapshot>;
+          const game = parsed.game as GameState | undefined;
+          if (!game || typeof game.id !== 'string') throw new Error('snapshot missing game');
+          normalizeLoadedGame(game);
+          loaded.set(game.id, game);
+          sawValid = true;
+          sawSnapshot = true;
+        } catch (err) {
+          this.archiveStateFile(snapshotFile, 'corrupt');
+          logger.error(`failed to load snapshot ${snapshotFile}`, err);
+        }
       }
     }
-    // 主文件与备份都不可用：启动时内存本来就是空的；若此前已有内存对局则保留，
-    // 不因一次加载失败丢弃仍在运行的状态。
+
+    // 2) 旧版单文件：仅在没有新快照时导入，避免旧文件把已删除对局复活。
+    if (!sawSnapshot) {
+      for (const candidate of [file, `${file}.bak`]) {
+        if (!existsSync(candidate)) continue;
+        try {
+          const parsed = JSON.parse(readFileSync(candidate, 'utf8')) as Partial<PersistedGamesFile>;
+          if (parsed.schemaVersion !== PERSISTENCE_SCHEMA_VERSION || !Array.isArray(parsed.games)) {
+            this.archiveStateFile(candidate, `schema-${parsed.schemaVersion ?? 'unknown'}`);
+            continue;
+          }
+          sawValid = true;
+          for (const game of parsed.games) {
+            if (!game || typeof game.id !== 'string' || loaded.has(game.id)) continue;
+            normalizeLoadedGame(game);
+            loaded.set(game.id, game);
+            imported.add(game.id);
+          }
+          if (candidate !== file) {
+            logger.warn(`主状态文件不可用，已从备份 ${candidate} 恢复`, { tag: 'game:persist' });
+          }
+        } catch (err) {
+          this.archiveStateFile(candidate, 'corrupt');
+          logger.error(`failed to load ${candidate}`, err);
+        }
+      }
+    }
+
+    if (!sawValid) return;
+    this.games = loaded;
+    // 旧格式导入的对局立刻落地为新快照，后续动作只写单局。
+    for (const id of imported) {
+      const game = loaded.get(id);
+      if (!game) continue;
+      try {
+        this.writeSnapshot(game);
+      } catch (err) {
+        logger.error(`failed to migrate snapshot ${id}`, err);
+      }
+    }
+    logger.info(`loaded ${this.games.size} games from snapshots/legacy state`, { tag: 'game:persist' });
+  }
+
+  private storeDir(): string | null {
+    const file = this.persistenceFile();
+    return file ? join(dirname(file), 'store') : null;
+  }
+
+  private snapshotPath(gameId: string): string | null {
+    const file = this.persistenceFile();
+    return file ? gameSnapshotPath(file, gameId) : null;
+  }
+
+  private writeSnapshot(game: GameState): void {
+    const target = this.snapshotPath(game.id);
+    if (!target) return;
+    mkdirSync(dirname(target), { recursive: true });
+    const payload: PersistedGameSnapshot = {
+      schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+      savedAt: new Date().toISOString(),
+      game,
+    };
+    const json = `${JSON.stringify(payload, null, 2)}\n`;
+    const tmp = `${target}.tmp`;
+    const fd = openSync(tmp, 'w');
+    try {
+      writeSync(fd, json);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    if (existsSync(target)) {
+      try {
+        renameSync(target, `${target}.prev`);
+      } catch {
+        // 快照轮转失败不阻塞主写入。
+      }
+    }
+    renameSync(tmp, target);
+  }
+
+  private removeSnapshot(gameId: string): void {
+    const target = this.snapshotPath(gameId);
+    if (!target) return;
+    for (const path of [target, `${target}.prev`]) {
+      try {
+        unlinkSync(path);
+      } catch {
+        // 文件不存在或已被清理。
+      }
+    }
   }
 
   /** 状态文件所在目录可写（/readyz 深检用）；未启用持久化时视为可写。 */
@@ -512,6 +670,52 @@ export class GameStore {
       throw err;
     } finally {
       observe('tactical_persist_duration_ms', Date.now() - started);
+    }
+  }
+
+  /**
+   * 归档并删除超期未活动的 lobby / 终局对局；active 对局永不自动删除。
+   * 返回被删除的 id 列表；归档失败的对局保留并留给下一次重试。
+   */
+  pruneInactive(options: { lobbyTtlMs: number; gameOverTtlMs: number; now?: number }): string[] {
+    const now = options.now ?? Date.now();
+    const removed: string[] = [];
+    for (const game of [...this.games.values()]) {
+      const ttl = game.phase === 'lobby'
+        ? options.lobbyTtlMs
+        : game.phase === 'game_over'
+          ? options.gameOverTtlMs
+          : 0;
+      if (!ttl || ttl <= 0) continue;
+      const last = game.lastActivityAt ?? game.createdAt ?? 0;
+      if (now - last < ttl) continue;
+      if (!this.archiveGame(game)) continue;
+      this.games.delete(game.id);
+      removed.push(game.id);
+    }
+    if (removed.length > 0) {
+      // 先导出一致性 games.json，再删快照；flush 失败时保留快照，避免重启复活/丢失两难。
+      this.flush();
+      for (const id of removed) this.removeSnapshot(id);
+    }
+    return removed;
+  }
+
+  private archiveGame(game: GameState): boolean {
+    const file = this.persistenceFile();
+    if (!file) return false;
+    const dir = join(dirname(file), 'archive');
+    const safeId = game.id.replace(/[^\w.-]/g, '_');
+    try {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${safeId}.json`), `${JSON.stringify({
+        archivedAt: new Date().toISOString(),
+        game,
+      }, null, 2)}\n`);
+      return true;
+    } catch (err) {
+      logger.error(`归档对局失败 ${game.id}`, err);
+      return false;
     }
   }
 

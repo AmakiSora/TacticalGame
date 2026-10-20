@@ -37,6 +37,7 @@ Copy `deploy/.env.deploy.example` to `deploy/.env.deploy` and fill in the values
 | `CONTROL_TOKEN` | yes | Value written to the remote `.env` as `AUTO_CONTROL_TOKEN`. Must stay stable across deploys so scripts/agents calling admin endpoints keep working. Generate with `openssl rand -hex 32`. |
 | `LOG_LEVEL` | no | Written to the remote `.env` (default `info`). |
 | `METRICS_TOKEN` | no | When set, `/metrics` requires `x-metrics-token` (or `Authorization: Bearer`). Leave unset only on trusted networks. |
+| `TACTICAL_GAME_TOKEN_PEPPER` | no | HMAC pepper for stored player/host tokens. Must stay stable across restarts and backups; if omitted, the server generates `runtime/token-pepper` on the volume. |
 | `DEPLOY_PRUNE` | no | Set `1` to delete remote files under the project directory that no longer exist locally. |
 
 Host keys are verified against `~/.ssh/known_hosts`. On the first connect (or when the known_hosts file has no entry for the host) the script prompts to accept and save the fingerprint (TOFU); in non-interactive environments an unknown host key aborts the deploy. A changed fingerprint always fails the connection.
@@ -71,7 +72,11 @@ The 30 most recent logs are kept; `deploy/logs/` is gitignored and excluded from
 
 ## State, Backups, And Restarts
 
-Game state is written to `/app/runtime/games.json`, backed by the named `tactical-game-runtime` Docker volume. Writes go to a temporary file, are `fsync`ed, and replace the previous file atomically; the previous complete file is kept as `games.json.bak`. On startup a corrupt/incompatible main file is archived as `games.json.corrupt-*` / `games.json.schema-*`, and the server tries `games.json.bak` instead of silently starting empty. The same volume also holds `runtime/records-index.json`. A normal app-container restart restores state, but immediately disconnects every SSE client. A process crash can lose only changes that have not completed their synchronous file write.
+Game state is stored per game under `/app/runtime/store/<gameId>.json`, backed by the named `tactical-game-runtime` Docker volume. Each write goes to a temporary file, is `fsync`ed, and atomically replaces that game's snapshot; the previous snapshot is kept as `<gameId>.json.prev`. `/app/runtime/games.json` is now the legacy/export format: it is imported on first upgrade and written by `npm run export-state` or on shutdown, so you can roll back to 3.6.x with the exported file. Corrupt snapshots or a corrupt legacy file are archived as `*.corrupt-*` instead of silently clearing state, and plaintext tokens from 3.6.x are migrated to hashes on load. The volume also holds `runtime/records-index.json`, `runtime/token-pepper`, and `runtime/archive/` (expired lobby / finished games).
+
+Expired lobbies (default 24h) and finished games (default 7 days) are archived to `runtime/archive/` and removed every 10 minutes. Override with `TACTICAL_GAME_LOBBY_TTL_HOURS` / `TACTICAL_GAME_OVER_TTL_HOURS` (0 disables that sweep); active games are never auto-deleted. If you set `TACTICAL_GAME_TOKEN_PEPPER`, keep it stable across restarts and include it in your secret backup, otherwise existing tokens stop authenticating.
+
+A normal app-container restart restores state, but immediately disconnects every SSE client. A process crash can lose only changes that have not completed their synchronous snapshot write.
 
 `/readyz` now performs a light deep check: map table loaded and the state directory writable. It still returns exactly `{"status":"ready"}` on success; a write-permission or map-load failure returns `503` with `status: degraded`, so a deploy that cannot persist state fails its health check instead of running half-broken.
 
@@ -113,6 +118,8 @@ python deploy/deploy.py
 ```
 
 Files that only exist in newer revisions are ignored by the old build (the image only consumes the files it copies), but they stay on the server; clean them up with `DEPLOY_PRUNE=1` on the next deploy. Restore a volume backup only when an incompatible game-state format or data corruption requires it.
+
+3.7.0 stores game state as per-game snapshots under `runtime/store/`; pre-3.7 builds only read `runtime/games.json`. Before rolling back to an older build, let the container stop gracefully (SIGTERM exports `games.json`) or run `docker compose exec app npm run export-state`; otherwise restore a volume backup.
 
 ## Smoke Test
 

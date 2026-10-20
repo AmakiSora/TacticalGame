@@ -53,6 +53,29 @@ describe('Events API', () => {
       headers: { accept: 'text/event-stream' },
     });
     expect(res.headers['x-accel-buffering']).toBe('no');
+    expect(res.body).toContain('retry: 3000');
+    expect(res.body).toContain('id: 1');
     expect(res.body).toContain('data:');
+  });
+
+  it('resumes from Last-Event-ID instead of replaying the whole history', async () => {
+    const { gameId, tokenA } = await createGameAndJoin(app);
+    const game = globalStore.get(gameId)!;
+    const lastSeq = game.events.at(-1)!.seq;
+    await app.inject({
+      method: 'POST', url: `/api/games/${gameId}/end-turn`,
+      headers: { 'x-player-token': tokenA },
+    });
+
+    const res = await app.inject({
+      method: 'GET', url: `/api/games/${gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream', 'last-event-id': String(lastSeq) },
+    });
+    const ids = res.body
+      .split('\n')
+      .filter(line => line.startsWith('id: '))
+      .map(line => Number(line.slice(4)));
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) expect(id).toBeGreaterThan(lastSeq);
   });
 });

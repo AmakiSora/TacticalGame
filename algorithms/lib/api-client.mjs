@@ -2,6 +2,8 @@
 //
 // REST API 客户端封装，提供类型安全的游戏操作接口
 
+import { randomUUID } from 'node:crypto';
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /**
@@ -30,10 +32,13 @@ export class GameApiClient {
    * @private
    */
   async _request(method, path, body) {
+    // 同一逻辑动作的所有重试复用同一个键；服务端已执行但响应丢失时不会重复生效。
+    const idempotencyKey = method === 'GET' ? null : randomUUID();
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       const headers = {
         'X-Player-Token': this.playerToken,
       };
+      if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
       if (body !== undefined) {
         headers['Content-Type'] = 'application/json';
       }
@@ -90,6 +95,17 @@ export class GameApiClient {
    */
   async getState() {
     return this._request('GET', `/api/games/${this.gameId}`);
+  }
+
+  /**
+   * 长轮询等待状态变化；超时返回 { changed: false }。
+   * 旧服务器没有该端点时调用方回退到轮询。
+   */
+  async waitForChange(afterSeq, timeoutSeconds = 25) {
+    return this._request(
+      'GET',
+      `/api/games/${this.gameId}/wait?afterSeq=${encodeURIComponent(afterSeq)}&timeout=${timeoutSeconds}`,
+    );
   }
 
   /**

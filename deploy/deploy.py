@@ -70,6 +70,7 @@ KEY_PATH = env.get("DEPLOY_KEY_PATH", "").strip()
 REMOTE_BASE = env.get("DEPLOY_REMOTE_BASE", "/srv/tactical-game")
 LOG_LEVEL = env.get("LOG_LEVEL", "info")
 METRICS_TOKEN = env.get("METRICS_TOKEN", "").strip()
+TOKEN_PEPPER = env.get("TACTICAL_GAME_TOKEN_PEPPER", "").strip()
 PRUNE_REMOTE = env.get("DEPLOY_PRUNE", "0").strip() == "1"
 LOCAL_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -431,6 +432,8 @@ def run_deploy(log):
     env_content = f"AUTO_CONTROL_TOKEN={CONTROL_TOKEN}\nLOG_LEVEL={LOG_LEVEL}\n"
     if METRICS_TOKEN:
         env_content += f"METRICS_TOKEN={METRICS_TOKEN}\n"
+    if TOKEN_PEPPER:
+        env_content += f"TACTICAL_GAME_TOKEN_PEPPER={TOKEN_PEPPER}\n"
     run_cmd(client, log,
             f"cat > {q(REMOTE_BASE)}/.env << 'ENVEOF'\n{env_content}ENVEOF\n"
             f"chmod 600 {q(REMOTE_BASE)}/.env")

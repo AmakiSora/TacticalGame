@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createInitialGame, GameStore } from '../../src/state/store.js';
+import { verifyToken } from '../../src/state/tokens.js';
 
 let tempDir: string | null = null;
 
@@ -58,5 +59,26 @@ describe('persistence recovery', () => {
     store.loadFromDisk();
 
     expect(store.get('from-backup')).toBeDefined();
+  });
+
+  it('migrates legacy plaintext tokens to hashes on load', () => {
+    const file = tempFile();
+    const game = createInitialGame('legacy-tokens');
+    game.hostToken = 'plain-host-token';
+    game.tokens.player_a = 'plain-player-a';
+    game.tokens.player_b = 'plain-player-b';
+    writeFileSync(file, persisted(game));
+
+    const store = new GameStore({ persistenceFile: file });
+    store.loadFromDisk();
+    const loaded = store.get('legacy-tokens')!;
+
+    expect(loaded.hostToken).toMatch(/^v1:/);
+    expect(loaded.tokens.player_a).toMatch(/^v1:/);
+    expect(loaded.tokens.player_b).toMatch(/^v1:/);
+    expect(verifyToken('plain-host-token', loaded.hostToken)).toBe(true);
+    expect(verifyToken('plain-player-a', loaded.tokens.player_a)).toBe(true);
+    expect(verifyToken('plain-player-b', loaded.tokens.player_b)).toBe(true);
+    expect(verifyToken('wrong-token', loaded.tokens.player_a)).toBe(false);
   });
 });

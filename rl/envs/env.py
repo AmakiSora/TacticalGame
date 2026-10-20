@@ -23,6 +23,7 @@ from collections import deque
 import json
 import os
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -300,6 +301,9 @@ class HexGameEnv(gym.Env):
             headers["X-Player-Token"] = token
         if host_token:
             headers["X-Host-Token"] = host_token
+        if method != "GET":
+            # 同一逻辑动作的 429/网络重试复用同一个幂等键。
+            headers["Idempotency-Key"] = uuid.uuid4().hex
         response = None
         for attempt in range(4):
             response = requests.request(
@@ -485,6 +489,14 @@ class HexGameEnv(gym.Env):
 
     def _get_state(self, token: str) -> dict[str, Any]:
         return self._request("GET", f"/api/games/{self.game_id}", token=token)
+
+    def _wait(self, after_seq: int, token: str, timeout: float = 25.0) -> dict[str, Any]:
+        """长轮询等待状态变化；旧服务器没有 /wait 时抛错，由调用方回退睡眠。"""
+        return self._request(
+            "GET",
+            f"/api/games/{self.game_id}/wait?afterSeq={int(after_seq)}&timeout={timeout}",
+            token=token,
+        )
 
     def _game_over(self) -> bool:
         return self.state.get("phase") == "game_over" or bool(self.state.get("winner"))

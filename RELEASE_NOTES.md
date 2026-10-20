@@ -4,6 +4,34 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.7.0
+
+### 新增
+
+- **动作幂等键**：所有玩法写接口支持可选 `Idempotency-Key`；同键同 body 回放首次响应并带 `Idempotent-Replay: true`，同键不同 body 返回 409 `idempotency_conflict`。按局保留最近 100 个键 / 24 小时，随对局持久化，重启后仍可去重；算法客户端与 RL 环境已为每个逻辑动作生成并复用键（`src/api/actions.ts`、`src/types.ts`、`algorithms/lib/api-client.mjs`、`rl/envs/env.py`）。
+- **AI 长轮询等待端点**：新增 `GET /api/games/:id/wait?afterSeq=&timeout=`，有事件立即返回、超时返回 `{changed:false}`；每玩家最多 2 个并发等待。`wait-turn.mjs`、算法 runner 与 RL runner 已改为优先长轮询、旧服务器/断线时回退轮询（`src/api/wait.ts`、`src/server.ts`、`skill/wait-turn.mjs`、`algorithms/runner.mjs`、`rl/runners/run_model.py`）。
+- **状态响应投影与 ETag**：`GET /api/games/:id` 支持 `include=events,config,adjudication`；`include=state` 只返回运行态（不含历史/配置/裁决），并返回 ETag，`If-None-Match` 命中时 304。默认请求仍返回旧全量响应（`src/api/auth.ts`、`src/api/games.ts`）。
+
+### 变更
+
+- **持久化改为每局快照**：`runtime/store/<gameId>.json` 每局独立写入（临时文件 + `fsync` + 原子替换 + `.prev` 轮转），动作不再序列化全部对局；旧 `runtime/games.json` 仅在首次升级时导入、创建/删除/退出时导出，另提供 `npm run export-state`。启动优先读快照，旧格式仍可迁移；令牌明文在加载时自动转为哈希（`src/state/store.ts`、`script/export-state.mjs`）。
+- **凭证哈希存储**：磁盘只保存 `v1:<HMAC-SHA256(pepper, token)>`，原始 token 只在创建/加入响应出现一次；旧明文 token 首次启动自动迁移，旧 token 继续有效。pepper 来自 `TACTICAL_GAME_TOKEN_PEPPER`，否则落到 `runtime/token-pepper`（`src/state/tokens.ts`、`src/api/auth.ts`、`src/api/events.ts`）。
+- **限流补齐与有界化**：覆盖所有对局写接口、随机地图预览与事件连接；固定窗口计数表超过 1 万条时清理过期/最旧桶，429 返回 `Retry-After`（`src/server.ts`）。
+- **SSE 可恢复与背压**：事件写 `id: <seq>`、连接写 `retry: 3000`，支持 `Last-Event-ID`（与 `after` 取较大值）；配额扩展为每局 + 每 IP + 每玩家，慢消费者连续写入失败 5 次后断开，客户端重连用 `Last-Event-ID` 补尾部（`src/api/events.ts`）。
+- **持久化降级响应**：动作已改内存但快照写失败时返回 503 `persistence_degraded` + `{applied:true, requestId}`，不再用 500 诱发盲目重试（`src/api/actions.ts`）。
+- **bot 子进程监管与凭证传递**：token 改环境变量 `TACTICAL_GAME_BOT_TOKEN`，不再出现在 argv；bot 异常退出按 0.5s→8s 退避重启，最多 3 次后标记失败并写 `bot_failed` 事件；增加最近 50 行输出缓冲（`src/api/bots.ts`、`rl/runners/run_model*.py`、`algorithms/runner.mjs`）。
+- **对局生命周期 GC**：`lastActivityAt` 只在写操作更新；lobby 默认 24h、终局默认 7 天未活动时归档到 `runtime/archive/` 并移除，active 对局不自动删除；启动后每 10 分钟检查一次，可用 `TACTICAL_GAME_LOBBY_TTL_HOURS` / `TACTICAL_GAME_OVER_TTL_HOURS` 调整或置 0 关闭（`src/state/store.ts`、`src/server.ts`）。
+
+### 修复
+
+- **动作/连接的可恢复性**：SSE 断线不再从头重放；持久化失败有明确 `applied` 语义；ID 令牌迁移不要求玩家重新加入；旧格式 `games.json` 在没有新快照时仍可恢复（`src/api/events.ts`、`src/api/actions.ts`、`src/state/store.ts`）。
+
+### 测试与验证
+
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 103 文件 / 869 例全绿。3.7.0 新增 12 例：幂等回放/冲突/降级 3、wait 超时/唤醒/鉴权 3、状态投影/304 2、生命周期归档 2、`Last-Event-ID` 1、明文 token 迁移 1。
+- 重点覆盖：同键重试只生效一次；磁盘写失败返回 503 且内存状态已生效；`include=state` 不含事件/配置；旧明文 token 迁移后仍可认证；SSE 从 `Last-Event-ID` 续传；lobby 归档后 active 对局保留。
+
+
 ## 3.6.5
 
 ### 变更

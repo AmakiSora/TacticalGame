@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildServer } from '../../src/server.js';
-import { globalStore } from '../../src/state/store.js';
+import { globalStore, gameSnapshotPath } from '../../src/state/store.js';
 import type { FastifyInstance } from 'fastify';
 
 const oldStateFile = process.env.TACTICAL_GAME_STATE_FILE;
@@ -366,8 +366,11 @@ describe('simultaneous mode API', () => {
       });
       await app.close();
 
-      const persisted = JSON.parse(readFileSync(process.env.TACTICAL_GAME_STATE_FILE!, 'utf8')) as { games: any[] };
-      const saved = persisted.games.find(g => g.id === gameId);
+      const persisted = JSON.parse(readFileSync(
+        gameSnapshotPath(process.env.TACTICAL_GAME_STATE_FILE!, gameId),
+        'utf8',
+      )) as { game: any };
+      const saved = persisted.game;
       expect(saved.config.mode).toBe('simultaneous');
       expect(saved.plan.committed).toHaveLength(1);
       expect(saved.plan.queues[seats[0]!.id]).toHaveLength(1);

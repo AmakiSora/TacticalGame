@@ -10,6 +10,9 @@ import { botsRoutes } from './api/bots.js';
 import { arenaEvalRoutes } from './api/arenaEval.js';
 import { actionsRoutes } from './api/actions.js';
 import { closeSseConnections, eventsRoutes } from './api/events.js';
+import { waitRoutes } from './api/wait.js';
+import { clearBotsForGame } from './api/bots.js';
+import { globalEventBus } from './events/bus.js';
 import { mapsRoutes } from './api/maps.js';
 import { skillRoutes } from './api/skill.js';
 import { recordsRoutes } from './api/records.js';
@@ -62,8 +65,11 @@ export function readRuntimeConfig(): RuntimeConfig {
 }
 
 function isRateLimitedPath(method: string, url: string): boolean {
-  if (method === 'POST' && (url === '/api/games' || /\/api\/games\/[^/]+\/(join|deploy|move|attack|heal|demolish|end-turn|force-adjudicate|plan\/revoke|plan\/clear|force-resolve)$/.test(url))) return true;
-  return method === 'GET' && /\/api\/games\/[^/]+\/events$/.test(url);
+  if (method === 'GET' && /\/api\/games\/[^/]+\/events$/.test(url)) return true;
+  // 随机地图预览是 CPU 生成入口；没有理由绕过限流。
+  if (method === 'POST' && url === '/api/maps/random/preview') return true;
+  // 所有对局写接口（动作、计划、房主管理、删除、加入/离开）统一覆盖。
+  return ['POST', 'PATCH', 'DELETE'].includes(method) && /^\/api\/games(\/|$)/.test(url);
 }
 
 export async function buildServer(): Promise<FastifyInstance> {
@@ -116,10 +122,25 @@ export async function buildServer(): Promise<FastifyInstance> {
     const entry = requestCounts.get(key);
     if (!entry || entry.resetAt <= now) {
       requestCounts.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+      // 固定窗口计数表必须有界：超过上限先清过期桶，再从最旧条目开始丢弃。
+      if (requestCounts.size > 10_000) {
+        for (const [bucketKey, bucket] of requestCounts) {
+          if (bucket.resetAt <= now) requestCounts.delete(bucketKey);
+          if (requestCounts.size <= 9_000) break;
+        }
+        while (requestCounts.size > 10_000) {
+          const oldest = requestCounts.keys().next().value;
+          if (oldest === undefined) break;
+          requestCounts.delete(oldest);
+        }
+      }
       return;
     }
     entry.count += 1;
     if (entry.count > protectedRateLimit) {
+      const retryAfter = Math.max(1, Math.ceil((entry.resetAt - now) / 1000));
+      reply.header('Retry-After', String(retryAfter));
+      inc('tactical_rate_limited_total');
       reply.code(429).send({ error: '请求过于频繁，请稍后再试', code: 'rate_limit' });
     }
   });
@@ -164,6 +185,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(arenaEvalRoutes);
   await app.register(actionsRoutes);
   await app.register(eventsRoutes);
+  await app.register(waitRoutes);
   await app.register(skillRoutes);
   await app.register(recordsRoutes);
   // 静态资源缓存策略（cacheControl: false 关闭默认的 public, max-age=0，
@@ -187,6 +209,31 @@ export async function buildServer(): Promise<FastifyInstance> {
       }
     },
   });
+
+  // 生命周期 GC：lobby / 终局对局按最后活动时间归档并移除；active 不自动删除。
+  if (!process.env.VITEST) {
+    const hours = (value: string | undefined, fallback: number): number => {
+      if (value === undefined || value === '') return fallback;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+    };
+    const lobbyTtlMs = hours(process.env.TACTICAL_GAME_LOBBY_TTL_HOURS, 24) * 3_600_000;
+    const gameOverTtlMs = hours(process.env.TACTICAL_GAME_OVER_TTL_HOURS, 7 * 24) * 3_600_000;
+    if (lobbyTtlMs > 0 || gameOverTtlMs > 0) {
+      const retentionTimer = setInterval(() => {
+        const removed = globalStore.pruneInactive({ lobbyTtlMs, gameOverTtlMs });
+        for (const gameId of removed) {
+          globalEventBus.clear(gameId);
+          clearBotsForGame(gameId);
+          closeSseConnections(gameId);
+          app.log.info({ gameId }, 'archived and removed inactive game');
+        }
+      }, 10 * 60_000);
+      retentionTimer.unref();
+      app.addHook('onClose', async () => clearInterval(retentionTimer));
+    }
+  }
+
   ready = true;
   return app;
 }
@@ -201,6 +248,12 @@ if (isMain) {
         if (closing) return;
         closing = true;
         app.log.info({ signal }, 'shutting down server');
+        // 退出前导出一份旧格式 games.json，便于回滚到 3.6.x；失败不阻止关闭。
+        try {
+          globalStore.flush();
+        } catch (err) {
+          app.log.error(err, 'failed to export legacy games.json on shutdown');
+        }
         closeSseConnections();
         app.close()
           .then(() => process.exit(0))

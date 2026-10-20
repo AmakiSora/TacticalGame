@@ -4,6 +4,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { GameState, PlayerId } from '../types.js';
 import { isSimultaneousMode, PLAYER_IDS } from '../types.js';
 import { globalStore } from '../state/store.js';
+import { hashToken, verifyToken } from '../state/tokens.js';
 import { buildAdjudicationSnapshot } from '../engine/engine.js';
 
 const errorStatus: Record<string, number> = {
@@ -18,6 +19,8 @@ const errorStatus: Record<string, number> = {
   game_not_started: 409,
   lobby_not_ready: 409,
   already_committed: 409,
+  idempotency_conflict: 409,
+  persistence_degraded: 503,
   not_simultaneous_game: 400,
   unsupported_player_count: 400,
   bot_not_supported: 400,
@@ -54,7 +57,7 @@ export function authenticate(
     reply.code(401).send({ error: '缺少玩家凭证', code: 'invalid_token' });
     return null;
   }
-  const player = PLAYER_IDS.find(id => safeEqual(game.tokens[id], token));
+  const player = PLAYER_IDS.find(id => safeEqual(game.tokens[id], hashToken(token)));
   if (!player) {
     reply.code(401).send({ error: '玩家凭证无效', code: 'invalid_token' });
     return null;
@@ -68,18 +71,34 @@ export function authenticateHost(
   const game = findGame(req, reply);
   if (!game) return null;
   const token = req.headers['x-host-token'];
-  if (typeof token !== 'string' || !safeEqual(game.hostToken, token)) {
+  if (typeof token !== 'string' || !verifyToken(token, game.hostToken)) {
     reply.code(401).send({ error: '房主凭证无效', code: 'invalid_host_token' });
     return null;
   }
   return game;
 }
 
-export function sanitizeGameForResponse(game: GameState, viewer?: PlayerId): unknown {
+export interface ResponseProjection {
+  events?: boolean;
+  config?: boolean;
+  adjudication?: boolean;
+}
+
+export function sanitizeGameForResponse(
+  game: GameState,
+  viewer?: PlayerId,
+  projection: ResponseProjection = {},
+): unknown {
   // rngState 一并剥离：泄露会让客户端预测后续伤害/治疗掷骰。
-  const { tokens: _tokens, hostToken: _hostToken, rngState: _rngState, ...rest } = game;
+  const {
+    tokens: _tokens, hostToken: _hostToken, rngState: _rngState,
+    events, config, ...rest
+  } = game;
   const body = structuredClone(rest) as Record<string, unknown>;
-  body.adjudication = buildAdjudicationSnapshot(game);
+  body.lastEventSeq = events.at(-1)?.seq ?? 0;
+  if (projection.events !== false) body.events = structuredClone(events);
+  if (projection.config !== false) body.config = structuredClone(config);
+  if (projection.adjudication !== false) body.adjudication = buildAdjudicationSnapshot(game);
   // simultaneous 模式下，其他玩家的计划队列属于秘密：只保留请求者自己的队列，
   // committed 名单公开（"谁已确认"不是秘密）。
   if (isSimultaneousMode(game.config.mode) && body.plan && typeof body.plan === 'object') {

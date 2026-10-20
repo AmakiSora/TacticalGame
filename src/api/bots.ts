@@ -113,6 +113,11 @@ interface BotRecord {
   /** 与该模型动作空间匹配的运行脚本；缺省时用当前版运行器。 */
   runnerScript?: string;
   child?: ChildProcess;
+  baseUrl?: string;
+  restarts?: number;
+  failed?: boolean;
+  restartTimer?: ReturnType<typeof setTimeout>;
+  output?: string[];
 }
 
 interface AlgorithmBotRecord {
@@ -121,20 +126,26 @@ interface AlgorithmBotRecord {
   token: string;
   algorithmName: string;
   child?: ChildProcess;
+  baseUrl?: string;
+  restarts?: number;
+  failed?: boolean;
+  restartTimer?: ReturnType<typeof setTimeout>;
+  output?: string[];
 }
 
 interface BotDeps {
   // 测试注入点：默认在 VITEST 环境下不真正拉起 python 进程。
-  spawner?: (cmd: string, args: string[], cwd: string) => ChildProcess | null;
+  spawner?: (cmd: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv) => ChildProcess | null;
 }
 
-const defaultSpawner: NonNullable<BotDeps['spawner']> = (cmd, args, cwd) => {
+const defaultSpawner: NonNullable<BotDeps['spawner']> = (cmd, args, cwd, env) => {
   if (process.env.VITEST) return null;
   return spawn(cmd, args, {
     cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
     detached: false,
+    env: { ...process.env, ...env },
   });
 };
 
@@ -356,98 +367,181 @@ export function removeBotRecord(gameId: string, playerId: PlayerId): boolean {
 
 /** 删除对局时清理并终止其全部 AI 子进程。 */
 export function clearBotsForGame(gameId: string): void {
-  for (const record of botsForGame(gameId)) record.child?.kill();
+  for (const record of botsForGame(gameId)) {
+    if (record.restartTimer) clearTimeout(record.restartTimer);
+    record.child?.kill();
+  }
   botsByGame.delete(gameId);
-  for (const record of algorithmBotsForGame(gameId)) record.child?.kill();
+  for (const record of algorithmBotsForGame(gameId)) {
+    if (record.restartTimer) clearTimeout(record.restartTimer);
+    record.child?.kill();
+  }
   algorithmBotsByGame.delete(gameId);
 }
 
 function killAllBotProcesses(): void {
   for (const records of botsByGame.values()) {
-    for (const record of records) record.child?.kill();
+    for (const record of records) {
+      if (record.restartTimer) clearTimeout(record.restartTimer);
+      record.child?.kill();
+    }
   }
   botsByGame.clear();
   for (const records of algorithmBotsByGame.values()) {
-    for (const record of records) record.child?.kill();
+    for (const record of records) {
+      if (record.restartTimer) clearTimeout(record.restartTimer);
+      record.child?.kill();
+    }
   }
   algorithmBotsByGame.clear();
 }
 
-export function launchBotsForGame(baseUrl: string, logger: FastifyBaseLogger, game: GameState): void {
-  const records = botsForGame(game.id);
-  if (records.length > 0) {
-    const python = resolvePython();
-    for (const record of records) {
-      const runnerScript = record.runnerScript ?? RUNNER_SCRIPT;
-      const args = [
-        runnerScript,
-        '--url', baseUrl,
-        '--game', record.gameId,
-        '--token', record.token,
-        '--side', record.playerId,
-        '--model', join(MODELS_DIR, record.modelFile),
-      ];
-      logger.info({ gameId: game.id, bot: record.playerId, model: record.modelFile }, 'launching RL bot runner');
-      let child: ChildProcess | null = null;
-      try {
-        child = activeSpawner(python, args, PROJECT_ROOT);
-      } catch (err) {
-        logger.error({ gameId: game.id, bot: record.playerId, err }, 'failed to spawn RL bot runner');
-        continue;
-      }
-      if (!child) continue;
-      record.child = child;
-      // 不打印 argv：其中包含该座位的玩家 token。
-      createInterface({ input: child.stdout! }).on('line', line =>
-        logger.info({ gameId: game.id, bot: record.playerId }, line));
-      createInterface({ input: child.stderr! }).on('line', line =>
-        logger.warn({ gameId: game.id, bot: record.playerId }, line));
-      child.on('error', err => {
-        logger.error({ gameId: game.id, bot: record.playerId, err }, 'RL bot runner failed');
-        record.child = undefined;
-      });
-      child.on('exit', code => {
-        logger.warn({ gameId: game.id, bot: record.playerId, code }, 'RL bot runner exited');
-        record.child = undefined;
-      });
-    }
-  }
+function appendOutput(record: BotRecord | AlgorithmBotRecord, line: string): void {
+  record.output = [...(record.output ?? []), line].slice(-50);
+}
 
-  const algoRecords = algorithmBotsForGame(game.id);
-  if (algoRecords.length > 0) {
-    for (const record of algoRecords) {
-      const args = [
-        ALGORITHM_RUNNER,
-        '--algorithm', record.algorithmName,
-        '--url', baseUrl,
-        '--game', record.gameId,
-        '--token', record.token,
-        '--side', record.playerId,
-        '--quiet',
-      ];
-      logger.info({ gameId: game.id, bot: record.playerId, algorithm: record.algorithmName }, 'launching algorithm bot');
-      let child: ChildProcess | null = null;
-      try {
-        child = activeSpawner('node', args, PROJECT_ROOT);
-      } catch (err) {
-        logger.error({ gameId: game.id, bot: record.playerId, err }, 'failed to spawn algorithm bot');
-        continue;
-      }
-      if (!child) continue;
-      record.child = child;
-      createInterface({ input: child.stdout! }).on('line', line =>
-        logger.info({ gameId: game.id, bot: record.playerId }, line));
-      createInterface({ input: child.stderr! }).on('line', line =>
-        logger.warn({ gameId: game.id, bot: record.playerId }, line));
-      child.on('error', err => {
-        logger.error({ gameId: game.id, bot: record.playerId, err }, 'algorithm bot runner failed');
-        record.child = undefined;
-      });
-      child.on('exit', code => {
-        logger.warn({ gameId: game.id, bot: record.playerId, code }, 'algorithm bot runner exited');
-        record.child = undefined;
-      });
-    }
+function rlStillRegistered(gameId: string, record: BotRecord): boolean {
+  return botsByGame.get(gameId)?.includes(record) ?? false;
+}
+
+function algorithmStillRegistered(gameId: string, record: AlgorithmBotRecord): boolean {
+  return algorithmBotsByGame.get(gameId)?.includes(record) ?? false;
+}
+
+function notifyBotFailed(game: GameState, record: BotRecord | AlgorithmBotRecord, reason: string): void {
+  appendEvent(game, globalEventBus, 'bot_failed', {
+    playerId: record.playerId,
+    bot: 'modelFile' in record ? 'rl' : 'algorithm',
+    reason,
+    restarts: record.restarts ?? 0,
+  });
+}
+
+function scheduleRestart(
+  game: GameState,
+  record: BotRecord | AlgorithmBotRecord,
+  logger: FastifyBaseLogger,
+  launch: () => void,
+  stillRegistered: () => boolean,
+): void {
+  if (record.failed || !stillRegistered()) return;
+  const restarts = (record.restarts ?? 0) + 1;
+  record.restarts = restarts;
+  if (restarts > 3) {
+    record.failed = true;
+    logger.error({ gameId: game.id, bot: record.playerId, restarts }, 'bot restart limit reached');
+    notifyBotFailed(game, record, 'restart_limit');
+    return;
+  }
+  const delayMs = Math.min(8_000, 500 * 2 ** (restarts - 1));
+  logger.warn({ gameId: game.id, bot: record.playerId, restarts, delayMs }, 'bot scheduled for restart');
+  record.restartTimer = setTimeout(() => {
+    record.restartTimer = undefined;
+    if (stillRegistered()) launch();
+  }, delayMs);
+  record.restartTimer.unref?.();
+}
+
+function launchRlRecord(baseUrl: string, logger: FastifyBaseLogger, game: GameState, record: BotRecord): void {
+  if (record.restartTimer) {
+    clearTimeout(record.restartTimer);
+    record.restartTimer = undefined;
+  }
+  const python = resolvePython();
+  const runnerScript = record.runnerScript ?? RUNNER_SCRIPT;
+  const args = [
+    runnerScript,
+    '--url', baseUrl,
+    '--game', record.gameId,
+    '--side', record.playerId,
+    '--model', join(MODELS_DIR, record.modelFile),
+  ];
+  logger.info({ gameId: game.id, bot: record.playerId, model: record.modelFile }, 'launching RL bot runner');
+  let child: ChildProcess | null = null;
+  try {
+    child = activeSpawner(python, args, PROJECT_ROOT, { TACTICAL_GAME_BOT_TOKEN: record.token });
+  } catch (err) {
+    logger.error({ gameId: game.id, bot: record.playerId, err }, 'failed to spawn RL bot runner');
+    scheduleRestart(game, record, logger, () => launchRlRecord(baseUrl, logger, game, record),
+      () => rlStillRegistered(game.id, record));
+    return;
+  }
+  if (!child) return;
+  record.child = child;
+  // 不打印 argv：token 通过环境变量传递，不进入命令行。
+  if (child.stdout) createInterface({ input: child.stdout }).on('line', line => {
+    appendOutput(record, line);
+    logger.info({ gameId: game.id, bot: record.playerId }, line);
+  });
+  if (child.stderr) createInterface({ input: child.stderr }).on('line', line => {
+    appendOutput(record, line);
+    logger.warn({ gameId: game.id, bot: record.playerId }, line);
+  });
+  child.on('error', err => {
+    logger.error({ gameId: game.id, bot: record.playerId, err }, 'RL bot runner failed');
+    record.child = undefined;
+  });
+  child.on('exit', code => {
+    logger.warn({ gameId: game.id, bot: record.playerId, code }, 'RL bot runner exited');
+    record.child = undefined;
+    scheduleRestart(game, record, logger, () => launchRlRecord(baseUrl, logger, game, record),
+      () => rlStillRegistered(game.id, record));
+  });
+}
+
+function launchAlgorithmRecord(baseUrl: string, logger: FastifyBaseLogger, game: GameState, record: AlgorithmBotRecord): void {
+  if (record.restartTimer) {
+    clearTimeout(record.restartTimer);
+    record.restartTimer = undefined;
+  }
+  const args = [
+    ALGORITHM_RUNNER,
+    '--algorithm', record.algorithmName,
+    '--url', baseUrl,
+    '--game', record.gameId,
+    '--side', record.playerId,
+    '--quiet',
+  ];
+  logger.info({ gameId: game.id, bot: record.playerId, algorithm: record.algorithmName }, 'launching algorithm bot');
+  let child: ChildProcess | null = null;
+  try {
+    child = activeSpawner('node', args, PROJECT_ROOT, { TACTICAL_GAME_BOT_TOKEN: record.token });
+  } catch (err) {
+    logger.error({ gameId: game.id, bot: record.playerId, err }, 'failed to spawn algorithm bot');
+    scheduleRestart(game, record, logger, () => launchAlgorithmRecord(baseUrl, logger, game, record),
+      () => algorithmStillRegistered(game.id, record));
+    return;
+  }
+  if (!child) return;
+  record.child = child;
+  if (child.stdout) createInterface({ input: child.stdout }).on('line', line => {
+    appendOutput(record, line);
+    logger.info({ gameId: game.id, bot: record.playerId }, line);
+  });
+  if (child.stderr) createInterface({ input: child.stderr }).on('line', line => {
+    appendOutput(record, line);
+    logger.warn({ gameId: game.id, bot: record.playerId }, line);
+  });
+  child.on('error', err => {
+    logger.error({ gameId: game.id, bot: record.playerId, err }, 'algorithm bot runner failed');
+    record.child = undefined;
+  });
+  child.on('exit', code => {
+    logger.warn({ gameId: game.id, bot: record.playerId, code }, 'algorithm bot runner exited');
+    record.child = undefined;
+    scheduleRestart(game, record, logger, () => launchAlgorithmRecord(baseUrl, logger, game, record),
+      () => algorithmStillRegistered(game.id, record));
+  });
+}
+
+export function launchBotsForGame(baseUrl: string, logger: FastifyBaseLogger, game: GameState): void {
+  for (const record of botsForGame(game.id)) {
+    record.baseUrl = baseUrl;
+    launchRlRecord(baseUrl, logger, game, record);
+  }
+  for (const record of algorithmBotsForGame(game.id)) {
+    record.baseUrl = baseUrl;
+    launchAlgorithmRecord(baseUrl, logger, game, record);
   }
 }
 

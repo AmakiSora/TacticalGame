@@ -27,7 +27,7 @@ function parseArgs(argv) {
     algorithm: '',
     url: '',
     game: '',
-    token: '',
+    token: process.env.TACTICAL_GAME_BOT_TOKEN || '',
     side: 'player_a',
     pollSeconds: 0.5,
     maxTurns: 120,
@@ -62,7 +62,7 @@ function parseArgs(argv) {
   if (!args.algorithm) throw new Error('--algorithm is required');
   if (!args.url) throw new Error('--url is required');
   if (!args.game) throw new Error('--game is required');
-  if (!args.token) throw new Error('--token is required');
+  if (!args.token) throw new Error('--token or TACTICAL_GAME_BOT_TOKEN is required');
 
   args.url = args.url.replace(/\/+$/, '');
 
@@ -80,7 +80,7 @@ function printHelp() {
   --algorithm <name>     算法名称（${listAlgorithms().join(', ')}）
   --url <url>            服务器地址（如 http://localhost:3100）
   --game <id>            游戏 ID
-  --token <token>        玩家 token
+  --token <token>        玩家 token（或环境变量 TACTICAL_GAME_BOT_TOKEN）
   --side <id>            玩家席位 ID（player_a, player_b, ...）
 
 可选参数：
@@ -144,6 +144,13 @@ async function waitForTurn(apiClient, side, pollSeconds, quiet) {
       if (state.phase === 'active' && !committed.includes(side)) {
         return { done: false, state };
       }
+      const lastSeq = state.lastEventSeq ?? state.events?.at?.(-1)?.seq ?? 0;
+      try {
+        const waited = await apiClient.waitForChange(lastSeq, 25);
+        if (waited.changed) continue;
+      } catch {
+        // 旧服务器/断线：保持原轮询节奏。
+      }
       await sleep(pollSeconds * 1000);
       continue;
     }
@@ -154,7 +161,14 @@ async function waitForTurn(apiClient, side, pollSeconds, quiet) {
       return { done: false, state };
     }
 
-    // 继续等待
+    // 继续等待：优先长轮询，端点不可用时回退到轮询。
+    const lastSeq = state.lastEventSeq ?? state.events?.at?.(-1)?.seq ?? 0;
+    try {
+      const waited = await apiClient.waitForChange(lastSeq, 25);
+      if (waited.changed) continue;
+    } catch {
+      // fall through to poll
+    }
     await sleep(pollSeconds * 1000);
   }
 }

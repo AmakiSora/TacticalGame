@@ -205,13 +205,21 @@ export type EventType =
   | 'headquarters_destroyed'
   | 'player_eliminated'
   | 'game_over'
-  | 'name_rename';
+  | 'name_rename'
+  | 'bot_failed';
 
 export interface GameEvent {
   seq: number;
   type: EventType;
   timestamp: number;
   payload: Record<string, unknown>;
+}
+
+/** 已成功动作的幂等回放记录；按对局、最近 N 个键保存。 */
+export interface IdempotencyRecord {
+  bodyHash: string;
+  response: unknown;
+  expiresAt: number;
 }
 
 export interface AdjudicationScore {
@@ -280,6 +288,8 @@ export interface GameState {
   config: MapConfig;
   /** 大厅创建时间（毫秒时间戳）。旧版持久化档案没有这个字段，读取时按首个事件兜底。 */
   createdAt?: number;
+  /** 最后一次成功写操作时间；读请求不续命，供生命周期 GC 使用。 */
+  lastActivityAt?: number;
   /**
    * 房主名（大厅列表展示用）。参战建房时取房主席位名，未参战时取创建表单填的名字；
    * 房主之后加入战斗 / 改名会同步到这里。旧版持久化档案没有这个字段。
@@ -300,6 +310,8 @@ export interface GameState {
   turn: TurnState;
   plan: PlanState | null;
   events: GameEvent[];
+  /** 最近的成功动作幂等记录；有界，旧存档缺省为空。 */
+  idempotency?: Record<string, IdempotencyRecord>;
   /**
    * 派生索引/缓存的失效版本：每次成功追加事件 +1。不参与游戏规则，
    * 旧存档缺省时按 0 处理。不要用它做客户端协议版本（公开 revision 是另一件事）。

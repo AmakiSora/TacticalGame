@@ -171,6 +171,8 @@ describe('GameStore persistence', () => {
       else game.config.balance.maxTurns = value;
     }
     writeFileSync(file, JSON.stringify(payload));
+    // 这个用例验证旧版单文件迁移；删除新快照，强制走 legacy 导入路径。
+    rmSync(join(tempDir!, 'store'), { recursive: true, force: true });
 
     const restored = new GameStore({ persistenceFile: file });
     restored.loadFromDisk();

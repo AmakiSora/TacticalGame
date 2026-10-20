@@ -1,13 +1,17 @@
 // src/api/games.ts
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer } from '../state/store.js';
+import {
+  globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer,
+  getRawHostToken, getRawPlayerToken,
+} from '../state/store.js';
+import { verifyToken } from '../state/tokens.js';
 import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
 import { eliminateFromPlanAndMaybeResolve, forceResolveRound } from '../engine/simultaneous.js';
 import {
-  authenticate, authenticateHost, safeEqual, sanitizeGameForResponse, statusForCode,
+  authenticate, authenticateHost, sanitizeGameForResponse, statusForCode,
 } from './auth.js';
 import { authorizeControlRequest } from './controlAuth.js';
 import { listMaps } from '../config/loader.js';
@@ -101,8 +105,8 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       const creatorId = joinedPlayerIds(game)[0];
       return {
         gameId: game.id,
-        hostToken: game.hostToken,
-        player: creatorId ? { id: creatorId, token: game.tokens[creatorId] } : null,
+        hostToken: getRawHostToken(game) ?? '',
+        player: creatorId ? { id: creatorId, token: getRawPlayerToken(game, creatorId) ?? '' } : null,
         lobby: lobbySummary(game),
       };
     },
@@ -120,7 +124,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (game.phase !== 'lobby') return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
     // 房主带房主凭证参战时，顺带把列表里的房主名同步成这个席位名。
     const hostHeader = req.headers['x-host-token'];
-    const hostJoining = typeof hostHeader === 'string' && safeEqual(hostHeader, game.hostToken);
+    const hostJoining = typeof hostHeader === 'string' && verifyToken(hostHeader, game.hostToken);
     const joined = addLobbyPlayer(game, req.body?.name);
     if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
     if (hostJoining) game.hostName = game.players[joined.id]!.name;
@@ -237,7 +241,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     ctx.game.playerNames[ctx.player] = name;
     // 房主自己改名：带房主凭证时同步列表里的房主名，免得大厅列表还显示旧名字。
     const hostHeader = req.headers['x-host-token'];
-    if (typeof hostHeader === 'string' && safeEqual(hostHeader, ctx.game.hostToken)) {
+    if (typeof hostHeader === 'string' && verifyToken(hostHeader, ctx.game.hostToken)) {
       ctx.game.hostName = name;
     }
     appendEvent(ctx.game, globalEventBus, 'name_rename', { playerId: ctx.player, name });
@@ -281,9 +285,24 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  app.get<{ Params: { id: string } }>('/api/games/:id', async (req, reply) => {
+  app.get<{ Params: { id: string }; Querystring: { include?: string } }>('/api/games/:id', async (req, reply) => {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
-    return sanitizeGameForResponse(ctx.game, ctx.player);
+    const includeRaw = typeof req.query.include === 'string' ? req.query.include : null;
+    const include = includeRaw === null
+      ? null
+      : new Set(includeRaw.split(',').map(item => item.trim()).filter(Boolean));
+    const projection = include === null
+      ? {}
+      : {
+        events: include.has('events'),
+        config: include.has('config'),
+        adjudication: include.has('adjudication'),
+      };
+    const includeKey = include === null ? 'all' : [...include].sort().join(',');
+    const etag = `"${ctx.game.id}-${ctx.game.stateVersion ?? 0}-${includeKey}"`;
+    reply.header('ETag', etag);
+    if (req.headers['if-none-match'] === etag) return reply.code(304).send();
+    return sanitizeGameForResponse(ctx.game, ctx.player, projection);
   });
 }

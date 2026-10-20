@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from '../../src/server.js';
-import { globalStore } from '../../src/state/store.js';
+import { globalStore, gameSnapshotPath } from '../../src/state/store.js';
 
 const oldStateFile = process.env.TACTICAL_GAME_STATE_FILE;
 const oldControlToken = process.env.AUTO_CONTROL_TOKEN;
@@ -78,8 +78,8 @@ describe('game persistence API', () => {
     });
     expect(end.statusCode).toBe(200);
 
-    const persisted = JSON.parse(readFileSync(file, 'utf8')) as { games: any[] };
-    expect(persisted.games.find(g => g.id === gameId).turn.currentOwner).toBe('player_b');
+    const persisted = JSON.parse(readFileSync(gameSnapshotPath(file, gameId), 'utf8')) as { game: any };
+    expect(persisted.game.turn.currentOwner).toBe('player_b');
     await app.close();
 
     const restoredApp = await buildServer();

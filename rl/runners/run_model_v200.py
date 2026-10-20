@@ -18,6 +18,7 @@ v2.0.0 模型（38 动作 / 8 单位槽）与当前 v2.1 环境（54 动作）�
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -40,13 +41,16 @@ def parse_args():
     parser.add_argument("--model", default="", help="模型路径；留空自动选择 rl/models 中最新的 v2.0 模型")
     parser.add_argument("--url", default="http://127.0.0.1:3100")
     parser.add_argument("--game", required=True)
-    parser.add_argument("--token", required=True)
+    parser.add_argument("--token", default=os.environ.get("TACTICAL_GAME_BOT_TOKEN", ""))
     parser.add_argument("--side", choices=("player_a", "player_b"), default="player_a")
     parser.add_argument("--poll-seconds", type=float, default=0.5)
     parser.add_argument("--max-actions", type=int, default=1000)
     parser.add_argument("--stochastic", action="store_true")
     parser.add_argument("--once", action="store_true", help="act once, then exit")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.token:
+        parser.error("--token or TACTICAL_GAME_BOT_TOKEN is required")
+    return args
 
 
 def main():

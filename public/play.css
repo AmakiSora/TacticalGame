@@ -25,10 +25,11 @@ body {
 
 /* ══════════ header ══════════ */
 header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 28px;
+  column-gap: 16px;
+  padding: 12px 24px;
   background: linear-gradient(135deg, #1a2530 0%, #16202b 100%);
   border-bottom: 1px solid #2a3a4a;
   position: sticky;
@@ -37,7 +38,7 @@ header {
 }
 header h1 { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
 header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6px; }
-.brand-block { display: flex; flex-direction: column; gap: 3px; }
+.brand-block { display: flex; flex-direction: column; gap: 3px; justify-self: start; }
 .page-subtitle { color: #7894a6; font-size: 12px; font-weight: 600; }
 .badge {
   padding: 4px 14px;
@@ -50,15 +51,20 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .badge.ok     { background: #1a4a2a; color: #6dcc8a; }
 .badge.err    { background: #4a1a1a; color: #cc6d6d; }
 
-.header-actions {
+.header-tools {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
+  justify-self: end;
+  min-width: 0;
 }
 .page-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  justify-self: center;
 }
 .page-nav a {
   text-decoration: none;
@@ -1377,7 +1383,7 @@ body.map-dialog-open { overflow: hidden; }
 /* ══════════ main layout ══════════ */
 #game-ui {
   display: grid;
-  grid-template-columns: var(--tg-grid, minmax(200px, 240px) minmax(420px, auto) minmax(330px, 380px));
+  grid-template-columns: var(--tg-grid, 300px minmax(420px, auto) 300px);
   padding: 18px 24px 24px;
   gap: 18px;
   align-items: flex-start;
@@ -1418,7 +1424,8 @@ body.map-dialog-open { overflow: hidden; }
 
 /* selection panel left of board */
 .selection-panel {
-  width: 200px;
+  width: 100%;
+  min-width: 0;
   flex-shrink: 0;
   background: #141c26;
   border: 1px solid #1e2e3e;
@@ -1573,6 +1580,8 @@ body.map-dialog-open { overflow: hidden; }
 .sel-stat-card.range { border-color: rgba(190,170,104,.45); }
 .sel-stat-card.heal { border-color: rgba(120,200,160,.45); }
 .sel-stat-card.cost { border-color: rgba(214,179,74,.45); }
+/* 属性个数为奇数时最后一张铺满整行，避免右下角空出一格 */
+.sel-stat-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .sel-coord, .sel-note { color: #668495; font-size: 12px; }
 
 /* ══════════ sidebar ══════════ */
@@ -2007,6 +2016,16 @@ body.map-dialog-open { overflow: hidden; }
     width: 100%;
     max-width: 760px;
     order: 4;
+  }
+}
+
+/* 窄屏放弃三列网格，回到「品牌 + 导航换行」的老布局 */
+@media (max-width: 900px) {
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
   }
 }
 

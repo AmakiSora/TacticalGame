@@ -75,16 +75,17 @@ button.danger:hover {
   color: #ffd2c8;
 }
 
-/* ---------- 头部工具区（配合 style.css 的 header / page-nav） ---------- */
+/* ---------- 头部动作区（导航位置由 style.css 的三列网格统一决定） ---------- */
 
-#editor-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+.header-tools {
   gap: 8px;
 }
 
-#editor-meta .file-tools button {
+.header-tools .file-tools {
+  flex-wrap: wrap;
+}
+
+.header-tools .file-tools button {
   font-size: 12px;
   padding: 4px 10px;
 }

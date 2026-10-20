@@ -27,10 +27,10 @@
   width: 100%;
 }
 
-/* 单位状态卡片原本固定 200px 宽，进入分区后与其他卡片同宽 */
+/* 单位状态卡片原本固定 200px 宽，进入分区后撑满分区（align-self: flex-start 会让它退成内容宽） */
 .tg-zone #selection-panel,
 .tg-zone .selection-panel {
-  width: auto;
+  width: 100%;
 }
 
 /* 拖拽状态 */

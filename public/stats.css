@@ -25,12 +25,11 @@ body.stats-shell {
 }
 
 header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 14px 28px;
+  column-gap: 16px;
+  padding: 12px 24px;
   background: linear-gradient(135deg, #1a2530 0%, #16202b 100%);
   border-bottom: 1px solid #2a3a4a;
   position: sticky;
@@ -39,13 +38,14 @@ header {
 }
 
 header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0; }
-.brand-block { display: flex; flex-direction: column; gap: 3px; }
+.brand-block { display: flex; flex-direction: column; gap: 3px; justify-self: start; }
 .page-subtitle { color: #7894a6; font-size: 12px; font-weight: 600; }
 
 .page-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  justify-self: center;
 }
 .page-nav a {
   text-decoration: none;
@@ -422,6 +422,16 @@ button:focus-visible,
   background: #162028;
   padding: 1px 5px;
   border-radius: 4px;
+}
+
+/* 窄屏放弃三列网格，回到「品牌 + 导航换行」的老布局 */
+@media (max-width: 900px) {
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
 }
 
 @media (max-width: 720px) {

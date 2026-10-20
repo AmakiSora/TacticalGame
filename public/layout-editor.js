@@ -15,16 +15,17 @@ import './ui-dialog.js';
       board: '.board-panel',
       sidebar: '#sidebar',
       boardDefaultCol: 'minmax(420px, auto)',
-      leftCol: 'minmax(200px, 240px)',
-      rightCol: 'minmax(330px, 380px)',
+      leftCol: '300px',
+      rightCol: '300px',
       cards: [
+        // 左栏：回合 / 资源在上，单位状态在下；事件流放到棋盘下方；右栏从分数排行榜开始
+        { id: 'turn-resources', selector: '#turn-resources', defaultZone: 'left' },
         { id: 'selection-panel', selector: '#selection-panel', defaultZone: 'left' },
-        { id: 'turn-resources', selector: '#turn-resources', defaultZone: 'right' },
+        { id: 'event-log', selector: '#event-log', defaultZone: 'bottom' },
         { id: 'score-panel', selector: '#score-panel', defaultZone: 'right' },
-        { id: 'action-hints', selector: '#action-hints', defaultZone: 'right' },
         { id: 'plan-panel', selector: '#plan-panel', defaultZone: 'right' },
         { id: 'quick-actions', selector: '#quick-actions', defaultZone: 'right' },
-        { id: 'event-log', selector: '#event-log', defaultZone: 'right' },
+        { id: 'action-hints', selector: '#action-hints', defaultZone: 'right' },
       ],
     },
     spectator: {

@@ -56,6 +56,39 @@ describe('layout editor', () => {
     expect(read('public/style.css')).toContain('var(--tg-grid');
   });
 
+  it('gives both sidebars the same width on the player and spectator pages', () => {
+    const source = read('public/layout-editor.js');
+    // 顺序：玩家页 left/right、观战页 left/right——同一页左右必须同宽，两页也保持同宽。
+    const cols = [...source.matchAll(/(?:left|right)Col: '([^']+)'/g)].map(m => m[1]);
+    expect(cols).toEqual(['300px', '300px', '300px', '300px']);
+    for (const css of ['public/play.css', 'public/style.css']) {
+      expect(read(css)).toContain('300px minmax(420px, auto) 300px');
+    }
+  });
+
+  it('ships the player default layout as 回合/单位状态 left, 事件流 under the board, 排行榜/快捷操作/操作 right', () => {
+    const source = read('public/layout-editor.js');
+    const block = source.slice(source.indexOf('play: {'), source.indexOf('spectator: {'));
+    // defaultState() 按 cards 声明顺序填充各分区，声明顺序即分区内的上下顺序
+    const zones = [...block.matchAll(/id: '([\w-]+)',\s*selector: '[^']+',\s*defaultZone: '(\w+)'/g)]
+      .map(m => `${m[2]}:${m[1]}`);
+    expect(zones).toEqual([
+      'left:turn-resources',
+      'left:selection-panel',
+      'bottom:event-log',
+      'right:score-panel',
+      'right:plan-panel',
+      'right:quick-actions',
+      'right:action-hints',
+    ]);
+  });
+
+  it('stretches the selection panel to the zone width so unit stats are not squeezed', () => {
+    for (const css of ['public/layout-editor.css', 'public/play.css']) {
+      expect(read(css)).toMatch(/(?:\.tg-zone (?:#selection-panel|\.selection-panel)|\.selection-panel)\s*\{[^}]*width:\s*100%/s);
+    }
+  });
+
   it('ships the spectator default layout as 资源/查看单位 left, 当前事件/事件流 under the board, 回合/排行榜/对局操作 right', () => {
     const source = read('public/layout-editor.js');
     const block = source.slice(source.indexOf('spectator: {'), source.indexOf('function detectConfig'));

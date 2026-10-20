@@ -4,6 +4,20 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.7.1
+
+### 变更
+
+- **取消「过期模型」机制，三个模型恢复为正常参评**：`v2.3.2@340K`、`v2.5.0@2M`、`v2.6.0@3.6M` 不再有独立的过期状态，`rl/models/` 下全部 19 个可加载模型都会进入新一轮评估与排行榜；`GET /api/rl/models` 不再过滤它们，竞技场页面不再提供「显示已过期」开关与「已过期模型」归档表，榜单/统计 JSON 移除 `expired` 状态、`expiredAt`/`expiredReason`/`expiredMatchesKept`/`expiredModelCount` 字段与 `payload.expired` 段。`arena/model-status.json`、`script/expireArenaModels.mjs`、`npm run arena-expire` 及对应契约/单元测试一并移除；模型状态仅保留「推荐 / 历史 / 作废」三种（`script/modelStatus.mjs`）。
+- **`round_robin.py` 自动发现不再排除过期模型**：启动日志与 `--models` 过滤只区分可对战模型与 v1.0.0 旧格式；三个原过期模型默认参评后，5 图 × 25 个参与者（19 模型 + 6 算法）的单图批次为 300 个 / 7,200 局。
+- **MODELS_NOTES 与 Docker 打包同步**：`rl/docs/MODELS_NOTES.md` 删除「已过期模型」小节，三条模型状态改回「历史 / 历史（不推荐）」；镜像不再 COPY `script/modelStatus.mjs` 与 `arena/model-status.json`（服务端已无该 import，`arena/` 整体不进镜像）。
+
+### 测试与验证
+
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 101 文件 / 853 例全绿；`pytest tests/rl -q` 66 例通过。
+- `npm run arena-leaderboard` 重新出榜：48,960 局、26 个参评参与者（25 个有对局；v1.0.0 旧格式不参评），`v2.3.2@340K` / `v2.5.0@2M` / `v2.6.0@3.6M` 均以 `legacy` 正常显示（评分 1223 / 1314 / 1304）；`npm run arena-stats` 同步生成 27 个参与者档案，无 `expired` 字段。
+- `round_robin.py --dry-run`：参评模型 19 个（含三个原过期模型）、算法 6 个；单图 300 批 / 7,200 局。
+
 ## 3.7.0
 
 ### 新增

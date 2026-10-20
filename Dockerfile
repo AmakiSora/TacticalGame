@@ -15,8 +15,6 @@ COPY src ./src
 # 构建期 tsc 需解析 src/api/{bots,arenaEval}.ts 对 algorithms/registry.mjs 的
 # import（类型声明 registry.d.mts）；运行时依赖算法子进程，见下方 runtime 阶段的 COPY。
 COPY algorithms ./algorithms
-# 同上：src/api/bots.ts 静态 import script/modelStatus.mjs（过期模型名单唯一来源）。
-COPY script/modelStatus.mjs script/modelStatus.d.mts ./script/
 RUN npm run build && npm run build:frontend
 
 # Install the runtime dependency set separately to keep the final image small.
@@ -68,16 +66,8 @@ COPY --from=build --chown=tactical:tactical /app/dist-public ./dist-public
 COPY --chown=tactical:tactical maps ./maps
 # 算法 AI：src/api/bots.ts 会以子进程拉起 node algorithms/runner.mjs，镜像必须携带。
 COPY --chown=tactical:tactical algorithms ./algorithms
-# 运行期镜像必须带上 modelStatus.mjs：dist/api/bots.js 里保留的是相对路径 import
-# （../../script/modelStatus.mjs），缺它容器启动即 ERR_MODULE_NOT_FOUND。
-# script/ 只带这一个文件：评估控制台另需的两个脚本（generateArenaLeaderboard.mjs /
-# generateArenaStats.mjs）按设计不进镜像——评估跑批是本地开发功能（见 src/api/arenaEval.ts
-# 头注），线上相关写接口返回 501 而不是 spawn ENOENT 的坏 500。
-# 该模块按自身位置回推项目根读 arena/model-status.json，只 COPY 登记表本身——
-# arena/ 其余内容（matches.jsonl 与 details/）是本地分析数据，不进镜像（.dockerignore 已排除，
-# 否则 2GB+ 每次构建都白传一遍上下文）。
-COPY --chown=tactical:tactical script/modelStatus.mjs ./script/
-COPY --chown=tactical:tactical arena/model-status.json ./arena/
+# 评估控制台所需的榜单/统计脚本按设计不进镜像：评估跑批是本地开发功能
+# （见 src/api/arenaEval.ts 头注），线上相关写接口返回 501 而不是 spawn ENOENT 的坏 500。
 COPY --chown=tactical:tactical rl ./rl
 # agent 通过 /api/skill* 接口拉取最新 skill，镜像需携带权威 skill 目录。
 COPY --chown=tactical:tactical skill ./skill

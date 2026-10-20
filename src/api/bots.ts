@@ -19,8 +19,6 @@ import { authenticateHost } from './auth.js';
 import { lobbySummary } from './games.js';
 // 算法展示元数据唯一来源（类型声明见 algorithms/registry.d.mts）。
 import { listAlgorithmInfo, algorithmParticipantId } from '../../algorithms/registry.mjs';
-// 过期模型名单唯一来源（类型声明见 script/modelStatus.d.mts）。
-import { loadModelStatus, versionOfModelFile } from '../../script/modelStatus.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -154,7 +152,7 @@ let activeSpawner: NonNullable<BotDeps['spawner']> = defaultSpawner;
 
 let modelsCache: RlModelInfo[] = [];
 // 模型解析结果按 (file, mtimeMs, size) 缓存：目录扫描仍每次做，但 ZIP 解压/动作空间
-// 探测只在文件变化时执行。过期名单是独立过滤条件，不参与缓存键。
+// 探测只在文件变化时执行。
 const modelInfoCache = new Map<string, { mtimeMs: number; size: number; info: RlModelInfo }>();
 
 /** 可用的算法 AI 配置。由 algorithms/registry.mjs 的展示元数据生成：
@@ -255,22 +253,8 @@ function readActionSpace(modelPath: string): number | null {
   }
 }
 
-/** 读取 arena/model-status.json 的过期模型版本集合（语义见 script/modelStatus.mjs）。 */
-function expiredVersionSet(): Set<string> {
-  try {
-    return new Set(loadModelStatus().entries.map(entry => entry.version));
-  } catch (err) {
-    // 口径（见 script/modelStatus.mjs 头注）：脚本与评估链路对坏名单 fail-fast，
-    // 服务端是唯一允许降级的消费端——登记表坏了不阻断线上对局，退化为「无过期」
-    // 但必须留下可见告警（代价仅是过期模型临时回到「添加 AI」列表）。
-    console.warn(`[bots] 无法读取过期模型登记表：${(err as Error).message}；本次不排除任何过期模型。`);
-    return new Set();
-  }
-}
-
 /** 扫描 rl/models 目录下的 .zip 模型文件（新者优先）。目录不存在时返回空列表。 */
 export function refreshRlModels(): RlModelInfo[] {
-  const expired = expiredVersionSet();
   let files: string[];
   try {
     files = readdirSync(MODELS_DIR).filter(file => file.toLowerCase().endsWith('.zip'));
@@ -284,8 +268,6 @@ export function refreshRlModels(): RlModelInfo[] {
   const seen = new Set<string>();
   const next: RlModelInfo[] = [];
   for (const file of files) {
-    const version = versionOfModelFile(file);
-    if (version !== null && expired.has(version)) continue;
     const full = join(MODELS_DIR, file);
     let stat;
     try {

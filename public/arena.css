@@ -4,15 +4,6 @@
     .tag.st-muted { background: #2a3a44; color: #9ab; }
     .tag.st-algo { background: #27424f; color: #9ad3e8; }
     .tag.st-model { background: #16301f; color: #8ddda4; }
-    /* 过期（expired）用琥珀色，与作废（st-bad 红）区分：模型本身没问题，只是退役归档。 */
-    .tag.st-expired { background: #4a3a12; color: #e8c46a; }
-    /* 「显示已过期模型」开关：.filters 的 label 是纵向列布局、input 带 34px 高，
-       勾选框必须覆盖掉行内 input 的盒模型，否则会被拉成一个方块。 */
-    .filters label.toggle { justify-content: flex-end; }
-    .filters label.toggle .toggle-line { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #9ab; font-weight: 400; min-height: 34px; cursor: pointer; }
-    .filters label.toggle input[type="checkbox"] { width: auto; min-height: 0; height: 14px; padding: 0; margin: 0; accent-color: #3f9b6c; cursor: pointer; }
-    .panel-heading .expired-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #9ab; cursor: pointer; }
-    .panel-heading .expired-toggle input[type="checkbox"] { accent-color: #3f9b6c; cursor: pointer; margin: 0; }
     .rating-ci { color: #6a8496; font-size: 11px; margin-left: 4px; }
     #h2h-table { min-width: 720px; }
     #h2h-table th, #h2h-table td { text-align: center; padding: 4px 6px; font-size: 12px; }

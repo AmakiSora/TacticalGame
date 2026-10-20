@@ -341,17 +341,17 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
     const outFile = join(tempDir, 'stats.json');
     const line = (a: string, b: string, winner: string) =>
       JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
-    // A（v2.2.0，走 MODEL_STATUS_BY_VERSION 查表 legacy 分支）× 已过期的 v2.3.2 × 注册算法。
-    const EXPIRED_ZIP = 'hex_ppo_v2.3.2_20260829_340K.zip';
+    // A（v2.2.0，走 MODEL_STATUS_BY_VERSION 查表 legacy 分支）× v2.3.2 × 注册算法。
+    const EXTRA_ZIP = 'hex_ppo_v2.3.2_20260829_340K.zip';
     writeFileSync(statsFile,
-      line(A, EXPIRED_ZIP, EXPIRED_ZIP) +
+      line(A, EXTRA_ZIP, EXTRA_ZIP) +
       line(A, 'algo_threat@v1', A));
 
     // --models-dir 指向自建临时目录：真 rl/models 是 gitignored 的本机产物，CI 检出上没有。
     const modelsDir = join(tempDir, 'models');
     mkdirSync(modelsDir, { recursive: true });
     writeFileSync(join(modelsDir, A), 'zip');
-    writeFileSync(join(modelsDir, EXPIRED_ZIP), 'zip');
+    writeFileSync(join(modelsDir, EXTRA_ZIP), 'zip');
 
     const result = spawnSync(
       process.execPath,

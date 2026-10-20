@@ -12,14 +12,6 @@
   传参规格为 ``algo:<name>@<version>``（版本取 registry.mjs 的当前标注，保证
   算法升版后历史对局仍归属旧版本 id）；--algorithms none 可退回纯模型循环赛。
 
-过期模型（``arena/model-status.json`` 登记，见 ``script/modelStatus.mjs``）**不自动参评**：
-它们的 zip 仍在 rl/models/ 下、历史对局也仍在评分池里（与「作废」不同），只是不再
-参与新一轮评估——过期原因只有一个：名次已沉底，继续陪跑只拉长新模型的评估时长。
-要临时让过期模型陪打，用 ``--models`` 显式点名即可（点名优先于过期排除）。
-登记表只在**文件不存在**（纯算法开发机）时按「无过期」处理；存在但损坏则报错退出，
-不降级为「无过期」——那会把过期模型重新拉回对手池陪跑，正是本机制要省掉的开销
-（唯一允许降级的消费端是线上服务 ``src/api/bots.ts``，口径见 ``script/modelStatus.mjs`` 头注）。
-
 用法示例：
 
     # 全量（模型+算法两两 × 7 图 × 24 局，可分批跑）
@@ -52,8 +44,6 @@ from pathlib import Path
 MODEL_RE = re.compile(r"^hex_ppo_(v\d+\.\d+\.\d+)_")
 # v1.0.0 为 512 动作旧格式，evaluate_cross.py 无法在进程内互打。
 EXCLUDED_VERSIONS = {"v1.0.0"}
-# 过期模型登记表（唯一事实来源，与 script/modelStatus.mjs 同读一份）。
-MODEL_STATUS_FILE = Path("arena/model-status.json")
 DEFAULT_MAPS = "random,default,breach,danger-close,dual-lanes"
 DEFAULT_STATS_FILE = Path("arena/matches.jsonl")
 # 模型批次的固定开销（torch 导入 + tsx worker 启动 + 模型加载）与单局耗时；
@@ -97,88 +87,16 @@ def resolve_python(root: Path) -> str:
     return sys.executable
 
 
-# 用 \Z 不用 $：Python 的 $ 允许尾部换行而 JS 的 $ 不允许，尾部换行的 version
-# 入字典后匹配不上 discover_models 提取的版本段，过期模型会静默回池
-# （契约见 tests/rl/test_model_status_contract.py 的尾部换行 fixture）。
-MODEL_STATUS_VERSION_RE = re.compile(r"^v\d+\.\d+\.\d+\Z")
-MODEL_STATUS_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\Z")
-
-
-def parse_expired_entries(raw, source: Path) -> dict[str, dict]:
-    """校验登记表结构并返回 {版本: 条目}；非法一律抛 ValueError。
-
-    校验口径与 script/modelStatus.mjs 的 parseModelStatus 逐条对齐（字符串字段严格
-    类型、版本格式、file 版本段一致性、重复登记、expiredAt、reason 非空），由跨语言
-    契约测试 tests/rl/test_model_status_contract.py 钉死「两侧接受/拒绝同一份登记表」。
-    """
-    if not isinstance(raw, dict) or not isinstance(raw.get("expired"), list):
-        raise ValueError(f"{source}: 缺少顶层 expired 数组")
-    result: dict[str, dict] = {}
-    for idx, item in enumerate(raw["expired"]):
-        at = f"{source} expired[{idx}]"
-        if not isinstance(item, dict):
-            raise ValueError(f"{at}: 必须是对象")
-        # 字段一律要求 JSON 字符串、不做 str() 归一——归一会把数字/数组悄悄变成
-        # 「看似合法」的内容，且与 JS 侧 parseModelStatus 的 typeof 口径分叉。
-        version = item.get("version")
-        if not isinstance(version, str):
-            raise ValueError(f"{at}: version 需是字符串，实际 {version!r}")
-        if not MODEL_STATUS_VERSION_RE.match(version):
-            raise ValueError(f"{at}: version 需形如 v3.0.3，实际 {version!r}")
-        file = item.get("file")
-        if not isinstance(file, str):
-            raise ValueError(f"{at}: file 需是字符串，实际 {file!r}")
-        if not file.endswith(".zip"):
-            raise ValueError(f"{at}: file 需是 .zip 文件名，实际 {file!r}")
-        match = MODEL_RE.match(file)
-        if not match or match.group(1) != version:
-            raise ValueError(f"{at}: file 的版本段与 version 不一致（{file} vs {version}）")
-        if version in result:
-            raise ValueError(f"{at}: 版本 {version} 重复登记")
-        expired_at = item.get("expiredAt")
-        if not isinstance(expired_at, str) or not MODEL_STATUS_DATE_RE.match(expired_at):
-            raise ValueError(f"{at}: expiredAt 需是形如 2026-09-19 的日期字符串，实际 {expired_at!r}")
-        reason = item.get("reason")
-        if not isinstance(reason, str) or not reason.strip():
-            raise ValueError(f"{at}: reason 需是非空字符串，实际 {reason!r}")
-        result[version] = item
-    return result
-
-
-def load_expired_versions(root: Path) -> dict[str, dict]:
-    """读取 arena/model-status.json 的过期登记，返回 {版本: 条目}。
-
-    过期 ≠ 作废：过期模型的 zip 仍在 rl/models/、历史对局仍留在竞技场评分池里，
-    只是不再参与新一轮评估。登记表是唯一事实来源（JS/TS 侧见 script/modelStatus.mjs），
-    不要在别处再写一份版本名单。文件缺失（纯算法开发机）按「无过期」处理；
-    文件损坏或结构非法抛 ValueError 中止——降级成「无过期」会把过期模型重新
-    拉进对手池陪跑，正是本机制要省掉的开销。
-    """
-    path = root / MODEL_STATUS_FILE
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"{path}: 读取/解析失败（{exc}）") from exc
-    return parse_expired_entries(raw, path)
-
-
-def discover_models(
-    models_dir: Path, expired_versions: dict[str, dict] | None = None,
-) -> tuple[list[Path], list[Path], list[Path]]:
-    """返回 (可对战模型, 旧格式排除的模型, 已过期的模型)，均按文件名排序。"""
-    expired_versions = expired_versions or {}
-    included, excluded, expired = [], [], []
+def discover_models(models_dir: Path) -> tuple[list[Path], list[Path]]:
+    """返回 (可对战模型, 旧格式排除的模型)，均按文件名排序。"""
+    included, excluded = [], []
     for path in sorted(models_dir.glob("*.zip")):
         match = MODEL_RE.match(path.name)
         if not match or match.group(1) in EXCLUDED_VERSIONS:
             excluded.append(path)
-        elif match.group(1) in expired_versions:
-            expired.append(path)
         else:
             included.append(path)
-    return included, excluded, expired
+    return included, excluded
 
 
 def discover_algorithms(root: Path) -> list[tuple[str, str]]:
@@ -348,19 +266,10 @@ def main():
     stats_file = root / args.stats_file if args.stats_file else root / DEFAULT_STATS_FILE
     maps = [m.strip() for m in args.maps.split(",") if m.strip()]
 
-    try:
-        expired_versions = load_expired_versions(root)
-    except ValueError as exc:
-        print(f"错误：{exc}；修好登记表（或暂时删除）再跑，不降级为「无过期」。", file=sys.stderr)
-        return 1
-    included, excluded, expired = discover_models(models_dir, expired_versions)
+    included, excluded = discover_models(models_dir)
     if args.models:
         needles = [n.strip() for n in args.models.split(",") if n.strip()]
-        # --models 显式点名优先于过期排除：点名过期模型时它仍按原样回到对手池（审计/复现用）。
-        picked = [m for m in included if any(n in m.name for n in needles)]
-        picked += [m for m in expired if any(n in m.name for n in needles)]
-        expired = [m for m in expired if not any(n in m.name for n in needles)]
-        included = picked
+        included = [m for m in included if any(n in m.name for n in needles)]
         excluded = [m for m in excluded if any(n in m.name for n in needles)]
 
     try:
@@ -391,11 +300,6 @@ def main():
         print(f"排除 {len(excluded)} 个（{', '.join(sorted(EXCLUDED_VERSIONS))} 不支持进程内互打）：")
         for path in excluded:
             print(f"  - {path.name}")
-    if expired:
-        print(f"已过期 {len(expired)} 个（不再参与新一轮评估；zip 与历史对局均保留，"
-              f"登记见 arena/model-status.json）：")
-        for path in expired:
-            print(f"  - {MODEL_RE.match(path.name).group(1):<8} {path.name}")
     if algorithm_infos:
         print(f"参评算法 {len(algorithm_infos)} 个："
               f"{', '.join(f'{name}@{version}' for name, version in algorithm_infos)}")

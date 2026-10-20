@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-20T07:46:02.985Z",
+  "generatedAt": "2026-10-20T19:29:38.627Z",
   "ratingMethod": {
     "model": "Bradley-Terry MLE (MM iteration), draw = 0.5 win",
     "prior": "1 virtual draw per played pair",
@@ -10,8 +10,6 @@
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
     "matchCount": 48960,
     "retiredMatchesDropped": 2352,
-    "expiredMatchesKept": 10296,
-    "expiredModelCount": 3,
     "mapDist": {
       "breach": 6984,
       "danger-close": 6984,
@@ -36,9 +34,7 @@
       "steps": 120000,
       "deliveredSteps": 120000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v2.0.0_20260824_500K.zip": {
       "kind": "model",
@@ -50,9 +46,7 @@
       "steps": 500000,
       "deliveredSteps": 500000,
       "status": "legacy",
-      "statusNote": "player_b 座位观测失真，成绩仅供参考",
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": "player_b 座位观测失真，成绩仅供参考"
     },
     "hex_ppo_v2.1.3_20260826_800K.zip": {
       "kind": "model",
@@ -64,9 +58,7 @@
       "steps": 800000,
       "deliveredSteps": 800000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v2.2.0_20260827_120K.zip": {
       "kind": "model",
@@ -78,9 +70,7 @@
       "steps": 120000,
       "deliveredSteps": 120000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v2.3.1_20260829_70K.zip": {
       "kind": "model",
@@ -92,9 +82,7 @@
       "steps": 70000,
       "deliveredSteps": 70000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v2.3.2_20260829_340K.zip": {
       "kind": "model",
@@ -105,10 +93,8 @@
       "opponentType": "selfplay",
       "steps": 340000,
       "deliveredSteps": 340000,
-      "status": "expired",
-      "statusNote": "交付期评估早于 --swap-sides 座位 bug 修复，历史 7:1 成绩属小样本噪声",
-      "expiredAt": "2026-09-19",
-      "expiredReason": "全图沉底：7 张图名次 21/15/21/21/21/19/21（共 22 名参与者），全局评分 1237 全场最低，没有任何一张图表现突出。档案里已记录「仅随机图可战、静态图 11%~24%」，属于最早的随机图模型，继续陪跑只拉长新模型评估时长。"
+      "status": "legacy",
+      "statusNote": "交付期评估早于 --swap-sides 座位 bug 修复，历史 7:1 成绩属小样本噪声"
     },
     "hex_ppo_v2.3.3_20260830_770K.zip": {
       "kind": "model",
@@ -120,9 +106,7 @@
       "steps": 770000,
       "deliveredSteps": 770000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v2.4.0_20260830_2M.zip": {
       "kind": "model",
@@ -134,9 +118,7 @@
       "steps": 2000000,
       "deliveredSteps": 2000000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v2.5.0_20260830_2M.zip": {
       "kind": "model",
@@ -147,10 +129,8 @@
       "opponentType": "selfplay",
       "steps": 2000000,
       "deliveredSteps": 2000000,
-      "status": "expired",
-      "statusNote": null,
-      "expiredAt": "2026-09-19",
-      "expiredReason": "全图沉底：7 张图名次 18/18/20/12/20/20/20，全局评分 1328，唯一高于中位的一张（desert 12/22）也只是中游，不构成「某张图特别优秀」。档案记录其观测维度（6024）早已被 v2.6 回退，是条死支。"
+      "status": "legacy",
+      "statusNote": null
     },
     "hex_ppo_v2.6.0_20260831_3.6M.zip": {
       "kind": "model",
@@ -161,10 +141,8 @@
       "opponentType": "selfplay",
       "steps": 3600000,
       "deliveredSteps": 3600000,
-      "status": "expired",
-      "statusNote": null,
-      "expiredAt": "2026-09-19",
-      "expiredReason": "全图沉底：7 张图名次 20/20/19/18/19/21/18，全局评分 1318，最好成绩也只有 18 名，无任何突出图。档案记录「default 0:24 全崩、灾难性遗忘」，是唯一一个连续两代被判定为退步的配方。"
+      "status": "legacy",
+      "statusNote": null
     },
     "hex_ppo_v2.7.0_20260901_4M.zip": {
       "kind": "model",
@@ -176,9 +154,7 @@
       "steps": 4000000,
       "deliveredSteps": 4000000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v2.8.0_20260903_4.7M.zip": {
       "kind": "model",
@@ -190,9 +166,7 @@
       "steps": 4700000,
       "deliveredSteps": 4700000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v3.0.0_20260903_50K.zip": {
       "kind": "model",
@@ -204,9 +178,7 @@
       "steps": 50000,
       "deliveredSteps": 50000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v3.0.2_20260905_1.4M.zip": {
       "kind": "model",
@@ -218,9 +190,7 @@
       "steps": 1400000,
       "deliveredSteps": 1400000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v3.0.3_20260908_5M.zip": {
       "kind": "model",
@@ -232,9 +202,7 @@
       "steps": 5000000,
       "deliveredSteps": 5000000,
       "status": "recommended",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v3.0.4_20260909_8.4M.zip": {
       "kind": "model",
@@ -246,9 +214,7 @@
       "steps": 8400000,
       "deliveredSteps": 8400000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v3.1.0_20260910_100K.zip": {
       "kind": "model",
@@ -260,9 +226,7 @@
       "steps": 100000,
       "deliveredSteps": 100000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v3.1.1_20260911_8.8M.zip": {
       "kind": "model",
@@ -274,9 +238,7 @@
       "steps": 8800000,
       "deliveredSteps": 8800000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v3.2.0_20260918_9.8M.zip": {
       "kind": "model",
@@ -288,9 +250,7 @@
       "steps": 9800000,
       "deliveredSteps": 9800000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "hex_ppo_v3.3.0_20260923_11.4M.zip": {
       "kind": "model",
@@ -302,9 +262,7 @@
       "steps": 11400000,
       "deliveredSteps": 11400000,
       "status": "legacy",
-      "statusNote": null,
-      "expiredAt": null,
-      "expiredReason": null
+      "statusNote": null
     },
     "algo_greedy@v1": {
       "kind": "algorithm",
@@ -54440,50 +54398,6 @@
       ]
     }
   },
-  "expired": [
-    {
-      "version": "v2.3.2",
-      "file": "hex_ppo_v2.3.2_20260829_340K.zip",
-      "expiredAt": "2026-09-19",
-      "reason": "全图沉底：7 张图名次 21/15/21/21/21/19/21（共 22 名参与者），全局评分 1237 全场最低，没有任何一张图表现突出。档案里已记录「仅随机图可战、静态图 11%~24%」，属于最早的随机图模型，继续陪跑只拉长新模型评估时长。",
-      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史」行：竞技场全榜垫底 17/17、胜率 19.7%",
-      "id": "hex_ppo_v2.3.2_20260829_340K.zip",
-      "found": true,
-      "rating": 1223,
-      "rank": 24,
-      "games": 3552,
-      "winRate": 0.2137,
-      "keptMatches": 3552
-    },
-    {
-      "version": "v2.6.0",
-      "file": "hex_ppo_v2.6.0_20260831_3.6M.zip",
-      "expiredAt": "2026-09-19",
-      "reason": "全图沉底：7 张图名次 20/20/19/18/19/21/18，全局评分 1318，最好成绩也只有 18 名，无任何突出图。档案记录「default 0:24 全崩、灾难性遗忘」，是唯一一个连续两代被判定为退步的配方。",
-      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史（不推荐）」行：default 0:24 全崩",
-      "id": "hex_ppo_v2.6.0_20260831_3.6M.zip",
-      "found": true,
-      "rating": 1304,
-      "rank": 23,
-      "games": 3552,
-      "winRate": 0.2877,
-      "keptMatches": 3552
-    },
-    {
-      "version": "v2.5.0",
-      "file": "hex_ppo_v2.5.0_20260830_2M.zip",
-      "expiredAt": "2026-09-19",
-      "reason": "全图沉底：7 张图名次 18/18/20/12/20/20/20，全局评分 1328，唯一高于中位的一张（desert 12/22）也只是中游，不构成「某张图特别优秀」。档案记录其观测维度（6024）早已被 v2.6 回退，是条死支。",
-      "evidence": "public/data/arena-leaderboard.json 各图池评分排名；MODELS_NOTES「历史（不推荐）」行：真换边 24 局 9:15 败于 v2.4.0",
-      "id": "hex_ppo_v2.5.0_20260830_2M.zip",
-      "found": true,
-      "rating": 1314,
-      "rank": 22,
-      "games": 3552,
-      "winRate": 0.2976,
-      "keptMatches": 3552
-    }
-  ],
   "excluded": [
     {
       "id": "hex_ppo_v1.0.0_20260824_120K.zip",

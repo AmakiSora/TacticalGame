@@ -12,12 +12,6 @@
  *     评估控制台同源，但带版本以便算法升版后历史战绩仍归属旧版本 id）；同一 BT 池混排名；
  *   - 作废模型（MODEL_STATUS_BY_VERSION 中 status=retired 的版本）不参评：注册表跳过、
  *     历史对局不计分，跳过局数记入 source.retiredMatchesDropped；
- *   - 过期模型（arena/model-status.json，见 script/modelStatus.mjs）**照常参评**：
- *     历史对局全部留在池里，只是不再打新对局，registry 里 status='expired'。
- *     它的评分因此跟着池子一起漂移，而不是冻结在过期那一刻；涉及它的对局数记入
- *     source.expiredMatchesKept，评分/名次汇总进 payload.expired 供归档展示。
- *     前端按 status 默认隐藏（「显示已过期模型」开关可展开）；作废与过期互斥，
- *     同一版本不得同时登记（assertExpiredRetiredDisjoint 启动断言兜底）；
  *   - Bradley-Terry MLE（MM 迭代），平局记 0.5 胜；每对交手过的参与者对附加 1 局虚拟
  *     平局作先验，防全败参与者评分发散并让稀疏对向均值收缩；
  *   - rating = 1500 + 400/ln(10) × ln p（Elo 刻度）；
@@ -30,7 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { wilsonLower, round2, round4 } from './generateStats.mjs';
 import { listAlgorithmInfo, algorithmVersionedId } from '../algorithms/registry.mjs';
-import { loadModelStatus, MODEL_STATUS_BY_VERSION, RETIRED_VERSIONS, assertExpiredRetiredDisjoint } from './modelStatus.mjs';
+import { MODEL_STATUS_BY_VERSION, RETIRED_VERSIONS } from './modelStatus.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);
@@ -86,24 +80,8 @@ export const MODEL_META_BY_VERSION = {
   'v3.3.0': { trainMap: 'random', opponentType: 'selfplay' },
 };
 
-// 作废（retired）名单 MODEL_STATUS_BY_VERSION / RETIRED_VERSIONS 在 script/modelStatus.mjs
-// （与过期登记表同住唯一事实来源）；本文件只消费，并在启动时做两态互斥断言。
-
-/**
- * 过期模型（expired）：名单来自 arena/model-status.json —— 过期名单的唯一事实来源
- * （见 script/modelStatus.mjs 的语义说明与 script/expireArenaModels.mjs 的过期流程）。
- *
- * 与作废的关键区别：过期模型**照常参评**。这里既不从注册表跳过、也不丢弃它的对局，
- * 只给它打 status='expired' 让前端默认隐藏、让 round_robin / 评估控制台不再选它。
- * 因此它的评分会随池子一起漂移（不是冻结值），「过期后的分数」仍然可与在役模型比较。
- */
-export const EXPIRED_MODELS = loadModelStatus().entries;
-export const EXPIRED_VERSIONS = new Set(EXPIRED_MODELS.map(entry => entry.version));
-export const EXPIRED_BY_VERSION = new Map(EXPIRED_MODELS.map(entry => [entry.version, entry]));
-
-// 过期与作废互斥（语义见 modelStatus.mjs 的 assertExpiredRetiredDisjoint）：
-// 兜底手工编辑过的登记表。断言只在榜单脚本启动时执行，不放进 modelStatus 模块加载期。
-assertExpiredRetiredDisjoint(EXPIRED_VERSIONS, RETIRED_VERSIONS);
+// 作废（retired）名单 MODEL_STATUS_BY_VERSION / RETIRED_VERSIONS 在 script/modelStatus.mjs；
+// 本文件只消费。
 
 /** 评估协议已知限制：v2.0.0 观测固定 player_a 视角，坐 player_b 属分布外。 */
 export const STATUS_NOTES = {
@@ -184,8 +162,6 @@ export function shortName(meta) {
  * 注册合法玩家名与"未参评"清单来源：rl/models/*.zip（kind=model）+ 内置算法
  * （kind=algorithm，来自 algorithms/registry.mjs）。作废版本（RETIRED_VERSIONS）
  * 直接跳过：不注册、不进"未参评"区（排行榜任何区域都不展示），其历史对局由 loadMatches 单独过滤。
- * 过期版本（EXPIRED_VERSIONS）**不跳过**：照常注册、照常进评分池，只是 status 标成 expired
- * 交给前端默认隐藏，并在新一轮评估里被 round_robin 排除。
  */
 export function collectRegistry(modelsDir, algorithms = listAlgorithmInfo()) {
   const registry = new Map();
@@ -224,15 +200,14 @@ function registryAlgorithms(registry, algorithms) {
   }
 }
 
-/** 读 JSONL，丢弃玩家名不在注册表/格式非法的行；作废模型（已归档）的对局不计分，按 retiredDropped 计数；过期模型的对局**照常计入**，只按 expiredKept 计数留痕。 */
+/** 读 JSONL，丢弃玩家名不在注册表/格式非法的行；作废模型（已归档）的对局不计分，按 retiredDropped 计数。 */
 export function loadMatches(statsFile, registry) {
   const matches = [];
   const warnings = [];
   let retiredDropped = 0;
-  let expiredKept = 0;
   if (!existsSync(statsFile)) {
     warnings.push(`stats file not found: ${statsFile}`);
-    return { matches, warnings, retiredDropped, expiredKept };
+    return { matches, warnings, retiredDropped };
   }
   const lines = readFileSync(statsFile, 'utf8').split('\n');
   for (let idx = 0; idx < lines.length; idx++) {
@@ -262,10 +237,6 @@ export function loadMatches(statsFile, registry) {
       retiredDropped += 1;
       continue;
     }
-    // 过期模型的对局照常进池（这是与作废的区别），只按计数留痕。
-    if ([a, b].some(name => EXPIRED_VERSIONS.has(parseModelFile(name)?.version))) {
-      expiredKept += 1;
-    }
     if (!registry.has(a) || !registry.has(b)) {
       warnings.push(`line ${idx + 1}: unknown participant name(s): ${[a, b].filter(n => !registry.has(n)).join(', ')}`);
       continue;
@@ -283,7 +254,7 @@ export function loadMatches(statsFile, registry) {
       rounds: Number.isFinite(record.rounds) ? record.rounds : null,
     });
   }
-  return { matches, warnings, retiredDropped, expiredKept };
+  return { matches, warnings, retiredDropped };
 }
 
 /**
@@ -514,7 +485,7 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const { registry, excluded, warning } = collectRegistry(opts.modelsDir ?? join(PROJECT_DIR, 'rl', 'models'));
   const warnings = warning ? [warning] : [];
-  const { matches, warnings: loadWarnings, retiredDropped, expiredKept } = loadMatches(opts.statsFile, registry);
+  const { matches, warnings: loadWarnings, retiredDropped } = loadMatches(opts.statsFile, registry);
   warnings.push(...loadWarnings);
 
   const ids = [...registry.keys()]
@@ -551,42 +522,9 @@ function main() {
     opponentType: meta.opponentType,
     steps: meta.steps,
     deliveredSteps: meta.deliveredSteps ?? null,
-    status: EXPIRED_VERSIONS.has(meta.version)
-      ? 'expired'
-      : (MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy'),
+    status: MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy',
     statusNote: STATUS_NOTES[meta.version] ?? null,
-    expiredAt: EXPIRED_BY_VERSION.get(meta.version)?.expiredAt ?? null,
-    expiredReason: EXPIRED_BY_VERSION.get(meta.version)?.reason ?? null,
   }]));
-
-  // 过期模型在池内照常参评，这里把它们当前的名次/评分/留存对局汇总成一段归档记录
-  // （前端「已过期模型」表用，也方便日后核对「过期时它排第几」）。
-  const rankById = new Map(
-    leagues.all.models.slice()
-      .sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity))
-      .map((m, i) => [m.id, m.games > 0 ? i + 1 : null]),
-  );
-  const idByVersion = new Map(
-    [...registry.entries()].filter(([, meta]) => meta.kind === 'model').map(([id, meta]) => [meta.version, id]),
-  );
-  const expiredPayload = EXPIRED_MODELS.map(entry => {
-    const id = idByVersion.get(entry.version) ?? null;
-    const row = id ? leagues.all.models.find(m => m.id === id) : null;
-    return {
-      version: entry.version,
-      file: entry.file,
-      expiredAt: entry.expiredAt,
-      reason: entry.reason,
-      evidence: entry.evidence,
-      id,
-      found: id !== null,
-      rating: row?.rating ?? null,
-      rank: id ? rankById.get(id) ?? null : null,
-      games: row?.games ?? 0,
-      winRate: row?.winRate ?? null,
-      keptMatches: id ? matches.filter(m => m.playerA === id || m.playerB === id).length : 0,
-    };
-  });
 
   const tsList = matches.map(m => m.ts).filter(Boolean).sort();
   const payload = {
@@ -601,8 +539,6 @@ function main() {
       file: opts.statsFile,
       matchCount: matches.length,
       retiredMatchesDropped: retiredDropped,
-      expiredMatchesKept: expiredKept,
-      expiredModelCount: EXPIRED_MODELS.length,
       mapDist: Object.fromEntries(maps.map(map => [map, matches.filter(m => m.map === map).length])),
       targetGamesPerPair: opts.targetGamesPerPair,
       dateMin: tsList[0] ?? null,
@@ -610,7 +546,6 @@ function main() {
     },
     registry: registryMeta,
     maps: leagues,
-    expired: expiredPayload,
     excluded,
     warnings,
   };
@@ -619,18 +554,6 @@ function main() {
   writeFileSync(opts.out, JSON.stringify(payload, null, 2), 'utf8');
   console.log(`Wrote ${opts.out} — ${matches.length} matches, ${ids.length} rated participants, ${maps.length + 1} league(s)` +
     (retiredDropped > 0 ? `（另跳过作废模型对局 ${retiredDropped} 局）` : ''));
-  if (expiredPayload.length) {
-    const ratedRows = leagues.all.models.filter(m => m.games > 0);
-    const hiddenRated = expiredPayload.filter(e => e.games > 0).length;
-    console.log(`过期模型 ${expiredPayload.length} 个（照常参评、前端默认隐藏，已留存对局 ${expiredKept} 局）；` +
-      `榜单可见 ${ratedRows.length - hiddenRated} 个 / 评分池 ${ratedRows.length} 个：`);
-    for (const e of expiredPayload) {
-      console.log(`  - ${e.version}  rating=${e.rating ?? '—'}  池内名次=${e.rank ?? '—'}  games=${e.games}` +
-        (e.found ? '' : '  ← 该 zip 不在 rl/models/，本轮无评分'));
-    }
-  } else {
-    console.log('（arena/model-status.json 里没有过期模型）');
-  }
 
   const rows = leagues.all.models.filter(m => m.games > 0)
     .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));

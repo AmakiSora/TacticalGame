@@ -54,4 +54,28 @@ describe('state projection and ETag', () => {
     expect(cached.statusCode).toBe(304);
     expect(cached.body).toBe('');
   });
+
+  it('strips idempotency records from state responses', async () => {
+    app = await startTestServer();
+    const { gameId, playerAToken, playerBToken } = await createGameAndJoin(app);
+    const key = 'leaky-key';
+    const action = await app.inject({
+      method: 'POST',
+      url: `/api/games/${gameId}/end-turn`,
+      headers: { 'x-player-token': playerAToken, 'idempotency-key': key },
+      payload: {},
+    });
+    expect(action.statusCode).toBe(200);
+    expect(globalStore.get(gameId)!.idempotency?.[`player_a:${key}`]).toBeTruthy();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/games/${gameId}`,
+      headers: { 'x-player-token': playerBToken },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.idempotency).toBeUndefined();
+    expect(res.body).not.toContain(key);
+  });
 });

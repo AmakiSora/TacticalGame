@@ -215,11 +215,13 @@ export interface GameEvent {
   payload: Record<string, unknown>;
 }
 
-/** 已成功动作的幂等回放记录；按对局、最近 N 个键保存。 */
+/** 已成功动作的幂等回放记录；按（玩家, 键）隔离，每局保留最近 N 条。 */
 export interface IdempotencyRecord {
   bodyHash: string;
   response: unknown;
   expiresAt: number;
+  /** 记录对应的状态是否已成功落盘；false/缺省时回放会补写一次快照。 */
+  persisted?: boolean;
 }
 
 export interface AdjudicationScore {
@@ -310,7 +312,7 @@ export interface GameState {
   turn: TurnState;
   plan: PlanState | null;
   events: GameEvent[];
-  /** 最近的成功动作幂等记录；有界，旧存档缺省为空。 */
+  /** 最近的成功动作幂等记录（键为“玩家:原始键”）；有界，旧存档缺省为空。 */
   idempotency?: Record<string, IdempotencyRecord>;
   /**
    * 派生索引/缓存的失效版本：每次成功追加事件 +1。不参与游戏规则，

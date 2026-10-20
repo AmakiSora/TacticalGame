@@ -1,6 +1,6 @@
 // src/api/actions.ts
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { globalEventBus } from '../events/bus.js';
 import { authenticate, statusForCode } from './auth.js';
 import { moveUnit } from '../engine/units.js';
@@ -15,7 +15,7 @@ import {
 } from '../engine/planning.js';
 import type { Result } from '../engine/result.js';
 import type { AuthContext } from './auth.js';
-import type { UnitType } from '../types.js';
+import type { GameState, IdempotencyRecord, PlayerId, UnitType } from '../types.js';
 import { isSimultaneousMode } from '../types.js';
 import { globalStore } from '../state/store.js';
 import { inc, observe } from '../utils/metrics.js';
@@ -26,6 +26,7 @@ function badRequest(reply: FastifyReply, msg: string) {
 
 /**
  * 动作已改内存后持久化失败：明确告诉客户端“已生效但未落盘”，不要用 500 诱发盲目重试。
+ * 幂等记录会保留 persisted=false，同键回放时补写快照。
  * 返回 false 表示已写出 503 响应。
  */
 function persistWithDegraded(reply: FastifyReply, game: Parameters<typeof globalStore.persist>[0]): boolean {
@@ -59,7 +60,8 @@ function canonicalValue(value: unknown): string {
 }
 
 function actionBodyHash(action: string, body: unknown): string {
-  return `${action}|${canonicalValue(body ?? null)}`;
+  // 只用于比对，不对外暴露；用真哈希避免日志/调试输出里出现完整动作参数。
+  return createHash('sha256').update(`${action}|${canonicalValue(body ?? null)}`).digest('hex');
 }
 
 function pruneIdempotency(records: NonNullable<AuthContext['game']['idempotency']>, now: number): void {
@@ -70,6 +72,46 @@ function pruneIdempotency(records: NonNullable<AuthContext['game']['idempotency'
   if (keys.length <= IDEMPOTENCY_MAX_KEYS) return;
   keys.sort((a, b) => records[a]!.expiresAt - records[b]!.expiresAt);
   for (const key of keys.slice(0, keys.length - IDEMPOTENCY_MAX_KEYS)) delete records[key];
+}
+
+/** 幂等键按玩家隔离：不同玩家可以用同一个原始键，互不冲突、互不回放。 */
+function scopedIdempotencyKey(player: PlayerId, key: string): string {
+  return `${player}:${key}`;
+}
+
+type ReplayLookup =
+  | { response: unknown; record: IdempotencyRecord }
+  | { conflict: true }
+  | null;
+
+function findReplay(game: GameState, key: string, bodyHash: string): ReplayLookup {
+  const records = game.idempotency ?? {};
+  const existing = records[key];
+  if (!existing) return null;
+  if (existing.expiresAt <= Date.now()) {
+    delete records[key];
+    return null;
+  }
+  if (existing.bodyHash !== bodyHash) return { conflict: true };
+  return { response: existing.response, record: existing };
+}
+
+function rememberAction(
+  game: GameState, key: string, bodyHash: string, response: unknown,
+): IdempotencyRecord {
+  const records = game.idempotency ?? {};
+  const now = Date.now();
+  const record: IdempotencyRecord = {
+    bodyHash,
+    response,
+    expiresAt: now + IDEMPOTENCY_TTL_MS,
+    // 快照写出成功后才置 true；回放时发现 false 会补写一次。
+    persisted: false,
+  };
+  records[key] = record;
+  pruneIdempotency(records, now);
+  game.idempotency = records;
+  return record;
 }
 
 function isUnitType(value: unknown): value is UnitType {
@@ -113,29 +155,25 @@ async function dispatchAction(
   if (idempotencyKey && idempotencyKey.length > 200) {
     return reply.code(400).send({ error: 'Idempotency-Key 不能超过 200 个字符', code: 'invalid_idempotency_key' });
   }
-  const bodyHash = idempotencyKey ? actionBodyHash(action, req.body) : null;
-  if (idempotencyKey && bodyHash) {
-    const records = ctx.game.idempotency ?? {};
-    const existing = records[idempotencyKey];
-    if (existing) {
-      if (existing.expiresAt > Date.now()) {
-        if (existing.bodyHash !== bodyHash) {
-          return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
-        }
-        reply.header('Idempotent-Replay', 'true');
-        return existing.response;
+  const scopedKey = idempotencyKey ? scopedIdempotencyKey(ctx.player, idempotencyKey) : null;
+  const bodyHash = scopedKey ? actionBodyHash(action, req.body) : null;
+  if (scopedKey && bodyHash) {
+    const replay = findReplay(ctx.game, scopedKey, bodyHash);
+    if (replay) {
+      if ('conflict' in replay) {
+        return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
       }
-      delete records[idempotencyKey];
+      if (replay.record.persisted !== true) {
+        if (!persistWithDegraded(reply, ctx.game)) return;
+        replay.record.persisted = true;
+      }
+      reply.header('Idempotent-Replay', 'true');
+      return replay.response;
     }
   }
-  const remember = (response: unknown): void => {
-    if (!idempotencyKey || !bodyHash) return;
-    const records = ctx.game.idempotency ?? {};
-    const now = Date.now();
-    records[idempotencyKey] = { bodyHash, response, expiresAt: now + IDEMPOTENCY_TTL_MS };
-    pruneIdempotency(records, now);
-    ctx.game.idempotency = records;
-  };
+  const remember = (response: unknown): IdempotencyRecord | null => (
+    scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null
+  );
   const started = Date.now();
   inc('tactical_action_total', { action, mode });
   try {
@@ -154,8 +192,9 @@ async function dispatchAction(
         queued: result.data ?? null,
         queue: [...(ctx.game.plan?.queues[ctx.player] ?? [])],
       };
-      remember(response);
+      const record = remember(response);
       if (!persistWithDegraded(reply, ctx.game)) return;
+      if (record) record.persisted = true;
       return response;
     }
     if (ctx.game.turn.currentPlayerId !== ctx.player) {
@@ -168,8 +207,9 @@ async function dispatchAction(
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
     const response = { ok: true };
-    remember(response);
+    const record = remember(response);
     if (!persistWithDegraded(reply, ctx.game)) return;
+    if (record) record.persisted = true;
     return response;
   } finally {
     observe('tactical_action_duration_ms', Date.now() - started, { action, mode });
@@ -260,29 +300,25 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     if (idempotencyKey && idempotencyKey.length > 200) {
       return reply.code(400).send({ error: 'Idempotency-Key 不能超过 200 个字符', code: 'invalid_idempotency_key' });
     }
-    const bodyHash = idempotencyKey ? actionBodyHash('end-turn', req.body) : null;
-    if (idempotencyKey && bodyHash) {
-      const records = ctx.game.idempotency ?? {};
-      const existing = records[idempotencyKey];
-      if (existing) {
-        if (existing.expiresAt > Date.now()) {
-          if (existing.bodyHash !== bodyHash) {
-            return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
-          }
-          reply.header('Idempotent-Replay', 'true');
-          return existing.response;
+    const scopedKey = idempotencyKey ? scopedIdempotencyKey(ctx.player, idempotencyKey) : null;
+    const bodyHash = scopedKey ? actionBodyHash('end-turn', req.body) : null;
+    if (scopedKey && bodyHash) {
+      const replay = findReplay(ctx.game, scopedKey, bodyHash);
+      if (replay) {
+        if ('conflict' in replay) {
+          return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
         }
-        delete records[idempotencyKey];
+        if (replay.record.persisted !== true) {
+          if (!persistWithDegraded(reply, ctx.game)) return;
+          replay.record.persisted = true;
+        }
+        reply.header('Idempotent-Replay', 'true');
+        return replay.response;
       }
     }
-    const remember = (response: unknown): void => {
-      if (!idempotencyKey || !bodyHash) return;
-      const records = ctx.game.idempotency ?? {};
-      const now = Date.now();
-      records[idempotencyKey] = { bodyHash, response, expiresAt: now + IDEMPOTENCY_TTL_MS };
-      pruneIdempotency(records, now);
-      ctx.game.idempotency = records;
-    };
+    const remember = (response: unknown): IdempotencyRecord | null => (
+      scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null
+    );
     if (isSimultaneousMode(ctx.game.config.mode)) {
       const result = commitAndMaybeResolve(ctx.game, globalEventBus, ctx.player);
       if (!result.ok) {
@@ -295,8 +331,9 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
         roundNumber: ctx.game.turn.roundNumber,
         phase: ctx.game.phase,
       };
-      remember(response);
+      const record = remember(response);
       if (!persistWithDegraded(reply, ctx.game)) return;
+      if (record) record.persisted = true;
       return response;
     }
     if (ctx.game.turn.currentPlayerId !== ctx.player) {
@@ -307,8 +344,9 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     }
     const response = { ok: true };
-    remember(response);
+    const record = remember(response);
     if (!persistWithDegraded(reply, ctx.game)) return;
+    if (record) record.persisted = true;
     return response;
   });
 

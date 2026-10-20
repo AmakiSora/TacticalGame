@@ -8,7 +8,7 @@
 
 ### 新增
 
-- **动作幂等键**：所有玩法写接口支持可选 `Idempotency-Key`；同键同 body 回放首次响应并带 `Idempotent-Replay: true`，同键不同 body 返回 409 `idempotency_conflict`。按局保留最近 100 个键 / 24 小时，随对局持久化，重启后仍可去重；算法客户端与 RL 环境已为每个逻辑动作生成并复用键（`src/api/actions.ts`、`src/types.ts`、`algorithms/lib/api-client.mjs`、`rl/envs/env.py`）。
+- **动作幂等键**：所有玩法写接口支持可选 `Idempotency-Key`；同键同 body 回放首次响应并带 `Idempotent-Replay: true`，同键不同 body 返回 409 `idempotency_conflict`。键按玩家隔离（不同玩家可用同一原始键），每局保留最近 100 条 / 24 小时，随对局持久化，重启后仍可去重；写快照失败后同键重试会补写落盘。算法客户端与 RL 环境已为每个逻辑动作生成并复用键（`src/api/actions.ts`、`src/types.ts`、`algorithms/lib/api-client.mjs`、`rl/envs/env.py`）。
 - **AI 长轮询等待端点**：新增 `GET /api/games/:id/wait?afterSeq=&timeout=`，有事件立即返回、超时返回 `{changed:false}`；每玩家最多 2 个并发等待。`wait-turn.mjs`、算法 runner 与 RL runner 已改为优先长轮询、旧服务器/断线时回退轮询（`src/api/wait.ts`、`src/server.ts`、`skill/wait-turn.mjs`、`algorithms/runner.mjs`、`rl/runners/run_model.py`）。
 - **状态响应投影与 ETag**：`GET /api/games/:id` 支持 `include=events,config,adjudication`；`include=state` 只返回运行态（不含历史/配置/裁决），并返回 ETag，`If-None-Match` 命中时 304。默认请求仍返回旧全量响应（`src/api/auth.ts`、`src/api/games.ts`）。
 

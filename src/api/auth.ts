@@ -92,7 +92,7 @@ export function sanitizeGameForResponse(
   // rngState 一并剥离：泄露会让客户端预测后续伤害/治疗掷骰。
   const {
     tokens: _tokens, hostToken: _hostToken, rngState: _rngState,
-    events, config, ...rest
+    idempotency: _idempotency, events, config, ...rest
   } = game;
   const body = structuredClone(rest) as Record<string, unknown>;
   body.lastEventSeq = events.at(-1)?.seq ?? 0;

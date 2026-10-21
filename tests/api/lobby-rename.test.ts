@@ -105,6 +105,12 @@ describe('lobby self rename', () => {
     expect(blank.statusCode).toBe(400);
     expect(blank.json().code).toBe('invalid_move');
 
+    const numeric = await app.inject({
+      method: 'PATCH', url, headers: { 'X-Player-Token': token }, payload: { name: 123 },
+    });
+    expect(numeric.statusCode).toBe(400);
+    expect(numeric.json().code).toBe('invalid_move');
+
     const longName = 'x'.repeat(80);
     const long = await app.inject({
       method: 'PATCH', url, headers: { 'X-Player-Token': token }, payload: { name: longName },

@@ -37,6 +37,38 @@ describe('action idempotency', () => {
     expect(globalStore.get(game.gameId)!.turn.currentPlayerId).toBe('player_b');
   });
 
+  it('replays the first response after the game has ended', async () => {
+    app = await startTestServer();
+    const game = await createGameAndJoin(app);
+    const key = 'idem-after-game-over';
+
+    const first = await app.inject({
+      method: 'POST',
+      url: `/api/games/${game.gameId}/end-turn`,
+      headers: { 'x-player-token': game.playerAToken, 'idempotency-key': key },
+      payload: {},
+    });
+    expect(first.statusCode).toBe(200);
+
+    // 动作之后对局结束：客户端丢响应重试时仍应拿到首次响应，而不是 409 game_over。
+    const adjudicated = await app.inject({
+      method: 'POST',
+      url: `/api/games/${game.gameId}/force-adjudicate`,
+    });
+    expect(adjudicated.statusCode).toBe(200);
+    const eventCount = globalStore.get(game.gameId)!.events.length;
+
+    const retry = await app.inject({
+      method: 'POST',
+      url: `/api/games/${game.gameId}/end-turn`,
+      headers: { 'x-player-token': game.playerAToken, 'idempotency-key': key },
+      payload: {},
+    });
+    expect(retry.statusCode).toBe(200);
+    expect(retry.headers['idempotent-replay']).toBe('true');
+    expect(globalStore.get(game.gameId)!.events).toHaveLength(eventCount);
+  });
+
   it('keeps the same raw key independent per player', async () => {
     app = await startTestServer();
     const game = await createGameAndJoin(app);

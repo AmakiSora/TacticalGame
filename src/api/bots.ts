@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { GameState, PlayerId } from '../types.js';
-import { isSimultaneousMode, MAX_PLAYER_NAME_LEN } from '../types.js';
+import { isSimultaneousMode, MAX_PLAYER_NAME_LEN, normalizePlayerName } from '../types.js';
 import { globalStore, addLobbyPlayer } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import { appendEvent } from '../engine/events.js';
@@ -406,6 +406,9 @@ function scheduleRestart(
   launch: () => void,
   stillRegistered: () => boolean,
 ): void {
+  // 对局结束/该座位被淘汰后运行器会正常退出；这不是崩溃，不能按退避策略重启，
+  // 否则会在已结束的对局上反复拉起进程并最终写入 bot_failed。
+  if (game.phase === 'game_over' || game.players[record.playerId]?.status !== 'active') return;
   if (record.failed || !stillRegistered()) return;
   const restarts = (record.restarts ?? 0) + 1;
   record.restarts = restarts;
@@ -425,6 +428,7 @@ function scheduleRestart(
 }
 
 function launchRlRecord(baseUrl: string, logger: FastifyBaseLogger, game: GameState, record: BotRecord): void {
+  if (game.phase === 'game_over' || game.players[record.playerId]?.status !== 'active') return;
   if (record.restartTimer) {
     clearTimeout(record.restartTimer);
     record.restartTimer = undefined;
@@ -472,6 +476,7 @@ function launchRlRecord(baseUrl: string, logger: FastifyBaseLogger, game: GameSt
 }
 
 function launchAlgorithmRecord(baseUrl: string, logger: FastifyBaseLogger, game: GameState, record: AlgorithmBotRecord): void {
+  if (game.phase === 'game_over' || game.players[record.playerId]?.status !== 'active') return;
   if (record.restartTimer) {
     clearTimeout(record.restartTimer);
     record.restartTimer = undefined;
@@ -593,7 +598,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
           code: 'bot_not_supported',
         });
       }
-      const name = uniqueLobbyName(game, req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || DEFAULT_BOT_NAME);
+      const name = uniqueLobbyName(game, normalizePlayerName(req.body?.name) || DEFAULT_BOT_NAME);
       const joined = addLobbyPlayer(game, name);
       if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
@@ -632,7 +637,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
           code: 'bot_not_supported',
         });
       }
-      const name = uniqueLobbyName(game, req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || config.name);
+      const name = uniqueLobbyName(game, normalizePlayerName(req.body?.name) || config.name);
       const joined = addLobbyPlayer(game, name);
       if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });

@@ -413,6 +413,23 @@ describe('hex V2 rules', () => {
     expect(support.hasActed).toBe(true);
   });
 
+  it('rejects healing a full-health friendly unit without spending an action', () => {
+    const { game, bus } = setup();
+    const support = game.units.find(u => u.owner === 'player_a' && u.type === 'infantry')!;
+    support.type = 'support';
+    support.healPower = 28;
+    support.q = -7; support.r = 0;
+    const target = game.units.find(u => u.owner === 'player_a' && u.id !== support.id)!;
+    target.q = -7; target.r = 1; target.hp = target.maxHp;
+    const actionsBefore = game.turn.actionsUsed;
+
+    const result = healTarget(game, bus, 'player_a', support.id, target.id);
+
+    expect(result).toMatchObject({ ok: false, code: 'invalid_heal' });
+    expect(game.turn.actionsUsed).toBe(actionsBefore);
+    expect(support.hasActed).toBe(false);
+  });
+
   it('limits the player to actionsPerTurn activations across deploy/move/attack', () => {
     const { game, bus } = setup();
     const limit = game.config.balance.actionsPerTurn;

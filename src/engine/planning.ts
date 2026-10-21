@@ -127,6 +127,9 @@ function computeCoveredCells(
 ): ShapeAim | null {
   const dq = target.q - from.q;
   const dr = target.r - from.r;
+  // 所有形状都受本局 attackRange/healRange 约束；line 的 shape.length 只是
+  // 覆盖上限，不能反过来突破射程。
+  if (hexDistance(from, target) > range) return null;
   if (shape.type === 'single') {
     const distance = hexDistance(from, target);
     if (distance > range) return null;
@@ -146,14 +149,15 @@ function computeCoveredCells(
       })),
     };
   }
-  // line：点击格必须落在某个正六方向射线上，距离 1..length。
+  // line：点击格必须落在某个正六方向射线上，距离 1..min(length, range)。
+  const length = Math.min(shape.length, range);
   for (let direction = 0; direction < 6; direction++) {
     const d = HEX_DIRECTIONS[direction]!;
     const k = d.q !== 0 ? dq / d.q : dr / d.r;
-    if (!Number.isInteger(k) || k < 1 || k > shape.length) continue;
+    if (!Number.isInteger(k) || k < 1 || k > length) continue;
     if (d.q * k !== dq || d.r * k !== dr) continue;
     const cells: Position[] = [];
-    for (let step = 1; step <= shape.length; step++) {
+    for (let step = 1; step <= length; step++) {
       cells.push({ q: from.q + d.q * step, r: from.r + d.r * step });
     }
     return { type: 'line', direction, cells };

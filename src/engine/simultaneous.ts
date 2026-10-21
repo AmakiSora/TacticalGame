@@ -487,6 +487,14 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       if (entity.hp === 0 && !recordedDeaths.has(entity.id)) {
         recordedDeaths.add(entity.id);
         deaths.push({ kind: target.kind, entity, killer: strike.owner });
+        // 击杀入账必须在死亡阶段之前完成：死亡阶段里 HQ 被摧毁会立刻冻结该玩家
+        // 的分数并移出单位，如果之后才处理它同轮打出的击杀，creditKill 会因
+        // 玩家已非 active 而漏记，且结果随 turnOrder（先处理哪条 death）漂移。
+        if (target.kind === 'unit') {
+          const killerStats = game.players[strike.owner]?.stats;
+          if (killerStats) killerStats.unitsDestroyed += 1;
+          creditKill(game, strike.owner, entity as Unit);
+        }
       }
     }
     outcomes[strike.owner]!.push({
@@ -504,9 +512,6 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     if (death.kind === 'unit') {
       const unit = death.entity as Unit;
       unit.alive = false;
-      const stats = game.players[death.killer]?.stats;
-      if (stats) stats.unitsDestroyed += 1;
-      creditKill(game, death.killer, unit);
       appendEvent(game, bus, 'unit_death', {
         unitId: unit.id, owner: unit.owner, type: unit.type, q: unit.q, r: unit.r, cause: 'attack',
       });
@@ -566,7 +571,9 @@ export function resolveRound(game: GameState, bus: EventBus): void {
   accumulateControlHold(game);
   // 先把终局摘要写完整，再让 game_over 收尾；adjudicateAtTurnLimit 内部会再校验一次。
   const adjudicated = isTurnLimitReached(game);
-  appendEvent(game, bus, 'round_end', { roundNumber, gameOver: adjudicated });
+  // 这里已经调用过 accumulateControlHold；标记供重启/回放重建区分
+  // 「回合上限终局」与「死亡终局」，避免后者也被错误补算最后一轮流量。
+  appendEvent(game, bus, 'round_end', { roundNumber, gameOver: adjudicated, controlHoldCounted: true });
   appendEvent(game, bus, 'round_resolved', { roundNumber, gameOver: adjudicated, results: outcomes });
   if (adjudicated) {
     adjudicateAtTurnLimit(game, bus);

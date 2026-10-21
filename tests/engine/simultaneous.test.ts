@@ -306,6 +306,19 @@ describe('simultaneous resolution', () => {
     });
   });
 
+  it('rejects line aims beyond attackRange even when shape length is longer', () => {
+    const { game } = createStandoffGame();
+    const a = game.turn.turnOrder[0]!;
+    const infantry = game.units.find(u => u.owner === a && u.type === 'infantry')!;
+    // 地图配置在进程内共享；测试内改射程必须克隆，并同步单位实例。
+    game.config = structuredClone(game.config);
+    game.config.units.infantry.attackRange = 1;
+    infantry.attackRange = 1;
+    place(infantry, 1, 0);
+    expect(queueAttackAction(game, a, infantry.id, 3, 0))
+      .toMatchObject({ ok: false, code: 'invalid_attack' });
+  });
+
   it('hits a stationary enemy with a cell attack', () => {
     const { game, bus } = createStandoffGame();
     const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
@@ -382,6 +395,34 @@ describe('simultaneous resolution', () => {
     expect(game.players[c]!.stats.unitsDestroyed).toBe(0);
     expect(game.players[c]!.stats.killValue).toBe(0);
     expect(buildAdjudicationScores(game)[c]!.killValue).toBe(0);
+  });
+
+  it('credits a kill even when the killer headquarters is destroyed earlier in the same volley', () => {
+    const { game, bus } = createStandoffGame(3);
+    const [first, second, third] = game.turn.turnOrder as [PlayerId, PlayerId, PlayerId];
+    // 固定结算顺序：先处理 second 的 HQ 击杀，再处理被淘汰的 third 的击杀。
+    game.turn.turnOrder = [second, third, first];
+
+    const killerScout = game.units.find(u => u.owner === third && u.type === 'scout')!;
+    const victimInfantry = game.units.find(u => u.owner === first && u.type === 'infantry')!;
+    const hqTarget = game.headquarters[third]!;
+    const hqAttacker = game.units.find(u => u.owner === second && u.type === 'scout')!;
+    place(killerScout, victimInfantry.q + 1, victimInfantry.r);
+    place(hqAttacker, hqTarget.q + 1, hqTarget.r);
+    hqAttacker.attack = 999;
+    killerScout.attack = 999;
+
+    expect(queueAttackAction(game, second, hqAttacker.id, hqTarget.q, hqTarget.r).ok).toBe(true);
+    expect(queueAttackAction(game, third, killerScout.id, victimInfantry.q, victimInfantry.r).ok).toBe(true);
+    commitAll(game, bus, [second, third, first]);
+
+    expect(game.players[second]!.status).toBe('active');
+    expect(game.players[third]!.status).toBe('eliminated');
+    // third 的 HQ 先被摧毁，但它在同一轮打出的击杀仍必须进入冻结分数；
+    // 否则结果会随 turnOrder 的死亡处理顺序漂移。
+    expect(game.players[third]!.stats.unitsDestroyed).toBe(1);
+    expect(game.players[third]!.stats.killValue).toBe(victimInfantry.cost);
+    expect(game.players[third]!.adjudicationScore?.killValue).toBe(victimInfantry.cost);
   });
 
   it('misses when the target moves away and hits a unit moving into the attacked cell', () => {
@@ -702,6 +743,7 @@ describe('simultaneous resolution', () => {
     const types = game.events.map(event => event.type);
     expect(types.slice(-3)).toEqual(['round_end', 'round_resolved', 'game_over']);
     expect(events(game, 'round_end').at(-1)!.payload.gameOver).toBe(true);
+    expect(events(game, 'round_end').at(-1)!.payload.controlHoldCounted).toBe(true);
     expect(events(game, 'round_resolved').at(-1)!.payload.gameOver).toBe(true);
     // 地图配置在所有对局间共享引用，测试结束必须还原。
     game.config.balance.maxTurns = 15;

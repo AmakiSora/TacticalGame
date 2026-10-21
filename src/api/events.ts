@@ -79,19 +79,19 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         return { events: filtered };
       }
 
-      // 配额：每局 + 每 IP + 每玩家；匿名观战额度更低。
+      // 配额：每局 + 每 IP + 每玩家；匿名连接没有玩家身份，只受每局/每 IP
+      // 约束，避免同一局所有匿名客户端共用「3 条」桶而把正常观战者挡在门外。
       const ipKey = `${game.id}:${req.ip}`;
-      const playerKey = `${game.id}:${viewer ?? 'anonymous'}`;
-      const perPlayerLimit = viewer ? MAX_SSE_PER_PLAYER : 3;
+      const playerKey = viewer ? `${game.id}:${viewer}` : null;
       if ((sseCounts.get(game.id) ?? 0) >= MAX_SSE_PER_GAME
         || (sseIpCounts.get(ipKey) ?? 0) >= MAX_SSE_PER_IP
-        || (ssePlayerCounts.get(playerKey) ?? 0) >= perPlayerLimit) {
+        || (playerKey !== null && (ssePlayerCounts.get(playerKey) ?? 0) >= MAX_SSE_PER_PLAYER)) {
         reply.header('Retry-After', '30');
         return reply.code(429).send({ error: '该对局的观战连接过多，请稍后再试', code: 'rate_limit' });
       }
       bump(sseCounts, game.id, 1);
       bump(sseIpCounts, ipKey, 1);
-      bump(ssePlayerCounts, playerKey, 1);
+      if (playerKey !== null) bump(ssePlayerCounts, playerKey, 1);
       activeSseTotal += 1;
       setGauge('tactical_sse_connections', activeSseTotal);
 
@@ -136,7 +136,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         setGauge('tactical_sse_connections', activeSseTotal);
         bump(sseCounts, game.id, -1);
         bump(sseIpCounts, ipKey, -1);
-        bump(ssePlayerCounts, playerKey, -1);
+        if (playerKey !== null) bump(ssePlayerCounts, playerKey, -1);
         const perGame = activeByGame.get(game.id);
         perGame?.delete(close);
         if (perGame && perGame.size === 0) activeByGame.delete(game.id);

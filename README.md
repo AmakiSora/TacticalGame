@@ -119,7 +119,7 @@ npm run export-state
 - 重装单位可花费本回合行动爆破相邻 `blocker` 地形，将其永久变为 `plain`。爆破遵循行动点上限；已移动但未行动的重装可继续爆破，爆破后不能攻击或治疗。
 - 总部归零的玩家被淘汰，其裁决分会在清场前冻结，随后单位移除、据点转为中立、资源冻结；对局继续。
 - 仅剩一名存活玩家时立即获胜。
-- 达到地图配置的最大轮数时，仅存活玩家参与裁决。分数按地图 `balance.adjudicationWeights` 计算：累计总部伤害×W_dmg + 己方总部当前 HP×W_hp + 己方据点数×W_cp + 存活部队价值×W_army + 剩余补给×W_sup + 有效行动贡献值×W_action。部署/爆破记 1 点，实际伤害/治疗每 20 HP 向上折算 1 点，占领据点记 2 点，纯移动不计分；同时模式的攻击命中改为每 10 HP 贡献 1 点，专门提高战斗行为的行动分。权重因图而异（例如 default 为 5/2/90/2/1，有效行动默认 2/贡献值）；唯一最高分获胜，并列最高则平局。歼灭/大逃杀模式有效行动默认 10/贡献值。`balance.maxTurns` 为 `null` 的地图（如 `whirlpool`）**无回合上限**，永不按轮数裁决，只能靠淘汰或房主强制裁决结束。
+- 达到地图配置的最大轮数时，仅存活玩家参与裁决。分数按地图 `balance.adjudicationWeights` 计算：累计总部伤害×W_dmg + 己方总部当前 HP×W_hp + 据点分×W_cp + 存活部队价值×W_army + 剩余补给×W_sup + 击杀敌军造价×W_kill。据点分按 `controlPointFlowRatio`（默认 0.7）混合「每轮平均持有」与「期末当前持有」；3.6.0 起行动功绩已移除，不再有行动分。权重因图而异；唯一最高分获胜，并列最高则平局。`balance.maxTurns` 为 `null` 的地图（如 `whirlpool`）**无回合上限**，永不按轮数裁决，只能靠淘汰或房主强制裁决结束。
 
 ## 单位
 
@@ -170,7 +170,7 @@ npm run export-state
 | `POST` | `/api/games/:id/deploy` | `{ unitType, fromId, q, r }` |
 | `POST` | `/api/games/:id/move` | `{ unitId, q, r }` |
 | `POST` | `/api/games/:id/attack` | 顺序模式 `{ attackerId, targetId }`；同时模式 `{ attackerId, q, r }`（指定格子） |
-| `POST` | `/api/games/:id/heal` | `{ supportId, targetId }` |
+| `POST` | `/api/games/:id/heal` | 顺序模式 `{ supportId, targetId }`；同时模式 `{ supportId, q, r }`（按 `healShape` 区域治疗） |
 | `POST` | `/api/games/:id/demolish` | `{ unitId, q, r }` |
 | `POST` | `/api/games/:id/end-turn` | `{}`（同时模式 = 确认锁定计划；全员确认即触发结算） |
 | `POST` | `/api/games/:id/plan/revoke` | `{ actionId }`（同时模式专用，撤回一条排队指令） |
@@ -178,6 +178,8 @@ npm run export-state
 | `POST` | `/api/games/:id/host/force-resolve` | 无（房主强制立即结算，未确认者按现有队列参与） |
 
 旧版 `/build`、`/produce`、`/sell` 已移除。
+
+所有玩法动作写接口（部署/移动/攻击/治疗/爆破/结束回合，以及同时模式的计划撤回/清空）支持可选 `Idempotency-Key` 请求头：同键同 body 回放首次响应并带 `Idempotent-Replay: true`，同键不同 body 返回 409 `idempotency_conflict`。`GET /api/games/:id` 支持 `include=state,events,config,adjudication` 投影与 `If-None-Match`（304）；AI 可用 `GET /api/games/:id/wait?afterSeq=<seq>&timeout=<seconds>` 长轮询等待新事件，SSE 断线可用 `Last-Event-ID` 续传。
 
 ### 事件
 
@@ -187,7 +189,7 @@ npm run export-state
 
 `player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `round_start`, `round_resolved`, `plan_committed`, `action_failed`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
 
-`game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。`game_over` 是事件流最后一条，最终回合的 `round_end` / `round_resolved` 必定先于它；客户端收到 `game_over` 后可以安全停止读取。
+`game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。新生成的事件流中 `game_over` 是最后一条，最终回合的 `round_end` / `round_resolved` 必定先于它；既有归档回放仍可能保留 3.7.1 之前的旧顺序（`game_over` 后还有终局 `round_resolved`），读取旧回放时不要只按 `game_over` 截断。
 
 `income` 事件保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。`deploy` 事件中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。`control_point_repair` 事件包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 

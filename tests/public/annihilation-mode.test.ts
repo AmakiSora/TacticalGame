@@ -75,7 +75,7 @@ describe('annihilation mode UI', () => {
       expect(source).toContain("const SIMULTANEOUS_MERIT_SCHEMA_VERSION = '3.3.4';");
       // 旧口径回放不吃击杀分项，也不累计据点流量。
       expect(source).toContain('if (!usesLegacyAdjudication() && target && previousHp > 0');
-      expect(source).toContain('if (p.gameOver !== true && !usesLegacyAdjudication()) {');
+      expect(source).toContain('if ((p.gameOver !== true || p.controlHoldCounted === true) && !usesLegacyAdjudication()) {');
       // 重导出旧回放必须沿用旧版本戳，否则会被误判成新规则对局。
       expect(source).toContain('function replayExportStamp()');
     }

@@ -12,6 +12,11 @@ export type PlayerRecord<T> = Partial<Record<PlayerId, T>>;
 /** 玩家名称最大长度；后端入口与前端输入框（public/*.html 的 maxlength）统一使用。 */
 export const MAX_PLAYER_NAME_LEN = 50;
 
+/** 把任意输入收敛为合法玩家名；非字符串/空白返回空串，由调用方决定默认值或 400。 */
+export function normalizePlayerName(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, MAX_PLAYER_NAME_LEN) : '';
+}
+
 export function isPlayerId(value: unknown): value is PlayerId {
   return typeof value === 'string' && (PLAYER_IDS as readonly string[]).includes(value);
 }
@@ -315,7 +320,7 @@ export interface GameState {
   /** 最近的成功动作幂等记录（键为“玩家:原始键”）；有界，旧存档缺省为空。 */
   idempotency?: Record<string, IdempotencyRecord>;
   /**
-   * 派生索引/缓存的失效版本：每次成功追加事件 +1。不参与游戏规则，
+   * 派生索引/缓存的失效版本：每次成功追加事件 +1（少量不发事件的配置变更也会显式 +1）。
    * 旧存档缺省时按 0 处理。不要用它做客户端协议版本（公开 revision 是另一件事）。
    */
   stateVersion?: number;

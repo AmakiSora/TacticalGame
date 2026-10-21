@@ -88,8 +88,25 @@ export async function buildServer(): Promise<FastifyInstance> {
     logger: {
       level: logLevel,
       redact: {
-        paths: ['req.headers.x-player-token', 'req.headers.x-host-token', 'req.headers.x-control-token', 'req.query.token'],
+        paths: [
+          'req.headers.x-player-token', 'req.headers.x-host-token', 'req.headers.x-control-token',
+          'req.headers.x-metrics-token', 'req.headers.authorization', 'req.query.token',
+        ],
         censor: '[REDACTED]',
+      },
+      serializers: {
+        // pino 默认 req serializer 会输出完整 req.url；控制 token/SSE token 允许走
+        // 查询串，因此必须在这里按参数名脱敏，而不是只依赖上面的 redact 路径。
+        req(request: { method?: string; url?: string; host?: string; ip?: string; socket?: { remotePort?: number } }) {
+          const rawUrl = typeof request.url === 'string' ? request.url : '';
+          return {
+            method: request.method,
+            url: rawUrl.replace(/([?&](?:token|access_token)=)[^&]*/gi, '$1[REDACTED]'),
+            host: request.host,
+            remoteAddress: request.ip,
+            remotePort: request.socket?.remotePort,
+          };
+        },
       },
     },
     trustProxy: readRuntimeConfig().trustProxy,
@@ -117,7 +134,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   app.addHook('onRequest', async (req, reply) => {
     const url = req.url.split('?')[0]!;
     if (!isRateLimitedPath(req.method, url)) return;
-    const key = `${req.ip}:${req.method}:${url.replace(/\/api\/games\/[^/]+/, '/api/games/:id')}`;
+    const key = `${req.ip}:${req.method}:${url
+      .replace(/\/api\/games\/[^/]+/, '/api/games/:id')
+      .replace(/\/players\/[^/]+/, '/players/:playerId')}`;
     const now = Date.now();
     const entry = requestCounts.get(key);
     if (!entry || entry.resetAt <= now) {
@@ -221,12 +240,18 @@ export async function buildServer(): Promise<FastifyInstance> {
     const gameOverTtlMs = hours(process.env.TACTICAL_GAME_OVER_TTL_HOURS, 7 * 24) * 3_600_000;
     if (lobbyTtlMs > 0 || gameOverTtlMs > 0) {
       const retentionTimer = setInterval(() => {
-        const removed = globalStore.pruneInactive({ lobbyTtlMs, gameOverTtlMs });
-        for (const gameId of removed) {
-          globalEventBus.clear(gameId);
-          clearBotsForGame(gameId);
-          closeSseConnections(gameId);
-          app.log.info({ gameId }, 'archived and removed inactive game');
+        try {
+          const removed = globalStore.pruneInactive({ lobbyTtlMs, gameOverTtlMs });
+          for (const gameId of removed) {
+            globalEventBus.clear(gameId);
+            clearBotsForGame(gameId);
+            closeSseConnections(gameId);
+            app.log.info({ gameId }, 'archived and removed inactive game');
+          }
+        } catch (err) {
+          // 持久化/归档失败不能把定时器异常抛成未捕获异常导致进程退出；
+          // 下一轮会重试，快照仍在磁盘上。
+          app.log.error(err, 'failed to prune inactive games');
         }
       }, 10 * 60_000);
       retentionTimer.unref();

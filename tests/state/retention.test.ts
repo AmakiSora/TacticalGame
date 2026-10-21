@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialGame, GameStore } from '../../src/state/store.js';
 
 let tempDir: string | null = null;
@@ -34,6 +34,39 @@ describe('game retention', () => {
     expect(store.get('old-lobby')).toBeUndefined();
     expect(store.get('active-game')).toBeDefined();
     expect(existsSync(join(tempDir!, 'archive', 'old-lobby.json'))).toBe(true);
+  });
+
+  it('keeps pruned games in memory when the consistency flush fails', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    const lobby = createInitialGame('prune-flush-failure');
+    lobby.phase = 'lobby';
+    store.save(lobby);
+    lobby.lastActivityAt = 0;
+    const flush = vi.spyOn(store, 'flush').mockImplementation(() => {
+      throw new Error('disk full');
+    });
+    try {
+      expect(() => store.pruneInactive({ lobbyTtlMs: 1, gameOverTtlMs: 1, now: Date.now() })).toThrow();
+      expect(store.get('prune-flush-failure')).toBeDefined();
+    } finally {
+      flush.mockRestore();
+    }
+  });
+
+  it('keeps a game when snapshot removal fails during delete', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    const game = createInitialGame('delete-snapshot-failure');
+    store.save(game);
+    const remove = vi.spyOn(store as unknown as { removeSnapshot: (id: string) => boolean }, 'removeSnapshot')
+      .mockReturnValue(false);
+    try {
+      expect(() => store.delete('delete-snapshot-failure')).toThrow(/failed to remove snapshot/);
+      expect(store.get('delete-snapshot-failure')).toBeDefined();
+    } finally {
+      remove.mockRestore();
+    }
   });
 
   it('refreshes lastActivityAt only on writes', () => {

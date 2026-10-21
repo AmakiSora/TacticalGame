@@ -47,6 +47,19 @@ describe('mobile website pages', () => {
     expect(spectator).toContain('/mobile-icons.css');
   });
 
+  it('keeps end-turn controls hidden at game over and disabled after commit', () => {
+    const desktop = read('public/play.js');
+    const mobile = read('public/play-m.js');
+    for (const source of [desktop, mobile]) {
+      expect(source).toContain("const endTurnUnavailable = !myToken || Boolean(state?.result) || state?.turn?.phase === 'game_over';");
+      expect(source).toContain('const endTurnCommitted = simultaneous && iCommitted();');
+      expect(source).toContain('els.btnEndTurn.disabled = endTurnCommitted;');
+    }
+    expect(mobile).toContain("endTurnBar.classList.toggle('hidden', endTurnUnavailable);");
+    expect(mobile).toContain('endTurnBar.disabled = endTurnCommitted;');
+    expect(read('public/play-m.css')).toContain('body.player-m-shell .bar-btn:disabled');
+  });
+
   it('uses consistent Lucide assets instead of font glyphs for mobile icon buttons', () => {
     const play = read('public/play-m.html');
     const spectator = read('public/spectator-m.html');

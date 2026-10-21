@@ -144,6 +144,8 @@ export function repairFromControlPoints(game: GameState, bus: EventBus, owner: P
   const repaired = new Set<string>();
   for (const point of game.controlPoints) {
     if (point.owner !== owner) continue;
+    // 维修点本身在炮火危险区时同样禁止维修（与部署/治疗的规则一致）。
+    if (isArtilleryDanger(game, point)) continue;
     const repairAmount = controlPointTypeSpec(game, point)?.repairAmount ?? 0;
     if (repairAmount <= 0) continue;
     for (const unit of game.units) {
@@ -264,6 +266,9 @@ export function buildAdjudicationSnapshot(game: GameState): AdjudicationSnapshot
 }
 
 export function endGame(game: GameState, bus: EventBus, winner: PlayerId | null, reason: GameOverReason): void {
+  // game_over 是事件流的终止事件：重复收尾（例如终局后再次淘汰/裁定）不得再追加
+  // 第二条 game_over，否则客户端按终止事件停读后仍会看到后续状态。
+  if (game.phase === 'game_over') return;
   const scores = buildAdjudicationScores(game);
   const rankings = buildRankings(game, scores);
   game.phase = 'game_over';
@@ -470,7 +475,7 @@ function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): v
     next = nextActiveInOrder(game, previousOwner, remaining);
   } else {
     accumulateControlHold(game);
-    appendEvent(game, bus, 'round_end', { roundNumber: game.turn.roundNumber });
+    appendEvent(game, bus, 'round_end', { roundNumber: game.turn.roundNumber, controlHoldCounted: true });
     if (adjudicateAtTurnLimit(game, bus)) return;
     grantComebackSupplies(game, bus);
     game.turn.roundNumber += 1;
@@ -499,6 +504,8 @@ export function eliminatePlayer(
   reason: EliminationReason,
   eliminatedBy: PlayerId | null,
 ): Result {
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: '对局已结束' };
+  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
   const player = game.players[playerId];
   if (!player || player.status !== 'active') {
     return { ok: false, code: 'player_eliminated', message: '该玩家已不在场上' };
@@ -535,6 +542,8 @@ export function endTurn(game: GameState, bus: EventBus, owner: PlayerId): Result
 
 export function skipTurn(game: GameState, bus: EventBus): Result {
   syncLegacyTurnAliases(game);
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: '对局已结束' };
+  if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
   const owner = game.turn.currentPlayerId;
   if (!owner) return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
   appendEvent(game, bus, 'turn_skipped', { playerId: owner, roundNumber: game.turn.roundNumber });

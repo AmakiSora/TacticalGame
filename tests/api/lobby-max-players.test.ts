@@ -63,6 +63,31 @@ describe('lobby max players', () => {
     expect(atCapacity.json().lobby.players).toHaveLength(2);
   });
 
+  it('invalidates the state ETag when max players changes', async () => {
+    app = await startTestServer();
+    const created = await createLobby(6);
+    const joined = await join(created.gameId, 'A');
+    const first = await app.inject({
+      method: 'GET',
+      url: `/api/games/${created.gameId}`,
+      headers: { 'x-player-token': joined.player.token },
+    });
+    expect(first.statusCode).toBe(200);
+    expect(first.headers.etag).toBeTruthy();
+
+    expect((await setMaxPlayers(created.gameId, created.hostToken, 3)).statusCode).toBe(200);
+    const second = await app.inject({
+      method: 'GET',
+      url: `/api/games/${created.gameId}`,
+      headers: {
+        'x-player-token': joined.player.token,
+        'if-none-match': String(first.headers.etag),
+      },
+    });
+    expect(second.statusCode).toBe(200);
+    expect(second.json().maxPlayers).toBe(3);
+  });
+
   it('rejects unsupported counts, counts below joined players and missing host auth', async () => {
     app = await startTestServer();
     const created = await createLobby(6);

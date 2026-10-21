@@ -296,6 +296,8 @@ const API = {
     const headers = {};
     if (myToken) headers['X-Player-Token'] = myToken;
     const res = await fetch(path, { headers });
+    // 代理/浏览器可能把 304 直接暴露给 fetch；此时没有 body，不能调用 res.json()。
+    if (res.status === 304) return { ok: true, status: 304, data: null, notModified: true };
     const data = await res.json();
     return { ok: res.ok, status: res.status, data };
   },
@@ -1118,7 +1120,7 @@ function applyEvent(s, ev) {
       break;
     case 'round_end':
       // 整轮边界：为未淘汰玩家累计据点持有（与服务器 accumulateControlHold 同口径）。
-      if (p.gameOver !== true) {
+      if (p.gameOver !== true || p.controlHoldCounted === true) {
         for (const [pid, pl] of Object.entries(s.players || {})) {
           if (pl.status === 'eliminated') continue;
           ensureStats(pl);
@@ -1204,8 +1206,12 @@ async function refreshAdjudication() {
       do {
         adjudicationRefreshQueued = false;
         const { ok, data } = await API.get(`/api/games/${gameId}`);
-        if (!ok || !data?.adjudication || !state) return false;
-        state.adjudication = data.adjudication;
+        if (!ok || !state) return false;
+        // 终局字段也要合并：SSE 在最后一轮断开时，GET 仍是唯一的真相来源。
+        if (data?.winner !== undefined) state.winner = data.winner;
+        if (data?.result !== undefined) state.result = data.result;
+        if (data?.phase) state.turn.phase = data.phase;
+        if (data?.adjudication) state.adjudication = data.adjudication;
         // 同时模式：合并服务器返回的计划状态（自己的队列 + 已确认名单）。
         if (data.plan) {
           state.plan = {
@@ -1866,7 +1872,7 @@ function committedStatusHtml() {
 function iCommitted() { return committedList().includes(myPlayer); }
 /** 当下是否允许我方操作：顺序模式=轮到我；同时模式=计划阶段且我未确认。 */
 function canActNow() {
-  if (!state || state.winner) return false;
+  if (!state || state.winner || state.result || state.turn?.phase === 'game_over') return false;
   if (playback.isActive()) return false; // 结算回放中暂不可操作。
   if (isSimultaneous()) {
     return state.players?.[myPlayer]?.status === 'active' && !iCommitted();
@@ -2287,10 +2293,16 @@ function renderSidebar() {
   renderScorePanel();
   renderPlanPanel();
   // 无玩家 token 的观战房主没有操作权，结束回合只会得到 401。
-  els.btnEndTurn.classList.toggle('hidden', !myToken);
+  const endTurnUnavailable = !myToken || Boolean(state?.result) || state?.turn?.phase === 'game_over';
+  const endTurnCommitted = simultaneous && iCommitted();
+  els.btnEndTurn.classList.toggle('hidden', endTurnUnavailable);
+  els.btnEndTurn.disabled = endTurnCommitted;
   const endTurnBar = document.getElementById('btn-end-turn-bar');
-  if (endTurnBar) endTurnBar.classList.toggle('hidden', !myToken);
-  els.btnEndTurn.textContent = simultaneous ? (iCommitted() ? '等待结算…' : '确认行动') : '结束回合';
+  if (endTurnBar) {
+    endTurnBar.classList.toggle('hidden', endTurnUnavailable);
+    endTurnBar.disabled = endTurnCommitted;
+  }
+  els.btnEndTurn.textContent = simultaneous ? (endTurnCommitted ? '等待结算…' : '确认行动') : '结束回合';
   if (endTurnBar) endTurnBar.textContent = els.btnEndTurn.textContent;
   els.events.innerHTML = '';
   // 最新事件置顶（slice 已产出新数组，reverse 不会改动 state.eventLog）
@@ -2330,7 +2342,7 @@ function formatEventShort(ev) {
     case 'move': return `移动到 (${p.toQ}, ${p.toR})`;
     case 'attack': return p.hit === false ? `开火落空 (${p.q}, ${p.r})` : `攻击造成 ${p.damage} 伤害`;
     case 'heal': return `治疗 +${p.amount}`;
-    case 'unit_death': return `${UNIT_NAMES[p.unitType] || '单位'} 阵亡`;
+    case 'unit_death': return `${UNIT_NAMES[p.unitType || p.type] || '单位'} 阵亡`;
     case 'headquarters_destroyed': return `${playerName(p.owner)} 指挥部被摧毁`;
     case 'control_point_captured': return `${playerName(p.owner)} 占领 ${p.name}`;
     case 'control_point_repair': return `${p.pointName || '维修站'} 修复单位 +${p.amount}`;
@@ -2455,7 +2467,16 @@ function deselect() { selectedUnitId = null; selectedOriginId = null; selectedDe
 
 async function apiAction(path, body) {
   const { ok, data } = await API.post(path, body);
-  if (!ok) toast(`${data.error || '操作失败'} (${data.code || ''})`, 'err');
+  if (!ok) {
+    toast(`${data.error || '操作失败'} (${data.code || ''})`, 'err');
+    // 503 persistence_degraded：动作已在内存生效，只是没落盘。不能当普通失败，
+    // 否则本地队列/棋盘会停在旧状态，用户重试还会撞上 invalid_move。
+    if (data?.applied === true) {
+      if (isSimultaneous()) await refreshAdjudication();
+      else await loadFullState();
+      return false;
+    }
+  }
   // 同时模式：入队/撤回/清空都会在响应里回传最新队列，直接落到本地状态，
   // 不再等下一次 GET（条件请求可能命中 304，旧队列会让计划面板与棋盘预览滞后）。
   if (ok && Array.isArray(data?.queue) && state) {

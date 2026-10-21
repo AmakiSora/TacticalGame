@@ -135,6 +135,9 @@ export function healTarget(
   if (!target || target.owner !== owner || !target.alive) {
     return { ok: false, code: 'invalid_heal', message: '目标不是友方单位' };
   }
+  if (target.hp >= target.maxHp) {
+    return { ok: false, code: 'invalid_heal', message: '目标已满血' };
+  }
   if (isArtilleryDanger(game, support) || isArtilleryDanger(game, target)) {
     return { ok: false, code: 'invalid_heal', message: '炮火区内无法治疗' };
   }

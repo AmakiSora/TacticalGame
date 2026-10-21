@@ -7,6 +7,7 @@ import {
 } from '../state/store.js';
 import { verifyToken } from '../state/tokens.js';
 import { globalEventBus } from '../events/bus.js';
+import { closeSseConnections } from './events.js';
 import { appendEvent } from '../engine/events.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
 import { eliminateFromPlanAndMaybeResolve, forceResolveRound } from '../engine/simultaneous.js';
@@ -18,7 +19,7 @@ import { listMaps } from '../config/loader.js';
 import { generateRandomMapConfig, sanitizeRandomOptions } from '../config/randomMap.js';
 import type { RandomParamValues } from '../config/randomMap.js';
 import { getCachedRandomMap, setCachedRandomMap } from '../config/randomMapCache.js';
-import { isPlayerId, isSimultaneousMode, MAX_PLAYER_NAME_LEN } from '../types.js';
+import { isPlayerId, isSimultaneousMode, normalizePlayerName } from '../types.js';
 import type { GameState, PlayerId } from '../types.js';
 import { launchBotsForGame, removeBotRecord, clearBotsForGame } from './bots.js';
 
@@ -220,6 +221,8 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         });
       }
       game.maxPlayers = maxPlayers;
+      // 该接口不发事件但改变状态响应内容；显式推进版本，避免条件 GET 命中旧 ETag。
+      game.stateVersion = (game.stateVersion ?? 0) + 1;
       globalStore.persist(game);
       return { ok: true, lobby: lobbySummary(game) };
     });
@@ -249,7 +252,10 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string }; Body: { name?: string } }>('/api/games/:id/player', async (req, reply) => {
     const ctx = authenticate(req, reply);
     if (!ctx) return;
-    const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN);
+    if (ctx.game.phase === 'game_over') {
+      return reply.code(409).send({ error: '对局已结束', code: 'game_over' });
+    }
+    const name = normalizePlayerName(req.body?.name);
     if (!name) return reply.code(400).send({ error: '名字不能为空', code: 'invalid_move' });
     ctx.game.players[ctx.player]!.name = name;
     ctx.game.playerNames[ctx.player] = name;
@@ -267,11 +273,14 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!authorizeControlRequest(req, reply)) return;
     const game = globalStore.get(req.params.id);
     if (!game) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
+    if (game.phase === 'game_over') {
+      return reply.code(409).send({ error: '对局已结束', code: 'game_over' });
+    }
     const playerId = req.body?.playerId;
     if (!isPlayerId(playerId) || !game.players[playerId]) {
       return reply.code(400).send({ error: '需要有效的玩家 ID', code: 'invalid_move' });
     }
-    const name = req.body?.name?.trim().slice(0, MAX_PLAYER_NAME_LEN);
+    const name = normalizePlayerName(req.body?.name);
     if (!name) return reply.code(400).send({ error: '名字不能为空', code: 'invalid_move' });
     game.players[playerId]!.name = name;
     game.playerNames[playerId] = name;
@@ -295,6 +304,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!globalStore.get(req.params.id)) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
     globalStore.delete(req.params.id);
     globalEventBus.clear(req.params.id);
+    closeSseConnections(req.params.id);
     clearBotsForGame(req.params.id);
     return { ok: true };
   });
@@ -316,6 +326,8 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const includeKey = include === null ? 'all' : [...include].sort().join(',');
     const etag = `"${ctx.game.id}-${ctx.game.stateVersion ?? 0}-${planQueueTag(ctx.game, ctx.player)}-${includeKey}"`;
     reply.header('ETag', etag);
+    // 响应包含请求者自己的计划队列，必须标记按玩家凭证变化，禁止共享缓存复用。
+    reply.header('Vary', 'X-Player-Token');
     // 个性化对局状态必须每次向服务器确认；未变化时仍走 304，省流量但不吃旧缓存。
     reply.header('Cache-Control', 'no-cache');
     if (req.headers['if-none-match'] === etag) return reply.code(304).send();

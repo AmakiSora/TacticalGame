@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import type {
   GameState, Headquarters, MapCell, PlayerId, PlayerState, Unit, UnitType,
 } from '../types.js';
-import { isAnnihilationMode, isPlayerId, isSimultaneousMode, MAX_PLAYER_NAME_LEN, PLAYER_IDS } from '../types.js';
+import { isAnnihilationMode, isPlayerId, isSimultaneousMode, normalizePlayerName, PLAYER_IDS } from '../types.js';
 import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
 import { createMapCells } from '../config/geometry.js';
@@ -79,10 +79,11 @@ function defaultPersistenceFile(): string | null {
   return join(PROJECT_ROOT, 'runtime', 'games.json');
 }
 
-export function createPlayer(id: PlayerId, name?: string): PlayerState {
+export function createPlayer(id: PlayerId, name?: unknown): PlayerState {
+  const normalizedName = normalizePlayerName(name);
   return {
     id,
-    name: name?.trim().slice(0, MAX_PLAYER_NAME_LEN) || `玩家 ${id.slice(-1).toUpperCase()}`,
+    name: normalizedName || `玩家 ${id.slice(-1).toUpperCase()}`,
     joinedAt: Date.now(),
     status: 'lobby',
     spawnSlotId: null,
@@ -152,7 +153,7 @@ export function createLobbyWithConfig(id: string, mapId: string, config: MapConf
   game.artillery = artilleryStateForRound(game, 1);
   // 大厅列表要显示房主名：参战时取房主席位名（留空由服务端分配默认名），
   // 未参战时用创建表单填的名字（可能为空，界面会只显示「房主」）。
-  const hostNameInput = options.playerName?.trim().slice(0, MAX_PLAYER_NAME_LEN) || '';
+  const hostNameInput = normalizePlayerName(options.playerName);
   let hostName = hostNameInput;
   if (options.participate !== false) {
     const joined = addLobbyPlayer(game, hostNameInput);
@@ -369,15 +370,22 @@ function restoreActionStats(game: GameState): void {
     if (event.type === 'player_eliminated' && isPlayerId(payload.playerId)) {
       eliminated.add(payload.playerId);
     }
-    if (event.type === 'round_end' && payload.gameOver !== true) {
-      for (const id of PLAYER_IDS) {
-        if (!game.players[id] || eliminated.has(id)) continue;
-        let held = 0;
-        for (const pointOwner of pointOwners.values()) {
-          if (pointOwner === id) held += 1;
+    if (event.type === 'round_end') {
+      // 终局回合的 round_end 可能是「淘汰型」（结算前没有 accumulateControlHold）
+      // 或「回合上限型」（先累计再写终局摘要）。旧存档没有 controlHoldCounted
+      // 标记时，用 game.result 的回合上限原因兜底，避免重启后丢掉最后一轮流量。
+      const turnLimitResult = game.result?.reason === 'turn_limit_score'
+        || game.result?.reason === 'turn_limit_draw';
+      if (payload.gameOver !== true || payload.controlHoldCounted === true || turnLimitResult) {
+        for (const id of PLAYER_IDS) {
+          if (!game.players[id] || eliminated.has(id)) continue;
+          let held = 0;
+          for (const pointOwner of pointOwners.values()) {
+            if (pointOwner === id) held += 1;
+          }
+          controlHoldTotals.set(id, (controlHoldTotals.get(id) ?? 0) + held);
+          controlHoldRoundTotals.set(id, (controlHoldRoundTotals.get(id) ?? 0) + 1);
         }
-        controlHoldTotals.set(id, (controlHoldTotals.get(id) ?? 0) + held);
-        controlHoldRoundTotals.set(id, (controlHoldRoundTotals.get(id) ?? 0) + 1);
       }
       continue;
     }
@@ -474,9 +482,27 @@ export class GameStore {
   get(id: string): GameState | undefined { return this.games.get(id); }
   list(): string[] { return [...this.games.keys()]; }
   delete(id: string): void {
+    const game = this.games.get(id);
+    if (!game) return;
     this.games.delete(id);
-    this.removeSnapshot(id);
-    this.flush();
+    const snapshotRemoved = this.removeSnapshot(id);
+    try {
+      this.flush();
+    } catch (err) {
+      // 导出旧格式失败时不要把内存条目丢掉；快照已删除则立即补写回去。
+      this.games.set(id, game);
+      if (snapshotRemoved) {
+        try { this.writeSnapshot(game); } catch { /* 保留内存状态，等待下一次落盘 */ }
+      }
+      throw err;
+    }
+    if (!snapshotRemoved) {
+      // 快照删除失败（Windows 文件占用/只读）不能静默成功，否则重启会复活。
+      // 恢复内存并重写一份可用快照，让调用方收到失败而不是假成功。
+      this.games.set(id, game);
+      try { this.writeSnapshot(game); this.flush(); } catch { /* 保留内存状态 */ }
+      throw new Error(`failed to remove snapshot for game ${id}`);
+    }
   }
   persist(game: GameState): void {
     game.lastActivityAt = Date.now();
@@ -493,7 +519,9 @@ export class GameStore {
     let sawValid = false;
     let sawSnapshot = false;
 
-    // 1) 每局快照（新格式，优先）。
+    // 1) 每局快照（新格式，优先）。主快照损坏/缺失时回退同目录的 .prev：
+    //    写入流程先把旧文件轮转为 .prev，再原子替换主文件；若进程在两次 rename
+    //    之间崩溃，主文件会暂时不存在，只有 .prev 是完整可用的。
     const dir = this.storeDir();
     if (dir && existsSync(dir)) {
       let names: string[] = [];
@@ -502,19 +530,64 @@ export class GameStore {
       } catch (err) {
         logger.error(`无法读取状态目录 ${dir}`, err);
       }
+      const loadSnapshot = (snapshotFile: string): GameState => {
+        const parsed = JSON.parse(readFileSync(snapshotFile, 'utf8')) as Partial<PersistedGameSnapshot>;
+        const game = parsed.game as GameState | undefined;
+        if (!game || typeof game.id !== 'string') throw new Error('snapshot missing game');
+        normalizeLoadedGame(game);
+        return game;
+      };
+      const loadedPrev = new Set<string>();
       for (const name of names.sort()) {
         const snapshotFile = join(dir, name);
         try {
-          const parsed = JSON.parse(readFileSync(snapshotFile, 'utf8')) as Partial<PersistedGameSnapshot>;
-          const game = parsed.game as GameState | undefined;
-          if (!game || typeof game.id !== 'string') throw new Error('snapshot missing game');
-          normalizeLoadedGame(game);
+          const game = loadSnapshot(snapshotFile);
+          if (loaded.has(game.id)) continue;
           loaded.set(game.id, game);
           sawValid = true;
           sawSnapshot = true;
         } catch (err) {
           this.archiveStateFile(snapshotFile, 'corrupt');
           logger.error(`failed to load snapshot ${snapshotFile}`, err);
+          const previousFile = `${snapshotFile}.prev`;
+          if (!existsSync(previousFile)) continue;
+          try {
+            const game = loadSnapshot(previousFile);
+            loadedPrev.add(previousFile);
+            if (loaded.has(game.id)) continue;
+            loaded.set(game.id, game);
+            sawValid = true;
+            sawSnapshot = true;
+            logger.warn(`主快照不可用，已从备份 ${previousFile} 恢复`, { tag: 'game:persist' });
+          } catch (previousError) {
+            this.archiveStateFile(previousFile, 'corrupt');
+            logger.error(`failed to load snapshot backup ${previousFile}`, previousError);
+          }
+        }
+      }
+      // 主文件已完全缺失时，readdir 的 .json 列表不会包含它；单独扫描孤立的
+      // .json.prev，覆盖「轮转完成后、替换主文件前崩溃」的场景。
+      let orphanPrevNames: string[] = [];
+      try {
+        orphanPrevNames = readdirSync(dir).filter(name => name.endsWith('.json.prev'));
+      } catch (err) {
+        logger.error(`无法读取状态目录 ${dir}`, err);
+      }
+      for (const name of orphanPrevNames.sort()) {
+        const previousFile = join(dir, name);
+        if (loadedPrev.has(previousFile)) continue;
+        const mainFile = previousFile.slice(0, -'.prev'.length);
+        if (existsSync(mainFile)) continue;
+        try {
+          const game = loadSnapshot(previousFile);
+          if (loaded.has(game.id)) continue;
+          loaded.set(game.id, game);
+          sawValid = true;
+          sawSnapshot = true;
+          logger.warn(`主快照缺失，已从备份 ${previousFile} 恢复`, { tag: 'game:persist' });
+        } catch (err) {
+          this.archiveStateFile(previousFile, 'corrupt');
+          logger.error(`failed to load snapshot backup ${previousFile}`, err);
         }
       }
     }
@@ -599,16 +672,21 @@ export class GameStore {
     renameSync(tmp, target);
   }
 
-  private removeSnapshot(gameId: string): void {
+  private removeSnapshot(gameId: string): boolean {
     const target = this.snapshotPath(gameId);
-    if (!target) return;
+    if (!target) return true;
+    let removed = true;
     for (const path of [target, `${target}.prev`]) {
       try {
         unlinkSync(path);
-      } catch {
-        // 文件不存在或已被清理。
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          removed = false;
+          logger.warn(`无法删除快照 ${path}`, { tag: 'game:persist' });
+        }
       }
     }
+    return removed;
   }
 
   /** 状态文件所在目录可写（/readyz 深检用）；未启用持久化时视为可写。 */
@@ -680,6 +758,7 @@ export class GameStore {
   pruneInactive(options: { lobbyTtlMs: number; gameOverTtlMs: number; now?: number }): string[] {
     const now = options.now ?? Date.now();
     const removed: string[] = [];
+    const removedGames: GameState[] = [];
     for (const game of [...this.games.values()]) {
       const ttl = game.phase === 'lobby'
         ? options.lobbyTtlMs
@@ -692,11 +771,29 @@ export class GameStore {
       if (!this.archiveGame(game)) continue;
       this.games.delete(game.id);
       removed.push(game.id);
+      removedGames.push(game);
     }
     if (removed.length > 0) {
-      // 先导出一致性 games.json，再删快照；flush 失败时保留快照，避免重启复活/丢失两难。
-      this.flush();
-      for (const id of removed) this.removeSnapshot(id);
+      // 先导出一致性 games.json，再删快照；flush 失败时把内存条目放回去，
+      // 避免一次磁盘故障让对局从服务内存中消失（调用方会重试下一轮）。
+      try {
+        this.flush();
+      } catch (err) {
+        for (const game of removedGames) this.games.set(game.id, game);
+        throw err;
+      }
+      const failed = removed.filter(id => !this.removeSnapshot(id));
+      if (failed.length > 0) {
+        // 快照删不掉就不算真正删除：恢复内存并重写快照，调用方下一轮再试。
+        for (const id of failed) {
+          const game = removedGames.find(candidate => candidate.id === id);
+          if (!game) continue;
+          this.games.set(id, game);
+          try { this.writeSnapshot(game); } catch { /* 保留内存状态 */ }
+        }
+        try { this.flush(); } catch (err) { logger.error('恢复未删除对局的 games.json 失败', err); }
+        return removed.filter(id => !failed.includes(id));
+      }
     }
     return removed;
   }

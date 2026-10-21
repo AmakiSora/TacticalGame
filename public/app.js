@@ -539,7 +539,7 @@ function applyEvent(s, ev) {
     case 'round_end':
       // 整轮边界：为未淘汰玩家累计据点持有（与服务器 accumulateControlHold 同口径）。
       // 旧回放（3.6.0 前）据点按期末全额计分，不累计流量。
-      if (p.gameOver !== true && !usesLegacyAdjudication()) {
+      if ((p.gameOver !== true || p.controlHoldCounted === true) && !usesLegacyAdjudication()) {
         for (const [pid, pl] of Object.entries(s.players || {})) {
           if (pl.status === 'eliminated') continue;
           ensureStats(pl);

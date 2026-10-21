@@ -170,6 +170,53 @@ describe('simultaneous mode API', () => {
     }
   });
 
+  it('replays a plan revoke with the same idempotency key', async () => {
+    const { app, gameId, seats } = await createSimultaneousGame();
+    try {
+      const state = await getState(app, gameId, seats[0]!.token);
+      const { unitId } = firstInfantryNearHq(state, seats[0]!.id);
+      const unit = state.units.find(u => u.id === unitId)!;
+      const target = emptyNeighbor(state, unit)!;
+      const move = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/move`,
+        headers: { 'x-player-token': seats[0]!.token },
+        payload: { unitId, q: target.q, r: target.r },
+      });
+      expect(move.statusCode).toBe(200);
+      const actionId = (move.json() as { queue: { id: string }[] }).queue[0]!.id;
+      const body = { actionId };
+      const first = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/plan/revoke`,
+        headers: { 'x-player-token': seats[0]!.token, 'idempotency-key': 'revoke-key' },
+        payload: body,
+      });
+      expect(first.statusCode).toBe(200);
+      expect((first.json() as { queue: unknown[] }).queue).toHaveLength(0);
+      // 回放时队列可能已被后续动作改变：响应里的 queue 必须是当前队列，
+      // 不能是首次撤回时的空队列快照。
+      const secondMove = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/move`,
+        headers: { 'x-player-token': seats[0]!.token },
+        payload: { unitId, q: target.q, r: target.r },
+      });
+      expect(secondMove.statusCode).toBe(200);
+      const replay = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/plan/revoke`,
+        headers: { 'x-player-token': seats[0]!.token, 'idempotency-key': 'revoke-key' },
+        payload: body,
+      });
+      expect(replay.statusCode).toBe(200);
+      expect(replay.headers['idempotent-replay']).toBe('true');
+      expect((replay.json() as { queue: unknown[] }).queue).toHaveLength(1);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('hides other players pending queues but exposes the committed list', async () => {
     const { app, gameId, seats } = await createSimultaneousGame();
     try {
@@ -247,7 +294,7 @@ describe('simultaneous mode API', () => {
         payload: {},
       });
       expect(commitB.statusCode).toBe(200);
-      expect(commitB.json()).toMatchObject({ committed: true, resolved: true });
+      expect(commitB.json()).toMatchObject({ committed: true, resolved: true, roundNumber: 1 });
 
       const after = await getState(app, gameId, seats[0]!.token);
       expect(after.turn.roundNumber).toBe(2);

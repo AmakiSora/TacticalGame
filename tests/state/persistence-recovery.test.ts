@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createInitialGame, GameStore } from '../../src/state/store.js';
+import { createInitialGame, GameStore, gameSnapshotPath } from '../../src/state/store.js';
 import { verifyToken } from '../../src/state/tokens.js';
 
 let tempDir: string | null = null;
@@ -59,6 +59,37 @@ describe('persistence recovery', () => {
     store.loadFromDisk();
 
     expect(store.get('from-backup')).toBeDefined();
+  });
+
+  it('recovers a per-game snapshot from .prev when the main snapshot is missing', () => {
+    const file = tempFile();
+    const game = createInitialGame('snapshot-prev');
+    const store = new GameStore({ persistenceFile: file });
+    store.save(game);
+    const main = gameSnapshotPath(file, 'snapshot-prev');
+    renameSync(main, `${main}.prev`);
+    unlinkSync(file);
+
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    expect(restored.get('snapshot-prev')).toBeDefined();
+  });
+
+  it('recovers a per-game snapshot from .prev when the main snapshot is corrupt', () => {
+    const file = tempFile();
+    const game = createInitialGame('snapshot-prev-corrupt');
+    const store = new GameStore({ persistenceFile: file });
+    store.save(game);
+    const main = gameSnapshotPath(file, 'snapshot-prev-corrupt');
+    renameSync(main, `${main}.prev`);
+    writeFileSync(main, '{ bad snapshot json');
+    unlinkSync(file);
+
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    expect(restored.get('snapshot-prev-corrupt')).toBeDefined();
   });
 
   it('migrates legacy plaintext tokens to hashes on load', () => {

@@ -21,6 +21,7 @@ export const ALGORITHMS = {
   verdict: './builtin/verdict.mjs',
   'random-sim': './builtin/random-sim.mjs',
   'dest-prob': './builtin/dest-prob.mjs',
+  kriegspiel: './builtin/kriegspiel.mjs',
 };
 
 /**
@@ -50,6 +51,7 @@ export const ALGORITHM_META = {
   verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v1', modes: ['standard'] },
   'random-sim': { displayName: '同时随机算法', description: '同时回合：从所有合法计划动作中随机选择入队，随后提交', version: 'v1', modes: ['simultaneous'] },
   'dest-prob': { displayName: '落点概率算法', description: '同时回合：建模敌军落点概率，预测射击并规避目的格冲突', version: 'v1', modes: ['simultaneous'] },
+  kriegspiel: { displayName: '兵棋推演算法', description: '同时回合：真实结算 rollout + 整份计划联合搜索 + 风险规避', version: 'v1', modes: ['simultaneous'] },
 };
 
 /**

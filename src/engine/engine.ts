@@ -301,10 +301,15 @@ function nextActiveInOrder(game: GameState, owner: PlayerId, allowed?: Set<Playe
   return null;
 }
 
-export function adjudicateAtTurnLimit(game: GameState, bus: EventBus): boolean {
+/** 当前回合边界是否触发回合上限裁决；不修改对局状态。 */
+export function isTurnLimitReached(game: GameState): boolean {
   // maxTurns === null 表示无回合上限：只靠淘汰或房主强制裁决收尾，回合边界永不裁定。
   if (game.config.balance.maxTurns === null) return false;
-  if (game.turn.roundNumber < game.config.balance.maxTurns) return false;
+  return game.turn.roundNumber >= game.config.balance.maxTurns;
+}
+
+export function adjudicateAtTurnLimit(game: GameState, bus: EventBus): boolean {
+  if (!isTurnLimitReached(game)) return false;
   const scores = buildAdjudicationScores(game);
   const active = activePlayerIds(game);
   const top = Math.max(...active.map(id => scores[id]?.total ?? 0));

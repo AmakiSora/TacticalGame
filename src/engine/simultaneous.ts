@@ -9,9 +9,11 @@
 //      落空即浪费）+ 治疗（按目标最终位置复核射程）；净血量 = 先治疗、再按顺序
 //      施加伤害（等价同时，且击杀归属确定）；
 //   4. 占点（每个存活玩家，一格一单位无冲突）；
-//   5. 回合边界：round_end → 回合上限裁定 → 翻盘补给 → 回合数+1 → 炮火收缩
-//      （annihilation/royale）→ 重置全员行动标志与计划状态 → 全员发收入与维修
-//      → round_start。
+//   5. 回合边界：round_end → round_resolved →（终局时 game_over）→ 翻盘补给 →
+//      回合数+1 → 炮火收缩（annihilation/royale）→ 重置全员行动标志与计划状态
+//      → 全员发收入与维修 → round_start。终局摘要始终先于 game_over，保证后者
+//      是事件流里最后一条。
+//   注：淘汰导致的终局同样先补 round_end / round_resolved，再发 game_over。
 import type { GameState, Headquarters, PendingAction, PlayerId, PlayerRecord, Unit } from '../types.js';
 import { isAnnihilationMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
@@ -24,8 +26,8 @@ import { createUnitFromConfig } from '../state/store.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import {
   accumulateControlHold, activePlayerIds, adjudicateAtTurnLimit, captureControlPoints, collectIncome,
-  creditKill, endGame, grantComebackSupplies, markPlayerEliminated, repairFromControlPoints, resetActions,
-  updateArtilleryForRound,
+  creditKill, endGame, grantComebackSupplies, isTurnLimitReached, markPlayerEliminated,
+  repairFromControlPoints, resetActions, updateArtilleryForRound,
 } from './engine.js';
 import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound, coveredCellsFor } from './planning.js';
 import { nextGameRandom } from './random.js';
@@ -537,19 +539,21 @@ export function resolveRound(game: GameState, bus: EventBus): void {
   };
 
   // 多家总部同回合被摧毁 → 可能直接终局或同归于尽。
+  // 终局回合的摘要必须先于 game_over 落库/广播：game_over 是客户端约定的终止事件，
+  // 先发会把最后一轮 round_resolved 留在终止事件之后。
   if (game.phase === 'game_over') {
     finish(true);
     return;
   }
   const activeAfterDeaths = activePlayerIds(game);
   if (activeAfterDeaths.length === 0) {
-    endGame(game, bus, null, 'mutual_annihilation');
     finish(true);
+    endGame(game, bus, null, 'mutual_annihilation');
     return;
   }
   if (activeAfterDeaths.length === 1) {
-    endGame(game, bus, activeAfterDeaths[0]!, 'last_player_standing');
     finish(true);
+    endGame(game, bus, activeAfterDeaths[0]!, 'last_player_standing');
     return;
   }
 
@@ -560,10 +564,14 @@ export function resolveRound(game: GameState, bus: EventBus): void {
 
   // ---------------------------------------------------------------- 阶段五回合边界
   accumulateControlHold(game);
-  appendEvent(game, bus, 'round_end', { roundNumber, gameOver: false });
-  const adjudicated = adjudicateAtTurnLimit(game, bus);
+  // 先把终局摘要写完整，再让 game_over 收尾；adjudicateAtTurnLimit 内部会再校验一次。
+  const adjudicated = isTurnLimitReached(game);
+  appendEvent(game, bus, 'round_end', { roundNumber, gameOver: adjudicated });
   appendEvent(game, bus, 'round_resolved', { roundNumber, gameOver: adjudicated, results: outcomes });
-  if (adjudicated) return;
+  if (adjudicated) {
+    adjudicateAtTurnLimit(game, bus);
+    return;
+  }
 
   grantComebackSupplies(game, bus);
   game.turn.roundNumber += 1;

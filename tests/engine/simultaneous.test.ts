@@ -471,6 +471,10 @@ describe('simultaneous resolution', () => {
     expect(game.phase).toBe('game_over');
     expect(game.winner).toBe(a);
     expect(game.result!.reason).toBe('last_player_standing');
+    // 淘汰型终局同样要先把本轮摘要发完，game_over 保持为最后一条事件。
+    const types = game.events.map(event => event.type);
+    expect(types.slice(-3)).toEqual(['round_end', 'round_resolved', 'game_over']);
+    expect(events(game, 'round_resolved').at(-1)!.payload.gameOver).toBe(true);
   });
 
   it('heals and damage settle as simultaneous net HP', () => {
@@ -694,6 +698,11 @@ describe('simultaneous resolution', () => {
     commitAll(game, bus, [a, b]);
     expect(game.phase).toBe('game_over');
     expect(['turn_limit_score', 'turn_limit_draw']).toContain(game.result!.reason);
+    // game_over 是终止事件：最终回合的 round_end / round_resolved 必须先于它。
+    const types = game.events.map(event => event.type);
+    expect(types.slice(-3)).toEqual(['round_end', 'round_resolved', 'game_over']);
+    expect(events(game, 'round_end').at(-1)!.payload.gameOver).toBe(true);
+    expect(events(game, 'round_resolved').at(-1)!.payload.gameOver).toBe(true);
     // 地图配置在所有对局间共享引用，测试结束必须还原。
     game.config.balance.maxTurns = 15;
   });

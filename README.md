@@ -187,7 +187,7 @@ npm run export-state
 
 `player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `round_start`, `round_resolved`, `plan_committed`, `action_failed`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
 
-`game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。
+`game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。`game_over` 是事件流最后一条，最终回合的 `round_end` / `round_resolved` 必定先于它；客户端收到 `game_over` 后可以安全停止读取。
 
 `income` 事件保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。`deploy` 事件中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。`control_point_repair` 事件包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 

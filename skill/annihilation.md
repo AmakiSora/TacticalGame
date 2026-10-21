@@ -17,6 +17,7 @@ Every action on your turn, inspect:
 
 - Your units **with** `config.units` + each instance's `moveRange` / `attackRange` / `canCapture` / `healPower` / cost (maps retune heavies, rangers, etc. — do not hardcode)
 - Supplies, AP
+- Each unit's `hasMoved` / `hasActed` / `actionSpent` flags — an already-activated unit can still take its free follow-up action
 - **Owned control points** (only legal deploy origins; kinds with `controlPointTypes.<kind>.canDeploy: false` are excluded)
 - Living **enemy units/armies** only — no HQ objects
 - **Artillery config + live state** (see below) — required every action
@@ -35,6 +36,13 @@ Every action on your turn, inspect:
 - `fromId` = owned CP id always.
 - Own zero CPs → you **cannot** deploy; fight/capture with existing units.
 - Origin or target in artillery **danger** → deploy illegal.
+- The new unit is already activated: it **cannot move** this turn, but it **can attack or heal immediately for free** (deploy + attack/heal = 1 AP total); check range from the deploy cell.
+
+### Action points
+
+- **Charged per unit activation, not per action.** The first deploy/move/attack/heal/demolish involving a unit costs 1 AP; every further legal action by that same unit in the same turn is free. Per-unit limits still apply: at most one move (`hasMoved`) and one attack/heal/demolish (`hasActed`) per unit.
+- **Move + attack/heal** — in either order — costs **1 AP total**.
+- `actionsUsed >= actionsPerTurn` blocks only **new activations** (`action_limit_reached`); units already activated keep their free follow-up action.
 
 ### Artillery — read config, then live state
 
@@ -102,6 +110,7 @@ Unless the user asks for a different style:
    - Wounded cluster reachable safely: support
    - No owned CP → skip deploy
    - `fromId` = owned CP id only
+   - Prefer a cell where the new unit can immediately attack/heal (free this turn); it cannot move.
 6. **Pre-shrink** (`round < artillery.startRound`): move infantry/scouts to nearest **safe** neutral income CP (`supply` preferred), then secure a nearby deploy pad (`forward_base` / owned CP) that will remain usable as the ring contracts.
 7. **From first shrink** (`round >= startRound`): advance on nearest living enemy army inside the safe zone; favorable trades; no outer-ring tourism. Re-check `warningCells` / `nextShrinkRound` every activation.
 8. **Near adjudication:** re-read `adjudication.weights` and `scores.*.killValue` / `armyValue`. If HQ/CP/supply weights are 0 → maximize army value and **killValue** via real exchanges (finish wounded enemies for the kill credit; deny enemy army). Spend leftover supplies on safe deploys when AP allows. No capture-spam for phantom point score, no supply hoarding, no empty reposition loops, no searching for HQs.
@@ -117,4 +126,4 @@ Never stall for adjudication while a kill, a safe capture that enables deploy/in
 - Artillery: read `config.annihilation.artillery` + `game.artillery` this turn; do not deploy/heal in `dangerCells`; avoid ending on danger/warning without an escape plan tied to `nextShrinkRound`
 - Deploy `fromId` is an **owned control point id** (never HQ); cost from `config.units[type]`
 - Attack `targetId` is a **living enemy unit** (never HQ)
-- AP allows new activation when needed
+- AP: a new activation needs 1 remaining AP; follow-ups on activated units are free. A unit deployed this turn may attack/heal but not move

@@ -185,6 +185,23 @@ describe('hex V2 rules', () => {
     expect(game.events.at(-1)!.type).toBe('deploy');
   });
 
+  it('lets a unit deployed this turn attack for free but not move', () => {
+    const { game, bus } = setup();
+    const deployed = deployUnit(game, bus, 'player_a', 'scout', game.headquarters.player_a.id, -8, 1).data!;
+    const enemy = game.units.find(u => u.owner === 'player_b' && u.alive)!;
+    enemy.q = -8;
+    enemy.r = 2;
+
+    const attack = attackTarget(game, bus, 'player_a', deployed.id, enemy.id);
+    expect(attack.ok).toBe(true);
+    expect(game.turn.actionsUsed).toBe(1); // deployment activation already paid for this attack
+    expect(deployed.hasActed).toBe(true);
+
+    const move = moveUnit(game, bus, 'player_a', deployed.id, -7, 1);
+    expect(move).toMatchObject({ ok: false, code: 'invalid_move', message: '该单位本回合已经移动过' });
+    expect(game.turn.actionsUsed).toBe(1);
+  });
+
   it('discounts deployments from forward bases without changing unit army value', () => {
     const game = createInitialGame('g1', 'dual-lanes');
     const bus = new EventBus();

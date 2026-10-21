@@ -276,9 +276,10 @@ Where:
 
 Read `config.balance.actionsPerTurn` per map.
 
-- First deploy/move/attack/heal/demolish on a unit costs 1 AP; further legal actions on that unit are free that turn.
-- Deploy always costs 1 AP; new unit cannot move the same turn.
-- `actionsUsed >= actionsPerTurn` → no new activations (`429 action_limit_reached`).
+- Actions are charged per **unit activation**, not per action: the first deploy/move/attack/heal/demolish on a unit costs 1 AP; every further legal action by that same unit is free that turn (still at most one move and one attack/heal/demolish per unit).
+- **Move + attack/heal** — in either order — therefore costs **1 AP total**.
+- Deploy always costs 1 AP. The new unit is already activated: it **cannot move** the same turn (`hasMoved: true`), but it **can attack or heal immediately for free** (`hasActed: false`).
+- `actionsUsed >= actionsPerTurn` → no **new activations** (`429 action_limit_reached`); already-activated units may still take their free follow-up action.
 - `403 player_eliminated` → stop acting.
 
 ### Economy (shared mechanics)

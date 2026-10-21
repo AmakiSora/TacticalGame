@@ -4,6 +4,22 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.7.3
+
+### 新增
+
+- **新增「兵棋推演算法」（kriegspiel）：同时回合模式的联合计划搜索算法**：把整份计划放入镜像 `resolveRound` 的 JS 单轮结算器真实结算，按 `objective`/`aggressive`/`random` 三种对手性格做蒙特卡洛 rollout，以「均值 − λ·标准差」风险调整分选择计划并爬山精修；复用 dest-prob 的 `computeAim`/`enumerateAims` 与落点模型。注册键 `algo_kriegspiel`，`modes: ['simultaneous']`，大厅算法下拉与 `/api/algorithms` 由注册表自动带出；详细档案见 `algorithms/docs/algorithms/kriegspiel.md`。
+
+### 变更
+
+- **竞技场展示更名**：`Space Bunny(sp)` 统一更名为 `MiniMaxM3.1Flash`，同步更新统计看板数据及回放、复盘文件中的引用。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/kriegspiel-selfplay.test.ts`，在真实 standoff / molten-throne 对局中校验每个 `decide` 输出均可入队，全部接受、零非法动作。
+- headless 标定（逐局交替先手，各 30 局 ×2 地图 ×2 对手）：kriegspiel 对 random-sim **60/60**、对 dest-prob **34/60（56.7%）**，全部 240 局零非法；单轮搜索约 20ms、缓存命中时 `decide` 约 2–3ms。
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 107 文件 / 888 例全绿。
+
 ## 3.7.2
 
 ### 新增

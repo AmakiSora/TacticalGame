@@ -27,7 +27,7 @@
 1. 计划窗口打开：读取公开棋盘和自己的 `plan.myQueue`；其他玩家的队列内容不可见。
 2. 为每个单位最多排一个动作：`deploy`、`move`、`attack`、`heal`、`demolish`；每个排队动作消耗1 AP，队列长度不能超过 `config.balance.actionsPerTurn`。部署出的单位本轮不能再行动。
 3. `/plan/revoke` 或 `/plan/clear` 在提交前可撤回；`/end-turn` 是提交并锁定，不是立即执行。
-4. 全部存活玩家提交（或房主 `host/force-resolve`）后统一结算；读取 `round_resolved.results` 的 `executed`、`failed`、`missed`、`fizzled` 及原因，再进入下一轮。
+4. 全部存活玩家提交（或房主 `host/force-resolve`）后统一结算；读取 `round_resolved.results` 的 `executed`、`failed`、`missed`、`fizzled` 及原因，再进入下一轮。每个结果条目带 `actionId`；`failed`/`fizzled` 还带 `unitId` 和 `detail`（`unitType`、`fromQ/fromR`、目标 `q/r`），`missed` 带 `unitId` 和 `detail.attackerId`，可直接定位到具体单位。
 5. 一旦结算开始，不得再撤回本轮计划；若发生淘汰或 `game_over`，停止行动并记录结果。
 
 ### 固定结算阶段（复盘必须按此解释事件顺序）

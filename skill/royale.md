@@ -33,7 +33,8 @@ halves: the plan/commit loop governs *how* you act, the artillery ring and army-
    cell. CP kinds the map bans (`controlPointTypes.<kind>.canDeploy: false`) are not legal origins.
    Origin **or** target in artillery danger → plan-time rejection `invalid_deploy`.
 4. `POST /api/games/:id/end-turn` = **commit and lock**. When the last living player commits, the
-   server resolves all queues strictly simultaneously (`round_resolved` carries per-action outcomes).
+   server resolves all queues strictly simultaneously (`round_resolved` carries per-action outcomes;
+   failed/fizzled entries include `unitId`/`detail`, missed entries include `unitId`/`detail.attackerId`).
 5. Stuck players → host `POST /api/games/:id/host/force-resolve`. Once resolution begins, do not
    revoke; if it eliminates you or ends the game, stop and report.
 

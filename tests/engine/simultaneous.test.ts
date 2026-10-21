@@ -235,10 +235,75 @@ describe('simultaneous resolution', () => {
     commitAll(game, bus, [a, b]);
     expect(unitA.q === 1 && unitA.r === -1).toBe(true);
     expect(unitB.q === 1 && unitB.r === 1).toBe(true);
-    expect(events(game, 'action_failed')).toHaveLength(2);
-    expect(events(game, 'action_failed').every(e => e.payload.reason === 'destination_conflict')).toBe(true);
+    const failedEvents = events(game, 'action_failed');
+    expect(failedEvents).toHaveLength(2);
+    expect(failedEvents.every(e => e.payload.reason === 'destination_conflict')).toBe(true);
+    for (const event of failedEvents) {
+      const expectedUnit = event.payload.owner === a ? unitA : unitB;
+      expect(event.payload.unitId).toBe(expectedUnit.id);
+      expect(event.payload.unitType).toBe(expectedUnit.type);
+      expect(event.payload.detail).toMatchObject({
+        unitId: expectedUnit.id,
+        unitType: expectedUnit.type,
+        fromQ: expectedUnit.q,
+        fromR: expectedUnit.r,
+        q: 0,
+        r: 0,
+      });
+    }
+    const resolved = events(game, 'round_resolved')[0]!;
+    const results = resolved.payload.results as Record<string, Array<{
+      status: string;
+      unitId?: string;
+      detail?: Record<string, unknown>;
+    }>>;
+    for (const [owner, expectedUnit] of [[a, unitA], [b, unitB]] as const) {
+      const failed = results[owner]!.find(result => result.status === 'failed')!;
+      expect(failed.unitId).toBe(expectedUnit.id);
+      expect(failed.detail).toMatchObject({
+        unitId: expectedUnit.id,
+        unitType: expectedUnit.type,
+        q: 0,
+        r: 0,
+      });
+    }
     expect(events(game, 'move')).toHaveLength(0);
     expect(game.players[a]!.stats.actionPointsUsed).toBe(1);
+  });
+
+  it('attributes a unit_gone failure to the queued unit', () => {
+    const { game, bus } = createStandoffGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    const mover = game.units.find(u => u.owner === a && u.type === 'scout')!;
+    place(mover, 1, 0);
+    expect(queueMoveAction(game, a, mover.id, 2, 0).ok).toBe(true);
+    // 队列已建立后单位消失：结算时应能指出是哪一只单位、从哪一格出发。
+    mover.alive = false;
+    commitAll(game, bus, [a, b]);
+    const failedEvent = events(game, 'action_failed').find(e => e.payload.reason === 'unit_gone')!;
+    expect(failedEvent.payload.unitId).toBe(mover.id);
+    expect(failedEvent.payload.detail).toMatchObject({
+      unitId: mover.id,
+      unitType: 'scout',
+      fromQ: 1,
+      fromR: 0,
+      q: 2,
+      r: 0,
+    });
+    const resolved = events(game, 'round_resolved')[0]!;
+    const results = resolved.payload.results as Record<string, Array<{
+      status: string;
+      unitId?: string;
+      detail?: Record<string, unknown>;
+    }>>;
+    const failed = results[a]!.find(result => result.status === 'failed')!;
+    expect(failed.unitId).toBe(mover.id);
+    expect(failed.detail).toMatchObject({
+      unitId: mover.id,
+      unitType: 'scout',
+      q: 2,
+      r: 0,
+    });
   });
 
   it('hits a stationary enemy with a cell attack', () => {
@@ -448,8 +513,32 @@ describe('simultaneous resolution', () => {
     expect(queueMoveAction(game, b, mover.id, 3, 0).ok).toBe(true);
     commitAll(game, bus, [a, b]);
     const failed = events(game, 'action_failed');
-    expect(failed.some(e => e.payload.type === 'heal' && e.payload.reason === 'out_of_range')).toBe(true);
+    const fizzle = failed.find(e => e.payload.type === 'heal' && e.payload.reason === 'out_of_range')!;
+    expect(fizzle.payload.unitId).toBe(walker.id);
+    expect(fizzle.payload.supportId).toBe(walker.id);
+    expect(fizzle.payload.detail).toMatchObject({
+      unitId: walker.id,
+      unitType: 'support',
+      fromQ: 0,
+      fromR: 0,
+      q: 1,
+      r: 0,
+    });
     expect(events(game, 'heal')).toHaveLength(0);
+    const resolved = events(game, 'round_resolved')[0]!;
+    const results = resolved.payload.results as Record<string, Array<{
+      status: string;
+      unitId?: string;
+      detail?: Record<string, unknown>;
+    }>>;
+    const fizzled = results[b]!.find(result => result.status === 'fizzled')!;
+    expect(fizzled.unitId).toBe(walker.id);
+    expect(fizzled.detail).toMatchObject({
+      unitId: walker.id,
+      unitType: 'support',
+      q: 1,
+      r: 0,
+    });
   });
 
   it('demolishes blocker terrain after movement has settled', () => {
@@ -484,7 +573,33 @@ describe('simultaneous resolution', () => {
     commitAll(game, bus, [a, b]);
     const deploys = events(game, 'deploy');
     expect(deploys).toHaveLength(0);
-    expect(events(game, 'action_failed').filter(e => e.payload.type === 'deploy')).toHaveLength(2);
+    const failedDeploys = events(game, 'action_failed').filter(e => e.payload.type === 'deploy');
+    expect(failedDeploys).toHaveLength(2);
+    for (const event of failedDeploys) {
+      expect(event.payload.unitId).toBeUndefined();
+      expect(event.payload.detail).toMatchObject({
+        unitType: 'infantry',
+        fromId: event.payload.owner === a ? hqA.id : hqB.id,
+        q: 3,
+        r: 0,
+      });
+    }
+    const resolved = events(game, 'round_resolved')[0]!;
+    const results = resolved.payload.results as Record<string, Array<{
+      status: string;
+      unitId?: string;
+      detail?: Record<string, unknown>;
+    }>>;
+    for (const [owner, hq] of [[a, hqA], [b, hqB]] as const) {
+      const failed = results[owner]!.find(result => result.status === 'failed')!;
+      expect(failed.unitId).toBeUndefined();
+      expect(failed.detail).toMatchObject({
+        unitType: 'infantry',
+        fromId: hq.id,
+        q: 3,
+        r: 0,
+      });
+    }
     // 部署失败全额退还；回合边界仍发放收入（基础 8）。
     expect(game.resources[a]!.supplies).toBe(suppliesA + 8);
     expect(game.resources[b]!.supplies).toBe(suppliesB + 8);
@@ -759,9 +874,25 @@ describe('unit shape overhaul (line / arc / lock / area heal)', () => {
     expect(attacks[0]!.payload.locked).toBe(true);
     expect(runner.alive).toBe(true);
     const resolved = events(game, 'round_resolved')[0]!;
-    const results = resolved.payload.results as Record<string, { status: string; reason?: string }[]>;
-    expect(results[a]![0]!.status).toBe('missed');
-    expect(results[a]![0]!.reason).toBe('target_escaped');
+    const results = resolved.payload.results as Record<string, Array<{
+      actionId: string;
+      status: string;
+      reason?: string;
+      unitId?: string;
+      detail?: Record<string, unknown>;
+    }>>;
+    const missed = results[a]![0]!;
+    expect(missed.status).toBe('missed');
+    expect(missed.reason).toBe('target_escaped');
+    expect(missed.unitId).toBe(ranger.id);
+    expect(missed.detail).toMatchObject({
+      attackerId: ranger.id,
+      q: 3,
+      r: 0,
+      shape: 'single',
+      locked: true,
+    });
+    expect(attacks[0]!.payload.actionId).toBe(missed.actionId);
   });
 
   it('area heal restores every wounded friendly in the covered cells', () => {

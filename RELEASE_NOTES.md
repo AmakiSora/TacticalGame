@@ -14,11 +14,12 @@
 
 ### 修复
 
+- **同时回合失败/落空动作可归属到单位**：`action_failed` 与 `round_resolved.results` 的 `failed`/`fizzled` 条目新增 `unitId` 与 `detail`（含 `unitType`、`fromQ/fromR`、目标 `q/r`、deploy 的 `fromId` 等）；`missed` 结果新增 `unitId` 与 `detail.attackerId`；同时回合的 deploy/move/attack/heal/demolish 事件补 `actionId`，可直接与结果条目对齐；前端事件日志显示单位类型及起点→目标格。
 - **同时回合 skill 文档按地图拆分**：`skill/simultaneous.md` 不再把 simultaneous 等同于 `standoff`，明确模式级规则与 `game.config.mapId` 门禁，并补充 `molten-throne` 的单位、经济、部署差异（全兵种默认 `single`、AP 4、仅前哨可部署等）；`skill/review-simultaneous.md` 同步改为模式级说明和按 `mapId` 的地图重点；`skill/SKILL.md`、README、AGENTS 的地图清单补上 `molten-throne`。避免 agent 在熔池王座对局套用对峙之地单位表读错数值。
 
 ### 测试与验证
 
-- `npm run build` 通过；`npm test -- --testTimeout=30000` 102 文件 / 855 例全绿；`pytest tests/rl -q` 66 例通过。
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 102 文件 / 856 例全绿；`pytest tests/rl -q` 66 例通过。
 - 新增 `tests/skill/simultaneous-docs.test.ts`：遍历地图表中所有 `mode: "simultaneous"` 的地图，断言 `simultaneous.md` 与 `review-simultaneous.md` 均按 `mapId` 覆盖，且不再把 `standoff` 写成唯一地图。
 - `npm run arena-leaderboard` 重新出榜：48,960 局、26 个参评参与者（25 个有对局；v1.0.0 旧格式不参评），`v2.3.2@340K` / `v2.5.0@2M` / `v2.6.0@3.6M` 均以 `legacy` 正常显示（评分 1223 / 1314 / 1304）；`npm run arena-stats` 同步生成 27 个参与者档案，无 `expired` 字段。
 - `round_robin.py --dry-run`：参评模型 19 个（含三个原过期模型）、算法 6 个；单图 300 批 / 7,200 局。

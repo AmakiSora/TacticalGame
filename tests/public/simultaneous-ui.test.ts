@@ -23,6 +23,8 @@ describe('simultaneous mode UI', () => {
       expect(source).toContain("case 'round_resolved'");
       expect(source).toContain("case 'action_failed'");
       expect(source).toContain('p.hit === false');
+      expect(source).toContain('p.unitType');
+      expect(source).toContain('p.detail.fromQ');
     }
   });
 

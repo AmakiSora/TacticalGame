@@ -1056,7 +1056,14 @@ function formatEventShort(ev) {
     case 'action_failed': {
       const failedLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破' }[p.type] || '动作';
       const failedReason = { destination_conflict: '目标格撞车', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', out_of_range: '超出射程', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
-      return `${playerName(p.owner)} ${failedLabel}未执行：${failedReason}`;
+      const unitLabel = p.unitType ? `${UNIT_NAMES[p.unitType] || p.unitType}` : '';
+      const from = p.detail && typeof p.detail.fromQ === 'number'
+        ? `(${p.detail.fromQ},${p.detail.fromR})` : '';
+      const target = typeof p.q === 'number' && typeof p.r === 'number'
+        ? `(${p.q},${p.r})` : '';
+      const move = from && target ? ` ${from}→${target}` : target ? ` @${target}` : '';
+      const subject = unitLabel ? `${unitLabel}${move} ` : '';
+      return `${playerName(p.owner)} ${subject}${failedLabel}未执行：${failedReason}`;
     }
     case 'reset_actions': return `${playerName(p.owner)} 结束回合，动作点重置`;
     case 'turn_skipped': return `${playerName(p.playerId)} 跳过回合`;

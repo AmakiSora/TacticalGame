@@ -37,6 +37,8 @@ export interface PlanOutcome {
   type: PendingAction['type'];
   owner: PlayerId;
   status: 'executed' | 'failed' | 'missed' | 'fizzled';
+  /** 动作绑定的单位；deploy 在失败时尚无单位，因此可能缺省。 */
+  unitId?: string;
   reason?: string;
   detail?: Record<string, unknown>;
 }
@@ -116,6 +118,32 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     queues.get(owner)!.indexOf(action) + 1;
   const remaining = (used: number): number => Math.max(0, limit - used);
 
+  /** 动作绑定的单位 ID；deploy 没有单位主体。 */
+  const actionUnitId = (action: PendingAction): string | undefined =>
+    action.unitId ?? action.attackerId ?? action.supportId;
+
+  /** 失败/落空动作的归属信息：单位、兵种、起点/目标格。 */
+  const actionDetail = (action: PendingAction): Record<string, unknown> => {
+    const unitId = actionUnitId(action);
+    const unit = unitId ? getGameIndex(game).unitById.get(unitId) : undefined;
+    const detail: Record<string, unknown> = {};
+    if (unitId) detail.unitId = unitId;
+    if (action.type === 'deploy') {
+      if (action.unitType) detail.unitType = action.unitType;
+      if (action.fromId) detail.fromId = action.fromId;
+    } else if (unit) {
+      detail.unitType = unit.type;
+    }
+    if (unit) {
+      detail.fromQ = unit.q;
+      detail.fromR = unit.r;
+    }
+    if (typeof action.q === 'number') detail.q = action.q;
+    if (typeof action.r === 'number') detail.r = action.r;
+    if (typeof action.direction === 'number') detail.direction = action.direction;
+    return detail;
+  };
+
   // ---------------------------------------------------------------- 阶段一+二：目的格声明池
   const claims = new Map<string, { owner: PlayerId; action: PendingAction }[]>();
   for (const id of order) {
@@ -131,13 +159,29 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     (claims.get(`${action.q},${action.r}`) ?? []).length > 1;
 
   const recordFailure = (owner: PlayerId, action: PendingAction, reason: string, extra: Record<string, unknown> = {}): void => {
-    outcomes[owner]!.push({ actionId: action.id, type: action.type, owner, status: 'failed', reason });
+    const unitId = actionUnitId(action);
+    const unit = unitId ? getGameIndex(game).unitById.get(unitId) : undefined;
+    const unitType = action.type === 'deploy' ? action.unitType : unit?.type;
+    const detail = { ...actionDetail(action), ...extra };
+    outcomes[owner]!.push({
+      actionId: action.id,
+      type: action.type,
+      owner,
+      status: 'failed',
+      reason,
+      ...(unitId ? { unitId } : {}),
+      detail,
+    });
     appendEvent(game, bus, 'action_failed', {
       owner,
       actionId: action.id,
       type: action.type,
       reason,
       roundNumber,
+      ...(unitId ? { unitId } : {}),
+      ...(unitType ? { unitType } : {}),
+      ...(action.type === 'deploy' && action.fromId ? { fromId: action.fromId } : {}),
+      detail,
       ...extra,
       actionsUsed: actionsUsedOf(owner, action),
     });
@@ -169,6 +213,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       unit.actionSpent = true;
       game.units.push(unit);
       appendEvent(game, bus, 'deploy', {
+        actionId: action.id,
         unitId: unit.id, owner: id, unitType: action.unitType, fromId: action.fromId,
         q: action.q, r: action.r, cost, unitCost: spec.cost, discount,
         hp: unit.hp, attack: unit.attack, defense: unit.defense,
@@ -176,7 +221,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
         canCapture: unit.canCapture, healPower: unit.healPower,
         actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
       });
-      outcomes[id]!.push({ actionId: action.id, type: 'deploy', owner: id, status: 'executed', detail: { unitId: unit.id, cost } });
+      outcomes[id]!.push({ actionId: action.id, type: 'deploy', owner: id, status: 'executed', unitId: unit.id, detail: { unitId: unit.id, cost } });
     }
   }
 
@@ -201,10 +246,11 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       unit.r = action.r!;
       unit.hasMoved = true;
       appendEvent(game, bus, 'move', {
+        actionId: action.id,
         unitId: unit.id, owner: id, fromQ, fromR, toQ: unit.q, toR: unit.r,
         actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
       });
-      outcomes[id]!.push({ actionId: action.id, type: 'move', owner: id, status: 'executed', detail: { fromQ, fromR, toQ: unit.q, toR: unit.r } });
+      outcomes[id]!.push({ actionId: action.id, type: 'move', owner: id, status: 'executed', unitId: unit.id, detail: { fromQ, fromR, toQ: unit.q, toR: unit.r } });
     }
   }
 
@@ -229,11 +275,15 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       setTerrainPlain(game, action.q!, action.r!);
       unit.hasActed = true;
       appendEvent(game, bus, 'demolish', {
+        actionId: action.id,
         unitId: unit.id, owner: id, q: action.q, r: action.r,
         fromTerrain: 'blocker', toTerrain: 'plain',
         actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
       });
-      outcomes[id]!.push({ actionId: action.id, type: 'demolish', owner: id, status: 'executed' });
+      outcomes[id]!.push({
+        actionId: action.id, type: 'demolish', owner: id, status: 'executed', unitId: unit.id,
+        detail: { q: action.q, r: action.r },
+      });
     }
   }
 
@@ -281,18 +331,31 @@ export function resolveRound(game: GameState, bus: EventBus): void {
 
   // 3c. 收集治疗：覆盖形状与攻击同构；目标按移动后的最终站位在施加时判定。
   const heals: { owner: PlayerId; action: PendingAction; support: Unit; aim: ShapeAim }[] = [];
+  const recordHealFizzle = (owner: PlayerId, action: PendingAction, reason: string): void => {
+    const unitId = action.supportId;
+    const detail = actionDetail(action);
+    const unitType = detail.unitType;
+    outcomes[owner]!.push({
+      actionId: action.id, type: 'heal', owner, status: 'fizzled', reason,
+      ...(unitId ? { unitId } : {}),
+      detail,
+    });
+    appendEvent(game, bus, 'action_failed', {
+      owner, actionId: action.id, type: 'heal', reason, roundNumber,
+      ...(unitId ? { unitId } : {}),
+      ...(typeof unitType === 'string' ? { unitType } : {}),
+      supportId: action.supportId, detail,
+      q: action.q, r: action.r,
+      actionsUsed: actionsUsedOf(owner, action),
+    });
+  };
   for (const id of order) {
     for (const action of queues.get(id)!) {
       if (action.type !== 'heal') continue;
       chargeActionPoint(game, id);
       const support = getGameIndex(game).unitById.get(action.supportId!);
       if (!support || support.owner !== id || !support.alive) {
-        outcomes[id]!.push({ actionId: action.id, type: 'heal', owner: id, status: 'fizzled', reason: 'out_of_range' });
-        appendEvent(game, bus, 'action_failed', {
-          owner: id, actionId: action.id, type: 'heal', reason: 'out_of_range',
-          supportId: action.supportId, q: action.q, r: action.r, roundNumber,
-          actionsUsed: actionsUsedOf(id, action),
-        });
+        recordHealFizzle(id, action, 'out_of_range');
         continue;
       }
       const aim = support.type === 'support'
@@ -305,12 +368,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
         )
         : null;
       if (!aim) {
-        outcomes[id]!.push({ actionId: action.id, type: 'heal', owner: id, status: 'fizzled', reason: 'out_of_range' });
-        appendEvent(game, bus, 'action_failed', {
-          owner: id, actionId: action.id, type: 'heal', reason: 'out_of_range',
-          supportId: action.supportId, q: action.q, r: action.r, roundNumber,
-          actionsUsed: actionsUsedOf(id, action),
-        });
+        recordHealFizzle(id, action, 'out_of_range');
         continue;
       }
       support.hasActed = true;
@@ -333,17 +391,13 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     }
     if (appliedList.length === 0) {
       const reason = targets.length > 0 ? 'already_healthy' : 'out_of_range';
-      outcomes[heal.owner]!.push({ actionId: heal.action.id, type: 'heal', owner: heal.owner, status: 'fizzled', reason });
-      appendEvent(game, bus, 'action_failed', {
-        owner: heal.owner, actionId: heal.action.id, type: 'heal', reason,
-        supportId: heal.action.supportId, q: heal.action.q, r: heal.action.r, roundNumber,
-        actionsUsed: actionsUsedOf(heal.owner, heal.action),
-      });
+      recordHealFizzle(heal.owner, heal.action, reason);
       continue;
     }
     for (const { target, amount: applied } of appliedList) {
       target.hp += applied;
       appendEvent(game, bus, 'heal', {
+        actionId: heal.action.id,
         owner: heal.owner, supportId: heal.support.id, targetId: target.id,
         amount: applied, targetHp: target.hp,
         actionsUsed: actionsUsedOf(heal.owner, heal.action), actionsRemaining: remaining(actionsUsedOf(heal.owner, heal.action)), roundNumber,
@@ -351,7 +405,11 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     }
     outcomes[heal.owner]!.push({
       actionId: heal.action.id, type: 'heal', owner: heal.owner, status: 'executed',
-      detail: { targets: appliedList.map(({ target, amount }) => ({ targetId: target.id, amount })) },
+      unitId: heal.support.id,
+      detail: {
+        supportId: heal.support.id,
+        targets: appliedList.map(({ target, amount }) => ({ targetId: target.id, amount })),
+      },
     });
   }
 
@@ -381,6 +439,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     }
     if (targets.length === 0) {
       appendEvent(game, bus, 'attack', {
+        actionId: action.id,
         owner: strike.owner, attackerId: strike.attacker.id,
         q: action.q, r: action.r, hit: false,
         aimQ: action.q, aimR: action.r,
@@ -392,8 +451,12 @@ export function resolveRound(game: GameState, bus: EventBus): void {
       });
       outcomes[strike.owner]!.push({
         actionId: action.id, type: 'attack', owner: strike.owner, status: 'missed',
+        unitId: strike.attacker.id,
         reason: escapedLock ? 'target_escaped' : undefined,
-        detail: { q: action.q, r: action.r, shape: strike.aim.type, locked: Boolean(strike.lockedEntity) },
+        detail: {
+          attackerId: strike.attacker.id,
+          q: action.q, r: action.r, shape: strike.aim.type, locked: Boolean(strike.lockedEntity),
+        },
       });
       continue;
     }
@@ -408,6 +471,7 @@ export function resolveRound(game: GameState, bus: EventBus): void {
         if (stats) stats.headquartersDamage += actualDamage;
       }
       appendEvent(game, bus, 'attack', {
+        actionId: action.id,
         owner: strike.owner, attackerId: strike.attacker.id,
         q: entity.q, r: entity.r, hit: true,
         aimQ: action.q, aimR: action.r,
@@ -425,7 +489,11 @@ export function resolveRound(game: GameState, bus: EventBus): void {
     }
     outcomes[strike.owner]!.push({
       actionId: action.id, type: 'attack', owner: strike.owner, status: 'executed',
-      detail: { q: action.q, r: action.r, shape: strike.aim.type, locked: Boolean(strike.lockedEntity), hits: hitDetails },
+      unitId: strike.attacker.id,
+      detail: {
+        attackerId: strike.attacker.id,
+        q: action.q, r: action.r, shape: strike.aim.type, locked: Boolean(strike.lockedEntity), hits: hitDetails,
+      },
     });
   }
 

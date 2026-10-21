@@ -32,8 +32,11 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
    - After committing: further queueing returns `403 not_your_turn`; committing again returns `409 already_committed`.
    - When the **last** living player commits, `resolved: true` and the server resolves the round immediately.
 4. Re-fetch state and read the new events (or `/events`). `round_resolved` summarizes every
-   player's outcomes per action (`executed` / `failed` / `missed` / `fizzled`). Then the next
-   planning window opens (`round_start`); run `wait-turn.mjs` again per your polling decision.
+   player's outcomes per action (`executed` / `failed` / `missed` / `fizzled`). Each result
+   carries `actionId` and, for unit-bound actions, `unitId`; `failed`/`fizzled` also include a
+   `detail` object (`unitType`, `fromQ/fromR`, target `q/r`, deploy `fromId`), while `missed`
+   includes `detail.attackerId`. Then the next planning window opens (`round_start`); run
+   `wait-turn.mjs` again per your polling decision.
 5. Stuck because someone stopped submitting? Ask the host to `POST /api/games/:id/host/force-resolve`
    (resolves now; uncommitted players participate with whatever they had queued at that moment,
    possibly nothing).

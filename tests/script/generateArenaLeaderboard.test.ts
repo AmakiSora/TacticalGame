@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   collectRegistry,
   loadMatches,
+  loadMapModes,
 } from '../../script/generateArenaLeaderboard.mjs';
 import { RETIRED_VERSIONS } from '../../script/modelStatus.mjs';
 
@@ -64,6 +65,67 @@ describe('loadMatches 过滤作废模型对局', () => {
     expect(matches[0].playerB).toBe(V1);
     expect(retiredDropped).toBe(2);
     expect(warnings).toHaveLength(0);
+  });
+});
+
+describe('按玩法模式归档对局', () => {
+  it('loadMapModes 读取地图 mode，未知地图按 standard 兼容', () => {
+    const modes = loadMapModes();
+    expect(modes.get('default')).toBe('standard');
+    expect(modes.get('standoff')).toBe('simultaneous');
+    expect(modes.get('snowflake')).toBe('royale');
+    expect(modes.get('random')).toBe('standard');
+    expect(modes.get('unknown-map')).toBeUndefined();
+  });
+
+  it('loadMatches 给每条对局写入地图对应模式', () => {
+    const dir = makeModelsDir([VALID]);
+    const stats = join(dir, 'matches.jsonl');
+    const line = (map: string, a: string, b: string, winner: string) =>
+      JSON.stringify({ map, players: { player_a: a, player_b: b }, winner }) + '\n';
+    writeFileSync(stats,
+      line('default', VALID, 'algo_threat@v1', VALID) +
+      line('standoff', 'algo_dest-prob@v1', 'algo_kriegspiel@v1', 'algo_dest-prob@v1'));
+    const { registry } = collectRegistry(dir);
+    const { matches } = loadMatches(stats, registry, loadMapModes());
+    expect(matches.map(m => m.mode)).toEqual(['standard', 'simultaneous']);
+  });
+
+  it('主脚本把不同模式的参与者与评分池完全分开', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-modes-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    const line = (map: string, a: string, b: string, winner: string) =>
+      JSON.stringify({ map, players: { player_a: a, player_b: b }, winner }) + '\n';
+    writeFileSync(statsFile,
+      line('default', VALID, 'algo_threat@v1', VALID) +
+      line('standoff', 'algo_dest-prob@v1', 'algo_kriegspiel@v1', 'algo_dest-prob@v1'));
+
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    expect(payload.maps).toBeUndefined();
+    expect(payload.modes.map((m: { id: string }) => m.id)).toEqual(['standard', 'simultaneous']);
+
+    const standard = payload.modes.find((m: { id: string }) => m.id === 'standard');
+    const simultaneous = payload.modes.find((m: { id: string }) => m.id === 'simultaneous');
+    expect(standard.maps.all.models.map((m: { id: string }) => m.id)).toContain(VALID);
+    expect(standard.maps.all.models.map((m: { id: string }) => m.id)).toContain('algo_threat@v1');
+    expect(standard.maps.all.models.map((m: { id: string }) => m.id)).not.toContain('algo_dest-prob@v1');
+    expect(simultaneous.maps.all.models.map((m: { id: string }) => m.id)).toEqual(
+      expect.arrayContaining(['algo_dest-prob@v1', 'algo_kriegspiel@v1', 'algo_random-sim@v1']),
+    );
+    expect(simultaneous.maps.all.models.map((m: { id: string }) => m.id)).not.toContain(VALID);
+    expect(simultaneous.games).toBe(1);
+    expect(simultaneous.maps.all.models.find((m: { id: string }) => m.id === 'algo_dest-prob@v1').games).toBe(1);
   });
 });
 

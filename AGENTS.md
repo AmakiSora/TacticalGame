@@ -18,7 +18,7 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 - `src/api/` 路由（games/actions/auth/events/skill），`src/engine/` 纯规则引擎，`src/state/store.ts` 内存状态 + 落盘 `runtime/games.json`
 - `maps/*.json` 地图（文件名即 mapId），`public/` 前端，`skill/` 玩法技能规范源，`tests/` vitest 与 src 镜像
 - `deploy/` 单 VPS 部署（[DEPLOYMENT.md](deploy/DEPLOYMENT.md)），`rl/` 强化学习训练，`records/` 回放存档
-- `arena/` AI 竞技场数据（`matches.jsonl` 对战记录入 git，`details/` 每局明细 gitignored）；页面 `/arena.html`（RL 模型 × 内置算法混榜 + 评估控制台，后端 `src/api/arenaEval.ts`）；算法注册表 `algorithms/registry.mjs`（含展示名，bot 清单/榜单/控制台同源）
+- `arena/` AI 竞技场数据（`matches.jsonl` 对战记录入 git，`details/` 每局明细 gitignored）；页面 `/arena.html`（RL 模型 × 内置算法按玩法模式分榜 + 评估控制台，后端 `src/api/arenaEval.ts`）；算法注册表 `algorithms/registry.mjs`（含展示名，bot 清单/榜单/控制台同源）
 
 ## 约束
 

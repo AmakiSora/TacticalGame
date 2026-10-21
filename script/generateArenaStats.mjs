@@ -8,6 +8,7 @@
  *   node script/generateArenaStats.mjs --stats-file arena/matches.jsonl --out public/data/arena-stats.json
  *
  * 口径与排行榜一致：
+ *   - 玩法统计按地图 mode 分模式聚合，页面切换模式后才读取对应 gameplay；
  *   - 作废模型（RETIRED_VERSIONS）不参与：对局整局丢弃并计数；
  *   - EXCLUDED_VERSIONS（v1.0.0，512 动作旧格式）不进玩法统计，对局按 formatDropped 计数；
  *   - 参与者档案（RL 模型 + 内置算法）的评分/胜率合并自 public/data/arena-leaderboard.json
@@ -24,6 +25,9 @@ import {
   shortName,
   STATUS_NOTES,
   EXCLUDED_VERSIONS,
+  GAME_MODES,
+  DEFAULT_MAPS_DIR,
+  loadMapModes,
 } from './generateArenaLeaderboard.mjs';
 import { MODEL_STATUS_BY_VERSION, RETIRED_VERSIONS } from './modelStatus.mjs';
 import { round2, round4 } from './generateStats.mjs';
@@ -42,6 +46,7 @@ export function parseArgs(argv) {
     out: DEFAULT_OUT,
     notesFile: DEFAULT_NOTES_FILE,
     leaderboardFile: DEFAULT_LEADERBOARD_FILE,
+    mapsDir: DEFAULT_MAPS_DIR,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -50,8 +55,9 @@ export function parseArgs(argv) {
     else if (a === '--notes') opts.notesFile = resolve(argv[++i]);
     else if (a === '--leaderboard') opts.leaderboardFile = resolve(argv[++i]);
     else if (a === '--models-dir') opts.modelsDir = resolve(argv[++i]);
+    else if (a === '--maps-dir') opts.mapsDir = resolve(argv[++i]);
     else if (a === '--help' || a === '-h') {
-      console.log('Usage: node script/generateArenaStats.mjs [--stats-file f] [--out f] [--notes f] [--leaderboard f] [--models-dir d]');
+      console.log('Usage: node script/generateArenaStats.mjs [--stats-file f] [--out f] [--notes f] [--leaderboard f] [--models-dir d] [--maps-dir d]');
       process.exit(0);
     }
   }
@@ -64,7 +70,7 @@ export function parseArgs(argv) {
  * 玩家不在注册表/同模型对局的行记入 warnings；另把 EXCLUDED_VERSIONS 参与的对局按
  * formatDropped 丢弃（旧格式模型的打法与现役协议不可比）。
  */
-export function loadMatchDetails(statsFile, registry) {
+export function loadMatchDetails(statsFile, registry, mapModes = new Map()) {
   const matches = [];
   const warnings = [];
   let retiredDropped = 0;
@@ -119,9 +125,11 @@ export function loadMatchDetails(statsFile, registry) {
         derived: d && typeof d === 'object' ? d : null,
       };
     };
+    const map = typeof record.map === 'string' ? record.map : 'unknown';
     matches.push({
       ts: record.ts ?? null,
-      map: typeof record.map === 'string' ? record.map : 'unknown',
+      map,
+      mode: mapModes.get(map) ?? 'standard',
       playerA: a,
       playerB: b,
       winner: record.winner === 'draw' || registry.has(record.winner) ? record.winner : null,
@@ -451,15 +459,48 @@ export function parseModelsNotes(mdText) {
 }
 
 /**
+ * 榜单里每个参与者的分模式评分。榜单按模式隔离，这里保留全部模式条目，档案页可按
+ * 主要模式展示一个评分，同时不丢失其他模式的历史成绩。
+ */
+function leaderboardRatings(leaderboardJson) {
+  const byId = new Map();
+  const add = (row, mode, modeLabel) => {
+    if (!row || !row.games) return;
+    const list = byId.get(row.id) ?? [];
+    list.push({
+      mode, modeLabel,
+      rating: row.rating ?? null,
+      ratingLo: row.ratingLo ?? null,
+      ratingHi: row.ratingHi ?? null,
+      winRate: row.winRate ?? null,
+      games: row.games,
+      wins: row.wins ?? 0,
+      losses: row.losses ?? 0,
+      draws: row.draws ?? 0,
+    });
+    byId.set(row.id, list);
+  };
+  for (const mode of Array.isArray(leaderboardJson?.modes) ? leaderboardJson.modes : []) {
+    for (const row of mode?.maps?.all?.models ?? []) add(row, mode.id, mode.label);
+  }
+  // 兼容旧版榜单文件（只有顶层 maps.all）：只在没有 modes 时使用，避免把跨模式旧数据
+  // 伪装成某个模式的新成绩。
+  if (byId.size === 0) {
+    for (const row of leaderboardJson?.maps?.all?.models ?? []) add(row, 'all', '全部模式');
+  }
+  for (const list of byId.values()) list.sort((a, b) => b.games - a.games);
+  return byId;
+}
+
+/**
  * 组装参与者档案列表：registry 元数据（模型 zip + 内置算法）+ 文件大小 + 榜单评分（可选）
  * + MODELS_NOTES/注册表说明。leaderboardJson 为 null 时评分字段留空（榜单未生成也能出档案）。
  */
 export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notesProfiles }) {
-  const lbModels = new Map(
-    (leaderboardJson?.maps?.all?.models ?? []).map(m => [m.id, m]),
-  );
+  const ratingsById = leaderboardRatings(leaderboardJson);
   const profiles = [...registry.entries()].map(([id, meta]) => {
-    const lb = lbModels.get(id);
+    const ratings = ratingsById.get(id) ?? [];
+    const lb = ratings[0] ?? null;
     if (meta.kind === 'algorithm') {
       return {
         id,
@@ -471,6 +512,7 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
         opponentType: null,
         steps: null,
         algorithm: meta.name,
+        modes: meta.modes,
         status: 'builtin',
         statusNote: null,
         rated: true,
@@ -480,6 +522,9 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
         ratingHi: lb?.ratingHi ?? null,
         winRate: lb?.winRate ?? null,
         games: lb?.games ?? 0,
+        ratings,
+        ratingMode: lb?.mode ?? null,
+        ratingModeLabel: lb?.modeLabel ?? null,
         docRef: `algorithms/docs/algorithms/${meta.name}.md`,
         docStatus: '内置算法',
         notes: meta.description,
@@ -498,6 +543,7 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
       trainDate: meta.trainDate,
       trainMap: meta.trainMap,
       opponentType: meta.opponentType,
+      modes: meta.modes,
       steps: meta.steps,
       deliveredSteps: meta.deliveredSteps ?? null,
       status: MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy',
@@ -509,6 +555,9 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
       ratingHi: lb?.ratingHi ?? null,
       winRate: lb?.winRate ?? null,
       games: lb?.games ?? 0,
+      ratings,
+      ratingMode: lb?.mode ?? null,
+      ratingModeLabel: lb?.modeLabel ?? null,
       docRef: notes?.docRef ?? null,
       docStatus: notes?.docStatus ?? null,
       notes: notes?.notes ?? null,
@@ -524,10 +573,23 @@ function main() {
   const modelsDir = opts.modelsDir ?? join(PROJECT_DIR, 'rl', 'models');
   const { registry, warning } = collectRegistry(modelsDir);
   const warnings = warning ? [warning] : [];
-  const { matches, warnings: loadWarnings, retiredDropped, formatDropped } = loadMatchDetails(opts.statsFile, registry);
+  const mapModes = loadMapModes(opts.mapsDir);
+  const { matches, warnings: loadWarnings, retiredDropped, formatDropped } = loadMatchDetails(opts.statsFile, registry, mapModes);
   warnings.push(...loadWarnings);
 
-  const gameplay = aggregateGameplay(matches);
+  // 玩法统计同样按模式隔离：页面切换模式时只读该模式的聚合，不把不同规则体系混在一起。
+  const modes = GAME_MODES.map(meta => {
+    const modeMatches = matches.filter(m => m.mode === meta.id);
+    return {
+      id: meta.id,
+      label: meta.label,
+      games: modeMatches.length,
+      gameplay: aggregateGameplay(modeMatches),
+    };
+  }).filter(mode => mode.games > 0);
+  const gameplay = modes.find(mode => mode.id === 'standard')?.gameplay
+    ?? modes[0]?.gameplay
+    ?? aggregateGameplay([]);
 
   let notesData = { profiles: new Map(), deprecated: [], warnings: [] };
   if (existsSync(opts.notesFile)) {
@@ -558,11 +620,14 @@ function main() {
       matchCount: matches.length,
       retiredMatchesDropped: retiredDropped,
       oldFormatMatchesDropped: formatDropped,
-      mapDist: gameplay.perMap.map(m => [m.map, m.games]).reduce((o, [k, v]) => ({ ...o, [k]: v }), {}),
+      mapDist: matches.map(m => m.map).reduce((o, map) => ({ ...o, [map]: (o[map] ?? 0) + 1 }), {}),
+      modeDist: Object.fromEntries(GAME_MODES.map(meta => [meta.id, matches.filter(m => m.mode === meta.id).length])),
       dateMin: tsList[0] ?? null,
       dateMax: tsList[tsList.length - 1] ?? null,
     },
+    // 顶层 gameplay 保留给旧客户端，语义固定为标准模式（没有标准数据时取第一个有数据的模式）。
     gameplay,
+    modes,
     models,
     deprecated: notesData.deprecated,
     warnings,
@@ -573,8 +638,11 @@ function main() {
   console.log(`Wrote ${opts.out} — ${matches.length} matches, ${models.length} participant profiles, ${notesData.deprecated.length} deprecated` +
     (retiredDropped > 0 ? `（跳过作废对局 ${retiredDropped}）` : '') +
     (formatDropped > 0 ? `（跳过旧格式对局 ${formatDropped}）` : ''));
-  console.log(`Units: ${gameplay.units.map(u => `${u.type} ${(u.deployShare * 100).toFixed(0)}%`).join(' / ') || '—'}`);
-  console.log(`EndReasons: ${gameplay.endReasons.map(e => `${e.reason} ${e.count}`).join(' / ') || '—'}`);
+  for (const mode of modes) {
+    const gp = mode.gameplay;
+    console.log(`${mode.label}（${mode.games} 局）Units: ${gp.units.map(u => `${u.type} ${(u.deployShare * 100).toFixed(0)}%`).join(' / ') || '—'}`);
+    console.log(`${mode.label}（${mode.games} 局）EndReasons: ${gp.endReasons.map(e => `${e.reason} ${e.count}`).join(' / ') || '—'}`);
+  }
   const noNotes = models.filter(m => !m.notes);
   if (noNotes.length) console.log(`Models without notes: ${noNotes.map(m => m.short).join(', ')}`);
   if (warnings.length) {

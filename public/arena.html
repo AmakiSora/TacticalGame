@@ -15,7 +15,7 @@
   <header>
     <div class="brand-block">
       <h1>AI 竞技场 <span class="version-badge"></span></h1>
-      <div class="page-subtitle">RL 模型 × 内置算法循环赛 · Bradley-Terry 评分</div>
+      <div class="page-subtitle">按玩法模式分榜 · RL 模型 × 内置算法循环赛 · Bradley-Terry 评分</div>
     </div>
     <nav class="page-nav" aria-label="站点导航">
       <a href="/">首页</a>
@@ -42,6 +42,8 @@
       <span id="eval-mini-text">评估跑批运行中</span>
       <button type="button" class="ghost" id="eval-mini-go">查看控制台 →</button>
     </div>
+
+    <div id="mode-bar" class="mode-bar" role="tablist" aria-label="对局模式"></div>
 
     <section class="meta-bar panel">
       <div class="meta-item">
@@ -70,8 +72,8 @@
     <section class="panel">
       <div class="panel-heading">
         <div class="panel-heading-copy">
-          <h2>综合评分榜</h2>
-          <span>Bradley-Terry MLE · 平局记 0.5 · 默认按评分排序，排名列固定为全局排名</span>
+          <h2>模式评分榜</h2>
+          <span id="board-mode-hint">Bradley-Terry MLE · 平局记 0.5 · 各模式独立评分，排名列固定为模式内排名</span>
         </div>
         <div class="filters" style="border: none; padding: 0;">
           <label>
@@ -108,7 +110,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="hint">评分基于全部参评对局的 Bradley-Terry 最大似然估计（每对附加 1 局虚拟平局先验），映射到 Elo 刻度（均值 1500）；±值为分层 bootstrap 95% 置信区间半径。Wilson 下界 = (胜 + 0.5·平) 的 95% 置信下限，供小样本参考。RL 模型与规则算法在同一池内互打评分，可直接跨类型比较。点击参与者行查看对位明细。</p>
+      <p class="hint">评分基于当前模式内全部参评对局的 Bradley-Terry 最大似然估计（每对附加 1 局虚拟平局先验），映射到 Elo 刻度（均值 1500）；±值为分层 bootstrap 95% 置信区间半径。Wilson 下界 = (胜 + 0.5·平) 的 95% 置信下限，供小样本参考。RL 模型与规则算法在同一模式内互打评分，可直接跨类型比较；不同模式规则不同，评分互不混算。点击参与者行查看对位明细。</p>
     </section>
 
     <section class="board-stack">
@@ -173,6 +175,8 @@
         <button id="rls-btn-reload" type="button">重新加载</button>
       </div>
     </section>
+
+    <div id="rls-mode-bar" class="mode-bar" role="tablist" aria-label="玩法统计对局模式"></div>
 
     <section id="rls-kpi-grid" class="kpi-grid" aria-label="玩法总览指标"></section>
 
@@ -316,7 +320,12 @@
       </div>
       <div class="eval-form">
         <div class="eval-field">
-          <span class="eval-label">地图池</span>
+          <span class="eval-label">对局模式（不同模式独立跑批、独立榜单）</span>
+          <div id="eval-modes" class="eval-chip-list eval-mode-list"></div>
+          <div id="eval-mode-hint" class="eval-hint"></div>
+        </div>
+        <div class="eval-field">
+          <span class="eval-label">地图池（仅显示当前模式的地图）</span>
           <div id="eval-maps" class="eval-chip-list"></div>
         </div>
         <div class="eval-field">

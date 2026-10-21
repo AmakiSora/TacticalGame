@@ -25,6 +25,8 @@ import './error-text.js';
     loadStatus: document.getElementById('load-status'),
     btnReload: document.getElementById('btn-reload'),
     kpiGrid: document.getElementById('kpi-grid'),
+    modeBar: document.getElementById('mode-bar'),
+    boardModeHint: document.getElementById('board-mode-hint'),
     filterLeague: document.getElementById('filter-league'),
     filterKind: document.getElementById('filter-kind'),
     modelTable: document.getElementById('model-table'),
@@ -38,10 +40,19 @@ import './error-text.js';
 
   /** @type {any} */
   let raw = null;
+  let mode = null;
   let league = 'all';
   let kindFilter = 'all';
   let selectedModel = null;
   let sort = { key: 'rating', dir: 'desc' };
+
+  function modes() {
+    return Array.isArray(raw?.modes) ? raw.modes : [];
+  }
+
+  function currentMode() {
+    return modes().find(m => m.id === mode) || modes()[0] || null;
+  }
 
   function setStatus(text, kind) {
     el.loadStatus.textContent = text;
@@ -71,7 +82,7 @@ import './error-text.js';
   }
 
   function currentLeague() {
-    return raw?.maps?.[league] || null;
+    return currentMode()?.maps?.[league] || null;
   }
 
   /** 每个参与者行的展示视图：合并 registry 元数据 + 排名 + 扁平化排序字段。 */
@@ -144,10 +155,12 @@ import './error-text.js';
     const modelCount = rated.filter(m => m.kind === 'model').length;
     const algoCount = rated.filter(m => m.kind === 'algorithm').length;
     const pairs = rated.length * (rated.length - 1) / 2;
-    const mapCount = Object.keys(raw.source.mapDist || {}).length || 1;
+    const current = currentMode();
+    const mapCount = Object.keys(current?.maps || {}).filter(key => key !== 'all').length;
     const target = pairs * mapCount * (raw.source.targetGamesPerPair || 24);
     const coverage = target > 0 ? Math.min(100, Math.round(ld.overview.games / target * 100)) : 0;
     const cards = [
+      { label: '当前模式', value: current?.label ?? '—', sub: '不同模式独立评分，不跨模式比较' },
       { label: '总局数', value: ld.overview.games, sub: `平局 ${ld.overview.draws}（${pct(ld.overview.drawRate)}）` },
       {
         label: '参评者',
@@ -156,7 +169,7 @@ import './error-text.js';
       },
       { label: '平局率', value: pct(ld.overview.drawRate), sub: '达到回合/动作上限' },
       { label: '平均回合', value: ld.overview.avgRounds ?? '—', sub: '单局 rounds 均值' },
-      { label: '局数覆盖度', value: `${coverage}%`, sub: `${ld.overview.games} / 目标 ${target}` },
+      { label: '局数覆盖度', value: target > 0 ? `${coverage}%` : '—', sub: target > 0 ? `${ld.overview.games} / 目标 ${target}` : '该模式暂无地图池' },
       {
         label: '当前地图池',
         value: league === 'all' ? '全部' : mapLabel(league),
@@ -171,6 +184,10 @@ import './error-text.js';
   function renderTable(rows) {
     const sorted = sortRows(rows, sort);
     const body = el.modelTable.querySelector('tbody');
+    if (!currentLeague()?.overview?.games) {
+      body.innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（当前评估跑批仅覆盖标准模式）</td></tr>';
+      return;
+    }
     body.innerHTML = sorted
       .map(r => {
         const selected = selectedModel === r.id ? 'selected' : '';
@@ -206,6 +223,11 @@ import './error-text.js';
   }
 
   function renderMatrix(ld) {
+    if (!ld.overview?.games) {
+      el.h2hHead.innerHTML = '<th class="model-col">参与者 \\ 对手</th>';
+      el.h2hBody.innerHTML = '<tr><td class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（当前评估跑批仅覆盖标准模式）</td></tr>';
+      return;
+    }
     const rows = viewRows(ld).filter(m => m.games > 0);
     const cols = rows.slice();
     // 列头用短名（v3.0.4 而非 v3.0.4@8.4M；算法取中文名）：宽矩阵的全名表头会把表格
@@ -317,6 +339,7 @@ import './error-text.js';
     const s = raw.source || {};
     const lines = [
       `<div><strong>评分模型</strong>：${escapeHtml(m.model || '—')}</div>`,
+      `<div><strong>模式隔离</strong>：不同玩法模式使用独立评分池，榜单只在当前模式内比较；模式之间不共享评分。</div>`,
       `<div><strong>先验</strong>：${escapeHtml(m.prior || '—')}</div>`,
       `<div><strong>Elo 映射</strong>：${escapeHtml(m.scale || '—')}</div>`,
       `<div><strong>置信区间</strong>：${escapeHtml(m.ci || '—')}</div>`,
@@ -344,9 +367,24 @@ import './error-text.js';
       </tr>`).join('')}</tbody></table></div>`;
   }
 
+  function populateModeBar() {
+    el.modeBar.innerHTML = modes().map(item => {
+      const active = item.id === mode;
+      return `<button type="button" class="mode-tab${active ? ' active' : ''}" data-mode="${escapeAttr(item.id)}" role="tab" aria-selected="${active}">
+        <span>${escapeHtml(item.label)}</span><span class="mode-count">${item.maps?.all?.overview?.games ?? 0}</span>
+      </button>`;
+    }).join('');
+    const current = currentMode();
+    el.boardModeHint.textContent = current
+      ? `${current.label} · Bradley-Terry MLE · 平局记 0.5 · 排名列固定为模式内排名`
+      : 'Bradley-Terry MLE · 平局记 0.5 · 各模式独立评分';
+  }
+
   function populateLeagueSelect() {
-    const maps = Object.keys(raw.maps || {});
-    el.filterLeague.innerHTML = maps
+    const current = currentMode();
+    const maps = Object.keys(current?.maps || {}).filter(key => key !== 'all');
+    if (league !== 'all' && !maps.includes(league)) league = 'all';
+    el.filterLeague.innerHTML = ['all', ...maps]
       .map(map => `<option value="${escapeAttr(map)}"${map === league ? ' selected' : ''}>${map === 'all' ? '全部地图' : escapeHtml(mapLabel(map))}</option>`)
       .join('');
   }
@@ -371,6 +409,12 @@ import './error-text.js';
       el.dateRange.textContent = raw.source?.dateMin
         ? `${raw.source.dateMin} → ${raw.source.dateMax ?? ''}`
         : '—';
+      if (!mode || !modes().some(item => item.id === mode)) {
+        mode = modes().find(item => item.maps?.all?.overview?.games > 0)?.id || modes()[0]?.id || null;
+      }
+      league = 'all';
+      selectedModel = null;
+      populateModeBar();
       populateLeagueSelect();
       renderAll();
       renderMethod();
@@ -389,9 +433,19 @@ import './error-text.js';
   }
 
   el.btnReload.addEventListener('click', loadData);
+  el.modeBar.addEventListener('click', event => {
+    const button = event.target.closest('.mode-tab[data-mode]');
+    if (!button || button.dataset.mode === mode) return;
+    mode = button.dataset.mode;
+    league = 'all';
+    selectedModel = null;
+    populateModeBar();
+    populateLeagueSelect();
+    renderAll();
+  });
   el.filterLeague.addEventListener('change', () => {
     league = el.filterLeague.value;
-    if (!raw.maps[league]) league = 'all';
+    if (!currentMode()?.maps?.[league]) league = 'all';
     selectedModel = null;
     renderAll();
   });
@@ -451,7 +505,7 @@ import './error-text.js';
 
   /* ===== 评估控制台：网页启动 round_robin.py 跑批（模型 × 算法混合循环赛） ===== */
   const evalEl = {};
-  for (const id of ['eval-status-pill', 'eval-maps', 'eval-algos', 'eval-models', 'eval-model-all', 'eval-model-none',
+  for (const id of ['eval-status-pill', 'eval-modes', 'eval-mode-hint', 'eval-maps', 'eval-algos', 'eval-models', 'eval-model-all', 'eval-model-none',
     'eval-model-count', 'eval-games', 'eval-jobs', 'eval-salt', 'eval-dry', 'eval-start', 'eval-stop',
     'eval-regen', 'eval-msg', 'eval-progress-wrap', 'eval-progress-fill', 'eval-progress-text', 'eval-output',
     'eval-tab-btn', 'eval-mini-strip', 'eval-mini-text', 'eval-mini-go']) {
@@ -462,7 +516,10 @@ import './error-text.js';
   let evalPrevRunning = false;
   let evalModels = [];
   let evalAlgos = [];
-  // status 接口会返回 knownMaps；这里的列表只是首屏兜底，收到 status 后以服务端为准。
+  let evalModeCatalog = [];
+  let evalMode = 'standard';
+  let renderedParticipantsMode = null;
+  // status 接口会返回 modeCatalog；这里的列表只是首屏兜底，收到 status 后以服务端为准。
   const EVAL_FALLBACK_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'];
   let renderedMapSig = '';
 
@@ -485,19 +542,58 @@ import './error-text.js';
     evalEl['eval-msg'].classList.toggle('eval-msg-err', kind === 'err');
   }
 
+  function currentEvalMode() {
+    return evalModeCatalog.find(item => item.id === evalMode) || evalModeCatalog[0] || null;
+  }
+
+  function currentEvalMaps() {
+    return currentEvalMode()?.maps?.map(item => item.id) || EVAL_FALLBACK_MAPS;
+  }
+
+  function evalAlgosForMode() {
+    return evalAlgos.filter(a => (Array.isArray(a.modes) ? a.modes : ['standard']).includes(evalMode));
+  }
+
+  function evalModelsForMode() {
+    return evalModels.filter(m => (Array.isArray(m.modes) ? m.modes : ['standard']).includes(evalMode));
+  }
+
+  function updateEvalStartState() {
+    const current = currentEvalMode();
+    const unsupported = Boolean(current && !current.supported);
+    evalEl['eval-start'].disabled = evalStatus?.status === 'running' || unsupported;
+    evalEl['eval-start'].title = unsupported ? (current.reason || '该模式暂不支持跑批') : '';
+  }
+
+  function renderEvalModeBar() {
+    evalEl['eval-modes'].innerHTML = evalModeCatalog.map(item => {
+      const active = item.id === currentEvalMode()?.id;
+      const label = item.supported ? item.label : `${item.label}（暂不支持）`;
+      return `<button type="button" class="mode-tab${active ? ' active' : ''}${item.supported ? '' : ' unsupported'}" data-eval-mode="${escapeAttr(item.id)}" role="tab" aria-selected="${active}">${escapeHtml(label)}</button>`;
+    }).join('');
+    const current = currentEvalMode();
+    evalEl['eval-mode-hint'].textContent = current
+      ? current.supported
+        ? `${current.maps?.length ?? 0} 张地图 · 该模式独立榜单与评分`
+        : (current.reason || '该模式暂不支持跑批')
+      : '';
+    updateEvalStartState();
+  }
+
   function renderMapChips(maps, checked) {
     evalEl['eval-maps'].innerHTML = maps
       .map(map => `<label><input type="checkbox" value="${escapeAttr(map)}"${checked.includes(map) ? ' checked' : ''}/> ${escapeHtml(mapLabel(map))}</label>`)
       .join('');
   }
 
-  // 服务端地图池变化时才重建 chips，保留用户已勾选项，避免 3s 轮询反复重绘。
+  // 服务端地图池或当前模式变化时才重建 chips，保留用户已勾选项，避免 3s 轮询反复重绘。
   function syncMapChips(maps) {
     if (!Array.isArray(maps) || !maps.length) return;
-    const sig = maps.join('\u0001');
+    const sig = `${evalMode}\u0001${maps.join('\u0001')}`;
     if (sig === renderedMapSig) return;
     renderedMapSig = sig;
-    renderMapChips(maps, checkedMaps());
+    const checked = checkedMaps().filter(map => maps.includes(map));
+    renderMapChips(maps, checked.length ? checked : maps);
   }
 
   function checkedMaps() {
@@ -510,6 +606,18 @@ import './error-text.js';
     return { algos, models };
   }
 
+  function renderEvalParticipants() {
+    // 算法默认全选：取消勾选即显式排除（不勾选任何参与者 = 全部模型 + 全部算法）。
+    evalEl['eval-algos'].innerHTML = evalAlgosForMode()
+      .map(a => `<label title="${escapeAttr(a.description)}"><input type="checkbox" value="algo:${escapeAttr(a.algorithm)}" checked/><span class="tag st-algo">算法</span> ${escapeHtml(a.name)}（${escapeHtml(a.algorithm)}）</label>`)
+      .join('');
+    evalEl['eval-models'].innerHTML = evalModelsForMode()
+      .map(m => `<label title="${escapeAttr(m.file)}"><input type="checkbox" value="${escapeAttr(m.file)}"/><span class="ver">${escapeHtml(m.label || '?')}</span> ${escapeHtml(m.file)}</label>`)
+      .join('');
+    renderedParticipantsMode = evalMode;
+    updateModelCount();
+  }
+
   async function loadEvalParticipants() {
     try {
       const res = await fetch('/api/arena/participants', { cache: 'no-store' });
@@ -518,16 +626,7 @@ import './error-text.js';
       // round_robin 自身排除 v1.0.0（512 动作旧格式无法进程内互打），这里同步过滤。
       evalModels = (data.models || []).filter(m => m.supported && !m.file.startsWith('hex_ppo_v1.'));
       evalAlgos = data.algorithms || [];
-      // 算法默认全选：取消勾选即显式排除（不勾选任何参与者 = 全部模型 + 全部算法）。
-      evalEl['eval-algos'].innerHTML = evalAlgos
-        .map(a => `<label title="${escapeAttr(a.description)}"><input type="checkbox" value="algo:${escapeAttr(a.algorithm)}" checked/><span class="tag st-algo">算法</span> ${escapeHtml(a.name)}（${escapeHtml(a.algorithm)}）</label>`)
-        .join('');
-      evalEl['eval-models'].innerHTML = evalModels
-        .map(m => `<label title="${escapeAttr(m.file)}"><input type="checkbox" value="${escapeAttr(m.file)}"/><span class="ver">${escapeHtml(m.label || '?')}</span> ${escapeHtml(m.file)}</label>`)
-        .join('');
-      evalEl['eval-algos'].addEventListener('change', updateModelCount);
-      evalEl['eval-models'].addEventListener('change', updateModelCount);
-      updateModelCount();
+      renderEvalParticipants();
     } catch (err) {
       evalEl['eval-model-count'].textContent = `参与者列表加载失败：${window.ErrorText.describe(err)}`;
     }
@@ -535,11 +634,14 @@ import './error-text.js';
 
   function updateModelCount() {
     const { algos, models } = checkedParticipants();
-    const total = evalModels.length + evalAlgos.length;
+    const modeAlgos = evalAlgosForMode();
+    const modeModels = evalModelsForMode();
+    const total = modeModels.length + modeAlgos.length;
     const selected = algos.length + models.length;
+    const modeLabel = currentEvalMode()?.label || evalMode;
     evalEl['eval-model-count'].textContent = selected
-      ? `已选 ${selected} / ${total} 个（模型 ${models.length} / ${evalModels.length}，算法 ${algos.length} / ${evalAlgos.length}）`
-      : `共 ${evalModels.length} 个可对战模型 + ${evalAlgos.length} 个算法（不选 = 全部参评）`;
+      ? `已选 ${selected} / ${total} 个（模型 ${models.length} / ${modeModels.length}，算法 ${algos.length} / ${modeAlgos.length}，${modeLabel}）`
+      : `共 ${modeModels.length} 个可对战模型 + ${modeAlgos.length} 个算法（${modeLabel}；不选 = 全部参评）`;
   }
 
   function formatDuration(iso) {
@@ -555,12 +657,18 @@ import './error-text.js';
 
   function renderEvalStatus(st) {
     evalStatus = st;
-    syncMapChips(st.knownMaps);
+    if (Array.isArray(st.modeCatalog) && st.modeCatalog.length) {
+      evalModeCatalog = st.modeCatalog;
+      if (!evalModeCatalog.some(item => item.id === evalMode)) evalMode = evalModeCatalog[0].id;
+      renderEvalModeBar();
+    }
+    syncMapChips(currentEvalMaps());
+    if (renderedParticipantsMode !== evalMode) renderEvalParticipants();
     const pill = EVAL_PILL[st.status] || { text: st.status, cls: '' };
     evalEl['eval-status-pill'].textContent = pill.text;
     evalEl['eval-status-pill'].classList.toggle('ok', pill.cls === 'ok');
     evalEl['eval-status-pill'].classList.toggle('err', pill.cls === 'err');
-    evalEl['eval-start'].disabled = st.status === 'running';
+    updateEvalStartState();
     evalEl['eval-stop'].disabled = st.status !== 'running';
 
     const running = st.status === 'running';
@@ -621,7 +729,26 @@ import './error-text.js';
     }
   }
 
+  evalEl['eval-modes'].addEventListener('click', event => {
+    const button = event.target.closest('.mode-tab[data-eval-mode]');
+    if (!button || button.dataset.evalMode === evalMode) return;
+    evalMode = button.dataset.evalMode;
+    renderedMapSig = '';
+    renderEvalModeBar();
+    syncMapChips(currentEvalMaps());
+    renderEvalParticipants();
+    const current = currentEvalMode();
+    evalMsg(current && !current.supported ? (current.reason || '该模式暂不支持跑批') : '', current && !current.supported ? 'err' : undefined);
+  });
+  evalEl['eval-algos'].addEventListener('change', updateModelCount);
+  evalEl['eval-models'].addEventListener('change', updateModelCount);
+
   evalEl['eval-start'].addEventListener('click', async () => {
+    const current = currentEvalMode();
+    if (current && !current.supported) {
+      evalMsg(current.reason || '该模式暂不支持跑批', 'err');
+      return;
+    }
     const maps = checkedMaps();
     if (!maps.length) {
       evalMsg('请至少选择一张地图', 'err');
@@ -703,7 +830,7 @@ import './error-text.js';
   });
 
   renderMapChips(EVAL_FALLBACK_MAPS, ['random']);
-  renderedMapSig = EVAL_FALLBACK_MAPS.join('\u0001');
+  renderedMapSig = `${evalMode}\u0001${EVAL_FALLBACK_MAPS.join('\u0001')}`;
   loadEvalParticipants();
   evalEl['eval-mini-strip'].addEventListener('click', () => switchTab('console'));
   pollEvalStatus();

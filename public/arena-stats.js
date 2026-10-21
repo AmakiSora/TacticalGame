@@ -6,6 +6,7 @@ import './error-text.js';
   const DATA_URL = '/data/arena-stats.json';
 
   const MAP_LABELS = { random: '随机图' };
+  const MODE_LABELS = { standard: '标准模式', annihilation: '歼灭模式', simultaneous: '同时回合', royale: '大逃杀' };
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
   const END_REASON_LABELS = {
     last_player_standing: '歼灭获胜',
@@ -22,7 +23,7 @@ import './error-text.js';
 
   const el = {};
   for (const id of ['rls-generated-at', 'rls-source-count', 'rls-date-range', 'rls-load-status', 'rls-btn-reload',
-    'rls-kpi-grid', 'rls-endreasons', 'rls-economy', 'rls-rounds-dist', 'rls-duration-dist',
+    'rls-mode-bar', 'rls-kpi-grid', 'rls-endreasons', 'rls-economy', 'rls-rounds-dist', 'rls-duration-dist',
     'rls-units-table', 'rls-model-table', 'rls-map-table',
     'rls-models-status', 'rls-model-cards', 'rls-deprecated']) {
     el[id] = document.getElementById(id);
@@ -30,7 +31,31 @@ import './error-text.js';
 
   /** @type {any} */
   let raw = null;
+  let mode = null;
   let modelSort = { key: 'winRate', dir: 'desc' };
+
+  function modes() {
+    if (Array.isArray(raw?.modes) && raw.modes.length) return raw.modes;
+    // 旧版 arena-stats.json 没有 modes：退回全量 gameplay，页面仍可用。
+    return raw?.gameplay ? [{ id: 'all', label: '全部模式', games: raw.source?.matchCount ?? 0, gameplay: raw.gameplay }] : [];
+  }
+
+  function currentMode() {
+    return modes().find(item => item.id === mode) || modes()[0] || null;
+  }
+
+  function currentGameplay() {
+    return currentMode()?.gameplay || { overview: {}, endReasons: [], economy: {}, roundsDist: [], durationDist: [], units: [], perModel: [], perMap: [] };
+  }
+
+  function renderModeBar() {
+    el['rls-mode-bar'].innerHTML = modes().map(item => {
+      const active = item.id === currentMode()?.id;
+      return `<button type="button" class="mode-tab${active ? ' active' : ''}" data-mode="${escapeAttr(item.id)}" role="tab" aria-selected="${active}">
+        <span>${escapeHtml(item.label)}</span><span class="mode-count">${item.games ?? item.gameplay?.overview?.games ?? 0}</span>
+      </button>`;
+    }).join('');
+  }
 
   function setStatus(text, kind) {
     el['rls-load-status'].textContent = text;
@@ -65,6 +90,10 @@ import './error-text.js';
 
   function mapLabel(map) {
     return MAP_LABELS[map] || map;
+  }
+
+  function modeLabelById(id) {
+    return modes().find(item => item.id === id)?.label || MODE_LABELS[id] || id;
   }
 
   function unitLabel(type) {
@@ -200,16 +229,22 @@ import './error-text.js';
     el['rls-model-cards'].innerHTML = models.map(m => {
       const statusMeta = STATUS_META[m.status] || STATUS_META.legacy;
       const ratingText = m.rating != null ? `${m.rating}` : '未参评';
-      const ratingTitle = m.rating != null && m.ratingLo != null ? `95% CI ${m.ratingLo}–${m.ratingHi}` : '';
+      const ratingTitle = m.rating != null && m.ratingLo != null
+        ? `95% CI ${m.ratingLo}–${m.ratingHi}${m.ratingModeLabel ? ` · ${m.ratingModeLabel}` : ''}`
+        : '';
       const metaBits = m.kind === 'algorithm' ? [
         m.games ? `<span>对局 <b>${fmtNum(m.games)}</b></span>` : '',
         m.winRate != null ? `<span>胜率 <b>${pct(m.winRate)}</b></span>` : '',
+        m.ratingModeLabel ? `<span>评分模式 <b>${escapeHtml(m.ratingModeLabel)}</b></span>` : '',
+        Array.isArray(m.modes) && m.modes.length ? `<span>支持模式 <b>${escapeHtml(m.modes.map(modeLabelById).join(' / '))}</b></span>` : '',
         `<span>注册名 <b>${escapeHtml(m.algorithm || '')}</b></span>`,
         `<span>版本 <b>${escapeHtml(m.version || '')}</b></span>`,
         m.docRef ? `<span>文档 <b>${escapeHtml(m.docRef)}</b></span>` : '',
       ].filter(Boolean).join('') : [
         m.games ? `<span>对局 <b>${fmtNum(m.games)}</b></span>` : '',
         m.winRate != null ? `<span>胜率 <b>${pct(m.winRate)}</b></span>` : '',
+        m.ratingModeLabel ? `<span>评分模式 <b>${escapeHtml(m.ratingModeLabel)}</b></span>` : '',
+        Array.isArray(m.modes) && m.modes.length ? `<span>支持模式 <b>${escapeHtml(m.modes.map(modeLabelById).join(' / '))}</b></span>` : '',
         `<span>训练日期 <b>${escapeHtml(m.trainDate)}</b></span>`,
         `<span>训练地图 <b>${escapeHtml(mapLabel(m.trainMap))}</b></span>`,
         `<span>训练对手 <b>${escapeHtml(m.opponentType)}</b></span>`,
@@ -254,7 +289,7 @@ import './error-text.js';
   }
 
   function renderAll() {
-    const gp = raw.gameplay;
+    const gp = currentGameplay();
     renderKpis(gp);
     renderBars(el['rls-endreasons'], gp.endReasons.map(e => ({ label: endReasonLabel(e.reason), count: e.count, pct: e.pct })));
     renderEconomy(gp.economy);
@@ -278,6 +313,8 @@ import './error-text.js';
       el['rls-date-range'].textContent = raw.source?.dateMin
         ? `${raw.source.dateMin} → ${raw.source.dateMax ?? ''}`
         : '—';
+      if (!mode || !modes().some(item => item.id === mode)) mode = modes()[0]?.id || null;
+      renderModeBar();
       renderAll();
       const warnings = raw.warnings || [];
       if (!raw.source?.matchCount) {
@@ -293,6 +330,13 @@ import './error-text.js';
   }
 
   el['rls-btn-reload'].addEventListener('click', loadData);
+  el['rls-mode-bar'].addEventListener('click', event => {
+    const button = event.target.closest('.mode-tab[data-mode]');
+    if (!button || button.dataset.mode === mode) return;
+    mode = button.dataset.mode;
+    renderModeBar();
+    renderAll();
+  });
   el['rls-model-table'].querySelectorAll('th[data-sort]').forEach(th => {
     th.addEventListener('click', () => {
       const key = th.dataset.sort;
@@ -301,7 +345,7 @@ import './error-text.js';
       } else {
         modelSort = { key, dir: key === 'short' ? 'asc' : 'desc' };
       }
-      if (raw) renderModelTable(raw.gameplay);
+      if (raw) renderModelTable(currentGameplay());
     });
   });
 

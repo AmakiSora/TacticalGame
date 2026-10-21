@@ -78,6 +78,13 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(data.knownMaps).toContain('random');
     expect(data.defaults.games).toBe(24);
     expect(data.gamesTotal).toBe(2);
+    const modeIds = data.modeCatalog.map((mode: { id: string }) => mode.id);
+    expect(modeIds).toEqual(['standard', 'annihilation', 'simultaneous', 'royale']);
+    expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'standard').supported).toBe(true);
+    expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'simultaneous')).toMatchObject({
+      supported: false,
+      maps: expect.arrayContaining([expect.objectContaining({ id: 'standoff' })]),
+    });
   });
 
   it('rejects invalid maps, games and jobs on start', async () => {
@@ -92,6 +99,22 @@ describe('AI 竞技场评估控制台 API', () => {
     const badJobs = await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'], jobs: 99 } });
     expect(badJobs.statusCode).toBe(400);
     expect(badJobs.json().code).toBe('invalid_jobs');
+
+    const unsupportedMode = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['standoff'] },
+    });
+    expect(unsupportedMode.statusCode).toBe(400);
+    expect(unsupportedMode.json().code).toBe('mode_not_supported');
+    expect(unsupportedMode.json().error).toContain('仅支持标准模式');
+  });
+
+  it('rejects a simultaneous-only algorithm in the standard evaluation pool', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['default'], participants: ['algo:dest-prob'] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('mode_not_supported');
   });
 
   it('translates participants into round_robin filters', async () => {
@@ -147,12 +170,16 @@ describe('AI 竞技场评估控制台 API', () => {
     const ids = data.algorithms.map((a: { id: string }) => a.id);
     expect(ids).toContain('algo_threat');
     expect(ids).toContain('algo_greedy');
-    // 评估跑批仅支持标准模式：非标准模式算法不进入参评清单（不同模式不能混用）。
-    expect(ids).not.toContain('algo_random-sim');
-    expect(ids).not.toContain('algo_dest-prob');
+    // 参评清单返回全部算法及 modes，由控制台按模式过滤；启动接口仍拒绝跨模式混用。
+    expect(ids).toContain('algo_dest-prob');
+    expect(ids).toContain('algo_random-sim');
     const threat = data.algorithms.find((a: { id: string }) => a.id === 'algo_threat');
     expect(threat.name).toBe('威胁感知算法');
     expect(threat.description).toContain('威胁图');
+    expect(threat.modes).toEqual(['standard']);
+    const destProb = data.algorithms.find((a: { id: string }) => a.id === 'algo_dest-prob');
+    expect(destProb.modes).toEqual(['simultaneous']);
+    expect(data.models.every((m: { modes: string[] }) => m.modes.includes('standard'))).toBe(true);
   });
 
   it('starts a run, tracks progress and auto-regenerates the leaderboard on finish', async () => {

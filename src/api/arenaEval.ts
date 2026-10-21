@@ -30,8 +30,48 @@ const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json'
  */
 const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRIPT];
 
-// 与 rl/evaluation/round_robin.py 的 DEFAULT_MAPS 保持一致。
-export const KNOWN_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
+// 评估链路当前只实现标准模式：地图池与 round_robin.py 的 DEFAULT_MAPS 保持一致。
+export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
+
+/**
+ * 控制台展示用地图目录：标准模式是当前唯一可跑批模式，另外三种模式也列出来，
+ * 让用户能明确看到“模式不同、地图不同、算法不同”，而不是把它们混在一个池里。
+ * 标准模式地图与 round_robin.py 的 DEFAULT_MAPS 保持一致；非标准模式地图用于展示该
+ * 模式已有哪些地图，跑批入口会明确拒绝。
+ */
+export const EVAL_MAPS = [
+  { id: 'random', label: '随机图', mode: 'standard' },
+  { id: 'default', label: '六角前线', mode: 'standard' },
+  { id: 'breach', label: '破障行动', mode: 'standard' },
+  { id: 'danger-close', label: '危险距离', mode: 'standard' },
+  { id: 'dual-lanes', label: '双线抉择', mode: 'standard' },
+  { id: 'artillery-zone', label: '炮火禁区', mode: 'annihilation' },
+  { id: 'standoff', label: '对峙之地', mode: 'simultaneous' },
+  { id: 'molten-throne', label: '熔池王座', mode: 'simultaneous' },
+  { id: 'snowflake', label: '雪花', mode: 'royale' },
+  { id: 'narrow-road', label: '狭路相逢', mode: 'royale' },
+] as const;
+
+export const EVAL_MODES = [
+  { id: 'standard', label: '标准模式', supported: true },
+  { id: 'annihilation', label: '歼灭模式', supported: false },
+  { id: 'simultaneous', label: '同时回合', supported: false },
+  { id: 'royale', label: '大逃杀', supported: false },
+] as const;
+
+export const EVAL_MODE_UNSUPPORTED_REASON = '评估跑批目前仅支持标准模式；该模式的地图与算法可在此查看，但尚不能在网页启动跑批。';
+
+// 兼容现有调用方：KNOWN_MAPS 仍表示“可跑批的地图”。
+export const KNOWN_MAPS = STANDARD_EVAL_MAPS;
+
+/** 控制台的模式目录：每个模式只带自己的地图，供前端切换与地图/算法联动过滤。 */
+export function buildEvalModeCatalog() {
+  return EVAL_MODES.map(mode => ({
+    ...mode,
+    maps: EVAL_MAPS.filter(map => map.mode === mode.id),
+    reason: mode.supported ? null : EVAL_MODE_UNSUPPORTED_REASON,
+  }));
+}
 
 export type EvalRunStatus = 'idle' | 'running' | 'finished' | 'failed' | 'stopped' | 'interrupted';
 
@@ -404,6 +444,7 @@ export class EvalRunner {
       outputTail: this.state.outputTail.slice(-30),
       notes: this.state.notes,
       knownMaps: KNOWN_MAPS,
+      modeCatalog: buildEvalModeCatalog(),
       defaults: { games: 24, jobs: 1, maps: ['random'] },
       statsFile: this.statsFile,
       python: this.pythonPath,
@@ -432,21 +473,19 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
   runner.restoreFromDisk();
   app.addHook('onClose', async () => runner.dispose());
 
-  // 参评者清单（模型 + 内置算法）：评估控制台的勾选数据源，与 /api/rl/models、
-  // /api/algorithms 同源，前端一个请求即可拿全。
-  // 算法只列标准模式：评估跑批（round_robin → evaluate_cross → local-worker）
-  // 的地图池与进程内引擎目前仅按标准模式对局，非标准模式算法（如 random-sim）参评必然失败。
-  // 注：随机地图生成器本身已支持全部四种模式，此处限制仅针对评估链路。
+  // 参评者清单（模型 + 内置算法）：评估控制台按模式过滤的完整数据源，与
+  // /api/rl/models、/api/algorithms 同源。这里不按标准模式预过滤，让前端能按
+  // 当前模式展示对应的算法；真正启动时仍由 start 接口做模式兼容校验。
   app.get('/api/arena/participants', async () => ({
-    models: refreshRlModels(),
-    algorithms: Object.entries(ALGORITHM_BOTS)
-      .filter(([, config]) => config.modes.includes('standard'))
-      .map(([id, config]) => ({
-        id,
-        name: config.name,
-        algorithm: config.algorithm,
-        description: config.description,
-      })),
+    // 现有 RL 训练环境只覆盖标准模式；模型支持模式写在响应里，前端按模式过滤。
+    models: refreshRlModels().map(model => ({ ...model, modes: ['standard'] })),
+    algorithms: Object.entries(ALGORITHM_BOTS).map(([id, config]) => ({
+      id,
+      name: config.name,
+      algorithm: config.algorithm,
+      description: config.description,
+      modes: config.modes,
+    })),
   }));
 
   // 状态快照含完整命令行、本地文件路径与输出尾，与写接口同样受控，
@@ -464,10 +503,20 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
     }
     const body = req.body ?? {};
     const maps = Array.isArray(body.maps) ? body.maps.map(m => String(m).trim()).filter(Boolean) : [];
-    if (!maps.length || maps.some(m => !(KNOWN_MAPS as readonly string[]).includes(m))) {
+    const mapInfos = maps.map(id => EVAL_MAPS.find(map => map.id === id));
+    if (!maps.length || mapInfos.some(info => !info)) {
       return reply.code(400).send({
-        error: `maps 必须是已知地图的非空子集（${KNOWN_MAPS.join(', ')}）`,
+        error: `maps 必须是已知地图的非空子集（${EVAL_MAPS.map(map => map.id).join(', ')}）`,
         code: 'invalid_maps',
+      });
+    }
+    const unsupportedMaps = mapInfos.filter(
+      (info): info is (typeof EVAL_MAPS)[number] => Boolean(info && info.mode !== 'standard'),
+    );
+    if (unsupportedMaps.length) {
+      return reply.code(400).send({
+        error: unsupportedMaps.map(info => `「${info.label}」`).join('、') + '不属于标准模式；' + EVAL_MODE_UNSUPPORTED_REASON,
+        code: 'mode_not_supported',
       });
     }
     const games = body.games ?? 24;
@@ -491,6 +540,18 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
         return reply.code(400).send({
           error: `未注册的算法参与者：${unknownAlgo.join(', ')}`,
           code: 'invalid_participants',
+        });
+      }
+      const unsupportedAlgo = participants
+        .filter(m => m.startsWith('algo:'))
+        .filter(m => {
+          const config = ALGORITHM_BOTS[algorithmParticipantId(m.slice('algo:'.length))];
+          return config && !config.modes.includes('standard');
+        });
+      if (unsupportedAlgo.length) {
+        return reply.code(400).send({
+          error: unsupportedAlgo.join(', ') + ' 不支持标准模式；' + EVAL_MODE_UNSUPPORTED_REASON,
+          code: 'mode_not_supported',
         });
       }
     }

@@ -100,6 +100,7 @@ describe('loadMatchDetails 过滤与字段保留', () => {
   it('作废/同模型/旧格式对局分别计数丢弃，有效行保留 derived 与 scores', () => {
     const { matches, warnings, retiredDropped, formatDropped } = loadFixture();
     expect(matches).toHaveLength(2);
+    expect(matches.every((m: { mode: string }) => m.mode === 'standard')).toBe(true);
     expect(retiredDropped).toBe(1);
     expect(formatDropped).toBe(1);
     // 同模型对局只记 warning。
@@ -301,6 +302,29 @@ describe('buildModelProfiles 档案组装', () => {
     expect(models[0].status).toBe('recommended');
   });
 
+  it('按榜单 modes 选择参与者评分最高的模式，并标记评分模式', () => {
+    const dir = makeModelsDir([A, B]);
+    const { registry } = collectRegistry(dir, []);
+    const leaderboardJson = {
+      modes: [
+        {
+          id: 'standard', label: '标准模式',
+          maps: { all: { models: [{ id: A, rating: 1510, ratingLo: 1490, ratingHi: 1530, winRate: 0.5, games: 8 }] } },
+        },
+        {
+          id: 'simultaneous', label: '同时回合',
+          maps: { all: { models: [{ id: A, rating: 1720, ratingLo: 1690, ratingHi: 1750, winRate: 0.7, games: 12 }] } },
+        },
+      ],
+    };
+    const models = buildModelProfiles({ registry, modelsDir: dir, leaderboardJson, notesProfiles: new Map() });
+    const pa = models.find(m => m.id === A);
+    expect(pa).toMatchObject({
+      rating: 1720, games: 12, ratingMode: 'simultaneous', ratingModeLabel: '同时回合',
+    });
+    expect(pa.ratings.map((r: { mode: string }) => r.mode)).toEqual(['simultaneous', 'standard']);
+  });
+
   it('榜单文件缺失时评分留空、档案仍完整', () => {
     const dir = makeModelsDir([A]);
     const { registry } = collectRegistry(dir, []);
@@ -339,13 +363,14 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'rl-stats-smoke-'));
     const statsFile = join(tempDir, 'matches.jsonl');
     const outFile = join(tempDir, 'stats.json');
-    const line = (a: string, b: string, winner: string) =>
-      JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
+    const line = (a: string, b: string, winner: string, map = 'default') =>
+      JSON.stringify({ map, players: { player_a: a, player_b: b }, winner }) + '\n';
     // A（v2.2.0，走 MODEL_STATUS_BY_VERSION 查表 legacy 分支）× v2.3.2 × 注册算法。
     const EXTRA_ZIP = 'hex_ppo_v2.3.2_20260829_340K.zip';
     writeFileSync(statsFile,
       line(A, EXTRA_ZIP, EXTRA_ZIP) +
-      line(A, 'algo_threat@v1', A));
+      line(A, 'algo_threat@v1', A) +
+      line('algo_dest-prob@v1', 'algo_kriegspiel@v1', 'algo_dest-prob@v1', 'standoff'));
 
     // --models-dir 指向自建临时目录：真 rl/models 是 gitignored 的本机产物，CI 检出上没有。
     const modelsDir = join(tempDir, 'models');
@@ -367,5 +392,10 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
     const payload = JSON.parse(readFileSync(outFile, 'utf8'));
     const a = payload.models.find((m: { id: string }) => m.id === A);
     expect(a.status).toBe('legacy');
+    expect(payload.modes.map((m: { id: string }) => m.id)).toEqual(['standard', 'simultaneous']);
+    expect(payload.source.modeDist.standard).toBe(2);
+    expect(payload.source.modeDist.simultaneous).toBe(1);
+    const krieg = payload.models.find((m: { id: string }) => m.id === 'algo_kriegspiel@v1');
+    expect(krieg.modes).toEqual(['simultaneous']);
   });
 });

@@ -4,6 +4,19 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.7.4
+
+### 新增
+
+- **AI 竞技场按玩法模式分榜**：榜单数据改为 `modes[]`，按地图 `mode` 将标准、歼灭、同时回合、大逃杀拆成独立评分池，每个模式内再池化该模式地图并给出分图榜单；页面新增模式切换条，地图池、参评者、对位矩阵、KPI 与玩法统计全部跟随当前模式，不再提供跨模式总榜。算法按 `ALGORITHM_META.modes` 只进入支持的模式，模型默认标准模式；历史 `arena/matches.jsonl` 无需迁移，生成时从 `maps/*.json` 读取模式归档。
+- **参与者档案分模式评分**：`arena-stats.json` 保留每个参与者的 `ratings` 分模式记录，档案卡标注主要评分模式；玩法统计同样按模式聚合。
+- **评估控制台按模式分组**：控制台新增玩法模式切换，地图与参评算法只显示当前模式支持的项；`/api/arena/eval/status` 返回模式目录，`/api/arena/participants` 返回算法的 `modes`。当前进程内评估链路仍只支持标准模式，其他模式明确标注「暂不支持跑批」并禁用启动，避免跨模式混跑。
+
+### 测试与验证
+
+- 新增 `tests/public/arena-mode.test.ts`，并扩展 `generateArenaLeaderboard` / `generateArenaStats` 的模式分组、算法隔离与档案评分测试。
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 108 文件 / 898 例全绿。
+
 ## 3.7.3
 
 ### 新增

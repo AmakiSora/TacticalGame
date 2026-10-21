@@ -472,7 +472,8 @@ evaluate_cross 默认为每个批次在 `arena/details/<批次>.jsonl` 落盘一
 
 `rl/evaluation/round_robin.py` 自动发现 `rl/models/` 下全部可对战模型（排除 v1.0.0 的 512 动作格式）
 与 `algorithms/registry.mjs` 注册的全部内置算法，两两混合 × 全地图批量对战，
-结果累积写入 `arena/matches.jsonl`（算法参与者名字为 `algo_<注册名>`）：
+结果累积写入 `arena/matches.jsonl`（算法参与者名字为 `algo_<注册名>`）。榜单按地图的
+`mode` 分成标准/歼灭/同时回合/大逃杀独立评分池，不同模式不混榜：
 
 ```powershell
 # 先小规模冒烟（只跑 default 图、3 个模型、2 个算法、每对 2 局）
@@ -502,6 +503,9 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --algorithms none
 - **评分协议**：Bradley-Terry MLE（MM 迭代，平局记 0.5，已交手对附加 1 局虚拟平局先验防发散），
   Elo 映射 `1500 + 400/ln10 × ln p`；95% CI 为按（对,图）分层 bootstrap（固定种子可复现）；
   小样本另附 Wilson 下界参考列。先手/后手只做展示统计，不进评分。
-  各地图独立出分图榜单（局数少，CI 更宽）。
-- **混池语义**：RL 模型与规则算法在同一池评分，可直接跨类型比较强弱；
-  榜单/统计/档案按 `kind`（model/algorithm）区分展示。
+- **评估控制台模式视图**：先选玩法模式，再只显示该模式的地图与算法（`ALGORITHM_META.modes`）；
+  当前进程内评估链路仅实现标准模式，其他模式在控制台标为「暂不支持跑批」，不会误启动跨模式批次。
+- **模式隔离**：先按地图 `mode` 分池，再在每个模式内池化该模式全部地图并给出分图榜单
+  （局数少，CI 更宽）；标准、歼灭、同时回合、大逃杀之间不共享评分，也不能跨模式比较。
+- **同池语义**：同一模式内 RL 模型与规则算法共用一个评分池，可直接跨类型比较强弱；
+  榜单/统计/档案同时按 `mode` 与 `kind`（model/algorithm）区分展示。

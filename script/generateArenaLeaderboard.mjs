@@ -9,14 +9,16 @@
  * 评分口径：
  *   - 参评者两类：RL 模型（id = 模型 zip 文件名，版本内嵌）与内置算法 AI
  *     （id = algo_<注册名>@<版本>，注册表来自 algorithms/registry.mjs，与线上 bot /
- *     评估控制台同源，但带版本以便算法升版后历史战绩仍归属旧版本 id）；同一 BT 池混排名；
+ *     评估控制台同源，但带版本以便算法升版后历史战绩仍归属旧版本 id）；
+ *   - **按玩法模式隔离评分**：地图的 `mode` 决定对局模式（standard / annihilation /
+ *     simultaneous / royale），不同模式玩法不同，绝不进入同一个 BT 池。每个模式内
+ *     再池化该模式全部地图，并另按每张图独立评分（局数少，CI 更宽）；
  *   - 作废模型（MODEL_STATUS_BY_VERSION 中 status=retired 的版本）不参评：注册表跳过、
  *     历史对局不计分，跳过局数记入 source.retiredMatchesDropped；
  *   - Bradley-Terry MLE（MM 迭代），平局记 0.5 胜；每对交手过的参与者对附加 1 局虚拟
  *     平局作先验，防全败参与者评分发散并让稀疏对向均值收缩；
  *   - rating = 1500 + 400/ln(10) × ln p（Elo 刻度）；
  *   - 95% CI 用按（参与者对, 地图）分层的有放回 bootstrap，随机数固定种子，输出可复现；
- *   - 全局评分池化全部地图，另按每张图独立评分（局数少，CI 更宽）；
  *   - 分座位（先手/后手）只做展示统计，不进评分。
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
@@ -31,6 +33,45 @@ export const PROJECT_DIR = dirname(SCRIPT_DIR);
 
 export const DEFAULT_STATS_FILE = join(PROJECT_DIR, 'arena', 'matches.jsonl');
 export const DEFAULT_OUT = join(PROJECT_DIR, 'public', 'data', 'arena-leaderboard.json');
+export const DEFAULT_MAPS_DIR = join(PROJECT_DIR, 'maps');
+
+/**
+ * 竞技场按玩法模式分榜。顺序即前端模式切换条的顺序；不同模式的规则、动作空间与
+ * 胜负条件都不同，评分只在同一模式内比较。
+ */
+export const GAME_MODES = [
+  { id: 'standard', label: '标准模式' },
+  { id: 'annihilation', label: '歼灭模式' },
+  { id: 'simultaneous', label: '同时回合' },
+  { id: 'royale', label: '大逃杀' },
+];
+
+export const MODE_LABELS = Object.fromEntries(GAME_MODES.map(mode => [mode.id, mode.label]));
+
+/**
+ * 读 maps/*.json 的 mode 字段。地图文件名即 mapId；未声明 mode 的地图按 standard
+ * 处理（与 src/config/loader.ts 的归一化规则一致）。随机图固定为标准模式，不需要
+ * 静态地图文件。
+ */
+export function loadMapModes(mapsDir = DEFAULT_MAPS_DIR) {
+  const modes = new Map([['random', 'standard']]);
+  try {
+    for (const file of readdirSync(mapsDir)) {
+      if (!file.endsWith('.json')) continue;
+      const id = file.replace(/\.json$/i, '');
+      try {
+        const config = JSON.parse(readFileSync(join(mapsDir, file), 'utf8'));
+        modes.set(id, typeof config?.mode === 'string' ? config.mode : 'standard');
+      } catch {
+        // 单张地图损坏不应让整份榜单失败；loadMaps 在服务启动时会单独报错。
+        modes.set(id, 'standard');
+      }
+    }
+  } catch {
+    // 地图目录不可读时仍可用默认 standard；没有地图信息时所有未知 mapId 按标准模式归类。
+  }
+  return modes;
+}
 
 /**
  * 模型文件名：`hex_ppo_<版本>_<日期>_<步数>.zip`（三段式，2026-09-24 起）。
@@ -102,6 +143,7 @@ export function parseArgs(argv) {
     bootstrap: 1000,
     bootstrapPerMap: 300,
     bootstrapSeed: 20260901,
+    mapsDir: DEFAULT_MAPS_DIR,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -112,8 +154,9 @@ export function parseArgs(argv) {
     else if (a === '--bootstrap-per-map') opts.bootstrapPerMap = Number(argv[++i]);
     else if (a === '--seed') opts.bootstrapSeed = Number(argv[++i]);
     else if (a === '--models-dir') opts.modelsDir = resolve(argv[++i]);
+    else if (a === '--maps-dir') opts.mapsDir = resolve(argv[++i]);
     else if (a === '--help' || a === '-h') {
-      console.log('Usage: node script/generateArenaLeaderboard.mjs [--stats-file f] [--out f] [--target-games n] [--bootstrap n] [--bootstrap-per-map n] [--seed n] [--models-dir d]');
+      console.log('Usage: node script/generateArenaLeaderboard.mjs [--stats-file f] [--out f] [--target-games n] [--bootstrap n] [--bootstrap-per-map n] [--seed n] [--models-dir d] [--maps-dir d]');
       process.exit(0);
     }
   }
@@ -145,6 +188,9 @@ export function parseModelFile(fileName) {
     trainDate,
     trainMap: meta.trainMap,
     opponentType: meta.opponentType,
+    // 现有 RL 训练环境只覆盖标准模式；未来若出现同时/歼灭模型，在 MODEL_META_BY_VERSION
+    // 里显式加 modes 即可，历史对局仍按实际地图模式归档。
+    modes: Array.isArray(meta.modes) && meta.modes.length ? meta.modes : ['standard'],
     steps: parseStepTag(stepsRaw),
   };
 }
@@ -196,12 +242,16 @@ function registryAlgorithms(registry, algorithms) {
     registry.set(id, {
       id, kind: 'algorithm', name: info.name, displayName: info.displayName,
       description: info.description, version: info.version,
+      modes: Array.isArray(info.modes) && info.modes.length ? info.modes : ['standard'],
     });
   }
 }
 
-/** 读 JSONL，丢弃玩家名不在注册表/格式非法的行；作废模型（已归档）的对局不计分，按 retiredDropped 计数。 */
-export function loadMatches(statsFile, registry) {
+/**
+ * 读 JSONL，丢弃玩家名不在注册表/格式非法的行；作废模型（已归档）的对局不计分，
+ * 按 retiredDropped 计数。mapModes 为 mapId → 玩法模式；未知地图按 standard 归类。
+ */
+export function loadMatches(statsFile, registry, mapModes = new Map()) {
   const matches = [];
   const warnings = [];
   let retiredDropped = 0;
@@ -245,9 +295,12 @@ export function loadMatches(statsFile, registry) {
       warnings.push(`line ${idx + 1}: same participant on both seats`);
       continue;
     }
+    const map = typeof record.map === 'string' ? record.map : 'unknown';
     matches.push({
       ts: record.ts ?? null,
-      map: typeof record.map === 'string' ? record.map : 'unknown',
+      map,
+      // 历史 JSONL 没有 mode 字段；以地图配置为准，未知地图按标准模式兼容。
+      mode: mapModes.get(map) ?? 'standard',
       playerA: a,
       playerB: b,
       winner: record.winner === 'draw' || registry.has(record.winner) ? record.winner : null,
@@ -398,7 +451,7 @@ export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory)
     i: indexOf.get(p.x), j: indexOf.get(p.y),
     wi: p.aScore + 0.5, n: p.games + 1,
   }));
-  const lnP = solveBT(pairs, n);
+  const lnP = n > 0 ? solveBT(pairs, n) : new Float64Array(0);
   const ratings = lnP.map(ln => 1500 + 400 / Math.LN10 * ln);
 
   // Bootstrap：按（对, 图）分层重采样该池的全部对局。
@@ -485,25 +538,43 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const { registry, excluded, warning } = collectRegistry(opts.modelsDir ?? join(PROJECT_DIR, 'rl', 'models'));
   const warnings = warning ? [warning] : [];
-  const { matches, warnings: loadWarnings, retiredDropped } = loadMatches(opts.statsFile, registry);
+  const mapModes = loadMapModes(opts.mapsDir);
+  const { matches, warnings: loadWarnings, retiredDropped } = loadMatches(opts.statsFile, registry, mapModes);
   warnings.push(...loadWarnings);
 
-  const ids = [...registry.keys()]
+  const allIds = [...registry.keys()]
     .filter(id => !EXCLUDED_VERSIONS.has(registry.get(id).version))
     .sort();
-  const indexOf = new Map(ids.map((id, i) => [id, i]));
   const strata = buildStrata(matches);
 
   const maps = [...new Set(matches.map(m => m.map))].sort();
-  const leagues = {
-    all: buildLeague(matches, ids, indexOf, strata, opts.bootstrap, () => mulberry32(opts.bootstrapSeed)),
-  };
-  for (const map of maps) {
-    leagues[map] = buildLeague(
-      matches.filter(m => m.map === map), ids, indexOf, strata,
-      opts.bootstrapPerMap, () => mulberry32(opts.bootstrapSeed),
-    );
-  }
+  const modes = GAME_MODES.map(modeMeta => {
+    const modeMatches = matches.filter(m => m.mode === modeMeta.id);
+    const actualIds = new Set(modeMatches.flatMap(m => [m.playerA, m.playerB]));
+    // 只让声明支持该模式的参与者进榜；历史对局里出现过的参与者即使元数据没标 modes
+    // 也保留，避免旧数据因注册表升级而被静默丢出榜单。
+    const ids = allIds.filter(id => {
+      const meta = registry.get(id);
+      return (Array.isArray(meta.modes) && meta.modes.includes(modeMeta.id)) || actualIds.has(id);
+    });
+    const indexOf = new Map(ids.map((id, i) => [id, i]));
+    const modeMaps = [...new Set(modeMatches.map(m => m.map))].sort();
+    const leagues = {
+      all: buildLeague(modeMatches, ids, indexOf, strata, opts.bootstrap, () => mulberry32(opts.bootstrapSeed)),
+    };
+    for (const map of modeMaps) {
+      leagues[map] = buildLeague(
+        modeMatches.filter(m => m.map === map), ids, indexOf, strata,
+        opts.bootstrapPerMap, () => mulberry32(opts.bootstrapSeed),
+      );
+    }
+    return {
+      id: modeMeta.id,
+      label: modeMeta.label,
+      games: modeMatches.length,
+      maps: leagues,
+    };
+  }).filter(mode => mode.games > 0 || mode.maps.all.models.length > 0);
 
   const registryMeta = Object.fromEntries([...registry.entries()].map(([id, meta]) => [id, meta.kind === 'algorithm' ? {
     kind: 'algorithm',
@@ -511,6 +582,7 @@ function main() {
     algorithm: meta.name,
     version: meta.version,
     description: meta.description,
+    modes: meta.modes,
     status: 'builtin',
     statusNote: null,
   } : {
@@ -520,6 +592,7 @@ function main() {
     trainDate: meta.trainDate,
     trainMap: meta.trainMap,
     opponentType: meta.opponentType,
+    modes: meta.modes,
     steps: meta.steps,
     deliveredSteps: meta.deliveredSteps ?? null,
     status: MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy',
@@ -531,38 +604,46 @@ function main() {
     generatedAt: new Date().toISOString(),
     ratingMethod: {
       model: 'Bradley-Terry MLE (MM iteration), draw = 0.5 win',
+      scope: 'per game mode; modes are never pooled together',
       prior: '1 virtual draw per played pair',
       scale: 'Elo: 1500 + 400/ln(10) * ln p',
-      ci: `stratified bootstrap by (pair,map): ${opts.bootstrap} draws for all / ${opts.bootstrapPerMap} per map, seed ${opts.bootstrapSeed}`,
+      ci: `stratified bootstrap by (pair,map) within each mode: ${opts.bootstrap} draws for mode / ${opts.bootstrapPerMap} per map, seed ${opts.bootstrapSeed}`,
     },
     source: {
       file: opts.statsFile,
       matchCount: matches.length,
       retiredMatchesDropped: retiredDropped,
       mapDist: Object.fromEntries(maps.map(map => [map, matches.filter(m => m.map === map).length])),
+      modeDist: Object.fromEntries(GAME_MODES.map(meta => [meta.id, matches.filter(m => m.mode === meta.id).length])),
       targetGamesPerPair: opts.targetGamesPerPair,
       dateMin: tsList[0] ?? null,
       dateMax: tsList[tsList.length - 1] ?? null,
     },
     registry: registryMeta,
-    maps: leagues,
+    modes,
     excluded,
     warnings,
   };
 
   mkdirSync(dirname(opts.out), { recursive: true });
   writeFileSync(opts.out, JSON.stringify(payload, null, 2), 'utf8');
-  console.log(`Wrote ${opts.out} — ${matches.length} matches, ${ids.length} rated participants, ${maps.length + 1} league(s)` +
+  console.log(`Wrote ${opts.out} — ${matches.length} matches, ${modes.length} mode league(s), ${allIds.length} registered participants` +
     (retiredDropped > 0 ? `（另跳过作废模型对局 ${retiredDropped} 局）` : ''));
 
-  const rows = leagues.all.models.filter(m => m.games > 0)
-    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-  console.log('Top ratings (all maps):');
-  rows.forEach((row, i) => {
-    const short = registryMeta[row.id].short;
-    const ci = row.ratingLo != null ? ` ±${Math.max(row.rating - row.ratingLo, row.ratingHi - row.rating)}` : '';
-    console.log(`  #${i + 1} ${short.padEnd(14)} rating=${row.rating}${ci}  ${row.wins}W/${row.losses}L/${row.draws}D  games=${row.games}`);
-  });
+  for (const mode of modes) {
+    const rows = mode.maps.all.models.filter(m => m.games > 0)
+      .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    console.log(`Top ratings (${mode.label}, all maps):`);
+    if (!rows.length) {
+      console.log('  （暂无该模式对局）');
+      continue;
+    }
+    rows.forEach((row, i) => {
+      const short = registryMeta[row.id].short;
+      const ci = row.ratingLo != null ? ` ±${Math.max(row.rating - row.ratingLo, row.ratingHi - row.rating)}` : '';
+      console.log(`  #${i + 1} ${short.padEnd(14)} rating=${row.rating}${ci}  ${row.wins}W/${row.losses}L/${row.draws}D  games=${row.games}`);
+    });
+  }
   if (warnings.length) {
     console.warn(`Warnings (${warnings.length}):`);
     for (const w of warnings.slice(0, 10)) console.warn(`  - ${w}`);

@@ -38,6 +38,14 @@
     /* 页面卡片间距整体放宽一档（stats.css 默认 14px/10px 偏贴）。 */
     main { gap: 18px; }
     #kpi-grid { gap: 12px; }
+    /* 玩法模式切换条：榜单与玩法统计各自独立，先选模式再看该模式内的地图/排名。 */
+    .mode-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mode-tab { display: inline-flex; align-items: center; gap: 8px; background: #141c22; border: 1px solid #2a3a44; color: #9ab; border-radius: 10px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    .mode-tab:hover { border-color: #3a6a7a; color: #dce8f0; }
+    .mode-tab.active { border-color: #3f9b6c; color: #fff; background: #16301f; }
+    .mode-tab .mode-count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #22303a; color: #9ab; font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
+    .mode-tab.active .mode-count { background: #2f7d54; color: #fff; }
+    .mode-tab:disabled { opacity: .45; cursor: not-allowed; }
     /* 页内页签 */
     .tab-bar { display: flex; gap: 8px; margin-bottom: 16px; }
     .tab-bar .tab { background: #141c22; border: 1px solid #2a3a44; color: #9ab; border-radius: 999px; padding: 7px 20px; font-size: 13px; cursor: pointer; }
@@ -55,6 +63,9 @@
     .eval-form { display: grid; gap: 14px; }
     .eval-label { display: block; font-size: 12px; color: #9ab; margin-bottom: 6px; }
     .eval-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .eval-mode-list .mode-tab { padding: 6px 12px; font-size: 12px; }
+    .eval-mode-list .mode-tab.unsupported { opacity: .65; }
+    .eval-mode-list .mode-tab.unsupported.active { border-color: #8a6a3a; background: #2a2115; color: #e8c890; }
     .eval-chip-list label { display: inline-flex; align-items: center; gap: 6px; background: #141c22; border: 1px solid #2a3a44; border-radius: 999px; padding: 4px 12px; font-size: 12px; color: #cdd; cursor: pointer; }
     .eval-chip-list label:has(input:checked) { border-color: #3f9b6c; color: #fff; background: #16301f; }
     .eval-model-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }

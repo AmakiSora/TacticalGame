@@ -8,25 +8,25 @@
 
 ### 变更
 
-- **取消「过期模型」机制，三个模型恢复为正常参评**：`v2.3.2@340K`、`v2.5.0@2M`、`v2.6.0@3.6M` 不再有独立的过期状态，`rl/models/` 下全部 19 个可加载模型都会进入新一轮评估与排行榜；`GET /api/rl/models` 不再过滤它们，竞技场页面不再提供「显示已过期」开关与「已过期模型」归档表，榜单/统计 JSON 移除 `expired` 状态、`expiredAt`/`expiredReason`/`expiredMatchesKept`/`expiredModelCount` 字段与 `payload.expired` 段。`arena/model-status.json`、`script/expireArenaModels.mjs`、`npm run arena-expire` 及对应契约/单元测试一并移除；模型状态仅保留「推荐 / 历史 / 作废」三种（`script/modelStatus.mjs`）。
-- **`round_robin.py` 自动发现不再排除过期模型**：启动日志与 `--models` 过滤只区分可对战模型与 v1.0.0 旧格式；三个原过期模型默认参评后，5 图 × 25 个参与者（19 模型 + 6 算法）的单图批次为 300 个 / 7,200 局。
-- **MODELS_NOTES 与 Docker 打包同步**：`rl/docs/MODELS_NOTES.md` 删除「已过期模型」小节，三条模型状态改回「历史 / 历史（不推荐）」；镜像不再 COPY `script/modelStatus.mjs` 与 `arena/model-status.json`（服务端已无该 import，`arena/` 整体不进镜像）。
+- **取消「过期模型」机制**：`v2.3.2@340K`、`v2.5.0@2M`、`v2.6.0@3.6M` 不再有独立过期状态，`rl/models/` 下 19 个可加载模型全部恢复参评与排行；`GET /api/rl/models` 不再过滤，竞技场页面移除「显示已过期」开关与归档表，榜单/统计 JSON 移除 `expired` 系列字段与 `payload.expired` 段，`arena/model-status.json`、`script/expireArenaModels.mjs`、`npm run arena-expire` 及相关测试一并删除，模型状态只保留推荐/历史/作废；`round_robin.py` 自动发现不再排除过期模型（单图 300 批 / 7,200 局），`rl/docs/MODELS_NOTES.md` 与 Docker 打包同步。
 
 ### 修复
 
-- **同时回合终局事件顺序修正**：`game_over` 现在恒为事件流最后一条，最终回合的 `round_end` / `round_resolved` 不再排在其后。回合上限裁决与同回合淘汰两条终局路径都先写完整轮摘要再发 `game_over`，且终局回合的 `round_end.payload.gameOver` / `round_resolved.payload.gameOver` 同步为 `true`；修复客户端按 `game_over` 停止读取时漏掉最后一轮结算结果的问题（`src/engine/engine.ts`、`src/engine/simultaneous.ts`）。既有回放文件仍保留原顺序，但仅供读取，不受新事件流影响。
-- **同时回合失败/落空动作可归属到单位**：`action_failed` 与 `round_resolved.results` 的 `failed`/`fizzled` 条目新增 `unitId` 与 `detail`（含 `unitType`、`fromQ/fromR`、目标 `q/r`、deploy 的 `fromId` 等）；`missed` 结果新增 `unitId` 与 `detail.attackerId`；同时回合的 deploy/move/attack/heal/demolish 事件补 `actionId`，可直接与结果条目对齐；前端事件日志显示单位类型及起点→目标格。
-- **同时回合 skill 文档按地图拆分**：`skill/simultaneous.md` 不再把 simultaneous 等同于 `standoff`，明确模式级规则与 `game.config.mapId` 门禁，并补充 `molten-throne` 的单位、经济、部署差异（全兵种默认 `single`、AP 4、仅前哨可部署等）；`skill/review-simultaneous.md` 同步改为模式级说明和按 `mapId` 的地图重点；`skill/SKILL.md`、README、AGENTS 的地图清单补上 `molten-throne`。避免 agent 在熔池王座对局套用对峙之地单位表读错数值。
-- **同时回合计划队列刷新修复**：`GET /api/games/:id` 的 ETag 此前只由 `stateVersion` 与投影参数组成，而计划入队 / 撤回 / 清空只改自己的队列、不产生事件，`stateVersion` 不变——浏览器条件请求命中 304 后继续使用入队前的旧响应，计划面板始终显示 0 条、棋盘也没有预测轨迹，再次操作同一单位还会被 `invalid_move` 拒绝。现在 ETag 额外包含「请求者本人计划队列」的摘要，只在本方队列变化时失效（不改变其他玩家的 ETag，避免借 ETag 变化泄露对手的计划活动）；桌面与移动玩家页也直接用入队 / 撤回 / 清空响应回传的 `queue` 更新本地计划，不再等下一次 GET，计划清单、行动点与棋盘预览即时刷新（`src/api/games.ts`、`public/play.js`、`public/play-m.js`）。
+- **同时回合事件流**：`game_over` 恒为最后一条，回合上限裁决与同回合淘汰都先写完整轮摘要（`round_end`/`round_resolved` 的 `gameOver` 置 `true`）再发终局；`action_failed` 与 `round_resolved.results` 的 `failed`/`fizzled`/`missed` 条目补 `unitId` 与 `detail`（单位类型、起点/目标格、`fromId`），各动作事件补 `actionId`，前端日志可直接定位单位与起止格；既有回放保留原顺序，仅供读取。
+- **同时回合 skill 文档按地图拆分**：`simultaneous.md`、`review-simultaneous.md` 改为模式级规则 + 按 `mapId` 的地图重点，补充 `molten-throne` 的全兵种 `single`、AP 4、仅前哨可部署等差异；`SKILL.md`、README、AGENTS 地图清单同步，并由 `tests/skill/simultaneous-docs.test.ts` 守住覆盖。
+- **计划队列刷新**：`GET /api/games/:id` 的 ETag 增补请求者本人计划队列摘要，入队/撤回/清空后不再命中 304 旧响应（仅本方队列变化时失效，不泄露对手计划）；桌面与移动端直接用响应回传的 `queue` 更新计划、行动点与棋盘预览。
+- **终局写入保护与幂等回放**：终局后 `host/eliminate`、`host/skip-turn`、改名均返回 409 且不追加事件，`endGame` 重复调用幂等，AI runner 不再重启，消除终局后的 `turn_skipped`、`name_rename`、`bot_failed` 与第二条 `game_over`；动作触发终局后同键重试仍返回首次响应，`plan/revoke`、`plan/clear` 支持幂等键，回放响应返回当前计划队列。
+- **快照恢复与删除回滚**：主快照缺失/损坏时回退 `.prev`；删除对局或保留期 GC 时快照删除失败不再静默成功，`flush` 失败回滚内存条目并补写快照，避免「接口报错但对局已丢」或重启后已删对局复活。
+- **终局统计一致性**：`round_end` 新增 `controlHoldCounted`，回合上限终局在重启与回放重建时补算最后一轮据点流量；同时模式击杀在伤害阶段即归属，击杀者总部同轮先毁也记 `killValue`，淘汰分不随 `turnOrder` 漂移。
+- **状态响应与客户端终局态**：`PATCH host/max-players` 推进 `stateVersion`，个性化状态补 `Vary: X-Player-Token`；平局终局同样禁用操作与结束回合，桌面/移动端按终局状态隐藏控件、同时模式确认后禁用；`GET` 合并 `winner/result/phase`，持久化降级 503 触发状态重同步，304 不再被误判为解析失败。
+- **SSE、日志与限流**：匿名观战不再共用整局 3 条配额（仍受每局 20 / 每 IP 10 约束）；日志脱敏 `token`、metrics token 与 `Authorization`；`DELETE .../players/:playerId` 的限流桶按参数模板归一化；删除对局时关闭该局 SSE。
+- **规则与输入**：同时模式 `line/arc` 受 `attackRange/healRange` 约束；炮火危险区内的维修点不再维修；顺序模式拒绝满血治疗且不扣行动点；非字符串玩家名返回 400 `invalid_move`。`SKILL.md` 伤害浮动改为读取本局 `damageVarianceRange`，README 修正同时模式 heal 请求体并补充 3.7.0 幂等/长轮询/ETag 契约。
 
 ### 测试与验证
 
-- `npm run build` 通过；`npm test -- --testTimeout=30000` 102 文件 / 859 例全绿；`pytest tests/rl -q` 66 例通过。
-- 新增 `tests/api/simultaneous-api.test.ts` 1 例：计划入队与撤回只让操作者自己的 ETag 失效（旧 ETag 条件请求返回 200 与最新 `plan.myQueue`），对手的相同条件请求仍为 304；`tests/public/plan-tools.test.ts` 2 例：两端 `apiAction` 命中计划接口回传的 `queue` 时立即更新本地计划，失败响应不覆盖本地队列并保持错误提示。
-- `tests/engine/simultaneous.test.ts` 补充终局顺序断言：回合上限裁决与总部摧毁两条路径都断言事件尾部为 `round_end` → `round_resolved` → `game_over`，并校验终局摘要的 `gameOver` 为 `true`。
-- 新增 `tests/skill/simultaneous-docs.test.ts`：遍历地图表中所有 `mode: "simultaneous"` 的地图，断言 `simultaneous.md` 与 `review-simultaneous.md` 均按 `mapId` 覆盖，且不再把 `standoff` 写成唯一地图。
-- `npm run arena-leaderboard` 重新出榜：48,960 局、26 个参评参与者（25 个有对局；v1.0.0 旧格式不参评），`v2.3.2@340K` / `v2.5.0@2M` / `v2.6.0@3.6M` 均以 `legacy` 正常显示（评分 1223 / 1314 / 1304）；`npm run arena-stats` 同步生成 27 个参与者档案，无 `expired` 字段。
-- `round_robin.py --dry-run`：参评模型 19 个（含三个原过期模型）、算法 6 个；单图 300 批 / 7,200 局。
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 104 文件 / 873 例全绿；`pytest tests/rl -q` 66 例通过。
+- 新增回归覆盖：终局后 host 淘汰/跳过回合/改名不追加事件，终局后与计划队列的幂等回放，maxPlayers 改变后 ETag 失效，计划响应即时更新本地队列，快照缺失/损坏从 `.prev` 恢复，删除失败保留对局，回合上限终局最后一轮 `controlHold` 重启一致，击杀者总部同轮先毁仍记 `killValue` 与 `line` 射程，满血治疗拒绝，终局隐藏与确认后禁用结束回合控件（`tests/api/game-over-invariants.test.ts`、`tests/state/simultaneous-stats-recovery.test.ts`、`tests/public/plan-tools.test.ts` 等）。
+- `npm run arena-leaderboard` 重出 36,000 局榜单：26 个参评参与者，三个原过期模型以 `legacy` 正常显示（评分 1215 / 1290 / 1292），`arena-stats` 生成 27 个档案且无 `expired` 字段；`round_robin.py --dry-run` 为 19 模型 + 6 算法，单图 300 批 / 7,200 局。
 
 ## 3.7.0
 

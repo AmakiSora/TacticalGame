@@ -11,7 +11,7 @@
 | 地图 / 模式 / 人数 | `narrow-road` 狭路相逢（pointy 半径 6，59 格 = **21 平原 + 38 阻挡**）/ `royale`（同时回合 × 歼灭缩圈）/ 2 人 |
 | 我的席位 / 玩家名 | **player_b / Step5-DSH**，`turnOrder = 0`（**先手**；player_a `turnOrder = 1`） |
 | 出生 | `slot_a` → 部署垫 `cp_1` 左据点 `(-5,0)`（d=5）；对手 `slot_b` → `cp_2` 右据点 `(5,0)` |
-| 对手 | player_a / sp-DSH |
+| 对手 | player_a / MiniMaxM3.1Flash-DSH |
 | 我的名次 | **rank 1（win）**，`rankings` 中 player_b rank 1 / player_a rank 2 |
 | 终局 | `game_over` `winner = player_b`，`reason = last_player_standing`，第 **15** 轮 |
 | 淘汰事件 | seq 211 `player_eliminated`，`reason = army_destroyed`（**战斗清场**，非炮火清场），`eliminatedBy = player_b`；同轮 seq 210 `control_point_neutralized`：`cp_2` 被中立化 |

@@ -5,7 +5,7 @@
 - **gameId**：`0b087f8c-436f-464e-8a8a-bea3d9165726`
 - **回放**：`records/V3/tg_0220_20261012.json`
 - **地图 / 模式**：`narrow-road`（狭路相逢） / `royale`（同时回合结算 × 歼灭缩圈）
-- **人数**：2 人；我的席位 `player_a`，玩家名 **sp-DSH**；对手 `player_b`（Step5-DSH）
+- **人数**：2 人；我的席位 `player_a`，玩家名 **MiniMaxM3.1Flash-DSH**；对手 `player_b`（Step5-DSH）
 - **名次**：**第 2 名（lose）**，`rankings` 中 player_b rank 1 / player_a rank 2
 - **终局**：`winner=player_b`，`reason=last_player_standing`，第 **15** 轮
   - 淘汰事件（seq 211）：`player_eliminated`，`reason=army_destroyed`（**战斗清场**，非炮火清场），`eliminatedBy=player_b`
@@ -105,4 +105,4 @@ Step5-DSH 靠**第 9 轮在狭路咽喉部署的 ranger**（射程 3）封锁住
 
 ---
 
-*本复盘全部数字取自 `records/V3/tg_0220_20261012.json`（gameId `0b087f8c-436f-464e-8a8a-bea3d9165726`）。席位视角：player_a / sp-DSH。*
+*本复盘全部数字取自 `records/V3/tg_0220_20261012.json`（gameId `0b087f8c-436f-464e-8a8a-bea3d9165726`）。席位视角：player_a / MiniMaxM3.1Flash-DSH。*

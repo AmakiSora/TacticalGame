@@ -110,7 +110,7 @@ CP(1650) + 军力价值(1606) 占敌方总分 87% —— 在这两项被压倒�
 
 ## 与历史对局对比
 
-本机无上一局 molten-throne self-vs-self 可比。但与 `records/V3/tg_0210_lose_WB@hy3.md` 比较同模式典型失手：都出现过前 5 轮对移动目标的攻击全部 `missed`。本机不同点是后期转向打静止 INF（R12+），命中率从 0% 提升到 7/8；但仍未改变被合围的结局。参考 `tg_0206_rank01_WB@spacebunny.md` 胜局，持续保持 ranger+INF 混编、以及 forward_base 始终有 scout 占住的经验值得借鉴。
+本机无上一局 molten-throne self-vs-self 可比。但与 `records/V3/tg_0210_lose_WB@hy3.md` 比较同模式典型失手：都出现过前 5 轮对移动目标的攻击全部 `missed`。本机不同点是后期转向打静止 INF（R12+），命中率从 0% 提升到 7/8；但仍未改变被合围的结局。参考 `tg_0206_rank01_WB@minimaxm3.1flash.md` 胜局，持续保持 ranger+INF 混编、以及 forward_base 始终有 scout 占住的经验值得借鉴。
 
 ## 总结
 

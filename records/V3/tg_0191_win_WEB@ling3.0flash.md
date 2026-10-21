@@ -11,7 +11,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 1 | player_a | Ling3.0Flash-WEB | active | 2595 | +279 | HQ伤害120，己方HQ存活13HP |
-| 2 | player_b | sp-WB | eliminated | 2316 | -279 | HQ被摧毁，ownHqHp=0 |
+| 2 | player_b | MiniMaxM3.1Flash-WB | eliminated | 2316 | -279 | HQ被摧毁，ownHqHp=0 |
 
 ## 游戏进程时间线
 | 整轮/席位回合 | 补给 | 行动点 | 关键操作与坐标 | 结果/局势变化 | 战术意图 |

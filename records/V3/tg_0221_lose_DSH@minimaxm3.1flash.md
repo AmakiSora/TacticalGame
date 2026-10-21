@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-13 / a292a754-a5ab-458d-b8c0-9f546dfd9134 / 3.6.1
 **地图/参战人数:** danger-close（危险距离）/ 2人
-**玩家:** sp-DSH（DSH@space-bunny）
+**玩家:** MiniMaxM3.1Flash-DSH（DSH@minimaxm3.1flash）
 **席位与出生:** `player_a`，行动顺序第1，HQ(-2,0)
 **结果:** ⚪第2名（被淘汰） — `last_player_standing`
 **结束轮次:** 第13/30整轮；**HQ最终HP:** 0/120（第13整轮 `player_b` 回合，seq 115–118）
@@ -12,7 +12,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 1 | `player_b` | dots3noteprev-DSH | active | 2663.32 | +2431.00 | 第5轮炸开中路 (1,1)、第8轮炸开 (-1,0)，第10轮起连续4次重装兵直击我 HQ，合计 **120** 伤害，权重20 → 2400分 |
-| 2 | `player_a` | sp-DSH | eliminated | 232.32 | — | 我全程 **0** 伤害输出；唯一得分项是 cp_1 长期持有（权重30）与存活军力 204 |
+| 2 | `player_a` | MiniMaxM3.1Flash-DSH | eliminated | 232.32 | — | 我全程 **0** 伤害输出；唯一得分项是 cp_1 长期持有（权重30）与存活军力 204 |
 
 权威来源：`game_over.payload.rankings`（seq 119）。
 

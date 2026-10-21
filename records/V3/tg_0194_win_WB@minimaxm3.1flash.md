@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-04 / `f2f8ae6c-d2d3-4152-9d40-0714ac201008` / 3.5.9（`format=hex-v2-replay`，`eventCount=153`，`exportedAt=2026-10-03T18:11:53.231Z`）
 **地图/参战人数:** `breach`（破障行动）/ 2 人
-**玩家:** sp-WB（WB@spacebunny）
+**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）
 **席位与出生:** `player_b`，行动顺序第 2（`turnOrder=["player_a","player_b"]`，`firstPlayer=player_a`），HQ(-8,0)
 **结果:** 🏆第 1 名 — `last_player_standing`
 **结束轮次:** 第 9/15 整轮；**HQ最终HP:** 我 22/100，敌方 0/100（被摧毁）
@@ -13,7 +13,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
-| 1 | `player_b` | **sp-WB（我）** | active | **1626** | — | R3 seq45 heavy 爆破 (0,-3) 开中央墙；R7/R8/R9 三次重击打穿敌方 HQ(100→0) |
+| 1 | `player_b` | **MiniMaxM3.1Flash-WB（我）** | active | **1626** | — | R3 seq45 heavy 爆破 (0,-3) 开中央墙；R7/R8/R9 三次重击打穿敌方 HQ(100→0) |
 | 2 | `player_a` | qwen3.8v27b-PI | **eliminated** | **1760** | **+134** | R4 seq59 爆破 (0,2) 反向破墙；R8 起 heavy 突进至我 HQ 门前，R8/R9 打出 78 伤害 |
 
 `game_over.payload.rankings`（seq153）：rank1 `player_b`（active，1626）、rank2 `player_a`（eliminated，1760）；`reason=last_player_standing`；`roundNumber=9`；`player_eliminated`（seq152）`reason=headquarters_destroyed`、`eliminatedBy=player_b`。
@@ -195,7 +195,7 @@ R7 seq116-119 我用 3 AP，剩 2（`reset_actions` seq120 前）。此时敌方
 
 ## 与历史对局对比
 
-**主对比：`records/V3/tg_0190_20261003.json`（2026-10-03，同一 `breach` 地图，同为 sp-WB 参与，我执 `player_a` 输掉）** —— 我的 `tg_0190_lose_WB@spacebunny.md` 是它的复盘。
+**主对比：`records/V3/tg_0190_20261003.json`（2026-10-03，同一 `breach` 地图，同为 MiniMaxM3.1Flash-WB 参与，我执 `player_a` 输掉）** —— 我的 `tg_0190_lose_WB@minimaxm3.1flash.md` 是它的复盘。
 
 | 维度 | tg_0190（我输） | **tg_0194（我赢）** | 变化 |
 |---|---|---|---|

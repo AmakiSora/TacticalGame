@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-03 / `3b505017-2561-496f-915c-b96acd3eba40` / 3.5.9（`format=hex-v2-replay`，`eventCount=187`，`exportedAt=2026-10-02T20:26:18.631Z`）
 **地图/参战人数:** `breach`（破障行动）/ 2 人
-**玩家:** sp-WB（WB@spacebunny）
+**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）
 **席位与出生:** `player_a`，行动顺序第 1（`turnOrder=["player_a","player_b"]`），HQ(-8,0)
 **结果:** 第2名（eliminated） — `last_player_standing`
 **结束轮次:** 第 11/15 整轮；**HQ最终HP:** 0/100
@@ -14,7 +14,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 1 | `player_b` | qwen3.8flash-QD | active | **2201** | **+990** | R3/R4 两次 heavy 爆破开中央墙，R5 起 7 单位压上，R9–R11 三次重击打穿我 HQ(100→0) |
-| 2 | `player_a` | sp-WB（我） | **eliminated** | **1211** | — | 全局 0 伤害对方 HQ、3 个近空转回合、补给囤到 167 未转兵 |
+| 2 | `player_a` | MiniMaxM3.1Flash-WB（我） | **eliminated** | **1211** | — | 全局 0 伤害对方 HQ、3 个近空转回合、补给囤到 167 未转兵 |
 
 `game_over.payload.rankings`（seq187）：rank1 `player_b`（active，2201）、rank2 `player_a`（eliminated，1211）；`reason=last_player_standing`；`roundNumber=11`。
 
@@ -194,7 +194,7 @@ R6–R9 我用 3 个单位集火敌方 heavy `d1b008be`：R6 dmg27（150→123�
 |---|---|---|---|
 | 地图/模式 | `breach` / standard | `breach` / standard | **同图同模式** |
 | 权重 | enemyHq5/ownHq2/cp90/army2/sup1 | 完全相同 | 权重未变 |
-| 座位 | 我 = `player_a`（GLM5.3Flash-ZC） | 我 = `player_a`（sp-WB） | 同为先行方 |
+| 座位 | 我 = `player_a`（GLM5.3Flash-ZC） | 我 = `player_a`（MiniMaxM3.1Flash-WB） | 同为先行方 |
 | 结果 | 负 `turn_limit_score` | 负 `last_player_standing` | — |
 | 对方对己方 HQ 伤害 | 80 | **100（打穿）** | 恶化 |
 | **己方 HQ 剩余 HP** | **20** | **0** | **从"勉强活着"退化为"被斩首"** |

@@ -3,7 +3,7 @@
 **日期/游戏ID/回放版本:** 2026-10-04 / `2d7fe410-0218-45e5-9848-43704d9250fa` / `3.5.10`（回放 `records/V3/tg_0197_20261004.json`，format `hex-v2-replay`，eventCount 1088，40 个 `round_end`）
 **地图/参战人数:** `whirlpool`（星海漩涡）/ 6人；**模式:** standard（总部制、顺序回合）
 **玩家:** qwen3.8flash-QD（QD@qwen3.8flash，本视角）
-**对手席位/玩家名/agent:** `player_a` Hy4-WB（WB@hy4）、`player_b` Dsv4.1Flash-QD（QD@Dsv4.1Flash）、`player_d` Dsv4Pro0813-QD（QD@Dsv4Pro0813）、`player_e` glm5.3flash-ZC（ZC@glm5.3flash）、`player_f` sp-WB（WB@sp）
+**对手席位/玩家名/agent:** `player_a` Hy4-WB（WB@hy4）、`player_b` Dsv4.1Flash-QD（QD@Dsv4.1Flash）、`player_d` Dsv4Pro0813-QD（QD@Dsv4Pro0813）、`player_e` glm5.3flash-ZC（ZC@glm5.3flash）、`player_f` MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）
 **席位与出生:** `player_c`，行动顺序第 **1**（`turnOrder = [c,b,e,d,f,a]`），HQ `(1,3)` 200/200 def5；初始 3 单位：步兵 `(2,2)`、斥候 `(3,2)`、重型 `(2,3)`
 **结果:** 🥈第2名 — `last_player_standing`（我于第 27 整轮 HQ 被 `player_f` 摧毁而淘汰，seq873/876；第 41 整轮 `player_d` 杀掉最后一家，独占存活）
 **结束轮次:** 第40/无上限（`maxTurns = null`）；**HQ最终HP:** 0/200
@@ -18,7 +18,7 @@
 |---|---|---|---|---:|---:|---|
 | 1 | player_d | Dsv4Pro0813-QD | active | **4295.5** | +2620.5 | **HQ伤害 600**（seq276 杀 e、seq495 杀 b、seq1087 杀 f）+ **己方 HQ 满血 200** + 6 据点；仅这三项就 3420 分 |
 | 2 | **player_c** | **qwen3.8flash-QD（本视角）** | eliminated R27(seq876) | **1675** | — | HQ伤害 200（seq249 杀 a）+ 行动分 420；`ownHqHp` 0 |
-| 3 | player_f | sp-WB | eliminated R41(seq1087) | 1404 | −271 | HQ伤害 127 **全部打在我头上**（seq424/825/848/872）、军力 678、补给 403（权重 0 不计分） |
+| 3 | player_f | MiniMaxM3.1Flash-WB | eliminated R41(seq1087) | 1404 | −271 | HQ伤害 127 **全部打在我头上**（seq424/825/848/872）、军力 678、补给 403（权重 0 不计分） |
 | 4 | player_b | Dsv4.1Flash-QD | eliminated R12(seq495) | 972 | −703 | 对我 HQ 打出 73（seq481/483，同一回合）后立刻被 d 收掉 |
 | 5 | player_e | glm5.3flash-ZC | eliminated R6(seq276) | 331 | −1344 | 6 回合即亡，HQ伤害 0，仅 2 据点 |
 | 6 | player_a | Hy4-WB | eliminated R6(seq249) | 307 | −1368 | 被我的狙击巢速杀，HQ伤害 0、行动分仅 52 |

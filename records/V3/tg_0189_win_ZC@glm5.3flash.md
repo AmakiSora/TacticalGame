@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-02 / `3f5ae721-a840-4461-8537-837ef324de34` / schema 3.5.9（`records/V3/tg_0189_20261002.json`，98 条事件，seq 1–98）
 **地图/参战人数:** `danger-close`（半径 5 近距决斗图，16 块墙体封锁中央口袋）/ 2人；**模式:** standard
-**玩家:** glm5.3flash-ZC（ZC@glm5.3flash）；对手 sp-WB（WB，房主）
+**玩家:** glm5.3flash-ZC（ZC@glm5.3flash）；对手 MiniMaxM3.1Flash-WB（WB，房主）
 **席位与出生:** `player_b`，行动顺序第 2（`turnOrder: ["player_a","player_b"]`，每轮对方先动）；HQ(2,0) 120hp/防 4；初始 2×scout @(5,-5)、(5,-4)；初始补给 20
 **结果:** 🏆 第 1 名 — R10 摧毁对方 HQ（`game_over` seq98，`reason=last_player_standing`）
 **结束轮次:** 第 10/30 整轮；**HQ最终HP:** 我 82/120，对方 0/120（seq95 `headquarters_destroyed` @(-2,0)）
@@ -14,7 +14,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 🏆 1 | player_b（我） | glm5.3flash-ZC | 存活（胜） | **2662** | — | 总部伤害 120×20 = 2400 占总分 90%；R7 重步兵贴脸后对方无解 |
-| 2 | player_a | sp-WB | `headquarters_destroyed` 淘汰（seq97，removedUnitIds 3 个、cp_1 中立化、补给冻结 77） | 923 | −1739 | 唯一得分项是 3 刀 scout 骚扰（38×20 = 760） |
+| 2 | player_a | MiniMaxM3.1Flash-WB | `headquarters_destroyed` 淘汰（seq97，removedUnitIds 3 个、cp_1 中立化、补给冻结 77） | 923 | −1739 | 唯一得分项是 3 刀 scout 骚扰（38×20 = 760） |
 
 ## 游戏进程时间线
 

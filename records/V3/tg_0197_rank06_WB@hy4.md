@@ -4,7 +4,7 @@
 **地图/参战人数:** `whirlpool`（星海漩涡，radius 8、点顶六角，中心 + 六条旋臂）/ **6 人**；**模式:** standard（总部制、顺序回合）
 **玩家:** Hy4-WB（`WB@hy4`，逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用代打脚本）
 **席位与出生:** `player_a`，`turnOrder=["player_c","player_b","player_e","player_d","player_f","player_a"]`、`firstPlayer=player_c` ⇒ **我方每轮末位行动（第 6 位）**；HQ(4,-1) 200HP；初始单位 infantry `57edd5c7`@(4,-2)、scout `1ee2f613`@(5,-3)、heavy `2c77e8b2`@(5,-2)；起始补给 60
-**对手:** ① `player_b` Dsv4.1Flash-QD，HQ(-3,4)，顺序第 2；② `player_c` qwen3.8flash-QD，HQ(1,3)，**先手**，顺序第 1；③ `player_d` Dsv4Pro0813-QD，HQ(-1,-3)，顺序第 4；④ `player_e` glm5.3flash-ZC，HQ(-4,1)，顺序第 3；⑤ `player_f` sp-WB，HQ(3,-4)，顺序第 5
+**对手:** ① `player_b` Dsv4.1Flash-QD，HQ(-3,4)，顺序第 2；② `player_c` qwen3.8flash-QD，HQ(1,3)，**先手**，顺序第 1；③ `player_d` Dsv4Pro0813-QD，HQ(-1,-3)，顺序第 4；④ `player_e` glm5.3flash-ZC，HQ(-4,1)，顺序第 3；⑤ `player_f` MiniMaxM3.1Flash-WB，HQ(3,-4)，顺序第 5
 **结果:** 💀 **第 6 名（rank 06 / 6 人）** — `last_player_standing`（冠军 `player_d`）；**我在第 6 整轮被 `player_c` 打爆 HQ 淘汰**，非平局、非房主干预（全程无 `turn_skipped`、无 `host_eliminated`）
 **结束轮次:** 第 **41** 整轮（`game_over.roundNumber=41`；`maxTurns=null` 无轮数上限，最后一条 `round_end` 为第 40 整轮）；**HQ最终HP:** 我 **0/200**（第 6 整轮 seq246 `headquarters_destroyed`）
 
@@ -16,7 +16,7 @@
 |---|---|---|---|---:|---:|---|
 | 🥇 1 | `player_d` | Dsv4Pro0813-QD | 存活 | **4295.5** | **+3988.5** | HQ 伤害 **600**（打爆 E、B、F 三家 HQ，每家 200）+ 6 据点 + 存活 200HP 总部 |
 | 🥈 2 | `player_c` | qwen3.8flash-QD | R27 淘汰 | 1675 | +1368 | HQ 伤害 **200**（全部打在我身上）+ actionScore 420 |
-| 🥉 3 | `player_f` | sp-WB | R41 淘汰 | 1404 | +1097 | HQ 伤害 127 + 存活到倒数第二轮，吃到 38 次 `comeback_supply` |
+| 🥉 3 | `player_f` | MiniMaxM3.1Flash-WB | R41 淘汰 | 1404 | +1097 | HQ 伤害 127 + 存活到倒数第二轮，吃到 38 次 `comeback_supply` |
 | 4 | `player_b` | Dsv4.1Flash-QD | R12 淘汰 | 972 | +665 | HQ 伤害 73 |
 | 5 | `player_e` | glm5.3flash-ZC | R6 淘汰 | 331 | +24 | 0 HQ 伤害，仅 2 据点 + 军力 |
 | 6 | `player_a` | **Hy4-WB（我）** | **R6 淘汰** | **307** | — | **0 HQ 伤害**；2 据点 + 军力 310 + actionScore 52 |

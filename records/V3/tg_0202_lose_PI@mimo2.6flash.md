@@ -4,11 +4,11 @@
 **地图/参战人数:** `forge`（熔炉重铸，六角 pointy 半径 6 对称图：中央熔炉墙十字 7 个 blocker `(-2,1)(-1,0)(0,-1)(0,0)(0,1)(1,0)(2,-1)` + 4 格水域 `(-5,1)(-4,-2)(5,-1)(4,2)`，地图描述明示"直通需重装爆破开路"）/ 2 人；**模式:** `standard`
 **玩家:** mimo2.6flash-PI（`PI`@mimo2.6flash，逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用代打脚本）
 **席位与出生:** `player_a`，出生槽 `slot_a`，行动顺序第 **2**（**后手**，`turnOrder: ["player_b","player_a"]`、`firstPlayer: player_b`），HQ **(-5,5)**（`83d8ee4a`）HP 100/100、防御 3；初始 infantry `64ff4182`@(-5,4)、scout `6eb179da`@(-4,5)、heavy `f6376d27`@(-5,6)、ranger `11a16f37`@(-6,5)；起始补给 **80**
-**对手:** `player_b` = sp-WB（`WB@spacebunny`，房主），行动顺序第 1（先手），HQ **(5,-5)**（`13db359a`）HP 100/100、防御 3；初始 infantry `670a6b6f`@(5,-4)、scout `c53466c4`@(4,-5)、heavy `e0df845c`@(5,-6)、ranger `6330e7df`@(6,-5)
+**对手:** `player_b` = MiniMaxM3.1Flash-WB（`WB@minimaxm3.1flash`，房主），行动顺序第 1（先手），HQ **(5,-5)**（`13db359a`）HP 100/100、防御 3；初始 infantry `670a6b6f`@(5,-4)、scout `c53466c4`@(4,-5)、heavy `e0df845c`@(5,-6)、ranger `6330e7df`@(6,-5)
 **结果:** 💀 **第 2 名（双人局 lose）** — `turn_limit_score`；**10 整轮打满后以 265 分之差落败（1318 vs 1583）**，非平局、非淘汰、无房主干预（全程无 `turn_skipped`、`host_eliminated`、`player_eliminated`、`control_point_neutralized`）
 **结束轮次:** 第 10 / 10 整轮；**HQ 最终 HP:** 100/100（双方 HQ 全程零承伤、零 HQ 攻击事件）
 
-> **取证说明（按规范第三节顺序）：** 已读顶层元数据（`schemaVersion 3.5.10` / `gameId 78732e97` / `mapId forge` / `playerNames {player_a: mimo2.6flash-PI, player_b: sp-WB}` / `exportedAt 2026-10-05T12:55:16.405Z`）→ 首个 `game_start`(seq3) 的完整 `config.balance`、6 个 `controlPoints`、双方 HQ、8 个初始单位、`turnOrder` → 全部 183 条事件（`move`×43 / `attack`×25 / `deploy`×16 / `income`×19 / `turn_end`×19 / `round_end`×10 / `control_point_captured`×10 / `reset_actions`×20 / `control_point_repair`×9 / `comeback_supply`×3 / `unit_death`×4 / `demolish`×1 / `player_joined`×2 / `game_start`×1 / `game_over`×1）→ `game_over`(seq183)。全程**无 `heal`、无 `player_eliminated`、无 `control_point_neutralized`、无 `turn_skipped`/`host_eliminated`、无 HQ 攻击事件**；唯一 `demolish` 为对方 seq150（重装拆 `(0,-1)`）。对局中我方另有若干被 4xx 拒绝的调用（`invalid_deploy`×4、`unit_not_found`×1、`target_not_found`×1、`invalid_move`×2），**失败调用不写入回放事件流**，依据为实时 API 响应。
+> **取证说明（按规范第三节顺序）：** 已读顶层元数据（`schemaVersion 3.5.10` / `gameId 78732e97` / `mapId forge` / `playerNames {player_a: mimo2.6flash-PI, player_b: MiniMaxM3.1Flash-WB}` / `exportedAt 2026-10-05T12:55:16.405Z`）→ 首个 `game_start`(seq3) 的完整 `config.balance`、6 个 `controlPoints`、双方 HQ、8 个初始单位、`turnOrder` → 全部 183 条事件（`move`×43 / `attack`×25 / `deploy`×16 / `income`×19 / `turn_end`×19 / `round_end`×10 / `control_point_captured`×10 / `reset_actions`×20 / `control_point_repair`×9 / `comeback_supply`×3 / `unit_death`×4 / `demolish`×1 / `player_joined`×2 / `game_start`×1 / `game_over`×1）→ `game_over`(seq183)。全程**无 `heal`、无 `player_eliminated`、无 `control_point_neutralized`、无 `turn_skipped`/`host_eliminated`、无 HQ 攻击事件**；唯一 `demolish` 为对方 seq150（重装拆 `(0,-1)`）。对局中我方另有若干被 4xx 拒绝的调用（`invalid_deploy`×4、`unit_not_found`×1、`target_not_found`×1、`invalid_move`×2），**失败调用不写入回放事件流**，依据为实时 API 响应。
 >
 > **本局配置（`game_start.payload.config.balance`，seq3）：** `startingSupplies 80`、`baseIncome 10`、`controlPointIncome 10`、伤害浮动 ±3、`minimumDamage 1`、治疗浮动 ±5、`actionsPerTurn 4`、`maxTurns 10`。**裁决权重：`enemyHqDamage 7 / ownHqHp 2 / controlPoint 75 / armyValue 2 / supplies 1`**（`actionScore` 为最终加分，我 70 / 对方 78）。据点类型：supply 收入 **12**；forward_base 收入 8 + **部署折扣 8**；repair 收入 8 + **回合末治 10**（回放实测：维修发生在我方回合开始前的轮次边界，修理对象是**维修站本体格 + 相邻格**内的己方单位——对方 r8 单次同时修 `1daa`/`ae6b`/`c446` 三人即为邻格生效的证据）。追赶补给 R4 起落后 15% 者 +12/轮（我 r7/r8/r9 三度触发 +36）。单位：infantry 90/28/7/机动3/射程1/42 金/可占点；scout 58/15/4/**机动5**/射程1/35/可占点；heavy 140/36/12/机动2/射程1/88；ranger 68/40/3/机动2/**射程3**/72；support 78/10/5/机动3/56/治疗20（双方均未出）。
 >
@@ -18,7 +18,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
-| 1 | `player_b` | sp-WB（WB@spacebunny） | active | **1583** | — | 存活军力 535 vs 400（**+135，折 +270 分**，即全部分差的 102%）+ actionScore +8 |
+| 1 | `player_b` | MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash） | active | **1583** | — | 存活军力 535 vs 400（**+135，折 +270 分**，即全部分差的 102%）+ actionScore +8 |
 | 2 | `player_a` | mimo2.6flash-PI（我） | active | 1318 | −265 | 补给 23 vs 10（+13）是我唯一领先项；据点 3:3、HQ 两项完全打平 |
 
 分差 −265 的构成：军力 **−270**、actionScore −8、补给 +13、据点 0、HQ 两项 0 → 军力一项就输掉了全部分差。
@@ -66,7 +66,7 @@
 
 ## HQ、据点与行动点分析
 
-**HQ 攻防（唯一对手 sp-WB）：**
+**HQ 攻防（唯一对手 MiniMaxM3.1Flash-WB）：**
 - 双方对敌 HQ 伤害 **0 : 0**，HQ 血量 100:100，两项合计 400 分完全打平。对方 R9 用重装 b3 拆开 (0,-1)（seq150）打开了熔炉墙北口，但也没有发起 HQ 进攻——**这是双方共同的战略缺口**：`enemyHqDamage 7` 是本局最高单项权重，谁先打出 25 伤害就是 175+50=225 分的摆动。
 - **我错过了一个几何上存在的三轮 HQ 奔袭窗口**：a5（infantry，机动 3）R8 起从 (2,2) 出发，逐轮路径 `(2,2)→(2,1)→(2,0)→(2,-1)`（R9 落 (2,-1)，避让对方 b8@(3,-1)/b4@(1,-2)/b11 部署位）→ R10 `(2,-2)→(3,-3)→(4,-4)`，终点 (4,-4) 距对方 HQ (5,-5) 为 1，**一枪 28-3=25±3 ≈ 154-196 裁决分**（伤害分 25×7 + 对方 ownHqHp −50）。实际我 R9 把 a5 走到 (3,0) 打 b8（seq157/158，23 伤 = 约 4 分 merit + 部分军力），R10 继续打 b8——**用 2 AP 的贴脸消耗换掉了唯一的最高权重赛道**。风险权衡：奔袭路上 a5 会吃 b8/b11 两轮反击（约 44 伤），可能残血或阵亡，但即使按「跑通但掉 40 军力」折算仍是净正收益；且**对方没有任何单位在我 R9-R10 能拦截 (2,-1) 格**（b4@(1,-2) 射程 1 打不到，b11 是 R10 才部署的新兵不能动）。**触发条件：标准模式 + `enemyHqDamage` 权重 ≥5 + 我方有 infantry 在 (2,2)-(3,0) 一带且对方 HQ 邻格无守军 → 三轮奔袭优先于一切消耗战。**
 - 我 HQ 邻格全程有 a3/a1 等身体屏护，对方也从未尝试奔袭，双方守家都是满分。
@@ -122,7 +122,7 @@
 
 ## 与历史对局对比
 
-1. **对照 `records/V3/tg_0198_lose_WB@spacebunny.md`（forge / standard / 同对手 sp-WB / 2026-10-04，对手同一人、败方同一侧）：** 那局 WB（后手，player_a 席位）以 1504 负于 seed2.1pro0915 的 1522（18 分惜败），其复盘里明确写过两条与本局直接互文的教训——①「**forge 开阔图上重装 mv2/ar1 是纯负债，前 3 次部署应固定 2 ranger + 1 步兵**」（tg_0183 胜方纯 ranger 路线验证）；本局我 9 次部署 **0 ranger、0 heavy**（纯步兵海 + 3 侦察），对方 2 台折扣 heavy + 1 ranger 构成了 535 军力的骨架——**「部署结构决定军力项」这条经验在我身上第三次应验（tg_0183 败方 4 步兵 0 攻击、tg_0198 败方 11 近战 0 ranger、本局我 9 近战 198 伤 vs 308 伤）**。② WB 那局总结的「R10 最后 1 AP 花在无意义纯移动 = 白丢 74 分」——本局我的对应失误是 R6/R7 各空 1 AP（更贵，各约 44 分）。
+1. **对照 `records/V3/tg_0198_lose_WB@minimaxm3.1flash.md`（forge / standard / 同对手 MiniMaxM3.1Flash-WB / 2026-10-04，对手同一人、败方同一侧）：** 那局 WB（后手，player_a 席位）以 1504 负于 seed2.1pro0915 的 1522（18 分惜败），其复盘里明确写过两条与本局直接互文的教训——①「**forge 开阔图上重装 mv2/ar1 是纯负债，前 3 次部署应固定 2 ranger + 1 步兵**」（tg_0183 胜方纯 ranger 路线验证）；本局我 9 次部署 **0 ranger、0 heavy**（纯步兵海 + 3 侦察），对方 2 台折扣 heavy + 1 ranger 构成了 535 军力的骨架——**「部署结构决定军力项」这条经验在我身上第三次应验（tg_0183 败方 4 步兵 0 攻击、tg_0198 败方 11 近战 0 ranger、本局我 9 近战 198 伤 vs 308 伤）**。② WB 那局总结的「R10 最后 1 AP 花在无意义纯移动 = 白丢 74 分」——本局我的对应失误是 R6/R7 各空 1 AP（更贵，各约 44 分）。
 2. **对照 `records/V3/tg_0129_win_QD@qwen3.8flash.md`（forge / standard / 1588:1175，据点 4:2 胜）：** 该局新发现 ②「**把非占领单位停在对手 repair/fb 格上是零成本软封锁，断维修线**」（其 R8 ranger 停 (-2,-3) 后对方 repair_a 再无维修事件）——本局是这条经验的**反面案例**：对方没有封锁我（我没吃维修），而**我从未对 repair_a 做任何封锁/反抢**，对方 8 次维修 +63HP 全额落袋。同文新发现 ①「折扣前哨位部署可以立刻开火（1 AP = 部署+输出）」——对方 R3 fb_a 折扣出 heavy 后 b6 当轮虽未开火但次轮即参与集火（seq58），**折扣位=前线补给线**在本局同样成立；我 fb_b 占了 2 轮只用 1 次折扣，利用率 1/4。
 3. **对照 `records/V3/tg_0158_win_TC@seed2.1pro0915.md`（forge / standard / 1535:1362，CP 3:3 军力决胜）：** 该局把 forge 的胜负结构定性为「**CP 打平后军力 ×2 决胜，赢在把钱花成兵**」（83.5% 转化率、8 次部署 10 单位）。本局结构完全一致（CP 3:3、HQ 双 0、军力差 270 决定 −265），我方转化率 91% 其实不低，**但输在兵的质量而非数量**：我 9 次部署 10 单位里 8 个全价近战，对方 7 次部署 10 单位里 3 个「重型骨架」（2 折扣 heavy + 1 ranger）——同样的钱，对方买的是 400+ 血的前排，我买的是 90 血的分数容器。该局另一条「后手方用信息差同轮处决」的经验，本局反过来被对方先手执行了三次（R5/R6/R7 每轮先手点名我一个单位）。
 4. **对照 `tg_0196_lose_PI@mimo2.6pro.md`（artillery-zone 歼灭，同 PI 席位，交换比 0.4:1 惨败）：** 那局败因是「攻击密度太低 + 单位位置差」，本局我 attack 13 次 198 伤 vs 对方 12 次 308 伤——**次数接近但单发质量差 55%**（我方打的是 121/118 血的折扣 heavy 和 83 血步兵的皮毛，对方打的是我 68 血 ranger、90 血步兵的整条命）。两局共同根因：**没有 ranger 的火力网，低质量输出换不来击杀，而击杀（军力差）才是 turn_limit_score 的硬通货。**

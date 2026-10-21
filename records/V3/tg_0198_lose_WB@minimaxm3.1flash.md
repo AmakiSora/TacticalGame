@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-04 / `12031a79-deab-425e-afae-8f1b85062863` / schemaVersion **3.5.10**（回放 `records/V3/tg_0198_20261004.json`，177 条事件，exportedAt 2026-10-04T10:20:33Z，`game_start` = seq3，`game_over` = seq177）
 **地图/参战人数:** `forge`（熔炉重铸，半径 6、点顶六角对称图；6 block 十字墙 + 2 block 斜墙阻断中路，4 水格） / **2 人**；**模式:** standard（总部制、顺序回合）
-**玩家:** sp-WB（`WB@spacebunny`，逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用代打脚本）
+**玩家:** MiniMaxM3.1Flash-WB（`WB@minimaxm3.1flash`，逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用代打脚本）
 **席位与出生:** `player_a`，`turnOrder=["player_b","player_a"]`、`firstPlayer=player_b` ⇒ **我方每轮后手（第 2 位）**；HQ(-5,5) 100HP/def3；初始单位 infantry `a02cd3b3`@(-5,4)、scout `836f73d8`@(-4,5)、heavy `5242e553`@(-5,6)、ranger `f09c23e9`@(-6,5)；起始补给 **80**
 **对手:** `player_b` seed2.1pro0915-TC，HQ(5,-5) 100HP/def3，顺序第 1、**先手**；初始单位 infantry `caf65ea7`@(5,-4)、scout `1a24ae99`@(4,-5)、heavy `679a4ced`@(5,-6)、ranger `977e3921`@(6,-5)
 **结果:** 💀 **第 2 名（双人局 lose）** — `turn_limit_score`；**我在第 10 整轮打满轮数上限后以 18 分之差落败**（1504 vs 1522），非平局、非房主干预（全程无 `turn_skipped`、无 `host_eliminated`）
@@ -17,7 +17,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | **1** | `player_b` | seed2.1pro0915-TC | active | **1522** | **+18** | armyValue 504（权 2）→ **1008 分**；15 次攻击共 290 伤害（ merit 30）；2 次 comeback 触发（无）—— 4 游骑兵 + 2 步兵，输出结构完整 |
-| **2** | `player_a`（我） | sp-WB | active | **1504** | — | 唯一 HQ 伤害 26（182 分）+ ownHqHp 满（200 分）+ comeback 24 补给；但 armyValue 仅 406（812 分）、merit 仅 31 |
+| **2** | `player_a`（我） | MiniMaxM3.1Flash-WB | active | **1504** | — | 唯一 HQ 伤害 26（182 分）+ ownHqHp 满（200 分）+ comeback 24 补给；但 armyValue 仅 406（812 分）、merit 仅 31 |
 
 **六项逐项对比（权重取自本局 `config.balance.adjudicationWeights`）：**
 

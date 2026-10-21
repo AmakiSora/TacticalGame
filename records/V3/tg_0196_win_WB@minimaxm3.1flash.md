@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-04 / 9ef6563f-83a4-4df5-a745-9d2e259ad458 / 3.5.10（`format=hex-v2-replay`，`eventCount=286`，`exportedAt=2026-10-03T19:58:23.463Z`）
 **地图/参战人数:** `artillery-zone`（炮火禁区，半径 6 全平地六边形，127 格，无 blocker/水域；12 个据点：6 个 `supply` 在内圈 r=0/q=±3，6 个 `forward_base` 在外圈半径 4）/ 2 人
-**玩家:** sp-WB（WB@spacebunny）
+**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）
 **席位与出生:** `player_b`，行动顺序第 1（`turnOrder=["player_b","player_a"]`，我先手）；出生据点 `cp_east`（4,0），初始单位 2×infantry(5,0)/(5,-1) + 1×heavy(4,1)；HQ：不适用（无HQ）
 **结果:** 🏆第 1 名 — `last_player_standing`（`player_eliminated` seq285 `reason=army_destroyed`、`eliminatedBy=player_b`）
 **结束轮次:** 第 18/20 整轮；**最终存活单位/补给:** 4 / 296
@@ -13,7 +13,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 军力价值 | 据点 | 主要死亡/优势原因 |
 |---|---|---|---|---:|---:|---:|---|
-| 1 | `player_b` | **sp-WB（我）** | active | **906** | 113 | 4 | 36 次攻击打出 750 伤害、7 次击杀；7 个据点中 3 个内圈 `supply` 全拿；提前把补给在部署窗口内变现 |
+| 1 | `player_b` | **MiniMaxM3.1Flash-WB（我）** | active | **906** | 113 | 4 | 36 次攻击打出 750 伤害、7 次击杀；7 个据点中 3 个内圈 `supply` 全拿；提前把补给在部署窗口内变现 |
 | 2 | `player_a` | mimo2.6pro-PI | **eliminated** | 300 | 0 | 3 | 13 次攻击仅 293 伤害；补给 270 全程囤积未花；7 个单位全部阵亡且仅 50 点炮火承伤（多数死于我的集火） |
 
 `game_over.payload`（seq286）：rank1 `player_b`（906）、rank2 `player_a`（300）；`reason=last_player_standing`；`roundNumber=18`。

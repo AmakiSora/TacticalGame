@@ -80,6 +80,17 @@ describe('stats aggregation', () => {
     expect(canonicalizeModel('DeepseekV4FlashPrevi')).toBe('DeepseekV4FlashPreview');
   });
 
+  it('canonicalizes the Space Bunny codename to MiniMaxM3.1Flash', () => {
+    expect(canonicalizeModel('sp-WB')).toBe('minimaxm3.1flash');
+    expect(canonicalizeModel('spacebunny')).toBe('minimaxm3.1flash');
+    expect(canonicalizeModel('space-bunny')).toBe('minimaxm3.1flash');
+    expect(canonicalizeModel('MiniMaxM3.1Flash-WB')).toBe('minimaxm3.1flash');
+    expect(parseReviewFileName('tg_0189_lose_WB@minimaxm3.1flash.md')).toMatchObject({
+      agent: 'WB',
+      model: 'minimaxm3.1flash',
+    });
+  });
+
   it('splits a known CP agent suffix off the model name', () => {
     expect(canonicalizeModel('LongCat2.0-CP')).toBe('longcat2.0');
     expect(parseReviewFileName('tg_0083_lose_CP@longcat2.0.md')).toMatchObject({

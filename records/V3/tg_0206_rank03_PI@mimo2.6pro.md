@@ -6,13 +6,13 @@
 **席位与出生:** `player_b`（slot_east），初始单位 infantry 235dfbbd@5,0、infantry 54fa70e9@5,-1、heavy 6b10d99d@4,1，出生控制点 cp_east(4,0,forward_base)；HQ：不适用（无HQ）
 **结果:** ⚪第3名 — `army_destroyed`（被 player_a 击杀，seq 260）
 **结束轮次:** 第11/20整轮被淘汰；**最终存活单位/补给:** 0 / 129
-**最终胜者:** player_c（sp-WB），`last_player_standing`，第13轮结束
+**最终胜者:** player_c（MiniMaxM3.1Flash-WB），`last_player_standing`，第13轮结束
 
 ## 最终排名与淘汰
 
 | 名次 | 席位 | 状态 | 总分 | 军力价值 | 据点 | 主要死亡/优势原因 |
 |---|---|---|---:|---:|---:|---|
-| 1 | player_c sp-WB | active | 1090 | 300 | 6 | 早期占 6 点位积累收入（每回合44补给），囤 8 军不卷入前期绞肉，炮火期收割残局 |
+| 1 | player_c MiniMaxM3.1Flash-WB | active | 1090 | 300 | 6 | 早期占 6 点位积累收入（每回合44补给），囤 8 军不卷入前期绞肉，炮火期收割残局 |
 | 2 | player_a mimo2.6flash-PI | eliminated(R13) | 630 | 0 | 4 | 前期集火我（对我的伤害340）夺占 supply_east，中期与 player_c 对耗394点后被歼灭 |
 | 3 | player_b mimo2.6pro-PI（我） | eliminated(R11) | 190 | 0 | 1 | 集火节奏慢、贪占外圈补给点不撤、重装停在危险区连续吃炮 |
 

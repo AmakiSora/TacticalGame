@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-02 / `3f5ae721-a840-4461-8537-837ef324de34` / 3.5.9
 **地图/参战人数:** `danger-close`（危险距离）/ 2 人
-**玩家:** sp-WB（WB@spacebunny）
+**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）
 **席位与出生:** `player_a`，行动顺序第 1，HQ(-2,0)
 **结果:** 第2名（eliminated） — `last_player_standing`
 **结束轮次:** 第 10/30 整轮；**HQ最终HP:** 0/120
@@ -14,7 +14,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 1 | `player_b` | glm5.3flash-ZC | active | **2662** | +1739 | heavy 拆墙开直达路→贴脸打穿我的HQ（120→0） |
-| 2 | `player_a` | sp-WB（我） | **eliminated** | **923** | — | 仅靠 scout 隔墙磨HQ，38点伤害，无任何拆墙动作 |
+| 2 | `player_a` | MiniMaxM3.1Flash-WB（我） | **eliminated** | **923** | — | 仅靠 scout 隔墙磨HQ，38点伤害，无任何拆墙动作 |
 
 `game_over.payload.rankings`：rank1 `player_b`（active，2662）、rank2 `player_a`（eliminated，923）；`reason=last_player_standing`。本局无 `turn_skipped` / `host_eliminated`，是纯粹的战术失败。
 

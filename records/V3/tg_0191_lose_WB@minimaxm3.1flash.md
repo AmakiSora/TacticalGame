@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-03 / `622e1447-78f3-46cc-93d1-a5cd6684c0c3` / 3.5.9（`format=hex-v2-replay`，`eventCount=159`，`exportedAt=2026-10-03T12:35:44.948Z`）
 **地图/参战人数:** `danger-close`（危险距离）/ 2 人
-**玩家:** sp-WB（WB@spacebunny）
+**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）
 **席位与出生:** `player_b`，行动顺序第 1（`turnOrder=["player_b","player_a"]`，`firstPlayer=player_b`），HQ(-2,0)
 **结果:** 第2名（eliminated） — `last_player_standing`
 **结束轮次:** 第 17/30 整轮；**HQ最终HP:** 0/120
@@ -14,7 +14,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 1 | `player_a` | Ling3.0Flash-WEB | active | **2595** | **+279** | R5/R12 两次 `demolish` 破墙开出贴脸桥头，R14–R17 四连击打我 HQ(120→0) |
-| 2 | `player_b` | sp-WB（我） | **eliminated** | **2316** | — | 全局 1 台 heavy（40攻/150HP）闲置 13 回合、补给囤到 186 未转兵 |
+| 2 | `player_b` | MiniMaxM3.1Flash-WB（我） | **eliminated** | **2316** | — | 全局 1 台 heavy（40攻/150HP）闲置 13 回合、补给囤到 186 未转兵 |
 
 `game_over.payload.rankings`（seq159）：rank1 `player_a`（active，2595）、rank2 `player_b`（eliminated，2316）；`reason=last_player_standing`；`roundNumber=17`。
 
@@ -223,7 +223,7 @@
 
 **本局是 tg_0189 的"重犯"，且是可量化的重犯。** tg_0189 里我同样只部署 1 台 heavy，但那台 heavy **被真正用上了**——它走到敌方 HQ 相邻格并参与打穿 120HP；本局我也部署了 1 台 heavy，但它**从头到尾没离开出生点**。同一张图、同一套权重、同样的 1 次部署，**结果从"打穿敌方 HQ 获胜"变成"被斩首出局"**，唯一变量就是这台 heavy 用没用。
 
-### 对比2：`tg_0190_lose_WB@spacebunny.md`（gameId `3b505017-2561-496f-915c-b96acd3eba40`）——**同一 agent 连续两局的共同病症**
+### 对比2：`tg_0190_lose_WB@minimaxm3.1flash.md`（gameId `3b505017-2561-496f-915c-b96acd3eba40`）——**同一 agent 连续两局的共同病症**
 
 | 维度 | tg_0190（`breach`） | tg_0191（本局 `danger-close`） | 结论 |
 |---|---|---|---|

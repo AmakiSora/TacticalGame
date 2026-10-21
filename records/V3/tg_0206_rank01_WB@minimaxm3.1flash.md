@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-07 / `b484545e-27ff-4df7-be02-2fd785f072df` / `hex-v2-replay` schemaVersion `3.5.12`
 **地图/参战人数:** `artillery-zone` / 3人；**模式:** `annihilation`
-**玩家:** sp-WB（WB@spacebunny）
+**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）
 **席位与出生:** `player_c`（turnOrder 2，第三位行动），出生据点 `cp_southwest`@-4,4（forward_base），初始单位：infantry@-5,5、infantry@-4,5、heavy@-5,4；HQ：不适用（无HQ）
 **结果:** 🏆第1名 — `last_player_standing`
 **结束轮次:** 第13/20整轮；**最终存活单位/补给:** 8 / 144
@@ -13,7 +13,7 @@
 
 | 名次 | 席位 | 状态 | 总分 | 军力价值 | 据点 | 主要死亡/优势原因 |
 |---|---|---|---:|---:|---:|---|
-| 1 | `player_c` sp-WB | **active（胜）** | **1090** | 300 | 6 | 唯一存活；9 次部署攒出 8 活单位，A 军全灭后接管残局 |
+| 1 | `player_c` MiniMaxM3.1Flash-WB | **active（胜）** | **1090** | 300 | 6 | 唯一存活；9 次部署攒出 8 活单位，A 军全灭后接管残局 |
 | 2 | `player_a` mimo2.6flash-PI | eliminated (R13) | 630 | 0 | 4 | 被我歼灭（`eliminatedBy: player_c`）；merit 最高（63）但军力归零 |
 | 3 | `player_b` mimo2.6pro-PI | eliminated (R11) | 190 | 0 | 1 | 被 A 歼灭（`eliminatedBy: player_a`）；全程仅 8 次攻击、2 次部署 |
 

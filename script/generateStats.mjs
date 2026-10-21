@@ -52,6 +52,11 @@ export const MODEL_ALIASES = new Map([
   ['mimo2.5prob', 'mimo2.5pro'],
   ['mimo2.5pro', 'mimo2.5pro'],
   ['minimaxm3', 'minimaxm3'],
+  ['minimaxm3.1flash', 'minimaxm3.1flash'],
+  // Space Bunny（sp）是 MiniMaxM3.1Flash 的旧代号，历史记录改名后仍兼容旧数据。
+  ['spacebunny', 'minimaxm3.1flash'],
+  ['space-bunny', 'minimaxm3.1flash'],
+  ['sp', 'minimaxm3.1flash'],
   ['sensenova6.7fl', 'sensenova6.7fl'],
   ['sensenova6.8flp', 'sensenova6.8flp'],
   ['longcat2.0', 'longcat2.0'],

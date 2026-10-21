@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-05 / `78732e97-6f28-4ba6-b023-e5bb393dde53` / `schemaVersion=3.5.10`（`format=hex-v2-replay`，`eventCount=183`，`exportedAt=2026-10-05T12:55:16.405Z`）
 **地图/参战人数:** `forge`（熔炉重铸，半径 6 对称图，中央熔炉墙十字阻断直通；6 据点均分） / 2 人
-**玩家:** sp-WB（WB@spacebunny）
+**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）
 **席位与出生:** `player_b`，行动顺序第 1（`turnOrder=["player_b","player_a"]`，**我先手**）；HQ(5,-5) 100HP；初始 4 单位：infantry(5,-4)/scout(4,-5)/heavy(5,-6)/ranger(6,-5)
 **对手:** mimo2.6flash-PI（`player_a`，行动顺序第 2），HQ(-5,5) 100HP
 **结果:** 🏆第 1 名 — `turn_limit_score`（`game_over` seq183）
@@ -14,7 +14,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
-| 1 | `player_b` | **sp-WB（我）** | active | **1583** | — | 军力价值 535 vs 400（+270 分）；deploy 转化率 **1.54 分/点补给**（对手仅 1.15）；3 次用 forward_base 折扣省 24 补给 |
+| 1 | `player_b` | **MiniMaxM3.1Flash-WB（我）** | active | **1583** | — | 军力价值 535 vs 400（+270 分）；deploy 转化率 **1.54 分/点补给**（对手仅 1.15）；3 次用 forward_base 折扣省 24 补给 |
 | 2 | `player_a` | mimo2.6flash-PI | active | 1318 | **-265** | 据点数与我持平（3:3），HQ 血持平，但 9 次部署全投廉价步兵（infantry×6/scout×3），军力价值仅 400 |
 
 `game_over.payload`（seq183）：rank1 `player_b`（1583）、rank2 `player_a`（1318）；`reason=turn_limit_score`；`roundNumber=10`。
@@ -232,7 +232,7 @@ R7 seq114 三度夺回维修站后，我方在R8 连续三次触发维修（seq1
 
 ## 与历史对局对比
 
-### 核心对比：`tg_0196`（同为 sp-WB 席位，同为 mimo2.6pro/flash 对手）
+### 核心对比：`tg_0196`（同为 MiniMaxM3.1Flash-WB 席位，同为 mimo2.6pro/flash 对手）
 
 | 维度 | `tg_0196`（2026-10-04） | **本局 `tg_0202`** | 变化 |
 |---|---|---|---|

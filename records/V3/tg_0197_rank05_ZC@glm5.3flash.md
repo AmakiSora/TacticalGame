@@ -12,7 +12,7 @@
 |---|---|---|---|---:|---:|---|
 | 1 | player_d | Dsv4Pro0813-QD | 存活 | 4295.5 | +3964.5 | 同一款"单格巷道重装+游侠掏 HQ"配方 3 杀（我/b/f），终局 6 据点、HQ 伤 600 |
 | 2 | player_c | qwen3.8flash-QD | 第27轮被 f 灭 | 1675 | +1344 | 击杀 a（HQ 伤 200），前期最高分（r5 领先我 74.4%） |
-| 3 | player_f | sp-WB | 第41轮被 d 灭 | 1404 | +1073 | 击杀 c，军力 678 撑到最后 |
+| 3 | player_f | MiniMaxM3.1Flash-WB | 第41轮被 d 灭 | 1404 | +1073 | 击杀 c，军力 678 撑到最后 |
 | 4 | player_b | Dsv4.1Flash-QD | 第12轮被 d 灭 | 972 | +641 | 峰值 3 据点（含抢夺 c 的 cp_20），被 d 同款突击 3 轮掏掉 |
 | 5 | **我 player_e** | glm5.3flash-ZC | **第6轮被 d 灭** | 331 | — | 2 据点、6 单位零战损，死于地理而非交换 |
 | 6 | player_a | Hy4-WB | 第6轮被 c 灭 | 307 | -24 | 最先失速：HQ 自 r3 起被 c 连续轰炸 |
@@ -82,8 +82,8 @@
 
 ## 与历史对局对比
 - `records/V3/tg_0195_20261004.json`（royale / narrow-road，2人，**我胜**）：那张窄路图验证了"咽喉点控制=胜负手"。本局是同一原理的**反面验证**——我 3 轮里没有任何资源投向咽喉，被 d 反向执行了 narrow-road 的胜利公式。重复的经验：**谁控制窄道谁赢**。
-- `records/V3/tg_0194_20261004.json`（standard / breach，sp-WB 胜）：standard 模式下 HQ 压力节奏再次压过 everything-else；与本局一致，输家都是 HQ 先失血的一方。
-- `records/V3/tg_0193_20261004.json` / `tg_0196_20261004.json`（royale snowflake / annihilation artillery-zone）：模式不同，不直接可比，但 sp-WB 在两局里均活到最后，其"先自保后收割"的节奏与本局 d 的打法同源。
+- `records/V3/tg_0194_20261004.json`（standard / breach，MiniMaxM3.1Flash-WB 胜）：standard 模式下 HQ 压力节奏再次压过 everything-else；与本局一致，输家都是 HQ 先失血的一方。
+- `records/V3/tg_0193_20261004.json` / `tg_0196_20261004.json`（royale snowflake / annihilation artillery-zone）：模式不同，不直接可比，但 MiniMaxM3.1Flash-WB 在两局里均活到最后，其"先自保后收割"的节奏与本局 d 的打法同源。
 - **本局新发现**：① 6 人 whirlpool 的 12 个 CP 全在外圈，扩张阶段第 2 轮即结束（r2 末全员 2 CP），之后是纯零和；② 臂间单格巷道使"重装+游侠掏 HQ"近乎无解——d 用同一配方击杀了 3/5 个对手（我 r3–r6、b r10–r12、f r38–r41，每次恰好 200 伤、约 4 轮）；③ 无回合上限图上 supplies 裁决权重为 0，囤金无意义（我死时 69 金、d 终局 720 金都不换算成分）。
 
 ## 总结

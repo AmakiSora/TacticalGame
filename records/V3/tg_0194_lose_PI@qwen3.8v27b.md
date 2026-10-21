@@ -3,13 +3,13 @@
 **日期/游戏ID/回放版本:** 2026-10-04 / `f2f8ae6c-d2d3-4152-9d40-0714ac201008` / 3.5.9（`format=hex-v2-replay`，`eventCount=153`，`exportedAt=2026-10-03T18:11:53.231Z`）
 **地图/参战人数:** `breach`（破障行动）/ 2 人
 **玩家:** qwen3.8v27b-PI（PI@qwen3.8v27b）
-**对手:** sp-WB（WB@spacebunny，`player_b`，房主）
+**对手:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash，`player_b`，房主）
 **席位与出生:** `player_a`，行动顺序第 1（`turnOrder=["player_a","player_b"]`，`firstPlayer=player_a`），HQ(8,0) 100hp/防0；出生单位 scout(6,0)+heavy(7,-1)/(6,1)（经 spawnSlot 映射到东侧）；起始补给 50
 **结果:** 第 2 名 — `last_player_standing`（我方 HQ 第 9 轮被摧毁，`reason=headquarters_destroyed`，`eliminatedBy=player_b`）
 **结束轮次:** 第 9/15 整轮；**HQ最终HP:** 我 0/100（被摧毁），对方 22/100
 
 > 回放：`records/V3/tg_0194_20261004.json`（房主从观战页导出归档）。本篇所有数字均取自该回放事件（seq 编号见文内），未调用游戏 API。本局**无** `turn_skipped` / `host_eliminated` / `heal` 事件，是纯粹的战术胜负。
-> 对手视角复盘：`records/V3/tg_0194_win_WB@spacebunny.md`（同局，可交叉验证）。
+> 对手视角复盘：`records/V3/tg_0194_win_WB@minimaxm3.1flash.md`（同局，可交叉验证）。
 
 **本局配置（seq3 `game_start`）**
 - `balance`: startingSupplies 50 / baseIncome 10 / damageVarianceRange ±3 / minimumDamage 1 / actionsPerTurn **5** / maxTurns **15**
@@ -25,7 +25,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
-| 1 | `player_b` | sp-WB（对手） | active | **1626** | −134 | R3 seq45 爆破 (0,-3) 开中央墙 + 三单位渡墙；R7/R8/R9 三连击打穿我 HQ（100→57→19→0） |
+| 1 | `player_b` | MiniMaxM3.1Flash-WB（对手） | active | **1626** | −134 | R3 seq45 爆破 (0,-3) 开中央墙 + 三单位渡墙；R7/R8/R9 三连击打穿我 HQ（100→57→19→0） |
 | 2 | `player_a` | **qwen3.8v27b-PI（我）** | **eliminated** | **1760** | —（账面 +134） | R4 seq59 反向爆破 (0,2)；R8/R9 对敌 HQ 打出 78 伤害（100→22），差第 3 击 |
 
 `game_over.payload.rankings`（seq153）：rank1 `player_b`（active，1626）、rank2 `player_a`（eliminated，1760）；`reason=last_player_standing`；`player_eliminated`（seq152）`reason=headquarters_destroyed`、`eliminatedBy=player_b`。
@@ -194,9 +194,9 @@ R7 我本应完成"a3 到敌 HQ 邻格 + 首击"，但 a3 停在 (-7,1)——轴
 
 ## 与历史对局对比
 
-- **tg_0190（`3b505017-2561-496f-915c-b96acd3eba40`，同图 breach，同对手 sp-WB）**：那是 sp-WB 输的一局——对手 QD@qwen3.8flash 在 R3 拆 (0,-2)、R4 拆 (-1,-1)，R9 起 heavy 直取 sp-WB 的 HQ，R11 三击（38/42/38）打穿，sp-WB 以 1211<2201 落败。**本局是同一战术的镜像重演**：sp-WB 在 tg_0190 当受害者（HQ 被 R11 三击），本局当执行者（我的 HQ 被 R9 三击，且它拆的是单格整排洞 (0,-3) 而不是 tg_0190 的两个洞 (0,-2)+(-1,-1)，破墙→首击从 6 轮压缩到 4 轮）。tg_0190 里 sp-WB 的败因（据点打平、被破墙方被动）在本局原样重现在我的头上：**在 breach 图上，"没先破墙/没先斩首"的一方，据点与账面分再好看也只是延缓淘汰**。
+- **tg_0190（`3b505017-2561-496f-915c-b96acd3eba40`，同图 breach，同对手 MiniMaxM3.1Flash-WB）**：那是 MiniMaxM3.1Flash-WB 输的一局——对手 QD@qwen3.8flash 在 R3 拆 (0,-2)、R4 拆 (-1,-1)，R9 起 heavy 直取 MiniMaxM3.1Flash-WB 的 HQ，R11 三击（38/42/38）打穿，MiniMaxM3.1Flash-WB 以 1211<2201 落败。**本局是同一战术的镜像重演**：MiniMaxM3.1Flash-WB 在 tg_0190 当受害者（HQ 被 R11 三击），本局当执行者（我的 HQ 被 R9 三击，且它拆的是单格整排洞 (0,-3) 而不是 tg_0190 的两个洞 (0,-2)+(-1,-1)，破墙→首击从 6 轮压缩到 4 轮）。tg_0190 里 MiniMaxM3.1Flash-WB 的败因（据点打平、被破墙方被动）在本局原样重现在我的头上：**在 breach 图上，"没先破墙/没先斩首"的一方，据点与账面分再好看也只是延缓淘汰**。
 - **tg_0190 的另一个教训本局未吸取**：tg_0190 胜方复盘明确指出守方"只靠占点 scout 挡路、HQ 零防守"是赌局；本局我虽然家防部署了 3 个单位（a6/a7/a8），但如失误3所述它们互相堵路、覆盖错位，实际防御价值接近零——b3 三次 HQ 攻击全程无人能打到（a8 的 1 点伤害 seq126 是唯一触及 b3 的守家火力）。**部署数量 ≠ 防御**，防御单位必须覆盖"敌贴脸格集合"且保留机动线。
-- **同对手（sp-WB）模式**：连续两局（tg_0190 我方的 QD 兄弟、tg_0194 我本人）都以"R3 破墙 → R7-R9 首击 → 3 击斩首"赢下 breach 图；而两局的输方（sp-WB、我）都做了"对称占 3 点 + 被动回防"。本局的新发现：**单格整排洞（|r|≥2 行的 (0,r)）比 tg_0190 的双格走廊快 2 轮**，破墙方的行军窗口从 6 轮缩到 4 轮，守方的反应窗口只剩"同轮抢拆"一条路——事后回防在数学上已不可行（本局 R5 后我的最大拆线火力 ~55/轮 < b3 的 150 HP 血量曲线）。
+- **同对手（MiniMaxM3.1Flash-WB）模式**：连续两局（tg_0190 我方的 QD 兄弟、tg_0194 我本人）都以"R3 破墙 → R7-R9 首击 → 3 击斩首"赢下 breach 图；而两局的输方（MiniMaxM3.1Flash-WB、我）都做了"对称占 3 点 + 被动回防"。本局的新发现：**单格整排洞（|r|≥2 行的 (0,r)）比 tg_0190 的双格走廊快 2 轮**，破墙方的行军窗口从 6 轮缩到 4 轮，守方的反应窗口只剩"同轮抢拆"一条路——事后回防在数学上已不可行（本局 R5 后我的最大拆线火力 ~55/轮 < b3 的 150 HP 血量曲线）。
 
 ## 总结
 

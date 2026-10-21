@@ -124,7 +124,7 @@
 
 ## 与历史对局对比
 
-对比 `records/V3/tg_0221_20261013.json`（`tg_0221_lose_DSH@sp.md`，danger-close · standard · 2 人，`player_a` sp-DSH 负）：
+对比 `records/V3/tg_0221_20261013.json`（`tg_0221_lose_DSH@minimaxm3.1flash.md`，danger-close · standard · 2 人，`player_a` MiniMaxM3.1Flash-DSH 负）：
 
 | 项 | 本局 0225（random） | 0221（danger-close） |
 |---|---|---|

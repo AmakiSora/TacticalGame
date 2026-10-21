@@ -2456,6 +2456,12 @@ function deselect() { selectedUnitId = null; selectedOriginId = null; selectedDe
 async function apiAction(path, body) {
   const { ok, data } = await API.post(path, body);
   if (!ok) toast(`${data.error || '操作失败'} (${data.code || ''})`, 'err');
+  // 同时模式：入队/撤回/清空都会在响应里回传最新队列，直接落到本地状态，
+  // 不再等下一次 GET（条件请求可能命中 304，旧队列会让计划面板与棋盘预览滞后）。
+  if (ok && Array.isArray(data?.queue) && state) {
+    if (!state.plan) state.plan = { committed: [], myQueue: [] };
+    state.plan.myQueue = [...data.queue];
+  }
   return ok;
 }
 async function afterAction(msg) {

@@ -20,6 +20,24 @@ function loadPlanActionRequest(file: string): (action: Record<string, unknown>) 
   return new Script(`(${fnSource})`).runInContext(context) as (action: Record<string, unknown>) => { path: string; body: Record<string, unknown> } | null;
 }
 
+// apiAction 依赖 API / toast / state，切出真实源码后注入最小桩执行。
+function loadApiAction(file: string, postResult: Record<string, unknown>, state: Record<string, unknown>) {
+  const source = read(file);
+  const start = source.indexOf('async function apiAction');
+  expect(start, `${file} 应包含 apiAction`).toBeGreaterThan(-1);
+  const end = source.indexOf('\n}', start);
+  expect(end, `${file} 中 apiAction 缺少收尾括号`).toBeGreaterThan(start);
+  const fnSource = source.slice(start, end + 2);
+  const toasts: string[] = [];
+  const context = createContext({
+    API: { post: async () => postResult },
+    toast: (message: string) => { toasts.push(message); },
+    state,
+  });
+  const fn = new Script(`(${fnSource})`).runInContext(context) as (path: string, body: Record<string, unknown>) => Promise<boolean>;
+  return { fn, toasts };
+}
+
 describe('simultaneous plan panel tools', () => {
   it('rebuilds re-enqueue requests for all five plan action types', () => {
     for (const file of PLAYER_CLIENTS) {
@@ -31,6 +49,35 @@ describe('simultaneous plan panel tools', () => {
       expect(build({ type: 'demolish', unitId: 'u4', q: 1, r: 1 })).toEqual({ path: 'demolish', body: { unitId: 'u4', q: 1, r: 1 } });
       expect(build({ type: 'unknown' })).toBeNull();
       expect(build(null)).toBeNull();
+    }
+  });
+
+  it('applies the queue echoed by plan actions immediately', async () => {
+    for (const file of PLAYER_CLIENTS) {
+      const state = { plan: { committed: [] as string[], myQueue: [{ id: 'old', type: 'attack' }] } };
+      const { fn, toasts } = loadApiAction(file, {
+        ok: true,
+        status: 200,
+        data: { ok: true, queue: [{ id: 'new', type: 'move', unitId: 'u1', q: 1, r: 0 }] },
+      }, state);
+      await expect(fn('/api/games/g/move', {})).resolves.toBe(true);
+      expect(state.plan.myQueue).toEqual([{ id: 'new', type: 'move', unitId: 'u1', q: 1, r: 0 }]);
+      expect(toasts).toEqual([]);
+    }
+  });
+
+  it('keeps the local queue untouched when a plan action is rejected', async () => {
+    for (const file of PLAYER_CLIENTS) {
+      const original = [{ id: 'old', type: 'attack' }];
+      const state = { plan: { committed: [] as string[], myQueue: [...original] } };
+      const { fn, toasts } = loadApiAction(file, {
+        ok: false,
+        status: 400,
+        data: { error: '该单位本轮已有计划动作', code: 'invalid_move' },
+      }, state);
+      await expect(fn('/api/games/g/move', {})).resolves.toBe(false);
+      expect(state.plan.myQueue).toEqual(original);
+      expect(toasts).toEqual(['该单位本轮已有计划动作 (invalid_move)']);
     }
   });
 

@@ -42,6 +42,8 @@ describe('state projection and ETag', () => {
     expect(body.adjudication).toBeUndefined();
     expect(body.turn).toBeTruthy();
     expect(typeof first.headers.etag).toBe('string');
+    // 个性化状态必须每次向服务器确认，避免浏览器用旧缓存覆盖计划队列等最新状态。
+    expect(first.headers['cache-control']).toBe('no-cache');
 
     const cached = await app.inject({
       method: 'GET',

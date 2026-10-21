@@ -1,6 +1,6 @@
 // src/api/games.ts
 import type { FastifyInstance } from 'fastify';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer,
   getRawHostToken, getRawPlayerToken,
@@ -18,7 +18,7 @@ import { listMaps } from '../config/loader.js';
 import { generateRandomMapConfig, sanitizeRandomOptions } from '../config/randomMap.js';
 import type { RandomParamValues } from '../config/randomMap.js';
 import { getCachedRandomMap, setCachedRandomMap } from '../config/randomMapCache.js';
-import { isPlayerId, MAX_PLAYER_NAME_LEN } from '../types.js';
+import { isPlayerId, isSimultaneousMode, MAX_PLAYER_NAME_LEN } from '../types.js';
 import type { GameState, PlayerId } from '../types.js';
 import { launchBotsForGame, removeBotRecord, clearBotsForGame } from './bots.js';
 
@@ -32,6 +32,20 @@ export function lobbySummary(game: GameState) {
     maxPlayers: game.maxPlayers, playerCount: players.length, players,
     supportedPlayerCounts: game.config.supportedPlayerCounts,
   };
+}
+
+/**
+ * ETag 里的「本方计划队列」标签。计划动作只改自己的队列、不产生事件，
+ * 因此 stateVersion 不会变化；若 ETag 只看 stateVersion，客户端条件请求会
+ * 拿到 304 + 旧响应，计划面板与棋盘预览就会停在入队前的空队列。
+ * 只把请求者自己的队列算进 ETag：其他玩家入队不改变本方响应，也避免通过
+ * ETag 变化泄露对手的计划活动。
+ */
+function planQueueTag(game: GameState, viewer?: PlayerId): string {
+  if (!viewer || !isSimultaneousMode(game.config.mode)) return 'none';
+  const queue = game.plan?.queues[viewer] ?? [];
+  if (queue.length === 0) return 'empty';
+  return createHash('sha256').update(JSON.stringify(queue)).digest('hex').slice(0, 16);
 }
 
 export async function gamesRoutes(app: FastifyInstance): Promise<void> {
@@ -300,8 +314,10 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         adjudication: include.has('adjudication'),
       };
     const includeKey = include === null ? 'all' : [...include].sort().join(',');
-    const etag = `"${ctx.game.id}-${ctx.game.stateVersion ?? 0}-${includeKey}"`;
+    const etag = `"${ctx.game.id}-${ctx.game.stateVersion ?? 0}-${planQueueTag(ctx.game, ctx.player)}-${includeKey}"`;
     reply.header('ETag', etag);
+    // 个性化对局状态必须每次向服务器确认；未变化时仍走 304，省流量但不吃旧缓存。
+    reply.header('Cache-Control', 'no-cache');
     if (req.headers['if-none-match'] === etag) return reply.code(304).send();
     return sanitizeGameForResponse(ctx.game, ctx.player, projection);
   });

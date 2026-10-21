@@ -17,10 +17,12 @@
 - **同时回合终局事件顺序修正**：`game_over` 现在恒为事件流最后一条，最终回合的 `round_end` / `round_resolved` 不再排在其后。回合上限裁决与同回合淘汰两条终局路径都先写完整轮摘要再发 `game_over`，且终局回合的 `round_end.payload.gameOver` / `round_resolved.payload.gameOver` 同步为 `true`；修复客户端按 `game_over` 停止读取时漏掉最后一轮结算结果的问题（`src/engine/engine.ts`、`src/engine/simultaneous.ts`）。既有回放文件仍保留原顺序，但仅供读取，不受新事件流影响。
 - **同时回合失败/落空动作可归属到单位**：`action_failed` 与 `round_resolved.results` 的 `failed`/`fizzled` 条目新增 `unitId` 与 `detail`（含 `unitType`、`fromQ/fromR`、目标 `q/r`、deploy 的 `fromId` 等）；`missed` 结果新增 `unitId` 与 `detail.attackerId`；同时回合的 deploy/move/attack/heal/demolish 事件补 `actionId`，可直接与结果条目对齐；前端事件日志显示单位类型及起点→目标格。
 - **同时回合 skill 文档按地图拆分**：`skill/simultaneous.md` 不再把 simultaneous 等同于 `standoff`，明确模式级规则与 `game.config.mapId` 门禁，并补充 `molten-throne` 的单位、经济、部署差异（全兵种默认 `single`、AP 4、仅前哨可部署等）；`skill/review-simultaneous.md` 同步改为模式级说明和按 `mapId` 的地图重点；`skill/SKILL.md`、README、AGENTS 的地图清单补上 `molten-throne`。避免 agent 在熔池王座对局套用对峙之地单位表读错数值。
+- **同时回合计划队列刷新修复**：`GET /api/games/:id` 的 ETag 此前只由 `stateVersion` 与投影参数组成，而计划入队 / 撤回 / 清空只改自己的队列、不产生事件，`stateVersion` 不变——浏览器条件请求命中 304 后继续使用入队前的旧响应，计划面板始终显示 0 条、棋盘也没有预测轨迹，再次操作同一单位还会被 `invalid_move` 拒绝。现在 ETag 额外包含「请求者本人计划队列」的摘要，只在本方队列变化时失效（不改变其他玩家的 ETag，避免借 ETag 变化泄露对手的计划活动）；桌面与移动玩家页也直接用入队 / 撤回 / 清空响应回传的 `queue` 更新本地计划，不再等下一次 GET，计划清单、行动点与棋盘预览即时刷新（`src/api/games.ts`、`public/play.js`、`public/play-m.js`）。
 
 ### 测试与验证
 
-- `npm run build` 通过；`npm test -- --testTimeout=30000` 102 文件 / 856 例全绿；`pytest tests/rl -q` 66 例通过。
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 102 文件 / 859 例全绿；`pytest tests/rl -q` 66 例通过。
+- 新增 `tests/api/simultaneous-api.test.ts` 1 例：计划入队与撤回只让操作者自己的 ETag 失效（旧 ETag 条件请求返回 200 与最新 `plan.myQueue`），对手的相同条件请求仍为 304；`tests/public/plan-tools.test.ts` 2 例：两端 `apiAction` 命中计划接口回传的 `queue` 时立即更新本地计划，失败响应不覆盖本地队列并保持错误提示。
 - `tests/engine/simultaneous.test.ts` 补充终局顺序断言：回合上限裁决与总部摧毁两条路径都断言事件尾部为 `round_end` → `round_resolved` → `game_over`，并校验终局摘要的 `gameOver` 为 `true`。
 - 新增 `tests/skill/simultaneous-docs.test.ts`：遍历地图表中所有 `mode: "simultaneous"` 的地图，断言 `simultaneous.md` 与 `review-simultaneous.md` 均按 `mapId` 覆盖，且不再把 `standoff` 写成唯一地图。
 - `npm run arena-leaderboard` 重新出榜：48,960 局、26 个参评参与者（25 个有对局；v1.0.0 旧格式不参评），`v2.3.2@340K` / `v2.5.0@2M` / `v2.6.0@3.6M` 均以 `legacy` 正常显示（评分 1223 / 1314 / 1304）；`npm run arena-stats` 同步生成 27 个参与者档案，无 `expired` 字段。

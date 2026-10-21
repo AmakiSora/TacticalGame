@@ -344,6 +344,75 @@ describe('simultaneous mode API', () => {
     }
   });
 
+  it('invalidates only the actor ETag when the pending queue changes', async () => {
+    const { app, gameId, seats } = await createSimultaneousGame();
+    try {
+      const firstA = await app.inject({
+        method: 'GET',
+        url: `/api/games/${gameId}`,
+        headers: { 'x-player-token': seats[0]!.token },
+      });
+      const firstB = await app.inject({
+        method: 'GET',
+        url: `/api/games/${gameId}`,
+        headers: { 'x-player-token': seats[1]!.token },
+      });
+      const etagA = firstA.headers.etag as string;
+      const etagB = firstB.headers.etag as string;
+      expect(etagA).toBeTruthy();
+      expect(etagB).toBeTruthy();
+
+      const state = firstA.json() as GameStateView;
+      const { unitId } = firstInfantryNearHq(state, seats[0]!.id);
+      const target = emptyNeighbor(state, state.units.find(u => u.id === unitId)!);
+      expect(target).not.toBeNull();
+
+      const queued = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/move`,
+        headers: { 'x-player-token': seats[0]!.token },
+        payload: { unitId, q: target!.q, r: target!.r },
+      });
+      expect(queued.statusCode).toBe(200);
+      const actionId = queued.json().queue[0].id as string;
+
+      // 自己的队列变了：旧 ETag 必须失效，条件请求返回新队列而不是 304。
+      const refreshedA = await app.inject({
+        method: 'GET',
+        url: `/api/games/${gameId}`,
+        headers: { 'x-player-token': seats[0]!.token, 'if-none-match': etagA },
+      });
+      expect(refreshedA.statusCode).toBe(200);
+      expect((refreshedA.json() as GameStateView).plan.myQueue).toHaveLength(1);
+
+      // 对手的可见表示没有变化：仍应命中 304，不能通过 ETag 泄露队列活动。
+      const refreshedB = await app.inject({
+        method: 'GET',
+        url: `/api/games/${gameId}`,
+        headers: { 'x-player-token': seats[1]!.token, 'if-none-match': etagB },
+      });
+      expect(refreshedB.statusCode).toBe(304);
+
+      // 撤回同样只让操作者自己的 ETag 失效。
+      const revoke = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/plan/revoke`,
+        headers: { 'x-player-token': seats[0]!.token },
+        payload: { actionId },
+      });
+      expect(revoke.statusCode).toBe(200);
+      const afterRevoke = await app.inject({
+        method: 'GET',
+        url: `/api/games/${gameId}`,
+        headers: { 'x-player-token': seats[0]!.token, 'if-none-match': refreshedA.headers.etag as string },
+      });
+      expect(afterRevoke.statusCode).toBe(200);
+      expect((afterRevoke.json() as GameStateView).plan.myQueue).toHaveLength(0);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('persists pending plan queues and mode across a server restart', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'tg-simul-persist-'));
     process.env.TACTICAL_GAME_STATE_FILE = join(tempDir, 'games.json');

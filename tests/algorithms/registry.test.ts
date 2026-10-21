@@ -30,6 +30,10 @@ describe('algorithm registry modes', () => {
     const info = listAlgorithmInfo().find(i => i.name === 'random-sim');
     expect(info?.modes).toEqual(['simultaneous']);
     expect(getAlgorithmMeta('random-sim')?.modes).toEqual(['simultaneous']);
+    const destProb = listAlgorithmInfo().find(i => i.name === 'dest-prob');
+    expect(destProb?.modes).toEqual(['simultaneous']);
+    expect(destProb?.displayName).toBe('落点概率算法');
+    expect(getAlgorithmMeta('dest-prob')?.modes).toEqual(['simultaneous']);
     expect(getAlgorithmMeta('greedy')?.modes).toEqual(['standard']);
   });
 
@@ -40,6 +44,8 @@ describe('algorithm registry modes', () => {
   it('answers supports-mode queries per registry declaration', () => {
     expect(algorithmSupportsMode('random-sim', 'simultaneous')).toBe(true);
     expect(algorithmSupportsMode('random-sim', 'standard')).toBe(false);
+    expect(algorithmSupportsMode('dest-prob', 'simultaneous')).toBe(true);
+    expect(algorithmSupportsMode('dest-prob', 'standard')).toBe(false);
     expect(algorithmSupportsMode('greedy', 'standard')).toBe(true);
     expect(algorithmSupportsMode('greedy', 'simultaneous')).toBe(false);
   });

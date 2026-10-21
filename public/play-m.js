@@ -3224,7 +3224,7 @@ async function ensureAlgorithmTypes() {
     }
   }
   // gameConfig 只在开局后的 game_start 事件才有值，而添加 AI 弹窗仅存在于大厅阶段，
-  // 此时须回退到大厅快照的 mode，否则同时回合对局选不到 random-sim、非标准模式全被 400 拒。
+  // 此时须回退到大厅快照的 mode，否则同时回合对局选不到同时模式算法、非标准模式全被 400 拒。
   const mode = gameConfig?.mode || botLobbyMode || 'standard';
   const available = algorithmTypesCache.filter(algo =>
     Array.isArray(algo.modes) ? algo.modes.includes(mode) : mode === 'standard');

@@ -20,6 +20,7 @@ export const ALGORITHMS = {
   field: './builtin/field.mjs',
   verdict: './builtin/verdict.mjs',
   'random-sim': './builtin/random-sim.mjs',
+  'dest-prob': './builtin/dest-prob.mjs',
 };
 
 /**
@@ -48,6 +49,7 @@ export const ALGORITHM_META = {
   field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'] },
   verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v1', modes: ['standard'] },
   'random-sim': { displayName: '同时随机算法', description: '同时回合：从所有合法计划动作中随机选择入队，随后提交', version: 'v1', modes: ['simultaneous'] },
+  'dest-prob': { displayName: '落点概率算法', description: '同时回合：建模敌军落点概率，预测射击并规避目的格冲突', version: 'v1', modes: ['simultaneous'] },
 };
 
 /**

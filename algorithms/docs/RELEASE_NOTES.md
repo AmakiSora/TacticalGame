@@ -2,6 +2,20 @@
 
 > 本文档记录算法 AI 系统的版本历史、功能变更和性能进展。
 
+## 3.7.2（2026-10-22）— Destination Probability 落点概率算法
+
+### 新增功能
+
+1. **落点概率算法（dest-prob）**：同时回合模式的第二个内置算法 `algorithms/builtin/dest-prob.mjs`（注册键 `algo_dest-prob`，`modes: ['simultaneous']`）。它把同时回合的隐藏计划当成分布问题：先为每个敌军建立"原地 + 可达格"的落点概率（占点引力、火力机会、我方威胁、支援锚点、原地惯性，softmax 归一化），再据此计算预测射击（覆盖格上的出现概率 × 伤害）、目的格冲突风险（同一格被多人声明会一起失败）与每个候选落点的期望承伤。据点按裁定流量权重 × 预计持有回合 + 收入计价，因此开局会优先铺开占点。与 threat/field 的静态威胁表不同，dest-prob 的核心输入是"敌人下一步会站哪"；与 mcts 不同，它不做整局模拟，单步毫秒级。
+2. **注册与入口**：注册表 `ALGORITHM_META` 新增 dest-prob 展示元数据；大厅算法下拉、`/api/algorithms` 与 bot 接口由注册表自动带出，无需另立清单。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/dest-prob.test.ts` 9 例：敌军落点分布把可占据点排在原地之前、冲突规避、预测射击空格、arc 治疗、部署、原地占点、提交/无座位/AP 短路，以及真实 standoff / molten-throne 的整轮入队校验。
+- 新增 `tests/algorithms/dest-prob-selfplay.test.ts` 2 例：standoff 与 molten-throne 整局互相对弈，零非法动作并正常完赛。
+- `tests/algorithms/registry.test.ts` 与 `tests/api/bots.test.ts` 补 dest-prob 的 modes、展示名与大厅添加断言。
+- headless 自博弈（`temp/dest-prob-100.mts`，逐局交替先手、种子基 1000）：vs random-sim 在 standoff / molten-throne 各 100 局 **100:0**、零非法动作；两图场均击杀 3.10 / 0.96（random-sim 0.23 / 0.01），场均裁定分 1105.10 : 280.13 / 3503.22 : 671.14；种子基 5000 复测各 100 局同样 100:0；3 人 standoff 10:0、6 人 standoff 5:0（零非法冒烟）。
+
 ## 3.5.12（2026-10-06）— 算法按模式注册隔离 + 同时随机算法
 
 ### 新增功能

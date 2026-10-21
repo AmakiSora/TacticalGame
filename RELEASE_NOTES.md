@@ -4,6 +4,18 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.7.2
+
+### 新增
+
+- **新增「落点概率算法」（dest-prob）：同时回合模式的第二个内置算法**：为每个敌军建立"原地 + 可达格"的落点概率分布（占点引力、火力机会、我方威胁、支援锚点、原地惯性），在分布上计算预测射击（覆盖格出现概率 × 伤害）、目的格冲突风险（同一格被多人声明会一起失败）与候选落点期望承伤；据点按裁定流量权重 × 预计持有回合 + 收入计价。注册键 `algo_dest-prob`，`modes: ['simultaneous']`，大厅算法下拉与 `/api/algorithms` 由注册表自动带出；详细档案见 `algorithms/docs/algorithms/dest-prob.md`。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/dest-prob.test.ts`（9 例：落点分布、冲突规避、预测射击、arc 治疗、部署、原地占点、提交/无座位/AP 短路、真实 standoff / molten-throne 整轮入队校验）与 `tests/algorithms/dest-prob-selfplay.test.ts`（standoff / molten-throne 整局互相对弈零非法动作）；`tests/algorithms/registry.test.ts`、`tests/api/bots.test.ts` 补 dest-prob 的 modes、展示名与大厅添加断言。
+- headless 自博弈（逐局交替先手，种子基 1000）：dest-prob vs random-sim 在 standoff / molten-throne 各 100 局 **100:0**、零非法动作；两图场均击杀 3.10 / 0.96（random-sim 0.23 / 0.01），场均裁定分 1105.10 : 280.13 / 3503.22 : 671.14；另一套种子基 5000 复测各 100 局同样 100:0。3 人 standoff 10:0、6 人 standoff 5:0 零非法冒烟。random-sim 是均匀随机基线，100:0 不代表对真人/RL 模型的强度。
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 106 文件 / 885 例全绿。
+
 ## 3.7.1
 
 ### 变更

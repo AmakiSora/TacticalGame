@@ -403,12 +403,29 @@ describe('Algorithm bot endpoints', () => {
     expect(body.bot.name).toBe('同时随机算法');
   });
 
+  it('allows dest-prob algorithm bots on simultaneous maps', async () => {
+    const created = await createTwoPlayerLobby(app, { mapId: 'standoff' });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_dest-prob' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { bot: { name: string; algorithm: string } };
+    expect(body.bot.algorithm).toBe('dest-prob');
+    expect(body.bot.name).toBe('落点概率算法');
+  });
+
   it('lists per-algorithm supported modes in the catalog', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/algorithms' });
     expect(res.statusCode).toBe(200);
-    const { algorithms } = res.json() as { algorithms: Array<{ id: string; modes: string[] }> };
+    const { algorithms } = res.json() as { algorithms: Array<{ id: string; modes: string[]; name: string }> };
     const randomSim = algorithms.find(a => a.id === 'algo_random-sim');
     expect(randomSim?.modes).toEqual(['simultaneous']);
+    const destProb = algorithms.find(a => a.id === 'algo_dest-prob');
+    expect(destProb?.modes).toEqual(['simultaneous']);
+    expect(destProb?.name).toBe('落点概率算法');
     const greedy = algorithms.find(a => a.id === 'algo_greedy');
     expect(greedy?.modes).toEqual(['standard']);
   });

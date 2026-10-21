@@ -16,6 +16,7 @@ algorithms/
 │   ├── field.mjs     # 势场算法（标准模式）
 │   ├── verdict.mjs   # 裁决线算法（标准模式）
 │   ├── random-sim.mjs # 同时随机算法（同时回合模式）
+│   ├── dest-prob.mjs # 落点概率算法（同时回合模式）
 │   └── README.md     # 算法开发指南
 ├── lib/              # 共享工具库
 │   ├── api-client.mjs    # REST API 客户端
@@ -31,7 +32,8 @@ algorithms/
 │       ├── threat.md
 │       ├── field.md
 │       ├── verdict.md
-│       └── random-sim.md
+│       ├── random-sim.md
+│       └── dest-prob.md
 ├── registry.mjs      # 算法注册表
 └── runner.mjs        # 通用运行器
 ```
@@ -105,8 +107,9 @@ export default {
 | **field** | 势场/梯度下降 | O(单位×格子) | 中上（vs greedy 7 图 ×30 局 **64.3%**）；**低行动点图最强**（danger-close 97%，threat 仅 18%）；高行动点图最弱（multiplayer-ring 7%） | 涌现式走位（风筝/分头抢点）、慢节奏消耗战 |
 | **verdict** | 反向规划/期限排程 | O(单位×格子 + 排程回合) | **对 greedy 最强**（7 图 ×30 局 **95.7%**，两套种子一致）；vs threat 76.7%、vs field 88.6%、vs random 24:0；`danger-close` 80%（threat 18%）、`multiplayer-ring` 100%（field 7%） | 全动作按裁决分统一计价、预算内斩首、守成与回防 |
 | **random-sim** | 随机 | O(n) | 未标定（仅同时回合模式） | 同时回合基线对照、模式隔离冒烟 |
+| **dest-prob** | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 同时回合对 random-sim **100:0**（standoff / molten-throne 各 100 局，零非法；两图场均击杀 3.10 / 0.96）；多席位仅冒烟 | 同时回合实战、预测射击与冲突规避样例 |
 
-> 表中除 random-sim 外均为标准模式算法；random-sim 仅支持同时回合（simultaneous）模式。
+> 表中 random-sim 与 dest-prob 为同时回合（simultaneous）模式算法，其余为标准模式算法。dest-prob 的 100:0 是对均匀随机基线的下界验证，不代表对真人/RL 的强度。
 
 > b = 分支因子（~20），d = 搜索深度（8），k = 模拟次数（100）
 >
@@ -228,6 +231,7 @@ verdict 的口径与 threat/field 完全一致（`scripts/algorithm-arena.mjs`�
 | 2026-09-16 | 3.5.3 | field 标定：尺度自适应档案（小图 1 环/据点井 4 格，大图 2 环/5 格）、同一敌军在斥力井中去重计费、纯波前导航（否决了"直线+绕行"混合场：default +10 但 breach −20） |
 | 2026-09-18 | 3.5.4 | 新增 verdict 裁决线算法（反向规划：三条裁决线 + 攻城排程 + 全动作按引擎裁决分统一计价）。初版 vs greedy 64.3%（7 图 ×30 局），最大短板是对 threat 的 `forge` 相克 |
 | 2026-09-18 | 3.5.4 | verdict 标定与修复：十处结构性约束（见 `algorithms/verdict.md`），其中四条各值 20 个以上百分点——到位后推进梯度归零（远程兵不再放弃已到手的打击）、打击扣"原地承伤"（dual-lanes 60%→93%）、打击加"暴露下降"差分（集火斩杀）、排程按抵达概率折损（dual-lanes 53%→83%）。`STEP_SURVIVAL` 扫描 0.72/0.62/0.55/0.45/0.35 → 89.0/92.4/**95.7**/回落/回落。最终 **vs greedy 95.7%（201:9）**、两套种子基一致 |
+| 2026-10-22 | 3.7.2 | 新增 dest-prob 落点概率算法（同时回合）：敌军落点概率分布 + 预测射击 + 目的格冲突规避 + 据点流量计价。headless 对 random-sim 两图各 100 局 **100:0**、零非法；场均击杀 3.10（standoff）/ 0.96（molten-throne）；3/6 人 standoff 零非法冒烟。 |
 
 ## 未来方向
 

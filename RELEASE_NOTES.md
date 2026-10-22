@@ -9,6 +9,7 @@
 ### 变更
 
 - 版本号提升至 3.8.1。
+- **matrix-eq 升级到 v2（3.8.0 分步引擎适配版）**：重写分步结算镜像、投影站位/地形寻路的结构性计划校验、组合动作生成与按步序的事件史重建，新增池内精修和自适应利用混合；注册表算法版本标注为 `v2`，历史对局仍按版本 id 归档。镜像裁判基准：对 v1 **23:7**、对 kriegspiel **12:18**、对 dest-prob **13:17**、对 random-sim **30:0**，单轮求解 ≤157ms/侧。
 
 ### 修复
 
@@ -17,6 +18,7 @@
 ### 测试与验证
 
 - 扩展 `tests/algorithms/random-sim.test.ts`：覆盖同单位多动作、投影位置后的攻击、攻击次数上限、投影后空位枚举与真实 standoff 对局合法性。
+- 新增 `tests/algorithms/matrix-eq-selfplay.test.ts` 覆盖 v2 在 standoff / molten-throne / 三人局的整局零非法动作；`node scripts/matrix_eq_smoke.mjs` 107 动作零非法、单轮 ≤85ms。
 - `npm run build` 通过；`npm test` 全量通过（110 文件 / 929 例）。
 
 ## 3.8.0

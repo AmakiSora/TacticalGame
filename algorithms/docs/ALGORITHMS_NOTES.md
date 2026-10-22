@@ -113,9 +113,9 @@ export default {
 | **random-sim** | 随机 | O(n) | 未标定（仅同时回合模式） | 同时回合基线对照、模式隔离冒烟 |
 | **dest-prob** | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 同时回合对 random-sim **100:0**（standoff / molten-throne 各 100 局，零非法；两图场均击杀 3.10 / 0.96）；多席位仅冒烟 | 同时回合实战、预测射击与冲突规避样例 |
 | **kriegspiel** | 真实结算 rollout + 联合计划搜索 | O(候选×种子计划×rollouts×单轮结算) | 同时回合对 random-sim **60/60**、对 dest-prob **34/60（56.7%）**（standoff / molten-throne 各 30 局 ×2 对手，零非法；单轮搜索约 20ms） | 同时回合最强内置、联合计划搜索样例 |
-| **matrix-eq** | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | 同时回合镜像裁判对 random-sim **30:0**、对 dest-prob **14:16（合计 25:35）**、对 kriegspiel **8:22**（standoff 各 30 局，零非法；单轮求解 ≤173ms） | 博弈论混合策略、计划组合矩阵博弈样例 |
+| **matrix-eq** | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | **v2（3.8.1）** 对 v1 **23:7**、对 kriegspiel **12:18**、对 dest-prob **13:17**、对 random-sim **30:0**（standoff 各 30 局，零非法；单轮求解 ≤157ms/侧） | 博弈论混合策略、计划组合矩阵博弈样例 |
 
-> 表中 random-sim、dest-prob、kriegspiel 与 matrix-eq 为同时回合（simultaneous）模式算法，其余为标准模式算法。random-sim 的 100:0 / 60:0 是对均匀随机基线的下界验证，不代表对真人/RL 的强度；kriegspiel 对 dest-prob 的 56.7%、matrix-eq 对 dest-prob 的 25:35 才是有意义的内置强度对照。
+> 表中 random-sim、dest-prob、kriegspiel 与 matrix-eq 为同时回合（simultaneous）模式算法，其余为标准模式算法。random-sim 的 100:0 / 60:0 是对均匀随机基线的下界验证，不代表对真人/RL 的强度；kriegspiel 对 dest-prob 的 56.7%、matrix-eq v2 对 kriegspiel 的 12:18 与对 dest-prob 的 13:17 才是有意义的内置强度对照。
 
 > b = 分支因子（~20），d = 搜索深度（8），k = 模拟次数（100）
 >
@@ -240,6 +240,7 @@ verdict 的口径与 threat/field 完全一致（`scripts/algorithm-arena.mjs`�
 | 2026-10-22 | 3.7.2 | 新增 dest-prob 落点概率算法（同时回合）：敌军落点概率分布 + 预测射击 + 目的格冲突规避 + 据点流量计价。headless 对 random-sim 两图各 100 局 **100:0**、零非法；场均击杀 3.10（standoff）/ 0.96（molten-throne）；3/6 人 standoff 零非法冒烟。 |
 | 2026-10-22 | 3.7.3 | 新增 kriegspiel 兵棋推演算法（同时回合）：把整份计划塞进镜像 `resolveRound` 的 JS 单轮结算器真实跑一遍，对 objective/aggressive/random 三种对手组合做蒙特卡洛 rollout，按「均值 − λ·标准差」风险调整分挑选 + 爬山精修；复用 dest-prob 的 `computeAim`/`enumerateAims` 与落点模型。headless 各 30 局 ×2 地图 ×2 对手：对 random-sim **60/60**、对 dest-prob **34/60（56.7%）**，全部 240 局零非法；单轮搜索约 20ms、`decide` 约 2–3ms。补 dest-prob「不做联合计划搜索」「对手模型可被反预测」两条限制。 |
 | 2026-10-22 | 3.7.5 | 新增 matrix-eq 矩阵均衡算法（同时回合）：把每轮升维成「计划组合 × 计划组合」矩阵博弈，用镜像结算器算支付、CFR 自我对弈解均衡混合，并从 `round_resolved` 事件史重建敌方真实计划做实证校正；输出混合策略抽样而非确定性 argmax。standoff 镜像裁判各 30 局：对 random-sim **30:0**、对 dest-prob **14:16**（顺序对照合计 25:35）、对 kriegspiel **8:22**；150 局零非法，单轮求解 ≤173ms。 |
+| 2026-10-23 | 3.8.1 | matrix-eq v2（3.8.0 分步引擎适配）：重写分步结算镜像（级联/到达依赖链/逐步死亡/攻击上限）、结构性计划校验（投影站位+地形寻路）、组合动作生成（连击/先射后撤/两连移）与事件史按步序重建；新增池内精修与自适应利用混合。standoff 镜像裁判各 30 局：对 v1 **23:7**、对 kriegspiel **12:18**、对 dest-prob **13:17**、对 random-sim **30:0**；全部零非法，单轮求解 ≤157ms/侧。 |
 
 ## 未来方向
 

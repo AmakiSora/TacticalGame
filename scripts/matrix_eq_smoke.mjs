@@ -15,14 +15,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// 双模式路径解析：
-//   仓库模式 —— 本包整体并入 TacticalGame 仓库后（脚本位于 <repo>/scripts/），
-//               直接用仓库内的算法与地图；
-//   包模式   —— 未并入时，用包内 algorithms/builtin/matrix-eq.mjs +
-//               开发工作区的地图副本。
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// 双模式路径：仓库模式（并入 TacticalGame 后）优先；否则回退开发工作区。
 const firstExisting = (...cands) => cands.find(c => existsSync(c));
-// 从脚本位置逐级向上找相对路径（兼容 仓库/scripts、包/scripts、工作区/scripts 三种深度）。
 const findUp = rel => {
   let dir = __dirname;
   for (let i = 0; i < 6; i++) {
@@ -35,17 +30,16 @@ const findUp = rel => {
   return null;
 };
 const algoPath = process.argv[2] ?? firstExisting(
-  join(__dirname, '../algorithms/builtin/matrix-eq.mjs'),            // 仓库/包布局
-  findUp('download/matrix-eq/matrix-eq.mjs'));                       // 开发工作区
+  join(__dirname, '../algorithms/builtin/matrix-eq.mjs'),
+  findUp('download/matrix-eq/matrix-eq.mjs'));
 const mapPath = process.argv[3] ?? firstExisting(
-  join(__dirname, '../maps/standoff.json'),                          // 仓库布局
-  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame372/maps/standoff.json')); // 工作区
+  join(__dirname, '../maps/standoff.json'),
+  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame380/maps/standoff.json'));
 if (!algoPath || !mapPath) {
-  console.error('找不到 matrix-eq.mjs 或 maps/standoff.json（可经 argv[2]/argv[3] 指定）');
+  console.error('找不到 matrix-eq.mjs 或 maps/standoff.json');
   process.exit(1);
 }
-console.log(`[冒烟] 算法: ${algoPath}
-[冒烟] 地图: ${mapPath}`);
+console.log(`[冒烟] 算法: ${algoPath}\n[冒烟] 地图: ${mapPath}`);
 
 const map = JSON.parse(readFileSync(mapPath, 'utf8'));
 const { default: matrixEq, matrixEqInternals: I } = await import(pathToFileURL(algoPath).href);
@@ -183,87 +177,117 @@ function terrainOf(state, q, r) {
   return state.cells.find(c => c.q === q && c.r === r)?.terrain ?? 'blocker';
 }
 
-/** 独立复刻 planning.ts 入队校验：返回错误说明或 null（合法）。 */
+/** 独立复刻 3.8.0 planning.ts 结构性入队校验：返回错误说明或 null（合法）。
+ *  与算法内部 structuralCheck 独立成文（防自证）：投影站位 + 地形寻路
+ *  （不看占位）+ 攻击次数上限 + 部署预算。 */
+function projectQueueOf(state, queue) {
+  const positions = new Map();
+  const attackCounts = new Map();
+  let deploySpend = 0;
+  for (const a of queue) {
+    if (a.type === 'move' && a.unitId) positions.set(a.unitId, { q: a.q, r: a.r });
+    if (a.type === 'attack' && a.attackerId) attackCounts.set(a.attackerId, (attackCounts.get(a.attackerId) ?? 0) + 1);
+    if (a.type === 'deploy' && a.unitType) {
+      const spec = map.units[a.unitType];
+      const origin = deployOriginOf(state, a.owner, a.fromId);
+      const discount = origin ? Math.min(spec.cost, map.balance.controlPointTypes?.[origin.kind]?.deployDiscount ?? 0) : 0;
+      deploySpend += spec.cost - discount;
+    }
+  }
+  return { positions, attackCounts, deploySpend };
+}
+
+function deployOriginOf(state, owner, fromId) {
+  const hq = state.headquarters[owner];
+  if (hq && hq.alive && (hq.id === fromId || fromId === `${owner}_hq` || fromId === 'hq')) return hq;
+  const cp = state.controlPoints.find(p => p.id === fromId && p.owner === owner);
+  if (cp && map.balance.controlPointTypes?.[cp.kind]?.canDeploy !== false) return cp;
+  return null;
+}
+
+function terrainReachableOf(state, from, range, projection) {
+  const visited = new Set([key(from)]);
+  const result = [];
+  const frontier = [{ q: from.q, r: from.r, d: 0 }];
+  for (let i = 0; i < frontier.length; i++) {
+    const cur = frontier[i];
+    if (cur.d >= range) continue;
+    for (const d of DIRS) {
+      const next = { q: cur.q + d.q, r: cur.r + d.r };
+      const k = key(next);
+      if (visited.has(k)) continue;
+      visited.add(k);
+      if (!inBounds(state, next.q, next.r)) continue;
+      if (terrainOf(state, next.q, next.r) !== 'plain') continue; // 单位不当墙
+      result.push(next);
+      frontier.push({ ...next, d: cur.d + 1 });
+    }
+  }
+  return result;
+}
+
 function validateAction(state, owner, action, queue) {
   const limit = map.balance.actionsPerTurn;
   if (queue.length >= limit) return 'AP 超限';
-  const usedUnits = new Set(queue.map(a => a.unitId ?? a.attackerId ?? a.supportId).filter(Boolean));
-  const claimed = new Set(queue.filter(a => a.type === 'move' || a.type === 'deploy').map(a => key(a)));
-  const unitId = action.unitId ?? action.attackerId ?? action.supportId;
-  if (unitId && usedUnits.has(unitId)) return '一单位一轮一动作被违反';
+  const projection = projectQueueOf(state, queue);
+  const unitOf = id => state.units.find(u => u.id === id && u.alive && u.owner === owner);
+
   if (action.type === 'move') {
-    const unit = state.units.find(u => u.id === action.unitId && u.alive && u.owner === owner);
+    const unit = unitOf(action.unitId);
     if (!unit) return '移动：单位不存在';
-    if (unit.q === action.q && unit.r === action.r) return '移动：原地不动';
-    if (claimed.has(key(action))) return '移动：己方重复认领';
-    // BFS 可达（计划时刻棋盘）。
-    const occ = new Set(state.units.filter(u => u.alive).map(u => key(u)));
-    for (const hq of Object.values(state.headquarters)) if (hq.alive) occ.add(key(hq));
-    const visited = new Set([key(unit)]);
-    const frontier = [{ q: unit.q, r: unit.r, d: 0 }];
-    let reachable = false;
-    for (let i = 0; i < frontier.length; i++) {
-      const cur = frontier[i];
-      if (cur.d >= unit.moveRange) continue;
-      for (const d of DIRS) {
-        const next = { q: cur.q + d.q, r: cur.r + d.r };
-        const k = key(next);
-        if (visited.has(k)) continue;
-        visited.add(k);
-        if (!inBounds(state, next.q, next.r)) continue;
-        if (terrainOf(state, next.q, next.r) !== 'plain') continue;
-        if (occ.has(k)) continue;
-        if (next.q === action.q && next.r === action.r) reachable = true;
-        frontier.push({ ...next, d: cur.d + 1 });
-      }
+    if (!inBounds(state, action.q, action.r)) return '移动：出界';
+    const from = projection.positions.get(unit.id) ?? unit;
+    if (from.q === action.q && from.r === action.r) return '移动：目标与投影站位相同';
+    if (!terrainReachableOf(state, from, unit.moveRange, projection).some(c => c.q === action.q && c.r === action.r)) {
+      return '移动：投影站位地形不可达';
     }
-    if (!reachable) return '移动：目的格不可达';
     return null;
   }
   if (action.type === 'attack') {
-    const unit = state.units.find(u => u.id === action.attackerId && u.alive && u.owner === owner);
+    const unit = unitOf(action.attackerId);
     if (!unit) return '攻击：攻击方不存在';
+    const attackLimit = map.balance.attacksPerUnit ?? 1;
+    if ((projection.attackCounts.get(unit.id) ?? 0) >= attackLimit) return `攻击：超过每单位 ${attackLimit} 次上限`;
     if (!inBounds(state, action.q, action.r)) return '攻击：出界';
-    const aim = covered(unit, unit.type, 'attackShape', action, unit.attackRange);
-    if (!aim) return '攻击：形状瞄准非法';
+    const from = projection.positions.get(unit.id) ?? unit;
+    const aim = covered(from, unit.type, 'attackShape', action, unit.attackRange);
+    if (!aim) return '攻击：形状瞄准非法（投影站位）';
     return null;
   }
   if (action.type === 'heal') {
-    const unit = state.units.find(u => u.id === action.supportId && u.alive && u.owner === owner);
+    const unit = unitOf(action.supportId);
     if (!unit) return '治疗：支援兵不存在';
+    if (!inBounds(state, action.q, action.r)) return '治疗：出界';
+    const from = projection.positions.get(unit.id) ?? unit;
     const healRange = map.units[unit.type]?.healRange ?? unit.attackRange;
-    const aim = covered(unit, unit.type, 'healShape', action, healRange);
-    if (!aim) return '治疗：形状瞄准非法';
-    const friend = aim.cells.some(c => state.units.some(u => u.alive && u.owner === owner && u.q === c.q && u.r === c.r));
-    if (!friend) return '治疗：覆盖内无友军';
+    const aim = covered(from, unit.type, 'healShape', action, healRange);
+    if (!aim) return '治疗：形状瞄准非法（投影站位）';
     return null;
   }
   if (action.type === 'deploy') {
     const spec = map.units[action.unitType];
     if (!spec) return '部署：未知兵种';
-    const hq = state.headquarters[owner];
-    let origin = null;
-    if (hq && hq.alive && hq.id === action.fromId && map.balance.deployFromHq !== false) origin = hq;
-    if (!origin) {
-      const cp = state.controlPoints.find(p => p.id === action.fromId && p.owner === owner);
-      if (cp && (map.balance.controlPointTypes?.[cp.kind]?.canDeploy !== false)) origin = cp;
-    }
+    const origin = deployOriginOf(state, owner, action.fromId);
     if (!origin) return '部署：起点无效';
     if (dist(origin, action) !== 1) return '部署：必须相邻';
-    if (legalOccupant(state, action.q, action.r)) return '部署：目标被占用';
+    if (!inBounds(state, action.q, action.r)) return '部署：出界';
     if (terrainOf(state, action.q, action.r) !== 'plain') return '部署：非平原';
-    if (claimed.has(key(action))) return '部署：己方重复认领';
     const discount = Math.min(spec.cost, map.balance.controlPointTypes?.[origin.kind]?.deployDiscount ?? 0);
     const cost = spec.cost - discount;
-    const spent = queue.filter(a => a.type === 'deploy').reduce((s, a) => {
-      const sp = map.units[a.unitType];
-      const dd = Math.min(sp.cost, state.controlPoints.find(p => p.id === a.fromId)?.kind
-        ? map.balance.controlPointTypes[state.controlPoints.find(p => p.id === a.fromId).kind].deployDiscount ?? 0 : 0);
-      return s + sp.cost - dd;
-    }, 0);
-    if (state.resources[owner].supplies - spent < cost) return '部署：补给不足';
+    if (state.resources[owner].supplies - projection.deploySpend < cost) return '部署：补给不足';
     return null;
   }
+  if (action.type === 'demolish') {
+    const unit = unitOf(action.unitId);
+    if (!unit) return '拆除：单位不存在';
+    if (unit.type !== 'heavy') return '拆除：非 heavy';
+    if (!inBounds(state, action.q, action.r)) return '拆除：出界';
+    const from = projection.positions.get(unit.id) ?? unit;
+    if (dist(from, action) > 1) return '拆除：不相邻（投影站位）';
+    if (terrainOf(state, action.q, action.r) !== 'blocker') return '拆除：非障碍';
+    return null;
+  }
+  if (action.type === 'wait') return null;
   return '未知动作类型';
 }
 
@@ -320,40 +344,20 @@ for (let round = 1; round <= 12; round++) {
   const fp = plan => plan.map(I.actionFingerprint).join(';');
   const repro = fp(solve1.plan ?? []) === fp(solve2.plan ?? []);
 
-  // 镜像结算器当裁判。
+  // 镜像结算器当裁判（3.8 分步结算；真随机掷骰）。
   const queues = new Map([[OWNER_A, resA.queue], [OWNER_B, resB.queue]]);
-  const post = I.simulateRound(I.cloneBoard(GAME), queues);
+  const rng = I.mulberry32(0xC0FFEE + round);
+  const { board: post, outcomes, steps } = I.simulateRound(I.cloneBoard(GAME), queues, rng);
 
-  // 生成 round_resolved 事件（喂事件史重建）。
-  const results = {};
-  for (const [owner, queue] of queues) {
-    results[owner] = queue.map(a => {
-      if (a.type === 'move') {
-        const u = GAME.units.find(x => x.id === a.unitId);
-        return { actionId: a.id, type: 'move', owner, status: 'executed', unitId: a.unitId,
-          detail: { fromQ: u?.q, fromR: u?.r, toQ: a.q, toR: a.r } };
-      }
-      if (a.type === 'attack') {
-        return { actionId: a.id, type: 'attack', owner, status: 'executed',
-          detail: { attackerId: a.attackerId, q: a.q, r: a.r } };
-      }
-      if (a.type === 'deploy') {
-        return { actionId: a.id, type: 'deploy', owner, status: 'failed',
-          unitId: a.unitType, detail: { unitType: a.unitType, fromId: a.fromId, q: a.q, r: a.r } };
-      }
-      if (a.type === 'heal') {
-        return { actionId: a.id, type: 'heal', owner, status: 'fizzled',
-          detail: { supportId: a.supportId, q: a.q, r: a.r } };
-      }
-      return { actionId: a.id, type: a.type, owner, status: 'executed' };
-    });
-  }
-  GAME.events.push({ type: 'round_resolved', roundNumber: round, results });
+  // 生成 round_resolved 事件（喂事件史重建；outcomes 已是引擎 PlanOutcome 形态）。
+  GAME.events.push({ type: 'round_resolved', roundNumber: round, results: outcomes, steps });
 
   // 回写状态。
-  GAME.units = post.units.map(u => ({ ...u, alive: true }));
-  // 死亡剔除：hp<=0 的单位置 alive=false（结算器保留尸体行以记账）。
-  GAME.units = post.units.filter(u => u.hp > 0).map(u => ({ ...u, alive: true }));
+  let unitSeq = GAME.units.length;
+  GAME.units = post.units.map(u => ({
+    ...u,
+    id: typeof u.id === 'string' && u.id.endsWith(':sim') ? `u_${u.owner}_${unitSeq++}` : u.id,
+  }));
   for (const [owner, hq] of Object.entries(post.hqs)) {
     Object.assign(GAME.headquarters[owner], { hp: Math.max(0, hq.hp), alive: hq.alive });
     if (!hq.alive) GAME.players[owner].status = 'eliminated';
@@ -365,6 +369,50 @@ for (let round = 1; round <= 12; round++) {
   for (const [owner, sup] of Object.entries(post.supplies)) GAME.resources[owner].supplies = sup;
   for (const [owner, p] of Object.entries(post.players)) {
     Object.assign(GAME.players[owner].stats, p.stats);
+  }
+
+  // 回合边界经济（镜像 3.8 simultaneous.ts：流量累计 → 翻盘补给 → 收入+维修，
+  // 首回合无收入）。冒烟不跑满 15 回合，翻盘补给只在分差 ≥40% 时触发。
+  for (const owner of [OWNER_A, OWNER_B]) {
+    if (GAME.players[owner].status !== 'active') continue;
+    const held = GAME.controlPoints.filter(c => c.owner === owner).length;
+    GAME.players[owner].stats.controlHold += held;
+    GAME.players[owner].stats.controlHoldRounds += 1;
+  }
+  if (round >= (map.balance.comebackSupply?.startRound ?? 4)) {
+    // 简化翻盘补给：按控制点数近似分差（冒烟用，不做完整裁定分）。
+    const heldA = GAME.controlPoints.filter(c => c.owner === OWNER_A).length;
+    const heldB = GAME.controlPoints.filter(c => c.owner === OWNER_B).length;
+    const maxHeld = Math.max(heldA, heldB);
+    const minHeld = Math.min(heldA, heldB);
+    if (maxHeld > 0 && (maxHeld - minHeld) * 100 >= maxHeld * 40 * 3) {
+      const laggard = heldA < heldB ? OWNER_A : OWNER_B;
+      GAME.resources[laggard].supplies += map.balance.comebackSupply?.amountPerRound ?? 12;
+    }
+  }
+  if (round >= 2) {
+    for (const owner of [OWNER_A, OWNER_B]) {
+      if (GAME.players[owner].status !== 'active') continue;
+      let income = map.balance.baseIncome ?? 8;
+      for (const cp of GAME.controlPoints) {
+        if (cp.owner !== owner) continue;
+        income += map.balance.controlPointTypes?.[cp.kind]?.income ?? 0;
+      }
+      GAME.resources[owner].supplies += income;
+      // 维修站：相邻受伤友军各回 repairAmount（每单位每边界一次）。
+      const repairCps = GAME.controlPoints.filter(cp => cp.owner === owner
+        && (map.balance.controlPointTypes?.[cp.kind]?.repairAmount ?? 0) > 0);
+      const repaired = new Set();
+      for (const cp of repairCps) {
+        for (const u of GAME.units) {
+          if (u.owner !== owner || u.hp >= u.maxHp || repaired.has(u.id)) continue;
+          if (dist(cp, u) > 1) continue;
+          const amount = Math.min(map.balance.controlPointTypes[cp.kind].repairAmount, u.maxHp - u.hp);
+          u.hp += amount;
+          repaired.add(u.id);
+        }
+      }
+    }
   }
 
   const aAlive = GAME.units.filter(u => u.owner === OWNER_A).length;

@@ -1,9 +1,27 @@
 // algorithms/builtin/matrix-eq.mjs
 //
-// 矩阵均衡算法（Matrix Equilibrium）——同时回合模式的第三条技术路线：
+// 矩阵均衡算法（Matrix Equilibrium）v2 ——同时回合模式的第三条技术路线：
 // 把每一轮升维成「计划组合 × 计划组合」的矩阵博弈，用自我对弈的
 // 后悔匹配（regret matching / 单步 CFR）在该矩阵上求解均衡混合策略，
 // 再从均衡分布中抽样本轮完整计划逐动作入队。
+//
+// v2（面向 3.8.0 引擎改版）：
+//   3.8.0 把同时模式改为「按行动点分步结算」——队列第 k 条在所有玩家之间
+//   同时结算完成后才进入第 k+1 条；同一单位可在多个行动点连续行动（先移动
+//   后攻击、连续两次移动）；计划期只做结构性校验（寻路只看地形、不看占位）；
+//   结算期才判定目的格到达（允许同一步腾格/交换）、级联预检（单位先前动作
+//   硬失败则后续作废）、每单位攻击次数上限、逐步死亡。本版本全面适配：
+//   1. 镜像结算器重写为分步结算器（级联/到达求解/逐步死亡/攻击上限）；
+//   2. 计划校验镜像 3.8 planning.ts 的结构性校验（投影站位 + 地形寻路）；
+//   3. 计划生成器升级为「组合动作」生成：移动+攻击连击、先射后撤、
+//      连续移动抢占点，充分利用多行动点机制；
+//   4. 事件史重建升级：按步序重建敌方整轮计划（含 executed deploy 的
+//      完整信息），实证场景更精确；
+//   5. 新增两项 v1 缺陷的针对性改进（v1 对 kriegspiel 8:22 的归因）：
+//      a. 池内精修——对被选中执行的计划做有界爬山变异（换瞄准/换落点/
+//         调步序/删动作），对场景分布评估后接受改进；
+//      b. 自适应利用混合——实证轮数越多，越提高对「实证分布最优响应」
+//         的采样权重 γ（对确定性对手形成剥削），其余权重保持均衡混合。
 //
 // 与 random-sim 的差别：random-sim 是动作级无模型均匀随机；本算法的
 // 随机性出现在「均衡混合」这一层——抽样分布是对手无论怎么读盘都
@@ -12,33 +30,30 @@
 // 与 dest-prob 的差别（三条轴）：
 //   1. 决策粒度：dest-prob 每次 decide 做一次边际贪心 argmax（单动作
 //      期望值最高者胜）；本算法一次性求解整轮 ≤5 个动作的组合计划，
-//      组合间的协同（占点+护点、锁射+驱赶）直接进入支付矩阵。
+//      组合间的协同（连击/换位/占点+护点）直接进入支付矩阵。
 //   2. 对手模型来源：dest-prob 用固定启发式（softmax 落点分布）预测
 //      敌人；本算法的对手策略是博弈解的内生部分（自我对弈均衡），
-//      并用 round_resolved 事件史重建的敌方真实计划做实证校正——
-//      dest-prob 完全不看历史事件。
+//      并用事件史重建的敌方真实计划做实证校正。
 //   3. 输出形态：dest-prob 确定性输出，面对会读盘的对手（人或强 AI）
-//      会被反预测（skill/simultaneous.md 原话：enemies see YOUR board
-//      too——avoid the obvious hex）；本算法输出混合策略，同一棋盘
-//      不同轮次可以打出不同计划，天然反读盘。
+//      会被反预测；本算法输出混合策略，同一棋盘不同轮次可以打出
+//      不同计划，天然反读盘。
 //
 // 管线（每轮）：
-//   检测新回合 → 生成我方 K 个候选计划（策略人格 + 随机权重贪心）
-//   → 生成敌方 K' 个镜像候选计划 + 事件史实证计划
-//   → 镜像结算器（部署冲突 → 移动冲突 → 拆除 → 治疗 → 攻击锁定/覆盖
-//      → 死亡 → 占点 → 维修/收入）逐组合模拟，支付按裁定权重
-//      （scorePlayer 增量）计价
-//   → 2 人局：CFR 自我对弈解均衡，再与「对实证分布的纯最优响应」
-//      按 ε 混合（鲁棒-利用）；3+ 人：对场景分布做后悔匹配
-//   → 从混合分布抽一个计划缓存，decide 逐动作吐出
+//   检测新回合 → 生成我方 K 个候选组合计划（人格 + 随机权重贪心，
+//   含连击/先射后撤/抢点模式）
+//   → 生成敌方 K' 个镜像候选计划 + 事件史实证计划（按步序重建）
+//   → 分步结算镜像器逐组合模拟（支付按裁定权重增量计价）
+//   → 2 人局：CFR 自我对弈解均衡 + 自适应利用混合 γ；3+ 人：对场景
+//     分布做后悔匹配
+//   → 抽样一个计划 → 有界池内精修 → 缓存，decide 逐动作吐出
 //
 // 随机性由 mulberry32 提供，种子 = fnv(gameId:owner:roundNumber)：
 // 同一局同一轮可复现（回放/标定友好），跨轮可变（反读盘）。
 //
-// 约束：所有枚举镜像 src/engine/planning.ts 的入队校验（形状瞄准、
-// 一单位一轮一动作、己方目的格认领、部署预算扣减、BFS 可达），结算
-// 模拟镜像 src/engine/simultaneous.ts 的阶段顺序与判定（含 attackLock、
-// 治疗按移动后站位、目的格冲突全员失败、同回合互杀、击杀先入账后判死），
+// 约束：所有枚举镜像 3.8.0 src/engine/planning.ts 的结构性入队校验
+// （投影站位、地形寻路、攻击次数上限、部署预算扣减），结算模拟镜像
+// src/engine/simultaneousResolve.ts 的分步判定（级联预检、到达求解、
+// 同步腾格、先治疗后扣伤、逐步死亡、attackLock 锁定计划时刻站位），
 // 保证 runner 不会因非法动作空耗重问配额。
 
 // ---------------------------------------------------------------- 常量
@@ -48,9 +63,16 @@ const ENEMY_PORTFOLIO_SIZE = 9;    // 每个敌方席位的镜像候选计划数
 const MAX_EMPIRICAL_PLANS = 3;     // 事件史重建的敌方计划，每席位最多保留
 const MULTI_SCENARIOS = 24;        // ≥3 人局联合场景抽样数
 const CFR_ITERATIONS = 300;        // 后悔匹配迭代轮数
-const EXPLOIT_WEIGHT = 0.15;       // 鲁棒-利用混合中纯最优响应的权重 ε
 const HQ_WIN_BONUS = 1e6;          // 模拟中摧毁敌方总部的支付（终局级）
 const ACTION_NOISE = 0.12;         // 人格贪心内的 PRNG 扰动幅度（比例）
+
+// v2 改进参数。
+const EXPLOIT_GAMMA_MAX = 0.45;    // 自适应利用混合的 γ 上限
+const EXPLOIT_GAMMA_STEP = 0.12;   // 每一轮实证证据的 γ 增量
+const REFINE_MUTANTS = 8;          // 池内精修的最大变异数
+const REFINE_SCENARIOS = 6;        // 精修评估的场景数上限
+const SOLVE_TIME_BUDGET_MS = 200;  // 矩阵求解的软时限（超时截断剩余行）
+const REFINE_TIME_BUDGET_MS = 320; // 精修放弃的软时限
 
 const HEX_DIRS = [
   { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
@@ -58,14 +80,14 @@ const HEX_DIRS = [
 ];
 
 // 策略人格：动作竞标权重（cp=占点 fire=火力 safety=避险 heal=治疗
-// deploy=部署 advance=推进）。生成器按权重做带扰动贪心构造整轮计划。
+// deploy=部署 advance=推进 combo=连击倾向）。生成器按权重构造组合计划。
 const PERSONAS = [
-  { name: 'occupy', w: { cp: 3.0, fire: 1.0, safety: 0.6, heal: 1.2, deploy: 1.6, advance: 0.4 } },
-  { name: 'strike', w: { cp: 0.8, fire: 3.0, safety: 1.0, heal: 0.8, deploy: 0.8, advance: 1.2 } },
-  { name: 'turtle', w: { cp: 0.6, fire: 1.0, safety: 2.5, heal: 2.5, deploy: 1.0, advance: 0.0 } },
-  { name: 'advance', w: { cp: 1.0, fire: 1.5, safety: 0.8, heal: 0.8, deploy: 1.2, advance: 3.0 } },
-  { name: 'hold', w: { cp: 0.5, fire: 2.0, safety: 1.5, heal: 1.5, deploy: 0.5, advance: 0.2 } },
-  { name: 'skirmish', w: { cp: 1.5, fire: 1.8, safety: 1.8, heal: 1.0, deploy: 1.0, advance: 1.0 } },
+  { name: 'occupy', w: { cp: 3.0, fire: 1.0, safety: 0.6, heal: 1.2, deploy: 1.6, advance: 0.4, combo: 1.0 } },
+  { name: 'strike', w: { cp: 0.8, fire: 3.0, safety: 1.0, heal: 0.8, deploy: 0.8, advance: 1.2, combo: 2.5 } },
+  { name: 'turtle', w: { cp: 0.6, fire: 1.0, safety: 2.5, heal: 2.5, deploy: 1.0, advance: 0.0, combo: 0.4 } },
+  { name: 'advance', w: { cp: 1.0, fire: 1.5, safety: 0.8, heal: 0.8, deploy: 1.2, advance: 3.0, combo: 2.0 } },
+  { name: 'hold', w: { cp: 0.5, fire: 2.0, safety: 1.5, heal: 1.5, deploy: 0.5, advance: 0.2, combo: 1.2 } },
+  { name: 'skirmish', w: { cp: 1.5, fire: 1.8, safety: 1.8, heal: 1.0, deploy: 1.0, advance: 1.0, combo: 1.8 } },
 ];
 
 // ---------------------------------------------------------------- 随机数
@@ -183,6 +205,7 @@ function cloneBoard(game) {
       moveRange: u.moveRange, attackRange: u.attackRange,
       canCapture: u.canCapture, attackLock: u.attackLock ?? false,
       healPower: u.healPower ?? 0, cost: u.cost ?? (unitsSpec[u.type]?.cost ?? 0),
+      alive: true,
     }));
   const hqs = {};
   for (const [owner, hq] of Object.entries(game.headquarters ?? {})) {
@@ -263,124 +286,207 @@ function occupancyMap(board) {
   return map;
 }
 
-// ---------------------------------------------------------------- 合法动作枚举
-// 镜像 src/engine/planning.ts 的入队校验：一单位一轮一动作（以现有队列
-// 为准）、己方目的格认领互斥、BFS 可达（把所有单位当障碍）、形状瞄准、
-// 部署相邻空平原 + 预算。攻击/治疗瞄准格只要求形状合法（预测射击允许
-// 打空格），治疗额外要求计划时刻覆盖格内有存活友军。
+// ---------------------------------------------------------------- 计划投影与结构性校验
+// 镜像 3.8.0 src/engine/planning.ts 的「结构性校验」口径：
+//   计划期只看结构——单位归属、行动点预算、目标格在图内、形状/射程匹配
+//   （起点按投影站位）、部署预算。占用/地形动态/目的格冲突一律留给结算期。
+//   同一单位可多行动点连续行动（先移后攻、连移）；寻路只按地形（单位可能
+//   会走开，不当作墙）；自己先前排的 demolish 投影成 plain。
 
-function plannedUnitIds(queue) {
-  const ids = new Set();
+/**
+ * 计划队列投影：执行完当前队列后的虚拟站位 / 虚拟地形 / 攻击计数 /
+ * 累计部署花费。只假设自己的动作全部成功（与引擎 projectPlanQueue 同义）。
+ */
+function projectQueue(board, queue) {
+  const positions = new Map();
+  const terrain = new Map();
+  const attackCounts = new Map();
+  let deploySpend = 0;
   for (const a of queue) {
-    const id = a.unitId ?? a.attackerId ?? a.supportId;
-    if (id) ids.add(id);
+    if (a.type === 'move' && a.unitId) {
+      positions.set(a.unitId, { q: a.q, r: a.r });
+    } else if (a.type === 'attack' && a.attackerId) {
+      attackCounts.set(a.attackerId, (attackCounts.get(a.attackerId) ?? 0) + 1);
+    } else if (a.type === 'demolish') {
+      terrain.set(hexKey(a), 'plain');
+    } else if (a.type === 'deploy' && a.unitType && a.fromId) {
+      const spec = board.unitsSpec[a.unitType];
+      if (spec) {
+        const origin = boardDeployOrigin(board, a.owner ?? '?', a.fromId);
+        deploySpend += spec.cost - Math.min(spec.cost, origin
+          ? deployDiscountFor(board, a.owner ?? '?', origin) : 0);
+      }
+    }
   }
-  return ids;
+  return { positions, terrain, attackCounts, deploySpend };
 }
 
-function claimedCells(queue) {
-  const set = new Set();
-  for (const a of queue) {
-    if (a.type === 'move' || a.type === 'deploy') set.add(hexKey(a));
-  }
-  return set;
+/** 投影后的单位站位（无投影时回落到当前站位）。 */
+function projectedPosition(board, projection, unitId) {
+  const p = projection.positions.get(unitId);
+  if (p) return p;
+  const unit = board.units.find(u => u.id === unitId);
+  return unit ? { q: unit.q, r: unit.r } : null;
 }
 
-function plannedDeploySpend(board, queue) {
-  let sum = 0;
-  for (const a of queue) {
-    if (a.type !== 'deploy' || !a.unitType) continue;
-    const spec = board.unitsSpec[a.unitType];
-    if (!spec) continue;
-    sum += spec.cost - deployDiscount(board, a.owner ?? '?', a.fromId);
-  }
-  return sum;
-}
-
-function deployDiscount(board, owner, fromId) {
-  const origin = boardDeployOrigin(board, owner, fromId);
-  if (!origin) return 0;
-  const kinds = board.balance?.controlPointTypes ?? {};
-  const kind = kinds[origin.kind ?? 'supply'];
-  return Math.min(999, kind?.deployDiscount ?? 0);
-}
-
-function boardDeployOrigin(board, owner, fromId) {
-  const hq = board.hqs[owner];
-  if (hq && hq.alive && hq.id === fromId) return hq;
-  if (hq && hq.alive && fromId === `${owner}_hq`) return hq;
-  const cp = board.cps.find(c => c.id === fromId && c.owner === owner);
-  if (cp) return cp;
-  // 状态里总部可能没有 id 字段：fromId 形如 'hq' / 'headquarters:player_a'。
-  if (hq && hq.alive && (fromId === 'hq' || fromId === 'headquarters')) return hq;
-  return null;
-}
-
-/** BFS 可达格（镜像 findReachableCells：所有单位为障碍、仅平原）。 */
-function reachableCells(board, unit, occupants) {
-  const visited = new Set([hexKey(unit)]);
+/** 计划期可达格：只按（投影）地形寻路，忽略单位与总部占位。 */
+function terrainReachable(board, from, range, projection) {
+  const visited = new Set([hexKey(from)]);
   const result = [];
-  const queue = [{ pos: unit, distance: 0 }];
-  for (let i = 0; i < queue.length; i++) {
-    const cur = queue[i];
-    if (cur.distance >= unit.moveRange) continue;
+  const bfs = [{ pos: from, distance: 0 }];
+  for (let i = 0; i < bfs.length; i++) {
+    const cur = bfs[i];
+    if (cur.distance >= range) continue;
     for (const next of neighborsOf(cur.pos)) {
       const key = hexKey(next);
       if (visited.has(key)) continue;
       visited.add(key);
       if (!board.cells.has(key)) continue;
-      if (boardTerrainAt(board, next) !== 'plain') continue;
-      if (occupants.has(key)) continue;
+      const terr = projection.terrain.get(key) ?? board.terrain.get(key) ?? 'blocker';
+      if (terr !== 'plain') continue;
       result.push({ q: next.q, r: next.r });
-      queue.push({ pos: next, distance: cur.distance + 1 });
+      bfs.push({ pos: next, distance: cur.distance + 1 });
     }
   }
   return result;
 }
 
-/** 枚举某单位全部合法攻击瞄准（含重复覆盖格的不同锁定目标）。 */
-function enumerateAttackAims(board, unit) {
+/**
+ * 结构性入队校验（镜像 3.8 planning.ts queueXxxAction 的检查链）。
+ * 返回 null 表示合法，否则返回原因字符串。
+ */
+function structuralCheck(board, owner, action, queue) {
+  const limit = board.balance?.actionsPerTurn ?? 5;
+  if (queue.length >= limit) return '行动点预算已满';
+  const projection = projectQueue(board, queue);
+
+  if (action.type === 'move') {
+    const unit = board.units.find(u => u.id === action.unitId && u.owner === owner && u.alive !== false);
+    if (!unit) return '移动：单位不存在';
+    if (!board.cells.has(hexKey(action))) return '移动：目标格在地图之外';
+    const from = projectedPosition(board, projection, unit.id);
+    if (!from) return '移动：单位不存在';
+    if (from.q === action.q && from.r === action.r) return '移动：目标与投影站位相同';
+    if (!terrainReachable(board, from, unit.moveRange, projection)
+      .some(pos => pos.q === action.q && pos.r === action.r)) {
+      return '移动：投影站位地形不可达';
+    }
+    return null;
+  }
+
+  if (action.type === 'attack') {
+    const unit = board.units.find(u => u.id === action.attackerId && u.owner === owner && u.alive !== false);
+    if (!unit) return '攻击：单位不存在';
+    const attackLimit = board.balance?.attacksPerUnit ?? 1;
+    const used = projection.attackCounts.get(unit.id) ?? 0;
+    if (used >= attackLimit) return `攻击：该单位本轮最多攻击 ${attackLimit} 次`;
+    if (!board.cells.has(hexKey(action))) return '攻击：目标格在地图之外';
+    const from = projectedPosition(board, projection, unit.id);
+    if (!from) return '攻击：单位不存在';
+    const spec = board.unitsSpec[unit.type] ?? {};
+    const aim = computeCoveredCells(from, shapeSpecFor(spec, 'attackShape'), 'attackShape', action, unit.attackRange);
+    if (!aim) return '攻击：形状/射程打不到目标格';
+    return null;
+  }
+
+  if (action.type === 'heal') {
+    const unit = board.units.find(u => u.id === action.supportId && u.owner === owner && u.alive !== false);
+    if (!unit) return '治疗：单位不存在';
+    if (!board.cells.has(hexKey(action))) return '治疗：目标格在地图之外';
+    const from = projectedPosition(board, projection, unit.id);
+    if (!from) return '治疗：单位不存在';
+    const spec = board.unitsSpec[unit.type] ?? {};
+    const healRange = spec.healRange ?? unit.attackRange ?? 1;
+    const aim = computeCoveredCells(from, shapeSpecFor(spec, 'healShape'), 'healShape', action, healRange);
+    if (!aim) return '治疗：形状/射程打不到目标格';
+    return null;
+  }
+
+  if (action.type === 'deploy') {
+    const spec = board.unitsSpec[action.unitType];
+    if (!spec) return '部署：未知兵种';
+    const origin = boardDeployOrigin(board, owner, action.fromId);
+    if (!origin) return '部署：起点无效（须为总部或己方可部署据点）';
+    if (hexDistance(origin, action) !== 1) return '部署：目标格不与起点相邻';
+    if (!board.cells.has(hexKey(action))) return '部署：目标格在地图之外';
+    const terr = projection.terrain.get(hexKey(action)) ?? board.terrain.get(hexKey(action)) ?? 'blocker';
+    if (terr !== 'plain') return '部署：目标格不是平原';
+    const discount = Math.min(spec.cost, deployDiscountFor(board, owner, origin));
+    const cost = spec.cost - discount;
+    if ((board.supplies[owner] ?? 0) - projection.deploySpend < cost) return '部署：补给不足';
+    return null;
+  }
+
+  if (action.type === 'demolish') {
+    const unit = board.units.find(u => u.id === action.unitId && u.owner === owner && u.alive !== false);
+    if (!unit) return '拆除：单位不存在';
+    if (unit.type !== 'heavy') return '拆除：只有 heavy 能拆除';
+    if (!board.cells.has(hexKey(action))) return '拆除：目标格在地图之外';
+    const from = projectedPosition(board, projection, unit.id);
+    if (!from || hexDistance(from, action) > 1) return '拆除：目标格不在投影站位相邻';
+    const terr = projection.terrain.get(hexKey(action)) ?? board.terrain.get(hexKey(action)) ?? 'blocker';
+    if (terr !== 'blocker') return '拆除：目标格不是障碍';
+    return null;
+  }
+
+  if (action.type === 'wait') return null; // 只占行动点
+  return '未知动作类型';
+}
+
+function boardDeployOrigin(board, owner, fromId) {
+  const hq = board.hqs[owner];
+  const hqAllowed = board.balance?.deployFromHq !== false;
+  if (hq && hq.alive && hqAllowed && hq.id === fromId) return hq;
+  if (hq && hq.alive && hqAllowed && fromId === `${owner}_hq`) return hq;
+  const cp = board.cps.find(c => c.id === fromId && c.owner === owner);
+  if (cp && (board.balance?.controlPointTypes ?? {})[cp.kind ?? 'supply']?.canDeploy !== false) return cp;
+  // 状态里总部可能没有 id 字段：fromId 形如 'hq' / 'headquarters:player_a'。
+  if (hq && hq.alive && hqAllowed && (fromId === 'hq' || fromId === 'headquarters')) return hq;
+  return null;
+}
+
+/** 枚举某单位从指定站位出发的全部合法攻击瞄准（含空格：预测射击）。 */
+function enumerateAttackAimsFrom(board, unit, from) {
   const spec = board.unitsSpec[unit.type] ?? {};
   const shape = shapeSpecFor(spec, 'attackShape');
   const aims = [];
   const seen = new Set();
   const tryAim = (target) => {
-    const aim = computeCoveredCells(unit, shape, 'attackShape', target, unit.attackRange);
+    const aim = computeCoveredCells(from, shape, 'attackShape', target, unit.attackRange);
     if (!aim) return;
-    const key = `${unit.q},${unit.r}|${aim.type}|${aim.direction}|${target.q},${target.r}`;
+    const key = `${aim.type}|${aim.direction}|${target.q},${target.r}`;
     if (seen.has(key)) return;
     seen.add(key);
     aims.push({ target: { q: target.q, r: target.r }, aim });
   };
   if (shape.type === 'single') {
-    // 射程内所有格（含空格：预测射击）。
     for (let dq = -unit.attackRange; dq <= unit.attackRange; dq++) {
       for (let dr = -unit.attackRange; dr <= unit.attackRange; dr++) {
-        if (hexDistance(unit, { q: unit.q + dq, r: unit.r + dr }) > unit.attackRange) continue;
-        tryAim({ q: unit.q + dq, r: unit.r + dr });
+        if (hexDistance(from, { q: from.q + dq, r: from.r + dr }) > unit.attackRange) continue;
+        tryAim({ q: from.q + dq, r: from.r + dr });
       }
     }
   } else if (shape.type === 'arc') {
-    for (const d of HEX_DIRS) tryAim({ q: unit.q + d.q, r: unit.r + d.r });
+    for (const d of HEX_DIRS) tryAim({ q: from.q + d.q, r: from.r + d.r });
   } else {
     for (const d of HEX_DIRS) {
       const maxK = Math.min(shape.length, unit.attackRange);
-      for (let k = 1; k <= maxK; k++) tryAim({ q: unit.q + k * d.q, r: unit.r + k * d.r });
+      for (let k = 1; k <= maxK; k++) tryAim({ q: from.q + k * d.q, r: from.r + k * d.r });
     }
   }
   return aims.filter(a => board.cells.has(hexKey(a.target)));
 }
 
-/** 枚举支援兵全部合法治疗瞄准（覆盖格内须有存活友军）。 */
-function enumerateHealAims(board, unit, occupants) {
+/** 枚举支援兵从指定站位出发的治疗瞄准（覆盖格含友军才有意义）。 */
+function enumerateHealAimsFrom(board, unit, from, occupants) {
   const spec = board.unitsSpec[unit.type] ?? {};
   const shape = shapeSpecFor(spec, 'healShape');
   const healRange = spec.healRange ?? unit.attackRange ?? 1;
   const aims = [];
   const seen = new Set();
   for (const d of HEX_DIRS) {
-    const target = { q: unit.q + d.q, r: unit.r + d.r };
-    const aim = computeCoveredCells(unit, shape, 'healShape', target, healRange);
+    const target = { q: from.q + d.q, r: from.r + d.r };
+    const aim = computeCoveredCells(from, shape, 'healShape', target, healRange);
     if (!aim) continue;
     const key = `${aim.type}|${aim.direction}`;
     if (seen.has(key)) continue;
@@ -395,75 +501,6 @@ function enumerateHealAims(board, unit, occupants) {
   return aims;
 }
 
-/** 枚举某席位的全部合法动作（不含拆除：对峙图上价值低，见文档局限）。 */
-function enumerateActions(board, owner, queue) {
-  const occupants = occupancyMap(board);
-  const usedUnits = plannedUnitIds(queue);
-  const claimed = claimedCells(queue);
-  const limit = board.balance?.actionsPerTurn ?? 5;
-  const remainingAp = limit - queue.length;
-  const actions = [];
-  if (remainingAp <= 0) return actions;
-
-  for (const unit of board.units) {
-    if (unit.owner !== owner || usedUnits.has(unit.id)) continue;
-    // 攻击
-    for (const { target, aim } of enumerateAttackAims(board, unit)) {
-      actions.push({
-        type: 'attack', unit, aim,
-        payload: { attackerId: unit.id, q: target.q, r: target.r, direction: aim.direction },
-      });
-    }
-    // 治疗
-    if (unit.type === 'support' && (board.unitsSpec[unit.type]?.healPower ?? 0) > 0) {
-      for (const { target, aim } of enumerateHealAims(board, unit, occupants)) {
-        actions.push({
-          type: 'heal', unit, aim,
-          payload: { supportId: unit.id, q: target.q, r: target.r, direction: aim.direction },
-        });
-      }
-    }
-    // 移动
-    for (const dest of reachableCells(board, unit, occupants)) {
-      if (claimed.has(hexKey(dest))) continue;
-      actions.push({ type: 'move', unit, payload: { unitId: unit.id, q: dest.q, r: dest.r } });
-    }
-  }
-  // 部署：总部（deployFromHq !== false 时）+ 己方据点（canDeploy !== false 的
-  // 类型即可部署源，对峙图 supply 点也算——与 deployOriginFor 同口径）。
-  const supplies = board.supplies[owner] ?? 0;
-  const spent = plannedDeploySpend(board, queue);
-  const deployFromHq = board.balance?.deployFromHq !== false;
-  const origins = [];
-  const ownHq = board.hqs[owner];
-  if (deployFromHq && ownHq && ownHq.alive) origins.push(ownHq);
-  for (const cp of board.cps) {
-    if (cp.owner !== owner) continue;
-    const kindCfg = (board.balance?.controlPointTypes ?? {})[cp.kind ?? 'supply'];
-    if (kindCfg?.canDeploy === false) continue;
-    origins.push(cp);
-  }
-  for (const origin of origins) {
-    for (const [typeName, spec] of Object.entries(board.unitsSpec)) {
-      if (!spec || spec.cost == null) continue;
-      const discount = Math.min(spec.cost, deployDiscountFor(board, owner, origin));
-      const cost = spec.cost - discount;
-      if (supplies - spent < cost) continue;
-      for (const pos of neighborsOf(origin)) {
-        if (!board.cells.has(hexKey(pos))) continue;
-        if (boardTerrainAt(board, pos) !== 'plain') continue;
-        if (occupants.has(hexKey(pos))) continue;
-        if (claimed.has(hexKey(pos))) continue;
-        actions.push({
-          type: 'deploy', unit: null,
-          payload: { unitType: typeName, fromId: origin.id ?? `${owner}_hq`, q: pos.q, r: pos.r },
-        });
-      }
-    }
-  }
-  return actions;
-}
-
 function deployDiscountFor(board, owner, origin) {
   const kinds = board.balance?.controlPointTypes ?? {};
   const cfg = kinds[origin.kind ?? 'supply'];
@@ -471,8 +508,12 @@ function deployDiscountFor(board, owner, origin) {
 }
 
 // ---------------------------------------------------------------- 计划生成器
-// 人格贪心：每轮对候选动作按人格权重竞标 + PRNG 扰动，argmax 入队，
-// 重复直到行动点用尽或无可行动作。产出完整计划（动作数组，队列形态）。
+// v2 组合动作生成器：3.8.0 允许同一单位在多个行动点连续行动，因此以
+// 「单位组合」为生成单元——移动+攻击连击、先射后撤、连续移动抢点、
+// 移动+治疗；组合按人格权重竞标，汇编模式决定步序：
+//   advance：部署 → 全部移动 → 全部攻击/治疗（推进后齐射，打预测终位）
+//   strike：全部攻击/治疗 → 全部移动（先手齐射，再位移躲后续火力）
+//   free：  按组合竞标分排序原样交错。
 
 function personaWeights(rng) {
   return {
@@ -482,15 +523,17 @@ function personaWeights(rng) {
     heal: 0.5 + rng() * 2.0,
     deploy: 0.5 + rng() * 2.0,
     advance: 0.5 + rng() * 2.0,
+    combo: 0.5 + rng() * 2.0,
   };
 }
 
-/** 敌方落点简单先验：0.5 留原地，0.5 均摊到 BFS 可达格。 */
-function enemyDestPrior(board, occupants, enemies) {
+/** 敌方落点先验：0.5 留原地，0.5 均摊到地形可达格（3.8 寻路不看占位）。 */
+function enemyDestPrior(board, enemies) {
   const prior = new Map();
+  const emptyProj = { terrain: new Map() };
   for (const u of enemies ?? board.units) {
     prior.set(hexKey(u), (prior.get(hexKey(u)) ?? 0) + 0.5);
-    const reach = reachableCells(board, u, occupants);
+    const reach = terrainReachable(board, u, u.moveRange, emptyProj);
     if (reach.length) {
       const share = 0.5 / reach.length;
       for (const c of reach) prior.set(hexKey(c), (prior.get(hexKey(c)) ?? 0) + share);
@@ -500,17 +543,15 @@ function enemyDestPrior(board, occupants, enemies) {
 }
 
 /** 我方每个候选落点的期望承伤（敌方按先验落点 + 从落点开火的覆盖）。 */
-function exposureMap(board, occupants, enemies, destPrior) {
+function exposureMap(board, enemies, destPrior) {
   const exposure = new Map();
   for (const enemy of enemies) {
     const spec = board.unitsSpec[enemy.type] ?? {};
     const shape = shapeSpecFor(spec, 'attackShape');
-    // 敌人从「先验概率 > 0.08 的落点」开火的覆盖格并集 × 落点概率。
     for (const [posKey, p] of destPrior) {
       if (p < 0.08) continue;
       const pos = { q: Number(posKey.split(',')[0]), r: Number(posKey.split(',')[1]) };
       if (hexDistance(enemy, pos) > enemy.moveRange) continue;
-      // 从该落点能打到的格：以 shape 枚举方向。
       const targets = shape.type === 'single'
         ? cellsWithin(pos, enemy.attackRange)
         : HEX_DIRS.map(d => ({ q: pos.q + d.q, r: pos.r + d.r }));
@@ -553,82 +594,6 @@ function expectedDamage(board, attacker, target, simRng) {
   return Math.max(min, attacker.attack - def);
 }
 
-/** 单动作人格竞标分。 */
-function actionScore(board, action, w, context) {
-  const { enemies, destPrior, exposure, occupants, ownerTargets } = context;
-  let score = 0;
-  if (action.type === 'attack') {
-    const unit = action.unit;
-    let dmg = 0;
-    if (unit.attackLock) {
-      // 锁定射击：计划时刻站在瞄准格上的敌军，未逃出射程必命中。
-      const occ = occupants.get(hexKey(action.payload));
-      if (occ && occ.kind === 'unit' && occ.entity.owner !== unit.owner) {
-        const escapeP = 0.35; // 逃出射程的粗略概率（移动力 ≥ 2 时不可忽略）
-        dmg += expectedDamage(board, unit, occ) * (1 - escapeP);
-      } else {
-        // 锁定兵打空格：只有预测价值（先验落点）。
-        dmg += expectedDamage(board, unit, null) * (destPrior.get(hexKey(action.payload)) ?? 0);
-      }
-    } else {
-      for (const cell of action.aim.cells) {
-        const occ = occupants.get(hexKey(cell));
-        if (!occ || occ.kind !== 'unit' || occ.entity.owner === unit.owner) continue;
-        dmg += expectedDamage(board, unit, occ) * 0.55; // 当前站位命中概率
-      }
-      // 预测射击：敌军先验会走进覆盖格。
-      for (const cell of action.aim.cells) {
-        dmg += expectedDamage(board, unit, null) * (destPrior.get(hexKey(cell)) ?? 0) * 0.45;
-      }
-    }
-    score += w.fire * dmg * 0.6;
-    score += w.fire * 0.8; // 火力人格的固定倾向（哪怕期望低也保留开火习惯）
-  } else if (action.type === 'heal') {
-    let heal = 0;
-    for (const cell of action.aim.cells) {
-      const occ = occupants.get(hexKey(cell));
-      if (!occ || occ.kind !== 'unit' || occ.entity.owner !== action.unit.owner) continue;
-      const missing = occ.entity.maxHp - occ.entity.hp;
-      if (missing <= 0) continue;
-      const expected = (board.unitsSpec[action.unit.type]?.healPower ?? 0)
-        + (board.balance?.healVarianceRange ?? 0) / 2;
-      heal += Math.min(missing, expected);
-    }
-    score += w.heal * heal * 0.5;
-  } else if (action.type === 'move') {
-    const unit = action.unit;
-    const from = hexDistance(unit, action.payload);
-    // 占点引力：离最优目标据点距离缩短。
-    if (unit.canCapture) {
-      const target = nearestTarget(action.payload, ownerTargets.cp ?? []);
-      const targetNow = nearestTarget(unit, ownerTargets.cp ?? []);
-      if (target && targetNow) {
-        const gain = hexDistance(unit, targetNow) - hexDistance(action.payload, target);
-        score += w.cp * Math.max(0, gain) * 3;
-        // 站上据点的大额奖励。
-        if (ownerTargets.cpKeys?.has(hexKey(action.payload))) score += w.cp * 8;
-      }
-    }
-    // 推进引力。
-    const hqTarget = ownerTargets.enemyHq;
-    if (hqTarget) {
-      const hqNow = hexDistance(unit, hqTarget);
-      const hqNext = hexDistance(action.payload, hqTarget);
-      score += w.advance * Math.max(0, hqNow - hqNext) * 1.5;
-    }
-    // 避险：落点期望承伤。
-    score -= w.safety * (exposure.get(hexKey(action.payload)) ?? 0) * 0.12;
-    score -= 0.05 * from; // 轻微的路途成本
-  } else if (action.type === 'deploy') {
-    const spec = board.unitsSpec[action.payload.unitType] ?? {};
-    score += w.deploy * (spec.cost ?? 0) * 0.35 * 0.3;
-    if (action.payload.unitType === 'support') score += w.heal * 4;
-    const target = nearestTarget(action.payload, ownerTargets.cp ?? []);
-    if (target) score += w.cp * Math.max(0, 4 - hexDistance(action.payload, target)) * 0.8;
-  }
-  return score;
-}
-
 function nearestTarget(pos, targets) {
   let best = null;
   let bestD = Infinity;
@@ -639,268 +604,710 @@ function nearestTarget(pos, targets) {
   return best;
 }
 
-/** 生成一个完整计划（贪心 + 扰动）。返回队列形态动作数组。 */
-function buildPlan(board, owner, weights, rng, seedQueue) {
-  // 种子队列（人类/上轮遗留的已排动作）归一成统一形态后作为固定前缀。
+/**
+ * 从指定站位出发的攻击瞄准价值（timing=early 打当前站位为主，
+ * late 打先验落点为主）。
+ */
+function strikeOptionValue(board, unit, from, target, aim, context, timing) {
+  const { destPrior, occupants, enemyHq } = context;
+  const nowW = timing === 'early' ? 0.6 : 0.35;
+  const priorW = timing === 'early' ? 0.4 : 0.65;
+  let value = 0;
+  for (const cell of aim.cells) {
+    const occ = occupants.get(hexKey(cell));
+    if (occ && occ.kind === 'unit' && occ.entity.owner !== unit.owner) {
+      const dmg = expectedDamage(board, unit, occ);
+      value += nowW * dmg * (1 + (occ.entity.hp > 0 && dmg >= occ.entity.hp ? occ.entity.cost * 0.02 : 0));
+    } else if (occ && occ.kind === 'headquarters' && occ.entity.owner !== unit.owner) {
+      value += nowW * expectedDamage(board, unit, occ) * 2.2;
+    }
+    value += priorW * expectedDamage(board, unit, null) * (destPrior.get(hexKey(cell)) ?? 0);
+    if (enemyHq && hexKey(enemyHq) === hexKey(cell)) value += 6;
+  }
+  return value;
+}
+
+/** 某单位在某站位的最佳瞄准（含价值）。 */
+function bestStrikeFrom(board, unit, from, context, timing) {
+  let best = null;
+  let bestValue = -Infinity;
+  for (const { target, aim } of enumerateAttackAimsFrom(board, unit, from)) {
+    const value = strikeOptionValue(board, unit, from, target, aim, context, timing);
+    if (value > bestValue) { bestValue = value; best = { target, aim, value }; }
+  }
+  return bestValue > 0 ? best : null;
+}
+
+/** 治疗组合：当前或先移动再治疗。 */
+function supportCombo(board, unit, w, context, rng, slots) {
+  const { occupants, planCtx } = context;
+  const healSpec = board.unitsSpec[unit.type] ?? {};
+  const healPower = (healSpec.healPower ?? 0) + (board.balance?.healVarianceRange ?? 0) / 2;
+  if (healPower <= 0) return null;
+  const healValue = option => {
+    let v = 0;
+    for (const cell of option.aim.cells) {
+      const occ = occupants.get(hexKey(cell));
+      if (!occ || occ.kind !== 'unit' || occ.entity.owner !== unit.owner) continue;
+      const missing = occ.entity.maxHp - occ.entity.hp;
+      if (missing > 0) v += Math.min(missing, healPower) * 0.5;
+    }
+    return v;
+  };
+  const nowAims = enumerateHealAimsFrom(board, unit, unit, occupants);
+  let bestNow = null;
+  let bestNowV = 0;
+  for (const opt of nowAims) {
+    const v = healValue(opt);
+    if (v > bestNowV) { bestNowV = v; bestNow = opt; }
+  }
+  if (bestNowV > 0 && slots >= 1) {
+    return { actions: [{ type: 'heal', owner: unit.owner, supportId: unit.id, q: bestNow.target.q, r: bestNow.target.r, direction: bestNow.aim.direction }], score: w.heal * bestNowV };
+  }
+  // 走向伤员再治疗（组合）。
+  if (slots >= 2) {
+    const wounded = board.units.filter(u => u.owner === unit.owner && u.hp < u.maxHp * 0.8);
+    if (wounded.length) {
+      const target = nearestTarget(unit, wounded);
+      const reach = terrainReachable(board, unit, unit.moveRange, { terrain: new Map() })
+        .filter(d => arrivalOk(board, occupants, d, planCtx, unit));
+      let bestCell = null;
+      let bestD = hexDistance(unit, target);
+      for (const c of reach) {
+        const d = hexDistance(c, target);
+        if (d < bestD) { bestD = d; bestCell = c; }
+      }
+      if (bestCell) {
+        const aimsAt = enumerateHealAimsFrom(board, unit, bestCell, occupants);
+        let best = null;
+        let bestV = 0;
+        for (const opt of aimsAt) {
+          const v = healValue(opt);
+          if (v > bestV) { bestV = v; best = opt; }
+        }
+        if (bestV > 0) {
+          return {
+            actions: [
+              { type: 'move', owner: unit.owner, unitId: unit.id, q: bestCell.q, r: bestCell.r },
+              { type: 'heal', owner: unit.owner, supportId: unit.id, q: best.target.q, r: best.target.r, direction: best.aim.direction },
+            ],
+            score: w.heal * bestV * 0.9,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 到达保守判定（生成器安全阀）：引擎允许同格冲突（全员失败）与依赖链，
+ * 但**自己计划内部**的自冲突等于白送对手——生成期排除：
+ *   1. 目的格已被本轮计划认领（任何步序的 move/deploy）；
+ *   2. 目的格当前被占（除非占用者是我方更早排队移出的单位——其原格
+ *      在我到达前已腾空，引擎依赖链允许）。
+ * 敌方占用一律排除（跟车移动成功率低且失败会级联作废后续动作）。
+ */
+function arrivalOk(board, occupants, dest, planCtx, selfUnit) {
+  const key = hexKey(dest);
+  if (planCtx.plannedDest.has(key)) return false;
+  const occ = occupants.get(key);
+  if (!occ) return true;
+  if (occ.kind !== 'unit') return false;
+  if (occ.entity === selfUnit) return false;
+  if (occ.entity.owner === selfUnit.owner) {
+    return planCtx.freedOrigins.has(key);
+  }
+  return false; // 敌方占用：保守排除
+}
+
+/** 战斗单位组合：连击 / 先射后撤 / 抢点 / 齐射 / 原地开火。 */
+function combatCombo(board, unit, w, context, rng, slots) {
+  const { exposure, ownerTargets, destPrior, occupants, planCtx } = context;
+  const noise = x => x * (1 + (rng() * 2 - 1) * ACTION_NOISE);
+  const moveOptions = () => terrainReachable(board, unit, unit.moveRange, { terrain: new Map() })
+    .filter(d => arrivalOk(board, occupants, d, planCtx, unit));
+  const options = [];
+
+  // E) 原地开火。
+  const strikeNow = bestStrikeFrom(board, unit, unit, context, 'early');
+  if (strikeNow) {
+    options.push({
+      actions: [{ type: 'attack', owner: unit.owner, attackerId: unit.id, q: strikeNow.target.q, r: strikeNow.target.r, direction: strikeNow.aim.direction }],
+      score: w.fire * noise(strikeNow.value * 0.9),
+    });
+  }
+
+  if (slots >= 2) {
+    // B) 推进连击：先移动到打击位，再开火（打预测终位）。
+    const reach = moveOptions();
+    let bestAdvance = null;
+    let bestAdvanceScore = -Infinity;
+    for (const d of reach) {
+      const strike = bestStrikeFrom(board, unit, d, context, 'late');
+      if (!strike) continue;
+      const exp = (exposure.get(hexKey(d)) ?? 0) * 0.12;
+      const cpGain = unit.canCapture && ownerTargets.cpKeys?.has(hexKey(d)) ? w.cp * 14 : 0;
+      const advanceGain = w.advance * 0.6;
+      const s = w.combo * (strike.value * 1.25) + cpGain + advanceGain - w.safety * exp;
+      if (s > bestAdvanceScore) { bestAdvanceScore = s; bestAdvance = { d, strike }; }
+    }
+    if (bestAdvance) {
+      options.push({
+        actions: [
+          { type: 'move', owner: unit.owner, unitId: unit.id, q: bestAdvance.d.q, r: bestAdvance.d.r },
+          { type: 'attack', owner: unit.owner, attackerId: unit.id, q: bestAdvance.strike.target.q, r: bestAdvance.strike.target.r, direction: bestAdvance.strike.aim.direction },
+        ],
+        score: noise(bestAdvanceScore),
+      });
+    }
+
+    // C) 先射后撤：先手齐射当前站位，再位移到低暴露格。
+    if (strikeNow) {
+      let bestDisplace = null;
+      let bestDExp = Infinity;
+      for (const d of reach) {
+        const exp = (exposure.get(hexKey(d)) ?? 0);
+        if (exp < bestDExp) { bestDExp = exp; bestDisplace = d; }
+      }
+      if (bestDisplace) {
+        options.push({
+          actions: [
+            { type: 'attack', owner: unit.owner, attackerId: unit.id, q: strikeNow.target.q, r: strikeNow.target.r, direction: strikeNow.aim.direction },
+            { type: 'move', owner: unit.owner, unitId: unit.id, q: bestDisplace.q, r: bestDisplace.r },
+          ],
+          score: noise(w.fire * strikeNow.value * 0.85 + w.safety * 4 - w.safety * bestDExp * 0.12),
+        });
+      }
+    }
+
+    // D) 连续移动抢点 / 推进。
+    if (unit.canCapture && ownerTargets.cp?.length) {
+      const cp = nearestTarget(unit, ownerTargets.cp);
+      if (cp && hexDistance(unit, cp) > unit.moveRange && hexDistance(unit, cp) <= unit.moveRange * 2) {
+        // 两段移动落上据点：中转格选离据点最近的地形可达格。
+        const reach1 = terrainReachable(board, unit, unit.moveRange, { terrain: new Map() });
+        let mid = null;
+        let midD = Infinity;
+        for (const c of reach1) {
+          if (hexDistance(c, cp) > unit.moveRange) continue;
+          const d = hexDistance(c, cp);
+          if (d < midD) { midD = d; mid = c; }
+        }
+        if (mid) {
+          options.push({
+            actions: [
+              { type: 'move', owner: unit.owner, unitId: unit.id, q: mid.q, r: mid.r },
+              { type: 'move', owner: unit.owner, unitId: unit.id, q: cp.q, r: cp.r },
+            ],
+            score: noise(w.cp * 18),
+          });
+        }
+      }
+    }
+  }
+
+  // A) 单移动：占点 / 推进 / 避险换位。
+  {
+    const reach = moveOptions();
+    let bestMove = null;
+    let bestMoveScore = -Infinity;
+    for (const d of reach) {
+      let s = 0;
+      if (unit.canCapture && ownerTargets.cpKeys?.has(hexKey(d))) s += w.cp * 14;
+      const cpT = nearestTarget(d, ownerTargets.cp ?? []);
+      const cpNow = nearestTarget(unit, ownerTargets.cp ?? []);
+      if (cpT && cpNow) s += w.cp * Math.max(0, hexDistance(unit, cpNow) - hexDistance(d, cpT)) * 4;
+      if (ownerTargets.enemyHq) {
+        s += w.advance * Math.max(0, hexDistance(unit, ownerTargets.enemyHq) - hexDistance(d, ownerTargets.enemyHq)) * 1.5;
+      }
+      s -= w.safety * (exposure.get(hexKey(d)) ?? 0) * 0.12;
+      s -= 0.05;
+      if (s > bestMoveScore) { bestMoveScore = s; bestMove = d; }
+    }
+    if (bestMove && bestMoveScore > 0.2) {
+      options.push({
+        actions: [{ type: 'move', owner: unit.owner, unitId: unit.id, q: bestMove.q, r: bestMove.r }],
+        score: noise(bestMoveScore),
+      });
+    }
+  }
+
+  if (!options.length) return null;
+  let best = null;
+  let bestScore = -Infinity;
+  for (const opt of options) {
+    if (sScore(opt) > bestScore) { bestScore = sScore(opt); best = opt; }
+  }
+  return best;
+  function sScore(opt) { return opt.score; }
+}
+
+/**
+ * 生成一个完整组合计划。pattern ∈ 'advance' | 'strike' | 'free'。
+ * 返回队列形态动作数组（步序 = 数组序）。
+ */
+function buildPlan(board, owner, weights, rng, seedQueue, pattern) {
   const queue = (seedQueue ?? []).map(a => ({ ...a, owner })).filter(a => a && a.type);
+  const limit = board.balance?.actionsPerTurn ?? 5;
   const occupants = occupancyMap(board);
   const enemies = board.units.filter(u => u.owner !== owner);
-  // 先验落点只统计敌军（预测射击与避险都只关心敌方动向）。
-  const destPrior = enemyDestPrior(board, occupants, enemies);
-  const exposure = exposureMap(board, occupants, enemies, destPrior);
+  const destPrior = enemyDestPrior(board, enemies);
+  const exposure = exposureMap(board, enemies, destPrior);
   const myUnits = board.units.filter(u => u.owner === owner);
-  const enemyHq = Object.values(board.hqs).find(h => h.owner !== owner) ?? null;
-  const cpTargets = board.cps
-    .filter(cp => cp.owner !== owner)
-    .map(cp => ({ q: cp.q, r: cp.r }));
+  const enemyHq = Object.values(board.hqs).find(h => h.owner !== owner && h.alive) ?? null;
+  const cpTargets = board.cps.filter(cp => cp.owner !== owner).map(cp => ({ q: cp.q, r: cp.r }));
+  const planCtx = { plannedDest: new Set(), freedOrigins: new Set() };
   const context = {
-    enemies, destPrior, exposure, occupants,
+    enemies, destPrior, exposure, occupants, planCtx,
     ownerTargets: {
       cp: cpTargets,
       cpKeys: new Set(cpTargets.map(hexKey)),
       enemyHq: enemyHq ? { q: enemyHq.q, r: enemyHq.r } : null,
     },
   };
-  const limit = board.balance?.actionsPerTurn ?? 5;
-  let guard = limit * 4 + 8;
-  while (queue.length < limit && guard-- > 0) {
-    const options = enumerateActions(board, owner, queue);
-    if (!options.length) break;
-    let best = null;
-    let bestScore = -Infinity;
-    for (const option of options) {
-      const base = actionScore(board, option, weights, context);
-      const noise = 1 + (rng() * 2 - 1) * ACTION_NOISE;
-      const s = base * noise;
-      if (s > bestScore) { bestScore = s; best = option; }
+
+  const combos = [];
+  // 组合分配优先级（行动点是稀缺资源，让"位置价值最高"的单位先选）：
+  // 占点型单位按距最近未占领据点的距离升序；战斗单位按火力价值降序。
+  const unitPriority = u => {
+    if (u.canCapture && cpTargets.length) {
+      const t = nearestTarget(u, cpTargets);
+      return 100 - hexDistance(u, t) * 4 + (u.attack ?? 0) * 0.1;
     }
-    if (!best || bestScore <= 0) break;
-    queue.push({ type: best.type, owner, ...best.payload });
+    return (u.attack ?? 0) * 2 - hexDistance(u, enemyHq ?? u) * 0.5;
+  };
+  const orderedUnits = myUnits.slice().sort((a, b) => unitPriority(b) - unitPriority(a));
+  for (const unit of orderedUnits) {
+    if (queue.length >= limit) break;
+    const slots = limit - queue.length - (combos.reduce((n, c) => n + c.actions.length, 0) || 0);
+    if (slots <= 0) break;
+    const combo = unit.type === 'support'
+      ? supportCombo(board, unit, weights, context, rng, slots)
+      : combatCombo(board, unit, weights, context, rng, slots);
+    if (combo) {
+      combos.push(combo);
+      // 立即登记本组合的认领格/腾格，让后续单位的 reach 过滤看到。
+      planCtx.freedOrigins.add(hexKey(unit));
+      for (const action of combo.actions) {
+        if (action.type === 'move' || action.type === 'deploy') {
+          planCtx.plannedDest.add(hexKey(action));
+        }
+      }
+    }
   }
-  return queue;
+
+  // 部署决策（人格加权）：部署总是第 1 步（新单位本轮不能行动，
+  // 早部署早占格早吃收入）。
+  const deployActions = [];
+  const spent = projectQueue(board, queue).deploySpend;
+  const supplies = (board.supplies[owner] ?? 0) - spent;
+  if (weights.deploy > 0.9 && queue.length + 1 < limit) {
+    const origins = [];
+    const ownHq = board.hqs[owner];
+    if (ownHq && ownHq.alive && board.balance?.deployFromHq !== false) origins.push(ownHq);
+    for (const cp of board.cps) {
+      if (cp.owner === owner && (board.balance?.controlPointTypes ?? {})[cp.kind ?? 'supply']?.canDeploy !== false) {
+        origins.push(cp);
+      }
+    }
+    let bestDeploy = null;
+    let bestDeployScore = -Infinity;
+    for (const origin of origins) {
+      const discount = Math.min(999, (board.balance?.controlPointTypes ?? {})[origin.kind ?? 'supply']?.deployDiscount ?? 0);
+      for (const [typeName, spec] of Object.entries(board.unitsSpec)) {
+        const cost = (spec?.cost ?? 999) - discount;
+        if (cost > supplies) continue;
+        for (const pos of neighborsOf(origin)) {
+          if (!board.cells.has(hexKey(pos))) continue;
+          if ((board.terrain.get(hexKey(pos)) ?? 'blocker') !== 'plain') continue;
+          if (occupants.has(hexKey(pos))) continue;
+          let s = weights.deploy * 2 + (spec.cost ?? 0) * 0.02;
+          if (typeName === 'support') s += weights.heal * 3;
+          if (typeName === 'ranger' || typeName === 'heavy') s += weights.fire * 1.5;
+          const cpT = nearestTarget(pos, cpTargets);
+          if (cpT) s += weights.cp * Math.max(0, 4 - hexDistance(pos, cpT)) * 0.8;
+          s -= weights.safety * (exposure.get(hexKey(pos)) ?? 0) * 0.08;
+          if (s > bestDeployScore) {
+            bestDeployScore = s;
+            bestDeploy = { type: 'deploy', owner, unitType: typeName, fromId: origin.id ?? `${owner}_hq`, q: pos.q, r: pos.r };
+          }
+        }
+      }
+    }
+    if (bestDeploy && bestDeployScore > 2.5) deployActions.push(bestDeploy);
+  }
+
+  // 汇编：pattern 决定步序。
+  const moves = [];
+  const strikes = [];
+  const ordered = [];
+  for (const combo of combos) {
+    for (const action of combo.actions) {
+      (action.type === 'move' ? moves : strikes).push(action);
+    }
+  }
+  const mode = pattern ?? (weights.combo > 1.6 ? 'strike' : 'advance');
+  if (mode === 'advance') ordered.push(...deployActions, ...moves, ...strikes);
+  else if (mode === 'strike') ordered.push(...deployActions, ...strikes, ...moves);
+  else {
+    // free：按组合原序交错。
+    for (const combo of combos) ordered.push(...combo.actions);
+    ordered.unshift(...deployActions);
+  }
+
+  // 拼接种子前缀 + 截断到行动点；逐动作结构性校验 + 自冲突过滤兜底。
+  const out = queue.slice(0, limit);
+  const finalClaim = new Set();
+  const freed = new Set();
+  for (const a of out) {
+    if (a.type === 'move' || a.type === 'deploy') {
+      finalClaim.add(hexKey(a));
+      const unit = a.unitId ? board.units.find(u => u.id === a.unitId && u.owner === owner) : null;
+      if (unit) freed.add(hexKey(unit));
+    }
+  }
+  for (const action of ordered) {
+    if (out.length >= limit) break;
+    if (structuralCheck(board, owner, action, out)) continue; // 生成器 bug 兜底
+    if (action.type === 'move' || action.type === 'deploy') {
+      const key = hexKey(action);
+      // 同计划内目的格互斥（引擎允许冲突，但自冲突=白送对手）。
+      if (finalClaim.has(key)) continue;
+      const occ = occupants.get(key);
+      if (occ && !(action.type === 'move' && occ.kind === 'unit' && occ.entity.id === action.unitId)) {
+        // 敌方占用 / 总部 / 未腾格的己方占用 → 排除。
+        if (!(occ.kind === 'unit' && freed.has(key))) continue;
+      }
+      finalClaim.add(key);
+      if (action.type === 'move' && action.unitId) {
+        const unit = board.units.find(u => u.id === action.unitId && u.owner === owner);
+        if (unit) freed.add(hexKey(unit));
+      }
+    }
+    out.push(action);
+  }
+  return out;
 }
 
-// ---------------------------------------------------------------- 结算模拟器
-// 镜像 src/engine/simultaneous.ts resolveRound 的阶段顺序与判定：
-//   0. 计划时刻站位快照（锁定射击依据）
-//   1. 部署：目的格冲突（跨全玩家的认领池）→ 补给扣减 → 生成单位
-//   2. 移动：单位有效 → 目的格冲突 → 落位
-//   3. 拆除（计划含拆除时）
-//   4. 治疗：覆盖格内受伤友军（按移动后站位）各回 expected 血
-//   5. 攻击：锁定目标（计划时刻瞄准格上的敌军，结算时未逃出射程必中，
-//      与覆盖格无关）；非锁定：覆盖格上的敌方单位/总部各吃期望伤害；
-//      同回合互杀成立，攻击者阵亡不影响其炮弹
-//   6. 死亡与淘汰：击杀/总部伤害先入账再判死；总部摧毁 → 淘汰并移除单位
-//   7. 占点：回合结束时站在据点上的 canCapture 单位改判归属
-//   8. 维修站治疗 + 收入 + 据点持有累计（裁定流量分用）
-// 伤害/治疗全部用期望值（damageVariance 期望为 0，healVariance 期望为
-// range/2）；这对矩阵博弈的解是蒙特卡洛期望的确定性近似。
+// ---------------------------------------------------------------- 分步结算模拟器
+// 镜像 3.8.0 src/engine/simultaneousResolve.ts 的「按行动点分步结算」：
+//   队列第 k 条在所有玩家之间同时结算完，才进入第 k+1 条。每一步：
+//   1. 级联预检：单位已亡/被淘汰 → 'unit_gone'；先前动作硬失败 →
+//      'previous_action_failed'（作废后续）；
+//   2. 到达求解（move+deploy 合并）：同格多到达全员失败、地形阻挡、
+//      目的格被不动的单位/总部占用失败；被"本步正在移出的单位"占用
+//      则形成依赖链（其移动失败 → 我的到达失败），迭代至稳定——
+//      允许交换、链式腾格；
+//   3. 拆除：heavy 从本步移动后站位相邻、目标格为 blocker 且为空；
+//      地形立即变 plain（下一步的到达可用）；
+//   4. wait：只占行动点；
+//   5. 攻击/治疗（先治后扣伤，净 HP 等价同时）：攻击形状按攻击者
+//      **本步结算后的实际站位**计算；锁定兵按计划时刻站位锁定目标，
+//      未逃出射程必中；每单位攻击次数上限（含失败次数）；逐步死亡
+//      （击杀入账在判死前，击杀归属确定）。
+//   回合末：占点（站位改判归属）。
+// 经济（收入/维修/翻盘补给/流量累计）不属于单轮结算，由裁判/支付层
+// 另行处理（scoreOf 的 supplies 权重为 0，捕获激励由 payoffOf 的
+// Δflow 项近似）。
+// simRng 提供时伤害/治疗按引擎口径掷骰；否则用期望值（矩阵推演模式）。
 
 function simulateRound(board, queuesByPlayer, simRng) {
   const sim = copyBoard(board);
-  const planTime = sim.units.map(u => ({ unit: u, q: u.q, r: u.r }));
-  const occupants = occupancyMap(sim);
-  const order = sim.turnOrder.filter(id => queuesByPlayer.has(id));
+  const order = sim.turnOrder
+    .filter(id => sim.players[id] && sim.players[id].status === 'active' && queuesByPlayer.has(id));
+  const queues = new Map(order.map(id => [id, (queuesByPlayer.get(id) ?? []).slice()]));
+  const maxSteps = order.reduce((m, id) => Math.max(m, queues.get(id).length), 0);
+  // 计划时刻站位（锁定射击依据，部署新单位不可被锁）。
+  const planTimePos = new Map(sim.units.map(u => [u.id, { q: u.q, r: u.r }]));
+  const failedUnits = new Set();
+  const attackCounts = new Map();
+  const attackLimit = sim.balance?.attacksPerUnit ?? 1;
+  const outcomes = {};
+  for (const id of sim.turnOrder) outcomes[id] = [];
+  let steps = 0;
 
-  // 认领池：deploy/move 目的格（所有玩家合并）。
-  const claimCount = new Map();
-  for (const id of order) {
-    for (const action of queuesByPlayer.get(id)) {
-      if (action.type !== 'move' && action.type !== 'deploy') continue;
-      const k = hexKey(action);
-      claimCount.set(k, (claimCount.get(k) ?? 0) + 1);
+  const unitOf = (owner, id) => sim.units.find(u => u.id === id && u.owner === owner && u.alive);
+  // 结果记录：与引擎 PlanOutcome 同形（unitId/q/r 顶层冗余一份，便于
+  // 旧口径算法的事件史重建直接读取）。
+  const record = (owner, action, status, reason, detail) => {
+    const unitId = action.unitId ?? action.attackerId ?? action.supportId
+      ?? detail?.unitId ?? undefined;
+    outcomes[owner].push({
+      type: action.type, status,
+      ...(unitId ? { unitId } : {}),
+      ...(action.q != null ? { q: action.q, r: action.r } : {}),
+      ...(reason ? { reason } : {}),
+      ...(detail ? { detail } : {}),
+    });
+  };
+
+  for (let step = 1; step <= maxSteps; step++) {
+    const activeCount = sim.turnOrder.filter(id => sim.players[id]?.status === 'active').length;
+    if (activeCount <= 1) break;
+
+    const items = [];
+    for (const id of order) {
+      const action = queues.get(id)[step - 1];
+      if (action && sim.players[id]?.status === 'active') items.push({ owner: id, action });
     }
-  }
-  const isConflict = action => (claimCount.get(hexKey(action)) ?? 0) > 1;
+    if (!items.length) continue;
+    steps = step;
 
-  // 阶段 1：部署。
-  for (const id of order) {
-    for (const action of queuesByPlayer.get(id)) {
-      if (action.type !== 'deploy') continue;
-      if (isConflict(action)) continue;
-      const spec = sim.unitsSpec[action.unitType];
-      if (!spec) continue;
-      const origin = boardDeployOrigin(sim, id, action.fromId);
-      if (!origin) continue;
-      if (hexDistance(origin, action) !== 1) continue;
-      const occ = occupants.get(hexKey(action));
-      if (occ) continue;
-      const discount = Math.min(spec.cost, deployDiscountFor(sim, id, origin));
+    // 1. 级联预检。
+    const kept = [];
+    for (const item of items) {
+      const a = item.action;
+      if (a.type === 'wait') { record(item.owner, a, 'executed', null, {}); continue; }
+      if (a.type === 'deploy') { kept.push(item); continue; }
+      const unitId = a.unitId ?? a.attackerId ?? a.supportId;
+      const unit = unitId ? unitOf(item.owner, unitId) : null;
+      if (!unit) {
+        record(item.owner, a, 'failed', 'unit_gone', { unitId });
+        if (unitId) failedUnits.add(unitId);
+        continue;
+      }
+      if (failedUnits.has(unitId)) {
+        record(item.owner, a, 'failed', 'previous_action_failed', { unitId });
+        continue;
+      }
+      kept.push(item);
+    }
+
+    // 2. 到达求解（move + deploy）。
+    const occupants = new Map();
+    for (const u of sim.units) if (u.alive) occupants.set(hexKey(u), { kind: 'unit', entity: u });
+    for (const hq of Object.values(sim.hqs)) if (hq.alive) occupants.set(hexKey(hq), { kind: 'headquarters', entity: hq });
+
+    const arrivals = [];
+    for (const item of kept) {
+      const a = item.action;
+      if (a.type !== 'move' && a.type !== 'deploy') continue;
+      const unit = a.type === 'move' ? unitOf(item.owner, a.unitId) : null;
+      arrivals.push({ item, unit, key: hexKey(a), to: { q: a.q, r: a.r } });
+    }
+    const destCount = new Map();
+    for (const arr of arrivals) destCount.set(arr.key, (destCount.get(arr.key) ?? 0) + 1);
+    const failedArr = new Set();
+    for (const arr of arrivals) {
+      if (destCount.get(arr.key) > 1) { failedArr.add(arr); continue; }
+      if (!sim.cells.has(arr.key)) { failedArr.add(arr); continue; }
+      if ((sim.terrain.get(arr.key) ?? 'blocker') !== 'plain') { failedArr.add(arr); continue; }
+      const occ = occupants.get(arr.key);
+      if (occ && occ.kind === 'headquarters') { failedArr.add(arr); continue; }
+      if (occ && occ.kind === 'unit') {
+        const dep = arrivals.find(x => x.unit && x.unit.id === occ.entity.id && !failedArr.has(x));
+        if (!dep) failedArr.add(arr); // 占用者本步不动 → 失败
+      }
+    }
+    // 依赖链迭代至稳定（占用者本步移动失败 → 我的到达也失败）。
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const arr of arrivals) {
+        if (failedArr.has(arr)) continue;
+        const occ = occupants.get(arr.key);
+        if (!occ || occ.kind !== 'unit') continue;
+        const dep = arrivals.find(x => x.unit && x.unit.id === occ.entity.id);
+        if (dep && failedArr.has(dep)) { failedArr.add(arr); changed = true; }
+      }
+    }
+
+    // 部署（先于移动应用：引擎 resolveDeploys 在 resolveMoves 之前）。
+    for (const arr of arrivals) {
+      const a = arr.item.action;
+      if (a.type !== 'deploy') continue;
+      if (failedArr.has(arr)) {
+        record(arr.item.owner, a, 'failed', 'destination_conflict_or_blocked',
+          { unitType: a.unitType, fromId: a.fromId, q: a.q, r: a.r });
+        continue;
+      }
+      const spec = sim.unitsSpec[a.unitType];
+      if (!spec) { record(arr.item.owner, a, 'failed', 'unknown_unit'); continue; }
+      const origin = boardDeployOrigin(sim, arr.item.owner, a.fromId);
+      const discount = origin ? Math.min(spec.cost, deployDiscountFor(sim, arr.item.owner, origin)) : 0;
       const cost = spec.cost - discount;
-      if ((sim.supplies[id] ?? 0) < cost) continue;
-      sim.supplies[id] -= cost;
+      if ((sim.supplies[arr.item.owner] ?? 0) < cost) {
+        record(arr.item.owner, a, 'failed', 'insufficient_supplies', { unitType: a.unitType, fromId: a.fromId, q: a.q, r: a.r });
+        continue;
+      }
+      sim.supplies[arr.item.owner] -= cost;
       const unit = {
-        id: `${action.unitType}:${action.q},${action.r}:sim`, owner: id, type: action.unitType,
-        q: action.q, r: action.r, hp: spec.hp, maxHp: spec.hp,
+        id: `${a.unitType}:${a.q},${a.r}:sim`, owner: arr.item.owner, type: a.unitType,
+        q: a.q, r: a.r, hp: spec.hp, maxHp: spec.hp,
         attack: spec.attack, defense: spec.defense,
         moveRange: spec.moveRange, attackRange: spec.attackRange,
         canCapture: spec.canCapture ?? false, attackLock: spec.attackLock ?? false,
-        healPower: spec.healPower ?? 0, cost: spec.cost,
+        healPower: spec.healPower ?? 0, cost: spec.cost, alive: true,
       };
       sim.units.push(unit);
       occupants.set(hexKey(unit), { kind: 'unit', entity: unit });
+      planTimePos.set(unit.id, { q: unit.q, r: unit.r });
+      record(arr.item.owner, a, 'executed', null,
+        { unitId: unit.id, cost, unitType: a.unitType, fromId: a.fromId, q: a.q, r: a.r });
     }
-  }
 
-  // 阶段 2：移动。
-  for (const id of order) {
-    for (const action of queuesByPlayer.get(id)) {
-      if (action.type !== 'move') continue;
-      if (isConflict(action)) continue;
-      const unit = sim.units.find(u => u.id === action.unitId && u.owner === id);
-      if (!unit) continue;
-      // 计划时刻 BFS 已保证可达（镜像校验），冲突过滤后落位无碰撞。
+    // 移动。
+    for (const arr of arrivals) {
+      const a = arr.item.action;
+      if (a.type !== 'move') continue;
+      if (failedArr.has(arr)) {
+        record(arr.item.owner, a, 'failed', 'destination_conflict_or_blocked',
+          { unitId: a.unitId, fromQ: arr.unit?.q, fromR: arr.unit?.r, toQ: a.q, toR: a.r });
+        if (a.unitId) failedUnits.add(a.unitId);
+        continue;
+      }
+      const unit = arr.unit;
+      if (!unit) continue; // 预检已记 unit_gone
+      const fromQ = unit.q, fromR = unit.r;
       occupants.delete(hexKey(unit));
-      unit.q = action.q; unit.r = action.r;
+      unit.q = a.q; unit.r = a.r;
       occupants.set(hexKey(unit), { kind: 'unit', entity: unit });
+      record(arr.item.owner, a, 'executed', null, { unitId: a.unitId, fromQ, fromR, toQ: a.q, toR: a.r });
     }
-  }
 
-  // 阶段 3：拆除。
-  for (const id of order) {
-    for (const action of queuesByPlayer.get(id)) {
-      if (action.type !== 'demolish') continue;
-      const unit = sim.units.find(u => u.id === action.unitId && u.owner === id);
-      if (!unit || unit.type !== 'heavy') continue;
-      if (hexDistance(unit, action) > 1) continue;
-      if (sim.terrain.get(hexKey(action)) !== 'blocker') continue;
-      if (occupants.has(hexKey(action))) continue;
-      sim.terrain.set(hexKey(action), 'plain');
+    // 3. 拆除（本步移动后站位；地形立即生效）。
+    const clearedThisStep = new Set();
+    for (const item of kept) {
+      const a = item.action;
+      if (a.type !== 'demolish') continue;
+      const unit = unitOf(item.owner, a.unitId);
+      if (!unit || unit.type !== 'heavy') { record(item.owner, a, 'failed', 'unit_not_found'); continue; }
+      const key = hexKey(a);
+      if (!sim.cells.has(key) || (sim.terrain.get(key) ?? 'blocker') !== 'blocker'
+        || hexDistance(unit, a) > 1 || occupants.has(key) || clearedThisStep.has(key)) {
+        record(item.owner, a, 'failed', 'invalid_target', { q: a.q, r: a.r });
+        failedUnits.add(a.unitId);
+        continue;
+      }
+      sim.terrain.set(key, 'plain');
+      clearedThisStep.add(key);
+      record(item.owner, a, 'executed', null, { q: a.q, r: a.r });
     }
-  }
 
-  // 阶段 4：治疗（移动后站位）。simRng 提供时按引擎口径逐目标掷量，
-  // 否则用期望值（算法内部推演模式）。
-  for (const id of order) {
-    for (const action of queuesByPlayer.get(id)) {
-      if (action.type !== 'heal') continue;
-      const support = sim.units.find(u => u.id === action.supportId && u.owner === id);
-      if (!support || support.type !== 'support') continue;
+    // 4. 治疗（先治后扣伤；站位 = 本步移动后）。
+    for (const item of kept) {
+      const a = item.action;
+      if (a.type !== 'heal') continue;
+      const support = unitOf(item.owner, a.supportId);
+      if (!support) { record(item.owner, a, 'failed', 'unit_gone', { supportId: a.supportId }); failedUnits.add(a.supportId); continue; }
       const spec = sim.unitsSpec[support.type] ?? {};
       const shape = shapeSpecFor(spec, 'healShape');
       const healRange = spec.healRange ?? support.attackRange ?? 1;
-      const aim = computeCoveredCells(support, shape, 'healShape', action, healRange);
-      if (!aim) continue;
+      const aim = computeCoveredCells(support, shape, 'healShape', a, healRange);
+      if (!aim) { record(item.owner, a, 'failed', 'out_of_range', { q: a.q, r: a.r }); failedUnits.add(a.supportId); continue; }
       const base = support.healPower || spec.healPower || 0;
       const varianceRange = sim.balance?.healVarianceRange ?? 0;
+      let applied = false;
       for (const cell of aim.cells) {
         const occ = occupants.get(hexKey(cell));
-        if (!occ || occ.kind !== 'unit' || occ.entity.owner !== id) continue;
+        if (!occ || occ.kind !== 'unit' || occ.entity.owner !== item.owner) continue;
         const u = occ.entity;
+        if (u.hp >= u.maxHp) continue;
         const amount = simRng
           ? base + Math.floor(simRng() * (varianceRange + 1))
           : base + varianceRange / 2;
         u.hp = Math.min(u.maxHp, u.hp + amount);
+        applied = true;
       }
+      record(item.owner, a, applied ? 'executed' : 'fizzled', applied ? null : 'no_wounded_target', { q: a.q, r: a.r });
     }
-  }
 
-  // 阶段 5：攻击（同回合全弹齐发后统一判死）。
-  const deaths = [];
-  const hqDestroyed = new Set();
-  for (const id of order) {
-    for (const action of queuesByPlayer.get(id)) {
-      if (action.type !== 'attack') continue;
-      const attacker = sim.units.find(u => u.id === action.attackerId && u.owner === id);
-      if (!attacker) continue;
-      const spec = sim.unitsSpec[attacker.type] ?? {};
-      const shape = shapeSpecFor(spec, 'attackShape');
-      const aim = computeCoveredCells(attacker, shape, 'attackShape', action, attacker.attackRange);
-      if (!aim) continue;
-
-      const targets = [];
-      if (spec.attackLock) {
-        const locked = planTime.find(entry =>
-          entry.unit.owner !== id && entry.q === action.q && entry.r === action.r);
-        if (locked && locked.unit.hp > 0 && hexDistance(attacker, locked.unit) <= attacker.attackRange) {
-          // 锁定目标逃不出射程 → 必中（与覆盖格无关）。
-          targets.push({ kind: 'unit', entity: locked.unit });
+    // 5. 攻击（按 turnOrder 顺序施加伤害；死亡推迟到本步末）。
+    const deadThisStep = new Set();
+    const hqDestroyed = new Set();
+    for (const id of order) {
+      for (const item of kept) {
+        if (item.owner !== id || item.action.type !== 'attack') continue;
+        const a = item.action;
+        const attacker = unitOf(id, a.attackerId);
+        if (!attacker) { record(id, a, 'failed', 'unit_gone', { attackerId: a.attackerId }); failedUnits.add(a.attackerId); continue; }
+        if ((attackCounts.get(attacker.id) ?? 0) >= attackLimit) {
+          record(id, a, 'failed', 'attack_limit_reached', { attackerId: a.attackerId });
+          failedUnits.add(a.attackerId);
+          continue;
         }
-        // 逃出射程或无人可锁 → 落空。
-      } else {
-        for (const cell of aim.cells) {
-          const occ = occupants.get(hexKey(cell));
-          if (!occ || occ.kind === 'unit' && occ.entity.owner === id) continue;
-          if (occ.kind === 'headquarters' && occ.entity.owner === id) continue;
-          if (occ.kind === 'unit' && occ.entity.hp <= 0) continue;
-          if (occ.kind === 'headquarters' && !occ.entity.alive) continue;
-          targets.push(occ);
-        }
-      }
+        attackCounts.set(attacker.id, (attackCounts.get(attacker.id) ?? 0) + 1);
+        const spec = sim.unitsSpec[attacker.type] ?? {};
+        const shape = shapeSpecFor(spec, 'attackShape');
+        const aim = computeCoveredCells(attacker, shape, 'attackShape', a, attacker.attackRange);
+        if (!aim) { record(id, a, 'failed', 'out_of_range', { attackerId: a.attackerId, q: a.q, r: a.r }); failedUnits.add(a.attackerId); continue; }
 
-      for (const target of targets) {
-        const entity = target.entity;
-        const dmg = expectedDamage(sim, attacker, target, simRng);
-        entity.hp -= dmg;
-        if (target.kind === 'headquarters') {
-          // 伤害记账：敌方总部承伤记到攻击者名下（scorePlayer 口径）。
-          if (id !== entity.owner) {
-            const attackerStats = sim.players[id]?.stats;
-            if (attackerStats) attackerStats.headquartersDamage += dmg;
+        const targets = [];
+        if (spec.attackLock) {
+          // 锁定：计划时刻站在瞄准格上的敌军；结算时未逃出射程必中。
+          for (const u of sim.units) {
+            if (u.owner === id || !u.alive) continue;
+            const pt = planTimePos.get(u.id);
+            if (pt && pt.q === a.q && pt.r === a.r) {
+              if (hexDistance(attacker, u) <= attacker.attackRange) targets.push({ kind: 'unit', entity: u });
+              break;
+            }
           }
-          if (entity.hp <= 0 && entity.alive) {
-            entity.alive = false;
-            hqDestroyed.add(entity.owner);
-          }
+          if (!targets.length) { record(id, a, 'missed', 'target_escaped', { attackerId: a.attackerId, q: a.q, r: a.r }); continue; }
         } else {
-          if (entity.hp <= 0 && !deaths.some(d => d.entity === entity)) {
-            deaths.push({ kind: 'unit', entity, killer: id });
-            const killerStats = sim.players[id]?.stats;
-            if (killerStats) killerStats.killValue += entity.cost ?? 0;
+          for (const cell of aim.cells) {
+            const occ = occupants.get(hexKey(cell));
+            if (!occ) continue;
+            if (occ.kind === 'unit' && (occ.entity.owner === id || occ.entity.hp <= 0)) continue;
+            if (occ.kind === 'headquarters' && (occ.entity.owner === id || !occ.entity.alive)) continue;
+            targets.push(occ);
+          }
+          if (!targets.length) { record(id, a, 'missed', 'no_target', { attackerId: a.attackerId, q: a.q, r: a.r }); continue; }
+        }
+
+        let hitAny = false;
+        for (const target of targets) {
+          const entity = target.entity;
+          const dmg = expectedDamage(sim, attacker, target, simRng);
+          entity.hp -= dmg;
+          hitAny = true;
+          if (target.kind === 'headquarters') {
+            if (id !== entity.owner) {
+              const stats = sim.players[id]?.stats;
+              if (stats) stats.headquartersDamage += dmg;
+            }
+            if (entity.hp <= 0 && entity.alive) {
+              entity.alive = false;
+              hqDestroyed.add(entity.owner);
+            }
+          } else if (entity.hp <= 0 && !deadThisStep.has(entity.id)) {
+            deadThisStep.add(entity.id);
+            const stats = sim.players[id]?.stats;
+            if (stats) stats.killValue += entity.cost ?? 0;
           }
         }
+        record(id, a, hitAny ? 'executed' : 'missed', null, { attackerId: a.attackerId, q: a.q, r: a.r });
       }
     }
-  }
 
-  // 阶段 6：死亡与淘汰。
-  for (const death of deaths) {
-    const entity = death.entity;
-    occupants.delete(hexKey(entity));
-    sim.units = sim.units.filter(u => u !== entity);
-  }
-  for (const owner of hqDestroyed) {
-    const player = sim.players[owner];
-    if (player) player.status = 'eliminated';
-    sim.units = sim.units.filter(u => u.owner !== owner);
-    for (const cp of sim.cps) if (cp.owner === owner) cp.owner = null;
-  }
-
-  // 阶段 7：占点（回合末站位）。
-  for (const cp of sim.cps) {
-    const occ = occupants.get(hexKey(cp));
-    if (occ && occ.kind === 'unit' && occ.entity.canCapture
-      && sim.players[occ.entity.owner]?.status === 'active') {
-      cp.owner = occ.entity.owner;
-    }
-  }
-
-  // 阶段 8：维修 / 收入 / 据点持有累计。
-  const kinds = sim.balance?.controlPointTypes ?? {};
-  for (const cp of sim.cps) {
-    const cfg = kinds[cp.kind ?? 'supply'] ?? {};
-    const repair = cfg.repairAmount ?? 0;
-    if (repair > 0) {
-      const occ = occupants.get(hexKey(cp));
-      if (occ && occ.kind === 'unit') {
-        occ.entity.hp = Math.min(occ.entity.maxHp, occ.entity.hp + repair);
+    // 本步末死亡与淘汰。
+    for (const unit of sim.units) {
+      if (unit.alive && unit.hp <= 0) {
+        unit.alive = false;
+        occupants.delete(hexKey(unit));
       }
     }
-    const income = cfg.income ?? 0;
-    if (cp.owner && sim.players[cp.owner]?.status === 'active') {
-      sim.supplies[cp.owner] = (sim.supplies[cp.owner] ?? 0) + income;
+    sim.units = sim.units.filter(u => u.alive);
+    for (const owner of hqDestroyed) {
+      const player = sim.players[owner];
+      if (player) player.status = 'eliminated';
+      sim.units = sim.units.filter(u => u.owner !== owner);
+      for (const cp of sim.cps) if (cp.owner === owner) cp.owner = null;
     }
   }
-  const baseIncome = sim.balance?.baseIncome ?? 0;
-  for (const id of sim.turnOrder) {
-    if (sim.players[id]?.status !== 'active') continue;
-    sim.supplies[id] = (sim.supplies[id] ?? 0) + baseIncome;
-    const held = sim.cps.filter(cp => cp.owner === id).length;
-    sim.players[id].stats.controlHold += held;
-    sim.players[id].stats.controlHoldRounds += 1;
+
+  // 回合末：占点。
+  const finalOcc = new Map();
+  for (const u of sim.units) finalOcc.set(hexKey(u), u);
+  for (const cp of sim.cps) {
+    const occ = finalOcc.get(hexKey(cp));
+    if (occ && occ.canCapture && sim.players[occ.owner]?.status === 'active') {
+      cp.owner = occ.owner;
+    }
   }
 
-  return sim;
+  return { board: sim, outcomes, steps };
 }
 
 // ---------------------------------------------------------------- 支付评估
@@ -945,6 +1352,16 @@ function payoffOf(preBoard, postBoard, me, enemies) {
     if (delta > worstEnemy) worstEnemy = delta;
   }
   if (Number.isFinite(worstEnemy)) pay -= worstEnemy;
+  // 捕获流价值近似：占点在裁定分里以「点数」计，但真实局里据点每回合
+  // 都在累积流量分（0.7 权重的主导项）；单轮模拟不滚动流量，这里把
+  // 本轮新增据点按一回合流量现值补进支付（与 v1 结算器内置口径同强度）。
+  {
+    const weights = preBoard.balance?.adjudicationWeights ?? {};
+    const wCp = weights.controlPoint ?? 0;
+    const flowRatio = weights.controlPointFlowRatio ?? 0.7;
+    const cpsOf = b => b.cps.filter(cp => cp.owner === me).length;
+    pay += wCp * flowRatio * (cpsOf(postBoard) - cpsOf(preBoard));
+  }
   // 总部摧毁：终局级奖励。
   for (const enemy of enemies) {
     const hq = postBoard.hqs[enemy];
@@ -956,9 +1373,10 @@ function payoffOf(preBoard, postBoard, me, enemies) {
 }
 
 // ---------------------------------------------------------------- 事件史重建
-// 从 game.events 的 round_resolved 结果里重建敌方上一轮的真实计划
-// （executed/failed/missed 都带 q/r 与单位信息）。dest-prob 完全不看
-// 事件史；本算法把它当作对手组合池的实证校正（fictitious play 味道）。
+// 3.8.0 的 round_resolved 结果带 step 序号与完整 detail（failed 移动含
+// from/to、executed deploy 事件含 fromId/q/r/unitType）。按步序重建敌方
+// 上一轮的真实整轮计划（含同一单位的「先移后攻」组合），作为对手组合
+// 池的实证场景（fictitious play 味道）。dest-prob 完全不看事件史。
 
 function reconstructEnemyPlans(game, me) {
   const plans = [];
@@ -970,15 +1388,19 @@ function reconstructEnemyPlans(game, me) {
     for (const [owner, outcomes] of Object.entries(results)) {
       if (owner === me) continue;
       if (!Array.isArray(outcomes) || !outcomes.length) continue;
+      // 先按 step 排序再重建（结果数组本身按结算序，但步序才是队列序）。
+      const sorted = outcomes
+        .map((o, idx) => ({ o, idx }))
+        .sort((a, b) => (a.o.step ?? a.idx) - (b.o.step ?? b.idx))
+        .map(x => x.o);
       const plan = [];
-      for (const outcome of outcomes) {
+      for (const outcome of sorted) {
         if (!outcome || !outcome.type) continue;
         if (outcome.type === 'attack') {
           const d = outcome.detail ?? {};
-          if (d.attackerId && d.q != null && d.r != null) {
-            plan.push({ type: 'attack', owner, attackerId: d.attackerId, q: d.q, r: d.r });
-          } else if (outcome.unitId && d.q != null && d.r != null) {
-            plan.push({ type: 'attack', owner, attackerId: outcome.unitId, q: d.q, r: d.r });
+          const attackerId = d.attackerId ?? outcome.unitId;
+          if (attackerId && d.q != null && d.r != null) {
+            plan.push({ type: 'attack', owner, attackerId, q: d.q, r: d.r });
           }
         } else if (outcome.type === 'move') {
           const d = outcome.detail ?? {};
@@ -992,11 +1414,10 @@ function reconstructEnemyPlans(game, me) {
           }
         } else if (outcome.type === 'deploy') {
           const d = outcome.detail ?? {};
-          if (d.fromId && d.unitType && outcome.q != null && outcome.r != null) {
-            plan.push({
-              type: 'deploy', owner, unitType: d.unitType, fromId: d.fromId,
-              q: outcome.q, r: outcome.r,
-            });
+          const fromId = d.fromId;
+          const q = d.q ?? outcome.q, r = d.r ?? outcome.r;
+          if (d.unitType && q != null && r != null) {
+            plan.push({ type: 'deploy', owner, unitType: d.unitType, fromId, q, r });
           }
         } else if (outcome.type === 'heal') {
           const d = outcome.detail ?? {};
@@ -1005,15 +1426,15 @@ function reconstructEnemyPlans(game, me) {
             plan.push({ type: 'heal', owner, supportId, q: d.q, r: d.r });
           }
         } else if (outcome.type === 'demolish') {
-          if (outcome.unitId && outcome.q != null && outcome.r != null) {
-            plan.push({ type: 'demolish', owner, unitId: outcome.unitId, q: outcome.q, r: outcome.r });
+          const d = outcome.detail ?? {};
+          if (outcome.unitId && d.q != null && d.r != null) {
+            plan.push({ type: 'demolish', owner, unitId: outcome.unitId, q: d.q, r: d.r });
           }
         }
       }
-      if (plan.length) plans.push({ owner, plan });
+      if (plan.length) plans.push({ owner, plan, round: ev.roundNumber });
     }
   }
-  // 只保留敌方座位（round_resolved 每轮一份，多席重建会交叉）。
   return plans;
 }
 
@@ -1179,10 +1600,22 @@ function solveRound(game, owner, utils) {
     for (let i = 0; i < randomN; i++) {
       personaPlans.push(buildPlan(board, enemy, personaWeights(rng), rng, []));
     }
+    // 实证计划：按敌方席位当前棋盘做结构性过滤（陈旧单位/非法落点剔除），
+    // 保留合法前缀——历史计划的位置可能已变，逐动作校验防止"幻觉对手"。
     const empiricalPlans = empirical
       .filter(e => e.owner === enemy)
       .slice(0, MAX_EMPIRICAL_PLANS)
-      .map(e => e.plan);
+      .map(e => e.plan)
+      .map(plan => {
+        const out = [];
+        for (const action of plan) {
+          if (out.length >= (board.balance?.actionsPerTurn ?? 5)) break;
+          if (structuralCheck(board, enemy, action, out)) continue;
+          out.push(action);
+        }
+        return out;
+      })
+      .filter(plan => plan.length > 0);
     enemyPortfolios.set(enemy, { persona: personaPlans, empirical: empiricalPlans });
   }
 
@@ -1224,32 +1657,46 @@ function solveRound(game, owner, utils) {
     return { plan: myPortfolio[0], alternatives: myPortfolio };
   }
 
-  // 支付矩阵：myPortfolio × scenarios。
-  const payoff = myPortfolio.map(myPlan => scenarios.map(scenario => {
-    const queues = new Map();
-    queues.set(owner, myPlan);
-    for (const [enemy, plan] of scenario.planByEnemy) queues.set(enemy, plan);
-    const post = simulateRound(board, queues);
-    return payoffOf(board, post, owner, enemies);
-  }));
+  // 支付矩阵：myPortfolio × scenarios（分步结算模拟；软时限内截断）。
+  const t0 = Date.now();
+  const payoff = [];
+  const keptPortfolio = [];
+  for (const myPlan of myPortfolio) {
+    const row = scenarios.map(scenario => {
+      const queues = new Map();
+      queues.set(owner, myPlan);
+      for (const [enemy, plan] of scenario.planByEnemy) queues.set(enemy, plan);
+      const { board: post } = simulateRound(board, queues);
+      return payoffOf(board, post, owner, enemies);
+    });
+    payoff.push(row);
+    keptPortfolio.push(myPlan);
+    if (Date.now() - t0 > SOLVE_TIME_BUDGET_MS && keptPortfolio.length >= 6) break;
+  }
+  const solvedPortfolio = keptPortfolio;
 
   // 求解 + 采样。
   let myMix;
   const personaScenarioCount = scenarios.filter(s => !s.empirical).length;
   if (enemies.length === 1 && personaScenarioCount > 0) {
     // 2 人局：人格场景子矩阵做 CFR 自我对弈（实证列不进对手策略集，
-    // 走下面的利用混合）。
+    // 走下面的自适应利用混合）。
     const personaPayoff = payoff.map(row => row.slice(0, personaScenarioCount));
     const { myMix: eqMix } = solveTwoPlayer(personaPayoff, CFR_ITERATIONS);
-    // 鲁棒-利用混合：ε 权重给「对实证分布的纯最优响应」。
+    // 自适应利用混合：γ = min(γmax, step × 实证轮数)，证据越足越敢剥削
+    // 确定性对手（v1 固定 ε=0.15 对 kriegspiel 类对手偏保守）。
     myMix = eqMix.slice();
     const empiricalCount = scenarios.length - personaScenarioCount;
     if (empiricalCount > 0) {
       const empiricalPayoff = payoff.map(row => row.slice(personaScenarioCount));
       const bestIdx = argmaxRowSum(empiricalPayoff);
       if (bestIdx >= 0) {
-        for (let i = 0; i < myMix.length; i++) myMix[i] *= (1 - EXPLOIT_WEIGHT);
-        myMix[bestIdx] += EXPLOIT_WEIGHT;
+        const empiricalRounds = new Set(
+          empirical.filter(e => e.round != null).map(e => e.round)).size
+          || empiricalCount;
+        const gamma = Math.min(EXPLOIT_GAMMA_MAX, EXPLOIT_GAMMA_STEP * empiricalRounds);
+        for (let i = 0; i < myMix.length; i++) myMix[i] *= (1 - gamma);
+        myMix[bestIdx] += gamma;
       }
     }
   } else {
@@ -1260,8 +1707,84 @@ function solveRound(game, owner, utils) {
     myMix = solveAgainstScenarios(payoff, normWeights, CFR_ITERATIONS);
   }
 
-  const chosen = myPortfolio[sampleIndex(myMix, rng)];
-  return { plan: chosen, alternatives: myPortfolio, mix: myMix };
+  let chosen = solvedPortfolio[sampleIndex(myMix, rng)];
+
+  // 池内精修：对被选中执行的计划做有界爬山变异（换瞄准/换落点/调步序/
+  // 删动作），对场景分布评估，严格更优才接受。v1 归因显示「一次性贪心
+  // 构造无精修」是对 kriegspiel 落后的主因——这里补上（时限内）。
+  chosen = refinePlan(board, owner, chosen, scenarios, enemies, t0);
+
+  return { plan: chosen, alternatives: solvedPortfolio, mix: myMix };
+}
+
+/** 对执行计划做有界变异爬山；返回改进版或原计划。 */
+function refinePlan(board, owner, plan, scenarios, enemies, t0) {
+  if (!plan || !plan.length || Date.now() - t0 > REFINE_TIME_BUDGET_MS) return plan;
+  const evalScenarios = scenarios.slice(0, REFINE_SCENARIOS);
+  if (!evalScenarios.length) return plan;
+  const evalPlan = candidate => {
+    let total = 0;
+    for (const scenario of evalScenarios) {
+      const queues = new Map();
+      queues.set(owner, candidate);
+      for (const [enemy, eplan] of scenario.planByEnemy) queues.set(enemy, eplan);
+      const { board: post } = simulateRound(board, queues);
+      total += payoffOf(board, post, owner, enemies);
+    }
+    return total / evalScenarios.length;
+  };
+  const currentScore = evalPlan(plan);
+
+  const mutants = [];
+  const projection = projectQueue(board, plan);
+  // 1) 换瞄准：每个攻击动作换成同起点的次优瞄准（预测价值排序取第 2）。
+  for (let i = 0; i < plan.length; i++) {
+    const a = plan[i];
+    if (a.type !== 'attack') continue;
+    const unit = board.units.find(u => u.id === a.attackerId && u.owner === owner);
+    if (!unit) continue;
+    const from = projection.positions.get(unit.id) ?? unit;
+    const context = {
+      destPrior: enemyDestPrior(board, board.units.filter(u => u.owner !== owner)),
+      occupants: occupancyMap(board),
+      enemyHq: Object.values(board.hqs).find(h => h.owner !== owner && h.alive) ?? null,
+    };
+    const opts = enumerateAttackAimsFrom(board, unit, from)
+      .map(opt => ({ opt, v: strikeOptionValue(board, unit, from, opt.target, opt.aim, context, 'late') }))
+      .sort((a, b) => b.v - a.v);
+    if (opts.length >= 2) {
+      const alt = opts[1].opt;
+      const mutant = plan.slice();
+      mutant[i] = { ...a, q: alt.target.q, r: alt.target.r, direction: alt.aim.direction };
+      mutants.push(mutant);
+    }
+    if (mutants.length >= REFINE_MUTANTS / 2) break;
+  }
+  // 2) 调步序：交换相邻的不同类型动作（改变开火/移动的相对时序）。
+  for (let i = 0; i + 1 < plan.length && mutants.length < REFINE_MUTANTS - 2; i++) {
+    if (plan[i].type === plan[i + 1].type) continue;
+    const mutant = plan.slice();
+    mutant[i] = plan[i + 1];
+    mutant[i + 1] = plan[i];
+    mutants.push(mutant);
+  }
+  // 3) 删末位动作（腾出行动点避免浪费在低价值动作上）。
+  if (plan.length > 1) mutants.push(plan.slice(0, -1));
+
+  let best = plan;
+  let bestScore = currentScore;
+  for (const mutant of mutants) {
+    if (Date.now() - t0 > REFINE_TIME_BUDGET_MS) break;
+    // 结构合法性：逐动作以前缀校验。
+    let legal = true;
+    for (let i = 0; i < mutant.length; i++) {
+      if (structuralCheck(board, owner, mutant[i], mutant.slice(0, i))) { legal = false; break; }
+    }
+    if (!legal) continue;
+    const score = evalPlan(mutant);
+    if (score > bestScore) { bestScore = score; best = mutant; }
+  }
+  return best;
 }
 
 function argmaxRowSum(matrix) {
@@ -1346,66 +1869,12 @@ function cleanPayload(action) {
   return payload;
 }
 
-/** 逐动作吐出前的最终校验（镜像 planning.ts 的入队校验）。 */
+/** 逐动作吐出前的最终校验（镜像 3.8 planning.ts 的结构性入队校验，
+ *  含投影站位——队列里已排的动作会投影我方后续动作的起点）。 */
 function stillLegal(game, owner, action, queue) {
   try {
     const board = cloneBoard(game);
-    const occupants = occupancyMap(board);
-    const usedUnits = plannedUnitIds(queue);
-    const claimed = claimedCells(queue);
-    const limit = board.balance?.actionsPerTurn ?? 5;
-    if (queue.length >= limit) return false;
-    if (action.type === 'attack') {
-      const unit = board.units.find(u => u.id === action.attackerId && u.owner === owner);
-      if (!unit || usedUnits.has(unit.id)) return false;
-      const spec = board.unitsSpec[unit.type] ?? {};
-      const shape = shapeSpecFor(spec, 'attackShape');
-      const aim = computeCoveredCells(unit, shape, 'attackShape', action, unit.attackRange);
-      return Boolean(aim) && board.cells.has(hexKey(action));
-    }
-    if (action.type === 'heal') {
-      const unit = board.units.find(u => u.id === action.supportId && u.owner === owner);
-      if (!unit || unit.type !== 'support' || usedUnits.has(unit.id)) return false;
-      const spec = board.unitsSpec[unit.type] ?? {};
-      const shape = shapeSpecFor(spec, 'healShape');
-      const healRange = spec.healRange ?? unit.attackRange ?? 1;
-      const aim = computeCoveredCells(unit, shape, 'healShape', action, healRange);
-      if (!aim) return false;
-      return aim.cells.some(cell => {
-        const occ = occupants.get(hexKey(cell));
-        return occ && occ.kind === 'unit' && occ.entity.owner === owner;
-      });
-    }
-    if (action.type === 'move') {
-      const unit = board.units.find(u => u.id === action.unitId && u.owner === owner);
-      if (!unit || usedUnits.has(unit.id)) return false;
-      if (unit.q === action.q && unit.r === action.r) return false;
-      if (claimed.has(hexKey(action))) return false;
-      return reachableCells(board, unit, occupants)
-        .some(pos => pos.q === action.q && pos.r === action.r);
-    }
-    if (action.type === 'deploy') {
-      const spec = board.unitsSpec[action.unitType];
-      if (!spec) return false;
-      const origin = boardDeployOrigin(board, owner, action.fromId);
-      if (!origin) return false;
-      if (hexDistance(origin, action) !== 1) return false;
-      if (!board.cells.has(hexKey(action))) return false;
-      if (boardTerrainAt(board, action) !== 'plain') return false;
-      if (occupants.has(hexKey(action))) return false;
-      if (claimed.has(hexKey(action))) return false;
-      const discount = Math.min(spec.cost, deployDiscountFor(board, owner, origin));
-      const cost = spec.cost - discount;
-      const spent = plannedDeploySpend(board, queue.filter(a => (a.owner ?? owner) === owner));
-      return (board.supplies[owner] ?? 0) - spent >= cost;
-    }
-    if (action.type === 'demolish') {
-      const unit = board.units.find(u => u.id === action.unitId && u.owner === owner);
-      if (!unit || unit.type !== 'heavy' || usedUnits.has(unit.id)) return false;
-      if (hexDistance(unit, action) > 1) return false;
-      return boardTerrainAt(board, action) === 'blocker' && !occupants.has(hexKey(action));
-    }
-    return false;
+    return structuralCheck(board, owner, action, queue) === null;
   } catch {
     return false;
   }
@@ -1416,8 +1885,8 @@ function stillLegal(game, owner, action, queue) {
 const matrixEq = {
   name: 'matrix-eq',
   displayName: '矩阵均衡算法',
-  description: '计划组合矩阵博弈 + CFR 均衡混合 + 结算模拟与事件史实证校正',
-  version: 'v1',
+  description: '计划组合矩阵博弈 + CFR 均衡混合 + 分步结算模拟与事件史实证校正（3.8.0 引擎适配）',
+  version: 'v2',
   modes: ['simultaneous'],
 
   decide(gameState, utils, ctx) {
@@ -1439,7 +1908,10 @@ export const matrixEqInternals = {
   cloneBoard,
   copyBoard,
   computeCoveredCells,
-  enumerateActions,
+  projectQueue,
+  structuralCheck,
+  terrainReachable,
+  enumerateAttackAimsFrom,
   buildPlan,
   simulateRound,
   scoreOf,
@@ -1448,6 +1920,7 @@ export const matrixEqInternals = {
   solveTwoPlayer,
   solveAgainstScenarios,
   solveRound,
+  refinePlan,
   actionFingerprint,
   stillLegal,
   mulberry32,

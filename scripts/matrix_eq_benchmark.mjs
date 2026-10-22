@@ -17,9 +17,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
-const REPO = join(ROOT, 'tmp/6ad92a18263c124b45549e8d_TacticalGame372');
+const GAMES = Number(process.argv[2] ?? 30);
+const WHICH = process.argv[3] ?? 'all';
+// 双模式路径解析：仓库模式（本包并入 TacticalGame 仓库后）用仓库自身的
+// 算法/地图；包模式回退开发工作区的 3.8.0 仓库副本（对手 .mjs 均为
+// "3.7 大脑跑 3.8 引擎"的真实对照）。
 const firstExisting = (...cands) => cands.find(c => existsSync(c));
-// 从脚本位置逐级向上找相对路径（兼容 仓库/scripts、包/scripts、工作区/scripts 三种深度）。
 const findUp = rel => {
   let dir = __dirname;
   for (let i = 0; i < 6; i++) {
@@ -31,46 +34,45 @@ const findUp = rel => {
   }
   return null;
 };
-const GAMES = Number(process.argv[2] ?? 30);
-const WHICH = process.argv[3] ?? 'all';
-
-// 双模式路径解析：
-//   仓库模式 —— 本包并入 TacticalGame 仓库后，对手算法取自仓库 algorithms/builtin，
-//               地图取自仓库 maps/（kriegspiel 存在则自动加入对阵）；
-//   包模式   —— 未并入时，取开发工作区解压的 3.7.2/3.7.3 仓库副本。
 const MAP_PATH = firstExisting(
-  join(ROOT, 'maps/standoff.json'),                                   // 仓库模式
-  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame372/maps/standoff.json')); // 包模式
+  join(ROOT, 'maps/standoff.json'),
+  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame380/maps/standoff.json'));
+// v2 = 包内/仓库内的 matrix-eq.mjs；v1 需要外部对照副本（包模式取
+// 工作区 3.8.0 仓库内置版；仓库模式下与 v2 同文件时跳过）。
 const ALGO_MEQ = firstExisting(
-  join(ROOT, 'algorithms/builtin/matrix-eq.mjs'),                     // 仓库/包模式
-  findUp('download/matrix-eq/matrix-eq.mjs'));                        // 开发工作区
-const REPO_LIB = firstExisting(
-  join(ROOT, 'algorithms/lib/game-utils.mjs'),
-  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame372/algorithms/lib/game-utils.mjs'));
+  join(ROOT, 'algorithms/builtin/matrix-eq.mjs'),
+  findUp('download/matrix-eq/matrix-eq.mjs'));
 const BOT_DIRS = [
   join(ROOT, 'algorithms/builtin'),
-  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame372/algorithms/builtin'),
+  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame380/algorithms/builtin'),
 ].filter(Boolean);
-const KRIEG_PATH = firstExisting(
-  join(ROOT, 'algorithms/builtin/kriegspiel.mjs'),
-  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame373/algorithms/builtin/kriegspiel.mjs'));
 const botImport = name => {
   const hit = BOT_DIRS.map(d => join(d, `${name}.mjs`)).find(existsSync);
   if (!hit) throw new Error(`找不到算法 ${name}.mjs（搜索: ${BOT_DIRS.join(', ')}）`);
   return import(pathToFileURL(hit).href);
 };
+const REPO_LIB = firstExisting(
+  join(ROOT, 'algorithms/lib/game-utils.mjs'),
+  findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame380/algorithms/lib/game-utils.mjs'));
+// v1 对照 = 3.8.0 官方收录的旧版（只在开发工作区副本里；仓库模式下
+// 与 v2 同文件，跳过——诚实口径：仓库内无 v1 可对照）。
+const V1_PATH = findUp('tmp/6ad92a18263c124b45549e8d_TacticalGame380/algorithms/builtin/matrix-eq.mjs');
+const hasV1 = V1_PATH && resolve(V1_PATH) !== resolve(ALGO_MEQ);
 
 const map = JSON.parse(readFileSync(MAP_PATH, 'utf8'));
+// v2 = 3.8.0 引擎适配版；裁判（分步结算器/校验器）取自 v2。
 const { default: matrixEq, matrixEqInternals: I } = await import(pathToFileURL(ALGO_MEQ).href);
+// v1 = 官方收录的旧版（3.7 阶段结算大脑，跑在 3.8 分步引擎上）。
+const { default: matrixEqV1 } = hasV1 ? await import(pathToFileURL(V1_PATH).href) : { default: null };
 const { default: randomSim } = await botImport('random-sim');
 const { default: destProb } = await botImport('dest-prob');
-// 3.7.3 新算法：kriegspiel（兵棋推演，rollout 计划搜索）；存在时自动加入对阵。
-const { default: kriegspiel } = KRIEG_PATH ? await import(pathToFileURL(KRIEG_PATH).href) : { default: null };
+const { default: kriegspiel } = await botImport('kriegspiel');
 const utils = await import(pathToFileURL(REPO_LIB).href);
-console.log(`[基准] matrix-eq: ${ALGO_MEQ}`);
-console.log(`[基准] 地图: ${MAP_PATH}${kriegspiel ? '（含 kriegspiel）' : ''}`);
+console.log(`[基准] v2: ${ALGO_MEQ}${hasV1 ? ` | v1 对照: ${V1_PATH}` : ''}`);
+console.log(`[基准] 地图: ${MAP_PATH}`);
 
 const BOTS = { 'matrix-eq': matrixEq, 'random-sim': randomSim, 'dest-prob': destProb, 'kriegspiel': kriegspiel };
+if (matrixEqV1) BOTS['matrix-eq-v1'] = matrixEqV1;
 const OWNER_A = 'player_a';
 const OWNER_B = 'player_b';
 // 回合顺序对照开关：BENCH_TURN_ORDER=ba 时 player_b 先结算/先计划。
@@ -174,20 +176,36 @@ function covered(unit, type, kind, target, range) {
 }
 
 function validateAction(state, owner, action, queue) {
-  if (queue.length >= (map.balance.actionsPerTurn ?? 5)) return '动作数超过行动点上限';
-  const usedUnits = new Set(queue.filter(a => a.unitId || a.attackerId || a.supportId)
-    .map(a => a.unitId ?? a.attackerId ?? a.supportId));
-  const claimed = new Set(queue.filter(a => a.type === 'move' || a.type === 'deploy').map(key));
+  // 3.8.0 结构性校验（独立成文，防自证）：投影站位 + 地形寻路（单位不
+  // 当墙）+ 攻击次数上限 + 部署预算；占用/冲突留给结算。
+  const limit = map.balance.actionsPerTurn ?? 5;
+  if (queue.length >= limit) return '动作数超过行动点上限';
+  const positions = new Map();
+  const attackCounts = new Map();
+  let deploySpend = 0;
+  for (const a of queue) {
+    if (a.type === 'move' && a.unitId) positions.set(a.unitId, { q: a.q, r: a.r });
+    if (a.type === 'attack' && a.attackerId) attackCounts.set(a.attackerId, (attackCounts.get(a.attackerId) ?? 0) + 1);
+    if (a.type === 'deploy' && a.unitType) {
+      const spec = map.units[a.unitType];
+      if (!spec) continue;
+      const origin = deployOriginOf(state, owner, a.fromId);
+      const discount = origin ? Math.min(spec.cost, map.balance.controlPointTypes?.[origin.kind]?.deployDiscount ?? 0) : 0;
+      deploySpend += spec.cost - discount;
+    }
+  }
+  const unitOf = id => state.units.find(u => u.id === id && u.alive && u.owner === owner);
+  const projected = id => positions.get(id) ?? unitOf(id);
+
   if (action.type === 'move') {
-    const unit = state.units.find(u => u.id === action.unitId && u.alive && u.owner === owner);
+    const unit = unitOf(action.unitId);
     if (!unit) return '移动：单位不存在';
-    if (unit.q === action.q && unit.r === action.r) return '移动：原地不动';
-    if (usedUnits.has(action.unitId)) return '移动：该单位本轮已有计划';
-    if (claimed.has(key(action))) return '移动：己方重复认领';
-    const occ = new Set(state.units.filter(u => u.alive).map(u => key(u)));
-    for (const hq of Object.values(state.headquarters)) if (hq.alive) occ.add(key(hq));
-    const visited = new Set([key(unit)]);
-    const frontier = [{ q: unit.q, r: unit.r, d: 0 }];
+    if (!inBounds(state, action.q, action.r)) return '移动：出界';
+    const from = projected(action.unitId);
+    if (!from) return '移动：单位不存在';
+    if (from.q === action.q && from.r === action.r) return '移动：目标与投影站位相同';
+    const visited = new Set([key(from)]);
+    const frontier = [{ q: from.q, r: from.r, d: 0 }];
     let reachable = false;
     for (let i = 0; i < frontier.length; i++) {
       const cur = frontier[i];
@@ -199,63 +217,68 @@ function validateAction(state, owner, action, queue) {
         visited.add(k);
         if (!inBounds(state, next.q, next.r)) continue;
         if (terrainOf(state, next.q, next.r) !== 'plain') continue;
-        if (occ.has(k)) continue;
         if (next.q === action.q && next.r === action.r) reachable = true;
         frontier.push({ ...next, d: cur.d + 1 });
       }
     }
-    if (!reachable) return '移动：目的格不可达';
+    if (!reachable) return '移动：投影站位地形不可达';
     return null;
   }
   if (action.type === 'attack') {
-    const unit = state.units.find(u => u.id === action.attackerId && u.alive && u.owner === owner);
+    const unit = unitOf(action.attackerId);
     if (!unit) return '攻击：攻击方不存在';
-    if (usedUnits.has(action.attackerId)) return '攻击：该单位本轮已有计划';
+    const attackLimit = map.balance.attacksPerUnit ?? 1;
+    if ((attackCounts.get(unit.id) ?? 0) >= attackLimit) return '攻击：超过每单位攻击上限';
     if (!inBounds(state, action.q, action.r)) return '攻击：出界';
-    if (!covered(unit, unit.type, 'attackShape', action, unit.attackRange)) return '攻击：形状瞄准非法';
+    const from = projected(action.attackerId);
+    if (!from || !covered(from, unit.type, 'attackShape', action, unit.attackRange)) return '攻击：形状瞄准非法（投影站位）';
     return null;
   }
   if (action.type === 'heal') {
-    const unit = state.units.find(u => u.id === action.supportId && u.alive && u.owner === owner);
+    const unit = unitOf(action.supportId);
     if (!unit) return '治疗：支援兵不存在';
-    if (usedUnits.has(action.supportId)) return '治疗：该单位本轮已有计划';
-    if (unit.type !== 'support') return '治疗：非支援兵';
-    const healRange = map.units.support.healRange ?? unit.attackRange;
-    const aim = covered(unit, unit.type, 'healShape', action, healRange);
-    if (!aim) return '治疗：形状瞄准非法';
-    const hasFriend = aim.cells.some(c =>
-      state.units.some(u => u.alive && u.owner === owner && u.q === c.q && u.r === c.r));
-    if (!hasFriend) return '治疗：覆盖内无友军';
+    if (!inBounds(state, action.q, action.r)) return '治疗：出界';
+    const from = projected(action.supportId);
+    if (!from) return '治疗：单位不存在';
+    const healRange = map.units[unit.type]?.healRange ?? unit.attackRange;
+    if (!covered(from, unit.type, 'healShape', action, healRange)) return '治疗：形状瞄准非法（投影站位）';
     return null;
   }
   if (action.type === 'deploy') {
-    if (claimed.has(key(action))) return '部署：己方重复认领';
-    const origin = state.headquarters[owner].id === action.fromId
-      ? state.headquarters[owner]
-      : state.controlPoints.find(p => p.id === action.fromId && p.owner === owner);
+    const origin = deployOriginOf(state, owner, action.fromId);
     if (!origin) return '部署：起点无效';
     const spec = map.units[action.unitType];
     if (!spec) return '部署：未知兵种';
     if (dist(origin, action) !== 1) return '部署：必须相邻';
-    const occupied = state.units.some(u => u.alive && u.q === action.q && u.r === action.r)
-      || Object.values(state.headquarters).some(h => h.alive && h.q === action.q && h.r === action.r);
-    if (occupied || !inBounds(state, action.q, action.r) || terrainOf(state, action.q, action.r) !== 'plain') {
-      return '部署：目标非空平原';
+    if (!inBounds(state, action.q, action.r) || terrainOf(state, action.q, action.r) !== 'plain') {
+      return '部署：非图内平原';
     }
     const kinds = map.balance.controlPointTypes ?? {};
-    const discount = origin.id === state.headquarters[owner].id ? 0
-      : (kinds[origin.kind]?.deployDiscount ?? 0);
-    const cost = spec.cost - Math.min(spec.cost, discount);
-    const spent = queue.filter(a => a.type === 'deploy' && a.unitType).reduce((s, a) => {
-      const sp = map.units[a.unitType];
-      const o = state.controlPoints.find(p => p.id === a.fromId && p.owner === owner);
-      const dd = o ? Math.min(sp.cost, kinds[o.kind]?.deployDiscount ?? 0) : 0;
-      return s + sp.cost - dd;
-    }, 0);
-    if (state.resources[owner].supplies - spent < cost) return '部署：补给不足';
+    const discount = Math.min(spec.cost, kinds[origin.kind]?.deployDiscount ?? 0);
+    const cost = spec.cost - discount;
+    if (state.resources[owner].supplies - deploySpend < cost) return '部署：补给不足';
     return null;
   }
+  if (action.type === 'demolish') {
+    const unit = unitOf(action.unitId);
+    if (!unit) return '拆除：单位不存在';
+    if (unit.type !== 'heavy') return '拆除：非 heavy';
+    if (!inBounds(state, action.q, action.r)) return '拆除：出界';
+    const from = projected(action.unitId);
+    if (!from || dist(from, action) > 1) return '拆除：不相邻（投影站位）';
+    if (terrainOf(state, action.q, action.r) !== 'blocker') return '拆除：非障碍';
+    return null;
+  }
+  if (action.type === 'wait') return null;
   return '未知动作类型';
+}
+
+function deployOriginOf(state, owner, fromId) {
+  const hq = state.headquarters[owner];
+  if (hq && hq.alive && (hq.id === fromId || fromId === `${owner}_hq` || fromId === 'hq')) return hq;
+  const cp = state.controlPoints.find(p => p.id === fromId && p.owner === owner);
+  if (cp && map.balance.controlPointTypes?.[cp.kind]?.canDeploy !== false) return cp;
+  return null;
 }
 
 // ---------------------------------------------------------------- 计划阶段（镜像 interfaces.mjs）
@@ -389,12 +412,13 @@ async function playGame(gameId, seatA, seatB, rngSeed) {
 
     const preBoard = I.cloneBoard(state);
     const queuesMap = new Map(Object.entries(queues).filter(([, q]) => Array.isArray(q)));
-    const post = I.simulateRound(preBoard, queuesMap, rng);
+    const { board: post, outcomes } = I.simulateRound(preBoard, queuesMap, rng);
 
-    // 回写。
-    const deployed = post.units.filter(u => typeof u.id === 'string' && u.id.endsWith(':sim'));
-    for (const u of deployed) u.id = `u_${u.owner}_${unitSeq++}`;
-    state.units = post.units.filter(u => u.hp > 0).map(u => ({ ...u, alive: true, hasActed: false, actionSpent: false }));
+    // 回写（3.8 分步结算：sim.units 已过滤死者；新单位重命名防 id 复用）。
+    for (const u of post.units) {
+      if (typeof u.id === 'string' && u.id.endsWith(':sim')) u.id = `u_${u.owner}_${unitSeq++}`;
+    }
+    state.units = post.units.map(u => ({ ...u, alive: true, hasActed: false, actionSpent: false }));
     for (const [owner, hq] of Object.entries(post.hqs)) {
       Object.assign(state.headquarters[owner], { hp: Math.max(0, hq.hp), alive: hq.alive });
       if (!hq.alive && state.players[owner].status === 'active') state.players[owner].status = 'eliminated';
@@ -406,7 +430,8 @@ async function playGame(gameId, seatA, seatB, rngSeed) {
     for (const [owner, sup] of Object.entries(post.supplies)) state.resources[owner].supplies = sup;
     for (const [owner, p] of Object.entries(post.players)) Object.assign(state.players[owner].stats, p.stats);
 
-    emitRoundResolved(state, round, queues, preBoard);
+    // 事件：round_resolved 直接用结算器的 PlanOutcome 形态结果（含步序）。
+    state.events.push({ type: 'round_resolved', roundNumber: round, results: outcomes });
 
     // 终局：总部摧毁（2 人局立即分胜负）。
     const hqA = state.headquarters[OWNER_A];
@@ -511,14 +536,10 @@ const matchups = [];
 if (WHICH === 'all' || WHICH === 'meq-rs') matchups.push(['matrix-eq', 'random-sim']);
 if (WHICH === 'all' || WHICH === 'meq-dp') matchups.push(['matrix-eq', 'dest-prob']);
 if (WHICH === 'all' || WHICH === 'dp-rs') matchups.push(['dest-prob', 'random-sim']);
-if (kriegspiel) {
-  if (WHICH === 'all' || WHICH === 'meq-krieg') matchups.push(['matrix-eq', 'kriegspiel']);
-  if (WHICH === 'all' || WHICH === 'krieg-dp') matchups.push(['kriegspiel', 'dest-prob']);
-  if (WHICH === 'all' || WHICH === 'krieg-rs') matchups.push(['kriegspiel', 'random-sim']);
-} else if (WHICH !== 'all' && ['meq-krieg', 'krieg-dp', 'krieg-rs'].includes(WHICH)) {
-  console.error('当前仓库副本未找到 kriegspiel.mjs（需 3.7.3+）');
-  process.exit(1);
-}
+if (matrixEqV1 && (WHICH === 'all' || WHICH === 'meq2-v1')) matchups.push(['matrix-eq', 'matrix-eq-v1']);
+if (WHICH === 'all' || WHICH === 'meq-krieg') matchups.push(['matrix-eq', 'kriegspiel']);
+if (WHICH === 'all' || WHICH === 'krieg-dp') matchups.push(['kriegspiel', 'dest-prob']);
+if (WHICH === 'all' || WHICH === 'krieg-rs') matchups.push(['kriegspiel', 'random-sim']);
 
 const results = [];
 for (const [a, b] of matchups) {

@@ -1,9 +1,9 @@
 // tests/algorithms/random-sim.test.ts
 // 同时随机算法（algorithms/builtin/random-sim.mjs）核心行为单元测试：
-// 形状瞄准（line/arc/single）、治疗瞄格、AP 预算门控、一单位一动作、
-// 己方目的格认领、部署补给扣减、炮火危险区过滤（歼灭轴镜像，simultaneous 恒通过）、
-// 提交后/无座位短路，以及真实 standoff 对局上「枚举出的每个动作都被引擎入队校验
-// 接受」的整轮回归。
+// 形状瞄准（line/arc/single）、治疗瞄格、AP 预算门控、同单位多动作、攻击次数上限、
+// 队列投影站位、己方目的格认领、部署补给扣减、炮火危险区过滤（歼灭轴镜像，
+// simultaneous 恒通过）、提交后/无座位短路，以及真实 standoff 对局上
+// 「枚举出的每个动作都被引擎入队校验接受」的整轮回归。
 import { describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/events/bus.js';
 import { startGame } from '../../src/engine/engine.js';
@@ -201,7 +201,21 @@ describe('random-sim plan constraints', () => {
     expect(await randomSim.decide(game, utils)).toBeNull();
   });
 
-  it('never plans a second action for a unit already in the queue', async () => {
+  it('allows another action for a unit already in the queue', async () => {
+    const scout = makeUnit('player_a', 'scout', 0, 0);
+    const game = makeGame({
+      units: [scout],
+      headquarters: farHq,
+      cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }],
+      myQueue: [{ type: 'move', unitId: scout.id, q: 1, r: 0 }],
+    });
+    const action = await randomSim.decide(game, utils, { owner: 'player_a' });
+    expect(action?.type).toBe('move');
+    // 投影位置 (1,0) 继续走一步；不会因为该单位已排过动作就提前提交。
+    expect(action?.payload.unitId).toBe(scout.id);
+  });
+
+  it('respects the per-unit attack limit when an attack is already queued', async () => {
     const attacker = makeUnit('player_a', 'infantry', 0, 0);
     const enemy = makeUnit('player_b', 'scout', 2, 0);
     const game = makeGame({
@@ -211,6 +225,27 @@ describe('random-sim plan constraints', () => {
       myQueue: [{ type: 'attack', attackerId: attacker.id, q: 2, r: 0 }],
     });
     expect(await randomSim.decide(game, utils, { owner: 'player_a' })).toBeNull();
+    // 地图把上限调到 2 后，同一单位可以再排一条攻击。
+    game.config.balance.attacksPerUnit = 2;
+    const action = await randomSim.decide(game, utils, { owner: 'player_a' });
+    expect(action?.type).toBe('attack');
+    expect(action?.payload.attackerId).toBe(attacker.id);
+  });
+
+  it('aims a later attack from the unit projected position', async () => {
+    const scout = makeUnit('player_a', 'scout', 0, 0, { moveRange: 0 });
+    const enemy = makeUnit('player_b', 'scout', 2, 0);
+    const game = makeGame({
+      units: [scout, enemy],
+      headquarters: farHq,
+      cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }],
+      myQueue: [{ type: 'move', unitId: scout.id, q: 1, r: 0 }],
+    });
+    const action = await randomSim.decide(game, utils, { owner: 'player_a' });
+    expect(action).toEqual({
+      type: 'attack',
+      payload: { attackerId: scout.id, q: 2, r: 0 },
+    });
   });
 
   it('never claims a move destination already claimed by its own queue', async () => {

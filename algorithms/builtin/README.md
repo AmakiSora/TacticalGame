@@ -110,7 +110,7 @@ export default {
 { type: 'demolish', payload: { unitId: 'u_123', q: 2, r: 1 } }
 ```
 
-**同时回合模式的额外约束**（详见 `skill/simultaneous.md`）：动作入队不立即执行；队列位置即行动点，第 N 条与所有玩家的第 N 条同时结算；单位可跨行动点多次行动（引擎已支持，本目录算法的镜像模拟器仍是旧口径，待适配）；己方队列长度即行动点用量（读 `game.plan.myQueue`，上限 `config.balance.actionsPerTurn`）；`endTurn` 即提交并锁定计划。
+**同时回合模式的额外约束**（详见 `skill/simultaneous.md`）：动作入队不立即执行；队列位置即行动点，第 N 条与所有玩家的第 N 条同时结算；单位可跨行动点多次行动（random-sim 已适配；dest-prob/kriegspiel/matrix-eq 的镜像模拟器仍是旧口径，待适配）；每单位每轮攻击次数受 `balance.attacksPerUnit` 限制（默认 1）；己方队列长度即行动点用量（读 `game.plan.myQueue`，上限 `config.balance.actionsPerTurn`）；`endTurn` 即提交并锁定计划。
 
 #### 2. 完整控制接口
 

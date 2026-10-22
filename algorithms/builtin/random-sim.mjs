@@ -7,7 +7,8 @@
 //
 // 与 standard 的 random 算法的差别：
 // - 动作入队而非立即执行：攻/治瞄准格子（{ q, r }）而非目标 id；
-// - 每单位每轮至多一个动作；队列长度即行动点用量；
+// - 队列位置即行动点：同一单位可以跨行动点多次行动；
+// - 攻击次数受地图 balance.attacksPerUnit 限制（默认 1）；
 // - 座位不能从 turn.currentPlayerId 读（同时模式恒为 null），由调用方经 ctx.owner 传入。
 
 const HEX_DIRS = [
@@ -16,21 +17,62 @@ const HEX_DIRS = [
 ];
 
 const cellKey = pos => `${pos.q},${pos.r}`;
+const attackLimit = game => game.config?.balance?.attacksPerUnit ?? 1;
 
-// ---------------------------------------------------------------- 队列约束
-// 镜像 src/engine/planning.ts 的入队校验：自己踩自己必然失败的动作不要枚举出来。
-
-/** 已有排队动作的单位（每单位每轮仅一个动作）。 */
-function plannedUnitIds(queue) {
-  const ids = new Set();
+// ---------------------------------------------------------------- 队列投影
+// 队列前面的 move 会改变后续动作的起点：攻击/治疗/爆破/移动都要按投影站位
+// 校验。这里只处理本算法会枚举的 move；不枚举 demolish，因此没有地形覆盖。
+function projectedPositions(game, owner, queue) {
+  const positions = new Map();
   for (const action of queue) {
-    const id = action.unitId ?? action.attackerId ?? action.supportId;
-    if (id) ids.add(id);
+    if (action.type !== 'move' || !action.unitId) continue;
+    if (!Number.isFinite(action.q) || !Number.isFinite(action.r)) continue;
+    positions.set(action.unitId, { q: action.q, r: action.r });
   }
-  return ids;
+  return positions;
 }
 
-/** 己方队列里被 deploy/move 声明的目的格（再声明会被 cell_occupied 拒绝）。 */
+function positionOf(positions, unit) {
+  return positions.get(unit.id) ?? { q: unit.q, r: unit.r };
+}
+
+/** 计划期地形寻路：水/障碍挡路，单位/总部不挡路（与引擎 planning.ts 对齐）。 */
+function reachableFrom(game, from, moveRange, utils) {
+  const visited = new Set([cellKey(from)]);
+  const reachable = [];
+  const queue = [{ p: from, d: 0 }];
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i];
+    if (cur.d >= moveRange) continue;
+    for (const next of utils.neighbors(cur.p)) {
+      const key = cellKey(next);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (!utils.isPlayable(game, next) || utils.terrainAt(game, next) !== 'plain') continue;
+      reachable.push(next);
+      queue.push({ p: next, d: cur.d + 1 });
+    }
+  }
+  return reachable;
+}
+
+/** 投影后该格是否仍为空（己方按队列投影，敌方按当前站位保守判断）。 */
+function isProjectedEmpty(game, owner, positions, pos, utils) {
+  for (const unit of utils.livingUnits(game, owner)) {
+    const at = positionOf(positions, unit);
+    if (at.q === pos.q && at.r === pos.r) return false;
+  }
+  for (const unit of game.units || []) {
+    if (!unit.alive || unit.owner === owner) continue;
+    if (unit.q === pos.q && unit.r === pos.r) return false;
+  }
+  for (const hq of Object.values(game.headquarters || {})) {
+    if (hq.alive && hq.q === pos.q && hq.r === pos.r) return false;
+  }
+  return true;
+}
+
+/** 己方队列里被 deploy/move 声明的目的格——重复声明会浪费一个行动点。 */
 function claimedCells(queue) {
   const claimed = new Set();
   for (const action of queue) {
@@ -84,7 +126,7 @@ function onRayWithin(from, target, length) {
 function canAimAttack(game, unit, target, utils) {
   const shape = shapeSpec(game, unit.type, 'attackShape');
   if (shape.type === 'arc') return utils.hexDistance(unit, target) === 1;
-  if (shape.type === 'line') return onRayWithin(unit, target, shape.length);
+  if (shape.type === 'line') return onRayWithin(unit, target, Math.min(shape.length, unit.attackRange));
   const dist = utils.hexDistance(unit, target);
   return dist > 0 && dist <= unit.attackRange;
 }
@@ -110,10 +152,8 @@ function healCoveredCells(game, support, target) {
 }
 
 // ---------------------------------------------------------------- 炮火危险区
-// 镜像 planning.ts deploy/heal 的 isArtilleryDanger 校验：引擎拒绝在缩圈炮火
-// 危险区内部署（出生点或落点）或治疗（施放者或任一覆盖格）。simultaneous 模式
-// 无炮火机制（game.artillery 恒为 null），此过滤恒通过；注册到歼灭轴模式
-// （annihilation / royale）后生效，否则被拒动作会空耗 runner 的重问配额。
+// 算法主动跳过炮火区内的部署/治疗（引擎已把治疗检查延到结算，部署仍在计划期拒绝）；
+// simultaneous 无炮火机制（game.artillery 恒为 null），此过滤恒通过。
 
 function isArtilleryDanger(game, pos) {
   return Boolean(game.artillery?.dangerCells.some(cell => cell.q === pos.q && cell.r === pos.r));
@@ -121,15 +161,21 @@ function isArtilleryDanger(game, pos) {
 
 // ---------------------------------------------------------------- 动作枚举
 
-function collectAttackActions(game, owner, units, utils) {
+function collectAttackActions(game, owner, queue, utils) {
   const actions = [];
   const targets = utils.enemyTargets(game, owner);
-  for (const unit of units) {
+  const positions = projectedPositions(game, owner, queue);
+  const limit = attackLimit(game);
+  for (const unit of utils.livingUnits(game, owner)) {
     if (!unit.attackRange) continue;
+    const used = queue.filter(action => action.type === 'attack' && action.attackerId === unit.id).length;
+    if (used >= limit) continue;
+    const from = positionOf(positions, unit);
+    const origin = { ...unit, q: from.q, r: from.r };
     for (const target of targets) {
       const entity = target.entity;
       if (typeof entity?.q !== 'number') continue;
-      if (!canAimAttack(game, unit, entity, utils)) continue;
+      if (!canAimAttack(game, origin, entity, utils)) continue;
       actions.push({
         type: 'attack',
         payload: { attackerId: unit.id, q: entity.q, r: entity.r },
@@ -139,30 +185,37 @@ function collectAttackActions(game, owner, units, utils) {
   return actions;
 }
 
-function collectHealActions(game, owner, units, utils) {
+function collectHealActions(game, owner, queue, utils) {
   const actions = [];
-  const supports = units.filter(u => u.type === 'support');
+  const positions = projectedPositions(game, owner, queue);
+  const supports = utils.livingUnits(game, owner).filter(u => u.type === 'support');
   if (!supports.length) return actions;
   const wounded = utils.livingUnits(game, owner).filter(u => u.hp < u.maxHp);
   for (const support of supports) {
     if (isArtilleryDanger(game, support)) continue;
+    const from = positionOf(positions, support);
+    const origin = { ...support, q: from.q, r: from.r };
     for (const target of wounded) {
-      if (!canAimHeal(game, support, target, utils)) continue;
-      if (healCoveredCells(game, support, target).some(pos => isArtilleryDanger(game, pos))) continue;
+      const targetPos = positionOf(positions, target);
+      if (!canAimHeal(game, origin, targetPos, utils)) continue;
+      if (healCoveredCells(game, origin, targetPos).some(pos => isArtilleryDanger(game, pos))) continue;
       actions.push({
         type: 'heal',
-        payload: { supportId: support.id, q: target.q, r: target.r },
+        payload: { supportId: support.id, q: targetPos.q, r: targetPos.r },
       });
     }
   }
   return actions;
 }
 
-function collectMoveActions(game, units, claimed, utils) {
+function collectMoveActions(game, owner, queue, claimed, utils) {
   const actions = [];
-  for (const unit of units) {
-    for (const pos of utils.reachableCells(game, unit)) {
+  const positions = projectedPositions(game, owner, queue);
+  for (const unit of utils.livingUnits(game, owner)) {
+    const from = positionOf(positions, unit);
+    for (const pos of reachableFrom(game, from, unit.moveRange, utils)) {
       if (claimed.has(cellKey(pos))) continue;
+      if (!isProjectedEmpty(game, owner, positions, pos, utils)) continue;
       actions.push({
         type: 'move',
         payload: { unitId: unit.id, q: pos.q, r: pos.r },
@@ -174,6 +227,7 @@ function collectMoveActions(game, units, claimed, utils) {
 
 function collectDeployActions(game, owner, queue, claimed, utils) {
   const actions = [];
+  const positions = projectedPositions(game, owner, queue);
   const supplies = game.resources?.[owner]?.supplies ?? 0;
   const remaining = supplies - plannedDeploySpend(game, owner, queue, utils);
   const unitTypes = Object.keys(game.config?.units ?? {});
@@ -183,8 +237,9 @@ function collectDeployActions(game, owner, queue, claimed, utils) {
     for (const type of unitTypes) {
       if (utils.effectiveDeployCost(game, type, origin) > remaining) continue;
       for (const pos of utils.neighbors(origin)) {
-        if (!utils.isEmptyPlain(game, pos)) continue;
+        if (!utils.isPlayable(game, pos) || utils.terrainAt(game, pos) !== 'plain') continue;
         if (claimed.has(cellKey(pos))) continue;
+        if (!isProjectedEmpty(game, owner, positions, pos, utils)) continue;
         if (isArtilleryDanger(game, pos)) continue;
         actions.push({
           type: 'deploy',
@@ -218,14 +273,11 @@ export default {
     const limit = game.config?.balance?.actionsPerTurn ?? 5;
     if (queue.length >= limit) return null;
 
-    const used = plannedUnitIds(queue);
     const claimed = claimedCells(queue);
-    const units = utils.livingUnits(game, owner).filter(u => !used.has(u.id));
-
     const allActions = [
-      ...collectAttackActions(game, owner, units, utils),
-      ...collectHealActions(game, owner, units, utils),
-      ...collectMoveActions(game, units, claimed, utils),
+      ...collectAttackActions(game, owner, queue, utils),
+      ...collectHealActions(game, owner, queue, utils),
+      ...collectMoveActions(game, owner, queue, claimed, utils),
       ...collectDeployActions(game, owner, queue, claimed, utils),
     ];
 

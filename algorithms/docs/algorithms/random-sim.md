@@ -24,7 +24,7 @@
 
 1. **动作入队而非立即执行**：服务器返回 `{ ok, queued, queue }`，结算在全员提交后统一发生。
 2. **攻/治瞄准格子而非目标 id**：`{ attackerId, q, r }` / `{ supportId, q, r }`，命中结算时落在覆盖形状上的单位——预测射击。
-3. **算法自身按“一单位一轮一动作”保守枚举**：引擎已支持同一单位跨行动点多次行动，但本算法的镜像校验/模拟器尚未适配（后续任务）。
+3. **队列位置即行动点**：同一单位可以跨行动点多次行动（例如先移动后攻击）；攻击次数另受地图 `balance.attacksPerUnit` 限制（默认 1，`attack_limit_reached`）。
 4. **队列长度即行动点**：上限 `config.balance.actionsPerTurn`，读 `game.plan.myQueue` 计数（`turn.actionsUsed` 在本模式不按座位维护）。
 5. **座位从 `ctx.owner` 拿**：同时模式 `turn.currentPlayerId` 恒为 null。
 
@@ -40,27 +40,27 @@
 
 ### 1. 枚举攻击（按形状瞄准）
 
-按 `config.units.<type>.attackShape` 镜像引擎 `coveredCellsFor` 的瞄准合法性：
+按 `config.units.<type>.attackShape` 镜像引擎 `coveredCellsFor` 的瞄准合法性；攻击起点使用该单位在队列中的**投影站位**（前面的 move 已生效的假设下），因此支持先移动后攻击。同一单位已排攻击数达到 `balance.attacksPerUnit`（默认 1）时不再枚举攻击。
 
 | 形状 | 可瞄准条件（目标当前格） |
 |---|---|
 | single / 缺省（含 ranger 锁定射） | 0 < 距离 ≤ attackRange |
-| line | 目标落在 6 向射线上且 1 ≤ 距离 ≤ length |
+| line | 目标落在 6 向射线上且 1 ≤ 距离 ≤ min(length, attackRange) |
 | arc | 目标相邻（距离 1，点击其格即被覆盖） |
 
 目标集为 `utils.enemyTargets`（敌方单位 + 总部）。
 
 ### 2. 枚举治疗
 
-支援兵（support）按 `healShape`（缺省 single）瞄准**受伤**友方所在格：single 允许本格（自治），射程取 `healRange ?? attackRange`；arc 仅相邻格。入队校验要求覆盖格至少有一个存活友方，瞄准受伤友方的格子必然满足。镜像炮火校验：施放者站在缩圈炮火危险区、或任一覆盖格（arc 为瞄准方向扇形三格）落在危险区的治疗不入队（引擎拒绝 `invalid_heal`）；simultaneous 无炮火机制（`game.artillery` 恒为 null），该过滤恒通过。
+支援兵（support）按 `healShape`（缺省 single）瞄准**受伤**友方所在格：single 允许本格（自治），射程取 `healRange ?? attackRange`；arc 仅相邻格。治疗起点和受伤友方的目标格都按队列投影站位计算。镜像炮火校验：施放者站在缩圈炮火危险区、或任一覆盖格（arc 为瞄准方向扇形三格）落在危险区的治疗不入队；simultaneous 无炮火机制（`game.artillery` 恒为 null），该过滤恒通过。
 
 ### 3. 枚举移动
 
-`utils.reachableCells`（计划期棋盘，敌我单位皆为障碍）排除己方队列已认领的目的格。
+从该单位的投影站位做**只按地形**的 BFS（水/障碍挡路，单位/总部不挡路，与引擎 `planning.ts` 一致）；排除己方队列已认领的目的格，以及投影后仍被己方/敌方单位或总部占据的格子。同一单位可以连续排多条移动。
 
 ### 4. 枚举部署
 
-`utils.deployOrigins`（总部 + 己方可部署据点，`canDeploy: false` 的类型已排除）× `config.units` 全兵种 × 相邻空平地；补给预算扣减队列中已计划部署的花费（`effectiveDeployCost` 含据点折扣）。出生点或落点在炮火危险区内的部署不入队（引擎拒绝 `invalid_deploy`，同治疗一节仅歼灭轴模式生效）。
+`utils.deployOrigins`（总部 + 己方可部署据点，`canDeploy: false` 的类型已排除）× `config.units` 全兵种 × 相邻平地；目标格按投影后是否为空判断（前面的己方移动可能腾空），并排除己方队列已认领的目的格。补给预算扣减队列中已计划部署的花费（`effectiveDeployCost` 含据点折扣）。出生点或落点在炮火危险区内的部署不入队（引擎拒绝 `invalid_deploy`，同治疗一节仅歼灭轴模式生效）。
 
 ### 5. 随机选择
 
@@ -71,7 +71,7 @@ return allActions[Math.floor(Math.random() * allActions.length)];
 
 ## 实现细节
 
-- **不依赖服务器拒绝来发现非法动作**：所有枚举都镜像 `src/engine/planning.ts` 的入队校验（形状瞄准、一单位一动作、目的格认领、部署预算扣减、炮火危险区）。被拒动作虽不再让 `runAlgorithm` 提前提交整轮计划（它会把被拒动作记住、让 decide 重选，有重问上限），但每次被拒仍空耗一次重问配额与一次请求往返，合法镜像才能保证一轮行动计划排满排快。
+- **不依赖服务器拒绝来发现非法动作**：所有枚举都镜像 `src/engine/planning.ts` 的入队校验（形状瞄准、攻击次数上限、队列投影站位、地形寻路、部署预算扣减、炮火危险区）。被拒动作虽不再让 `runAlgorithm` 提前提交整轮计划（它会把被拒动作记住、让 decide 重选，有重问上限），但每次被拒仍空耗一次重问配额与一次请求往返，合法镜像才能保证一轮行动计划排满排快。
 - **回归测试保证枚举口径与引擎一致**：`tests/algorithms/random-sim.test.ts` 在真实 standoff 对局上把算法返回的每个动作喂给引擎 `queueXxxAction`，全部接受才算通过。
 - 总复杂度 O(n·m + n·c)，与标准 random 相同，单步决策远低于 0.1 秒。
 

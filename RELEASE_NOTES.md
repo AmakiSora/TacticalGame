@@ -15,7 +15,7 @@
 
 ### 修复
 
-- **同时随机算法（random-sim）适配分步结算引擎**：不再按“每单位每轮一动作”保守枚举；同一单位可跨行动点连续行动，攻击/治疗/移动按队列投影站位计算，移动改为地形寻路（单位不挡路），并遵守地图 `balance.attacksPerUnit`（默认 1）。修复随机基线在 3.8.0 规则下行动点用不满、枚举口径与引擎不一致的问题。
+- **同时随机算法（random-sim）升级到 v2 并适配分步结算引擎**：不再按“每单位每轮一动作”保守枚举；同一单位可跨行动点连续行动，攻击/治疗/移动按队列投影站位计算，移动改为地形寻路（单位不挡路），并遵守地图 `balance.attacksPerUnit`（默认 1）。修复随机基线在 3.8.0 规则下行动点用不满、枚举口径与引擎不一致的问题。
 
 ### 测试与验证
 
@@ -23,7 +23,8 @@
 - 新增 `tests/algorithms/matrix-eq-selfplay.test.ts` 覆盖 v2 在 standoff / molten-throne / 三人局的整局零非法动作；`node scripts/matrix_eq_smoke.mjs` 107 动作零非法、单轮 ≤85ms。
 - 更新 `tests/algorithms/kriegspiel-selfplay.test.ts`：入队口径补上 `demolish` / `wait`，kriegspiel v2 在 standoff / molten-throne 整局自博弈零非法动作。
 - kriegspiel v2 结算保真度对拍：把伤害/治疗方差归零使结算完全确定，让同一份计划分别在真实引擎（`resolveRoundSteps` + `captureControlPoints`）与算法的 JS 分步结算器上跑一遍，逐点比对存活单位 `(owner,type,q,r,hp)`、总部 HP/存活、据点归属、补给与席位状态——standoff / molten-throne 各 20 个局面**零偏差**。
-- kriegspiel v2 headless 标定（真实引擎 harness，逐局交替先手，standoff / molten-throne 各 30 局 ×3 对手，合计 180 局零非法动作）：对 random-sim **60:0**、对 dest-prob **52:8（86.7%）**（v1 为 34/60）、对 matrix-eq v2 **29:31**（standoff 27:3、molten-throne **2:28**）；`decide` 平均 45ms（standoff）/ 113–169ms（molten-throne）。molten-throne 的 2:28 是已知短板而非适配缺陷：单轮 rollout 无法给「N 轮后总部被斩首」定价，给总部血量加凸性惩罚实测无效，诊断与数据见 `algorithms/docs/algorithms/kriegspiel.md`「已知短板」。
+- kriegspiel v2 headless 标定（真实引擎 harness，逐局交替先手，standoff / molten-throne 各 30 局 ×3 对手，合计 180 局零非法动作，种子 `1000 + i×7919`，2026-10-23）：对 random-sim **60:0**、对 dest-prob **52:8（86.7%，p<0.0001）**、对 matrix-eq v2 **29:31**（standoff 27:3、molten-throne **2:28**；合计 p=0.90，两图方向相反，必须按图读）；`decide` 平均 45ms（standoff）/ 113–169ms（molten-throne）。
+- kriegspiel v1 同口径基线补测：把 `git show 89f3b69^` 的 v1 实现放进同一 harness、同一批种子跑 4 对手 ×2 图 ×30 局。v1 对 dest-prob **43.3%**（standoff 仅 20.0%）、对 matrix-eq **31.7%**，v2 分别为 86.7% 与 48.3%，即适配价值 **+43.4pp / +16.6pp**；v1↔v2 直接对打 **35:25（58.3%，p=0.245）未达显著**。**两项负结果如实记录**：molten-throne 对 matrix-eq 是 v1 6:24 → v2 **2:28** 的负提升（单轮 rollout 无法给「N 轮后总部被斩首」定价，给总部血量加凸性惩罚实测胜负序列完全不变）；按 `action_failed` 事件计数发现 v2 结算期失败 **17.1–23.1/局**（v1 1.3/局、dest-prob 0.6–3.0/局），主因 `destination_occupied`——移动/部署候选不排除敌军当前占位，只按「敌军到达概率」打折。诊断、数据与修法见 `algorithms/docs/algorithms/kriegspiel.md`「已知短板」「代价与边界」「已知限制 #2」。
 - `npm run build` 通过；`npm test` 全量通过（110 文件 / 929 例）。
 
 ## 3.8.0

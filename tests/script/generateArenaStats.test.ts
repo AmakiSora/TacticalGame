@@ -370,7 +370,7 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
     writeFileSync(statsFile,
       line(A, EXTRA_ZIP, EXTRA_ZIP) +
       line(A, 'algo_threat@v1', A) +
-      line('algo_dest-prob@v1', 'algo_kriegspiel@v1', 'algo_dest-prob@v1', 'standoff'));
+      line('algo_dest-prob@v1', 'algo_kriegspiel@v2', 'algo_dest-prob@v1', 'standoff'));
 
     // --models-dir 指向自建临时目录：真 rl/models 是 gitignored 的本机产物，CI 检出上没有。
     const modelsDir = join(tempDir, 'models');
@@ -395,7 +395,7 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
     expect(payload.modes.map((m: { id: string }) => m.id)).toEqual(['standard', 'simultaneous']);
     expect(payload.source.modeDist.standard).toBe(2);
     expect(payload.source.modeDist.simultaneous).toBe(1);
-    const krieg = payload.models.find((m: { id: string }) => m.id === 'algo_kriegspiel@v1');
+    const krieg = payload.models.find((m: { id: string }) => m.id === 'algo_kriegspiel@v2');
     expect(krieg.modes).toEqual(['simultaneous']);
   });
 });

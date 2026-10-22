@@ -102,6 +102,9 @@ export async function runAlgorithm(algorithm, gameState, apiClient, utils, ctx =
           case 'demolish':
             await apiClient.demolish(payload.unitId, payload.q, payload.r);
             break;
+          case 'wait':
+            await apiClient.wait();
+            break;
           default:
             throw new Error(`Unsupported action type: ${action.type}`);
         }

@@ -1,15 +1,16 @@
 // tests/algorithms/kriegspiel-selfplay.test.ts
 // 整局合法性回归：kriegspiel 在真实 standoff / molten-throne 上互相对弈，
 // 每个 decide 返回值都喂给引擎入队校验；任何非法动作都算失败。
-// 兵棋推演算法内部用 JS 单轮结算器做 rollout，与引擎语义若有偏差会体现在
-// 计划里的非法目的格/越界部署上，所以"整局零非法"是硬指标。
+// 兵棋推演算法内部用 JS 分步结算器做 rollout，与引擎语义若有偏差会体现在
+// 计划里的非法目的格/越界部署/超攻击上限上，所以"整局零非法"是硬指标。
 import { describe, expect, it } from 'vitest';
 import { loadMaps } from '../../src/config/loader.js';
 import { addLobbyPlayer, createLobby } from '../../src/state/store.js';
 import { startGame } from '../../src/engine/engine.js';
 import { commitAndMaybeResolve } from '../../src/engine/simultaneous.js';
 import {
-  queueAttackAction, queueDeployAction, queueHealAction, queueMoveAction,
+  queueAttackAction, queueDemolishAction, queueDeployAction, queueHealAction, queueMoveAction,
+  queueWaitAction,
 } from '../../src/engine/planning.js';
 import { globalEventBus } from '../../src/events/bus.js';
 // @ts-expect-error 算法模块为 ESM .mjs，无类型声明
@@ -58,6 +59,8 @@ function enqueue(game: any, owner: string, action: any) {
     case 'heal': return queueHealAction(game, owner as never, p.supportId, p.q, p.r);
     case 'move': return queueMoveAction(game, owner as never, p.unitId, p.q, p.r);
     case 'deploy': return queueDeployAction(game, owner as never, p.unitType, p.fromId, p.q, p.r);
+    case 'demolish': return queueDemolishAction(game, owner as never, p.unitId, p.q, p.r);
+    case 'wait': return queueWaitAction(game, owner as never);
     default: return { ok: false as const, code: 'unknown_action', message: action.type };
   }
 }

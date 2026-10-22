@@ -212,6 +212,15 @@ export class GameApiClient {
   }
 
   /**
+   * 待命（仅同时回合模式）：占 1 个行动点、不做任何事，
+   * 用于把后续动作对齐到更晚的行动点。
+   * @returns {Promise<object>}
+   */
+  async wait() {
+    return this._request('POST', `/api/games/${this.gameId}/plan/wait`, {});
+  }
+
+  /**
    * 结束当前回合
    * @returns {Promise<object>}
    */

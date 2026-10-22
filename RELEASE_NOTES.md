@@ -9,7 +9,9 @@
 ### 变更
 
 - 版本号提升至 3.8.1。
-- **matrix-eq 升级到 v2（3.8.0 分步引擎适配版）**：重写分步结算镜像、投影站位/地形寻路的结构性计划校验、组合动作生成与按步序的事件史重建，新增池内精修和自适应利用混合；注册表算法版本标注为 `v2`，历史对局仍按版本 id 归档。镜像裁判基准：对 v1 **23:7**、对 kriegspiel **12:18**、对 dest-prob **13:17**、对 random-sim **30:0**，单轮求解 ≤157ms/侧。
+- **matrix-eq 升级到 v2（3.8.0 分步引擎适配版）**：重写分步结算镜像、投影站位/地形寻路的结构性计划校验、组合动作生成与按步序的事件史重建，新增池内精修和自适应利用混合；注册表算法版本标注为 `v2`，历史对局仍按版本 id 归档。镜像裁判基准：对 v1 **23:7**、对 kriegspiel v1 **12:18**、对 dest-prob **13:17**、对 random-sim **30:0**，单轮求解 ≤157ms/侧。
+- **kriegspiel 升级到 v2（3.8.0 分步引擎适配版）**：镜像对象从旧 `resolveRound` 换成 `resolveRoundSteps`——结算器改为按行动点逐步推进（级联失败、到达判定与依赖传播、同一步先移出后移入、`attackLock` 按计划时刻锁定、逐步死亡、终局轮跳过占点）；计划合法性改为队列前缀投影（站位投影 + 自有爆破改写地形 + 只按地形寻路，占用/覆盖类判定与引擎一致推迟到结算）；候选生成改为逐行动点重算，支持同一单位跨行动点连动并新增 `wait`（对齐行动点）与 `demolish`（按可达格增量计价）；搜索邻域扩展为「换步 / 删步 / 插入 `wait` / 交换相邻两步 / 追加」，粗筛用少量 rollout、胜出者再按满额复核；敌方计划采样改为有序。注册表算法版本标注为 `v2`。
+- **同时回合算法 runner 支持 `wait`**：`algorithms/lib/api-client.mjs` 新增 `wait()`（`POST /api/games/:id/plan/wait`），`algorithms/lib/interfaces.mjs` 新增 `case 'wait'` 分支，算法脚本从此可以主动对齐行动点。
 
 ### 修复
 
@@ -19,6 +21,9 @@
 
 - 扩展 `tests/algorithms/random-sim.test.ts`：覆盖同单位多动作、投影位置后的攻击、攻击次数上限、投影后空位枚举与真实 standoff 对局合法性。
 - 新增 `tests/algorithms/matrix-eq-selfplay.test.ts` 覆盖 v2 在 standoff / molten-throne / 三人局的整局零非法动作；`node scripts/matrix_eq_smoke.mjs` 107 动作零非法、单轮 ≤85ms。
+- 更新 `tests/algorithms/kriegspiel-selfplay.test.ts`：入队口径补上 `demolish` / `wait`，kriegspiel v2 在 standoff / molten-throne 整局自博弈零非法动作。
+- kriegspiel v2 结算保真度对拍：把伤害/治疗方差归零使结算完全确定，让同一份计划分别在真实引擎（`resolveRoundSteps` + `captureControlPoints`）与算法的 JS 分步结算器上跑一遍，逐点比对存活单位 `(owner,type,q,r,hp)`、总部 HP/存活、据点归属、补给与席位状态——standoff / molten-throne 各 20 个局面**零偏差**。
+- kriegspiel v2 headless 标定（真实引擎 harness，逐局交替先手，standoff / molten-throne 各 30 局 ×3 对手，合计 180 局零非法动作）：对 random-sim **60:0**、对 dest-prob **52:8（86.7%）**（v1 为 34/60）、对 matrix-eq v2 **29:31**（standoff 27:3、molten-throne **2:28**）；`decide` 平均 45ms（standoff）/ 113–169ms（molten-throne）。molten-throne 的 2:28 是已知短板而非适配缺陷：单轮 rollout 无法给「N 轮后总部被斩首」定价，给总部血量加凸性惩罚实测无效，诊断与数据见 `algorithms/docs/algorithms/kriegspiel.md`「已知短板」。
 - `npm run build` 通过；`npm test` 全量通过（110 文件 / 929 例）。
 
 ## 3.8.0

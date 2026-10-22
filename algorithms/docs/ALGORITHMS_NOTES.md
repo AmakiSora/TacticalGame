@@ -1,33 +1,56 @@
 # 算法 AI 开发笔记
 
 > 本文档记录所有算法 AI 的设计、实现和性能变化。
+>
+> **维护口径（2026-10-23，对应 3.8.1）**：前半部分是当前规范；标为“历史标定”的表格只用于追溯，不代表当前强度。性能表必须带引擎版本、地图池、harness、局数与日期，否则不得作为选型依据。
 
 算法 AI 是基于规则、搜索和启发式的 JavaScript 决策模块，无需训练模型即可运行。与强化学习模型相比，算法 AI 的优势在于开发迅速、可解释性强、无需 GPU，但性能上限受限于人工设计的策略质量。
+
+## 阅读须知：当前口径
+
+| 项目 | 当前值 |
+|---|---|
+| 代码版本 | 3.8.1 |
+| 标准图池 | `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `whirlpool` |
+| 同时回合图 | `standoff` / `molten-throne` |
+| 大逃杀图 | `snowflake` / `narrow-road`（暂无内置算法） |
+| 歼灭图 | `artillery-zone`（暂无内置算法） |
+| 同时回合规则 | 3.8.0 起按行动点**分步结算**，不是“一单位一轮一动作” |
+| 裁决分 | 3.6.0 起为击杀价值 + 据点流量制 |
+| 已退役地图 | `forge` → `molten-throne`（3.5.11，同时回合）、`desert`（3.5.8 下线）、`four-corners`（3.5.7 下线） |
+
+写作规则：
+
+- 只有标为“当前快照”的表可用于选型；标为“历史标定”的表只用于回归追踪。
+- 不同模式、不同 harness（真实引擎 / 镜像裁判）、不同地图池的数字不可直接比较。
+- 单图胜率不可外推；至少 3 张图 × 30 局、逐局交替先手，6 局不构成结论。
+- 同时回合的镜像模拟器必须注明适配的引擎版本；3.8.0 前后的结果不能混在一张表里。
+- 算法升版必须在单算法档案写 `vN → vN+1` 的改动清单与同口径提升幅度；没有数据就写“暂无同口径对照”，不能只写“优化”。
 
 ## 目录结构
 
 ```
 algorithms/
-├── builtin/           # 内置算法实现
-│   ├── greedy.mjs    # 贪心算法（标准模式）
-│   ├── random.mjs    # 随机算法（标准模式）
-│   ├── mcts.mjs      # 蒙特卡洛树搜索（标准模式）
-│   ├── threat.mjs    # 威胁感知算法（标准模式）
-│   ├── field.mjs     # 势场算法（标准模式）
-│   ├── verdict.mjs   # 裁决线算法（标准模式）
-│   ├── random-sim.mjs # 同时随机算法（同时回合模式）
-│   ├── dest-prob.mjs # 落点概率算法（同时回合模式）
-│   ├── kriegspiel.mjs # 兵棋推演算法（同时回合模式）
-│   ├── matrix-eq.mjs # 矩阵均衡算法（同时回合模式）
-│   └── README.md     # 算法开发指南
-├── lib/              # 共享工具库
+├── builtin/              # 内置算法实现
+│   ├── greedy.mjs        # 贪心算法（标准模式）
+│   ├── random.mjs        # 随机算法（标准模式）
+│   ├── mcts.mjs          # 蒙特卡洛树搜索（标准模式）
+│   ├── threat.mjs        # 威胁感知算法（标准模式）
+│   ├── field.mjs         # 势场算法（标准模式）
+│   ├── verdict.mjs       # 裁决线算法（标准模式）
+│   ├── random-sim.mjs    # 同时随机算法（同时回合模式）
+│   ├── dest-prob.mjs     # 落点概率算法（同时回合模式）
+│   ├── kriegspiel.mjs    # 兵棋推演算法（同时回合模式）
+│   ├── matrix-eq.mjs     # 矩阵均衡算法（同时回合模式）
+│   └── README.md         # 算法开发指南
+├── lib/                  # 共享工具库
 │   ├── api-client.mjs    # REST API 客户端
 │   ├── game-utils.mjs    # 游戏工具函数
 │   └── interfaces.mjs    # 算法接口适配器
-├── docs/             # 算法文档
+├── docs/                 # 算法文档
 │   ├── ALGORITHMS_NOTES.md   # 本文件
 │   ├── RELEASE_NOTES.md      # 版本发布记录
-│   ── algorithms/           # 单算法详细档案
+│   └── algorithms/           # 单算法详细档案
 │       ├── greedy.md
 │       ├── random.md
 │       ├── mcts.md
@@ -38,15 +61,14 @@ algorithms/
 │       ├── dest-prob.md
 │       ├── kriegspiel.md
 │       └── matrix-eq.md
-├── registry.mjs      # 算法注册表
-└── runner.mjs        # 通用运行器
+├── registry.mjs          # 算法注册表与 ALGORITHM_META
+├── registry.d.mts        # 注册表 TypeScript 类型声明
+└── runner.mjs            # 通用运行器
 ```
 
 ## 算法接口
 
-所有算法必须实现以下两种接口之一。算法按对局模式注册（注册表 `ALGORITHM_META.modes`，
-缺省视为 `['standard']`），不同模式不能混用——大厅 bot 接口、runner、评估链路
-都会按注册表校验，模式不匹配一律拒绝。
+所有算法必须实现 `decide` 或 `playTurn` 之一。算法按对局模式注册（`ALGORITHM_META.modes`，缺省视为 `['standard']`），不同模式不能混用——大厅 bot 接口、runner、评估链路都会按注册表校验，模式不匹配一律拒绝。
 
 ### 策略接口（推荐）
 
@@ -56,18 +78,15 @@ algorithms/
 export default {
   name: 'algorithm_name',
   description: '算法描述',
-  
+
   async decide(gameState, utils, ctx) {
     // gameState: 完整游戏状态
-    // utils: 工具函数集合
-    // ctx.owner: 算法座位（同时回合模式没有 turn.currentPlayerId，座位只能从这里拿）
+    // utils: 工具函数集合（见下文）
+    // ctx.owner: 算法座位（同时回合/大逃杀没有 turn.currentPlayerId，座位只能从这里拿）
     // 返回 { type: 'attack', payload: {...} } 或 null（结束回合；同时模式 = 提交计划）
   }
 }
 ```
-
-同时回合模式的动作形态不同：攻击/治疗瞄准格子（`payload: { attackerId, q, r }` /
-`{ supportId, q, r }`），动作入队而非立即执行，`plan.myQueue` 记录己方队列。
 
 ### 完整控制接口
 
@@ -77,7 +96,7 @@ export default {
 export default {
   name: 'algorithm_name',
   description: '算法描述',
-  
+
   async playTurn(gameState, apiClient, utils) {
     // apiClient: REST API 调用封装
     // 自己负责整个回合的所有动作
@@ -85,87 +104,193 @@ export default {
 }
 ```
 
+> **限制**：`runAlgorithm` 只向 `playTurn` 传三个参数，没有 `ctx`；同时回合/大逃杀没有 `turn.currentPlayerId`，因此 `playTurn` 目前只适合标准模式。需要在计划模式运行的算法必须实现 `decide`。
+
+### 动作类型
+
+| `type` | `payload` | 适用模式 | 说明 |
+|---|---|---|---|
+| `attack` | `{ attackerId, targetId }` | 标准 | 按目标 id |
+| `attack` | `{ attackerId, q, r }` | 同时回合 / 大逃杀 | 瞄准格子，形状由 `attackShape` 决定 |
+| `heal` | `{ supportId, targetId }` | 标准 | 按目标 id |
+| `heal` | `{ supportId, q, r }` | 同时回合 / 大逃杀 | 瞄准格子，覆盖格上的受伤友军各自结算 |
+| `move` | `{ unitId, q, r }` | 全部 | 移动 |
+| `deploy` | `{ unitType, fromId, q, r }` | 全部 | 从总部/据点部署 |
+| `demolish` | `{ unitId, q, r }` | 全部 | 拆除障碍 |
+| `wait` | `{}` | 同时回合 / 大逃杀 | 3.8.0 新增，消耗 1 行动点，用于对齐行动点 |
+
+> `decide` 返回 `null` 的语义是**结束整个回合**；同时回合/大逃杀模式下等于提交计划并锁定。
+>
+> 当前实现（3.8.x 适配）已在 `algorithms/lib/api-client.mjs` 增加 `wait()`，并在 `interfaces.mjs` 的 `decide` 分发中补上 `case 'wait'`；`decide` 返回 `{ type: 'wait', payload: {} }` 会调用 `POST /api/games/:id/plan/wait`。
+
+### 同时回合计划语义（3.8.0 起）
+
+- 队列顺序就是行动点顺序：所有玩家的第 1 条动作同时结算完成后，再结算第 2 条，依此类推。
+- 同一单位可以在多个行动点连续行动（移动→攻击→再移动）；每个行动点每人仍只能执行一条动作。
+- 队列长度即行动点用量，上限为 `config.balance.actionsPerTurn`；`plan.myQueue` 是己方队列。
+- 每单位每轮攻击次数受 `config.balance.attacksPerUnit` 限制（默认 1）；超出返回 `attack_limit_reached`。
+- `wait` 消耗 1 行动点，用于把关键动作对齐到更晚的行动点。
+- 移动/部署目的格是否被占用延迟到结算时判定；同一步允许“先移出、再移入”，移动失败会触发后续动作的级联作废。
+- `end-turn` 表示提交并锁定；`POST /plan/revoke`、`POST /plan/clear`、`POST /plan/reorder` 分别撤回、清空、原子重排。
+- 结算结果 `round_resolved.steps` 与动作事件都带 `step` 字段（与 `actionsUsed` 一致）。
+
+### 注册、版本与模式
+
+注册表 `algorithms/registry.mjs` 是展示名、描述、版本与支持模式的唯一来源：
+
+```javascript
+export const ALGORITHM_META = {
+  'algorithm_name': {
+    displayName: '算法中文名',
+    description: '一句话描述',
+    version: 'v1',
+    modes: ['standard'], // standard / simultaneous / royale / annihilation
+  },
+};
+```
+
+- `modes` 缺省为 `['standard']`；大厅 bot 接口、runner、`rl/training/local-worker.ts`、`rl/evaluation/round_robin.py` 与 `/api/arena/participants` 都按它校验/过滤。
+- `version` 是算法的“当前版本”标注。算法行为被改进后应升版（如 `v1` → `v2`）；竞技场参与者 id 是 `algo_<name>@<version>`，历史对局仍归属旧版本 id。
+- 升版时必须按下面的“版本升级的文档要求”更新单算法档案，不能只改代码和 `version`。
+- 线上 bot type 是 `algo_<name>`，永远指向当前实现；`src/api/bots.ts` 的 `ALGORITHM_BOTS` 由注册表自动生成，前端下拉从 `/api/algorithms` 动态拉取。**不要再手工维护第二份算法清单。**
+- 若旧版本实现不再保留，需要像模型退役一样显式处理旧版本 id，否则历史对局会因“未知参与者”被榜单过滤。
+
+### 版本升级的文档要求（强制）
+
+算法从 `vN` 升到 `vN+1` 时，必须在对应档案 `algorithms/docs/algorithms/<name>.md`（即该算法的“算法.md”）中增加 `## vN → vN+1：<主题>` 一节，至少包含：
+
+1. **改动清单**：按模块写清规则镜像、搜索/评估、动作生成、参数、接口适配的变化；不能只写“优化了性能”。
+2. **同口径对照**：同引擎版本、同地图池、同种子与局数的 `vN` vs `vN+1` 表；至少列胜率，建议同时给平均裁定分、击杀、回合数、决策耗时。
+3. **提升幅度**：用绝对值和百分点/比值表示，例如 `对 dest-prob：63.3% → 86.7%（+23.4pp）`。跨 harness 或跨规则版本不可直接相减时，必须写明“不可相减”，并给出同一 harness 下的替代指标。
+4. **代价与边界**：决策耗时、内存、非法动作、已知短板的变化；没有提升或负提升也要如实写。
+5. **样本边界**：引擎版本、地图池、局数、是否镜像裁判；6 局或退役地图不构成版本提升结论。
+
+没有同口径前代数据时，写“暂无同口径对照”并说明原因与补测计划；**不得省略本节，也不得用不同 harness 的数字冒充提升幅度**。
+
+当前示例：`algorithms/docs/algorithms/kriegspiel.md` 的“v1 → v2：3.8.0 分步引擎适配”与“v1 → v2 强度变化”；`algorithms/docs/algorithms/matrix-eq.md` 的 v2 改动分布在“候选计划组合（v2）/支付矩阵（v2）/求解（v2）”三节，强度对照见“基准结果 III：3.8.0 引擎适配版 v2”。
+
+### 3.8 同时回合适配状态
+
+| 算法 | 计划语义 | 当前状态 |
+|---|---|---|
+| `random-sim` | 同单位多动作、队列投影、`attacksPerUnit` | **3.8.1 已适配**，作为同时回合基线 |
+| `dest-prob` | 仍按“一单位一动作”的旧镜像生成计划 | 未适配；3.7 的 100:0 等数据只代表旧规则 |
+| `kriegspiel` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配并完成 3.8 真实引擎标定**（分步语义、`wait`、`demolish`、`attacksPerUnit`）：与引擎逐点对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法；旧 3.7 数据只代表旧规则 |
+| `matrix-eq` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配**并按 3.8 镜像裁判标定；真实服务器口径待验证 |
+
+> 在 `dest-prob` 完成 3.8 适配前，不要把它的旧胜率写进“当前最强”结论——`kriegspiel` v2 对它的 52:8 里有相当一部分来自 dest-prob 的旧口径计划在分步引擎下吃到级联失败与到达冲突，不是纯策略差距。`matrix-eq` v2 的已有数字来自镜像裁判，`kriegspiel` v2 的来自真实引擎 harness，两者口径不同，引用时必须标清。
+
 ## 工具函数（utils）
 
-`game-utils.mjs` 提供以下核心函数：
+`algorithms/lib/game-utils.mjs` 提供以下函数：
 
 | 函数 | 功能 |
 |---|---|
 | `hexDistance(a, b)` | 六边形距离计算 |
 | `neighbors(pos)` | 相邻六格 |
-| `reachableCells(game, unit)` | 单位可移动范围 |
+| `isPlayable(game, pos)` | 格子是否在地图可玩区域内 |
+| `terrainAt(game, pos)` | 地形类型（plain / water / blocker） |
+| `occupantAt(game, pos)` | 格子上的单位或总部 |
+| `isEmptyPlain(game, pos)` | 是否为空的平地 |
+| `reachableCells(game, unit)` | 单位可移动范围（BFS，单位/总部挡路；标准模式口径） |
 | `livingUnits(game, owner)` | 存活单位列表 |
+| `activeSeats(game)` | 活跃玩家席位 |
+| `enemySeats(game, owner)` | 敌方席位 |
+| `scoreTarget(target)` | 目标优先级评分（标准模式攻击排序） |
 | `enemyTargets(game, owner)` | 敌方目标（单位 + 总部） |
-| `scoreTarget(target)` | 目标优先级评分 |
-| `bestAttackTarget(game, owner, unit)` | 最佳攻击目标 |
-| `movementGoal(game, owner, unit)` | 移动目标位置 |
+| `bestAttackTarget(game, owner, unit)` | 射程内最佳攻击目标 |
+| `nearestEnemyHeadquarters(game, owner, from)` | 最近存活敌方总部 |
+| `controlPriority(game, cp)` | 据点优先级 |
+| `cpKindEffect(game, point)` | 据点类型效果（收入/折扣/维修/部署开关） |
+| `movementGoal(game, owner, unit)` | 移动目标位置（标准模式） |
+| `deployOrigins(game, owner)` | 部署源（遵守 `deployFromHq` 与 `canDeploy`） |
+| `effectiveDeployCost(game, type, origin)` | 考虑据点折扣后的部署费用 |
+| `actionsRemaining(game)` | 剩余行动点（标准模式；同时回合用队列长度/`actionsPerTurn`） |
+| `deployDecision(game, owner)` | 共用部署决策（threat/mcts/field/verdict 已接入） |
+
+> 同时回合的计划期寻路只按地形，不把单位/总部当障碍；不要直接用 `reachableCells` 的“单位挡路”口径推导计划队列。计划模式请按 `src/engine/planning.ts` 的前缀投影语义实现。
 
 ## 算法清单
 
-| 算法 | 类型 | 复杂度 | 性能 | 用途 |
-|---|---|---|---|---|
-| **random** | 随机 | O(n) | 极弱 | 基准对照、测试 |
-| **greedy** | 启发式 | O(n²) | 中（作为基准线） | 快速决策、演示 |
-| **mcts** | 搜索 | O(b^d · k) | 弱（vs greedy 20 局 3:17） | 战术推演、对比实验 |
-| **threat** | 效用/影响图 | O(单位×格子) | **2 人局最强内置**（vs greedy 7 图 ×40 局 70.6%，vs mcts 14:6）；3-4 人局未标定 | 走位稳健的对战、教学 |
-| **field** | 势场/梯度下降 | O(单位×格子) | 中上（vs greedy 7 图 ×30 局 **64.3%**）；**低行动点图最强**（danger-close 97%，threat 仅 18%）；高行动点图最弱（multiplayer-ring 7%） | 涌现式走位（风筝/分头抢点）、慢节奏消耗战 |
-| **verdict** | 反向规划/期限排程 | O(单位×格子 + 排程回合) | **对 greedy 最强**（7 图 ×30 局 **95.7%**，两套种子一致）；vs threat 76.7%、vs field 88.6%、vs random 24:0；`danger-close` 80%（threat 18%）、`multiplayer-ring` 100%（field 7%） | 全动作按裁决分统一计价、预算内斩首、守成与回防 |
-| **random-sim** | 随机 | O(n) | 未标定（仅同时回合模式） | 同时回合基线对照、模式隔离冒烟 |
-| **dest-prob** | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 同时回合对 random-sim **100:0**（standoff / molten-throne 各 100 局，零非法；两图场均击杀 3.10 / 0.96）；多席位仅冒烟 | 同时回合实战、预测射击与冲突规避样例 |
-| **kriegspiel** | 真实结算 rollout + 联合计划搜索 | O(候选×种子计划×rollouts×单轮结算) | 同时回合对 random-sim **60/60**、对 dest-prob **34/60（56.7%）**（standoff / molten-throne 各 30 局 ×2 对手，零非法；单轮搜索约 20ms） | 同时回合最强内置、联合计划搜索样例 |
-| **matrix-eq** | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | **v2（3.8.1）** 对 v1 **23:7**、对 kriegspiel **12:18**、对 dest-prob **13:17**、对 random-sim **30:0**（standoff 各 30 局，零非法；单轮求解 ≤157ms/侧） | 博弈论混合策略、计划组合矩阵博弈样例 |
+| 算法 | 模式 | 版本 | 类型 | 复杂度 | 强度 / 状态 | 用途 |
+|---|---|---|---|---|---|---|
+| **random** | standard | v1 | 随机 | O(n) | arena 756 / 1.3%（2026-10-21 UTC） | 基准对照、测试 |
+| **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
+| **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
+| **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
+| **field** | standard | v1 | 势场/梯度下降 | O(单位×格子) | arena 1753 / 76.8%；历史 vs greedy 64.3%；danger-close 强项、multiplayer-ring 短板 | 涌现式走位、慢节奏消耗战 |
+| **verdict** | standard | v1 | 反向规划/期限排程 | O(单位×格子 + 排程回合) | arena 1933 / 90.1%（该快照 standard 第一）；历史 vs greedy 95.7% | 裁决分统一计价、预算内斩首、守成与回防 |
+| **random-sim** | simultaneous | v1 | 随机 | O(n) | 3.8.1 已适配；同时回合基线 | 基线对照、模式隔离冒烟 |
+| **dest-prob** | simultaneous | v1 | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 3.7 旧规则对 random-sim 100:0；3.8 待重测 | 预测射击、冲突规避样例 |
+| **kriegspiel** | simultaneous | v2 | 分步结算 rollout + 有序计划联合搜索 | O(行动点×候选×种子计划×rollouts×分步结算) | 3.8.1 真实引擎标定（standoff / molten-throne 各 30 局 ×3 对手，2026-10-23）：60:0 vs random-sim、52:8（86.7%）vs dest-prob、29:31 vs matrix-eq v2（standoff 27:3 / molten-throne **2:28**，斩首短板）；与引擎逐点对拍 40 局面零偏差；180 局零非法；`decide` 45–169ms | 同时回合搜索型内置、分步结算语义参考镜像 |
+| **matrix-eq** | simultaneous | v2 | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | 3.8 镜像裁判：23:7 vs v1、12:18 vs kriegspiel **v1**、13:17 vs dest-prob、30:0 vs random-sim；真实引擎待验证（3.8.1 真实引擎口径下被 kriegspiel v2 在 standoff 打到 3:27、在 molten-throne 反打 28:2） | 博弈论混合策略样例 |
 
-> 表中 random-sim、dest-prob、kriegspiel 与 matrix-eq 为同时回合（simultaneous）模式算法，其余为标准模式算法。random-sim 的 100:0 / 60:0 是对均匀随机基线的下界验证，不代表对真人/RL 的强度；kriegspiel 对 dest-prob 的 56.7%、matrix-eq v2 对 kriegspiel 的 12:18 与对 dest-prob 的 13:17 才是有意义的内置强度对照。
-
-> b = 分支因子（~20），d = 搜索深度（8），k = 模拟次数（100）
+> arena 数字来自 `public/data/arena-leaderboard.json`（2026-10-21 UTC 生成，standard，36,000 局，300 对，每人 2,880 局）；评分是 Bradley-Terry 混合池，胜率包含不同对手，不能与单图对拍数字直接比较。
 >
-> threat / field / verdict 的强度不可直接比大小：三者各有专属短板，且存在相克。
-> 同图对拍 30 局：threat 12:8 领先 field，verdict 18:12 领先 threat（dual-lanes）
-> 但 10:20 输给 threat（forge）；danger-close 上三方相克（field 97% 打 greedy、
-> threat 60% 打 field、threat 18% 打 greedy，verdict 三家通吃 80%/30:0/30:0）。**单图胜率不可外推。**
+> 历史数字采集于 3.5.x 地图池与 3.6.0 之前的裁决分口径；`forge`、`desert` 已不在当前池，详见“历史标定”。
 
-## 性能对比
+### 模式覆盖
 
-实测方法（自 3.5.1 threat 标定起统一）：**headless 自博弈** —— 直接驱动 `src/engine/`，不走 HTTP、不限速，每图 40 局、逐局交替先手，种子固定可复现（参考实现 `temp/threat-bench.mts`）。
+| 模式 | 内置算法数 | 算法 |
+|---|---:|---|
+| standard | 6 | random / greedy / mcts / threat / field / verdict |
+| simultaneous | 4 | random-sim / dest-prob / kriegspiel / matrix-eq |
+| annihilation | 0 | — |
+| royale | 0 | — |
 
-### vs greedy（threat：各图 40 局）
+> 歼灭与大逃杀目前没有内置算法；这是当前最大的模式空白，优先于继续打磨 2 人标准图。
+
+## 当前强度快照（standard，2026-10-21 UTC）
+
+| 参与者 | 类型 | 评分 | 胜率 | 局数 |
+|---|---|---:|---:|---:|
+| `algo_verdict@v1` | 算法 | **1933** | **90.1%** | 2,880 |
+| `algo_threat@v1` | 算法 | 1778 | 79.1% | 2,880 |
+| `algo_greedy@v1` | 算法 | 1761 | 77.5% | 2,880 |
+| `algo_field@v1` | 算法 | 1753 | 76.8% | 2,880 |
+| `hex_ppo_v3.1.1_20260911_8.8M.zip` | 模型 | 1660 | 67.3% | 2,880 |
+| `algo_mcts@v1` | 算法 | 1631 | 64.1% | 2,880 |
+| `algo_random@v1` | 算法 | 756 | 1.3% | 2,880 |
+
+> 口径：Arena 标准模式混合池（`default` / `breach` / `danger-close` / `dual-lanes` / `random`），不含 `multiplayer-ring` 与 `whirlpool`；胜率是对混合对手的总体胜率，不是对固定基线的单挑。该快照生成于 3.8.0 之前（`generatedAt` 为 2026-10-21T22:02Z），standard 规则不受同时回合分步结算影响。该快照只能说明“在这个池子里”的强弱，不能外推到全图池、同时回合、大逃杀或歼灭。
+
+## 历史标定（3.5.x 标准模式）
+
+> **以下表格是历史数据，不是当前强度。** 采集时 `forge` / `desert` 仍在标准图池，裁决分仍是 3.6.0 之前的公式；3.8.0 之后同时回合规则也已改变。保留这些数字只为回归追踪和解释算法演化，不要与当前快照相加或比较。
+
+### threat vs greedy（3.5.1，各图 40 局）
 
 | 地图 | threat | 初版 threat | 备注 |
 |---|---:|---:|---|
 | default | **38:2** | 16:24 | 主图 |
 | dual-lanes | **38:2** | 30:10 | |
 | breach | **35:5** | **0:40** | 初版因拆墙判据一局未赢 |
-| forge | **31:8** | 16:24 | 1 平 | 
-| desert | **28:12** | 24:16 | |
+| forge | **31:8** | 16:24 | 1 平；forge 已于 3.5.11 改造为 molten-throne |
+| desert | **28:12** | 24:16 | desert 已于 3.5.8 下线 |
 | multiplayer-ring | 20:20 | 22:18 | 每回合 7 行动点 |
 | danger-close | 7:33 | 7:33 | 每回合 1 行动点，已知短板 |
-| **合计** | **197:82（70.6%）** | 115:165（41.1%） | |
-| random 地图 | 17:15（53%），32 局 | — | 回合数与裁定权重随机生成，优势被摊薄 |
+| **合计** | **197:82（70.6%）** | 115:165（41.1%） | 279 局分胜负 + 1 平 |
+| random 地图 | 17:15（53%），32 局 | — | 旧随机域；回合数与裁定权重随机生成 |
 
-### vs greedy（field：各图 30 局，逐局交替先手）
+### field vs greedy（3.5.3，各图 30 局）
 
-field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，头less 自博弈），局数取 30（每图 40 局×7 图的成本更高，30 局已足够区分 20 个百分点以上的差异）。
+field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自博弈），局数取 30。
 
 | 地图 | field | threat 同图对照 | 备注 |
 |---|---:|---:|---|
 | default | 18:12（60%） | 95% | 主图 |
 | dual-lanes | 25:5（83%） | 95% | |
 | breach | 17:13（57%） | 88% | 隔墙图，靠波前距离场绕行 |
-| desert | 26:4（87%） | 70% | |
-| forge | 18:12（60%） | 80% | 半径 6 短图；另一套种子 14:16（47%），**短图波动大** |
-| multiplayer-ring | 2:28（7%） | 50% | **每回合 7 行动点，field 已知短板** |
-| danger-close | 29:1（97%） | 18% | **每回合 1 行动点，field 最强项** |
+| desert | 26:4（87%） | 70% | 地图已下线 |
+| forge | 18:12（60%） | 80% | 半径 6 短图；另一套种子 14:16（47%），短图波动大；forge 已改造 |
+| multiplayer-ring | 2:28（7%） | 50% | 每回合 7 行动点，field 已知短板 |
+| danger-close | 29:1（97%） | 18% | 每回合 1 行动点，field 最强项 |
 | **合计** | **135:75（64.3%）** | 197:82（70.6%） | 7 图 |
-| random 地图 | 12:18（40%），30 局 | 53%（32 局） | 权重随机化摊薄优势 |
+| random 地图 | 12:18（40%），30 局 | 53%（32 局） | 旧随机域，权重随机化摊薄优势 |
 
-> field 与 threat 的强度不可直接比大小：threat 的短板正是 field 的强项（danger-close 18% vs 97%），反之亦然（multiplayer-ring 50% vs 7%）。
-> 同图（default）直接对拍 30 局 **threat 18:12 领先**；但 danger-close 上存在三方相克——field 打 greedy 97%、threat 打 field 60%、threat 打 greedy 仅 18%。**单图胜率不可外推。**
->
-> field 的性能曲线由"行动点预算"决定：每回合 1 行动点（一次走位 = 一整回合）时势场避险最省，7 行动点时"井外"不存在、找不到正收益落点就站住（304 个回合里 280 次带着行动点交回合），把 tempo 让给对手。
+> field 与 threat 的强度不可直接比大小：threat 的短板正是 field 的强项（danger-close 18% vs 97%），反之亦然（multiplayer-ring 50% vs 7%）。同图 default 直接对拍 30 局 threat 18:12 领先；danger-close 上存在三方相克（field 打 greedy 97%、threat 打 field 60%、threat 打 greedy 仅 18%）。**单图胜率不可外推。**
 
-### vs greedy（verdict：各图 30 局，两套种子基）
-
-verdict 的口径与 threat/field 完全一致（`scripts/algorithm-arena.mjs`，headless 自博弈）。
+### verdict vs greedy（3.5.4，各图 30 局，两套种子基）
 
 | 地图 | 种子基 1000 | 种子基 3000 | threat | field |
 |---|---:|---:|---:|---:|
@@ -179,51 +304,57 @@ verdict 的口径与 threat/field 完全一致（`scripts/algorithm-arena.mjs`�
 | **合计** | **201:9（95.7%）** | **201:9（95.7%）** | 197:82（70.6%） | 135:75（64.3%） |
 | random 地图 | 18:12（60%），30 局 | — | 53%（32 局） | 40%（30 局） |
 
-> verdict 是唯一在两套种子基上给出**完全相同合计**的内置算法（逐图仅 ±1~3 局波动）。
+> verdict 是唯一在两套种子基上给出完全相同合计的内置算法（逐图仅 ±1~3 局波动）。该表采集于 3.5.4，地图池与裁决分口径均已变化，不能当作 3.8.1 的当前胜率。
 
-### vs 其他算法（verdict：各 7 图 ×30 局）
+### verdict vs 其他算法（3.5.4，各 7 图 ×30 局）
 
-| 对手 | 战绩 | 逐图（verdict 胜，7 图顺序同上） |
+| 对手 | 战绩 | 逐图（verdict 胜，顺序 default / breach / desert / dual-lanes / forge / danger-close / multiplayer-ring） |
 |---|---:|---|
 | threat | **161:49（76.7%）** | 24 / 30 / 27 / 18 / **10** / 30 / 22 |
 | field | **186:24（88.6%）** | 28 / 30 / 28 / 16 / 30 / 30 / 24 |
 | random | 24:0（100%），24 局 | default |
 
-> verdict 在 threat/field 各自的最大短板上都是碾压：`danger-close` 30:0 打 threat、
-> 30:0 打 field；`multiplayer-ring` 22:8 打 threat、24:6 打 field。
-> 反过来，verdict 的短板是 `forge`（对 threat 仅 10:20）—— 半径 6、10 回合的短图，
-> 双方都要抢 tempo，而排程天然按回合摊销，被 threat 的单步兑现率压住。**相克是双向的。**
+> verdict 在 threat/field 各自的最大短板上都是碾压：`danger-close` 30:0 打 threat、30:0 打 field；`multiplayer-ring` 22:8 打 threat、24:6 打 field。反过来，verdict 的旧短板是 `forge`（对 threat 仅 10:20）——该图已在 3.5.11 改造为同时回合的 `molten-throne`，这条相克结论不能直接套到当前图池。
 
-### 其他对局
+### 其他历史对局
 
 | 对局 | 胜率 | 备注 |
 |---|---|---|
-| verdict vs greedy | **95.7% (201:9)**，7 图 ×30 局 | 两套种子基一致 |
-| verdict vs threat | 76.7% (161:49)，7 图 ×30 局 | forge 图被相克（10:20） |
-| verdict vs field | 88.6% (186:24)，7 图 ×30 局 | |
 | verdict vs random | 100% (24:0)，24 局 | default |
-| verdict vs greedy（4 人局） | four-corners 2/20 席位局（10%），greedy 每席位 30% | 未标定，见 verdict.md 已知限制 2 |
+| verdict vs greedy（4 人局） | four-corners 2/20 席位局（10%），greedy 每席位 30% | four-corners 已下线；未标定 |
 | threat vs 初版 threat | **78% (31:9)**，40 局 | default；修复的直接效果 |
-| threat vs mcts | 70% (14:6)，20 局 | default。mcts 的模拟用未播种随机数，批次间会飘（另一批 18:2）；要定序需 40 局以上 |
+| threat vs mcts | 70% (14:6)，20 局 | default；mcts 模拟未播种，批次间会飘（另一批 18:2）；要定序需 40 局以上 |
 | threat vs random | 100% (24:0)，24 局 | default |
 | field vs random | 100% (24:0)，24 局 | default |
 | field vs threat | 40% (12:18)，30 局 | default |
-| mcts vs greedy | 25% (5:15)，20 局 | 两个算法都已修正行动点门控；历史记录 26.7%（30 局 8:22）是双方都带 bug 时测的；同样受 mcts 未播种随机影响 |
+| mcts vs greedy | 25% (5:15)，20 局 | 两个算法都已修正行动点门控；旧记录 26.7%（30 局 8:22）是双方都带 bug 时测的；mcts 未播种随机 |
 | greedy vs random | 100% (24:0)，24 局 | 修正后重测；旧记录 96.9%（31:1），32 局 |
 
-> 行动点预算门控原本是**四个内置算法共有的陷阱**：动作失败会让 runner 直接 break 掉整个回合、作废剩余行动点。greedy / mcts / random 已同步修正（攻击/治疗/爆破/移动），headless 自博弈下三者零非法动作。MCTS 含随机模拟，胜负方差较大。
+> 行动点预算门控原本是四个内置算法共有的陷阱：动作失败会让 runner 直接 break 掉整个回合、作废剩余行动点。greedy / mcts / random 已同步修正（攻击/治疗/爆破/移动），headless 自博弈下零非法动作。MCTS 含随机模拟，胜负方差较大。
 
 ## 算法 vs RL 模型
 
-算法 AI 与强化学习模型在 random 地图对战（各 48 局配对换座）：
+当前可比较的数据是上面的 Arena 标准模式快照：`algo_verdict@v1` 评分 1933、胜率 90.1%，高于最强模型 `hex_ppo_v3.1.1` 的 1660 / 67.3%。因此不能再概括为“算法 AI 与训练良好的 RL 模型仍有显著差距”；更准确的说法是：**在当前 Arena 标准图池与模型池里，规则算法第一梯队不弱于最强模型**，但这不能外推到同时回合、大逃杀、歼灭或训练分布外的地图。
+
+历史上只有一组 48 局配对换座的旧数据：
 
 | 对局 | 胜率 | 先手/后手 | 备注 |
 |---|---|---|---|
-| greedy vs v2.7.0 | 18.8% (9:39) | 6:18 / 3:21 | RL 模型碾压 |
+| greedy vs v2.7.0 | 18.8% (9:39) | 6:18 / 3:21 | 历史；random 地图，48 局；数据源 `rl/test-output/stats/algo_vs_rl_random.jsonl` 已不在仓库 |
 
-> 数据来源：`rl/test-output/stats/algo_vs_rl_random.jsonl`
+> 旧数据只用于解释 3.5.x 时代的差距；模型池、随机地图域与竞技场口径都已变化，不能作为当前结论。MCTS 的 RL 同口径数据现在可从 Arena 的 2,880 局记录中读取，不再标注“尚未进行”。
 
-**结论**：算法 AI 与训练良好的 RL 模型仍有显著差距。算法 AI 的价值在于无需训练、可快速迭代、易于调试，适合作为开发期对手和教学演示。MCTS 对 RL 模型的同口径实测尚未进行。
+## 规则与地图变更对算法的影响
+
+| 版本 | 日期 | 变更 | 对算法的影响 |
+|---|---|---|---|
+| 3.5.7 | 2026-09-27 | `four-corners` 下线 | 4 人局旧标定（verdict 2/20）不再可复现 |
+| 3.5.8 | 2026-09-28 | `desert` 下线 | 所有含 desert 的 7 图合计变成历史口径 |
+| 3.5.11 | 2026-10-06 | `forge` → `molten-throne`，并转为 simultaneous | 旧 forge 标准图对拍（含 verdict vs threat 10:20）失效 |
+| 3.6.0 | 2026-10-10 | 裁决分重构为击杀价值 + 据点流量制 | 3.5.x 标准算法胜率全部变成旧计分口径 |
+| 3.7.4 | 2026-10-22 | Arena 按玩法模式分榜 | 同时回合暂无跑批；评估控制台仍只支持 standard |
+| 3.8.0 | 2026-10-22 | 同时回合改为按行动点分步结算 | 所有同时算法的镜像/模拟器需要重写 |
+| 3.8.1 | 2026-10-23 | random-sim、kriegspiel v2、matrix-eq v2 适配分步结算 | `kriegspiel` v2 已完成真实引擎对拍与两图 ×3 对手标定；`dest-prob` 仍按旧镜像运行，需单独适配与重标定 |
 
 ## 历史里程碑
 
@@ -232,47 +363,61 @@ verdict 的口径与 threat/field 完全一致（`scripts/algorithm-arena.mjs`�
 | 2026-09-13 | 3.5.0 | 算法 AI 系统上线：greedy、random |
 | 2026-09-13 | 3.5.1 | 新增 MCTS（目标导向采样、据点占领、入口部署决策）；实测 vs greedy 30 局 8:22 |
 | 2026-09-14 | 3.5.1 | 新增 threat 威胁感知效用算法：初版实测 vs greedy 仅 41.1%（7 图 ×40 局），breach 图 0 胜 |
-| 2026-09-14 | 3.5.1 | threat 标定与修复：行动点预算门控、结束回合门槛（与 PROGRESS_SCALE 碰磁）、威胁惩罚按 `actionsPerTurn` 截断、据点收入按 kind 取实际值、部署参与同尺度比较、拆墙判据放宽 → **vs greedy 70.6%**；greedy 同步修正行动点门控；新增自博弈合法性回归测试 |
-| 2026-09-16 | 3.5.3 | 新增 field 势场算法（人工势场：斥力井 + 引力井 + 波前距离场）。初版 vs greedy 0/30：三处结构性 bug（反击风险用势能与血量比较、机会火力选完落点才补减、孤军 cohesion 为 Infinity 导致不移动）；修复后 64.3%（7 图 ×30 局），并在 threat 的短板 danger-close 上拿到 97% |
-| 2026-09-16 | 3.5.3 | field 标定：尺度自适应档案（小图 1 环/据点井 4 格，大图 2 环/5 格）、同一敌军在斥力井中去重计费、纯波前导航（否决了"直线+绕行"混合场：default +10 但 breach −20） |
-| 2026-09-18 | 3.5.4 | 新增 verdict 裁决线算法（反向规划：三条裁决线 + 攻城排程 + 全动作按引擎裁决分统一计价）。初版 vs greedy 64.3%（7 图 ×30 局），最大短板是对 threat 的 `forge` 相克 |
-| 2026-09-18 | 3.5.4 | verdict 标定与修复：十处结构性约束（见 `algorithms/verdict.md`），其中四条各值 20 个以上百分点——到位后推进梯度归零（远程兵不再放弃已到手的打击）、打击扣"原地承伤"（dual-lanes 60%→93%）、打击加"暴露下降"差分（集火斩杀）、排程按抵达概率折损（dual-lanes 53%→83%）。`STEP_SURVIVAL` 扫描 0.72/0.62/0.55/0.45/0.35 → 89.0/92.4/**95.7**/回落/回落。最终 **vs greedy 95.7%（201:9）**、两套种子基一致 |
-| 2026-10-22 | 3.7.2 | 新增 dest-prob 落点概率算法（同时回合）：敌军落点概率分布 + 预测射击 + 目的格冲突规避 + 据点流量计价。headless 对 random-sim 两图各 100 局 **100:0**、零非法；场均击杀 3.10（standoff）/ 0.96（molten-throne）；3/6 人 standoff 零非法冒烟。 |
-| 2026-10-22 | 3.7.3 | 新增 kriegspiel 兵棋推演算法（同时回合）：把整份计划塞进镜像 `resolveRound` 的 JS 单轮结算器真实跑一遍，对 objective/aggressive/random 三种对手组合做蒙特卡洛 rollout，按「均值 − λ·标准差」风险调整分挑选 + 爬山精修；复用 dest-prob 的 `computeAim`/`enumerateAims` 与落点模型。headless 各 30 局 ×2 地图 ×2 对手：对 random-sim **60/60**、对 dest-prob **34/60（56.7%）**，全部 240 局零非法；单轮搜索约 20ms、`decide` 约 2–3ms。补 dest-prob「不做联合计划搜索」「对手模型可被反预测」两条限制。 |
-| 2026-10-22 | 3.7.5 | 新增 matrix-eq 矩阵均衡算法（同时回合）：把每轮升维成「计划组合 × 计划组合」矩阵博弈，用镜像结算器算支付、CFR 自我对弈解均衡混合，并从 `round_resolved` 事件史重建敌方真实计划做实证校正；输出混合策略抽样而非确定性 argmax。standoff 镜像裁判各 30 局：对 random-sim **30:0**、对 dest-prob **14:16**（顺序对照合计 25:35）、对 kriegspiel **8:22**；150 局零非法，单轮求解 ≤173ms。 |
-| 2026-10-23 | 3.8.1 | matrix-eq v2（3.8.0 分步引擎适配）：重写分步结算镜像（级联/到达依赖链/逐步死亡/攻击上限）、结构性计划校验（投影站位+地形寻路）、组合动作生成（连击/先射后撤/两连移）与事件史按步序重建；新增池内精修与自适应利用混合。standoff 镜像裁判各 30 局：对 v1 **23:7**、对 kriegspiel **12:18**、对 dest-prob **13:17**、对 random-sim **30:0**；全部零非法，单轮求解 ≤157ms/侧。 |
+| 2026-09-14 | 3.5.1 | threat 标定与修复：行动点预算门控、结束回合门槛、威胁惩罚按 `actionsPerTurn` 截断、据点收入按 kind 取实际值、部署参与同尺度比较、拆墙判据放宽 → vs greedy 70.6%；greedy 同步修正行动点门控；新增自博弈合法性回归测试 |
+| 2026-09-16 | 3.5.3 | 新增 field 势场算法（人工势场：斥力井 + 引力井 + 波前距离场）。初版 vs greedy 0/30：三处结构性 bug；修复后 64.3%（7 图 ×30 局），并在 threat 的短板 danger-close 上拿到 97% |
+| 2026-09-16 | 3.5.3 | field 标定：尺度自适应档案（小图 1 环/据点井 4 格，大图 2 环/5 格）、同一敌军在斥力井中去重计费、纯波前导航 |
+| 2026-09-18 | 3.5.4 | 新增 verdict 裁决线算法（反向规划：三条裁决线 + 攻城排程 + 全动作按引擎裁决分统一计价）。初版 vs greedy 64.3%（7 图 ×30 局），最大短板是对 threat 的 forge 相克 |
+| 2026-09-18 | 3.5.4 | verdict 标定与修复：十处结构性约束；`STEP_SURVIVAL` 扫描 0.72/0.62/0.55/0.45/0.35 → 89.0/92.4/95.7/回落/回落；最终 vs greedy 95.7%（201:9），两套种子基一致 |
+| 2026-10-10 | 3.6.0 | 裁决分重构为击杀价值 + 据点流量制；verdict 同步新口径；3.5.x 标准强度数据转入历史口径 |
+| 2026-10-22 | 3.7.2 | 新增 dest-prob 落点概率算法（同时回合）：敌军落点概率分布 + 预测射击 + 目的格冲突规避 + 据点流量计价。旧规则 headless 对 random-sim 两图各 100 局 100:0、零非法；场均击杀 3.10（standoff）/ 0.96（molten-throne） |
+| 2026-10-22 | 3.7.3 | 新增 kriegspiel 兵棋推演算法 v1（同时回合）：旧 `resolveRound` 单轮结算 rollout + 联合计划搜索；旧规则对 random-sim 60/60、对 dest-prob 34/60（56.7%），240 局零非法 |
+| 2026-10-22 | 3.7.5 | 新增 matrix-eq 矩阵均衡算法 v1（同时回合）：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正；旧规则对 random-sim 30:0、对 dest-prob 14:16、对 kriegspiel 8:22 |
+| 2026-10-22 | 3.8.0 | 同时回合改为按行动点分步结算；新增 wait、`attacksPerUnit`、失败连锁、计划重排；同时算法镜像进入适配期 |
+| 2026-10-23 | 3.8.1 | kriegspiel v2（3.8 分步引擎适配）：镜像 `src/engine/simultaneousResolve.ts` 的分步结算（级联失败/到达依赖链/逐步死亡/`attacksPerUnit`/终局轮跳过占点），计划合法性改为队列前缀投影 + 地形寻路，候选生成与爬山改为逐行动点并支持 `wait` / `demolish`，敌方计划改为有序采样。真实引擎对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法：对 random-sim 60:0、对 dest-prob 52:8（86.7%）、对 matrix-eq v2 29:31（standoff 27:3、molten-throne 2:28 斩首短板） |
+| 2026-10-23 | 3.8.1 | random-sim 适配分步结算：同单位多动作、队列投影、`attacksPerUnit`；同时回合基线恢复可用 |
+| 2026-10-23 | 3.8.1 | matrix-eq v2（3.8 分步引擎适配）：重写分步结算镜像、计划校验、组合动作生成与事件史按步序重建；镜像裁判对 v1 23:7、对 kriegspiel 12:18、对 dest-prob 13:17、对 random-sim 30:0；真实服务器口径待验证 |
 
 ## 未来方向
 
-1. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索
-2. **规则增强**：针对特定地图的专家系统
-3. **混合架构**：MCTS + 学习评估函数
-4. **多线程并行**：利用 Worker 加速搜索
-5. **算法锦标赛**：已起步为 `scripts/algorithm-arena.mjs`（headless 自博弈、交替席位、非法动作审计、决策耗时分位、`--strict` 可进 CI）；还缺多算法轮转与自动排行落盘
-6. **多席位标定**：现有权重全部在 2 人对局上调出，3-4 人图上 threat 不再优于 greedy（见 `algorithms/threat.md` 已知限制 7），field 同样未标定（斥力井把多席位敌人等价叠加）
-7. **部署决策继续收敛**：`threat` 与 `mcts` 的逐字重复拷贝已提到 `game-utils.deployDecision()` 共用；还剩 `greedy`（按距离+费用排序的另一份）与 `scripts/auto-standard-game.mjs` 两份变体未合并
-8. **tempo 量纲**：两个算法各自的最大短板指向同一个缺失——"什么时候该接受亏损交换"。
-   threat 输 danger-close（每回合 1 行动点，避险换不来 tempo，18%），
-   field 输 multiplayer-ring（7 行动点，井外不存在，7%）。
-   **verdict（3.5.4）给出了第一版可用的答案**：把行动点预算建进攻城排程
-   （赶路与开火争抢同一份行动点），再让"打击分 − 原地承伤 × 姿态系数"自己算出交换阈值——
-   它在 `danger-close` 拿到 80%（threat 18%）、`multiplayer-ring` 拿到 100%（field 7%），
-   两个老短板同时补上。但 tempo 的账没有算完：verdict 在 `forge`（半径 6、10 回合的短图）
-   被 threat 反打 10:20 —— 排程按回合摊销，短图上"每一步都要兑现"的兑现率才是硬通货。
-   下一版需要的是**兑现率**量纲，不是再配一个系数。
+1. **同时回合 3.8 适配与重标定（最高优先级）**：完成 dest-prob 的分步语义适配；为 matrix-eq v2 补真实引擎标定，确认镜像裁判结论（kriegspiel v2 已完成：真实引擎对拍零偏差 + 两图 ×3 对手各 30 局）。
+2. **大逃杀 / 歼灭算法空白**：当前 0 个内置算法。先做随机/效用基线，再处理无总部、炮火缩圈、出生据点绑定与淘汰规则。
+3. **多席位标定**：现有标准权重主要在 2 人对局上调出；用 `multiplayer-ring`（多席位）、`snowflake` / `standoff`（3/6 人）补 3–6 人标定。`four-corners` 已下线，不能再用。
+4. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索，可作为 mcts 之外的确定性搜索基线。
+5. **混合架构**：MCTS + 学习评估函数，或规则算法 + RL 局面评估。
+6. **多线程并行**：利用 Worker 加速搜索；先做可复现的基准，再决定是否值得。
+7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；缺口是同时回合与大逃杀跑批（Arena 当前 simultaneous 0 局，评估控制台只支持 standard）。
+8. **部署决策继续收敛**：`deployDecision()` 已统一 threat / mcts / field / verdict；还剩 `greedy` 与 `scripts/auto-standard-game.mjs` 两份变体未合并。
+9. **tempo / 兑现率量纲**：verdict 已用行动点预算与“打击分 − 原地承伤 × 姿态系数”补上 danger-close / multiplayer-ring 两个老短板；下一步是把“每一步兑现率”做成可计算量纲，而不是再配一个系数。旧 `forge` 例子已不适用，改用当前短图与多行动点图验证。
+10. **基准数据自动化**：让 `scripts/algorithm-arena.mjs` / `scripts/matrix_eq_benchmark.mjs` 输出带 `engineVersion / mapPool / harness / games / seed / date` 的 JSON，再由脚本生成本文表格，避免手工抄写再次漂移。
+11. **同时回合的多轮视野**：kriegspiel v2 在 molten-throne 被 matrix-eq v2 打到 2:28，且**场均裁定分反而领先**（2496.6 vs 1764.3）——单轮 rollout 无法给「N 轮后总部被斩首」定价，每轮的局部最优都是「再挨一下换一格据点」。给总部血量加凸性惩罚（`KRIEG_HQ_URGENCY` 扫 1800 / 4000）实测**胜负序列完全不变**，在 24 格据点 ×75 分的尺度面前压不过抢点收益。需要的是多轮 rollout 或「剩余存活轮数」的期限量纲（参 verdict 的攻城排程），与第 9 条同源。
 
 ## 贡献指南
 
 新算法提交清单：
 
 - [ ] 实现文件 `algorithms/builtin/<name>.mjs`
-- [ ] 在 `registry.mjs` 注册
-- [ ] 在 `src/api/bots.ts` 添加 `algo_<name>` 配置
-- [ ] 前端下拉菜单添加选项（`play.html` 和 `play-m.html`）
-- [ ] 编写算法文档 `algorithms/docs/algorithms/<name>.md`（性能表**不得留“待填”进入仓库**）
-- [ ] 更新本文档的算法清单
-- [ ] 合法性回归：headless 跑完整对局，断言返回的动作零被引擎拒绝（参 `tests/algorithms/threat-selfplay.test.ts`）
-- [ ] 强度口径：至少 3 张图 × 30 局、交替先手；**6 局的胜负不构成结论**
+- [ ] 在 `registry.mjs` 的 `ALGORITHMS` 注册，并在 `ALGORITHM_META` 填写 `displayName` / `description` / `version` / `modes`
+- [ ] 模式隔离：确认 `modes` 与实际玩法一致；不要再手工改 `src/api/bots.ts` 或前端下拉，二者由注册表/`/api/algorithms` 自动生成
+- [ ] 编写算法文档 `algorithms/docs/algorithms/<name>.md`（性能表不得留“待填”进入仓库；必须带引擎版本/地图池/harness/局数/日期）
+- [ ] 更新本文档的算法清单与模式覆盖表
+- [ ] 合法性回归：headless 跑完整对局，断言返回的动作零被引擎拒绝（参 `tests/algorithms/threat-selfplay.test.ts`）；同时回合算法还要覆盖 3.8 分步语义（同单位多动作、`wait`、失败连锁、`attacksPerUnit`）
+- [ ] 强度口径：至少 3 张图 × 30 局、逐局交替先手；**6 局的胜负不构成结论**；不得用已退役地图或旧计分口径冒充当前数据
+- [ ] 算法行为变更时升 `version`（竞技场历史对局归旧版本 id，新对局归新 id）
+- [ ] 升版时在 `algorithms/docs/algorithms/<name>.md` 写 `vN → vN+1` 的改动清单、同口径对照表、提升幅度（绝对值 + 百分点/比值）与代价；无同口径数据时写“暂无同口径对照”及补测计划
+- [ ] 同步更新本文档算法清单的版本/强度列与“历史里程碑”
 - [ ] 提交前通过 `npm run build`、`npm test` 与冒烟脚本验证（服务器运行时执行 `node scripts/test-algorithm-bots.mjs algo_<name> algo_random`）
 
 详细开发指南见 `algorithms/builtin/README.md`。
+
+## 数据源与复现
+
+| 用途 | 入口 | 说明 |
+|---|---|---|
+| 标准模式自博弈 | `scripts/algorithm-arena.mjs` | 直接驱动 `src/engine/`，逐局交替先手、非法动作审计、`--strict` 可进 CI；用 `npx tsx` 运行 |
+| 同时回合镜像标定 | `scripts/matrix_eq_benchmark.mjs` | 镜像 3.8 分步结算的裁判；矩阵均衡等算法的专用基准 |
+| Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 2026-10-21 UTC 标准模式快照；按模式分榜，同时回合暂为 0 局 |
+| 合法性回归 | `tests/algorithms/*-selfplay.test.ts` | 整局零非法动作、正常完赛 |
+| 单算法档案 | `algorithms/docs/algorithms/*.md` | 设计细节与逐图数据；本文只保留总览与当前快照 |
+| 版本历史 | 根 `RELEASE_NOTES.md`（权威） / `algorithms/docs/RELEASE_NOTES.md`（旧专题记录） | 后者为旧专题记录，可能滞后；新增版本以根文档与本表“历史里程碑”为准 |
+
+> `temp/threat-bench.mts` 是本机临时标定脚本（gitignored），不能作为长期复现入口；`rl/test-output/stats/algo_vs_rl_random.jsonl` 已不在仓库，旧 48 局数据仅作历史引用。

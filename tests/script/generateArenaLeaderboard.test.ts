@@ -85,7 +85,7 @@ describe('按玩法模式归档对局', () => {
       JSON.stringify({ map, players: { player_a: a, player_b: b }, winner }) + '\n';
     writeFileSync(stats,
       line('default', VALID, 'algo_threat@v1', VALID) +
-      line('standoff', 'algo_dest-prob@v1', 'algo_kriegspiel@v1', 'algo_dest-prob@v1'));
+      line('standoff', 'algo_dest-prob@v1', 'algo_kriegspiel@v2', 'algo_dest-prob@v1'));
     const { registry } = collectRegistry(dir);
     const { matches } = loadMatches(stats, registry, loadMapModes());
     expect(matches.map(m => m.mode)).toEqual(['standard', 'simultaneous']);
@@ -102,7 +102,7 @@ describe('按玩法模式归档对局', () => {
       JSON.stringify({ map, players: { player_a: a, player_b: b }, winner }) + '\n';
     writeFileSync(statsFile,
       line('default', VALID, 'algo_threat@v1', VALID) +
-      line('standoff', 'algo_dest-prob@v1', 'algo_kriegspiel@v1', 'algo_dest-prob@v1'));
+      line('standoff', 'algo_dest-prob@v1', 'algo_kriegspiel@v2', 'algo_dest-prob@v1'));
 
     const result = spawnSync(
       process.execPath,
@@ -121,7 +121,7 @@ describe('按玩法模式归档对局', () => {
     expect(standard.maps.all.models.map((m: { id: string }) => m.id)).toContain('algo_threat@v1');
     expect(standard.maps.all.models.map((m: { id: string }) => m.id)).not.toContain('algo_dest-prob@v1');
     expect(simultaneous.maps.all.models.map((m: { id: string }) => m.id)).toEqual(
-      expect.arrayContaining(['algo_dest-prob@v1', 'algo_kriegspiel@v1', 'algo_random-sim@v1']),
+      expect.arrayContaining(['algo_dest-prob@v1', 'algo_kriegspiel@v2', 'algo_random-sim@v1']),
     );
     expect(simultaneous.maps.all.models.map((m: { id: string }) => m.id)).not.toContain(VALID);
     expect(simultaneous.games).toBe(1);

@@ -17,6 +17,8 @@ halves: the plan/commit loop governs *how* you act, the artillery ring and army-
 - **Queue position = action point**; a unit may act in several steps, and if its earlier action
   hard-fails its later queued actions are void. Attacks/heals aim at a **cell**, not a unit id
   (`single`/`line`/`arc` shapes from `config.units`; `attackLock` locks plan-time occupants).
+- **Attack limit per unit**: at most `config.balance.attacksPerUnit` attacks per unit per round
+  (map setting, default **1**); further attacks are rejected with `attack_limit_reached`.
 - **Arrival rules**: two or more moves/deploys on the same cell in the same step all fail
   (`destination_conflict`). Within a step departures happen first, so a cell vacated in the same
   step can be entered (swaps/chains allowed); a destination that stays occupied fails
@@ -136,7 +138,8 @@ Before queuing each action:
 
 - Read unit **instance** stats from this map's `config.units`, not memory.
 - Count queue vs `actionsPerTurn`; queue order is the step timeline, so put setup moves before the
-  attacks/heals that depend on them (use `wait` to delay).
+  attacks/heals that depend on them (use `wait` to delay). Each unit may attack at most
+  `config.balance.attacksPerUnit` times per round (default 1).
 - Attack cells must match the unit's shape (ray cell for `line`, adjacent for `arc`, in-range for
   `single`) from its projected position; rangers: click a cell an enemy occupies **now** to lock.
 - Artillery: check `game.artillery` every round. Never deploy/heal in danger; do not end your plan

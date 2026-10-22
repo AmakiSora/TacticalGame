@@ -70,6 +70,10 @@ interface ResolveContext {
   limit: number;
   /** 本轮已经硬失败的单位：后续行动点直接作废。 */
   failedUnits: Set<string>;
+  /** 每单位每轮最多攻击次数（地图 balance.attacksPerUnit，缺省 1）。 */
+  attackLimit: number;
+  /** 本轮各单位已结算的攻击次数（含失败/落空）。 */
+  attackCounts: Map<string, number>;
   /** 计划时刻（回合开始）各单位站位：锁定射击据此判定"计划时点击格上的敌人"。 */
   planTimePositions: { unit: Unit; q: number; r: number }[];
 }
@@ -480,6 +484,14 @@ function resolveAttacksAndHeals(ctx: ResolveContext, stepActions: QueuedAction[]
       ctx.failedUnits.add(item.action.attackerId!);
       continue;
     }
+    const attacksUsed = ctx.attackCounts.get(attacker.id) ?? 0;
+    if (attacksUsed >= ctx.attackLimit) {
+      // 兜底旧存档/旧计划：新计划在入队与重排校验时已经拦截超限攻击。
+      recordFailure(ctx, item, 'attack_limit_reached');
+      ctx.failedUnits.add(attacker.id);
+      continue;
+    }
+    ctx.attackCounts.set(attacker.id, attacksUsed + 1);
     const spec = game.config.units[attacker.type];
     const aim = coveredCellsFor(
       attacker,
@@ -739,6 +751,8 @@ export function resolveRoundSteps(
     outcomes,
     limit: game.config.balance.actionsPerTurn,
     failedUnits: new Set<string>(),
+    attackLimit: game.config.balance.attacksPerUnit ?? 1,
+    attackCounts: new Map<string, number>(),
     planTimePositions: game.units
       .filter(unit => unit.alive)
       .map(unit => ({ unit, q: unit.q, r: unit.r })),

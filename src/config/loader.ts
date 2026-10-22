@@ -126,6 +126,8 @@ export interface MapConfig {
     minimumDamage: number;
     healVarianceRange: number;
     actionsPerTurn: number;
+    /** 每单位每轮最多攻击次数；同时回合/大逃杀可用，缺省 1。 */
+    attacksPerUnit?: number;
     /** null = 无回合上限，对局永不因回合数结束。 */
     maxTurns: number | null;
     /** false = 总部不可作为部署起点（只能从己方据点部署）；缺省/true 允许。 */
@@ -166,6 +168,8 @@ export interface MapPreview {
   /** null = 无回合上限。 */
   maxTurns: number | null;
   actionsPerTurn: number;
+  /** 每单位每轮最多攻击次数；缺省 1。 */
+  attacksPerUnit: number;
   cells: MapCell[];
   terrainCells: TerrainCellConfig[];
   controlPoints: ControlPointConfig[];
@@ -358,6 +362,9 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
   if (!('maxTurns' in balance)) throw new Error(`Map "${id}".balance.maxTurns is required`);
   // null = 无回合上限；0/NaN/Infinity/字符串仍按原规则拒绝。
   if (balance.maxTurns !== null) assertNumber(balance, 'maxTurns', `Map "${id}".balance`, 1);
+  if ('attacksPerUnit' in balance) {
+    assertNumber(balance, 'attacksPerUnit', `Map "${id}".balance`, 1);
+  }
   if ('deployFromHq' in balance && typeof balance.deployFromHq !== 'boolean') {
     throw new Error(`Map "${id}".balance.deployFromHq must be boolean`);
   }
@@ -592,6 +599,7 @@ export function previewForConfig(cfg: MapConfig): MapPreview {
     radius: cfg.radius,
     maxTurns: cfg.balance.maxTurns,
     actionsPerTurn: cfg.balance.actionsPerTurn,
+    attacksPerUnit: cfg.balance.attacksPerUnit ?? 1,
     cells: createMapCells(cfg.playableCells, cfg.terrainCells),
     terrainCells: cfg.terrainCells.map(cell => ({ ...cell })),
     controlPoints: cfg.controlPoints.map(point => ({ ...point })),

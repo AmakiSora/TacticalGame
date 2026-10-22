@@ -24,6 +24,7 @@ import './error-text.js';
     ['minimumDamage', '最低伤害', 0],
     ['healVarianceRange', '治疗浮动', 0],
     ['actionsPerTurn', '每回合行动点', 1],
+    ['attacksPerUnit', '单位每轮攻击上限', 1],
     ['maxTurns', '最大回合', 1],
   ];
   const WEIGHT_KEYS = [
@@ -118,6 +119,7 @@ import './error-text.js';
       minimumDamage: 1,
       healVarianceRange: 6,
       actionsPerTurn: 5,
+      attacksPerUnit: 1,
       maxTurns: 15,
       adjudicationWeights: {
         enemyHqDamage: 4,

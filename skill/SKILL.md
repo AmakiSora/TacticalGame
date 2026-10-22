@@ -33,7 +33,8 @@ Re-read the mode file if you are about to deploy, attack a "base", or score near
 players queue actions secretly in a planning phase, then the server resolves them in **action-point steps**:
 everyone's 1st action settles at once, then everyone's 2nd, and so on. Attacks target cells instead of
 units; a unit may act in several steps, and if its earlier action hard-fails its later actions are void
-(`previous_action_failed`). `wait` (`POST /plan/wait`) spends 1 AP to skip a step. `wait-turn.mjs` exit 0
+(`previous_action_failed`). `wait` (`POST /plan/wait`) spends 1 AP to skip a step. Each unit may attack at
+most `config.balance.attacksPerUnit` times per round (default 1; `attack_limit_reached`). `wait-turn.mjs` exit 0
 there means "your planning window is open and you have not committed".
 
 ## Scratch files (mandatory)

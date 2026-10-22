@@ -1931,6 +1931,13 @@ function canActNow() {
 function plannedStepsForUnit(unitId) {
   return myPlanQueue().filter(a => a.unitId === unitId || a.attackerId === unitId || a.supportId === unitId).length;
 }
+/** 每单位每轮攻击上限（地图 balance.attacksPerUnit，缺省 1）。 */
+function attackLimit() {
+  return gameConfig?.balance?.attacksPerUnit ?? 1;
+}
+function attacksPlannedForUnit(unitId) {
+  return myPlanQueue().filter(a => a.type === 'attack' && a.attackerId === unitId).length;
+}
 function describePlanAction(a) {
   const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破', wait: '待命' }[a.type] || a.type;
   if (a.type === 'wait') return '待命（本行动点不做任何事）';
@@ -2436,11 +2443,18 @@ function selectUnit(unit) {
   if (unit.owner !== myPlayer || !canActNow()) return;
   const budgetLeft = myPlanQueue().length < actionsPerTurn();
   const plannedSteps = isSimultaneous() ? plannedStepsForUnit(unit.id) : 0;
+  const attacksUsed = isSimultaneous() ? attacksPlannedForUnit(unit.id) : 0;
+  const canAttack = !isSimultaneous() || attacksUsed < attackLimit();
   const items = [];
   if (budgetLeft && !unit.hasMoved) items.push({ label: '移动', action: 'move' });
-  if (budgetLeft && !unit.hasActed) items.push({ label: unit.type === 'support' ? '治疗' : '攻击', action: unit.type === 'support' ? 'heal' : 'attack' });
+  if (budgetLeft && !unit.hasActed && canAttack) items.push({ label: unit.type === 'support' ? '治疗' : '攻击', action: unit.type === 'support' ? 'heal' : 'attack' });
   if (budgetLeft && unit.type === 'heavy' && !unit.hasActed && demolishableCells(unit).length > 0) items.push({ label: '爆破', action: 'demolish' });
-  if (items.length) showPopup(unit, plannedSteps > 0 ? `单位操作（本轮已排 ${plannedSteps} 步）` : '单位操作', items, action => {
+  if (!items.length && isSimultaneous() && attacksUsed >= attackLimit()) {
+    toast(`该单位本轮攻击已达上限（${attackLimit()} 次）`, 'err');
+  }
+  if (items.length) showPopup(unit, plannedSteps > 0
+    ? `单位操作（已排 ${plannedSteps} 步，攻击 ${attacksUsed}/${attackLimit()}）`
+    : '单位操作', items, action => {
     closePopup();
     if (action === 'move') {
       interactionMode = 'move_mode';

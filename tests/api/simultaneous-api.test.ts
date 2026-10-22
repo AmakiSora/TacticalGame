@@ -211,6 +211,31 @@ describe('simultaneous mode API', () => {
     }
   });
 
+  it('rejects a second attack from the same unit in one round', async () => {
+    const { app, gameId, seats } = await createSimultaneousGame();
+    try {
+      const state = await getState(app, gameId, seats[0]!.token);
+      const { unitId } = firstInfantryNearHq(state, seats[0]!.id);
+      const unit = state.units.find(candidate => candidate.id === unitId)!;
+      const target = emptyNeighbor(state, unit)!;
+      const headers = { 'x-player-token': seats[0]!.token };
+      const first = await app.inject({
+        method: 'POST', url: `/api/games/${gameId}/attack`, headers,
+        payload: { attackerId: unitId, q: target.q, r: target.r },
+      });
+      expect(first.statusCode).toBe(200);
+      const second = await app.inject({
+        method: 'POST', url: `/api/games/${gameId}/attack`, headers,
+        payload: { attackerId: unitId, q: target.q, r: target.r },
+      });
+      expect(second.statusCode).toBe(400);
+      expect(second.json().code).toBe('attack_limit_reached');
+      expect(first.json().queue).toHaveLength(1);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('reorders the plan atomically and keeps the original on rejection', async () => {
     const { app, gameId, seats } = await createSimultaneousGame();
     try {

@@ -57,6 +57,7 @@
     const hqSpec = config?.headquartersSpec;
     const chips = [
       ['行动点/回合', balance.actionsPerTurn ?? '—'],
+      ['单位攻击上限/轮', balance.attacksPerUnit ?? 1],
       ['回合上限', maxTurns],
       ['起始补给', balance.startingSupplies ?? '—'],
       ['基础收入', balance.baseIncome ?? '—'],

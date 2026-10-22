@@ -171,6 +171,22 @@ describe('simultaneous planning phase', () => {
     expect(game.plan!.queues[a]).toHaveLength(0);
   });
 
+  it('limits attacks per unit per round from map balance', () => {
+    const { game } = createStandoffGame();
+    const a = game.turn.turnOrder[0]!;
+    const scout = game.units.find(unit => unit.owner === a && unit.type === 'scout')!;
+    place(scout, 4, 0);
+    expect(queueAttackAction(game, a, scout.id, 3, 0).ok).toBe(true);
+    expect(queueAttackAction(game, a, scout.id, 4, 1))
+      .toMatchObject({ ok: false, code: 'attack_limit_reached' });
+    // 地图可把上限调高到 2；同单位第二条攻击才被允许。
+    game.config = structuredClone(game.config);
+    game.config.balance.attacksPerUnit = 2;
+    expect(queueAttackAction(game, a, scout.id, 4, 1).ok).toBe(true);
+    expect(queueAttackAction(game, a, scout.id, 5, 0))
+      .toMatchObject({ ok: false, code: 'attack_limit_reached' });
+  });
+
   it('caps the queue at actionsPerTurn and charges nothing on failure', () => {
     const { game } = createStandoffGame();
     const a = game.turn.turnOrder[0]!;

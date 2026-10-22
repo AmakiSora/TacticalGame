@@ -69,6 +69,11 @@ function checkBudget(game: GameState, owner: PlayerId): Failure | null {
   return null;
 }
 
+/** 每单位每轮最多攻击次数；地图 balance.attacksPerUnit，缺省 1。 */
+export function attackLimitFor(game: GameState): number {
+  return game.config.balance.attacksPerUnit ?? 1;
+}
+
 function findOwnUnit(game: GameState, owner: PlayerId, unitId: string) {
   const unit = getGameIndex(game).unitById.get(unitId);
   return unit && unit.owner === owner && unit.alive ? unit : null;
@@ -387,6 +392,11 @@ function checkAttack(
 ): Failure | null {
   const attacker = findOwnUnit(game, owner, attackerId);
   if (!attacker) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
+  const limit = attackLimitFor(game);
+  const used = queue.filter(action => action.type === 'attack' && action.attackerId === attackerId).length;
+  if (used >= limit) {
+    return { ok: false, code: 'attack_limit_reached', message: `该单位本轮最多攻击 ${limit} 次` };
+  }
   if (!isInBounds(game, q, r)) {
     return { ok: false, code: 'invalid_attack', message: '目标格在地图之外' };
   }

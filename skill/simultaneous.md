@@ -64,6 +64,10 @@ your signal to act is: `phase === "active"` and `plan.committed` does not includ
   move across three steps. Each step still holds at most one action per player, and a unit can
   only have one action in a given step. Deployed units have no unit id to reference during planning,
   so they cannot be given further actions in the round they appear.
+- **Attack limit per unit**: a unit may queue at most `config.balance.attacksPerUnit` attacks per
+  round (map setting, default **1**); a further attack is rejected with `attack_limit_reached`, so a
+  single unit cannot dump every AP into repeat-firing one target. Moves/heals/waits are still limited
+  only by the shared AP budget.
 - **Failure cascade**: if a unit's earlier action hard-fails (move blocked/occupied, invalid target,
   unit gone, …), every later queued action of that unit in this round is **void** and still costs its
   AP (`action_failed`, reason `previous_action_failed`). Missed attacks and heals with nobody to heal
@@ -207,6 +211,8 @@ Before queuing each action:
   before the attacks/heals that depend on them; use `wait` to delay when you need a later step.
 - A unit may appear several times, but if its earlier action hard-fails the rest of that unit's
   entries are void (and still cost AP). Keep contingency moves on other units.
+- A unit may queue at most `config.balance.attacksPerUnit` attacks per round (default 1); do not
+  spend multiple AP on repeat-firing the same unit.
 - Attack ranges/coverage are measured from the attacker's **projected** hex after its earlier
   queued moves; check the unit's `attackShape` before picking a cell.
 - Lock every shot you can: rangers clicking a cell an enemy occupies NOW cannot be dodged

@@ -10,6 +10,7 @@
 
 - **同时回合模式改为按行动点分步结算**：计划队列的顺序就是行动点顺序——所有玩家的第 1 条动作同时结算完成后再结算第 2 条，依此类推。同一单位可在多个行动点连续行动（移动→攻击→再移动等），每个行动点每人仍只能执行一条动作；`round_resolved.results` 的每条结果与动作事件新增 `step`，`round_resolved` 新增 `steps`。
 - **新增「待命」动作**：`POST /api/games/:id/plan/wait` 消耗 1 行动点、不做任何事，用于把关键动作对齐到更晚的行动点；计划面板同步增加「待命」按钮。
+- **每单位每轮攻击上限**：新增地图配置 `balance.attacksPerUnit`（默认 1）限制同一单位本轮的攻击次数；入队、重排、撤回后的计划校验与结算兜底都会执行，超出返回 `attack_limit_reached`。前端单位操作弹窗会显示已排攻击数/上限，达到上限后不再提供攻击选项。
 - **同一步先移出、再移入**：同一步内 A 离开 X、B 进入 X 可同时成功，交换位置与链式腾格也允许；若依赖的移出失败，依赖的移入随之失败。
 - **失败连锁**：单位在较早行动点硬失败（移动失败、目标非法、单位已不存在等）后，该单位本轮后续排队的动作全部作废（`action_failed`，reason `previous_action_failed`），行动点照扣；攻击落空/治疗无人可治不触发连锁。
 - **计划期延迟判定**：移动目的地/部署目标被占用、治疗覆盖内无友军、爆破目标被占用等不再在入队时拒绝，改为结算时按该行动点开始时的局面判定；移动范围仍按地形寻路在入队时校验（水/障碍挡路，单位与总部不挡路，因此可排队进入当前被占、稍后腾出的格子）。
@@ -30,7 +31,7 @@
 
 - 新增 `tests/engine/simultaneous-steps.test.ts`，覆盖示例 1–5（逐点推进、移动到总部失败、跨步腾格、敌方腾格后进入、移动失败连锁作废）、同步交换/链式腾格、`wait` 对齐、范围/地形拒绝、同一步部署填格、爆破后移动、阵亡单位后续动作与提前终局。
 - 更新 `tests/engine/simultaneous.test.ts`、`tests/api/simultaneous-api.test.ts`（多动作入队、`/plan/wait`、`/plan/reorder` 原子重排与非法顺序保留原计划）、`tests/public/simultaneous-ui.test.ts`、`tests/public/plan-tools.test.ts`、`tests/public/playback.test.ts` 与文档断言。
-- `npm run build` 通过；`npm test` 全量通过（110 文件 / 925 例）。
+- `npm run build` 通过；`npm test` 全量通过（110 文件 / 927 例）。
 
 ## 3.7.5
 

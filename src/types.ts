@@ -366,6 +366,7 @@ export type ApiErrorCode =
   | 'lobby_not_ready'
   | 'unsupported_player_count'
   | 'action_limit_reached'
+  | 'attack_limit_reached'
   | 'invalid_demolish'
   | 'invalid_plan_order'
   | 'not_simultaneous_game'

@@ -121,7 +121,7 @@ describe('按玩法模式归档对局', () => {
     expect(standard.maps.all.models.map((m: { id: string }) => m.id)).toContain('algo_threat@v1');
     expect(standard.maps.all.models.map((m: { id: string }) => m.id)).not.toContain('algo_dest-prob@v1');
     expect(simultaneous.maps.all.models.map((m: { id: string }) => m.id)).toEqual(
-      expect.arrayContaining(['algo_dest-prob@v1', 'algo_kriegspiel@v2', 'algo_random-sim@v1']),
+      expect.arrayContaining(['algo_dest-prob@v1', 'algo_kriegspiel@v2', 'algo_matrix-eq@v2', 'algo_random-sim@v2']),
     );
     expect(simultaneous.maps.all.models.map((m: { id: string }) => m.id)).not.toContain(VALID);
     expect(simultaneous.games).toBe(1);

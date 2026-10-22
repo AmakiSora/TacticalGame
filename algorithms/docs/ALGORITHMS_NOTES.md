@@ -167,18 +167,18 @@ export const ALGORITHM_META = {
 
 没有同口径前代数据时，写“暂无同口径对照”并说明原因与补测计划；**不得省略本节，也不得用不同 harness 的数字冒充提升幅度**。
 
-当前示例：`algorithms/docs/algorithms/kriegspiel.md` 的“v1 → v2：3.8.0 分步引擎适配”与“v1 → v2 强度变化”；`algorithms/docs/algorithms/matrix-eq.md` 的 v2 改动分布在“候选计划组合（v2）/支付矩阵（v2）/求解（v2）”三节，强度对照见“基准结果 III：3.8.0 引擎适配版 v2”。
+当前示例：`algorithms/docs/algorithms/kriegspiel.md`、`matrix-eq.md` 与 `random-sim.md` 的“v1 → v2：3.8.0 分步引擎适配”三节均已按（改动清单 / 同口径对照 / 提升幅度 / 代价与边界 / 样本边界）五个子节组织。其中 `kriegspiel.md` 的同口径对照含 v1 基线在 3.8.1 引擎上的重跑（4 对手 ×2 图 ×30 局，同种子）与 v1↔v2 直接对打，并如实记录了**负提升**（molten-throne 对 matrix-eq 6:24 → 2:28）与**未达显著**（对打 35:25，p=0.245）。
 
 ### 3.8 同时回合适配状态
 
 | 算法 | 计划语义 | 当前状态 |
 |---|---|---|
-| `random-sim` | 同单位多动作、队列投影、`attacksPerUnit` | **3.8.1 已适配**，作为同时回合基线 |
+| `random-sim` | 同单位多动作、队列投影、`attacksPerUnit` | **v2 已适配（3.8.1）**，作为同时回合基线 |
 | `dest-prob` | 仍按“一单位一动作”的旧镜像生成计划 | 未适配；3.7 的 100:0 等数据只代表旧规则 |
 | `kriegspiel` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配并完成 3.8 真实引擎标定**（分步语义、`wait`、`demolish`、`attacksPerUnit`）：与引擎逐点对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法；旧 3.7 数据只代表旧规则 |
 | `matrix-eq` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配**并按 3.8 镜像裁判标定；真实服务器口径待验证 |
 
-> 在 `dest-prob` 完成 3.8 适配前，不要把它的旧胜率写进“当前最强”结论——`kriegspiel` v2 对它的 52:8 里有相当一部分来自 dest-prob 的旧口径计划在分步引擎下吃到级联失败与到达冲突，不是纯策略差距。`matrix-eq` v2 的已有数字来自镜像裁判，`kriegspiel` v2 的来自真实引擎 harness，两者口径不同，引用时必须标清。
+> 在 `dest-prob` 完成 3.8 适配前，不要把它的旧胜率写进“当前最强”结论——`kriegspiel` v2 对它的 52:8 里含「适配 vs 未适配」的成分，不是纯策略差距，dest-prob 适配后必须重测。**但不要把差距归因成「dest-prob 的计划在分步引擎下大量失败」：实测相反。** 同 harness 同种子按 `action_failed` 事件计数（standoff，30 局）：dest-prob 只有 17 次（0.6/局），`kriegspiel` v1 39 次（1.3/局），而 `kriegspiel` **v2 自己是 513 次（17.1/局）**，主因 `destination_occupied=360`——v2 的移动/部署候选不排除敌军当前占位，只按「敌军到达概率」打折（详见 `kriegspiel.md`「已知限制 #2」）。可观测的真实差距在总部与节奏上：dest-prob 对 kriegspiel v1 打出 55.8 点总部伤害、对 v2 只有 5.0。`matrix-eq` v2 的已有数字来自镜像裁判，`kriegspiel` v2 的来自真实引擎 harness，两者口径不同，引用时必须标清。
 
 ## 工具函数（utils）
 
@@ -220,9 +220,9 @@ export const ALGORITHM_META = {
 | **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
 | **field** | standard | v1 | 势场/梯度下降 | O(单位×格子) | arena 1753 / 76.8%；历史 vs greedy 64.3%；danger-close 强项、multiplayer-ring 短板 | 涌现式走位、慢节奏消耗战 |
 | **verdict** | standard | v1 | 反向规划/期限排程 | O(单位×格子 + 排程回合) | arena 1933 / 90.1%（该快照 standard 第一）；历史 vs greedy 95.7% | 裁决分统一计价、预算内斩首、守成与回防 |
-| **random-sim** | simultaneous | v1 | 随机 | O(n) | 3.8.1 已适配；同时回合基线 | 基线对照、模式隔离冒烟 |
+| **random-sim** | simultaneous | v2 | 随机 | O(n) | v2 已适配分步引擎；同时回合基线（无同口径强度标定） | 基线对照、模式隔离冒烟 |
 | **dest-prob** | simultaneous | v1 | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 3.7 旧规则对 random-sim 100:0；3.8 待重测 | 预测射击、冲突规避样例 |
-| **kriegspiel** | simultaneous | v2 | 分步结算 rollout + 有序计划联合搜索 | O(行动点×候选×种子计划×rollouts×分步结算) | 3.8.1 真实引擎标定（standoff / molten-throne 各 30 局 ×3 对手，2026-10-23）：60:0 vs random-sim、52:8（86.7%）vs dest-prob、29:31 vs matrix-eq v2（standoff 27:3 / molten-throne **2:28**，斩首短板）；与引擎逐点对拍 40 局面零偏差；180 局零非法；`decide` 45–169ms | 同时回合搜索型内置、分步结算语义参考镜像 |
+| **kriegspiel** | simultaneous | v2 | 分步结算 rollout + 有序计划联合搜索 | O(行动点×候选×种子计划×rollouts×分步结算) | 3.8.1 真实引擎标定（standoff / molten-throne 各 30 局 ×3 对手，2026-10-23）：60:0 vs random-sim、52:8（86.7%，p<0.0001）vs dest-prob、29:31 vs matrix-eq v2（standoff 27:3 / molten-throne **2:28**，斩首短板；合计 p=0.90 不可用，必须按图拆）；与引擎逐点对拍 40 局面零偏差；180 局零非法；`decide` 45–169ms（v1 的 15–40 倍）。**同 harness 同种子的 v1 基线**：vs dest-prob 43.3%、vs matrix-eq 31.7%，即适配带来 +43.4pp / +16.6pp；但 v1↔v2 直接对打 35:25（p=0.245）**未达显著**，且 v2 结算期失败 17.1–23.1/局远高于 v1 的 1.3/局（`destination_occupied` 未修） | 同时回合搜索型内置、分步结算语义参考镜像 |
 | **matrix-eq** | simultaneous | v2 | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | 3.8 镜像裁判：23:7 vs v1、12:18 vs kriegspiel **v1**、13:17 vs dest-prob、30:0 vs random-sim；真实引擎待验证（3.8.1 真实引擎口径下被 kriegspiel v2 在 standoff 打到 3:27、在 molten-throne 反打 28:2） | 博弈论混合策略样例 |
 
 > arena 数字来自 `public/data/arena-leaderboard.json`（2026-10-21 UTC 生成，standard，36,000 局，300 对，每人 2,880 局）；评分是 Bradley-Terry 混合池，胜率包含不同对手，不能与单图对拍数字直接比较。
@@ -354,7 +354,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 3.6.0 | 2026-10-10 | 裁决分重构为击杀价值 + 据点流量制 | 3.5.x 标准算法胜率全部变成旧计分口径 |
 | 3.7.4 | 2026-10-22 | Arena 按玩法模式分榜 | 同时回合暂无跑批；评估控制台仍只支持 standard |
 | 3.8.0 | 2026-10-22 | 同时回合改为按行动点分步结算 | 所有同时算法的镜像/模拟器需要重写 |
-| 3.8.1 | 2026-10-23 | random-sim、kriegspiel v2、matrix-eq v2 适配分步结算 | `kriegspiel` v2 已完成真实引擎对拍与两图 ×3 对手标定；`dest-prob` 仍按旧镜像运行，需单独适配与重标定 |
+| 3.8.1 | 2026-10-23 | random-sim v2、kriegspiel v2、matrix-eq v2 适配分步结算 | `kriegspiel` v2 已完成真实引擎对拍与两图 ×3 对手标定；`dest-prob` 仍按旧镜像运行，需单独适配与重标定 |
 
 ## 历史里程碑
 
@@ -374,7 +374,8 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 2026-10-22 | 3.7.5 | 新增 matrix-eq 矩阵均衡算法 v1（同时回合）：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正；旧规则对 random-sim 30:0、对 dest-prob 14:16、对 kriegspiel 8:22 |
 | 2026-10-22 | 3.8.0 | 同时回合改为按行动点分步结算；新增 wait、`attacksPerUnit`、失败连锁、计划重排；同时算法镜像进入适配期 |
 | 2026-10-23 | 3.8.1 | kriegspiel v2（3.8 分步引擎适配）：镜像 `src/engine/simultaneousResolve.ts` 的分步结算（级联失败/到达依赖链/逐步死亡/`attacksPerUnit`/终局轮跳过占点），计划合法性改为队列前缀投影 + 地形寻路，候选生成与爬山改为逐行动点并支持 `wait` / `demolish`，敌方计划改为有序采样。真实引擎对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法：对 random-sim 60:0、对 dest-prob 52:8（86.7%）、对 matrix-eq v2 29:31（standoff 27:3、molten-throne 2:28 斩首短板） |
-| 2026-10-23 | 3.8.1 | random-sim 适配分步结算：同单位多动作、队列投影、`attacksPerUnit`；同时回合基线恢复可用 |
+| 2026-10-23 | 3.8.1 | kriegspiel v1 同口径基线补测：把 `git show 89f3b69^` 的 v1 实现放进同一真实引擎 harness、同一批种子（`1000 + i×7919`）跑 4 对手 ×2 图 ×30 局。结果——v1 对 dest-prob 43.3%（standoff 仅 20.0%）、对 matrix-eq 31.7%，v2 分别是 86.7% 与 48.3%，**适配价值 +43.4pp / +16.6pp**；但 molten-throne 对 matrix-eq 是 v1 6:24 → v2 2:28 的**负提升**，且 v1↔v2 直接对打 35:25（p=0.245）未达显著。同时按 `action_failed` 事件计数发现 v2 结算期失败 17.1–23.1/局（v1 1.3/局、dest-prob 0.6–3.0/局），主因 `destination_occupied`：候选生成不排除敌军当前占位，已记入 `kriegspiel.md`「已知限制 #2」，未修 |
+| 2026-10-23 | 3.8.1 | random-sim v2 适配分步结算：同单位多动作、队列投影、`attacksPerUnit`；同时回合基线恢复可用；无同口径 v1/v2 强度数据 |
 | 2026-10-23 | 3.8.1 | matrix-eq v2（3.8 分步引擎适配）：重写分步结算镜像、计划校验、组合动作生成与事件史按步序重建；镜像裁判对 v1 23:7、对 kriegspiel 12:18、对 dest-prob 13:17、对 random-sim 30:0；真实服务器口径待验证 |
 
 ## 未来方向
@@ -390,6 +391,8 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 9. **tempo / 兑现率量纲**：verdict 已用行动点预算与“打击分 − 原地承伤 × 姿态系数”补上 danger-close / multiplayer-ring 两个老短板；下一步是把“每一步兑现率”做成可计算量纲，而不是再配一个系数。旧 `forge` 例子已不适用，改用当前短图与多行动点图验证。
 10. **基准数据自动化**：让 `scripts/algorithm-arena.mjs` / `scripts/matrix_eq_benchmark.mjs` 输出带 `engineVersion / mapPool / harness / games / seed / date` 的 JSON，再由脚本生成本文表格，避免手工抄写再次漂移。
 11. **同时回合的多轮视野**：kriegspiel v2 在 molten-throne 被 matrix-eq v2 打到 2:28，且**场均裁定分反而领先**（2496.6 vs 1764.3）——单轮 rollout 无法给「N 轮后总部被斩首」定价，每轮的局部最优都是「再挨一下换一格据点」。给总部血量加凸性惩罚（`KRIEG_HQ_URGENCY` 扫 1800 / 4000）实测**胜负序列完全不变**，在 24 格据点 ×75 分的尺度面前压不过抢点收益。需要的是多轮 rollout 或「剩余存活轮数」的期限量纲（参 verdict 的攻城排程），与第 9 条同源。
+12. **kriegspiel 的目的格占用定价（实测缺陷，修法明确）**：v2 的 `stepCandidates` 只排除己方投影占位，敌军当前站着的格子照样生成 move/deploy 候选，`moveStaticScore` 又只按 `combinedClaimRisk`（敌军**到达**概率）打折，不表达「敌军**已经在这里**」。3.8.0 把占用判定推迟到结算，于是 standoff 上每局有 17.1–23.1 个动作以 `destination_occupied` 等理由失败（v1 只有 1.3/局），折算成该图 5 行动点/回合即 **23–31% 的行动点以失败告终**，少数还级联作废同单位后续动作。修法是把「occupant 在本步之前离开的概率」计进成功率（可与落点模型复用），预计同时改善耗时（失败候选白占 rollout 预算）。**修完必须重跑 180 局标定并升 v3**，因为全部现有数字都会变。
+13. **同时回合标定 harness 入库**：`temp/kriegspiel-arena.mts`（真实引擎 headless、`--a-path` 可加载历史版本、按 `action_failed` 计结算期失败）与 `temp/krieg-fidelity.mts`（引擎对拍）目前都在 gitignored 的 `temp/` 下，导致本文与 `kriegspiel.md` 的数字**别人无法复现**，v1 基线还要从 git 历史重建。应提升到 `scripts/` 并接进第 10 条的自动化输出。
 
 ## 贡献指南
 

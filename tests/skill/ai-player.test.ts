@@ -237,8 +237,9 @@ describe('AI player skill documentation', () => {
     expect(skill).toContain('Simultaneous/royale: income and repair are issued together');
     expect(simultaneous).toContain('plan.myQueue.length');
     expect(simultaneous).toContain('turn.currentPlayerId` and `turn.currentOwner` are always `null`');
-    expect(simultaneous).toContain('queue-list order is not execution priority');
-    expect(simultaneous).toContain('deployment declarations/generation');
+    expect(simultaneous).toContain('Queue position = action point');
+    expect(simultaneous).toContain('Deterministic step phases');
+    expect(simultaneous).toContain('Each step: cascade check');
     expect(simultaneous).toContain('destination_conflict');
     expect(simultaneous).toContain('Once resolution\n   begins, do not try to revoke or clear');
   });

@@ -170,6 +170,47 @@ describe('simultaneous mode API', () => {
     }
   });
 
+  it('queues multiple actions for one unit and a wait slot', async () => {
+    const { app, gameId, seats } = await createSimultaneousGame();
+    try {
+      const state = await getState(app, gameId, seats[0]!.token);
+      const { unitId } = firstInfantryNearHq(state, seats[0]!.id);
+      const unit = state.units.find(u => u.id === unitId)!;
+      const target = emptyNeighbor(state, unit)!;
+      const move = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/move`,
+        headers: { 'x-player-token': seats[0]!.token },
+        payload: { unitId, q: target.q, r: target.r },
+      });
+      expect(move.statusCode).toBe(200);
+      expect(move.json().queue).toHaveLength(1);
+
+      const wait = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/plan/wait`,
+        headers: { 'x-player-token': seats[0]!.token },
+        payload: {},
+      });
+      expect(wait.statusCode).toBe(200);
+      expect(wait.json().queue).toHaveLength(2);
+      expect(wait.json().queue[1].type).toBe('wait');
+
+      // 同一单位再次移动：队列顺序即行动点顺序，第二条移动排在第 3 步。
+      const back = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/move`,
+        headers: { 'x-player-token': seats[0]!.token },
+        payload: { unitId, q: unit.q, r: unit.r },
+      });
+      expect(back.statusCode).toBe(200);
+      const queue = back.json().queue as Array<{ type: string }>;
+      expect(queue.map(action => action.type)).toEqual(['move', 'wait', 'move']);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('replays a plan revoke with the same idempotency key', async () => {
     const { app, gameId, seats } = await createSimultaneousGame();
     try {
@@ -562,6 +603,15 @@ describe('sequential mode regression', () => {
       });
       expect(revoke.statusCode).toBe(400);
       expect(revoke.json().code).toBe('not_simultaneous_game');
+
+      const wait = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/plan/wait`,
+        headers: { 'x-player-token': created.player.token },
+        payload: {},
+      });
+      expect(wait.statusCode).toBe(400);
+      expect(wait.json().code).toBe('not_simultaneous_game');
 
       const forceResolve = await app.inject({
         method: 'POST',

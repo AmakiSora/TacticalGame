@@ -39,7 +39,7 @@ function loadApiAction(file: string, postResult: Record<string, unknown>, state:
 }
 
 describe('simultaneous plan panel tools', () => {
-  it('rebuilds re-enqueue requests for all five plan action types', () => {
+  it('rebuilds re-enqueue requests for all six plan action types', () => {
     for (const file of PLAYER_CLIENTS) {
       const build = loadPlanActionRequest(file);
       expect(build({ type: 'move', unitId: 'u1', q: 2, r: -1 })).toEqual({ path: 'move', body: { unitId: 'u1', q: 2, r: -1 } });
@@ -47,6 +47,7 @@ describe('simultaneous plan panel tools', () => {
       expect(build({ type: 'heal', supportId: 'u3', q: 0, r: 1 })).toEqual({ path: 'heal', body: { supportId: 'u3', q: 0, r: 1 } });
       expect(build({ type: 'deploy', unitType: 'infantry', fromId: 'cp1', q: 3, r: -1 })).toEqual({ path: 'deploy', body: { unitType: 'infantry', fromId: 'cp1', q: 3, r: -1 } });
       expect(build({ type: 'demolish', unitId: 'u4', q: 1, r: 1 })).toEqual({ path: 'demolish', body: { unitId: 'u4', q: 1, r: 1 } });
+      expect(build({ type: 'wait' })).toEqual({ path: 'plan/wait', body: {} });
       expect(build({ type: 'unknown' })).toBeNull();
       expect(build(null)).toBeNull();
     }

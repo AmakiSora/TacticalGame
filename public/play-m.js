@@ -1020,11 +1020,20 @@ function createEmptyState() {
   };
 }
 function recordActionPoint(s, owner, payload) {
-  if (!owner || typeof payload.actionsUsed !== 'number' || payload.actionsUsed <= (s.turn.actionsUsed ?? 0)) return;
+  if (!owner || typeof payload.actionsUsed !== 'number') return;
   const player = s.players?.[owner];
   if (!player) return;
   if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
-  player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - (s.turn.actionsUsed ?? 0);
+  if (!isSimultaneous()) {
+    if (payload.actionsUsed <= (s.turn.actionsUsed ?? 0)) return;
+    player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - (s.turn.actionsUsed ?? 0);
+    return;
+  }
+  if (!s.turn.actionsUsedByPlayer) s.turn.actionsUsedByPlayer = {};
+  const last = s.turn.actionsUsedByPlayer[owner] ?? 0;
+  if (payload.actionsUsed <= last) return;
+  player.stats.actionPointsUsed = (player.stats.actionPointsUsed ?? 0) + payload.actionsUsed - last;
+  s.turn.actionsUsedByPlayer[owner] = payload.actionsUsed;
 }
 function ensureStats(player) {
   if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
@@ -1064,6 +1073,7 @@ function applyEvent(s, ev) {
       if (t && previousHp > 0 && p.targetHp === 0 && a && s.units.has(p.targetId)) { const pl = s.players[a.owner]; if (pl) { ensureStats(pl); pl.stats.killValue = (pl.stats.killValue ?? 0) + (t.cost || 0); } }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
     case 'heal': { const t = s.units.get(p.targetId); if (t) t.hp = p.targetHp; const u = s.units.get(p.supportId); recordActionPoint(s, p.owner || u?.owner, p); if (u) { u.hasActed = true; u.actionSpent = true; } if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
+    case 'wait': { recordActionPoint(s, p.owner, p); if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed; break; }
     case 'unit_death': { const u = s.units.get(p.unitId); if (u) u.alive = false; break; }
     case 'headquarters_destroyed': { const h = s.headquarters.get(p.headquartersId); if (h) h.alive = false; break; }
     case 'control_point_captured': { const cp = s.controlPoints.get(p.pointId); if (cp) cp.owner = p.owner; break; }
@@ -1138,6 +1148,7 @@ function applyEvent(s, ev) {
       s.turn.roundNumber = p.roundNumber || s.turn.roundNumber + 1;
       s.turn.turnNumber = s.turn.roundNumber;
       s.turn.actionsUsed = 0;
+      s.turn.actionsUsedByPlayer = {};
       // 同时模式没有 reset_actions 事件：新回合开启即重置全员单位行动标志。
       for (const u of s.units.values()) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : [], myQueue: [] };
@@ -1238,6 +1249,40 @@ function entityAt(q, r, owner) {
 }
 function occupied(q, r) { return !!entityAt(q, r); }
 
+/**
+ * 同时模式：把当前计划队列投影成虚拟站位与虚拟地形（与服务端 planning.ts 同口径）。
+ * 队列顺序即行动点顺序；攻击/治疗/爆破的起点、移动范围都按投影位置计算。
+ */
+function planProjection() {
+  const positions = new Map();
+  const terrain = new Map();
+  const actionPositions = new Map();
+  const positionOf = unitId => {
+    if (positions.has(unitId)) return positions.get(unitId);
+    const unit = state?.units?.get(unitId);
+    return unit ? { q: unit.q, r: unit.r } : null;
+  };
+  for (const action of myPlanQueue()) {
+    const unitId = action.unitId || action.attackerId || action.supportId;
+    if (unitId) {
+      const pos = positionOf(unitId);
+      if (pos) actionPositions.set(action.id, pos);
+    }
+    if (action.type === 'move' && unitId && Number.isFinite(action.q) && Number.isFinite(action.r)) {
+      positions.set(unitId, { q: action.q, r: action.r });
+    } else if (action.type === 'demolish' && Number.isFinite(action.q) && Number.isFinite(action.r)) {
+      terrain.set(hexKey({ q: action.q, r: action.r }), 'plain');
+    }
+  }
+  return { positions, terrain, actionPositions };
+}
+function projectedUnitOrigin(unit) {
+  return planProjection().positions.get(unit.id) || { q: unit.q, r: unit.r };
+}
+function projectedTerrainAt(q, r) {
+  return planProjection().terrain.get(hexKey({ q, r })) ?? cellAt(q, r)?.terrain;
+}
+
 function setCellTerrain(targetState, q, r, terrain) {
   const cell = targetState.cells.find(c => c.q === q && c.r === r);
   if (cell) cell.terrain = terrain;
@@ -1252,10 +1297,34 @@ function cloneMapPayload(map = {}) {
 }
 function demolishableCells(unit) {
   if (unit.type !== 'heavy' || unit.hasActed) return [];
-  return hexNeighbors(unit).filter(p => cellAt(p.q, p.r)?.terrain === 'blocker' && !occupied(p.q, p.r));
+  const from = isSimultaneous() ? projectedUnitOrigin(unit) : unit;
+  return hexNeighbors(from).filter(p => {
+    const terrain = isSimultaneous() ? projectedTerrainAt(p.q, p.r) : cellAt(p.q, p.r)?.terrain;
+    if (terrain !== 'blocker') return false;
+    return isSimultaneous() || !occupied(p.q, p.r);
+  });
 }
 function reachable(unit) {
-  const result = [], visited = new Set([hexKey(unit)]), queue = [{ q: unit.q, r: unit.r, d: 0 }];
+  if (!isSimultaneous()) {
+    const result = [], visited = new Set([hexKey(unit)]), queue = [{ q: unit.q, r: unit.r, d: 0 }];
+    for (let i = 0; i < queue.length; i++) {
+      const cur = queue[i];
+      if (cur.d >= unit.moveRange) continue;
+      for (const n of hexNeighbors(cur)) {
+        const k = hexKey(n);
+        if (visited.has(k)) continue;
+        visited.add(k);
+        if (!isPlain(n.q, n.r) || occupied(n.q, n.r)) continue;
+        result.push(n);
+        queue.push({ ...n, d: cur.d + 1 });
+      }
+    }
+    return result;
+  }
+  // 同时模式：路径只受地形限制（水/障碍），单位/总部不挡路；目的地当前被占用也可入队。
+  const projection = planProjection();
+  const from = projection.positions.get(unit.id) || { q: unit.q, r: unit.r };
+  const result = [], visited = new Set([hexKey(from)]), queue = [{ ...from, d: 0 }];
   for (let i = 0; i < queue.length; i++) {
     const cur = queue[i];
     if (cur.d >= unit.moveRange) continue;
@@ -1263,7 +1332,8 @@ function reachable(unit) {
       const k = hexKey(n);
       if (visited.has(k)) continue;
       visited.add(k);
-      if (!isPlain(n.q, n.r) || occupied(n.q, n.r)) continue;
+      const terrain = projection.terrain.get(k) ?? cellAt(n.q, n.r)?.terrain;
+      if (terrain !== 'plain') continue;
       result.push(n);
       queue.push({ ...n, d: cur.d + 1 });
     }
@@ -1272,6 +1342,10 @@ function reachable(unit) {
 }
 function deployCells(origin) {
   if (isArtilleryDangerCell(origin.q, origin.r)) return [];
+  if (isSimultaneous()) {
+    return hexNeighbors(origin).filter(p =>
+      projectedTerrainAt(p.q, p.r) === 'plain' && !isArtilleryDangerCell(p.q, p.r));
+  }
   return hexNeighbors(origin).filter(p => isPlain(p.q, p.r) && !occupied(p.q, p.r) && !isArtilleryDangerCell(p.q, p.r));
 }
 const SHAPE_HEX_DIRS = [{ q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 }, { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }];
@@ -1286,21 +1360,22 @@ function unitHealRange(unit) {
   return gameConfig?.units?.[unit.type]?.healRange ?? unit.attackRange;
 }
 /** 客户端镜像服务端的形状瞄准推导：返回 { type, direction, cells } 或 null（不可瞄准）。 */
-function shapeAimFor(unit, kind, q, r) {
+function shapeAimFor(unit, kind, q, r, origin = null) {
+  const from = origin || unit;
   const shape = unitShapeSpec(unit, kind);
-  const dq = q - unit.q, dr = r - unit.r;
+  const dq = q - from.q, dr = r - from.r;
   if (shape.type === 'single') {
-    const d = hexDistance(unit, { q, r });
+    const d = hexDistance(from, { q, r });
     if (d > (kind === 'healShape' ? unitHealRange(unit) : unit.attackRange)) return null;
     if (kind === 'attackShape' && d === 0) return null;
     return { type: 'single', direction: 0, cells: [{ q, r }] };
   }
   if (shape.type === 'arc') {
-    if (hexDistance(unit, { q, r }) !== 1) return null;
+    if (hexDistance(from, { q, r }) !== 1) return null;
     const direction = SHAPE_HEX_DIRS.findIndex(dir => dir.q === dq && dir.r === dr);
     if (direction < 0) return null;
     const idx = [(direction + 5) % 6, direction, (direction + 1) % 6];
-    return { type: 'arc', direction, cells: idx.map(i => ({ q: unit.q + SHAPE_HEX_DIRS[i].q, r: unit.r + SHAPE_HEX_DIRS[i].r })) };
+    return { type: 'arc', direction, cells: idx.map(i => ({ q: from.q + SHAPE_HEX_DIRS[i].q, r: from.r + SHAPE_HEX_DIRS[i].r })) };
   }
   for (let direction = 0; direction < 6; direction++) {
     const dir = SHAPE_HEX_DIRS[direction];
@@ -1308,16 +1383,17 @@ function shapeAimFor(unit, kind, q, r) {
     if (!Number.isInteger(k) || k < 1 || k > shape.length) continue;
     if (dir.q * k !== dq || dir.r * k !== dr) continue;
     const cells = [];
-    for (let s = 1; s <= shape.length; s++) cells.push({ q: unit.q + dir.q * s, r: unit.r + dir.r * s });
+    for (let s = 1; s <= shape.length; s++) cells.push({ q: from.q + dir.q * s, r: from.r + dir.r * s });
     return { type: 'line', direction, cells };
   }
   return null;
 }
 /** 可点击的瞄准格集合。旧地图无形状配置 → single = 射程内全部格（与历史行为一致）。 */
-function aimableCells(unit, kind) {
+function aimableCells(unit, kind, origin = null) {
+  const from = origin || (isSimultaneous() ? projectedUnitOrigin(unit) : unit);
   const aims = [];
   for (const c of state.cells) {
-    if (shapeAimFor(unit, kind, c.q, c.r)) aims.push({ q: c.q, r: c.r });
+    if (shapeAimFor(unit, kind, c.q, c.r, from)) aims.push({ q: c.q, r: c.r });
   }
   return aims;
 }
@@ -1333,7 +1409,8 @@ function hoverRangeHint() {
   if (rangeHighlights.length > 0) return null;
   const unit = [...state.units.values()].find(u => u.alive && u.q === hoverCell.q && u.r === hoverCell.r);
   if (!unit) return null;
-  const hint = window.BoardInspect?.rangeHintFor(unit, state.cells, gameConfig);
+  const hintUnit = isSimultaneous() ? { ...unit, ...projectedUnitOrigin(unit) } : unit;
+  const hint = window.BoardInspect?.rangeHintFor(hintUnit, state.cells, gameConfig);
   return hint ? { ...hint, unit } : null;
 }
 
@@ -1347,7 +1424,8 @@ function aimPreview() {
   const isHeal = interactionMode === 'heal_mode';
   let cells;
   if (isSimultaneous()) {
-    const aim = shapeAimFor(unit, isHeal ? 'healShape' : 'attackShape', hoverCell.q, hoverCell.r);
+    const origin = projectedUnitOrigin(unit);
+    const aim = shapeAimFor(unit, isHeal ? 'healShape' : 'attackShape', hoverCell.q, hoverCell.r, origin);
     if (!aim) return null;
     cells = aim.cells;
   } else {
@@ -1442,8 +1520,8 @@ function aimPreviewInfo() {
 }
 
 // —— 同时模式：已排队指令的棋盘预览（编号与计划面板清单一一对应） ——
-const PLAN_COLORS = { move: '#3cc878', attack: '#ff5a5a', heal: '#50dcb4', deploy: '#f0d25a', demolish: '#ffaa46' };
-const PLAN_KIND_LABELS = { move: '移动', attack: '攻击', heal: '治疗', deploy: '部署', demolish: '爆破' };
+const PLAN_COLORS = { move: '#3cc878', attack: '#ff5a5a', heal: '#50dcb4', deploy: '#f0d25a', demolish: '#ffaa46', wait: '#9aa7b2' };
+const PLAN_KIND_LABELS = { move: '移动', attack: '攻击', heal: '治疗', deploy: '部署', demolish: '爆破', wait: '待命' };
 let planHoverId = null;
 
 function hexToRgba(hex, alpha) {
@@ -1455,21 +1533,23 @@ function hexToRgba(hex, alpha) {
 /** 把我方计划队列翻译成预览图层；结算回放期间隐藏（棋盘上正在演真实结果）。 */
 function planOverlays() {
   if (!isSimultaneous() || !state || playback.isActive()) return [];
+  const projection = planProjection();
   return myPlanQueue().map((a, i) => {
     const base = { id: a.id, index: i + 1, kind: a.type, to: Number.isFinite(a.q) && Number.isFinite(a.r) ? { q: a.q, r: a.r } : null };
+    const actionOrigin = projection.actionPositions.get(a.id) || null;
     if (a.type === 'deploy') {
       const origin = state.headquarters.get(a.fromId) || state.controlPoints.get(a.fromId) || null;
       return { ...base, unitType: a.unitType, from: origin ? { q: origin.q, r: origin.r } : null };
     }
     if (a.type === 'move' || a.type === 'demolish') {
       const unit = state.units.get(a.unitId) || null;
-      return { ...base, unit, from: unit ? { q: unit.q, r: unit.r } : null };
+      return { ...base, unit, from: actionOrigin };
     }
     if (a.type === 'attack' || a.type === 'heal') {
       const unit = state.units.get(a.type === 'attack' ? a.attackerId : a.supportId) || null;
-      if (!unit || !base.to) return null;
-      const aim = shapeAimFor(unit, a.type === 'attack' ? 'attackShape' : 'healShape', a.q, a.r);
-      return { ...base, unit, from: { q: unit.q, r: unit.r }, cells: aim?.cells || [base.to] };
+      if (!unit || !base.to || !actionOrigin) return null;
+      const aim = shapeAimFor(unit, a.type === 'attack' ? 'attackShape' : 'healShape', a.q, a.r, actionOrigin);
+      return { ...base, unit, from: actionOrigin, cells: aim?.cells || [base.to] };
     }
     return null;
   }).filter(Boolean);
@@ -1832,7 +1912,7 @@ function drawBoard(now = performance.now()) {
   drawHoverRangeHints();
   for (const h of rangeHighlights) {
     pathHex(h.q, h.r, 3);
-    ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'attack' ? 'rgba(255,80,80,.28)' : h.type === 'attack-radius' ? 'rgba(255,80,80,.08)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : h.type === 'demolish' ? 'rgba(255,170,70,.28)' : 'rgba(80,220,180,.20)';
+    ctx.fillStyle = h.type === 'move' ? 'rgba(60,200,120,.20)' : h.type === 'move-occupied' ? 'rgba(240,140,60,.26)' : h.type === 'attack' ? 'rgba(255,80,80,.28)' : h.type === 'attack-radius' ? 'rgba(255,80,80,.08)' : h.type === 'deploy' ? 'rgba(240,210,90,.24)' : h.type === 'demolish' ? 'rgba(255,170,70,.28)' : 'rgba(80,220,180,.20)';
     ctx.fill();
   }
   drawPlanCellHighlights();
@@ -1879,12 +1959,13 @@ function canActNow() {
   }
   return (state.turn?.currentPlayerId || state.turn?.currentOwner) === myPlayer;
 }
-/** 同时模式：该单位本回合是否已有排队动作（每单位一个动作）。 */
-function unitHasPlannedAction(unitId) {
-  return myPlanQueue().some(a => a.unitId === unitId || a.attackerId === unitId || a.supportId === unitId);
+/** 同时模式：该单位在本轮队列里已排了多少步（用于卡片提示，不限制继续追加）。 */
+function plannedStepsForUnit(unitId) {
+  return myPlanQueue().filter(a => a.unitId === unitId || a.attackerId === unitId || a.supportId === unitId).length;
 }
 function describePlanAction(a) {
-  const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破' }[a.type] || a.type;
+  const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破', wait: '待命' }[a.type] || a.type;
+  if (a.type === 'wait') return '待命（本行动点不做任何事）';
   if (a.type === 'heal') return Number.isFinite(a.q) && Number.isFinite(a.r) ? `${typeLabel} → (${a.q}, ${a.r})` : `${typeLabel} 友方单位`;
   if (Number.isFinite(a.q) && Number.isFinite(a.r)) return `${typeLabel} → (${a.q}, ${a.r})`;
   return typeLabel;
@@ -1897,11 +1978,12 @@ function planActionRequest(a) {
     case 'heal': return { path: 'heal', body: { supportId: a.supportId, q: a.q, r: a.r } };
     case 'deploy': return { path: 'deploy', body: { unitType: a.unitType, fromId: a.fromId, q: a.q, r: a.r } };
     case 'demolish': return { path: 'demolish', body: { unitId: a.unitId, q: a.q, r: a.r } };
+    case 'wait': return { path: 'plan/wait', body: {} };
     default: return null;
   }
 }
 let planReordering = false;
-/** 调整计划顺序：结算与顺序无关，仅影响清单编号与棋盘角标的核对体验。 */
+/** 调整计划顺序：队列顺序就是行动点顺序，重排会改变每条动作的结算步骤。 */
 async function reorderPlan(fromIndex, toIndex) {
   if (planReordering) return;
   const queue = myPlanQueue();
@@ -1947,16 +2029,20 @@ function renderPlanPanel() {
   const committedNames = committedList().map(id => playerName(id)).join('、') || '—';
   const rows = queue.map((a, i) => `
     <li class="plan-item plan-kind-${esc(a.type)}" data-plan-id="${esc(a.id)}">
-      <em class="plan-num">${i + 1}</em>
+      <em class="plan-num" title="第 ${i + 1} 个行动点">${i + 1}</em>
       <span class="plan-desc">${esc(describePlanAction(a))}</span>
-      ${iCommitted() ? '' : `<span class="plan-order"><button type="button" class="plan-order-btn" data-plan-move="${i}:${i - 1}" ${i === 0 ? 'disabled' : ''} title="上移" aria-label="上移第 ${i + 1} 条">▲</button><button type="button" class="plan-order-btn" data-plan-move="${i}:${i + 1}" ${i === queue.length - 1 ? 'disabled' : ''} title="下移" aria-label="下移第 ${i + 1} 条">▼</button></span><button class="plan-revoke" data-revoke="${esc(a.id)}" title="撤销该指令">撤销</button>`}
+      ${iCommitted() ? '' : `<span class="plan-order"><button type="button" class="plan-order-btn" data-plan-move="${i}:${i - 1}" ${i === 0 ? 'disabled' : ''} title="上移一步" aria-label="上移第 ${i + 1} 条">▲</button><button type="button" class="plan-order-btn" data-plan-move="${i}:${i + 1}" ${i === queue.length - 1 ? 'disabled' : ''} title="下移一步" aria-label="下移第 ${i + 1} 条">▼</button></span><button class="plan-revoke" data-revoke="${esc(a.id)}" title="撤销该指令">撤销</button>`}
     </li>`).join('');
   const clearBtn = (!iCommitted() && queue.length > 0)
     ? `<button type="button" class="plan-clear-all">全部撤销（${queue.length} 条）</button>`
     : '';
+  const waitBtn = (!iCommitted() && queue.length < max)
+    ? '<button type="button" class="plan-wait">待命（占 1 行动点）</button>'
+    : '';
   el.innerHTML = `<h3>本回合计划 <span class="plan-count">${queue.length}/${max}</span></h3>
+    <div class="plan-hint">队列顺序 = 行动点顺序：第 N 条与所有玩家的第 N 条同时结算</div>
     <ul class="plan-list">${rows || '<li class="plan-empty">尚未下达指令，点击棋盘单位开始排队</li>'}</ul>
-    ${clearBtn ? `<div class="plan-tools">${clearBtn}</div>` : ''}
+    ${(clearBtn || waitBtn) ? `<div class="plan-tools">${waitBtn}${clearBtn}</div>` : ''}
     <div class="plan-status">${iCommitted() ? '已确认，等待全员提交后统一结算' : `已确认 ${committedList().length}/${activeCount}（${esc(committedNames)}）`}</div>`;
   el.querySelectorAll('.plan-revoke').forEach(btn => btn.addEventListener('click', async () => {
     if (await apiAction(`/api/games/${gameId}/plan/revoke`, { actionId: btn.dataset.revoke })) {
@@ -1971,6 +2057,14 @@ function renderPlanPanel() {
     reorderPlan(from, to);
   }));
   el.querySelector('.plan-clear-all')?.addEventListener('click', clearAllPlans);
+  el.querySelector('.plan-wait')?.addEventListener('click', async () => {
+    if (await apiAction(`/api/games/${gameId}/plan/wait`, {})) {
+      toast('已排入待命（占 1 行动点）', 'ok');
+      await refreshAdjudication();
+      renderSidebar();
+      drawBoard();
+    }
+  });
   // 触屏没有悬停：点按清单项切换棋盘上对应预览的加亮（其余压暗）。
   el.querySelectorAll('.plan-item[data-plan-id]').forEach(item => {
     item.addEventListener('click', e => {
@@ -2363,11 +2457,12 @@ function formatEventShort(ev) {
     case 'name_rename': return `${p.playerId} 改名为 ${p.name}`;
     case 'demolish': return `${playerName(p.owner)} 爆破 (${p.q}, ${p.r})`;
     case 'plan_committed': return `${playerName(p.playerId)} 已确认本回合计划`;
+    case 'wait': return `${playerName(p.owner)} 第 ${p.actionsUsed} 个行动点待命`;
     case 'round_start': return `第 ${p.roundNumber} 回合计划阶段开始`;
     case 'round_resolved': return `第 ${p.roundNumber} 回合同时结算完毕`;
     case 'action_failed': {
-      const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破' }[p.type] || '动作';
-      const reasonLabel = { destination_conflict: '目标格撞车，全部失败', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', out_of_range: '超出射程，落空', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
+      const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破', wait: '待命' }[p.type] || '动作';
+      const reasonLabel = { destination_conflict: '目标格撞车，全部失败', destination_blocked: '目标地形不可用', destination_occupied: '目标格仍被占用', previous_action_failed: '前一步失败，后续作废', artillery_zone: '炮火区内无法治疗', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', out_of_range: '超出射程，落空', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
       const unitLabel = p.unitType ? `${UNIT_NAMES[p.unitType] || p.unitType}` : '';
       const from = p.detail && typeof p.detail.fromQ === 'number'
         ? `(${p.detail.fromQ},${p.detail.fromR})` : '';
@@ -2495,15 +2590,18 @@ function selectUnit(unit) {
   selectedUnitId = unit.id; selectedOriginId = null; selectedDeployType = null; interactionMode = 'unit_selected'; rangeHighlights = [];
   renderSidebar(); drawBoard();
   if (unit.owner !== myPlayer || !canActNow()) return;
-  // 同时模式：已有排队动作的单位本回合不能再下令（每单位一个动作）。
-  const plannedAlready = isSimultaneous() && unitHasPlannedAction(unit.id);
+  const budgetLeft = myPlanQueue().length < actionsPerTurn();
+  const plannedSteps = isSimultaneous() ? plannedStepsForUnit(unit.id) : 0;
   const items = [];
-  if (!unit.hasMoved && !plannedAlready) items.push({ label: '移动', action: 'move' });
-  if (!unit.hasActed && !plannedAlready) items.push({ label: unit.type === 'support' ? '治疗' : '攻击', action: unit.type === 'support' ? 'heal' : 'attack' });
-  if (unit.type === 'heavy' && !unit.hasActed && !plannedAlready && demolishableCells(unit).length > 0) items.push({ label: '爆破', action: 'demolish' });
-  if (items.length) showPopup(unit, '单位操作', items, action => {
+  if (budgetLeft && !unit.hasMoved) items.push({ label: '移动', action: 'move' });
+  if (budgetLeft && !unit.hasActed) items.push({ label: unit.type === 'support' ? '治疗' : '攻击', action: unit.type === 'support' ? 'heal' : 'attack' });
+  if (budgetLeft && unit.type === 'heavy' && !unit.hasActed && demolishableCells(unit).length > 0) items.push({ label: '爆破', action: 'demolish' });
+  if (items.length) showPopup(unit, plannedSteps > 0 ? `单位操作（本轮已排 ${plannedSteps} 步）` : '单位操作', items, action => {
     closePopup();
-    if (action === 'move') { interactionMode = 'move_mode'; rangeHighlights = reachable(unit).map(p => ({ ...p, type: 'move' })); }
+    if (action === 'move') {
+      interactionMode = 'move_mode';
+      rangeHighlights = reachable(unit).map(p => ({ ...p, type: isSimultaneous() && occupied(p.q, p.r) ? 'move-occupied' : 'move' }));
+    }
     if (action === 'attack') {
       interactionMode = 'attack_mode';
       const inRange = attackRangeCells(unit);
@@ -2516,11 +2614,7 @@ function selectUnit(unit) {
     if (action === 'heal') {
       interactionMode = 'heal_mode';
       if (isSimultaneous()) {
-        // 区域治疗：所有"覆盖格内含友军"的瞄准格都可点击。
-        rangeHighlights = aimableCells(unit, 'healShape').filter(pos => {
-          const aim = shapeAimFor(unit, 'healShape', pos.q, pos.r);
-          return aim.cells.some(c => [...state.units.values()].some(e => e.alive && e.owner === myPlayer && e.q === c.q && e.r === c.r));
-        }).map(p => ({ ...p, type: 'heal' }));
+        rangeHighlights = aimableCells(unit, 'healShape').map(p => ({ ...p, type: 'heal' }));
       } else {
         rangeHighlights = [...state.units.values()].filter(e => e.owner === myPlayer && e.alive && e.hp < e.maxHp && hexDistance(unit, e) <= unitHealRange(unit)).map(e => ({ q: e.q, r: e.r, type: 'heal' }));
       }

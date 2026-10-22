@@ -1,49 +1,27 @@
 // src/engine/simultaneous.ts
-// simultaneous 模式的统一结算器：所有玩家在计划阶段秘密排队动作，全员确认（或房主
-// 强制）后严格同时结算。结算顺序恒按 turn.turnOrder（开局随机洗牌），确定性可回放。
+// simultaneous 模式的对外入口与回合边界。
 //
-// 结算分五个阶段：
-//   1. 部署与移动共享同一"目的格声明池"：同一格被 ≥2 个动作声明 → 全部失败；
-//   2. 移动按计划时刻路径同时落位；
-//   3. 拆除（移动后地形才生效）+ 格子攻击（按移动/部署后的棋盘判定，友军免伤、
-//      落空即浪费）+ 治疗（按目标最终位置复核射程）；净血量 = 先治疗、再按顺序
-//      施加伤害（等价同时，且击杀归属确定）；
-//   4. 占点（每个存活玩家，一格一单位无冲突）；
-//   5. 回合边界：round_end → round_resolved →（终局时 game_over）→ 翻盘补给 →
-//      回合数+1 → 炮火收缩（annihilation/royale）→ 重置全员行动标志与计划状态
-//      → 全员发收入与维修 → round_start。终局摘要始终先于 game_over，保证后者
-//      是事件流里最后一条。
-//   注：淘汰导致的终局同样先补 round_end / round_resolved，再发 game_over。
-import type { GameState, Headquarters, PendingAction, PlayerId, PlayerRecord, Unit } from '../types.js';
-import { isAnnihilationMode } from '../types.js';
+// 所有玩家在计划阶段秘密排队动作，全员确认（或房主强制）后严格同时结算。结算按
+// 行动点分步进行（见 simultaneousResolve.ts）：队列第 k 条在所有玩家之间同时结算，
+// 完成后才进入第 k+1 条。结算顺序恒按 turn.turnOrder（开局随机洗牌），确定性可回放。
+//
+// 每轮末尾：占点 → 据点流量累计 → round_end → round_resolved →（终局时 game_over）→
+// 翻盘补给 → 回合数+1 → 炮火收缩（annihilation/royale）→ 重置全员行动标志与计划状态
+// → 全员发收入与维修 → round_start。终局摘要始终先于 game_over，保证后者是事件流里
+// 最后一条。
+import type { GameState, PendingAction, PlayerId } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import { appendEvent } from './events.js';
-import { hexDistance } from './hex.js';
-import { computeDamage } from './combat.js';
-import { getCellOccupant, getTerrain } from './validation.js';
-import { getGameIndex } from './gameIndex.js';
-import { createUnitFromConfig } from '../state/store.js';
-import { deployDiscountForOrigin } from './controlPoints.js';
 import {
   accumulateControlHold, activePlayerIds, adjudicateAtTurnLimit, captureControlPoints, collectIncome,
-  creditKill, endGame, grantComebackSupplies, isTurnLimitReached, markPlayerEliminated,
-  repairFromControlPoints, resetActions, updateArtilleryForRound,
+  endGame, grantComebackSupplies, isTurnLimitReached, repairFromControlPoints, resetActions,
+  updateArtilleryForRound,
 } from './engine.js';
-import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound, coveredCellsFor } from './planning.js';
-import { nextGameRandom } from './random.js';
-import type { ShapeAim } from './planning.js';
+import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound } from './planning.js';
+import { resolveRoundSteps } from './simultaneousResolve.js';
 import type { Result, Failure } from './result.js';
 
-export interface PlanOutcome {
-  actionId: string;
-  type: PendingAction['type'];
-  owner: PlayerId;
-  status: 'executed' | 'failed' | 'missed' | 'fizzled';
-  /** 动作绑定的单位；deploy 在失败时尚无单位，因此可能缺省。 */
-  unitId?: string;
-  reason?: string;
-  detail?: Record<string, unknown>;
-}
+export type { PlanOutcome } from './simultaneousResolve.js';
 
 function notSimultaneous(): Failure {
   return { ok: false, code: 'not_simultaneous_game', message: '该对局不是同时回合模式' };
@@ -82,499 +60,48 @@ export function eliminateFromPlanAndMaybeResolve(game: GameState, bus: EventBus,
   if (shouldAutoResolve(game)) resolveRound(game, bus);
 }
 
-function chargeActionPoint(game: GameState, owner: PlayerId): void {
-  const stats = game.players[owner]?.stats;
-  if (stats) stats.actionPointsUsed = (stats.actionPointsUsed ?? 0) + 1;
-}
-
-function setTerrainPlain(game: GameState, q: number, r: number): void {
-  const cell = game.cells.find(c => c.q === q && c.r === r);
-  if (cell) cell.terrain = 'plain';
-  const override = game.map.terrainCells.find(c => c.q === q && c.r === r);
-  if (override) {
-    override.terrain = 'plain';
-  } else {
-    game.map.terrainCells.push({ q, r, terrain: 'plain' });
-  }
-}
-
-function rollHeal(game: GameState, support: Unit): number {
-  const base = support.healPower ?? 0;
-  return base + Math.floor(nextGameRandom(game) * (game.config.balance.healVarianceRange + 1));
-}
-
 export function resolveRound(game: GameState, bus: EventBus): void {
   const roundNumber = game.turn.roundNumber;
   const order = game.turn.turnOrder.filter(id => game.players[id]?.status === 'active');
-  // 计划时刻各单位站位快照：锁定射击据此判定"计划时点击格上的敌人"。
-  const planTimePositions = game.units
-    .filter(u => u.alive)
-    .map(u => ({ unit: u, q: u.q, r: u.r }));
   const queues = new Map<PlayerId, PendingAction[]>(
-    order.map(id => [id, [...(game.plan?.queues[id] ?? [])]]));
-  const outcomes: PlayerRecord<PlanOutcome[]> = {};
-  for (const id of order) outcomes[id] = [];
-  const limit = game.config.balance.actionsPerTurn;
-  // 事件里的 actionsUsed 为该动作在玩家队列中的位置（1 起），供统计重建使用。
-  const actionsUsedOf = (owner: PlayerId, action: PendingAction): number =>
-    queues.get(owner)!.indexOf(action) + 1;
-  const remaining = (used: number): number => Math.max(0, limit - used);
+    order.map(id => [id, [...(game.plan?.queues[id] ?? [])]]),
+  );
 
-  /** 动作绑定的单位 ID；deploy 没有单位主体。 */
-  const actionUnitId = (action: PendingAction): string | undefined =>
-    action.unitId ?? action.attackerId ?? action.supportId;
-
-  /** 失败/落空动作的归属信息：单位、兵种、起点/目标格。 */
-  const actionDetail = (action: PendingAction): Record<string, unknown> => {
-    const unitId = actionUnitId(action);
-    const unit = unitId ? getGameIndex(game).unitById.get(unitId) : undefined;
-    const detail: Record<string, unknown> = {};
-    if (unitId) detail.unitId = unitId;
-    if (action.type === 'deploy') {
-      if (action.unitType) detail.unitType = action.unitType;
-      if (action.fromId) detail.fromId = action.fromId;
-    } else if (unit) {
-      detail.unitType = unit.type;
-    }
-    if (unit) {
-      detail.fromQ = unit.q;
-      detail.fromR = unit.r;
-    }
-    if (typeof action.q === 'number') detail.q = action.q;
-    if (typeof action.r === 'number') detail.r = action.r;
-    if (typeof action.direction === 'number') detail.direction = action.direction;
-    return detail;
-  };
-
-  // ---------------------------------------------------------------- 阶段一+二：目的格声明池
-  const claims = new Map<string, { owner: PlayerId; action: PendingAction }[]>();
-  for (const id of order) {
-    for (const action of queues.get(id)!) {
-      if (action.type !== 'deploy' && action.type !== 'move') continue;
-      const key = `${action.q},${action.r}`;
-      if (!claims.has(key)) claims.set(key, []);
-      claims.get(key)!.push({ owner: id, action });
-    }
-  }
-  const hasDestinationConflict = (action: PendingAction): boolean =>
-    (action.type === 'deploy' || action.type === 'move') &&
-    (claims.get(`${action.q},${action.r}`) ?? []).length > 1;
-
-  const recordFailure = (owner: PlayerId, action: PendingAction, reason: string, extra: Record<string, unknown> = {}): void => {
-    const unitId = actionUnitId(action);
-    const unit = unitId ? getGameIndex(game).unitById.get(unitId) : undefined;
-    const unitType = action.type === 'deploy' ? action.unitType : unit?.type;
-    const detail = { ...actionDetail(action), ...extra };
-    outcomes[owner]!.push({
-      actionId: action.id,
-      type: action.type,
-      owner,
-      status: 'failed',
-      reason,
-      ...(unitId ? { unitId } : {}),
-      detail,
-    });
-    appendEvent(game, bus, 'action_failed', {
-      owner,
-      actionId: action.id,
-      type: action.type,
-      reason,
-      roundNumber,
-      ...(unitId ? { unitId } : {}),
-      ...(unitType ? { unitType } : {}),
-      ...(action.type === 'deploy' && action.fromId ? { fromId: action.fromId } : {}),
-      detail,
-      ...extra,
-      actionsUsed: actionsUsedOf(owner, action),
-    });
-  };
-
-  // ---------------------------------------------------------------- 阶段一：部署
-  for (const id of order) {
-    for (const action of queues.get(id)!) {
-      if (action.type !== 'deploy') continue;
-      const used = actionsUsedOf(id, action);
-      chargeActionPoint(game, id);
-      if (hasDestinationConflict(action)) {
-        // 冲突失败：不扣补给，不生成单位。
-        recordFailure(id, action, 'destination_conflict', { q: action.q, r: action.r });
-        continue;
-      }
-      const spec = game.config.units[action.unitType!];
-      const discount = Math.min(spec.cost, deployDiscountForOrigin(game, id, action.fromId!));
-      const cost = spec.cost - discount;
-      const resources = game.resources[id];
-      if (!resources || resources.supplies < cost) {
-        recordFailure(id, action, 'insufficient_supplies', { q: action.q, r: action.r });
-        continue;
-      }
-      resources.supplies -= cost;
-      const unit = createUnitFromConfig(game.config, id, action.unitType!, action.q!, action.r!);
-      unit.hasMoved = true;
-      unit.hasActed = false;
-      unit.actionSpent = true;
-      game.units.push(unit);
-      appendEvent(game, bus, 'deploy', {
-        actionId: action.id,
-        unitId: unit.id, owner: id, unitType: action.unitType, fromId: action.fromId,
-        q: action.q, r: action.r, cost, unitCost: spec.cost, discount,
-        hp: unit.hp, attack: unit.attack, defense: unit.defense,
-        moveRange: unit.moveRange, attackRange: unit.attackRange,
-        canCapture: unit.canCapture, healPower: unit.healPower,
-        actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
-      });
-      outcomes[id]!.push({ actionId: action.id, type: 'deploy', owner: id, status: 'executed', unitId: unit.id, detail: { unitId: unit.id, cost } });
-    }
-  }
-
-  // ---------------------------------------------------------------- 阶段二：移动
-  for (const id of order) {
-    for (const action of queues.get(id)!) {
-      if (action.type !== 'move') continue;
-      const used = actionsUsedOf(id, action);
-      chargeActionPoint(game, id);
-      const unit = getGameIndex(game).unitById.get(action.unitId!);
-      if (!unit || unit.owner !== id || !unit.alive) {
-        recordFailure(id, action, 'unit_gone');
-        continue;
-      }
-      if (hasDestinationConflict(action)) {
-        recordFailure(id, action, 'destination_conflict', { q: action.q, r: action.r });
-        continue;
-      }
-      const fromQ = unit.q;
-      const fromR = unit.r;
-      unit.q = action.q!;
-      unit.r = action.r!;
-      unit.hasMoved = true;
-      appendEvent(game, bus, 'move', {
-        actionId: action.id,
-        unitId: unit.id, owner: id, fromQ, fromR, toQ: unit.q, toR: unit.r,
-        actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
-      });
-      outcomes[id]!.push({ actionId: action.id, type: 'move', owner: id, status: 'executed', unitId: unit.id, detail: { fromQ, fromR, toQ: unit.q, toR: unit.r } });
-    }
-  }
-
-  // ---------------------------------------------------------------- 阶段三：同时攻击 / 治疗 / 拆除
-  // 3a. 拆除：地形在移动结算之后才变化，本回合新开的缺口不影响本回合移动。
-  for (const id of order) {
-    for (const action of queues.get(id)!) {
-      if (action.type !== 'demolish') continue;
-      const used = actionsUsedOf(id, action);
-      chargeActionPoint(game, id);
-      const unit = getGameIndex(game).unitById.get(action.unitId!);
-      if (!unit || unit.owner !== id || !unit.alive) {
-        recordFailure(id, action, 'unit_gone');
-        continue;
-      }
-      if (unit.type !== 'heavy'
-        || hexDistance(unit, { q: action.q!, r: action.r! }) > 1
-        || getTerrain(game, action.q!, action.r!) !== 'blocker') {
-        recordFailure(id, action, 'invalid_target', { q: action.q, r: action.r });
-        continue;
-      }
-      setTerrainPlain(game, action.q!, action.r!);
-      unit.hasActed = true;
-      appendEvent(game, bus, 'demolish', {
-        actionId: action.id,
-        unitId: unit.id, owner: id, q: action.q, r: action.r,
-        fromTerrain: 'blocker', toTerrain: 'plain',
-        actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
-      });
-      outcomes[id]!.push({
-        actionId: action.id, type: 'demolish', owner: id, status: 'executed', unitId: unit.id,
-        detail: { q: action.q, r: action.r },
-      });
-    }
-  }
-
-  // 3b. 收集攻击：形状由地图配置推导（single 单格 / line 定向直线 / arc 定向三格
-  //     扇形）；锁定兵种（attackLock）在计划时点击格上站着敌人则锁定该单位。
-  //     目标判定延迟到伤害施加时，按移动/部署后的棋盘结算；友军免伤。
-  interface StrikeTargetRef {
-    kind: 'unit' | 'headquarters';
-    entity: Unit | Headquarters;
-    defense: number;
-  }
-  interface Strike {
-    owner: PlayerId;
-    action: PendingAction;
-    attacker: Unit;
-    aim: ShapeAim;
-    lockedEntity?: Unit;
-  }
-  const strikes: Strike[] = [];
-  for (const id of order) {
-    for (const action of queues.get(id)!) {
-      if (action.type !== 'attack') continue;
-      chargeActionPoint(game, id);
-      const attacker = getGameIndex(game).unitById.get(action.attackerId!);
-      if (!attacker || attacker.owner !== id || !attacker.alive) {
-        recordFailure(id, action, 'unit_gone');
-        continue;
-      }
-      const spec = game.config.units[attacker.type];
-      const aim = coveredCellsFor(attacker, spec, 'attackShape', { q: action.q!, r: action.r! }, attacker.attackRange);
-      if (!aim) {
-        recordFailure(id, action, 'invalid_target', { q: action.q, r: action.r });
-        continue;
-      }
-      attacker.hasActed = true;
-      const strike: Strike = { owner: id, action, attacker, aim };
-      if (spec?.attackLock) {
-        const locked = planTimePositions.find(entry =>
-          entry.unit.owner !== id && entry.q === action.q && entry.r === action.r);
-        if (locked) strike.lockedEntity = locked.unit;
-      }
-      strikes.push(strike);
-    }
-  }
-
-  // 3c. 收集治疗：覆盖形状与攻击同构；目标按移动后的最终站位在施加时判定。
-  const heals: { owner: PlayerId; action: PendingAction; support: Unit; aim: ShapeAim }[] = [];
-  const recordHealFizzle = (owner: PlayerId, action: PendingAction, reason: string): void => {
-    const unitId = action.supportId;
-    const detail = actionDetail(action);
-    const unitType = detail.unitType;
-    outcomes[owner]!.push({
-      actionId: action.id, type: 'heal', owner, status: 'fizzled', reason,
-      ...(unitId ? { unitId } : {}),
-      detail,
-    });
-    appendEvent(game, bus, 'action_failed', {
-      owner, actionId: action.id, type: 'heal', reason, roundNumber,
-      ...(unitId ? { unitId } : {}),
-      ...(typeof unitType === 'string' ? { unitType } : {}),
-      supportId: action.supportId, detail,
-      q: action.q, r: action.r,
-      actionsUsed: actionsUsedOf(owner, action),
-    });
-  };
-  for (const id of order) {
-    for (const action of queues.get(id)!) {
-      if (action.type !== 'heal') continue;
-      chargeActionPoint(game, id);
-      const support = getGameIndex(game).unitById.get(action.supportId!);
-      if (!support || support.owner !== id || !support.alive) {
-        recordHealFizzle(id, action, 'out_of_range');
-        continue;
-      }
-      const aim = support.type === 'support'
-        ? coveredCellsFor(
-          support,
-          game.config.units[support.type],
-          'healShape',
-          { q: action.q!, r: action.r! },
-          game.config.units[support.type]?.healRange ?? support.attackRange,
-        )
-        : null;
-      if (!aim) {
-        recordHealFizzle(id, action, 'out_of_range');
-        continue;
-      }
-      support.hasActed = true;
-      heals.push({ owner: id, action, support, aim });
-    }
-  }
-
-  // 3d. 净血量结算：先施放全部治疗（按最终站位、覆盖格内所有受伤友军各自掷量，
-  //     上限截断），再按 turnOrder 顺序施加伤害——数学上等价于同时结算
-  //     （hp + 治疗 - 伤害），且击杀归属确定。
-  for (const heal of heals) {
-    const targets = heal.aim.cells
-      .map(cell => game.units.find(u => u.alive && u.owner === heal.owner && u.q === cell.q && u.r === cell.r))
-      .filter((u): u is Unit => Boolean(u));
-    const appliedList: { target: Unit; amount: number }[] = [];
-    for (const target of targets) {
-      if (target.hp >= target.maxHp) continue;
-      const applied = Math.min(target.maxHp - target.hp, rollHeal(game, heal.support));
-      if (applied > 0) appliedList.push({ target, amount: applied });
-    }
-    if (appliedList.length === 0) {
-      const reason = targets.length > 0 ? 'already_healthy' : 'out_of_range';
-      recordHealFizzle(heal.owner, heal.action, reason);
-      continue;
-    }
-    for (const { target, amount: applied } of appliedList) {
-      target.hp += applied;
-      appendEvent(game, bus, 'heal', {
-        actionId: heal.action.id,
-        owner: heal.owner, supportId: heal.support.id, targetId: target.id,
-        amount: applied, targetHp: target.hp,
-        actionsUsed: actionsUsedOf(heal.owner, heal.action), actionsRemaining: remaining(actionsUsedOf(heal.owner, heal.action)), roundNumber,
-      });
-    }
-    outcomes[heal.owner]!.push({
-      actionId: heal.action.id, type: 'heal', owner: heal.owner, status: 'executed',
-      unitId: heal.support.id,
-      detail: {
-        supportId: heal.support.id,
-        targets: appliedList.map(({ target, amount }) => ({ targetId: target.id, amount })),
-      },
-    });
-  }
-
-  const deaths: { kind: 'unit' | 'headquarters'; entity: Unit | Headquarters; killer: PlayerId }[] = [];
-  const recordedDeaths = new Set<string>();
-  for (const strike of strikes) {
-    const action = strike.action;
-    const used = actionsUsedOf(strike.owner, action);
-    const spec = game.config.units[strike.attacker.type];
-    const targets: StrikeTargetRef[] = [];
-    let escapedLock = false;
-    if (strike.lockedEntity) {
-      // 锁定射击：目标只要没逃出攻击者的射程，跑到哪里都命中。
-      const entity = strike.lockedEntity;
-      if (hexDistance(strike.attacker, entity) <= strike.attacker.attackRange) {
-        targets.push({ kind: 'unit', entity, defense: entity.defense });
-      } else {
-        escapedLock = true;
-      }
-    } else {
-      for (const cell of strike.aim.cells) {
-        const occupant = getCellOccupant(game, cell.q, cell.r);
-        if (occupant !== null && occupant.entity.owner !== strike.owner) {
-          targets.push({ kind: occupant.kind, entity: occupant.entity, defense: occupant.entity.defense });
-        }
-      }
-    }
-    if (targets.length === 0) {
-      appendEvent(game, bus, 'attack', {
-        actionId: action.id,
-        owner: strike.owner, attackerId: strike.attacker.id,
-        q: action.q, r: action.r, hit: false,
-        aimQ: action.q, aimR: action.r,
-        shape: strike.aim.type,
-        locked: Boolean(strike.lockedEntity),
-        targetId: strike.lockedEntity ? strike.lockedEntity.id : null,
-        targetKind: null, damage: 0, actualDamage: 0,
-        actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
-      });
-      outcomes[strike.owner]!.push({
-        actionId: action.id, type: 'attack', owner: strike.owner, status: 'missed',
-        unitId: strike.attacker.id,
-        reason: escapedLock ? 'target_escaped' : undefined,
-        detail: {
-          attackerId: strike.attacker.id,
-          q: action.q, r: action.r, shape: strike.aim.type, locked: Boolean(strike.lockedEntity),
-        },
-      });
-      continue;
-    }
-    const hitDetails: Record<string, unknown>[] = [];
-    for (const target of targets) {
-      const entity = target.entity;
-      const damage = computeDamage(game, strike.attacker.attack, target.defense);
-      const actualDamage = Math.min(entity.hp, damage);
-      entity.hp = Math.max(0, entity.hp - damage);
-      if (target.kind === 'headquarters') {
-        const stats = game.players[strike.owner]?.stats;
-        if (stats) stats.headquartersDamage += actualDamage;
-      }
-      appendEvent(game, bus, 'attack', {
-        actionId: action.id,
-        owner: strike.owner, attackerId: strike.attacker.id,
-        q: entity.q, r: entity.r, hit: true,
-        aimQ: action.q, aimR: action.r,
-        shape: strike.aim.type,
-        locked: Boolean(strike.lockedEntity),
-        targetId: entity.id, targetKind: target.kind,
-        damage, actualDamage, targetHp: entity.hp,
-        actionsUsed: used, actionsRemaining: remaining(used), roundNumber,
-      });
-      hitDetails.push({ targetId: entity.id, kind: target.kind, damage, actualDamage, killed: entity.hp === 0 });
-      if (entity.hp === 0 && !recordedDeaths.has(entity.id)) {
-        recordedDeaths.add(entity.id);
-        deaths.push({ kind: target.kind, entity, killer: strike.owner });
-        // 击杀入账必须在死亡阶段之前完成：死亡阶段里 HQ 被摧毁会立刻冻结该玩家
-        // 的分数并移出单位，如果之后才处理它同轮打出的击杀，creditKill 会因
-        // 玩家已非 active 而漏记，且结果随 turnOrder（先处理哪条 death）漂移。
-        if (target.kind === 'unit') {
-          const killerStats = game.players[strike.owner]?.stats;
-          if (killerStats) killerStats.unitsDestroyed += 1;
-          creditKill(game, strike.owner, entity as Unit);
-        }
-      }
-    }
-    outcomes[strike.owner]!.push({
-      actionId: action.id, type: 'attack', owner: strike.owner, status: 'executed',
-      unitId: strike.attacker.id,
-      detail: {
-        attackerId: strike.attacker.id,
-        q: action.q, r: action.r, shape: strike.aim.type, locked: Boolean(strike.lockedEntity), hits: hitDetails,
-      },
-    });
-  }
-
-  // 3e. 死亡与淘汰：所有伤害已施加完毕，同回合互杀成立；攻击者阵亡不影响其炮弹。
-  for (const death of deaths) {
-    if (death.kind === 'unit') {
-      const unit = death.entity as Unit;
-      unit.alive = false;
-      appendEvent(game, bus, 'unit_death', {
-        unitId: unit.id, owner: unit.owner, type: unit.type, q: unit.q, r: unit.r, cause: 'attack',
-      });
-    } else {
-      const hq = death.entity as Headquarters;
-      hq.alive = false;
-      appendEvent(game, bus, 'headquarters_destroyed', {
-        headquartersId: hq.id, owner: hq.owner, q: hq.q, r: hq.r,
-      });
-      markPlayerEliminated(game, bus, hq.owner, 'headquarters_destroyed', death.killer);
-    }
-  }
-
-  // 歼灭规则（annihilation/royale）没有总部兜底：兵力打光的玩家立即淘汰，
-  // 击杀归属取其本回合阵亡单位的凶手；终局交给下方 activeAfterDeaths 检查。
-  if (isAnnihilationMode(game.config.mode)) {
-    const killedBy = new Map<PlayerId, PlayerId>();
-    for (const death of deaths) {
-      if (death.kind === 'unit') killedBy.set((death.entity as Unit).owner, death.killer);
-    }
-    for (const owner of activePlayerIds(game)) {
-      if (game.units.some(unit => unit.owner === owner && unit.alive)) continue;
-      markPlayerEliminated(game, bus, owner, 'army_destroyed', killedBy.get(owner) ?? null);
-    }
-  }
+  const { outcomes, steps, ending } = resolveRoundSteps(game, bus, order, queues);
 
   const finish = (gameOver: boolean): void => {
-    appendEvent(game, bus, 'round_end', { roundNumber, gameOver });
-    appendEvent(game, bus, 'round_resolved', { roundNumber, gameOver, results: outcomes });
+    appendEvent(game, bus, 'round_end', { roundNumber, gameOver, steps });
+    appendEvent(game, bus, 'round_resolved', { roundNumber, gameOver, results: outcomes, steps });
   };
 
-  // 多家总部同回合被摧毁 → 可能直接终局或同归于尽。
+  // 多家总部同一步被摧毁 → 可能直接终局或同归于尽。
   // 终局回合的摘要必须先于 game_over 落库/广播：game_over 是客户端约定的终止事件，
   // 先发会把最后一轮 round_resolved 留在终止事件之后。
+  if (ending) {
+    finish(true);
+    endGame(game, bus, ending.winner, ending.reason);
+    return;
+  }
   if (game.phase === 'game_over') {
     finish(true);
     return;
   }
-  const activeAfterDeaths = activePlayerIds(game);
-  if (activeAfterDeaths.length === 0) {
-    finish(true);
-    endGame(game, bus, null, 'mutual_annihilation');
-    return;
-  }
-  if (activeAfterDeaths.length === 1) {
-    finish(true);
-    endGame(game, bus, activeAfterDeaths[0]!, 'last_player_standing');
-    return;
-  }
 
-  // ---------------------------------------------------------------- 阶段四：占点
+  // ---------------------------------------------------------------- 占点
   for (const id of activePlayerIds(game)) {
     captureControlPoints(game, bus, id);
   }
 
-  // ---------------------------------------------------------------- 阶段五回合边界
+  // ---------------------------------------------------------------- 回合边界
   accumulateControlHold(game);
   // 先把终局摘要写完整，再让 game_over 收尾；adjudicateAtTurnLimit 内部会再校验一次。
   const adjudicated = isTurnLimitReached(game);
   // 这里已经调用过 accumulateControlHold；标记供重启/回放重建区分
   // 「回合上限终局」与「死亡终局」，避免后者也被错误补算最后一轮流量。
-  appendEvent(game, bus, 'round_end', { roundNumber, gameOver: adjudicated, controlHoldCounted: true });
-  appendEvent(game, bus, 'round_resolved', { roundNumber, gameOver: adjudicated, results: outcomes });
+  appendEvent(game, bus, 'round_end', {
+    roundNumber, gameOver: adjudicated, controlHoldCounted: true, steps,
+  });
+  appendEvent(game, bus, 'round_resolved', { roundNumber, gameOver: adjudicated, results: outcomes, steps });
   if (adjudicated) {
     adjudicateAtTurnLimit(game, bus);
     return;

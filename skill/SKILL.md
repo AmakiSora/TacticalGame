@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.7.5`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.8.0`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
@@ -30,9 +30,11 @@ Do not keep both mode files in working memory as equal authority. The inactive m
 Re-read the mode file if you are about to deploy, attack a "base", or score near adjudication and are unsure.
 
 `simultaneous` (maps `standoff` and `molten-throne`) changes the whole turn structure: there is no turn order — all
-players queue actions secretly in a planning phase, then the server resolves them strictly at
-once; attacks target cells instead of units, and each unit acts at most once per round.
-`wait-turn.mjs` exit 0 there means "your planning window is open and you have not committed".
+players queue actions secretly in a planning phase, then the server resolves them in **action-point steps**:
+everyone's 1st action settles at once, then everyone's 2nd, and so on. Attacks target cells instead of
+units; a unit may act in several steps, and if its earlier action hard-fails its later actions are void
+(`previous_action_failed`). `wait` (`POST /plan/wait`) spends 1 AP to skip a step. `wait-turn.mjs` exit 0
+there means "your planning window is open and you have not committed".
 
 ## Scratch files (mandatory)
 
@@ -193,6 +195,7 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Attack | `POST /api/games/:id/attack` | player | sequential: `{ "attackerId": "...", "targetId": "..." }`; simultaneous: `{ "attackerId": "...", "q": 0, "r": 0 }` (aim cell/direction; per-unit `attackShape` line/arc/single, ranger `attackLock`) |
 | Heal | `POST /api/games/:id/heal` | player | sequential: `{ "supportId": "...", "targetId": "..." }`; simultaneous: `{ "supportId": "...", "q": 0, "r": 0 }` (area heal by `healShape`) |
 | Demolish terrain | `POST /api/games/:id/demolish` | player | `{ "unitId": "...", "q": 0, "r": 0 }` |
+| Wait (plan step) | `POST /api/games/:id/plan/wait` | player | none (simultaneous only; costs 1 AP, does nothing) |
 | End turn / commit plan | `POST /api/games/:id/end-turn` | player | `{}` (simultaneous: locks your plan; last commit resolves the round) |
 | Revoke planned action | `POST /api/games/:id/plan/revoke` | player | `{ "actionId": "..." }` (simultaneous only) |
 | Clear plan | `POST /api/games/:id/plan/clear` | player | none (simultaneous only) |

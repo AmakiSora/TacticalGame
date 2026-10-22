@@ -11,7 +11,7 @@ import { endTurn } from '../engine/engine.js';
 import { commitAndMaybeResolve } from '../engine/simultaneous.js';
 import {
   clearPlanActions, queueAttackAction, queueDeployAction, queueDemolishAction,
-  queueHealAction, queueMoveAction, revokePlanAction,
+  queueHealAction, queueMoveAction, queueWaitAction, revokePlanAction,
 } from '../engine/planning.js';
 import type { Result } from '../engine/result.js';
 import type { AuthContext } from './auth.js';
@@ -300,6 +300,50 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     return dispatchAction(req, reply,
       ({ game, player }) => demolishTerrain(game, globalEventBus, player, unitId, q, r),
       ({ game, player }) => queueDemolishAction(game, player, unitId, q, r));
+  });
+
+  // 待命：占 1 个行动点、不做任何事，用于把关键动作对齐到更晚的行动点。
+  app.post<{ Params: { id: string } }>('/api/games/:id/plan/wait', async (req, reply) => {
+    const ctx = authenticate(req, reply);
+    if (!ctx) return;
+    if (!isSimultaneousMode(ctx.game.config.mode)) {
+      return reply.code(statusForCode('not_simultaneous_game')).send({ error: '该对局不是同时回合模式', code: 'not_simultaneous_game' });
+    }
+    const rawKey = req.headers['idempotency-key'];
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.trim() ? rawKey.trim() : null;
+    if (idempotencyKey && idempotencyKey.length > 200) {
+      return reply.code(400).send({ error: 'Idempotency-Key 不能超过 200 个字符', code: 'invalid_idempotency_key' });
+    }
+    const scopedKey = idempotencyKey ? scopedIdempotencyKey(ctx.player, idempotencyKey) : null;
+    const bodyHash = scopedKey ? actionBodyHash('plan/wait', req.body) : null;
+    if (scopedKey && bodyHash) {
+      const replay = findReplay(ctx.game, scopedKey, bodyHash);
+      if (replay) {
+        if ('conflict' in replay) {
+          return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
+        }
+        if (replay.record.persisted !== true) {
+          if (!persistWithDegraded(reply, ctx.game)) return;
+          replay.record.persisted = true;
+        }
+        reply.header('Idempotent-Replay', 'true');
+        return replayWithCurrentQueue(ctx.game, ctx.player, replay.response);
+      }
+    }
+    if (!basicGate(ctx, reply)) return;
+    const result = queueWaitAction(ctx.game, ctx.player);
+    if (!result.ok) {
+      return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
+    }
+    const response = {
+      ok: true,
+      queued: result.data,
+      queue: [...(ctx.game.plan?.queues[ctx.player] ?? [])],
+    };
+    const record = scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null;
+    if (!persistWithDegraded(reply, ctx.game)) return;
+    if (record) record.persisted = true;
+    return response;
   });
 
   // 顺序模式 = 结束当前回合；simultaneous 模式 = 确认锁定本回合计划队列，

@@ -59,9 +59,24 @@ describe('simultaneous mode UI', () => {
       const source = read(file);
       expect(source).toContain('function canActNow()');
       expect(source).toContain("gameConfig?.mode === 'simultaneous'");
-      expect(source).toContain('function unitHasPlannedAction(unitId)');
-      expect(source).toContain('plannedAlready');
+      // 单位可跨行动点多次行动：不再有“每单位一个动作”的入队拦截。
+      expect(source).not.toContain('unitHasPlannedAction');
+      expect(source).not.toContain('plannedAlready');
+      expect(source).toContain('function plannedStepsForUnit(unitId)');
+      expect(source).toContain('projectedUnitOrigin');
       expect(source).toContain("state.players?.[myPlayer]?.status === 'active' && !iCommitted()");
+    }
+  });
+
+  it('lets players queue wait steps and multi-action plans', () => {
+    for (const file of playerClients) {
+      const source = read(file);
+      expect(source).toContain("case 'wait': return { path: 'plan/wait', body: {} }");
+      expect(source).toContain('/plan/wait');
+      expect(source).toContain('plan-wait');
+      expect(source).toContain('计划已满');
+      expect(source).toContain('第 ${i + 1} 个行动点');
+      expect(source).toContain('队列顺序 = 行动点顺序');
     }
   });
 

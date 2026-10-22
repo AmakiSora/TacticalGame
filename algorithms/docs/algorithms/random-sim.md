@@ -24,7 +24,7 @@
 
 1. **动作入队而非立即执行**：服务器返回 `{ ok, queued, queue }`，结算在全员提交后统一发生。
 2. **攻/治瞄准格子而非目标 id**：`{ attackerId, q, r }` / `{ supportId, q, r }`，命中结算时落在覆盖形状上的单位——预测射击。
-3. **一单位一轮一动作**：同一单位再排队会被 `invalid_*` 拒绝。
+3. **算法自身按“一单位一轮一动作”保守枚举**：引擎已支持同一单位跨行动点多次行动，但本算法的镜像校验/模拟器尚未适配（后续任务）。
 4. **队列长度即行动点**：上限 `config.balance.actionsPerTurn`，读 `game.plan.myQueue` 计数（`turn.actionsUsed` 在本模式不按座位维护）。
 5. **座位从 `ctx.owner` 拿**：同时模式 `turn.currentPlayerId` 恒为 null。
 

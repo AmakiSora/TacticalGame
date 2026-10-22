@@ -175,14 +175,20 @@ describe('simultaneous planning phase', () => {
     expect(game.plan!.queues[a]).toHaveLength(1);
   });
 
-  it('rejects own-queue destination conflicts at queue time', () => {
-    const { game } = createStandoffGame();
+  it('lets two own moves claim one cell and fails the later arrival', () => {
+    const { game, bus } = createStandoffGame();
     const a = game.turn.turnOrder[0]!;
     const first = unitAt(game, a, 4, 0);
     const second = unitAt(game, a, 4, 1);
     expect(queueMoveAction(game, a, first.id, 3, 0).ok).toBe(true);
-    expect(queueMoveAction(game, a, second.id, 3, 0))
-      .toMatchObject({ ok: false, code: 'cell_occupied' });
+    expect(queueMoveAction(game, a, second.id, 3, 0).ok).toBe(true);
+    commitAll(game, bus, [a, game.turn.turnOrder[1]!]);
+    const failedEvents = events(game, 'action_failed');
+    expect(failedEvents).toHaveLength(1);
+    expect(failedEvents[0]!.payload.reason).toBe('destination_occupied');
+    expect(failedEvents[0]!.payload.unitId).toBe(second.id);
+    expect(first.q).toBe(3);
+    expect(second.q).toBe(4);
   });
 
   it('rejects out-of-range attack cells but allows empty in-range cells', () => {
@@ -554,8 +560,9 @@ describe('simultaneous resolution', () => {
     const mover = game.units.find(u => u.owner === b && u.type === 'scout')!;
     place(walker, 0, 0);
     place(mover, 1, 0);
-    expect(queueHealAction(game, b, walker.id, 1, 0).ok).toBe(true);
+    // 队列顺序即行动点顺序：先移动（第 1 步），再治疗（第 2 步）。
     expect(queueMoveAction(game, b, mover.id, 3, 0).ok).toBe(true);
+    expect(queueHealAction(game, b, walker.id, 1, 0).ok).toBe(true);
     commitAll(game, bus, [a, b]);
     const failed = events(game, 'action_failed');
     const fizzle = failed.find(e => e.payload.type === 'heal' && e.payload.reason === 'out_of_range')!;
@@ -968,20 +975,23 @@ describe('unit shape overhaul (line / arc / lock / area heal)', () => {
     expect(heals).toHaveLength(2);
   });
 
-  it('rejects heal aims that do not match the configured shape', () => {
-    const { game } = createStandoffGame();
-    const b = game.turn.turnOrder[1]!;
+  it('defers the heal coverage check to resolution', () => {
+    const { game, bus } = createStandoffGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
     const medic = game.units.find(u => u.owner === b && u.type === 'infantry')!;
     medic.type = 'support';
     medic.healPower = 22;
     const friend = game.units.find(u => u.owner === b && u.type === 'infantry')!;
-    place(medic, 0, 0);
+    place(medic, 0, 1);
     place(friend, 2, 0);
     // 扇形要求点击相邻格：(2,0) 距离 2 不可瞄准。
     expect(queueHealAction(game, b, medic.id, 2, 0))
       .toMatchObject({ ok: false, code: 'invalid_heal' });
-    // 覆盖格内没有友军也不行。
-    expect(queueHealAction(game, b, medic.id, 0, -1))
-      .toMatchObject({ ok: false, code: 'invalid_heal' });
+    // 覆盖格内没有友军——计划期允许，结算时 fizzle。
+    expect(queueHealAction(game, b, medic.id, 0, 0).ok).toBe(true);
+    commitAll(game, bus, [a, b]);
+    const fizzled = events(game, 'action_failed').find(event =>
+      event.payload.type === 'heal' && event.payload.reason === 'out_of_range');
+    expect(fizzled).toBeTruthy();
   });
 });

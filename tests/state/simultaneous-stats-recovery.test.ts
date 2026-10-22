@@ -6,6 +6,7 @@ import { EventBus } from '../../src/events/bus.js';
 import { startGame } from '../../src/engine/engine.js';
 import { appendEvent } from '../../src/engine/events.js';
 import { commitAndMaybeResolve } from '../../src/engine/simultaneous.js';
+import { queueWaitAction } from '../../src/engine/planning.js';
 import { addLobbyPlayer, createLobby, GameStore } from '../../src/state/store.js';
 
 let tempDir: string | null = null;
@@ -50,5 +51,28 @@ describe('simultaneous stats recovery', () => {
     const after = restored.get('control-hold-recovery')!.players[holder!]!.stats;
     expect(after.controlHold).toBe(before.controlHold);
     expect(after.controlHoldRounds).toBe(before.controlHoldRounds);
+  });
+
+  it('rebuilds action points spent on wait steps after a reload', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'tg-wait-'));
+    const file = join(tempDir, 'games.json');
+    const bus = new EventBus();
+    const game = createLobby('wait-recovery', 'standoff', {
+      maxPlayers: 2, participate: true, playerName: 'A',
+    });
+    expect(addLobbyPlayer(game, 'B')).not.toBeNull();
+    expect(startGame(game, bus, () => 0).ok).toBe(true);
+    const [first, second] = game.turn.turnOrder;
+    expect(queueWaitAction(game, first!).ok).toBe(true);
+    expect(queueWaitAction(game, first!).ok).toBe(true);
+    expect(commitAndMaybeResolve(game, bus, first!).ok).toBe(true);
+    expect(commitAndMaybeResolve(game, bus, second!).ok).toBe(true);
+    expect(game.players[first!]!.stats.actionPointsUsed).toBe(2);
+
+    const store = new GameStore({ persistenceFile: file });
+    store.save(game);
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+    expect(restored.get('wait-recovery')!.players[first!]!.stats.actionPointsUsed).toBe(2);
   });
 });

@@ -405,16 +405,15 @@ function restoreActionStats(game: GameState): void {
       const merit = actionMeritForEvent(event.type, payload, simultaneous);
       if (merit > 0) actionMeritTotals.set(owner, (actionMeritTotals.get(owner) ?? 0) + merit);
     }
-    if (!['deploy', 'move', 'attack', 'heal', 'demolish', 'action_failed'].includes(event.type)) continue;
+    if (!['deploy', 'move', 'attack', 'heal', 'demolish', 'wait', 'action_failed'].includes(event.type)) continue;
     if (!owner || typeof payload.actionsUsed !== 'number') continue;
     if (simultaneous) {
       const last = ownerActionsUsed.get(owner) ?? 0;
       if (payload.actionsUsed > last) {
         actionPointTotals.set(owner, (actionPointTotals.get(owner) ?? 0) + payload.actionsUsed - last);
       }
-      // simultaneous 结算按动作阶段发事件，而不是按玩家计划队列顺序发事件；
-      // 后到事件的 actionsUsed 可能更小（例如 3 -> 1 -> 2）。游标不能回退，
-      // 否则后续的 2 会被再次计入，导致重启恢复后的 AP 超额。
+      // 同时模式 3.8.0 起按行动点步序发事件，同一玩家的 actionsUsed 单调递增；
+      // 用 Math.max 兜底旧回放/旧存档里的乱序事件，避免重复计入 AP。
       ownerActionsUsed.set(owner, Math.max(last, payload.actionsUsed));
       continue;
     }

@@ -258,7 +258,7 @@ describe('player page playback wiring', () => {
       expect(source).toContain('playback.reset();');
       expect(source).toContain("els.btnSkipReplay?.addEventListener('click', () => playback.skip());");
 
-      const canActNowBlock = source.slice(source.indexOf('function canActNow()'), source.indexOf('function unitHasPlannedAction'));
+      const canActNowBlock = source.slice(source.indexOf('function canActNow()'), source.indexOf('function plannedStepsForUnit'));
       expect(canActNowBlock).toContain('playback.isActive()');
 
       const sseBlock = source.slice(source.indexOf('function subscribeSse'), source.indexOf('function subscribeLobbyStart'));

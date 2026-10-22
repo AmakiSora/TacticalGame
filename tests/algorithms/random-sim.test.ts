@@ -304,7 +304,7 @@ describe('random-sim artillery zone (annihilation-axis mirror)', () => {
       headquarters: farHq,
       cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }],
     });
-    expect(queueHealAction(game as never, 'player_a' as never, support.id, 1, 0).ok).toBe(false);
+    // 引擎已把炮火区检查延到结算（计划期可入队），算法自身仍主动跳过该治疗。
     expect(await randomSim.decide(game, utils, { owner: 'player_a' })).toBeNull();
   });
 
@@ -320,7 +320,7 @@ describe('random-sim artillery zone (annihilation-axis mirror)', () => {
       headquarters: farHq,
       cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: -1, r: 0 }, { q: 0, r: 1 }],
     });
-    expect(queueHealAction(game as never, 'player_a' as never, support.id, 1, 0).ok).toBe(false);
+    // 引擎已把炮火区检查延到结算，算法自身仍跳过覆盖到危险区的瞄准。
     for (let i = 0; i < 20; i++) {
       const action = await randomSim.decide(game, utils, { owner: 'player_a' });
       expect(action.type).toBe('heal');

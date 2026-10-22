@@ -14,10 +14,14 @@ halves: the plan/commit loop governs *how* you act, the artillery ring and army-
   `headquarters` / `spawnSlots[].headquarters` as **spawn metadata only** — never attack, defend,
   path-to, or score those as HQs. Never invent an HQ id for `fromId`/`targetId`.
 - Elimination is **army wipe** (final living unit dies — to combat or artillery), not HQ destroy.
-- **One action per unit per round**; attacks/heals aim at a **cell**, not a unit id
+- **Queue position = action point**; a unit may act in several steps, and if its earlier action
+  hard-fails its later queued actions are void. Attacks/heals aim at a **cell**, not a unit id
   (`single`/`line`/`arc` shapes from `config.units`; `attackLock` locks plan-time occupants).
-- **Destination conflicts fail for everyone** (all claiming moves/deploys fail); your own queue
-  cannot claim the same cell twice.
+- **Arrival rules**: two or more moves/deploys on the same cell in the same step all fail
+  (`destination_conflict`). Within a step departures happen first, so a cell vacated in the same
+  step can be entered (swaps/chains allowed); a destination that stays occupied fails
+  (`destination_occupied`). Movement range is a terrain-only path search at plan time — units do
+  not block the path, water/blockers do.
 - **Never hardcode artillery phase rounds** (e.g. "rounds 1–5"). Always derive timing from this
   map's config + live `game.artillery`.
 
@@ -26,15 +30,17 @@ halves: the plan/commit loop governs *how* you act, the artillery ring and army-
 1. `wait-turn.mjs` exits 0 → your planning window is open. `GET /api/games/:id`, study the board.
    `turn.currentPlayerId` is always `null`; act when `phase === "active"` and you are not in
    `plan.committed`.
-2. Queue actions (`/deploy`, `/move`, `/attack`, `/heal`, `/demolish`) — they do **not** execute.
-   Each queued action costs 1 AP (queue length ≤ `config.balance.actionsPerTurn`); each unit acts
-   at most once. Revoke with `/plan/revoke` / `/plan/clear` before committing.
-3. **Deploy only from owned control points** (`fromId` = owned CP id) into an adjacent empty plain
-   cell. CP kinds the map bans (`controlPointTypes.<kind>.canDeploy: false`) are not legal origins.
+2. Queue actions (`/deploy`, `/move`, `/attack`, `/heal`, `/demolish`, `/plan/wait`) — they do **not**
+   execute. Entry N settles with every player's entry N. Each queued action (including `wait`) costs
+   1 AP (queue length ≤ `config.balance.actionsPerTurn`). Revoke with `/plan/revoke` / `/plan/clear`
+   before committing.
+3. **Deploy only from owned control points** (`fromId` = owned CP id) into an adjacent plain cell.
+   CP kinds the map bans (`controlPointTypes.<kind>.canDeploy: false`) are not legal origins.
    Origin **or** target in artillery danger → plan-time rejection `invalid_deploy`.
 4. `POST /api/games/:id/end-turn` = **commit and lock**. When the last living player commits, the
-   server resolves all queues strictly simultaneously (`round_resolved` carries per-action outcomes;
-   failed/fizzled entries include `unitId`/`detail`, missed entries include `unitId`/`detail.attackerId`).
+   server resolves the queues in action-point steps (`round_resolved` carries per-action outcomes with
+   `step` and a `steps` count; failed/fizzled entries include `unitId`/`detail`, missed entries include
+   `unitId`/`detail.attackerId`).
 5. Stuck players → host `POST /api/games/:id/host/force-resolve`. Once resolution begins, do not
    revoke; if it eliminates you or ends the game, stop and report.
 
@@ -129,9 +135,10 @@ Do **not** memorize a fixed timetable. Each royale map carries its own schedule.
 Before queuing each action:
 
 - Read unit **instance** stats from this map's `config.units`, not memory.
-- Count queue vs `actionsPerTurn`; one action per unit; no duplicate destinations in your queue.
+- Count queue vs `actionsPerTurn`; queue order is the step timeline, so put setup moves before the
+  attacks/heals that depend on them (use `wait` to delay).
 - Attack cells must match the unit's shape (ray cell for `line`, adjacent for `arc`, in-range for
-  `single`); rangers: click a cell an enemy occupies **now** to lock.
+  `single`) from its projected position; rangers: click a cell an enemy occupies **now** to lock.
 - Artillery: check `game.artillery` every round. Never deploy/heal in danger; do not end your plan
   on a `warningCells` cell you cannot evacuate before `nextShrinkRound`.
 - As the ring closes, terrain funnels everyone inward — expect contested `destination_conflict`
@@ -160,7 +167,8 @@ Unless the user asks for a different style:
 
 ## Pre-commit sanity pass
 
-- Queue length ≤ AP budget; every action is a different unit (or deploy); no duplicate destinations.
+- Queue length ≤ AP budget; queue order is the step timeline, so setup moves must precede the
+  attacks/heals that depend on them; `wait` can delay a key action.
 - Every attack/heal cell matches its shape; supports' arc covers wounded allies' likely cells.
 - Nobody you need is parked on a danger/warning cell without an escape plan tied to `nextShrinkRound`.
 - You are not stacking your whole army on cells enemies can predictably shell as the ring funnels.

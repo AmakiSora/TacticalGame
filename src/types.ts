@@ -158,7 +158,7 @@ export interface TurnState {
 /** simultaneous 模式下玩家在计划阶段提交的待结算动作。 */
 export interface PendingAction {
   id: string;
-  type: 'deploy' | 'move' | 'attack' | 'heal' | 'demolish';
+  type: 'deploy' | 'move' | 'attack' | 'heal' | 'demolish' | 'wait';
   /** deploy */
   unitType?: UnitType;
   fromId?: string;
@@ -206,6 +206,7 @@ export type EventType =
   | 'round_start'
   | 'round_resolved'
   | 'plan_committed'
+  | 'wait'
   | 'action_failed'
   | 'headquarters_destroyed'
   | 'player_eliminated'

@@ -1,14 +1,20 @@
 // src/engine/planning.ts
 // simultaneous 模式的计划阶段：玩家把动作"入队不执行"，全部玩家确认后由
-// simultaneous.ts 统一同时结算。所有校验针对计划时刻的棋盘（结算前棋盘不会变化）。
+// simultaneous.ts 按行动点逐步结算。
+//
+// 入队只做"结构性合理"校验：单位归属、行动点预算、目标格是否在地图内、形状/射程
+// 是否匹配、部署补给是否足够。占用、地形是否仍可用、目的格冲突等动态条件一律
+// 留到结算时按每一步的棋盘判定——这样才允许"第 1 步腾格、第 2 步进入"这类计划。
+//
+// 队列数组顺序就是行动点顺序： `queues[owner][i]` 在第 i+1 个行动点结算。
 import { randomUUID } from 'node:crypto';
-import type { GameState, PendingAction, PlayerId, Position, UnitType } from '../types.js';
+import type { GameState, PendingAction, PlayerId, Position, TerrainType, UnitType } from '../types.js';
 import { isSimultaneousMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result, Failure } from './result.js';
 import { appendEvent } from './events.js';
-import { hexDistance, HEX_DIRECTIONS } from './hex.js';
-import { findReachableCells, isDeployable, isInBounds, getCellOccupant, getTerrain, deployOriginFor } from './validation.js';
+import { hexDistance, hexKey, hexNeighbors, HEX_DIRECTIONS } from './hex.js';
+import { isInBounds, getTerrain, deployOriginFor } from './validation.js';
 import { getGameIndex } from './gameIndex.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import { isArtilleryDanger } from './artillery.js';
@@ -49,25 +55,13 @@ function queueOf(game: GameState, owner: PlayerId): PendingAction[] {
   return game.plan.queues[owner]!;
 }
 
-/** 该单位是否已有排队的动作（每单位每回合仅一个动作）。 */
-function unitAlreadyPlanned(queue: PendingAction[], unitId: string): boolean {
-  return queue.some(action =>
-    action.unitId === unitId || action.attackerId === unitId || action.supportId === unitId);
-}
-
-/** 自己队列里已被 deploy/move 声明的目标格——自己与自己冲突必然失败，入队时直接拒绝。 */
-function claimedCells(queue: PendingAction[]): Set<string> {
-  const claimed = new Set<string>();
-  for (const action of queue) {
-    if ((action.type === 'deploy' || action.type === 'move') && typeof action.q === 'number') {
-      claimed.add(`${action.q},${action.r}`);
-    }
-  }
-  return claimed;
+/** 动作绑定的单位 ID；deploy / wait 没有单位主体。 */
+function actionUnitId(action: PendingAction): string | undefined {
+  return action.unitId ?? action.attackerId ?? action.supportId;
 }
 
 function checkBudget(game: GameState, owner: PlayerId): Failure | null {
-  // simultaneous 模式下每个排队动作恰好消耗 1 点行动点，队列长度即用量。
+  // 每个排队动作（含 wait）恰好消耗 1 点行动点，队列长度即用量。
   const limit = game.config.balance.actionsPerTurn;
   if (queueOf(game, owner).length >= limit) {
     return { ok: false, code: 'action_limit_reached', message: `每轮最多行动 ${limit} 次` };
@@ -87,6 +81,87 @@ function healRangeFor(game: GameState, support: { type: UnitType; attackRange: n
 function enqueue(game: GameState, owner: PlayerId, action: PendingAction): Result<PendingAction> {
   queueOf(game, owner).push(action);
   return { ok: true, data: action };
+}
+
+// ---------------------------------------------------------------- 计划投影
+// 同一单位可以在多个行动点连续行动，因此"攻击/治疗/爆破/移动的起点"要按队列里
+// 之前的移动投影计算；自己先前排的爆破也会把目标格视为 plain。投影只假设自己的
+// 动作成功——若结算时前面的动作失败，后续动作会被失败连锁作废。
+
+export interface PlanProjection {
+  /** unitId -> 执行完当前队列后的虚拟站位。 */
+  positions: Map<string, Position>;
+  /** 自己先前 demolish 造成的虚拟地形覆盖。 */
+  terrain: Map<string, TerrainType>;
+  /** actionId -> 执行该动作前的虚拟站位。 */
+  actionPositions: Map<string, Position>;
+}
+
+export function projectPlanQueue(game: GameState, owner: PlayerId): PlanProjection {
+  const queue = queueOf(game, owner);
+  const positions = new Map<string, Position>();
+  const terrain = new Map<string, TerrainType>();
+  const actionPositions = new Map<string, Position>();
+  const positionOf = (unitId: string): Position | null => {
+    const projected = positions.get(unitId);
+    if (projected) return projected;
+    const unit = getGameIndex(game).unitById.get(unitId);
+    return unit ? { q: unit.q, r: unit.r } : null;
+  };
+  for (const action of queue) {
+    const unitId = actionUnitId(action);
+    if (unitId) {
+      const position = positionOf(unitId);
+      if (position) actionPositions.set(action.id, position);
+    }
+    if (action.type === 'move' && unitId && typeof action.q === 'number' && typeof action.r === 'number') {
+      positions.set(unitId, { q: action.q, r: action.r });
+    } else if (action.type === 'demolish' && typeof action.q === 'number' && typeof action.r === 'number') {
+      terrain.set(hexKey({ q: action.q, r: action.r }), 'plain');
+    }
+  }
+  return { positions, terrain, actionPositions };
+}
+
+function projectedTerrain(game: GameState, projection: PlanProjection, q: number, r: number): TerrainType {
+  return projection.terrain.get(hexKey({ q, r })) ?? getTerrain(game, q, r);
+}
+
+function projectedPosition(game: GameState, projection: PlanProjection, unitId: string): Position | null {
+  const projected = projection.positions.get(unitId);
+  if (projected) return projected;
+  const unit = getGameIndex(game).unitById.get(unitId);
+  return unit ? { q: unit.q, r: unit.r } : null;
+}
+
+/**
+ * 计划期可达格：只按地形寻路（水/障碍挡路），忽略单位与总部占位。
+ * 单位可能在本轮移动，所以计划阶段不能把它们当成永久墙；目的地是否仍被占用
+ * 由结算时的到达判定负责。
+ */
+function planningReachableCells(
+  game: GameState,
+  from: Position,
+  range: number,
+  projection: PlanProjection,
+): Position[] {
+  const visited = new Set<string>([hexKey(from)]);
+  const result: Position[] = [];
+  const queue: { position: Position; distance: number }[] = [{ position: from, distance: 0 }];
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index]!;
+    if (current.distance >= range) continue;
+    for (const next of hexNeighbors(current.position)) {
+      const key = hexKey(next);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (!isInBounds(game, next.q, next.r)) continue;
+      if (projectedTerrain(game, projection, next.q, next.r) !== 'plain') continue;
+      result.push(next);
+      queue.push({ position: next, distance: current.distance + 1 });
+    }
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------- 形状系统
@@ -116,7 +191,7 @@ export function shapeSpecFor(spec: UnitSpec | undefined, kind: 'attackShape' | '
 
 /**
  * 由施放者位置与点击格推导形状方向与覆盖格。瞄准不合法（超出射程、不在正六方向
- * 射线上、非相邻格等）返回 null。攻击者/支援本回合不会移动，计划与结算结果一致。
+ * 射线上、非相邻格等）返回 null。
  */
 function computeCoveredCells(
   from: Position,
@@ -221,14 +296,17 @@ export function queueDeployAction(
   }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
+  if (!isInBounds(game, q, r)) {
+    return { ok: false, code: 'invalid_deploy', message: '部署目标在地图之外' };
+  }
   if (hexDistance(origin, { q, r }) !== 1) {
     return { ok: false, code: 'out_of_deploy_range', message: '部署目标必须相邻' };
   }
-  if (!isDeployable(game, q, r)) {
-    return { ok: false, code: 'invalid_terrain', message: '部署目标必须是空的平原地形' };
-  }
-  if (claimedCells(queueOf(game, owner)).has(`${q},${r}`)) {
-    return { ok: false, code: 'cell_occupied', message: '该格已被你本轮的另一条计划占用' };
+  // 目标是否为 plain 按投影地形判定（自己先前的爆破可能已经清出该格）；是否被
+  // 占用留到结算——同一步腾格后仍然可以部署成功。
+  const projection = projectPlanQueue(game, owner);
+  if (projectedTerrain(game, projection, q, r) !== 'plain') {
+    return { ok: false, code: 'invalid_terrain', message: '部署目标必须是平原地形' };
   }
   const discount = Math.min(unitSpec.cost, deployDiscountForOrigin(game, owner, fromId));
   const actualCost = unitSpec.cost - discount;
@@ -253,20 +331,18 @@ export function queueMoveAction(
   if (!ready.ok) return ready;
   const unit = findOwnUnit(game, owner, unitId);
   if (!unit) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
-  const queue = queueOf(game, owner);
-  if (unitAlreadyPlanned(queue, unitId)) {
-    return { ok: false, code: 'invalid_move', message: '该单位本轮已有计划动作' };
-  }
-  if (unit.q === q && unit.r === r) return { ok: false, code: 'invalid_move', message: '目标格就是当前所在格' };
   const budget = checkBudget(game, owner);
   if (budget) return budget;
-  // 路径按计划时刻棋盘计算：所有单位（含敌方）都视为障碍，BFS 天然排除被占用格。
-  const reachable = findReachableCells(game, unit);
+  const projection = projectPlanQueue(game, owner);
+  const from = projectedPosition(game, projection, unitId);
+  if (!from) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
+  if (from.q === q && from.r === r) return { ok: false, code: 'invalid_move', message: '目标格就是当前所在格' };
+  if (!isInBounds(game, q, r)) return { ok: false, code: 'invalid_move', message: '目标格在地图之外' };
+  // 路径只受地形限制：其他单位可能在本轮移动，不能把它们当成墙。目的地是否
+  // 仍被占用（或是否被同一步腾空）由结算时的到达判定负责。
+  const reachable = planningReachableCells(game, from, unit.moveRange, projection);
   if (!reachable.some(pos => pos.q === q && pos.r === r)) {
     return { ok: false, code: 'invalid_move', message: '目标格无法到达' };
-  }
-  if (claimedCells(queue).has(`${q},${r}`)) {
-    return { ok: false, code: 'cell_occupied', message: '该格已被你本轮的另一条计划占用' };
   }
   return enqueue(game, owner, { id: randomUUID(), type: 'move', unitId, q, r });
 }
@@ -284,17 +360,17 @@ export function queueAttackAction(
   if (!ready.ok) return ready;
   const attacker = findOwnUnit(game, owner, attackerId);
   if (!attacker) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
-  const queue = queueOf(game, owner);
-  if (unitAlreadyPlanned(queue, attackerId)) {
-    return { ok: false, code: 'invalid_attack', message: '该单位本轮已有计划动作' };
-  }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
-  // 攻击瞄准一个格子/方向：射程内任选一格；未配置形状 = 单格预测射击。
   if (!isInBounds(game, q, r)) {
     return { ok: false, code: 'invalid_attack', message: '目标格在地图之外' };
   }
-  const aim = coveredCellsFor(attacker, game.config.units[attacker.type], 'attackShape', { q, r }, attacker.attackRange);
+  // 攻击起点按投影站位计算：同一单位可以先移动、后攻击；若移动最终失败，
+  // 攻击会被失败连锁作废。
+  const projection = projectPlanQueue(game, owner);
+  const from = projectedPosition(game, projection, attackerId);
+  if (!from) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
+  const aim = coveredCellsFor(from, game.config.units[attacker.type], 'attackShape', { q, r }, attacker.attackRange);
   if (!aim) {
     return { ok: false, code: 'invalid_attack', message: `该单位的攻击范围打不到 (${q},${r})` };
   }
@@ -304,8 +380,8 @@ export function queueAttackAction(
 // ---------------------------------------------------------------- heal
 
 /**
- * 治疗瞄准格子/方向（覆盖形状由 healShape 配置，默认单格）。计划时要求覆盖格内
- * 至少站着一个存活友方单位；结算时对覆盖格内所有受伤友方单位各自掷治疗量。
+ * 治疗瞄准格子/方向（覆盖形状由 healShape 配置，默认单格）。计划期只校验形状与
+ * 射程；覆盖格内是否有友军、是否有人受伤、是否在炮火区都留到结算判定。
  */
 export function queueHealAction(
   game: GameState,
@@ -319,26 +395,15 @@ export function queueHealAction(
   const support = findOwnUnit(game, owner, supportId);
   if (!support) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
   if (support.type !== 'support') return { ok: false, code: 'invalid_heal', message: '该单位不是支援兵' };
-  const queue = queueOf(game, owner);
-  if (unitAlreadyPlanned(queue, supportId)) {
-    return { ok: false, code: 'invalid_heal', message: '该单位本轮已有计划动作' };
-  }
   if (!isInBounds(game, q, r)) {
     return { ok: false, code: 'invalid_heal', message: '目标格在地图之外' };
   }
-  const aim = coveredCellsFor(support, game.config.units[support.type], 'healShape', { q, r }, healRangeFor(game, support));
+  const projection = projectPlanQueue(game, owner);
+  const from = projectedPosition(game, projection, supportId);
+  if (!from) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
+  const aim = coveredCellsFor(from, game.config.units[support.type], 'healShape', { q, r }, healRangeFor(game, support));
   if (!aim) {
     return { ok: false, code: 'invalid_heal', message: `该单位的治疗范围覆盖不到 (${q},${r})` };
-  }
-  const spec = game.config.units[support.type];
-  if (spec && (isArtilleryDanger(game, support)
-    || aim.cells.some(cell => isInBounds(game, cell.q, cell.r) && isArtilleryDanger(game, cell)))) {
-    return { ok: false, code: 'invalid_heal', message: '炮火区内无法治疗' };
-  }
-  const coveredFriend = aim.cells.some(cell =>
-    game.units.some(unit => unit.alive && unit.owner === owner && unit.q === cell.q && unit.r === cell.r));
-  if (!coveredFriend) {
-    return { ok: false, code: 'invalid_heal', message: '覆盖范围内没有友方单位' };
   }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
@@ -361,25 +426,34 @@ export function queueDemolishAction(
   if (unit.type !== 'heavy') {
     return { ok: false, code: 'invalid_demolish', message: '只有重装单位可以拆除地形' };
   }
-  const queue = queueOf(game, owner);
-  if (unitAlreadyPlanned(queue, unitId)) {
-    return { ok: false, code: 'invalid_demolish', message: '该单位本轮已有计划动作' };
-  }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
-  if (hexDistance(unit, { q, r }) > 1) {
-    return { ok: false, code: 'invalid_demolish', message: '目标必须相邻' };
-  }
   if (!isInBounds(game, q, r)) {
     return { ok: false, code: 'invalid_demolish', message: '目标必须在地图范围内' };
   }
-  if (getTerrain(game, q, r) !== 'blocker') {
+  const projection = projectPlanQueue(game, owner);
+  const from = projectedPosition(game, projection, unitId);
+  if (!from) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
+  if (hexDistance(from, { q, r }) > 1) {
+    return { ok: false, code: 'invalid_demolish', message: '目标必须相邻' };
+  }
+  // 计划期只确认目标当前（按投影）是障碍；是否已被同一步的其他爆破清掉，
+  // 以及格上是否有单位，留到结算判定。
+  if (projectedTerrain(game, projection, q, r) !== 'blocker') {
     return { ok: false, code: 'invalid_demolish', message: '目标地形不是障碍' };
   }
-  if (getCellOccupant(game, q, r) !== null) {
-    return { ok: false, code: 'invalid_demolish', message: '目标格已有单位' };
-  }
   return enqueue(game, owner, { id: randomUUID(), type: 'demolish', unitId, q, r });
+}
+
+// ---------------------------------------------------------------- wait
+
+/** 待命：占 1 个行动点，不做任何事，用于把后续动作对齐到更晚的行动点。 */
+export function queueWaitAction(game: GameState, owner: PlayerId): Result<PendingAction> {
+  const ready = requirePlanning(game, owner);
+  if (!ready.ok) return ready;
+  const budget = checkBudget(game, owner);
+  if (budget) return budget;
+  return enqueue(game, owner, { id: randomUUID(), type: 'wait' });
 }
 
 // ---------------------------------------------------------------- 撤回 / 清空 / 确认

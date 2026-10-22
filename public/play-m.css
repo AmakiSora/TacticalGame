@@ -2083,6 +2083,7 @@ body.player-m-shell #m-data-mounts { display: none !important; }
 .plan-kind-heal .plan-num { background: #50dcb4; }
 .plan-kind-deploy .plan-num { background: #f0d25a; }
 .plan-kind-demolish .plan-num { background: #ffaa46; }
+.plan-kind-wait .plan-num { background: #9aa7b2; }
 .plan-revoke { border: 1px solid rgba(214, 90, 74, .55); background: transparent; color: #d65a4a; border-radius: 5px; padding: 2px 10px; font-size: 11px; cursor: pointer; }
 .plan-revoke:hover, .plan-revoke:active { background: rgba(214, 90, 74, .18); }
 .plan-empty { color: #7c8ba1; font-size: 12px; padding: 2px 0; }
@@ -2097,7 +2098,13 @@ body.player-m-shell #m-data-mounts { display: none !important; }
 }
 .plan-order-btn:active:not(:disabled) { background: rgba(148, 163, 184, .18); color: #e8f0f8; }
 .plan-order-btn:disabled { opacity: .3; }
-.plan-tools { margin-top: 8px; }
+.plan-tools { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.plan-hint { margin: 2px 0 6px; color: #7c8ea3; font-size: 10px; line-height: 1.4; }
+.plan-wait {
+  flex: 1 1 100%; border: 1px solid rgba(148, 163, 184, .4); background: transparent;
+  color: #b8c6d6; border-radius: 6px; padding: 8px 10px; font-size: 12px; cursor: pointer;
+}
+.plan-wait:active { background: rgba(148, 163, 184, .14); }
 .plan-clear-all {
   width: 100%; border: 1px solid rgba(214, 90, 74, .45); background: transparent;
   color: #d68a7a; border-radius: 6px; padding: 8px 10px; font-size: 12px; cursor: pointer;

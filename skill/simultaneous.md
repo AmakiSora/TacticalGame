@@ -12,22 +12,27 @@ snapshots — re-read `config.units` and `config.balance` before acting.
 
 Core loop difference: there is **no turn order**. Every round all players secretly queue
 actions in a **planning phase**; once every living player commits (or the host forces),
-the server resolves **all queues strictly simultaneously**. `turn.currentPlayerId` is
-always `null`; your signal to act is: `phase === "active"` and `plan.committed` does not
-include you (same condition `wait-turn.mjs` exit 0 uses).
+the server resolves the queues **in action-point steps**: everyone's 1st queued action
+settles at once, then everyone's 2nd, and so on. `turn.currentPlayerId` is always `null`;
+your signal to act is: `phase === "active"` and `plan.committed` does not include you
+(same condition `wait-turn.mjs` exit 0 uses).
 
 ## The round loop
 
 1. `wait-turn.mjs` exits 0 → your planning window is open. `GET /api/games/:id`, study the board.
-2. Queue actions one by one (they do **not** execute): `/deploy`, `/move`, `/attack`, `/heal`, `/demolish`.
+2. Queue actions one by one (they do **not** execute): `/deploy`, `/move`, `/attack`, `/heal`, `/demolish`, `/plan/wait`.
+   - **Queue position is the action point.** The 1st entry settles at step 1, the 2nd at step 2, and so on. A unit may appear in several steps (move at step 1, attack at step 2, …); only one action per player per step.
    - Every response returns `{ ok, queued, queue }` — `queue` is your current plan (only you can see it).
-   - Deploy origins follow the standard rule: your HQ **or** an owned CP, into an adjacent empty
+   - `POST /api/games/:id/plan/wait` (empty body) appends a **wait** entry: it costs 1 AP and does nothing, so you can delay a key action to a later step.
+   - Deploy origins follow the standard rule: your HQ **or** an owned CP, into an adjacent
      plain cell. A map may set `balance.deployFromHq: false` — the HQ is then **not** legal as
      `fromId` (plan-time rejection `invalid_deploy`), only owned CPs are. Per-kind deploy bans
      (`balance.controlPointTypes.<kind>.canDeploy: false`) apply the same way — owned CPs of such
-     kinds are not legal `fromId`.
+     kinds are not legal `fromId`. Whether the target cell is currently occupied is only checked at
+     settlement (it may be vacated earlier in the round).
    - Made a mistake? `POST /api/games/:id/plan/revoke` with `{ "actionId": ... }` removes one queued action;
-     `POST /api/games/:id/plan/clear` empties the whole plan. Free until you commit.
+     `POST /api/games/:id/plan/clear` empties the whole plan. Free until you commit. Revoking shifts later
+     steps up.
 3. `POST /api/games/:id/end-turn` = **commit and lock**. Response `{ committed: true, resolved, roundNumber }`.
    - After committing: further queueing returns `403 not_your_turn`; committing again returns `409 already_committed`.
    - When the **last** living player commits, `resolved: true` and the server resolves the round immediately.
@@ -46,15 +51,27 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
 
 ## Hard rules (differ from sequential modes)
 
-- **One action per unit per round** — a unit may queue exactly ONE of: move, attack, heal
-  (support), demolish (heavy). No move-then-attack combos. Queueing a second action for the
-  same unit is rejected (`invalid_*`, "unit already has a planned action this round").
+- **Queue position = action point**: entry 1 settles at step 1, entry 2 at step 2, and so on.
+  Every living player's step-k action settles at the same time; nobody starts step k+1 until
+  step k is fully resolved. Each queued action (including `wait`) costs 1 AP; queue length ≤
+  `config.balance.actionsPerTurn` (`standoff`: **5**, `molten-throne`: **4**; always use the live value).
+  In simultaneous mode `turn.currentPlayerId` and `turn.currentOwner` are always `null`; do not use
+  `turn.actionsUsed` — use `plan.myQueue.length`.
+- **A unit may act in several steps**: e.g. move at step 1 and attack at step 2, or move → attack →
+  move across three steps. Each step still holds at most one action per player, and a unit can
+  only have one action in a given step. Deployed units have no unit id to reference during planning,
+  so they cannot be given further actions in the round they appear.
+- **Failure cascade**: if a unit's earlier action hard-fails (move blocked/occupied, invalid target,
+  unit gone, …), every later queued action of that unit in this round is **void** and still costs its
+  AP (`action_failed`, reason `previous_action_failed`). Missed attacks and heals with nobody to heal
+  are not hard failures and do not void later steps.
 - **Attacks aim at a cell/direction, not a unit**: `POST /attack { "attackerId": "...", "q": 3, "r": 0 }`.
-  What you may click depends on the unit's configured `attackShape` in `config.units`
-  (see the subsection for your `game.mapId`; units with no `attackShape` default to
+  Plan-time range/shape is checked from the attacker's **projected** position (after its earlier queued
+  moves), so move-then-attack works. What you may click depends on the unit's configured `attackShape`
+  in `config.units` (see the subsection for your `game.mapId`; units with no `attackShape` default to
   `single` = any cell within `attackRange`):
-  - `single` — one cell within `attackRange`. At resolution the shot hits whatever **enemy**
-    unit or enemy HQ occupies that cell after all moves/deploys settle: an enemy that was there
+  - `single` — one cell within `attackRange`. At settlement the shot hits whatever **enemy**
+    unit or enemy HQ occupies that cell after this step's moves/deploys settle: an enemy that was there
     at plan time and moves away → **miss**; an empty cell an enemy moves into → **hit**
     (prediction fire); friendly/own entity or still-empty cell → no effect. No friendly fire.
   - `line` (infantry) — the clicked cell must lie on one of the 6 straight rays from the
@@ -65,47 +82,40 @@ include you (same condition `wait-turn.mjs` exit 0 uses).
   - `arc` (heavy) — click an adjacent cell to pick a direction; the shot covers that cell and
     its two adjacent neighbours (3 cells around the attacker). Sweeps clumped enemies.
   - `attackLock` (ranger) — if an **enemy unit** stands on the clicked cell at plan time, the
-    shot **locks onto it**: at resolution it hits that unit wherever it ended up, as long as it
+    shot **locks onto it**: at settlement it hits that unit wherever it ended up, as long as it
     did not escape the attacker's `attackRange` bubble; escaping the bubble is the only dodge
     (`missed`, reason `target_escaped`). Locked shots on movers are the anti-kite tool.
-  - Attack events carry `shape` (`single/line/arc`) and `locked: true` for lock shots.
-- **Destination conflicts fail for everyone**: if two or more moves/deploys from ANY players
-  claim the same cell, **all of them fail** (`action_failed`, reason `destination_conflict`).
-  Failed attempts are NOT refunded (AP spent, no supplies deducted for failed deploys).
-  Every failed, missed, or fizzled queued action still consumes its queue slot/AP. Failed deploys
-  do not deduct supplies; failed moves, attacks, heals, and demolishes are not refunded. Common
-  resolution reasons include `destination_conflict`, `unit_gone`, `out_of_range`,
-  `already_healthy`, `invalid_target`, and `target_gone`.
-  Your own queue cannot claim the same cell twice (rejected at queue time with `cell_occupied`).
-- **Movement paths use the plan-time board**: every unit (including enemies that might move)
-  blocks pathing, and the destination must be empty at plan time. No swap/chase-through tricks.
-- **Demolish changes terrain only after movement**: the newly cleared cell is not walkable this round.
+  - Attack events carry `shape` (`single/line/arc`), `locked: true` for lock shots, and the step number.
+- **Arrival rules within one step**: all moves/deploys of that step are declared together.
+  Two or more arrivals on the same cell all fail (`destination_conflict`). An arrival fails if the
+  destination is still a blocker (`destination_blocked`) or is occupied by a headquarters / a unit
+  that is not moving out this step (`destination_occupied`). Because the step resolves **departures
+  first**, a unit may enter a cell vacated in the same step; swaps and chains are allowed. If a
+  vacating move fails, arrivals that depended on that cell fail too. Failed attempts are NOT
+  refunded (AP spent, no supplies deducted for failed deploys). Every failed, missed, or fizzled
+  queued action still consumes its step/AP.
+- **Movement range uses terrain-only path search at plan time**: water/blocker cells block the
+  path; units and headquarters do **not** block it. The destination may be occupied when you queue
+  it — settlement decides whether it was vacated in time. You cannot queue a destination beyond
+  `moveRange` or one that needs to cross water/blockers (unless your own earlier demolish cleared it).
+- **Demolish changes terrain from the next step on**: a blocker cleared at step k is walkable at step k+1.
 - **Heals are area effects aimed at a cell/direction**: `POST /heal { "supportId": "...", "q": 1, "r": 0 }`
   (NOT `targetId` — that is the sequential-mode body). The coverage shape comes from
   `healShape` in `config.units` (`standoff` support: `arc`; `molten-throne` support has no
-  `healShape`, so `single`; default is `single`). Queueing requires at least one living
-  friendly unit on the covered cells at plan time. At resolution every **wounded** friendly on
-  the final covered cells receives its own heal roll; if targets moved off the coverage the
-  heal fizzles (`action_failed`, reason `out_of_range`), and if everyone left on it is at full
-  HP the reason is `already_healthy`.
-- **Damage and heals settle as simultaneous net HP**: target HP = HP + heals − all incoming
-  damage; survives if > 0. Two units attacking each other's cells can kill each other in the
-  same round; an attacker that dies still fires its own shot.
-- **Action points**: every queued action costs 1 AP. Use `plan.myQueue.length` and
-  `config.balance.actionsPerTurn` to count remaining AP; do not use `turn.actionsUsed`.
-  In simultaneous mode `turn.currentPlayerId` and `turn.currentOwner` are always `null`
-  (`turn.currentPlayerId/currentOwner` 始终为 `null`).
-  Queue length ≤ `config.balance.actionsPerTurn` (`standoff`: **5**, `molten-throne`: **4**;
-  always use the live value). Deployed units cannot act in the round they appear (deploy is their activation).
-
-- **Deterministic settlement phases**: queue-list order is not execution priority
-  (队列列表顺序不代表执行优先级). All players'
-  inputs are locked first, then the server resolves fixed phases in the opening `turnOrder` when a
-  same-phase tie needs an order, so replays are deterministic. The phases are:
-  deployment declarations/generation → movement → demolish → attacks and net healing →
-  deaths/elimination → control-point capture → round adjudication → comeback supplies → next-round
-  income and repair. Event order may therefore differ from each player's queue order. Simultaneous
-  means simultaneous input, not random or phase-less settlement.
+  `healShape`, so `single`; default is `single`). Plan-time only checks shape/range from the support's
+  projected position. At settlement every **wounded** friendly on the final covered cells receives its
+  own heal roll; if targets moved off the coverage the heal fizzles (`out_of_range`), if everyone left
+  is at full HP the reason is `already_healthy`, and healing in an artillery danger zone fizzles with
+  reason `artillery_zone`.
+- **Damage and heals settle as simultaneous net HP within each step**: target HP = HP + heals − all
+  incoming damage; survives if > 0. Two units attacking each other's cells can kill each other in the
+  same step; an attacker that dies in the step still fires its own shot.
+- **Deterministic step phases**: queue-list order is execution priority by step, and within a step the
+  server resolves fixed sub-phases in the opening `turnOrder` when a tie needs an order, so replays are
+  deterministic. Each step: cascade check → deployments and movements (arrival solver) → demolish →
+  attacks and net healing → deaths/elimination. After the last step: control-point capture → round
+  adjudication → comeback supplies → next-round income and repair. `round_resolved` carries a `steps`
+  count and each outcome carries its `step`.
 - **Income is symmetric**: round 1 has NO income; from round 2 on, every living player receives
   income + repair-CP healing at the round boundary, all at once.
 - **Capture**: at the end of resolution, any of your `canCapture` units standing on a CP you do
@@ -189,17 +199,19 @@ Before queuing each action:
 
 - Read unit **instance** stats from this map's config (`config.units`), not memory — and do not
   reuse another map's roster.
-- Count your queue vs `actionsPerTurn`; each action = 1 AP, failed or not.
-- One action per unit — pick each unit's single best contribution.
-- Do not queue two of your own moves/deploys onto the same destination cell.
-- Attack ranges/coverage are measured from the attacker's **current** hex (it will not move
-  this round); check the unit's `attackShape` before picking a cell.
+- Count your queue vs `actionsPerTurn`; each action (including `wait`) = 1 AP, failed or not.
+- Remember the queue is a timeline: entry N settles with everyone else's entry N. Put setup moves
+  before the attacks/heals that depend on them; use `wait` to delay when you need a later step.
+- A unit may appear several times, but if its earlier action hard-fails the rest of that unit's
+  entries are void (and still cost AP). Keep contingency moves on other units.
+- Attack ranges/coverage are measured from the attacker's **projected** hex after its earlier
+  queued moves; check the unit's `attackShape` before picking a cell.
 - Lock every shot you can: rangers clicking a cell an enemy occupies NOW cannot be dodged
   inside the range bubble. Infantry lines cover the enemy's straight escape lanes; heavy arcs
   punish clumps around CPs and choke cells. (On maps without these shapes, all shots are
   `single` — check the map subsection.)
 - Keep supports adjacent to the line: arc heals only cover the 3 cells around the aim
-  direction, and targets must still be on them at resolution. On maps with the default
+  direction, and targets must still be on them at settlement. On maps with the default
   `single` heal shape, aim directly at the wounded unit's cell.
 - Commit early when your plan is set; the round only resolves when everyone has.
 
@@ -208,7 +220,7 @@ Before queuing each action:
 Unless the user asks for a different style:
 
 1. Read the previous `round_resolved` results: your misses reveal enemy movement patterns;
-   `action_failed destination_conflict` cells reveal contested destinations.
+   `action_failed destination_conflict` / `destination_occupied` cells reveal contested destinations.
 2. **Lethal shots first**: ranger **locks** on killable enemies (undodgeable inside the
    bubble); infantry lines along the enemy's likely retreat lane; heavy arcs on clumped
    killables. On maps without lock/line/arc, concentrate `single` shots on the best target.
@@ -217,17 +229,20 @@ Unless the user asks for a different style:
 4. **Zone denial**: sweep contested CP cells / choke cells where enemy capturers must stand —
    area shapes make standing there costly even if they dodge one hex.
 5. **Heal** the unit most likely to be focused (net-HP can save it through the volley).
-6. **Deploy** to hold or contest (new unit doubles as a body-block this round).
-7. **Move** capturers onto CPs; move threatened units off cells enemies will predictably shell;
-   remember enemies see YOUR board too — avoid the obvious hex.
-8. **Demolish** when a blocker removal opens future lanes (effect lands after this round's moves).
+6. **Deploy** to hold or contest (new unit doubles as a body-block; it cannot be referenced again
+   this round).
+7. **Move** capturers onto CPs; vacate cells for your own later steps; move threatened units off
+   cells enemies will predictably shell; remember enemies see YOUR board too — avoid the obvious hex.
+8. **Demolish** when a blocker removal opens a lane for a later step (the terrain lands next step).
 9. Commit (`/end-turn`) when the queue is set — do not hold the table hostage.
 
 ## Pre-commit sanity pass
 
-- Queue length ≤ AP budget; every queued action is for a different unit (or deploy).
-- No duplicate destinations within your own queue.
+- Queue length ≤ AP budget; remember one action per player per step.
+- Check the step order: setup moves (or `wait`) must come before the actions that depend on them.
 - Every attack cell matches that attacker's shape (ray cell for `line`, adjacent for `arc`,
-  in-range for `single`); heals aim at adjacent cells whose arc still covers wounded allies
-  after their likely move.
+  in-range for `single`) from its **projected** position; heals aim at cells whose arc still
+  covers wounded allies after their likely move.
+- Occupied destination cells are allowed, but they fail unless vacated earlier in the round; do
+  not rely on an enemy moving out at the same step unless you are deliberately swapping.
 - You are not stacking your whole army into cells enemies can predictably shell.

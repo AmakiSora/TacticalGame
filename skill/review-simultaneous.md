@@ -1,7 +1,7 @@
 # TacticalGame 经验复盘规范：同时回合模式
 
 **版本:** 3.1（V3）  
-**模式:** `simultaneous`（秘密计划、全员确认、严格同时结算）  
+**模式:** `simultaneous`（秘密计划、全员确认、按行动点逐步同时结算）
 **最后更新:** 2026-10-21
 
 本文件只适用于 `game_start.payload.config.mode === "simultaneous"`（当前内置地图为
@@ -15,7 +15,7 @@
 
 每局必写，按自己的席位视角逐一区分对手；先读 `game_start`、中间事件和
 `game_over.payload.rankings`，所有数字以本局配置为准。用“第 N 轮 / 计划阶段”描述输入，用
-`round_resolved` 描述统一结算后的结果；不能把队列顺序当成执行优先级。统计不了就明确写无法可靠统计，必须引用历史 `gameId` 或文件名。
+`round_resolved` 描述按行动点逐步结算后的结果；队列顺序就是行动点顺序，同一行动点内没有先后。统计不了就明确写无法可靠统计，必须引用历史 `gameId` 或文件名。
 
 ### 产物与命名
 
@@ -25,16 +25,16 @@
 ## 二、同时回合的核心循环
 
 1. 计划窗口打开：读取公开棋盘和自己的 `plan.myQueue`；其他玩家的队列内容不可见。
-2. 为每个单位最多排一个动作：`deploy`、`move`、`attack`、`heal`、`demolish`；每个排队动作消耗1 AP，队列长度不能超过 `config.balance.actionsPerTurn`。部署出的单位本轮不能再行动。
+2. 队列位置就是行动点：第 N 条与所有玩家的第 N 条同时结算。每个排队动作（含 `wait` 待命）消耗 1 AP，队列长度不能超过 `config.balance.actionsPerTurn`；同一单位可跨行动点多次行动，但前一条硬失败后该单位后续动作作废（`previous_action_failed`）。
 3. `/plan/revoke` 或 `/plan/clear` 在提交前可撤回；`/end-turn` 是提交并锁定，不是立即执行。
-4. 全部存活玩家提交（或房主 `host/force-resolve`）后统一结算；读取 `round_resolved.results` 的 `executed`、`failed`、`missed`、`fizzled` 及原因，再进入下一轮。每个结果条目带 `actionId`；`failed`/`fizzled` 还带 `unitId` 和 `detail`（`unitType`、`fromQ/fromR`、目标 `q/r`），`missed` 带 `unitId` 和 `detail.attackerId`，可直接定位到具体单位。
+4. 全部存活玩家提交（或房主 `host/force-resolve`）后按行动点逐步结算；读取 `round_resolved.results` 的 `step`、`executed`、`failed`、`missed`、`fizzled` 及原因，再进入下一轮。每个结果条目带 `actionId`；`failed`/`fizzled` 还带 `unitId` 和 `detail`（`unitType`、`fromQ/fromR`、目标 `q/r`），`missed` 带 `unitId` 和 `detail.attackerId`，可直接定位到具体单位。
 5. 一旦结算开始，不得再撤回本轮计划；若发生淘汰或 `game_over`，停止行动并记录结果。
 
-### 固定结算阶段（复盘必须按此解释事件顺序）
+### 固定结算步骤（复盘必须按此解释事件顺序）
 
-部署声明/生成 → 移动 → 拆除地形 → 攻击与净治疗 → 死亡/淘汰 → 占领据点 → 轮次裁决 → 追赶补给 → 下一轮收入与维修。
+每个行动点内部：级联预检 → 部署/移动（先移出、再移入的到达判定）→ 爆破 → 攻击与净治疗 → 死亡/淘汰。全部行动点结束后：占领据点 → 轮次裁决 → 追赶补给 → 下一轮收入与维修。
 
-队列列表顺序不是优先级；同阶段需要打破平局时按开局 `turnOrder` 的确定性顺序处理。
+同一行动点内需要打破平局时按开局 `turnOrder` 的确定性顺序处理；队列顺序是行动点顺序，同一行动点内没有“队列先后”。
 
 ## 三、同时模式的战术重点
 
@@ -98,7 +98,7 @@
 比较计划命中率、冲突格、AP浪费、中央据点控制、HQ伤害和最终分差，引用具体对局文件。
 
 ## 总结
-> **核心口诀：{例如“每单位只押一个动作，先想敌人会走哪格再提交”}**
+> **核心口诀：{例如“队列位置就是行动点，先铺路再出手；前一步失手，后续全作废”}**
 **一句话总结：{加粗的一句话}**
 ```
 
@@ -107,11 +107,11 @@
 ## 六、同时回合模式质量检查
 
 - [ ] 文件命名、作者 agent/模型名、元数据、排名、结束原因与 `game_over` 一致。
-- [ ] 明确写出 `turn.currentPlayerId/currentOwner` 为 `null`、计划阶段、提交锁定和统一结算。
+- [ ] 明确写出 `turn.currentPlayerId/currentOwner` 为 `null`、计划阶段、提交锁定和按行动点分步结算。
 - [ ] `host/force-resolve`、`turn_skipped` 等管理操作与正常的同时结算结果分开记录。
-- [ ] 没有把队列顺序当执行顺序；按固定结算阶段解释 `round_resolved`。
-- [ ] 每单位最多一个动作、每动作1 AP；记录失败/落空/失效及 AP/补给是否扣除。
-- [ ] 分析预测攻击、`attackShape`、`attackLock`、destination conflict、净HP和区域治疗。
+- [ ] 按行动点解释 `round_resolved` 的 `step`；同一行动点内按“先移出、再移入”和固定子阶段解释事件顺序。
+- [ ] 记录失败/落空/失效及 AP/补给是否扣除；说明 `previous_action_failed` 造成的作废链。
+- [ ] 分析预测攻击、`attackShape`、`attackLock`、同一步腾格/交换、`destination conflict`、净HP和区域治疗。
 - [ ] 对手计划内容只写公开可推断的信息，不声称 API 暴露了秘密队列。
 - [ ] 有收入支出、HQ/据点（流量+期末）/军力/补给/`killValue` 完整账本和计划质量统计。
 - [ ] 引用历史、给出正确做法与触发条件；第一名有失误，平局有破局动作，一句话总结齐全。

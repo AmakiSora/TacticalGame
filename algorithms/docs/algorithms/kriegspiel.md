@@ -65,7 +65,7 @@
 
 ### 4. 种子计划与采样（`generateSeedPlans`）
 
-一份 `greedyPlan`（按静态分降序、满足「一单位一动作 / 目的格互不冲突 / 预算 / 部署花费」约束逐个纳入）+ K−1 份 `sampledPlan`（对 top 候选做 softmax 采样，温度 `sampleTemp`），按排序签名去重，得到多样化的初始计划集合。
+一份 `greedyPlan`（按静态分降序、满足算法自身的「一单位一动作 / 目的格互不冲突 / 预算 / 部署花费」保守约束逐个纳入）+ K−1 份 `sampledPlan`（对 top 候选做 softmax 采样，温度 `sampleTemp`），按排序签名去重，得到多样化的初始计划集合。引擎已改为按行动点分步结算，本算法的镜像模拟器尚未适配（后续任务）。
 
 ### 5. rollout 打分（`scorePlan`）
 

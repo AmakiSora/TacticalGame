@@ -48,6 +48,7 @@ function runAimPreview(
     myPlayer: opts.myPlayer ?? 'player_a',
     gameConfig: { balance: opts.balance ?? { damageVarianceRange: 3, minimumDamage: 1, healVarianceRange: 6 } },
     isSimultaneous: () => opts.simultaneous,
+    projectedUnitOrigin: (unit: { q: number; r: number }) => ({ q: unit.q, r: unit.r }),
     shapeAimFor: (_unit: unknown, _kind: string, q: number, r: number) => {
       if (opts.aimCells === null) return null;
       if (opts.aimCells) return { cells: opts.aimCells };
@@ -157,6 +158,8 @@ describe('attack preview on player clients', () => {
         interactionMode: 'idle',
         rangeHighlights: [],
         playback: { isActive: () => false },
+        isSimultaneous: () => false,
+        projectedUnitOrigin: (unit: { q: number; r: number }) => ({ q: unit.q, r: unit.r }),
         gameConfig: {},
         window: { BoardInspect: { rangeHintFor: () => ({ kind: 'attack', cells: [{ q: 1, r: 0 }] }) } },
         ...overrides,

@@ -482,6 +482,12 @@ function applyEvent(s, ev) {
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
       break;
     }
+    case 'wait': {
+      recordActionPoint(s, p.owner, p);
+      recordActionMerit(s, p.owner, ev.type, p);
+      if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
+      break;
+    }
     case 'unit_death': {
       const u = s.units.get(p.unitId);
       if (u) u.alive = false;
@@ -1007,6 +1013,7 @@ const EVENT_LABELS = {
   round_start: '轮次开始',
   round_resolved: '同时结算',
   plan_committed: '计划已确认',
+  wait: '待命',
   action_failed: '动作失败',
   headquarters_destroyed: '指挥部被毁',
   player_eliminated: '玩家淘汰',
@@ -1053,9 +1060,10 @@ function formatEventShort(ev) {
     case 'round_start': return `第 ${p.roundNumber || '?'} 轮计划阶段开始`;
     case 'round_resolved': return `第 ${p.roundNumber || '?'} 轮同时结算完毕`;
     case 'plan_committed': return `${playerName(p.playerId)} 已确认本回合计划`;
+    case 'wait': return `${playerName(p.owner)} 第 ${p.actionsUsed} 个行动点待命`;
     case 'action_failed': {
-      const failedLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破' }[p.type] || '动作';
-      const failedReason = { destination_conflict: '目标格撞车', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', out_of_range: '超出射程', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
+      const failedLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破', wait: '待命' }[p.type] || '动作';
+      const failedReason = { destination_conflict: '目标格撞车', destination_blocked: '目标地形不可用', destination_occupied: '目标格仍被占用', previous_action_failed: '前一步失败，后续作废', artillery_zone: '炮火区内无法治疗', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', out_of_range: '超出射程', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
       const unitLabel = p.unitType ? `${UNIT_NAMES[p.unitType] || p.unitType}` : '';
       const from = p.detail && typeof p.detail.fromQ === 'number'
         ? `(${p.detail.fromQ},${p.detail.fromR})` : '';

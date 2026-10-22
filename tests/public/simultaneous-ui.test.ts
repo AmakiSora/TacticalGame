@@ -71,8 +71,9 @@ describe('simultaneous mode UI', () => {
   it('lets players queue wait steps and multi-action plans', () => {
     for (const file of playerClients) {
       const source = read(file);
-      expect(source).toContain("case 'wait': return { path: 'plan/wait', body: {} }");
       expect(source).toContain('/plan/wait');
+      expect(source).toContain('/plan/reorder');
+      expect(source).not.toContain('planActionRequest');
       expect(source).toContain('plan-wait');
       expect(source).toContain('计划已满');
       expect(source).toContain('第 ${i + 1} 个行动点');

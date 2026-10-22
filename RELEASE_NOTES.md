@@ -18,14 +18,19 @@
 
 - **同时回合/大逃杀规则调整**：删除「每单位每回合仅一个动作」「己方队列内重复目标格入队即拒」限制；移动路径不再把单位/总部视为障碍；同一行动点的目的格冲突仍全部失败；爆破产生的平地从下一步起生效。
 - **结算事件与统计口径**：`deploy / move / attack / heal / demolish / wait / action_failed` 事件携带 `step`（与 `actionsUsed` 一致）；行动点统计按每名玩家的步序单调累计，重启/回放重建兼容。
-- **前端计划面板**：队列条目标注「第 N 个行动点」，重排按钮改为调整结算步骤；单位可反复选择追加动作，移动范围/攻击/治疗预览按队列投影站位计算，当前被占的目的格以橙色提示；玩家与观战端补充 `wait` 事件及新失败原因文案。
+- **前端计划面板**：队列条目标注「第 N 个行动点」，重排按钮改为调用服务端原子接口调整结算步骤；单位可反复选择追加动作，移动范围/攻击/治疗预览按队列投影站位计算，当前被占的目的格以橙色提示；玩家与观战端补充 `wait` 事件及新失败原因文案。
 - **文档**：`skill/simultaneous.md`、`skill/royale.md`、`skill/review-simultaneous.md`、`skill/SKILL.md`、`README.md` 与规则速查同步改写；同时回合 AI 算法档案标注其镜像校验/模拟器仍为旧口径，待后续适配。
+
+### 修复
+
+- **计划重排改为原子操作**：新增 `POST /api/games/:id/plan/reorder`，只接受当前队列的一个排列并按新顺序做一次计划期校验；非法顺序返回 `invalid_plan_order` 且原计划保持不变。前端不再使用 `plan/clear` + 逐条重放入队，避免中途被拒导致半份计划丢失。
+- **撤回后重放校验**：`plan/revoke` 先对剩余队列按新顺序重放计划期校验；若后续动作依赖被撤回的动作（例如攻击只在移动后进入射程），撤回被拒绝并保留原计划，需先撤回依赖动作，避免结算时白烧行动点。
 
 ### 测试与验证
 
 - 新增 `tests/engine/simultaneous-steps.test.ts`，覆盖示例 1–5（逐点推进、移动到总部失败、跨步腾格、敌方腾格后进入、移动失败连锁作废）、同步交换/链式腾格、`wait` 对齐、范围/地形拒绝、同一步部署填格、爆破后移动、阵亡单位后续动作与提前终局。
-- 更新 `tests/engine/simultaneous.test.ts`、`tests/api/simultaneous-api.test.ts`（多动作入队、`/plan/wait`）、`tests/public/simultaneous-ui.test.ts`、`tests/public/plan-tools.test.ts`、`tests/public/playback.test.ts` 与文档断言。
-- `npm run build` 通过；`npm test` 全量通过（110 文件 / 921 例）。
+- 更新 `tests/engine/simultaneous.test.ts`、`tests/api/simultaneous-api.test.ts`（多动作入队、`/plan/wait`、`/plan/reorder` 原子重排与非法顺序保留原计划）、`tests/public/simultaneous-ui.test.ts`、`tests/public/plan-tools.test.ts`、`tests/public/playback.test.ts` 与文档断言。
+- `npm run build` 通过；`npm test` 全量通过（110 文件 / 925 例）。
 
 ## 3.7.5
 

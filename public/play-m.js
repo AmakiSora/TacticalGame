@@ -1970,18 +1970,6 @@ function describePlanAction(a) {
   if (Number.isFinite(a.q) && Number.isFinite(a.r)) return `${typeLabel} → (${a.q}, ${a.r})`;
   return typeLabel;
 }
-/** 把已入队的计划动作还原为重新入队所需的接口请求（重排 = 清空后按新顺序重放）。 */
-function planActionRequest(a) {
-  switch (a?.type) {
-    case 'move': return { path: 'move', body: { unitId: a.unitId, q: a.q, r: a.r } };
-    case 'attack': return { path: 'attack', body: { attackerId: a.attackerId, q: a.q, r: a.r } };
-    case 'heal': return { path: 'heal', body: { supportId: a.supportId, q: a.q, r: a.r } };
-    case 'deploy': return { path: 'deploy', body: { unitType: a.unitType, fromId: a.fromId, q: a.q, r: a.r } };
-    case 'demolish': return { path: 'demolish', body: { unitId: a.unitId, q: a.q, r: a.r } };
-    case 'wait': return { path: 'plan/wait', body: {} };
-    default: return null;
-  }
-}
 let planReordering = false;
 /** 调整计划顺序：队列顺序就是行动点顺序，重排会改变每条动作的结算步骤。 */
 async function reorderPlan(fromIndex, toIndex) {
@@ -1993,14 +1981,8 @@ async function reorderPlan(fromIndex, toIndex) {
   next.splice(toIndex, 0, moved);
   planReordering = true;
   try {
-    if (!await apiAction(`/api/games/${gameId}/plan/clear`, {})) return;
-    for (const a of next) {
-      const req = planActionRequest(a);
-      if (!req || !await apiAction(`/api/games/${gameId}/${req.path}`, req.body)) {
-        toast('重排中途失败，请核对当前计划', 'err');
-        break;
-      }
-    }
+    // 服务端原子重排：只接受当前队列的排列，失败时原计划保持不变。
+    if (!await apiAction(`/api/games/${gameId}/plan/reorder`, { actionIds: next.map(a => a.id) })) return;
     await refreshAdjudication();
     renderSidebar();
     drawBoard();

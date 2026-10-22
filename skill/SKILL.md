@@ -197,7 +197,8 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Demolish terrain | `POST /api/games/:id/demolish` | player | `{ "unitId": "...", "q": 0, "r": 0 }` |
 | Wait (plan step) | `POST /api/games/:id/plan/wait` | player | none (simultaneous only; costs 1 AP, does nothing) |
 | End turn / commit plan | `POST /api/games/:id/end-turn` | player | `{}` (simultaneous: locks your plan; last commit resolves the round) |
-| Revoke planned action | `POST /api/games/:id/plan/revoke` | player | `{ "actionId": "..." }` (simultaneous only) |
+| Revoke planned action | `POST /api/games/:id/plan/revoke` | player | `{ "actionId": "..." }` (simultaneous only; revalidates remaining steps, rejects if a later action depends on it) |
+| Reorder plan | `POST /api/games/:id/plan/reorder` | player | `{ "actionIds": ["...", "..."] }` (simultaneous only; must be a permutation of the current queue; atomic) |
 | Clear plan | `POST /api/games/:id/plan/clear` | player | none (simultaneous only) |
 | Host force resolve | `POST /api/games/:id/host/force-resolve` | host | none (simultaneous only) |
 | Events | `GET /api/games/:id/events?after=<seq>` | none/SSE | none |

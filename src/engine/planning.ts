@@ -97,8 +97,7 @@ export interface PlanProjection {
   actionPositions: Map<string, Position>;
 }
 
-export function projectPlanQueue(game: GameState, owner: PlayerId): PlanProjection {
-  const queue = queueOf(game, owner);
+export function projectPlanQueue(game: GameState, owner: PlayerId, queue: PendingAction[] = queueOf(game, owner)): PlanProjection {
   const positions = new Map<string, Position>();
   const terrain = new Map<string, TerrainType>();
   const actionPositions = new Map<string, Position>();
@@ -265,9 +264,9 @@ export function coveredCellsFor(
 
 // ---------------------------------------------------------------- deploy
 
-function plannedDeploySpend(game: GameState, owner: PlayerId): number {
+function plannedDeploySpend(game: GameState, owner: PlayerId, queue: PendingAction[] = queueOf(game, owner)): number {
   const spec = (action: PendingAction) => game.config.units[action.unitType as UnitType];
-  return queueOf(game, owner)
+  return queue
     .filter(action => action.type === 'deploy')
     .reduce((sum, action) => {
       const unitSpec = spec(action);
@@ -275,6 +274,44 @@ function plannedDeploySpend(game: GameState, owner: PlayerId): number {
       const discount = Math.min(unitSpec.cost, deployDiscountForOrigin(game, owner, action.fromId));
       return sum + unitSpec.cost - discount;
     }, 0);
+}
+
+function checkDeploy(
+  game: GameState,
+  owner: PlayerId,
+  unitType: UnitType,
+  fromId: string,
+  q: number,
+  r: number,
+  queue: PendingAction[],
+): Failure | null {
+  const unitSpec: UnitSpec | undefined = game.config.units[unitType];
+  if (!unitSpec) return { ok: false, code: 'invalid_deploy', message: '未知兵种' };
+  const origin = deployOriginFor(game, owner, fromId);
+  if (!origin) return { ok: false, code: 'invalid_deploy', message: '部署起点无效' };
+  if (isArtilleryDanger(game, origin) || isArtilleryDanger(game, { q, r })) {
+    return { ok: false, code: 'invalid_deploy', message: '炮火区内无法部署' };
+  }
+  if (!isInBounds(game, q, r)) {
+    return { ok: false, code: 'invalid_deploy', message: '部署目标在地图之外' };
+  }
+  if (hexDistance(origin, { q, r }) !== 1) {
+    return { ok: false, code: 'out_of_deploy_range', message: '部署目标必须相邻' };
+  }
+  // 目标是否为 plain 按投影地形判定（自己先前的爆破可能已经清出该格）；是否被
+  // 占用留到结算——同一步腾格后仍然可以部署成功。
+  const projection = projectPlanQueue(game, owner, queue);
+  if (projectedTerrain(game, projection, q, r) !== 'plain') {
+    return { ok: false, code: 'invalid_terrain', message: '部署目标必须是平原地形' };
+  }
+  const discount = Math.min(unitSpec.cost, deployDiscountForOrigin(game, owner, fromId));
+  const actualCost = unitSpec.cost - discount;
+  const resources = game.resources[owner];
+  if (!resources) return { ok: false, code: 'player_eliminated', message: '资源不足' };
+  if (resources.supplies - plannedDeploySpend(game, owner, queue) < actualCost) {
+    return { ok: false, code: 'insufficient_supplies', message: `需要 ${actualCost} 补给` };
+  }
+  return null;
 }
 
 export function queueDeployAction(
@@ -287,53 +324,27 @@ export function queueDeployAction(
 ): Result<PendingAction> {
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
-  const unitSpec: UnitSpec | undefined = game.config.units[unitType];
-  if (!unitSpec) return { ok: false, code: 'invalid_deploy', message: '未知兵种' };
-  const origin = deployOriginFor(game, owner, fromId);
-  if (!origin) return { ok: false, code: 'invalid_deploy', message: '部署起点无效' };
-  if (isArtilleryDanger(game, origin) || isArtilleryDanger(game, { q, r })) {
-    return { ok: false, code: 'invalid_deploy', message: '炮火区内无法部署' };
-  }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
-  if (!isInBounds(game, q, r)) {
-    return { ok: false, code: 'invalid_deploy', message: '部署目标在地图之外' };
-  }
-  if (hexDistance(origin, { q, r }) !== 1) {
-    return { ok: false, code: 'out_of_deploy_range', message: '部署目标必须相邻' };
-  }
-  // 目标是否为 plain 按投影地形判定（自己先前的爆破可能已经清出该格）；是否被
-  // 占用留到结算——同一步腾格后仍然可以部署成功。
-  const projection = projectPlanQueue(game, owner);
-  if (projectedTerrain(game, projection, q, r) !== 'plain') {
-    return { ok: false, code: 'invalid_terrain', message: '部署目标必须是平原地形' };
-  }
-  const discount = Math.min(unitSpec.cost, deployDiscountForOrigin(game, owner, fromId));
-  const actualCost = unitSpec.cost - discount;
-  const resources = game.resources[owner];
-  if (!resources) return { ok: false, code: 'player_eliminated', message: '资源不足' };
-  if (resources.supplies - plannedDeploySpend(game, owner) < actualCost) {
-    return { ok: false, code: 'insufficient_supplies', message: `需要 ${actualCost} 补给` };
-  }
+  const queue = queueOf(game, owner);
+  const failure = checkDeploy(game, owner, unitType, fromId, q, r, queue);
+  if (failure) return failure;
   return enqueue(game, owner, { id: randomUUID(), type: 'deploy', unitType, fromId, q, r });
 }
 
 // ---------------------------------------------------------------- move
 
-export function queueMoveAction(
+function checkMove(
   game: GameState,
   owner: PlayerId,
   unitId: string,
   q: number,
   r: number,
-): Result<PendingAction> {
-  const ready = requirePlanning(game, owner);
-  if (!ready.ok) return ready;
+  queue: PendingAction[],
+): Failure | null {
   const unit = findOwnUnit(game, owner, unitId);
   if (!unit) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
-  const budget = checkBudget(game, owner);
-  if (budget) return budget;
-  const projection = projectPlanQueue(game, owner);
+  const projection = projectPlanQueue(game, owner, queue);
   const from = projectedPosition(game, projection, unitId);
   if (!from) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
   if (from.q === q && from.r === r) return { ok: false, code: 'invalid_move', message: '目标格就是当前所在格' };
@@ -344,10 +355,52 @@ export function queueMoveAction(
   if (!reachable.some(pos => pos.q === q && pos.r === r)) {
     return { ok: false, code: 'invalid_move', message: '目标格无法到达' };
   }
+  return null;
+}
+
+export function queueMoveAction(
+  game: GameState,
+  owner: PlayerId,
+  unitId: string,
+  q: number,
+  r: number,
+): Result<PendingAction> {
+  const ready = requirePlanning(game, owner);
+  if (!ready.ok) return ready;
+  const budget = checkBudget(game, owner);
+  if (budget) return budget;
+  const queue = queueOf(game, owner);
+  const failure = checkMove(game, owner, unitId, q, r, queue);
+  if (failure) return failure;
   return enqueue(game, owner, { id: randomUUID(), type: 'move', unitId, q, r });
 }
 
 // ---------------------------------------------------------------- attack
+
+function checkAttack(
+  game: GameState,
+  owner: PlayerId,
+  attackerId: string,
+  q: number,
+  r: number,
+  queue: PendingAction[],
+): Failure | null {
+  const attacker = findOwnUnit(game, owner, attackerId);
+  if (!attacker) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
+  if (!isInBounds(game, q, r)) {
+    return { ok: false, code: 'invalid_attack', message: '目标格在地图之外' };
+  }
+  // 攻击起点按投影站位计算：同一单位可以先移动、后攻击；若移动最终失败，
+  // 攻击会被失败连锁作废。
+  const projection = projectPlanQueue(game, owner, queue);
+  const from = projectedPosition(game, projection, attackerId);
+  if (!from) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
+  const aim = coveredCellsFor(from, game.config.units[attacker.type], 'attackShape', { q, r }, attacker.attackRange);
+  if (!aim) {
+    return { ok: false, code: 'invalid_attack', message: `该单位的攻击范围打不到 (${q},${r})` };
+  }
+  return null;
+}
 
 export function queueAttackAction(
   game: GameState,
@@ -358,22 +411,15 @@ export function queueAttackAction(
 ): Result<PendingAction> {
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
-  const attacker = findOwnUnit(game, owner, attackerId);
-  if (!attacker) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
   const budget = checkBudget(game, owner);
   if (budget) return budget;
-  if (!isInBounds(game, q, r)) {
-    return { ok: false, code: 'invalid_attack', message: '目标格在地图之外' };
-  }
-  // 攻击起点按投影站位计算：同一单位可以先移动、后攻击；若移动最终失败，
-  // 攻击会被失败连锁作废。
-  const projection = projectPlanQueue(game, owner);
-  const from = projectedPosition(game, projection, attackerId);
-  if (!from) return { ok: false, code: 'unit_not_found', message: '找不到攻击方单位' };
-  const aim = coveredCellsFor(from, game.config.units[attacker.type], 'attackShape', { q, r }, attacker.attackRange);
-  if (!aim) {
-    return { ok: false, code: 'invalid_attack', message: `该单位的攻击范围打不到 (${q},${r})` };
-  }
+  const queue = queueOf(game, owner);
+  const failure = checkAttack(game, owner, attackerId, q, r, queue);
+  if (failure) return failure;
+  const attacker = findOwnUnit(game, owner, attackerId)!;
+  const projection = projectPlanQueue(game, owner, queue);
+  const from = projectedPosition(game, projection, attackerId)!;
+  const aim = coveredCellsFor(from, game.config.units[attacker.type], 'attackShape', { q, r }, attacker.attackRange)!;
   return enqueue(game, owner, { id: randomUUID(), type: 'attack', attackerId, q, r, direction: aim.direction });
 }
 
@@ -383,6 +429,30 @@ export function queueAttackAction(
  * 治疗瞄准格子/方向（覆盖形状由 healShape 配置，默认单格）。计划期只校验形状与
  * 射程；覆盖格内是否有友军、是否有人受伤、是否在炮火区都留到结算判定。
  */
+function checkHeal(
+  game: GameState,
+  owner: PlayerId,
+  supportId: string,
+  q: number,
+  r: number,
+  queue: PendingAction[],
+): Failure | null {
+  const support = findOwnUnit(game, owner, supportId);
+  if (!support) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
+  if (support.type !== 'support') return { ok: false, code: 'invalid_heal', message: '该单位不是支援兵' };
+  if (!isInBounds(game, q, r)) {
+    return { ok: false, code: 'invalid_heal', message: '目标格在地图之外' };
+  }
+  const projection = projectPlanQueue(game, owner, queue);
+  const from = projectedPosition(game, projection, supportId);
+  if (!from) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
+  const aim = coveredCellsFor(from, game.config.units[support.type], 'healShape', { q, r }, healRangeFor(game, support));
+  if (!aim) {
+    return { ok: false, code: 'invalid_heal', message: `该单位的治疗范围覆盖不到 (${q},${r})` };
+  }
+  return null;
+}
+
 export function queueHealAction(
   game: GameState,
   owner: PlayerId,
@@ -392,46 +462,37 @@ export function queueHealAction(
 ): Result<PendingAction> {
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
-  const support = findOwnUnit(game, owner, supportId);
-  if (!support) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
-  if (support.type !== 'support') return { ok: false, code: 'invalid_heal', message: '该单位不是支援兵' };
-  if (!isInBounds(game, q, r)) {
-    return { ok: false, code: 'invalid_heal', message: '目标格在地图之外' };
-  }
-  const projection = projectPlanQueue(game, owner);
-  const from = projectedPosition(game, projection, supportId);
-  if (!from) return { ok: false, code: 'unit_not_found', message: '找不到支援单位' };
-  const aim = coveredCellsFor(from, game.config.units[support.type], 'healShape', { q, r }, healRangeFor(game, support));
-  if (!aim) {
-    return { ok: false, code: 'invalid_heal', message: `该单位的治疗范围覆盖不到 (${q},${r})` };
-  }
   const budget = checkBudget(game, owner);
   if (budget) return budget;
+  const queue = queueOf(game, owner);
+  const failure = checkHeal(game, owner, supportId, q, r, queue);
+  if (failure) return failure;
+  const support = findOwnUnit(game, owner, supportId)!;
+  const projection = projectPlanQueue(game, owner, queue);
+  const from = projectedPosition(game, projection, supportId)!;
+  const aim = coveredCellsFor(from, game.config.units[support.type], 'healShape', { q, r }, healRangeFor(game, support))!;
   return enqueue(game, owner, { id: randomUUID(), type: 'heal', supportId, q, r, direction: aim.direction });
 }
 
 // ---------------------------------------------------------------- demolish
 
-export function queueDemolishAction(
+function checkDemolish(
   game: GameState,
   owner: PlayerId,
   unitId: string,
   q: number,
   r: number,
-): Result<PendingAction> {
-  const ready = requirePlanning(game, owner);
-  if (!ready.ok) return ready;
+  queue: PendingAction[],
+): Failure | null {
   const unit = findOwnUnit(game, owner, unitId);
   if (!unit) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
   if (unit.type !== 'heavy') {
     return { ok: false, code: 'invalid_demolish', message: '只有重装单位可以拆除地形' };
   }
-  const budget = checkBudget(game, owner);
-  if (budget) return budget;
   if (!isInBounds(game, q, r)) {
     return { ok: false, code: 'invalid_demolish', message: '目标必须在地图范围内' };
   }
-  const projection = projectPlanQueue(game, owner);
+  const projection = projectPlanQueue(game, owner, queue);
   const from = projectedPosition(game, projection, unitId);
   if (!from) return { ok: false, code: 'unit_not_found', message: '找不到该单位' };
   if (hexDistance(from, { q, r }) > 1) {
@@ -442,6 +503,23 @@ export function queueDemolishAction(
   if (projectedTerrain(game, projection, q, r) !== 'blocker') {
     return { ok: false, code: 'invalid_demolish', message: '目标地形不是障碍' };
   }
+  return null;
+}
+
+export function queueDemolishAction(
+  game: GameState,
+  owner: PlayerId,
+  unitId: string,
+  q: number,
+  r: number,
+): Result<PendingAction> {
+  const ready = requirePlanning(game, owner);
+  if (!ready.ok) return ready;
+  const budget = checkBudget(game, owner);
+  if (budget) return budget;
+  const queue = queueOf(game, owner);
+  const failure = checkDemolish(game, owner, unitId, q, r, queue);
+  if (failure) return failure;
   return enqueue(game, owner, { id: randomUUID(), type: 'demolish', unitId, q, r });
 }
 
@@ -456,6 +534,84 @@ export function queueWaitAction(game: GameState, owner: PlayerId): Result<Pendin
   return enqueue(game, owner, { id: randomUUID(), type: 'wait' });
 }
 
+// ---------------------------------------------------------------- 重排
+
+function checkAction(game: GameState, owner: PlayerId, action: PendingAction, queue: PendingAction[]): Failure | null {
+  switch (action.type) {
+    case 'deploy':
+      if (!action.unitType || !action.fromId || typeof action.q !== 'number' || typeof action.r !== 'number') {
+        return { ok: false, code: 'invalid_plan_order', message: '部署计划缺少字段' };
+      }
+      return checkDeploy(game, owner, action.unitType, action.fromId, action.q, action.r, queue);
+    case 'move':
+      if (!action.unitId || typeof action.q !== 'number' || typeof action.r !== 'number') {
+        return { ok: false, code: 'invalid_plan_order', message: '移动计划缺少字段' };
+      }
+      return checkMove(game, owner, action.unitId, action.q, action.r, queue);
+    case 'attack':
+      if (!action.attackerId || typeof action.q !== 'number' || typeof action.r !== 'number') {
+        return { ok: false, code: 'invalid_plan_order', message: '攻击计划缺少字段' };
+      }
+      return checkAttack(game, owner, action.attackerId, action.q, action.r, queue);
+    case 'heal':
+      if (!action.supportId || typeof action.q !== 'number' || typeof action.r !== 'number') {
+        return { ok: false, code: 'invalid_plan_order', message: '治疗计划缺少字段' };
+      }
+      return checkHeal(game, owner, action.supportId, action.q, action.r, queue);
+    case 'demolish':
+      if (!action.unitId || typeof action.q !== 'number' || typeof action.r !== 'number') {
+        return { ok: false, code: 'invalid_plan_order', message: '爆破计划缺少字段' };
+      }
+      return checkDemolish(game, owner, action.unitId, action.q, action.r, queue);
+    case 'wait':
+      return null;
+    default:
+      return { ok: false, code: 'invalid_plan_order', message: '未知计划动作' };
+  }
+}
+
+/** 按顺序重放计划期校验；用于重排/撤回后确认剩余队列仍然结构性合法。 */
+function validateQueue(game: GameState, owner: PlayerId, queue: PendingAction[]): Failure | null {
+  const prefix: PendingAction[] = [];
+  for (const action of queue) {
+    const failure = checkAction(game, owner, action, prefix);
+    if (failure) return failure;
+    prefix.push(action);
+  }
+  return null;
+}
+
+/**
+ * 原子重排：只接受当前队列的一个排列，按新顺序做一次计划期校验后整体替换。
+ * 任一条不合法就返回失败且队列保持不变，避免前端“先清空再逐条重放”造成半份计划丢失。
+ */
+export function reorderPlanActions(
+  game: GameState,
+  owner: PlayerId,
+  actionIds: string[],
+): Result<PendingAction[]> {
+  const ready = requirePlanning(game, owner);
+  if (!ready.ok) return ready;
+  const queue = queueOf(game, owner);
+  if (!Array.isArray(actionIds) || actionIds.length !== queue.length) {
+    return { ok: false, code: 'invalid_plan_order', message: 'actionIds 必须覆盖当前计划的全部条目' };
+  }
+  const byId = new Map(queue.map(action => [action.id, action] as const));
+  if (new Set(actionIds).size !== actionIds.length) {
+    return { ok: false, code: 'invalid_plan_order', message: 'actionIds 不能包含重复条目' };
+  }
+  const ordered: PendingAction[] = [];
+  for (const id of actionIds) {
+    const action = byId.get(id);
+    if (!action) return { ok: false, code: 'invalid_plan_order', message: 'actionIds 不属于当前计划' };
+    ordered.push(action);
+  }
+  const failure = validateQueue(game, owner, ordered);
+  if (failure) return failure;
+  game.plan!.queues[owner] = ordered;
+  return { ok: true, data: [...ordered] };
+}
+
 // ---------------------------------------------------------------- 撤回 / 清空 / 确认
 
 export function revokePlanAction(game: GameState, owner: PlayerId, actionId: string): Result<PendingAction[]> {
@@ -464,8 +620,16 @@ export function revokePlanAction(game: GameState, owner: PlayerId, actionId: str
   const queue = queueOf(game, owner);
   const index = queue.findIndex(action => action.id === actionId);
   if (index < 0) return { ok: false, code: 'invalid_move', message: '找不到这条计划' };
-  queue.splice(index, 1);
-  return { ok: true, data: [...queue] };
+  const remaining = queue.filter((_, actionIndex) => actionIndex !== index);
+  // 撤回会让后续动作提前：例如 [move, attack] 撤回 move 后，attack 的投影起点会
+  // 退回原位而变成结构性非法。这里先重放校验，失败则保持原队列不变——不能让玩家
+  // 带着一条注定 out_of_range 的动作进入结算白烧 AP。
+  const failure = validateQueue(game, owner, remaining);
+  if (failure) {
+    return { ok: false, code: failure.code, message: `撤回后剩余计划不合法：${failure.message}（请先撤回依赖它的后续动作）` };
+  }
+  game.plan!.queues[owner] = remaining;
+  return { ok: true, data: [...remaining] };
 }
 
 export function clearPlanActions(game: GameState, owner: PlayerId): Result<PendingAction[]> {

@@ -11,7 +11,7 @@ import { endTurn } from '../engine/engine.js';
 import { commitAndMaybeResolve } from '../engine/simultaneous.js';
 import {
   clearPlanActions, queueAttackAction, queueDeployAction, queueDemolishAction,
-  queueHealAction, queueMoveAction, queueWaitAction, revokePlanAction,
+  queueHealAction, queueMoveAction, queueWaitAction, reorderPlanActions, revokePlanAction,
 } from '../engine/planning.js';
 import type { Result } from '../engine/result.js';
 import type { AuthContext } from './auth.js';
@@ -340,6 +340,50 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
       queued: result.data,
       queue: [...(ctx.game.plan?.queues[ctx.player] ?? [])],
     };
+    const record = scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null;
+    if (!persistWithDegraded(reply, ctx.game)) return;
+    if (record) record.persisted = true;
+    return response;
+  });
+
+  // 原子重排：只接受当前队列的一个排列，非法顺序不会清空或改动原计划。
+  app.post<{ Params: { id: string }; Body: { actionIds?: string[] } }>('/api/games/:id/plan/reorder', async (req, reply) => {
+    const ctx = authenticate(req, reply);
+    if (!ctx) return;
+    if (!isSimultaneousMode(ctx.game.config.mode)) {
+      return reply.code(statusForCode('not_simultaneous_game')).send({ error: '该对局不是同时回合模式', code: 'not_simultaneous_game' });
+    }
+    const rawKey = req.headers['idempotency-key'];
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.trim() ? rawKey.trim() : null;
+    if (idempotencyKey && idempotencyKey.length > 200) {
+      return reply.code(400).send({ error: 'Idempotency-Key 不能超过 200 个字符', code: 'invalid_idempotency_key' });
+    }
+    const scopedKey = idempotencyKey ? scopedIdempotencyKey(ctx.player, idempotencyKey) : null;
+    const bodyHash = scopedKey ? actionBodyHash('plan/reorder', req.body) : null;
+    if (scopedKey && bodyHash) {
+      const replay = findReplay(ctx.game, scopedKey, bodyHash);
+      if (replay) {
+        if ('conflict' in replay) {
+          return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
+        }
+        if (replay.record.persisted !== true) {
+          if (!persistWithDegraded(reply, ctx.game)) return;
+          replay.record.persisted = true;
+        }
+        reply.header('Idempotent-Replay', 'true');
+        return replayWithCurrentQueue(ctx.game, ctx.player, replay.response);
+      }
+    }
+    if (!basicGate(ctx, reply)) return;
+    const actionIds = req.body?.actionIds;
+    if (!Array.isArray(actionIds) || actionIds.some(id => typeof id !== 'string' || id.length === 0)) {
+      return badRequest(reply, '需要提供 actionIds 数组');
+    }
+    const result = reorderPlanActions(ctx.game, ctx.player, actionIds);
+    if (!result.ok) {
+      return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
+    }
+    const response = { ok: true, queue: result.data };
     const record = scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null;
     if (!persistWithDegraded(reply, ctx.game)) return;
     if (record) record.persisted = true;

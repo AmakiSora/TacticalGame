@@ -8,18 +8,6 @@ function read(path: string): string {
 
 const PLAYER_CLIENTS = ['public/play.js', 'public/play-m.js'];
 
-// 计划面板脚本依赖 DOM 全局，无法整体加载；切出真实的 planActionRequest 函数源码执行。
-function loadPlanActionRequest(file: string): (action: Record<string, unknown>) => { path: string; body: Record<string, unknown> } | null {
-  const source = read(file);
-  const start = source.indexOf('function planActionRequest');
-  expect(start, `${file} 应包含 planActionRequest`).toBeGreaterThan(-1);
-  const end = source.indexOf('\n}', start);
-  expect(end, `${file} 中 planActionRequest 缺少收尾括号`).toBeGreaterThan(start);
-  const fnSource = source.slice(start, end + 2);
-  const context = createContext({});
-  return new Script(`(${fnSource})`).runInContext(context) as (action: Record<string, unknown>) => { path: string; body: Record<string, unknown> } | null;
-}
-
 // apiAction 依赖 API / toast / state，切出真实源码后注入最小桩执行。
 function loadApiAction(file: string, postResult: Record<string, unknown>, state: Record<string, unknown>) {
   const source = read(file);
@@ -39,17 +27,21 @@ function loadApiAction(file: string, postResult: Record<string, unknown>, state:
 }
 
 describe('simultaneous plan panel tools', () => {
-  it('rebuilds re-enqueue requests for all six plan action types', () => {
+  it('reorders through the atomic server endpoint without clearing the plan', () => {
     for (const file of PLAYER_CLIENTS) {
-      const build = loadPlanActionRequest(file);
-      expect(build({ type: 'move', unitId: 'u1', q: 2, r: -1 })).toEqual({ path: 'move', body: { unitId: 'u1', q: 2, r: -1 } });
-      expect(build({ type: 'attack', attackerId: 'u2', q: 1, r: 0 })).toEqual({ path: 'attack', body: { attackerId: 'u2', q: 1, r: 0 } });
-      expect(build({ type: 'heal', supportId: 'u3', q: 0, r: 1 })).toEqual({ path: 'heal', body: { supportId: 'u3', q: 0, r: 1 } });
-      expect(build({ type: 'deploy', unitType: 'infantry', fromId: 'cp1', q: 3, r: -1 })).toEqual({ path: 'deploy', body: { unitType: 'infantry', fromId: 'cp1', q: 3, r: -1 } });
-      expect(build({ type: 'demolish', unitId: 'u4', q: 1, r: 1 })).toEqual({ path: 'demolish', body: { unitId: 'u4', q: 1, r: 1 } });
-      expect(build({ type: 'wait' })).toEqual({ path: 'plan/wait', body: {} });
-      expect(build({ type: 'unknown' })).toBeNull();
-      expect(build(null)).toBeNull();
+      const source = read(file);
+      const start = source.indexOf('async function reorderPlan');
+      expect(start, `${file} 应包含 reorderPlan`).toBeGreaterThan(-1);
+      const end = source.indexOf('\n}', start);
+      const body = source.slice(start, end + 2);
+      expect(body).toContain('/plan/reorder');
+      expect(body).toContain('actionIds: next.map(a => a.id)');
+      expect(body).not.toContain('/plan/clear');
+      expect(body).not.toContain('planActionRequest');
+      expect(body).toContain('refreshAdjudication()');
+      // 越界与同位移动直接短路，不发请求。
+      expect(body).toContain('fromIndex === toIndex');
+      expect(body).toContain('planReordering');
     }
   });
 
@@ -85,30 +77,27 @@ describe('simultaneous plan panel tools', () => {
   it('wires clear-all and reorder controls in both player clients', () => {
     for (const file of PLAYER_CLIENTS) {
       const source = read(file);
-      // 全部撤销走服务器 plan/clear；重排 = 清空后按新顺序重放入队。
+      // 全部撤销走服务器 plan/clear；重排走原子 plan/reorder，不再清空重放。
       expect(source, `${file} 应调用 plan/clear`).toContain('/plan/clear');
       expect(source, `${file} 应提供全部撤销按钮`).toContain('plan-clear-all');
       expect(source, `${file} 应提供上移/下移按钮`).toContain('plan-order-btn');
       expect(source, `${file} 重排应走 reorderPlan`).toContain('reorderPlan');
-      expect(source, `${file} 重排重放应使用 planActionRequest`).toContain('planActionRequest');
+      expect(source, `${file} 重排应调用 plan/reorder`).toContain('/plan/reorder');
       // 已确认计划后不允许再改：按钮仅在未确认时渲染。
       expect(source).toContain('iCommitted()');
     }
   });
 
-  it('reorder replays actions in the new order after clearing the queue', () => {
+  it('keeps the original plan when a reorder is rejected', async () => {
     for (const file of PLAYER_CLIENTS) {
-      const source = read(file);
-      const start = source.indexOf('async function reorderPlan');
-      expect(start, `${file} 应包含 reorderPlan`).toBeGreaterThan(-1);
-      const end = source.indexOf('\n}', start);
-      const body = source.slice(start, end + 2);
-      // 先清空、再逐条重放、最后刷新裁决与界面。
-      expect(body.indexOf('plan/clear')).toBeLessThan(body.indexOf('planActionRequest(a)'));
-      expect(body).toContain('refreshAdjudication()');
-      // 越界与同位移动直接短路，不发请求。
-      expect(body).toContain('fromIndex === toIndex');
-      expect(body).toContain('planReordering');
+      const state = { plan: { committed: [] as string[], myQueue: [{ id: 'a', type: 'move' }, { id: 'b', type: 'wait' }] } };
+      const { fn } = loadApiAction(file, {
+        ok: false,
+        status: 400,
+        data: { error: '计划顺序无效', code: 'invalid_plan_order' },
+      }, state);
+      await expect(fn('/api/games/g/plan/reorder', { actionIds: ['b', 'a'] })).resolves.toBe(false);
+      expect(state.plan.myQueue.map(action => action.id)).toEqual(['a', 'b']);
     }
   });
 });

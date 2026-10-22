@@ -5,7 +5,7 @@ import { EventBus } from '../../src/events/bus.js';
 import { buildAdjudicationScores, eliminatePlayer, startGame } from '../../src/engine/engine.js';
 import {
   clearPlanActions, queueAttackAction, queueDemolishAction, queueDeployAction,
-  queueHealAction, queueMoveAction, revokePlanAction,
+  queueHealAction, queueMoveAction, queueWaitAction, reorderPlanActions, revokePlanAction,
 } from '../../src/engine/planning.js';
 import {
   commitAndMaybeResolve, eliminateFromPlanAndMaybeResolve, forceResolveRound,
@@ -121,6 +121,54 @@ describe('simultaneous planning phase', () => {
     expect(queueMoveAction(game, a, infantry.id, 3, 0).ok).toBe(true);
     expect(queueAttackAction(game, a, infantry.id, 4, 1))
       .toMatchObject({ ok: false, code: 'invalid_attack' });
+  });
+
+  it('reorders the queue atomically and rejects a non-permutation', () => {
+    const { game } = createStandoffGame();
+    const a = game.turn.turnOrder[0]!;
+    const infantry = unitAt(game, a, 4, 0);
+    const move = queueMoveAction(game, a, infantry.id, 3, 0);
+    expect(move.ok).toBe(true);
+    expect(queueWaitAction(game, a).ok).toBe(true);
+    const [first, second] = game.plan!.queues[a]!;
+    expect(reorderPlanActions(game, a, [second!.id, first!.id]).ok).toBe(true);
+    expect(game.plan!.queues[a]!.map(action => action.id)).toEqual([second!.id, first!.id]);
+    // 非排列（少一条）必须失败且不改动原队列。
+    expect(reorderPlanActions(game, a, [first!.id]))
+      .toMatchObject({ ok: false, code: 'invalid_plan_order' });
+    expect(game.plan!.queues[a]!.map(action => action.id)).toEqual([second!.id, first!.id]);
+  });
+
+  it('rejects a reorder that makes an attack unreachable', () => {
+    const { game } = createStandoffGame();
+    const a = game.turn.turnOrder[0]!;
+    const scout = game.units.find(unit => unit.owner === a && unit.type === 'scout')!;
+    place(scout, 4, 0);
+    expect(queueMoveAction(game, a, scout.id, 3, 0).ok).toBe(true);
+    expect(queueAttackAction(game, a, scout.id, 2, 0).ok).toBe(true);
+    const [move, attack] = game.plan!.queues[a]!;
+    expect(reorderPlanActions(game, a, [attack!.id, move!.id]))
+      .toMatchObject({ ok: false, code: 'invalid_attack' });
+    expect(game.plan!.queues[a]!.map(action => action.id)).toEqual([move!.id, attack!.id]);
+  });
+
+  it('rejects a revoke that would make a later action structurally invalid', () => {
+    const { game } = createStandoffGame();
+    const a = game.turn.turnOrder[0]!;
+    const scout = game.units.find(unit => unit.owner === a && unit.type === 'scout')!;
+    place(scout, 4, 0);
+    const move = queueMoveAction(game, a, scout.id, 3, 0);
+    const attack = queueAttackAction(game, a, scout.id, 2, 0);
+    expect(move.ok).toBe(true);
+    expect(attack.ok).toBe(true);
+    // [move, attack]：攻击按移动后的位置才成立，撤回 move 必须被拒绝且队列不变。
+    expect(revokePlanAction(game, a, move.data!.id))
+      .toMatchObject({ ok: false, code: 'invalid_attack' });
+    expect(game.plan!.queues[a]!.map(action => action.id)).toEqual([move.data!.id, attack.data!.id]);
+    // 先撤回依赖的 attack，再撤回 move。
+    expect(revokePlanAction(game, a, attack.data!.id).ok).toBe(true);
+    expect(revokePlanAction(game, a, move.data!.id).ok).toBe(true);
+    expect(game.plan!.queues[a]).toHaveLength(0);
   });
 
   it('caps the queue at actionsPerTurn and charges nothing on failure', () => {

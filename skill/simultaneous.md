@@ -31,8 +31,11 @@ your signal to act is: `phase === "active"` and `plan.committed` does not includ
      kinds are not legal `fromId`. Whether the target cell is currently occupied is only checked at
      settlement (it may be vacated earlier in the round).
    - Made a mistake? `POST /api/games/:id/plan/revoke` with `{ "actionId": ... }` removes one queued action;
-     `POST /api/games/:id/plan/clear` empties the whole plan. Free until you commit. Revoking shifts later
-     steps up.
+     `POST /api/games/:id/plan/clear` empties the whole plan; `POST /api/games/:id/plan/reorder` with
+     `{ "actionIds": [...] }` atomically reorders the current queue (must be a permutation; rejected orders
+     leave the plan untouched). Revoking re-validates the remaining steps: if a later action depended on the
+     removed one (e.g. attack only in range after its move), the revoke is rejected and the queue is unchanged —
+     remove the dependent action first.
 3. `POST /api/games/:id/end-turn` = **commit and lock**. Response `{ committed: true, resolved, roundNumber }`.
    - After committing: further queueing returns `403 not_your_turn`; committing again returns `409 already_committed`.
    - When the **last** living player commits, `resolved: true` and the server resolves the round immediately.

@@ -211,6 +211,45 @@ describe('simultaneous mode API', () => {
     }
   });
 
+  it('reorders the plan atomically and keeps the original on rejection', async () => {
+    const { app, gameId, seats } = await createSimultaneousGame();
+    try {
+      const headers = { 'x-player-token': seats[0]!.token };
+      const first = await app.inject({
+        method: 'POST', url: `/api/games/${gameId}/plan/wait`, headers, payload: {},
+      });
+      const second = await app.inject({
+        method: 'POST', url: `/api/games/${gameId}/plan/wait`, headers, payload: {},
+      });
+      expect(first.statusCode).toBe(200);
+      expect(second.statusCode).toBe(200);
+      const [a, b] = (second.json().queue as Array<{ id: string }>).map(action => action.id);
+
+      const reorder = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/plan/reorder`,
+        headers,
+        payload: { actionIds: [b, a] },
+      });
+      expect(reorder.statusCode).toBe(200);
+      expect((reorder.json().queue as Array<{ id: string }>).map(action => action.id)).toEqual([b, a]);
+
+      // 非当前队列的排列：拒绝且不改动原计划。
+      const rejected = await app.inject({
+        method: 'POST',
+        url: `/api/games/${gameId}/plan/reorder`,
+        headers,
+        payload: { actionIds: [a] },
+      });
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json().code).toBe('invalid_plan_order');
+      const state = await getState(app, gameId, seats[0]!.token);
+      expect((state.plan.myQueue as Array<{ id: string }>).map(action => action.id)).toEqual([b, a]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('replays a plan revoke with the same idempotency key', async () => {
     const { app, gameId, seats } = await createSimultaneousGame();
     try {

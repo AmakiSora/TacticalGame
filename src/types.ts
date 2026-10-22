@@ -367,6 +367,7 @@ export type ApiErrorCode =
   | 'unsupported_player_count'
   | 'action_limit_reached'
   | 'invalid_demolish'
+  | 'invalid_plan_order'
   | 'not_simultaneous_game'
   | 'already_committed'
   | 'bot_not_supported'

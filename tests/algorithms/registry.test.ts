@@ -34,6 +34,10 @@ describe('algorithm registry modes', () => {
     expect(destProb?.modes).toEqual(['simultaneous']);
     expect(destProb?.displayName).toBe('落点概率算法');
     expect(getAlgorithmMeta('dest-prob')?.modes).toEqual(['simultaneous']);
+    const matrixEq = listAlgorithmInfo().find(i => i.name === 'matrix-eq');
+    expect(matrixEq?.modes).toEqual(['simultaneous']);
+    expect(matrixEq?.displayName).toBe('矩阵均衡算法');
+    expect(getAlgorithmMeta('matrix-eq')?.modes).toEqual(['simultaneous']);
     expect(getAlgorithmMeta('greedy')?.modes).toEqual(['standard']);
   });
 
@@ -46,6 +50,8 @@ describe('algorithm registry modes', () => {
     expect(algorithmSupportsMode('random-sim', 'standard')).toBe(false);
     expect(algorithmSupportsMode('dest-prob', 'simultaneous')).toBe(true);
     expect(algorithmSupportsMode('dest-prob', 'standard')).toBe(false);
+    expect(algorithmSupportsMode('matrix-eq', 'simultaneous')).toBe(true);
+    expect(algorithmSupportsMode('matrix-eq', 'standard')).toBe(false);
     expect(algorithmSupportsMode('greedy', 'standard')).toBe(true);
     expect(algorithmSupportsMode('greedy', 'simultaneous')).toBe(false);
   });

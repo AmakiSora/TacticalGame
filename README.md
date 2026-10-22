@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`（对峙之地）地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）与 `narrow-road`（狭路相逢）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则。
 
-当前版本：`3.7.4`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`3.7.5`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -304,6 +304,8 @@ python rl/evaluate.py --model rl/models/model.zip
 - **威胁感知算法（Threat）**：效用 AI + 威胁影响图——把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，内置敌方威胁图（落点承伤按敌方行动预算截断），因此集火斩杀、残血避险、走位避炮同时成立；单步决策 p50 0.25ms，实测对 greedy 胜率 70.6%（7 张标准地图 × 40 局）、对 mcts 14:6，为 2 人局最强的内置算法 AI（仅支持标准模式；3-4 人局权重未标定），详细档案见 `algorithms/docs/algorithms/threat.md`
 - **同时随机算法（Random-Sim，仅同时回合模式）**：从所有合法计划动作中随机选择入队（攻击/治疗按形状瞄准格子、一单位一轮一动作、队列长度即行动点），随后提交；同时回合模式的基线算法，详细档案见 `algorithms/docs/algorithms/random-sim.md`
 - **落点概率算法（Destination Probability，仅同时回合模式）**：为每个敌军建立落点概率分布，按"覆盖格上敌军出现概率 × 伤害"做预测射击；把敌军认领概率计入移动/部署成功率以规避同时模式的目的格冲突，并按据点裁定流量与收入计价抢点；实测对 random-sim 在 standoff / molten-throne 各 100 局 **100:0**、零非法动作，场均击杀 3.10 / 0.96，详细档案见 `algorithms/docs/algorithms/dest-prob.md`
+- **兵棋推演算法（Kriegspiel，仅同时回合模式）**：把整份计划放进镜像 `resolveRound` 的单轮结算器真实推演，对多种对手性格做蒙特卡洛 rollout，按「均值 − λ·标准差」选择并爬山精修整份计划；实测对 random-sim **60/60**、对 dest-prob **34/60（56.7%）**，详细档案见 `algorithms/docs/algorithms/kriegspiel.md`
+- **矩阵均衡算法（Matrix Equilibrium，仅同时回合模式）**：把每轮升维成「计划组合 × 计划组合」的矩阵博弈，用镜像结算器计算支付、CFR 自我对弈求均衡混合策略，并从 `round_resolved` 事件史重建敌方计划做实证校正；输出混合策略抽样而非确定性 argmax，实测镜像裁判对 random-sim **30:0**、对 dest-prob **14:16**、对 kriegspiel **8:22**，详细档案见 `algorithms/docs/algorithms/matrix-eq.md`
 
 添加算法 AI 时可自定义玩家名，默认预填所选算法的中文名。
 
@@ -336,7 +338,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, mcts, threat, field, verdict, random-sim, dest-prob） |
+| `--algorithm <name>` | 算法名称（greedy, random, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |

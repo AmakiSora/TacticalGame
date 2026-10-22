@@ -4,6 +4,24 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.7.5
+
+### 新增
+
+- **新增「矩阵均衡算法」（matrix-eq）：同时回合模式的博弈论路线**：把每轮升维成「计划组合 × 计划组合」的矩阵博弈——我方 10 个候选整轮计划（6 种策略人格 + 4 个随机权重）与敌方镜像计划（含从 `round_resolved` 事件史重建的真实计划）逐组合跑镜像结算器算支付，用 CFR 自我对弈求均衡混合，再按 ε=0.15 与「对实证分布的纯最优响应」混合后抽样；`decide` 在每轮首次调用时求解并缓存整轮计划，之后逐动作吐出入队。注册键 `algo_matrix-eq`，`modes: ['simultaneous']`，大厅算法下拉与 `/api/algorithms` 由注册表自动带出；详细档案见 `algorithms/docs/algorithms/matrix-eq.md`。
+
+### 变更
+
+- **补全同时回合算法清单**：README 与 `algorithms/builtin/README.md` 的算法列表补上 kriegspiel 与 matrix-eq，命令行 `--algorithm` 名称同步。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/matrix-eq-selfplay.test.ts`，在真实 standoff / molten-throne 两人对局与 standoff 三人局（联合场景路径）中校验每个 `decide` 输出均可入队，全部接受、零非法动作并正常完赛。
+- 新增无服务器验证脚本 `scripts/matrix_eq_smoke.mjs`（合成棋盘自博弈：116 个动作零非法、无 NaN、同局同轮可复现、单轮最大 61ms）与 `scripts/matrix_eq_benchmark.mjs`（镜像裁判，真随机掷骰 + 引擎回合生命周期镜像）。
+- standoff 2 人局各 30 局（逐局交替座位）：matrix-eq 对 random-sim **30:0**、对 dest-prob **14:16**（顺序对照合计 **25:35**，n=60 二项检验 p≈0.20）、对 kriegspiel **8:22**；全部 150 局零非法动作，单轮求解最大 173ms。当前排名 kriegspiel > dest-prob ≈ matrix-eq > random-sim；组合池一次性贪心构造是已知短板，改进方向见算法档案。
+- 真实服务器端到端：standoff 双 matrix-eq bot 完成 15 回合裁定（149 个动作、30 次提交，零 `action_failed` / `bot_failed`），验证 runner 的 `decide` 循环、整轮计划缓存与事件史读取链路。
+- `npm run build` 通过；`npm test -- --testTimeout=30000` 109 文件 / 902 例全绿。
+
 ## 3.7.4
 
 ### 新增

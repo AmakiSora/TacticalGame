@@ -18,6 +18,7 @@ algorithms/
 │   ├── random-sim.mjs # 同时随机算法（同时回合模式）
 │   ├── dest-prob.mjs # 落点概率算法（同时回合模式）
 │   ├── kriegspiel.mjs # 兵棋推演算法（同时回合模式）
+│   ├── matrix-eq.mjs # 矩阵均衡算法（同时回合模式）
 │   └── README.md     # 算法开发指南
 ├── lib/              # 共享工具库
 │   ├── api-client.mjs    # REST API 客户端
@@ -35,7 +36,8 @@ algorithms/
 │       ├── verdict.md
 │       ├── random-sim.md
 │       ├── dest-prob.md
-│       └── kriegspiel.md
+│       ├── kriegspiel.md
+│       └── matrix-eq.md
 ├── registry.mjs      # 算法注册表
 └── runner.mjs        # 通用运行器
 ```
@@ -111,8 +113,9 @@ export default {
 | **random-sim** | 随机 | O(n) | 未标定（仅同时回合模式） | 同时回合基线对照、模式隔离冒烟 |
 | **dest-prob** | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 同时回合对 random-sim **100:0**（standoff / molten-throne 各 100 局，零非法；两图场均击杀 3.10 / 0.96）；多席位仅冒烟 | 同时回合实战、预测射击与冲突规避样例 |
 | **kriegspiel** | 真实结算 rollout + 联合计划搜索 | O(候选×种子计划×rollouts×单轮结算) | 同时回合对 random-sim **60/60**、对 dest-prob **34/60（56.7%）**（standoff / molten-throne 各 30 局 ×2 对手，零非法；单轮搜索约 20ms） | 同时回合最强内置、联合计划搜索样例 |
+| **matrix-eq** | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | 同时回合镜像裁判对 random-sim **30:0**、对 dest-prob **14:16（合计 25:35）**、对 kriegspiel **8:22**（standoff 各 30 局，零非法；单轮求解 ≤173ms） | 博弈论混合策略、计划组合矩阵博弈样例 |
 
-> 表中 random-sim、dest-prob 与 kriegspiel 为同时回合（simultaneous）模式算法，其余为标准模式算法。random-sim 的 100:0 / 60:0 是对均匀随机基线的下界验证，不代表对真人/RL 的强度；kriegspiel 对 dest-prob 的 56.7% 才是有意义的内置强度对照。
+> 表中 random-sim、dest-prob、kriegspiel 与 matrix-eq 为同时回合（simultaneous）模式算法，其余为标准模式算法。random-sim 的 100:0 / 60:0 是对均匀随机基线的下界验证，不代表对真人/RL 的强度；kriegspiel 对 dest-prob 的 56.7%、matrix-eq 对 dest-prob 的 25:35 才是有意义的内置强度对照。
 
 > b = 分支因子（~20），d = 搜索深度（8），k = 模拟次数（100）
 >
@@ -236,6 +239,7 @@ verdict 的口径与 threat/field 完全一致（`scripts/algorithm-arena.mjs`�
 | 2026-09-18 | 3.5.4 | verdict 标定与修复：十处结构性约束（见 `algorithms/verdict.md`），其中四条各值 20 个以上百分点——到位后推进梯度归零（远程兵不再放弃已到手的打击）、打击扣"原地承伤"（dual-lanes 60%→93%）、打击加"暴露下降"差分（集火斩杀）、排程按抵达概率折损（dual-lanes 53%→83%）。`STEP_SURVIVAL` 扫描 0.72/0.62/0.55/0.45/0.35 → 89.0/92.4/**95.7**/回落/回落。最终 **vs greedy 95.7%（201:9）**、两套种子基一致 |
 | 2026-10-22 | 3.7.2 | 新增 dest-prob 落点概率算法（同时回合）：敌军落点概率分布 + 预测射击 + 目的格冲突规避 + 据点流量计价。headless 对 random-sim 两图各 100 局 **100:0**、零非法；场均击杀 3.10（standoff）/ 0.96（molten-throne）；3/6 人 standoff 零非法冒烟。 |
 | 2026-10-22 | 3.7.3 | 新增 kriegspiel 兵棋推演算法（同时回合）：把整份计划塞进镜像 `resolveRound` 的 JS 单轮结算器真实跑一遍，对 objective/aggressive/random 三种对手组合做蒙特卡洛 rollout，按「均值 − λ·标准差」风险调整分挑选 + 爬山精修；复用 dest-prob 的 `computeAim`/`enumerateAims` 与落点模型。headless 各 30 局 ×2 地图 ×2 对手：对 random-sim **60/60**、对 dest-prob **34/60（56.7%）**，全部 240 局零非法；单轮搜索约 20ms、`decide` 约 2–3ms。补 dest-prob「不做联合计划搜索」「对手模型可被反预测」两条限制。 |
+| 2026-10-22 | 3.7.5 | 新增 matrix-eq 矩阵均衡算法（同时回合）：把每轮升维成「计划组合 × 计划组合」矩阵博弈，用镜像结算器算支付、CFR 自我对弈解均衡混合，并从 `round_resolved` 事件史重建敌方真实计划做实证校正；输出混合策略抽样而非确定性 argmax。standoff 镜像裁判各 30 局：对 random-sim **30:0**、对 dest-prob **14:16**（顺序对照合计 25:35）、对 kriegspiel **8:22**；150 局零非法，单轮求解 ≤173ms。 |
 
 ## 未来方向
 

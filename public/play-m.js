@@ -2451,7 +2451,7 @@ function formatEventShort(ev) {
     case 'round_resolved': return `第 ${p.roundNumber} 回合同时结算完毕`;
     case 'action_failed': {
       const typeLabel = { deploy: '部署', move: '移动', attack: '攻击', heal: '治疗', demolish: '爆破', wait: '待命' }[p.type] || '动作';
-      const reasonLabel = { destination_conflict: '目标格撞车，全部失败', destination_blocked: '目标地形不可用', destination_occupied: '目标格仍被占用', previous_action_failed: '前一步失败，后续作废', artillery_zone: '炮火区内无法治疗', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', out_of_range: '超出射程，落空', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
+      const reasonLabel = { destination_conflict: '目标格撞车，全部失败', destination_blocked: '目标地形不可用', destination_occupied: '目标格仍被占用', previous_action_failed: '前一步失败，后续作废', artillery_zone: '炮火区内无法治疗', insufficient_supplies: '补给不足', unit_gone: '单位已不存在', unknown_unit: '兵种不存在', out_of_range: '超出射程，落空', already_healthy: '目标无需治疗', invalid_target: '目标无效', target_gone: '目标已消失' }[p.reason] || p.reason || '失败';
       const unitLabel = p.unitType ? `${UNIT_NAMES[p.unitType] || p.unitType}` : '';
       const from = p.detail && typeof p.detail.fromQ === 'number'
         ? `(${p.detail.fromQ},${p.detail.fromR})` : '';

@@ -15,8 +15,8 @@
 //   2. 计划校验镜像 3.8 planning.ts 的结构性校验（投影站位 + 地形寻路）；
 //   3. 计划生成器升级为「组合动作」生成：移动+攻击连击、先射后撤、
 //      连续移动抢占点，充分利用多行动点机制；
-//   4. 事件史重建升级：按步序重建敌方整轮计划（含 executed deploy 的
-//      完整信息），实证场景更精确；
+//   4. 事件史重建升级：按步序重建敌方整轮计划（executed/failed 的部署、
+//      攻击、移动、治疗均可还原），实证场景更精确；
 //   5. 新增两项 v1 缺陷的针对性改进（v1 对 kriegspiel 8:22 的归因）：
 //      a. 池内精修——对被选中执行的计划做有界爬山变异（换瞄准/换落点/
 //         调步序/删动作），对场景分布评估后接受改进；
@@ -296,8 +296,10 @@ function occupancyMap(board) {
 /**
  * 计划队列投影：执行完当前队列后的虚拟站位 / 虚拟地形 / 攻击计数 /
  * 累计部署花费。只假设自己的动作全部成功（与引擎 projectPlanQueue 同义）。
+ * owner 指定动作归属方（部署折扣按该方的部署起点计算）；缺省时回退动作上的
+ * owner 字段，外部队列的动作可能没有该字段，此时折扣按 0 处理。
  */
-function projectQueue(board, queue) {
+function projectQueue(board, queue, owner) {
   const positions = new Map();
   const terrain = new Map();
   const attackCounts = new Map();
@@ -312,9 +314,9 @@ function projectQueue(board, queue) {
     } else if (a.type === 'deploy' && a.unitType && a.fromId) {
       const spec = board.unitsSpec[a.unitType];
       if (spec) {
-        const origin = boardDeployOrigin(board, a.owner ?? '?', a.fromId);
+        const origin = boardDeployOrigin(board, owner ?? a.owner ?? '?', a.fromId);
         deploySpend += spec.cost - Math.min(spec.cost, origin
-          ? deployDiscountFor(board, a.owner ?? '?', origin) : 0);
+          ? deployDiscountFor(board, owner ?? a.owner ?? '?', origin) : 0);
       }
     }
   }
@@ -358,7 +360,7 @@ function terrainReachable(board, from, range, projection) {
 function structuralCheck(board, owner, action, queue) {
   const limit = board.balance?.actionsPerTurn ?? 5;
   if (queue.length >= limit) return '行动点预算已满';
-  const projection = projectQueue(board, queue);
+  const projection = projectQueue(board, queue, owner);
 
   if (action.type === 'move') {
     const unit = board.units.find(u => u.id === action.unitId && u.owner === owner && u.alive !== false);
@@ -454,7 +456,12 @@ function enumerateAttackAimsFrom(board, unit, from) {
   const tryAim = (target) => {
     const aim = computeCoveredCells(from, shape, 'attackShape', target, unit.attackRange);
     if (!aim) return;
-    const key = `${aim.type}|${aim.direction}|${target.q},${target.r}`;
+    // 线性武器的覆盖格只由 type|direction 决定（与点击格距离无关，引擎的
+    // 锁定查找也只看计划时刻站位），同射线 k 步去重为一条瞄准；single/arc
+    // 的覆盖随目标格变化，仍按格去重。
+    const key = aim.type === 'line'
+      ? `${aim.type}|${aim.direction}`
+      : `${aim.type}|${aim.direction}|${target.q},${target.r}`;
     if (seen.has(key)) return;
     seen.add(key);
     aims.push({ target: { q: target.q, r: target.r }, aim });
@@ -900,7 +907,7 @@ function buildPlan(board, owner, weights, rng, seedQueue, pattern) {
   // 部署决策（人格加权）：部署总是第 1 步（新单位本轮不能行动，
   // 早部署早占格早吃收入）。
   const deployActions = [];
-  const spent = projectQueue(board, queue).deploySpend;
+  const spent = projectQueue(board, queue, owner).deploySpend;
   const supplies = (board.supplies[owner] ?? 0) - spent;
   if (weights.deploy > 0.9 && queue.length + 1 < limit) {
     const origins = [];
@@ -1019,7 +1026,10 @@ function simulateRound(board, queuesByPlayer, simRng) {
   const queues = new Map(order.map(id => [id, (queuesByPlayer.get(id) ?? []).slice()]));
   const maxSteps = order.reduce((m, id) => Math.max(m, queues.get(id).length), 0);
   // 计划时刻站位（锁定射击依据，部署新单位不可被锁）。
+  // 同时保留单位对象：锁定目标在后续行动点阵亡后仍是"存在过的计划时刻目标"，
+  // 引擎会按 target_escaped 处理，而不是回退命中后来进入该格的单位。
   const planTimePos = new Map(sim.units.map(u => [u.id, { q: u.q, r: u.r }]));
+  const planTimeUnits = new Map(sim.units.map(u => [u.id, u]));
   const failedUnits = new Set();
   const attackCounts = new Map();
   const attackLimit = sim.balance?.attacksPerUnit ?? 1;
@@ -1142,7 +1152,7 @@ function simulateRound(board, queuesByPlayer, simRng) {
       };
       sim.units.push(unit);
       occupants.set(hexKey(unit), { kind: 'unit', entity: unit });
-      planTimePos.set(unit.id, { q: unit.q, r: unit.r });
+      // 不写入 planTimePos：计划时刻尚不存在的单位不可被锁定射击（与引擎一致）。
       record(arr.item.owner, a, 'executed', null,
         { unitId: unit.id, cost, unitType: a.unitType, fromId: a.fromId, q: a.q, r: a.r });
     }
@@ -1160,7 +1170,10 @@ function simulateRound(board, queuesByPlayer, simRng) {
       const unit = arr.unit;
       if (!unit) continue; // 预检已记 unit_gone
       const fromQ = unit.q, fromR = unit.r;
-      occupants.delete(hexKey(unit));
+      // 先校验占用表归属再删除：两个同格单位互换时，第一个 mover 先写入了
+      // 目的格，第二个 mover 若无条件 delete(hexKey(self)) 会把对方刚写入的
+      // 条目当成自己的抹掉（对方从占用表消失，本步后续攻击判定漏目标）。
+      if (occupants.get(hexKey(unit))?.entity === unit) occupants.delete(hexKey(unit));
       unit.q = a.q; unit.r = a.r;
       occupants.set(hexKey(unit), { kind: 'unit', entity: unit });
       record(arr.item.owner, a, 'executed', null, { unitId: a.unitId, fromQ, fromR, toQ: a.q, toR: a.r });
@@ -1234,15 +1247,24 @@ function simulateRound(board, queuesByPlayer, simRng) {
         if (!aim) { record(id, a, 'failed', 'out_of_range', { attackerId: a.attackerId, q: a.q, r: a.r }); failedUnits.add(a.attackerId); continue; }
 
         const targets = [];
+        // 锁定兵种只有在计划时刻点击格上确实有敌军时才进入锁定分支；
+        // 否则引擎会回退到普通形状覆盖（见 simultaneouslyResolve.ts 的
+        // strike.lockedEntity 分支），预测射击仍可能命中的是本步移动进来的单位。
+        let locked = null;
         if (spec.attackLock) {
-          // 锁定：计划时刻站在瞄准格上的敌军；结算时未逃出射程必中。
-          for (const u of sim.units) {
-            if (u.owner === id || !u.alive) continue;
+          for (const u of planTimeUnits.values()) {
+            if (u.owner === id) continue;
             const pt = planTimePos.get(u.id);
             if (pt && pt.q === a.q && pt.r === a.r) {
-              if (hexDistance(attacker, u) <= attacker.attackRange) targets.push({ kind: 'unit', entity: u });
+              locked = u;
               break;
             }
+          }
+        }
+        if (locked) {
+          // 锁定：计划时刻站在瞄准格上的敌军；结算时未逃出射程必中。
+          if (locked.alive && hexDistance(attacker, locked) <= attacker.attackRange) {
+            targets.push({ kind: 'unit', entity: locked });
           }
           if (!targets.length) { record(id, a, 'missed', 'target_escaped', { attackerId: a.attackerId, q: a.q, r: a.r }); continue; }
         } else {
@@ -1253,19 +1275,22 @@ function simulateRound(board, queuesByPlayer, simRng) {
             if (occ.kind === 'headquarters' && (occ.entity.owner === id || !occ.entity.alive)) continue;
             targets.push(occ);
           }
-          if (!targets.length) { record(id, a, 'missed', 'no_target', { attackerId: a.attackerId, q: a.q, r: a.r }); continue; }
+          if (!targets.length) { record(id, a, 'missed', null, { attackerId: a.attackerId, q: a.q, r: a.r }); continue; }
         }
 
         let hitAny = false;
         for (const target of targets) {
           const entity = target.entity;
           const dmg = expectedDamage(sim, attacker, target, simRng);
-          entity.hp -= dmg;
+          // 引擎口径：入账伤害按实际扣血量截断（Math.min(entity.hp, dmg)），
+          // 总部残血被补刀时不得超额计入 headquartersDamage。
+          const actual = Math.min(entity.hp, dmg);
+          entity.hp = Math.max(0, entity.hp - dmg);
           hitAny = true;
           if (target.kind === 'headquarters') {
             if (id !== entity.owner) {
               const stats = sim.players[id]?.stats;
-              if (stats) stats.headquartersDamage += dmg;
+              if (stats) stats.headquartersDamage += actual;
             }
             if (entity.hp <= 0 && entity.alive) {
               entity.alive = false;
@@ -1736,7 +1761,7 @@ function refinePlan(board, owner, plan, scenarios, enemies, t0) {
   const currentScore = evalPlan(plan);
 
   const mutants = [];
-  const projection = projectQueue(board, plan);
+  const projection = projectQueue(board, plan, owner);
   // 1) 换瞄准：每个攻击动作换成同起点的次优瞄准（预测价值排序取第 2）。
   for (let i = 0; i < plan.length; i++) {
     const a = plan[i];
@@ -1814,8 +1839,11 @@ function decideImpl(game, utils, ctx) {
     cache = {
       round: roundNumber,
       plan: solved.plan,
-      rejected: new Set(),
-      emitted: new Set(),
+      // 指纹可能重复（同一单位的两个 wait 动作指纹相同），按「同指纹出现
+      // 次数」计数：用 Set 去重会让两个 wait 在吐出第一条后互相吞掉对方的
+      // 拒绝/排队判定，导致第二条永远不再吐出。
+      rejected: new Map(),
+      emitted: new Map(),
     };
     planCache.set(key, cache);
     if (planCache.size > 32) {
@@ -1826,21 +1854,34 @@ function decideImpl(game, utils, ctx) {
     }
   }
 
-  const queued = new Set(queue.map(actionFingerprint));
-  // 吐出过但没出现在队列里 = 被服务器拒绝：记入拒绝集，跳过。
-  for (const fp of cache.emitted) {
-    if (!queued.has(fp)) cache.rejected.add(fp);
+  const queuedCounts = new Map();
+  for (const fp of queue.map(actionFingerprint)) {
+    queuedCounts.set(fp, (queuedCounts.get(fp) ?? 0) + 1);
+  }
+  const bump = (map, fp) => map.set(fp, (map.get(fp) ?? 0) + 1);
+  // 吐出 n 次而队列里不足 n 条 → 至少 n - queued 条被拒；用差额更新，
+  // 不能每次只 +1（同一指纹的多个动作可能同时被拒）。
+  for (const [fp, emittedN] of cache.emitted) {
+    const deficit = emittedN - (queuedCounts.get(fp) ?? 0);
+    if (deficit > (cache.rejected.get(fp) ?? 0)) cache.rejected.set(fp, deficit);
   }
 
+  // 逐条消费"已在队列"与"已知被拒"的计数：同一个指纹可能对应多个 wait，
+  // 不能因为队列里已有一条同指纹动作就跳过计划里的全部同指纹动作。
+  const remainingQueued = new Map(queuedCounts);
+  const remainingRejected = new Map(cache.rejected);
   for (const action of cache.plan) {
     const fp = actionFingerprint(action);
-    if (queued.has(fp)) continue;
-    if (cache.rejected.has(fp)) continue;
+    const queuedLeft = remainingQueued.get(fp) ?? 0;
+    if (queuedLeft > 0) { remainingQueued.set(fp, queuedLeft - 1); continue; }
+    const rejectedLeft = remainingRejected.get(fp) ?? 0;
+    if (rejectedLeft > 0) { remainingRejected.set(fp, rejectedLeft - 1); continue; }
     if (!stillLegal(game, owner, action, queue)) {
-      cache.rejected.add(fp);
+      bump(cache.rejected, fp);
+      remainingRejected.set(fp, (remainingRejected.get(fp) ?? 0) + 1);
       continue;
     }
-    cache.emitted.add(fp);
+    bump(cache.emitted, fp);
     return { type: action.type, payload: cleanPayload(action) };
   }
   // 计划全部入队或被拒 → 返回 null 提交（interfaces.mjs 会带已排计划提交）。
@@ -1923,6 +1964,8 @@ export const matrixEqInternals = {
   refinePlan,
   actionFingerprint,
   stillLegal,
+  decideImpl,
+  planCache,
   mulberry32,
   hashSeed,
 };

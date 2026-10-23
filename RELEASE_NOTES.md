@@ -9,25 +9,27 @@
 ### 变更
 
 - 版本号提升至 3.8.1。
-- **matrix-eq 升级到 v2（3.8.0 分步引擎适配版）**：重写分步结算镜像、投影站位/地形寻路的结构性计划校验、组合动作生成与按步序的事件史重建，新增池内精修和自适应利用混合；注册表算法版本标注为 `v2`，历史对局仍按版本 id 归档。镜像裁判基准：对 v1 **23:7**、对 kriegspiel v1 **12:18**、对 dest-prob v1 **13:17**、对 random-sim **30:0**，单轮求解 ≤157ms/侧。
+- **matrix-eq 升级到 v2（3.8.0 分步引擎适配版）**：重写分步结算镜像、投影站位/地形寻路的结构性计划校验、组合动作生成与按步序的事件史重建，新增池内精修和自适应利用混合；注册表算法版本标注为 `v2`，历史对局仍按版本 id 归档。镜像裁判基准（2026-10-23 修复后复跑，standoff 30 局、交替座位）：对 v1 **24:6（80.0%）**、对 kriegspiel v1 **11:19（36.7%）**、对 dest-prob v1 **14:16（46.7%）**、对 random-sim **30:0**；对当前 v2 kriegspiel / dest-prob 各 **7:23（23.3%）**，旧 v1 数字不能当作当前强度。本次 smoke 单轮最大 47ms。
 - **kriegspiel 升级到 v2（3.8.0 分步引擎适配版）**：镜像对象从旧 `resolveRound` 换成 `resolveRoundSteps`——结算器改为按行动点逐步推进（级联失败、到达判定与依赖传播、同一步先移出后移入、`attackLock` 按计划时刻锁定、逐步死亡、终局轮跳过占点）；计划合法性改为队列前缀投影（站位投影 + 自有爆破改写地形 + 只按地形寻路，占用/覆盖类判定与引擎一致推迟到结算）；候选生成改为逐行动点重算，支持同一单位跨行动点连动并新增 `wait`（对齐行动点）与 `demolish`（按可达格增量计价）；搜索邻域扩展为「换步 / 删步 / 插入 `wait` / 交换相邻两步 / 追加」，粗筛用少量 rollout、胜出者再按满额复核；敌方计划采样改为有序。注册表算法版本标注为 `v2`。
 - **dest-prob 升级到 v2（3.8.0 分步引擎适配版）**：候选生成改为队列前缀投影，同一单位可跨行动点连续行动；移动按地形 BFS（单位/总部不挡路）、部署按投影空位、攻击受 `attacksPerUnit` 限制；治疗按投影站位并去重，重装新增低优先级 `demolish`。保留解析式对手落点模型（敌军落点仍用 blocker-aware BFS 保守预测），不做整轮模拟。同 harness 对 v1 **50/60（83.3%）**、对 random-sim **60/60**。
 - **同时回合算法 runner 支持 `wait`**：`algorithms/lib/api-client.mjs` 新增 `wait()`（`POST /api/games/:id/plan/wait`），`algorithms/lib/interfaces.mjs` 新增 `case 'wait'` 分支，算法脚本从此可以主动对齐行动点。
 
 ### 修复
 
+- **同时回合引擎结算的健壮性与事件可追溯性**：`resolveRoundSteps` 部署引用不存在单位类型时记录 `unknown_unit` 失败（原先会在结算期抛错中断本轮）；部署的执行明细补充 `unitType`/`fromId`/`q`/`r`，治疗事件与执行明细补充瞄准格 `q`/`r`，算法与回放可按步序还原完整已执行计划。
 - **同时随机算法（random-sim）升级到 v2 并适配分步结算引擎**：不再按“每单位每轮一动作”保守枚举；同一单位可跨行动点连续行动，攻击/治疗/移动按队列投影站位计算，移动改为地形寻路（单位不挡路），并遵守地图 `balance.attacksPerUnit`（默认 1）。修复随机基线在 3.8.0 规则下行动点用不满、枚举口径与引擎不一致的问题。
 
 ### 测试与验证
 
 - 扩展 `tests/algorithms/random-sim.test.ts`：覆盖同单位多动作、投影位置后的攻击、攻击次数上限、投影后空位枚举与真实 standoff 对局合法性。
 - 扩展 `tests/algorithms/dest-prob.test.ts`（14 例）：落点分布、冲突规避、预测射击、arc 治疗、部署、原地占点、同单位多动作、队列投影后的攻击、地形寻路忽略单位、`attacksPerUnit`、真实 standoff / molten-throne 整轮入队；`tests/algorithms/dest-prob-selfplay.test.ts` 两图整局互搏零非法。
-- 新增 `tests/algorithms/matrix-eq-selfplay.test.ts` 覆盖 v2 在 standoff / molten-throne / 三人局的整局零非法动作；`node scripts/matrix_eq_smoke.mjs` 107 动作零非法、单轮 ≤85ms。
+- 新增 `tests/algorithms/matrix-eq-selfplay.test.ts` 覆盖 v2 在 standoff / molten-throne / 三人局的整局零非法动作；`node scripts/matrix_eq_smoke.mjs` 107 动作零非法、单轮 ≤47ms。
+- 新增 `tests/algorithms/matrix-eq-simulator.test.ts`（5 例）钉住 matrix-eq 模拟器/计划队列语义：同一步互换后第三人立即攻击不丢失目标、部署结算 `executed` 且明细含 `unitType`/`fromId`/`q`/`r`、锁定兵种按计划时刻占位锁定（新部署单位不可锁定但会被普通覆盖命中，逃逸目标 → `missed/target_escaped`）、HQ 伤害入账按实际扣血截断（`actual = min(hp, dmg)`）、连续 `wait` 按出现次数逐条吐出。
 - 更新 `tests/algorithms/kriegspiel-selfplay.test.ts`：入队口径补上 `demolish` / `wait`，kriegspiel v2 在 standoff / molten-throne 整局自博弈零非法动作。
 - kriegspiel v2 结算保真度对拍：把伤害/治疗方差归零使结算完全确定，让同一份计划分别在真实引擎（`resolveRoundSteps` + `captureControlPoints`）与算法的 JS 分步结算器上跑一遍，逐点比对存活单位 `(owner,type,q,r,hp)`、总部 HP/存活、据点归属、补给与席位状态——standoff / molten-throne 各 20 个局面**零偏差**。
 - kriegspiel v2 headless 标定（真实引擎 harness，逐局交替先手，standoff / molten-throne 各 30 局 ×3 对手，合计 180 局零非法动作，种子 `1000 + i×7919`，2026-10-23）：对 random-sim **60:0**、对 dest-prob v1 **52:8（86.7%，p<0.0001）**、对 matrix-eq v2 **29:31**（standoff 27:3、molten-throne **2:28**；合计 p=0.90，两图方向相反，必须按图读）；`decide` 平均 45ms（standoff）/ 113–169ms（molten-throne）。dest-prob v2 适配后同 harness 抽样对 kriegspiel v2 为 21/60（35.0%），不再引用旧 52:8 作为当前差距。
 - kriegspiel v1 同口径基线补测：把 `git show 89f3b69^` 的 v1 实现放进同一 harness、同一批种子跑 4 对手 ×2 图 ×30 局。v1 对 dest-prob v1 **43.3%**（standoff 仅 20.0%）、对 matrix-eq **31.7%**，v2 分别为 86.7% 与 48.3%，即适配价值 **+43.4pp / +16.6pp**；v1↔v2 直接对打 **35:25（58.3%，p=0.245）未达显著**。**两项负结果如实记录**：molten-throne 对 matrix-eq 是 v1 6:24 → v2 **2:28** 的负提升（单轮 rollout 无法给「N 轮后总部被斩首」定价，给总部血量加凸性惩罚实测胜负序列完全不变）；按 `action_failed` 事件计数发现 v2 结算期失败 **17.1–23.1/局**（v1 1.3/局、dest-prob v1 0.6–3.0/局），主因 `destination_occupied`——移动/部署候选不排除敌军当前占位，只按「敌军到达概率」打折。诊断、数据与修法见 `algorithms/docs/algorithms/kriegspiel.md`「已知短板」「代价与边界」「已知限制 #2」。
-- `npm run build` 通过；`npm test` 全量通过（110 文件 / 934 例）。
+- `npm run build` 通过；`npm test` 全量通过（111 文件 / 939 例）。
 
 ## 3.8.0
 

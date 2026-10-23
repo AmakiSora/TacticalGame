@@ -338,6 +338,10 @@ function resolveDeploys(
       continue;
     }
     const spec = game.config.units[item.action.unitType!];
+    if (!spec) {
+      recordFailure(ctx, item, 'unknown_unit', { q: item.action.q, r: item.action.r });
+      continue;
+    }
     const discount = Math.min(spec.cost, deployDiscountForOrigin(game, item.owner, item.action.fromId!));
     const cost = spec.cost - discount;
     const resources = game.resources[item.owner];
@@ -367,7 +371,11 @@ function resolveDeploys(
       actionsUsed: item.step, actionsRemaining: remaining(ctx.limit, item.step),
       roundNumber, step: item.step,
     });
-    recordExecuted(ctx, item, { unitId: unit.id, cost }, unit.id);
+    recordExecuted(ctx, item, {
+      unitId: unit.id, cost,
+      unitType: item.action.unitType, fromId: item.action.fromId,
+      q: item.action.q, r: item.action.r,
+    }, unit.id);
   }
 }
 
@@ -586,6 +594,7 @@ function resolveAttacksAndHeals(ctx: ResolveContext, stepActions: QueuedAction[]
       appendEvent(game, bus, 'heal', {
         actionId: heal.item.action.id,
         owner: heal.item.owner, supportId: heal.support.id, targetId: target.id,
+        q: heal.item.action.q, r: heal.item.action.r,
         amount: applied, targetHp: target.hp,
         actionsUsed: heal.item.step, actionsRemaining: remaining(ctx.limit, heal.item.step),
         roundNumber, step: heal.item.step,
@@ -593,6 +602,7 @@ function resolveAttacksAndHeals(ctx: ResolveContext, stepActions: QueuedAction[]
     }
     recordExecuted(ctx, heal.item, {
       supportId: heal.support.id,
+      q: heal.item.action.q, r: heal.item.action.r,
       targets: appliedList.map(({ target, amount }) => ({ targetId: target.id, amount })),
     });
   }

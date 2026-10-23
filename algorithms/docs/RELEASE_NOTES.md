@@ -25,9 +25,9 @@
 
 - `random-sim`：18 个单测（形状瞄准、治疗瞄格、AP、同单位多动作、`attacksPerUnit`、投影站位、目的格去重、部署预算、炮火过滤、真实 standoff 整轮合法性）。
 - `kriegspiel`：真实引擎逐点对拍 40 个局面零偏差；standoff / molten-throne 各 30 局 ×3 对手共 180 局零非法；对 random-sim 60:0、对 dest-prob 52:8（86.7%）、对 matrix-eq v2 29:31（standoff 27:3、molten-throne 2:28 为已知斩首短板）；v1 同 harness 基线对 dest-prob 43.3%、对 matrix-eq 31.7%，适配价值 +43.4pp / +16.6pp，v1↔v2 直接对打 35:25（p=0.245）未达显著。
-- `matrix-eq`：镜像裁判 v2 vs v1 **23:7（76.7%）**、vs kriegspiel v1 12:18、vs dest-prob v1 13:17、vs random-sim 30:0；90 局零非法，单轮 ≤157ms/侧；冒烟 107 动作零非法、最大 85ms。
+- `matrix-eq`：镜像裁判（2026-10-23 修复后复跑，standoff 30 局、交替座位）v2 vs v1 **24:6（80.0%）**、vs kriegspiel v1 11:19、vs dest-prob v1 14:16、vs random-sim 30:0；对当前 v2 kriegspiel / dest-prob 各 7:23。v1 对照 120 局零非法；单次 decide 2.3–3.2ms；冒烟 107 动作零非法、单轮最大 47ms。
 - `dest-prob`：14 个单测覆盖落点分布/冲突规避/预测射击/arc 治疗/部署/原地占点/同单位多动作/队列投影攻击/地形寻路/`attacksPerUnit`/真实两图整轮入队；整局自博弈两图零非法。真实引擎同 harness 30 局/图：对 random-sim 60/60，对 v1 50/60（83.3%），对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（抽样）。
-- `npm run build` 通过；`npm test` 110 文件 / 934 例全绿（dest-prob v2 加入后单测数见主项目测试记录）；四份算法档案新增/补齐 `v1 → v2` 五段式版本说明。
+- `npm run build` 通过；`npm test` 111 文件 / 939 例全绿（dest-prob v2 加入后单测数见主项目测试记录）；四份算法档案新增/补齐 `v1 → v2` 五段式版本说明。
 
 ## 3.8.0（2026-10-22）— 同时回合改为按行动点分步结算
 

@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-10-21T22:06:37.015Z",
+  "generatedAt": "2026-10-23T09:35:35.764Z",
   "source": {
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
-    "matchCount": 36000,
+    "matchCount": 36288,
     "retiredMatchesDropped": 0,
     "oldFormatMatchesDropped": 0,
     "mapDist": {
@@ -10,16 +10,18 @@
       "default": 7200,
       "breach": 7200,
       "danger-close": 7200,
-      "dual-lanes": 7200
+      "dual-lanes": 7200,
+      "standoff": 144,
+      "molten-throne": 144
     },
     "modeDist": {
       "standard": 36000,
       "annihilation": 0,
-      "simultaneous": 0,
+      "simultaneous": 288,
       "royale": 0
     },
     "dateMin": "2026-10-21 03:57:34",
-    "dateMax": "2026-10-21 08:12:59"
+    "dateMax": "2026-10-23 17:35:21"
   },
   "gameplay": {
     "overview": {
@@ -1894,6 +1896,296 @@
           }
         ]
       }
+    },
+    {
+      "id": "simultaneous",
+      "label": "同时回合",
+      "games": 288,
+      "gameplay": {
+        "overview": {
+          "games": 288,
+          "draws": 1,
+          "drawRate": 0.0035,
+          "annihilationRate": 0.3681,
+          "avgRounds": 15.75,
+          "avgDurationSec": 3.01,
+          "avgActions": 170
+        },
+        "endReasons": [
+          {
+            "reason": "turn_limit_score",
+            "count": 181,
+            "pct": 0.6285
+          },
+          {
+            "reason": "last_player_standing",
+            "count": 106,
+            "pct": 0.3681
+          },
+          {
+            "reason": "mutual_annihilation",
+            "count": 1,
+            "pct": 0.0035
+          }
+        ],
+        "roundsDist": [
+          {
+            "bucket": "≤9",
+            "count": 5,
+            "pct": 0.0189
+          },
+          {
+            "bucket": "10–14",
+            "count": 31,
+            "pct": 0.117
+          },
+          {
+            "bucket": "15–19",
+            "count": 161,
+            "pct": 0.6075
+          },
+          {
+            "bucket": "20–24",
+            "count": 68,
+            "pct": 0.2566
+          },
+          {
+            "bucket": "25–29",
+            "count": 0,
+            "pct": 0
+          },
+          {
+            "bucket": "30（打满）",
+            "count": 0,
+            "pct": 0
+          }
+        ],
+        "durationDist": [
+          {
+            "bucket": "<1s",
+            "count": 99,
+            "pct": 0.3438
+          },
+          {
+            "bucket": "1–2s",
+            "count": 45,
+            "pct": 0.1563
+          },
+          {
+            "bucket": "2–3s",
+            "count": 38,
+            "pct": 0.1319
+          },
+          {
+            "bucket": "3–5s",
+            "count": 51,
+            "pct": 0.1771
+          },
+          {
+            "bucket": "5–10s",
+            "count": 50,
+            "pct": 0.1736
+          },
+          {
+            "bucket": "≥10s",
+            "count": 5,
+            "pct": 0.0174
+          }
+        ],
+        "units": [
+          {
+            "type": "infantry",
+            "deploys": 1932,
+            "deployShare": 0.4087,
+            "losses": 153,
+            "lossShare": 0.1681
+          },
+          {
+            "type": "scout",
+            "deploys": 1419,
+            "deployShare": 0.3002,
+            "losses": 618,
+            "lossShare": 0.6791
+          },
+          {
+            "type": "support",
+            "deploys": 833,
+            "deployShare": 0.1762,
+            "losses": 82,
+            "lossShare": 0.0901
+          },
+          {
+            "type": "ranger",
+            "deploys": 340,
+            "deployShare": 0.0719,
+            "losses": 52,
+            "lossShare": 0.0571
+          },
+          {
+            "type": "heavy",
+            "deploys": 203,
+            "deployShare": 0.0429,
+            "losses": 5,
+            "lossShare": 0.0055
+          }
+        ],
+        "economy": {
+          "seatCount": 576,
+          "avgIncomeTotal": 385,
+          "controlShare": 0.7549,
+          "avgDeployCost": 398,
+          "avgCaptures": 16.16,
+          "avgSteals": 8.46,
+          "avgFirstCaptureRound": 1.51,
+          "comebackRate": 0.4132
+        },
+        "perModel": [
+          {
+            "id": "algo_dest-prob@v2",
+            "games": 144,
+            "wins": 91,
+            "losses": 53,
+            "draws": 0,
+            "winRate": 0.6319,
+            "avgScore": 1784,
+            "avgDamageDealt": 278,
+            "avgDamageTaken": 273,
+            "avgKills": 2.56,
+            "avgLosses": 1.98,
+            "avgCaptures": 20.77,
+            "avgSteals": 11.38,
+            "avgIncome": 519,
+            "avgFirstCaptureRound": 1,
+            "topDeploys": [
+              {
+                "type": "infantry",
+                "count": 800
+              },
+              {
+                "type": "scout",
+                "count": 581
+              },
+              {
+                "type": "ranger",
+                "count": 173
+              }
+            ]
+          },
+          {
+            "id": "algo_kriegspiel@v2",
+            "games": 144,
+            "wins": 94,
+            "losses": 49,
+            "draws": 1,
+            "winRate": 0.6528,
+            "avgScore": 1954,
+            "avgDamageDealt": 250,
+            "avgDamageTaken": 290,
+            "avgKills": 1.72,
+            "avgLosses": 2.18,
+            "avgCaptures": 20.78,
+            "avgSteals": 10.83,
+            "avgIncome": 501,
+            "avgFirstCaptureRound": 1,
+            "topDeploys": [
+              {
+                "type": "infantry",
+                "count": 628
+              },
+              {
+                "type": "scout",
+                "count": 560
+              },
+              {
+                "type": "support",
+                "count": 298
+              }
+            ]
+          },
+          {
+            "id": "algo_matrix-eq@v2",
+            "games": 144,
+            "wins": 102,
+            "losses": 41,
+            "draws": 1,
+            "winRate": 0.7083,
+            "avgScore": 1756,
+            "avgDamageDealt": 366,
+            "avgDamageTaken": 163,
+            "avgKills": 2.03,
+            "avgLosses": 0.92,
+            "avgCaptures": 17.92,
+            "avgSteals": 8.38,
+            "avgIncome": 385,
+            "avgFirstCaptureRound": 1,
+            "topDeploys": [
+              {
+                "type": "infantry",
+                "count": 410
+              },
+              {
+                "type": "support",
+                "count": 319
+              },
+              {
+                "type": "scout",
+                "count": 145
+              }
+            ]
+          },
+          {
+            "id": "algo_random-sim@v2",
+            "games": 144,
+            "wins": 0,
+            "losses": 144,
+            "draws": 0,
+            "winRate": 0,
+            "avgScore": 427,
+            "avgDamageDealt": 53,
+            "avgDamageTaken": 223,
+            "avgKills": 0.02,
+            "avgLosses": 1.24,
+            "avgCaptures": 5.15,
+            "avgSteals": 3.27,
+            "avgIncome": 136,
+            "avgFirstCaptureRound": 3.13,
+            "topDeploys": [
+              {
+                "type": "scout",
+                "count": 133
+              },
+              {
+                "type": "infantry",
+                "count": 94
+              },
+              {
+                "type": "support",
+                "count": 80
+              }
+            ]
+          }
+        ],
+        "perMap": [
+          {
+            "map": "molten-throne",
+            "games": 144,
+            "drawRate": 0,
+            "annihilationRate": 0.5625,
+            "avgRounds": 16.72,
+            "avgDurationSec": 4.16,
+            "topEndReason": "last_player_standing"
+          },
+          {
+            "map": "standoff",
+            "games": 144,
+            "drawRate": 0.0069,
+            "annihilationRate": 0.1736,
+            "avgRounds": 14.78,
+            "avgDurationSec": 1.86,
+            "topEndReason": "turn_limit_score"
+          }
+        ]
+      }
     }
   ],
   "models": [
@@ -2064,6 +2356,132 @@
       "docRef": "algorithms/docs/algorithms/field.md",
       "docStatus": "内置算法",
       "notes": "连续势场塑形：斥力井+引力井，风筝走位、分头抢点"
+    },
+    {
+      "id": "algo_matrix-eq@v2",
+      "kind": "algorithm",
+      "short": "矩阵均衡算法",
+      "version": "v2",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "matrix-eq",
+      "modes": [
+        "simultaneous"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 1730,
+      "ratingLo": 1664,
+      "ratingHi": 1738,
+      "winRate": 0.7083,
+      "games": 144,
+      "ratings": [
+        {
+          "mode": "simultaneous",
+          "modeLabel": "同时回合",
+          "rating": 1730,
+          "ratingLo": 1664,
+          "ratingHi": 1738,
+          "winRate": 0.7083,
+          "games": 144,
+          "wins": 102,
+          "losses": 41,
+          "draws": 1
+        }
+      ],
+      "ratingMode": "simultaneous",
+      "ratingModeLabel": "同时回合",
+      "docRef": "algorithms/docs/algorithms/matrix-eq.md",
+      "docStatus": "内置算法",
+      "notes": "同时回合：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正"
+    },
+    {
+      "id": "algo_kriegspiel@v2",
+      "kind": "algorithm",
+      "short": "兵棋推演算法",
+      "version": "v2",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "kriegspiel",
+      "modes": [
+        "simultaneous"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 1692,
+      "ratingLo": 1626,
+      "ratingHi": 1702,
+      "winRate": 0.6528,
+      "games": 144,
+      "ratings": [
+        {
+          "mode": "simultaneous",
+          "modeLabel": "同时回合",
+          "rating": 1692,
+          "ratingLo": 1626,
+          "ratingHi": 1702,
+          "winRate": 0.6528,
+          "games": 144,
+          "wins": 94,
+          "losses": 49,
+          "draws": 1
+        }
+      ],
+      "ratingMode": "simultaneous",
+      "ratingModeLabel": "同时回合",
+      "docRef": "algorithms/docs/algorithms/kriegspiel.md",
+      "docStatus": "内置算法",
+      "notes": "同时回合：分步结算 rollout + 整份计划联合搜索 + 风险规避"
+    },
+    {
+      "id": "algo_dest-prob@v2",
+      "kind": "algorithm",
+      "short": "落点概率算法",
+      "version": "v2",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "dest-prob",
+      "modes": [
+        "simultaneous"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 1676,
+      "ratingLo": 1606,
+      "ratingHi": 1687,
+      "winRate": 0.6319,
+      "games": 144,
+      "ratings": [
+        {
+          "mode": "simultaneous",
+          "modeLabel": "同时回合",
+          "rating": 1676,
+          "ratingLo": 1606,
+          "ratingHi": 1687,
+          "winRate": 0.6319,
+          "games": 144,
+          "wins": 91,
+          "losses": 53,
+          "draws": 0
+        }
+      ],
+      "ratingMode": "simultaneous",
+      "ratingModeLabel": "同时回合",
+      "docRef": "algorithms/docs/algorithms/dest-prob.md",
+      "docStatus": "内置算法",
+      "notes": "同时回合分步：建模敌军落点概率，预测射击并规避目的格冲突"
     },
     {
       "id": "hex_ppo_v3.1.1_20260911_8.8M.zip",
@@ -2906,6 +3324,48 @@
       "notes": "首个任意地图可战模型（2026-09-16 复测：仅随机图成立，静态图 11%~24%）；竞技场全榜垫底（17/17，胜率 19.7%），对 v2.3.3 大样本 79:89 持平"
     },
     {
+      "id": "algo_random-sim@v2",
+      "kind": "algorithm",
+      "short": "同时随机算法",
+      "version": "v2",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "random-sim",
+      "modes": [
+        "simultaneous"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 903,
+      "ratingLo": 987,
+      "ratingHi": 993,
+      "winRate": 0,
+      "games": 144,
+      "ratings": [
+        {
+          "mode": "simultaneous",
+          "modeLabel": "同时回合",
+          "rating": 903,
+          "ratingLo": 987,
+          "ratingHi": 993,
+          "winRate": 0,
+          "games": 144,
+          "wins": 0,
+          "losses": 144,
+          "draws": 0
+        }
+      ],
+      "ratingMode": "simultaneous",
+      "ratingModeLabel": "同时回合",
+      "docRef": "algorithms/docs/algorithms/random-sim.md",
+      "docStatus": "内置算法",
+      "notes": "同时回合：从所有合法计划动作中随机选择入队，随后提交"
+    },
+    {
       "id": "algo_random@v1",
       "kind": "algorithm",
       "short": "随机算法",
@@ -2946,93 +3406,6 @@
       "docRef": "algorithms/docs/algorithms/random.md",
       "docStatus": "内置算法",
       "notes": "从所有合法动作中随机选择"
-    },
-    {
-      "id": "algo_dest-prob@v1",
-      "kind": "algorithm",
-      "short": "落点概率算法",
-      "version": "v1",
-      "trainDate": null,
-      "trainMap": null,
-      "opponentType": null,
-      "steps": null,
-      "algorithm": "dest-prob",
-      "modes": [
-        "simultaneous"
-      ],
-      "status": "builtin",
-      "statusNote": null,
-      "rated": true,
-      "sizeMB": null,
-      "rating": null,
-      "ratingLo": null,
-      "ratingHi": null,
-      "winRate": null,
-      "games": 0,
-      "ratings": [],
-      "ratingMode": null,
-      "ratingModeLabel": null,
-      "docRef": "algorithms/docs/algorithms/dest-prob.md",
-      "docStatus": "内置算法",
-      "notes": "同时回合：建模敌军落点概率，预测射击并规避目的格冲突"
-    },
-    {
-      "id": "algo_kriegspiel@v1",
-      "kind": "algorithm",
-      "short": "兵棋推演算法",
-      "version": "v1",
-      "trainDate": null,
-      "trainMap": null,
-      "opponentType": null,
-      "steps": null,
-      "algorithm": "kriegspiel",
-      "modes": [
-        "simultaneous"
-      ],
-      "status": "builtin",
-      "statusNote": null,
-      "rated": true,
-      "sizeMB": null,
-      "rating": null,
-      "ratingLo": null,
-      "ratingHi": null,
-      "winRate": null,
-      "games": 0,
-      "ratings": [],
-      "ratingMode": null,
-      "ratingModeLabel": null,
-      "docRef": "algorithms/docs/algorithms/kriegspiel.md",
-      "docStatus": "内置算法",
-      "notes": "同时回合：真实结算 rollout + 整份计划联合搜索 + 风险规避"
-    },
-    {
-      "id": "algo_random-sim@v1",
-      "kind": "algorithm",
-      "short": "同时随机算法",
-      "version": "v1",
-      "trainDate": null,
-      "trainMap": null,
-      "opponentType": null,
-      "steps": null,
-      "algorithm": "random-sim",
-      "modes": [
-        "simultaneous"
-      ],
-      "status": "builtin",
-      "statusNote": null,
-      "rated": true,
-      "sizeMB": null,
-      "rating": null,
-      "ratingLo": null,
-      "ratingHi": null,
-      "winRate": null,
-      "games": 0,
-      "ratings": [],
-      "ratingMode": null,
-      "ratingModeLabel": null,
-      "docRef": "algorithms/docs/algorithms/random-sim.md",
-      "docStatus": "内置算法",
-      "notes": "同时回合：从所有合法计划动作中随机选择入队，随后提交"
     },
     {
       "id": "hex_ppo_v1.0.0_20260824_120K.zip",

@@ -471,20 +471,26 @@ evaluate_cross 默认为每个批次在 `arena/details/<批次>.jsonl` 落盘一
 ## AI 竞技场：批量对战与排行榜
 
 `rl/evaluation/round_robin.py` 自动发现 `rl/models/` 下全部可对战模型（排除 v1.0.0 的 512 动作格式）
-与 `algorithms/registry.mjs` 注册的全部内置算法，两两混合 × 全地图批量对战，
-结果累积写入 `arena/matches.jsonl`（算法参与者名字为 `algo_<注册名>`）。榜单按地图的
+与 `algorithms/registry.mjs` 注册的内置算法，两两混合 × 全地图批量对战，
+结果累积写入 `arena/matches.jsonl`（算法参与者名字为 `algo_<注册名>@<版本>`）。地图模式由
+`maps/*.json` 的 `mode` 字段推断：标准模式跑「模型 × 算法」，同时回合模式只跑注册表声明
+`simultaneous` 的算法（现有 RL 模型仅覆盖标准模式），同一批不允许混模式。榜单按地图的
 `mode` 分成标准/歼灭/同时回合/大逃杀独立评分池，不同模式不混榜：
 
 ```powershell
 # 先小规模冒烟（只跑 default 图、3 个模型、2 个算法、每对 2 局）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models v2.7.0,v2.4.0,v2.2.0 --algorithms greedy,threat --games 2
 
-# 全量跑批（模型+算法两两 × 7 图 × 24 局，建议先跑随机图出第一版榜单）
+# 全量跑批（模型+算法两两 × 5 图 × 24 局，建议先跑随机图出第一版榜单）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default,breach,danger-close,desert,dual-lanes
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default,breach,danger-close,dual-lanes
 
 # 纯模型循环赛（不带算法，如复现旧口径）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --algorithms none
+
+# 同时回合（仅内置算法；地图池 standoff / molten-throne）
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps standoff,molten-throne --games 2 \
+    --algorithms random-sim,dest-prob,kriegspiel,matrix-eq
 ```
 
 要点：
@@ -504,7 +510,8 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --algorithms none
   Elo 映射 `1500 + 400/ln10 × ln p`；95% CI 为按（对,图）分层 bootstrap（固定种子可复现）；
   小样本另附 Wilson 下界参考列。先手/后手只做展示统计，不进评分。
 - **评估控制台模式视图**：先选玩法模式，再只显示该模式的地图与算法（`ALGORITHM_META.modes`）；
-  当前进程内评估链路仅实现标准模式，其他模式在控制台标为「暂不支持跑批」，不会误启动跨模式批次。
+  进程内评估链路已接入标准与同时回合模式（同时模式只跑该模式算法，RL 模型不参评），
+  歼灭/大逃杀在控制台标为「暂不支持跑批」，不会误启动跨模式批次。
 - **模式隔离**：先按地图 `mode` 分池，再在每个模式内池化该模式全部地图并给出分图榜单
   （局数少，CI 更宽）；标准、歼灭、同时回合、大逃杀之间不共享评分，也不能跨模式比较。
 - **同池语义**：同一模式内 RL 模型与规则算法共用一个评分池，可直接跨类型比较强弱；

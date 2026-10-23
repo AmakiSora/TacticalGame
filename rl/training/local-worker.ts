@@ -15,9 +15,15 @@ import { endTurn } from '../../src/engine/engine.js';
 import { deployUnit } from '../../src/engine/deployment.js';
 import { moveUnit } from '../../src/engine/units.js';
 import { buildAdjudicationSnapshot } from '../../src/engine/engine.js';
+import { commitAndMaybeResolve } from '../../src/engine/simultaneous.js';
+import {
+  queueAttackAction, queueDeployAction, queueDemolishAction, queueHealAction,
+  queueMoveAction, queueWaitAction,
+} from '../../src/engine/planning.js';
 import { createInitialGame, createInitialGameWithConfig } from '../../src/state/store.js';
 import { loadMaps } from '../../src/config/loader.js';
 import { generateRandomMapConfig, sanitizeRandomOptions } from '../../src/config/randomMap.js';
+import { isSimultaneousMode } from '../../src/types.js';
 import type { GameState, PlayerId, UnitType } from '../../src/types.js';
 
 let game: GameState | null = null;
@@ -29,16 +35,26 @@ loadMaps();
 const DEFAULT_SNAPSHOT_EVENT_TAIL = 80;
 let snapshotEventTail = DEFAULT_SNAPSHOT_EVENT_TAIL;
 
-function snapshot(): unknown {
+function snapshot(viewer?: PlayerId): unknown {
   if (!game) throw new Error('game is not initialized');
   // 只克隆一次：事件先切尾再随整体克隆，避免此前对全量事件日志的二次 structuredClone。
   // rngState 与线上 REST 序列化（sanitizeGameForResponse）保持一致一并剥离。
   const { tokens: _tokens, hostToken: _hostToken, rngState: _rngState, events, ...rest } = game;
-  return structuredClone({
+  const body = structuredClone({
     ...rest,
     events: snapshotEventTail > 0 ? events.slice(-snapshotEventTail) : [],
     adjudication: buildAdjudicationSnapshot(game),
-  });
+  }) as Record<string, unknown>;
+  // 同时模式：对手计划队列是秘密。与 src/api/auth.ts 的 sanitizeGameForResponse 同口径，
+  // 只给当前决策座位自己的队列（myQueue），committed 名单保持公开。
+  if (viewer && isSimultaneousMode(game.config.mode) && body.plan && typeof body.plan === 'object') {
+    const plan = body.plan as { queues?: unknown; committed?: unknown };
+    const myQueue = game.plan?.queues[viewer] ?? [];
+    const queues: Record<string, unknown> = {};
+    if (myQueue.length > 0) queues[viewer] = structuredClone(myQueue);
+    body.plan = { ...plan, queues, myQueue: structuredClone(myQueue) };
+  }
+  return body;
 }
 
 function parseEventTail(value: unknown): number {
@@ -54,13 +70,49 @@ function owner(value: unknown): PlayerId {
   throw new Error('owner must be player_a or player_b');
 }
 
+/** 同时模式：动作只入队，不立即执行；end_turn 表示提交本回合计划。 */
+function applyPlannedAction(who: PlayerId, type: unknown, action: Record<string, unknown>) {
+  if (!game) throw new Error('game is not initialized');
+  if (type === 'move') {
+    return queueMoveAction(game, who, String(action.unitId), Number(action.q), Number(action.r));
+  }
+  if (type === 'attack') {
+    return queueAttackAction(game, who, String(action.attackerId), Number(action.q), Number(action.r));
+  }
+  if (type === 'heal') {
+    return queueHealAction(game, who, String(action.supportId), Number(action.q), Number(action.r));
+  }
+  if (type === 'deploy') {
+    return queueDeployAction(
+      game,
+      who,
+      String(action.unitType) as UnitType,
+      String(action.fromId),
+      Number(action.q),
+      Number(action.r),
+    );
+  }
+  if (type === 'demolish') {
+    return queueDemolishAction(game, who, String(action.unitId), Number(action.q), Number(action.r));
+  }
+  if (type === 'wait') {
+    return queueWaitAction(game, who);
+  }
+  if (type === 'end_turn') {
+    return commitAndMaybeResolve(game, globalEventBus, who);
+  }
+  throw new Error(`unknown action type: ${String(type)}`);
+}
+
 function apply(command: Record<string, unknown>): unknown {
   if (!game) throw new Error('game is not initialized');
   const who = owner(command.owner);
   const action = command.action as Record<string, unknown>;
   const type = action.type;
   let result;
-  if (type === 'move') {
+  if (isSimultaneousMode(game.config.mode)) {
+    result = applyPlannedAction(who, type, action);
+  } else if (type === 'move') {
     result = moveUnit(game, globalEventBus, who, String(action.unitId), Number(action.q), Number(action.r));
   } else if (type === 'attack') {
     result = attackTarget(game, globalEventBus, who, String(action.attackerId), String(action.targetId));
@@ -100,10 +152,12 @@ export async function handleCommand(command: Record<string, unknown>): Promise<u
     } else {
       game = createInitialGame(randomUUID(), mapId);
     }
-    if (game.config.mode !== 'standard') {
-      // apply 通道（moveUnit/attackTarget/... 逐动作立即执行）只实现标准语义；
-      // 同时模式的计划/结算链路不在这里支持，故 reset 一律拒绝非标准地图。
-      throw new Error(`map "${mapId}" uses ${game.config.mode} mode; local baseline supports standard mode only`);
+    // apply 通道支持两类语义：standard 逐动作立即执行；simultaneous 动作入队、
+    // end_turn 提交并触发统一结算。歼灭/大逃杀跑批尚未接入（炮火缩圈与淘汰流程）。
+    if (game.config.mode !== 'standard' && game.config.mode !== 'simultaneous') {
+      throw new Error(
+        `map "${mapId}" uses ${game.config.mode} mode; local baseline supports standard and simultaneous modes only`,
+      );
     }
     return snapshot();
   }
@@ -117,7 +171,9 @@ export async function handleCommand(command: Record<string, unknown>): Promise<u
 // 与 REST runner 的差别：这里每次 decide 只返回一个动作交给调用方（evaluate_cross）
 // 应用并回传新快照，由 Python 侧驱动回合循环；playTurn 型接口依赖 HTTP 客户端，
 // 进程内不支持。
-const algorithmCache = new Map<string, { decide: (game: unknown, utils: unknown) => Promise<unknown> }>();
+const algorithmCache = new Map<string, {
+  decide: (game: unknown, utils: unknown, ctx?: { owner: PlayerId }) => Promise<unknown>;
+}>();
 
 async function loadDecideAlgorithm(name: string) {
   const cached = algorithmCache.get(name);
@@ -127,20 +183,20 @@ async function loadDecideAlgorithm(name: string) {
   if (typeof module.playTurn === 'function') {
     throw new Error(`algorithm "${name}" implements playTurn(); the in-process decide channel requires decide()`);
   }
-  const entry = { decide: module.decide as (game: unknown, utils: unknown) => Promise<unknown> };
+  const entry = {
+    decide: module.decide as (game: unknown, utils: unknown, ctx?: { owner: PlayerId }) => Promise<unknown>,
+  };
   algorithmCache.set(name, entry);
   return entry;
 }
 
 async function decideAlgorithmAction(command: Record<string, unknown>): Promise<unknown> {
   if (!game) throw new Error('game is not initialized');
-  // standard 模式全情报，快照视角与座位无关；此处仅校验 owner 合法。
-  owner(command.owner);
+  const who = owner(command.owner);
   const name = typeof command.algorithm === 'string' ? command.algorithm : '';
   if (!name) throw new Error('decide requires an algorithm name');
   // 不同模式不能混用算法：注册表 ALGORITHM_META.modes 是唯一口径（缺省仅 standard）。
-  // 注意 reset 仍只接受 standard 地图（apply 通道只实现标准语义），因此这里实际
-  // 挡住的是「标准图跑非标准算法」方向的混用。
+  // reset 接受 standard 与 simultaneous 两类地图，因此这里同时挡住两个方向的混用。
   const declared = ALGORITHM_META[name]?.modes;
   const modes = Array.isArray(declared) && declared.length ? declared : ['standard'];
   if (!modes.includes(game.config.mode)) {
@@ -149,8 +205,10 @@ async function decideAlgorithmAction(command: Record<string, unknown>): Promise<
     );
   }
   const algorithm = await loadDecideAlgorithm(name);
-  const view = snapshot();
-  const action = await algorithm.decide(view, algorithmUtils);
+  // 同时模式没有 currentPlayerId，算法只能从 ctx.owner 得知自己的座位；
+  // 快照也按座位做计划保密（只暴露 myQueue）。
+  const view = snapshot(who);
+  const action = await algorithm.decide(view, algorithmUtils, { owner: who });
   // decide 返回 null 即结束回合（与 algorithms/lib/interfaces.mjs 的适配器语义一致）。
   if (!action) return { endTurn: true };
   const { type, payload } = action as { type?: unknown; payload?: unknown };

@@ -5,7 +5,11 @@ import './error-text.js';
 (() => {
   const DATA_URL = '/data/arena-stats.json';
 
-  const MAP_LABELS = { random: '随机图' };
+  const MAP_LABELS = {
+    random: '随机图', default: '六角前线', breach: '破障行动', 'danger-close': '危险距离',
+    'dual-lanes': '双线抉择', 'artillery-zone': '炮火禁区', standoff: '对峙之地',
+    'molten-throne': '熔池王座', snowflake: '雪花', 'narrow-road': '狭路相逢',
+  };
   const MODE_LABELS = { standard: '标准模式', annihilation: '歼灭模式', simultaneous: '同时回合', royale: '大逃杀' };
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
   const END_REASON_LABELS = {

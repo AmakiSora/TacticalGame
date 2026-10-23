@@ -641,59 +641,15 @@ class DetailWriter:
             return resolved.as_posix()
 
 
-def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], args,
-                  game_index: int) -> tuple[str | None, int, int, dict[str, Any]]:
-    """跑完一局，返回 (winner, acted, rounds, detail)；detail 为该局完整明细。"""
-    started_at = time.perf_counter()
-    command = reset_command(args, game_index)
-    map_seed = (command.get("random") or {}).get("seed")
-    collector = EventCollector()
-    state = worker.call(command)
-    collector.seed_ownership(state)
-    collector.absorb(state)
+def _is_plan_mode(state: dict[str, Any]) -> bool:
+    """同时回合机制：simultaneous 与 royale 共享计划队列语义（当前仅 simultaneous 可跑批）。"""
+    return (state.get("config") or {}).get("mode") in ("simultaneous", "royale")
 
-    timeline_by_round: dict[int, dict[str, Any]] = {}
-    action_log: list[dict[str, Any]] = []
-    acted = 0
-    rounds_timeout = False
-    while acted < args.max_actions:
-        if state.get("phase") == "game_over":
-            break
-        round_number = int(state.get("turn", {}).get("roundNumber", 1))
-        if round_number > args.max_rounds:
-            rounds_timeout = True
-            break
-        # 同一回合的快照互相覆盖，保留的是该回合最后一次动作后的状态。
-        timeline_by_round[round_number] = _state_snapshot(state)
-        side = state.get("turn", {}).get("currentPlayerId")
-        controller = seat_map.get(side)
-        if controller is None:
-            raise RuntimeError(f"unknown current player: {side!r}")
-        action_type, payload, info = controller.act_with_info(state, args.stochastic)
-        if args.verbose:
-            print(f"  r{round_number} {controller.short}: {action_type} {payload}")
-        action_log.append({
-            "seat": side,
-            "round": round_number,
-            "action": {"type": action_type, **payload},
-            **info,
-        })
-        try:
-            state = worker.apply(side, action_type, payload)
-        except RuntimeError as exc:
-            if getattr(controller, "kind", "model") != "algorithm":
-                raise
-            # 线上 runner 对算法动作失败的处理是结束整个回合（algorithms/lib/interfaces.mjs），
-            # 进程内评估对齐该语义：记录失败动作并改走 end_turn，不中断整批跑测。
-            print(f"  警告：{controller.short} 动作被引擎拒绝（{exc}），按线上语义结束该回合")
-            action_log.append({"seat": side, "round": round_number,
-                               "action": {"type": "end_turn"}, "kind": "algorithm",
-                               "failed": True, "error": str(exc)})
-            state = worker.apply(side, "end_turn", {})
-        collector.absorb(state)
-        acted += 1
-    timeline_by_round[int(state.get("turn", {}).get("roundNumber", 1))] = _state_snapshot(state)
 
+def _build_detail(args, seat_map: dict[str, SideController], state: dict[str, Any],
+                  action_log: list[dict[str, Any]], timeline_by_round: dict[int, dict[str, Any]],
+                  collector: EventCollector, started_at: float, game_index: int,
+                  map_seed: str | None, rounds_timeout: bool) -> dict[str, Any]:
     duration = time.perf_counter() - started_at
     if state.get("phase") == "game_over":
         result = state.get("result") or {}
@@ -748,6 +704,183 @@ def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], arg
         "actions": action_log,
         "events": collector.events,
     }
+    return detail
+
+
+def _play_sequential(worker: EngineWorker, seat_map: dict[str, SideController], args,
+                     state: dict[str, Any], collector: EventCollector,
+                     action_log: list[dict[str, Any]],
+                     timeline_by_round: dict[int, dict[str, Any]]) -> tuple[dict[str, Any], int, bool]:
+    """逐人轮流模式：按 currentPlayerId 逐动作执行，null 即 end_turn。"""
+    acted = 0
+    rounds_timeout = False
+    while acted < args.max_actions:
+        if state.get("phase") == "game_over":
+            break
+        round_number = int(state.get("turn", {}).get("roundNumber", 1))
+        if round_number > args.max_rounds:
+            rounds_timeout = True
+            break
+        # 同一回合的快照互相覆盖，保留的是该回合最后一次动作后的状态。
+        timeline_by_round[round_number] = _state_snapshot(state)
+        side = state.get("turn", {}).get("currentPlayerId")
+        controller = seat_map.get(side)
+        if controller is None:
+            raise RuntimeError(f"unknown current player: {side!r}")
+        action_type, payload, info = controller.act_with_info(state, args.stochastic)
+        if args.verbose:
+            print(f"  r{round_number} {controller.short}: {action_type} {payload}")
+        action_log.append({
+            "seat": side,
+            "round": round_number,
+            "action": {"type": action_type, **payload},
+            **info,
+        })
+        try:
+            state = worker.apply(side, action_type, payload)
+        except RuntimeError as exc:
+            if getattr(controller, "kind", "model") != "algorithm":
+                raise
+            # 线上 runner 对算法动作失败的处理是结束整个回合（algorithms/lib/interfaces.mjs），
+            # 进程内评估对齐该语义：记录失败动作并改走 end_turn，不中断整批跑测。
+            print(f"  警告：{controller.short} 动作被引擎拒绝（{exc}），按线上语义结束该回合")
+            action_log.append({"seat": side, "round": round_number,
+                               "action": {"type": "end_turn"}, "kind": "algorithm",
+                               "failed": True, "error": str(exc)})
+            state = worker.apply(side, "end_turn", {})
+        collector.absorb(state)
+        acted += 1
+    return state, acted, rounds_timeout
+
+
+def _play_simultaneous(worker: EngineWorker, seat_map: dict[str, SideController], args,
+                       state: dict[str, Any], collector: EventCollector,
+                       action_log: list[dict[str, Any]],
+                       timeline_by_round: dict[int, dict[str, Any]]) -> tuple[dict[str, Any], int, bool]:
+    """同时回合模式：每轮各座位把动作逐个入队，null 即提交；全员提交后引擎统一结算。
+
+    与线上 runner 的语义一致：
+    - 动作入队失败（被引擎计划期校验拒绝）不提交计划，记失败动作后继续重选；
+    - 行动点用尽或算法主动返回 null 时提交（end_turn = commit），由引擎自动结算；
+    - 结算后 plan.committed 清空、roundNumber +1，进入下一轮。
+    """
+    acted = 0
+    rounds_timeout = False
+    while acted < args.max_actions:
+        if state.get("phase") == "game_over":
+            break
+        round_number = int(state.get("turn", {}).get("roundNumber", 1))
+        if round_number > args.max_rounds:
+            rounds_timeout = True
+            break
+        # 轮初快照与轮内最后一次入队后的快照都会保留，便于回看计划阶段。
+        timeline_by_round[round_number] = _state_snapshot(state)
+        players = state.get("players") or {}
+        turn_order = (state.get("turn") or {}).get("turnOrder") or list(_SEATS)
+        active = [seat for seat in turn_order if (players.get(seat) or {}).get("status") == "active"]
+        # 引擎只在至少两名存活玩家且全员提交时自动结算；少于两人时交给上层超时兜底。
+        if len(active) < 2:
+            break
+        committed = set((state.get("plan") or {}).get("committed") or [])
+        pending = [seat for seat in active if seat not in committed]
+        if not pending:
+            break
+        progressed = False
+        for side in pending:
+            if state.get("phase") == "game_over" or int((state.get("turn") or {}).get("roundNumber", 1)) != round_number:
+                break
+            controller = seat_map.get(side)
+            if controller is None:
+                raise RuntimeError(f"unknown active player: {side!r}")
+            budget = int(((state.get("config") or {}).get("balance") or {}).get("actionsPerTurn") or 1)
+            queued = 0
+            rejected = 0
+            committed_ok = False
+            while queued <= budget and rejected < 20:
+                action_type, payload, info = controller.act_with_info(state, args.stochastic)
+                entry = {"seat": side, "round": round_number,
+                         "action": {"type": action_type, **payload}, **info}
+                action_log.append(entry)
+                if args.verbose:
+                    print(f"  r{round_number} {controller.short}: {action_type} {payload}")
+                if action_type == "end_turn":
+                    entry["commit"] = True
+                    try:
+                        state = worker.apply(side, "end_turn", {})
+                        acted += 1
+                        progressed = True
+                        committed_ok = True
+                        # 全员提交时这一步会触发整轮结算，事件量远大于一次普通动作；
+                        # 立即合并，避免只靠下一轮动作快照的事件尾巴而丢事件。
+                        collector.absorb(state)
+                    except RuntimeError as exc:
+                        entry["failed"] = True
+                        entry["error"] = str(exc)
+                        print(f"  警告：{controller.short} 提交计划失败（{exc}）")
+                    break
+                try:
+                    state = worker.apply(side, action_type, payload)
+                    acted += 1
+                    queued += 1
+                    progressed = True
+                    collector.absorb(state)
+                    timeline_by_round[round_number] = _state_snapshot(state)
+                except RuntimeError as exc:
+                    if getattr(controller, "kind", "model") != "algorithm":
+                        raise
+                    # 被拒动作没有入队、局面未变：继续让算法重选，不能直接 end_turn
+                    # （那会把已排队列和剩余行动点一起提交作废）。
+                    entry["failed"] = True
+                    entry["error"] = str(exc)
+                    print(f"  警告：{controller.short} 动作被引擎拒绝（{exc}），继续重选")
+                    rejected += 1
+                    continue
+                if state.get("phase") == "game_over" or int((state.get("turn") or {}).get("roundNumber", 1)) != round_number:
+                    break
+            if state.get("phase") == "game_over" or int((state.get("turn") or {}).get("roundNumber", 1)) != round_number:
+                break
+            if not committed_ok:
+                # 行动点/重选上限兜底：按已排队列提交，保证本轮能推进。
+                try:
+                    state = worker.apply(side, "end_turn", {})
+                    acted += 1
+                    progressed = True
+                    collector.absorb(state)
+                except RuntimeError as exc:
+                    print(f"  警告：{controller.short} 兜底提交计划失败（{exc}）")
+                    break
+        if not progressed:
+            break
+    return state, acted, rounds_timeout
+
+
+def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], args,
+                  game_index: int) -> tuple[str | None, int, int, dict[str, Any]]:
+    """跑完一局，返回 (winner, acted, rounds, detail)；detail 为该局完整明细。"""
+    started_at = time.perf_counter()
+    command = reset_command(args, game_index)
+    map_seed = (command.get("random") or {}).get("seed")
+    collector = EventCollector()
+    state = worker.call(command)
+    collector.seed_ownership(state)
+    collector.absorb(state)
+
+    timeline_by_round: dict[int, dict[str, Any]] = {}
+    action_log: list[dict[str, Any]] = []
+    if _is_plan_mode(state):
+        if any(getattr(controller, "kind", "model") == "model" for controller in seat_map.values()):
+            raise RuntimeError(
+                f"map {args.map_id!r} uses {state.get('config', {}).get('mode')} mode; "
+                "RL models currently support standard mode only"
+            )
+        state, acted, rounds_timeout = _play_simultaneous(
+            worker, seat_map, args, state, collector, action_log, timeline_by_round)
+    else:
+        state, acted, rounds_timeout = _play_sequential(
+            worker, seat_map, args, state, collector, action_log, timeline_by_round)
+    timeline_by_round[int((state.get("turn") or {}).get("roundNumber", 1))] = _state_snapshot(state)
+    detail = _build_detail(args, seat_map, state, action_log, timeline_by_round,
+                           collector, started_at, game_index, map_seed, rounds_timeout)
     return state.get("winner"), acted, detail["summary"]["rounds"], detail
 
 

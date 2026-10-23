@@ -6,7 +6,11 @@ import './error-text.js';
 (() => {
   const DATA_URL = '/data/arena-leaderboard.json';
 
-  const MAP_LABELS = { random: '随机图' };
+  const MAP_LABELS = {
+    random: '随机图', default: '六角前线', breach: '破障行动', 'danger-close': '危险距离',
+    'dual-lanes': '双线抉择', 'artillery-zone': '炮火禁区', standoff: '对峙之地',
+    'molten-throne': '熔池王座', snowflake: '雪花', 'narrow-road': '狭路相逢',
+  };
   const STATUS_META = {
     recommended: { label: '当前推荐', cls: 'st-good' },
     legacy: { label: '历史', cls: 'st-muted' },
@@ -185,7 +189,7 @@ import './error-text.js';
     const sorted = sortRows(rows, sort);
     const body = el.modelTable.querySelector('tbody');
     if (!currentLeague()?.overview?.games) {
-      body.innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（当前评估跑批仅覆盖标准模式）</td></tr>';
+      body.innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（可在评估控制台选择该模式启动跑批）</td></tr>';
       return;
     }
     body.innerHTML = sorted
@@ -225,7 +229,7 @@ import './error-text.js';
   function renderMatrix(ld) {
     if (!ld.overview?.games) {
       el.h2hHead.innerHTML = '<th class="model-col">参与者 \\ 对手</th>';
-      el.h2hBody.innerHTML = '<tr><td class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（当前评估跑批仅覆盖标准模式）</td></tr>';
+      el.h2hBody.innerHTML = '<tr><td class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（可在评估控制台选择该模式启动跑批）</td></tr>';
       return;
     }
     const rows = viewRows(ld).filter(m => m.games > 0);
@@ -575,6 +579,7 @@ import './error-text.js';
     evalEl['eval-mode-hint'].textContent = current
       ? current.supported
         ? `${current.maps?.length ?? 0} 张地图 · 该模式独立榜单与评分`
+          + (current.id === 'simultaneous' ? ' · 仅内置算法（RL 模型暂只支持标准模式）' : '')
         : (current.reason || '该模式暂不支持跑批')
       : '';
     updateEvalStartState();
@@ -611,9 +616,12 @@ import './error-text.js';
     evalEl['eval-algos'].innerHTML = evalAlgosForMode()
       .map(a => `<label title="${escapeAttr(a.description)}"><input type="checkbox" value="algo:${escapeAttr(a.algorithm)}" checked/><span class="tag st-algo">算法</span> ${escapeHtml(a.name)}（${escapeHtml(a.algorithm)}）</label>`)
       .join('');
-    evalEl['eval-models'].innerHTML = evalModelsForMode()
-      .map(m => `<label title="${escapeAttr(m.file)}"><input type="checkbox" value="${escapeAttr(m.file)}"/><span class="ver">${escapeHtml(m.label || '?')}</span> ${escapeHtml(m.file)}</label>`)
-      .join('');
+    const modeModels = evalModelsForMode();
+    evalEl['eval-models'].innerHTML = modeModels.length
+      ? modeModels
+        .map(m => `<label title="${escapeAttr(m.file)}"><input type="checkbox" value="${escapeAttr(m.file)}"/><span class="ver">${escapeHtml(m.label || '?')}</span> ${escapeHtml(m.file)}</label>`)
+        .join('')
+      : '<span class="eval-hint">当前模式暂无 RL 模型（现有模型仅覆盖标准模式）</span>';
     renderedParticipantsMode = evalMode;
     updateModelCount();
   }

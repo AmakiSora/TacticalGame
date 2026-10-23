@@ -106,6 +106,53 @@ describe('local engine worker random maps', () => {
   });
 });
 
+describe('local engine worker simultaneous mode', () => {
+  interface PlanState {
+    config: { mode: string };
+    phase: string;
+    turn: { roundNumber: number };
+    plan: { committed: string[]; queues: Record<string, unknown[]> } | null;
+  }
+
+  async function planAndCommit(seat: string, algorithm = 'random-sim'): Promise<PlanState> {
+    let state = await handleCommand({ cmd: 'state' }) as PlanState;
+    for (let step = 0; step < 40; step++) {
+      const result = await handleCommand({ cmd: 'decide', owner: seat, algorithm }) as DecideResult;
+      if (result.endTurn) {
+        return await handleCommand({ cmd: 'apply', owner: seat, action: { type: 'end_turn' } }) as PlanState;
+      }
+      if (!result.action) throw new Error('decide returned neither action nor endTurn');
+      state = await handleCommand({
+        cmd: 'apply', owner: seat, action: { type: result.action.type, ...result.action.payload },
+      }) as PlanState;
+    }
+    throw new Error(`${seat} did not commit within 40 actions`);
+  }
+
+  it('accepts simultaneous maps and resolves a round after both seats commit', async () => {
+    const initial = await handleCommand({ cmd: 'reset', mapId: 'standoff' }) as PlanState;
+    expect(initial.config.mode).toBe('simultaneous');
+    expect(initial.phase).toBe('active');
+
+    let state = await planAndCommit('player_a');
+    expect(state.plan?.committed).toContain('player_a');
+    expect(state.turn.roundNumber).toBe(1);
+
+    state = await planAndCommit('player_b');
+    // 全员提交后引擎自动结算：要么进入下一轮，要么本轮直接终局。
+    expect(state.phase === 'game_over' || state.turn.roundNumber > 1).toBe(true);
+  });
+
+  it('honors algorithm modes and rejects unsupported plan modes', async () => {
+    await handleCommand({ cmd: 'reset', mapId: 'standoff' });
+    // 标准算法不能坐进同时模式对局。
+    await expect(handleCommand({ cmd: 'decide', owner: 'player_a', algorithm: 'threat' }))
+      .rejects.toThrow('mode');
+    // 歼灭/大逃杀尚未接入进程内跑批。
+    await expect(handleCommand({ cmd: 'reset', mapId: 'snowflake' })).rejects.toThrow('simultaneous modes only');
+  });
+});
+
 describe('local engine worker algorithm decide channel', () => {
   // 与线上 REST 适配器语义一致：decide 返回动作或 null（=结束回合）；
   // 动作合法性由 apply 把关——apply 对非法动作抛错，因此"整回合 decide 循环

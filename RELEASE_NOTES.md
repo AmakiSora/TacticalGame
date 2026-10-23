@@ -4,6 +4,20 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.8.2
+
+### 新增
+
+- **AI 竞技场评估控制台支持同时回合模式**：`/api/arena/eval/start` 现在按所选地图的 `mode` 接受 `simultaneous` 批次（`standoff` / `molten-throne`），同一批混模式直接拒绝；参评者按注册表 `ALGORITHM_META.modes` 过滤，同时模式只纳入 `random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` 四个算法，RL 模型（仅覆盖标准模式）明确不参评。控制台模式条不再把同时回合标为「暂不支持」，地图、算法、模型清单随模式联动；`round_robin.py` 新增 `--mode`（auto/standard/simultaneous），按地图模式自动发现算法。
+- **进程内评估链路接入同时回合计划/结算**：`rl/training/local-worker.ts` 的 `reset` 接受 simultaneous 地图，`apply` 通道把 move/attack/heal/deploy/demolish/wait 映射到 `queue*Action`，`end_turn` 走 `commitAndMaybeResolve`；`decide` 通道按座位传入 `ctx.owner` 并按 REST 同口径隐藏对手计划队列。`rl/evaluation/evaluate_cross.py` 新增同时回合逐轮「各座位入队 → 全员提交 → 统一结算」循环：动作被引擎拒绝时继续重选而不提前提交，行动点/重选上限兜底提交；明细照常记录 timeline/actions/events/derived。
+- **同时回合首轮榜单数据**：完成 4 个同时算法 × `standoff` / `molten-throne` × 每对每图 24 局跑批（288 局，0 失败批），`arena/matches.jsonl` 累积至 36,288 局；`arena-leaderboard.json` / `arena-stats.json` 新增同时回合分区（4 名参与者各 144 局），标准榜评分与局数不变。
+
+### 测试与验证
+
+- `npm run build` 通过；`npm test` 全量 111 个测试文件 / 943 个用例通过；`rl/.venv/Scripts/python.exe -m pytest tests/rl -q` 69 个用例通过（新增 `tests/rl/test_round_robin_modes.py`：地图模式推断、混模式/未接入模式/`--mode` 不一致拒绝）。
+- `tests/rl/local-worker.test.ts` 新增同时模式用例：`standoff` reset、两个座位入队并提交后自动推进回合、标准算法/大逃杀地图拒绝；`tests/api/arena-eval.test.ts` 覆盖同时模式启动、混模式拒绝、模型与标准算法跨模式拒绝。
+- 同时回合冒烟：`round_robin.py --maps standoff --games 2`（4 算法、12 局）0 失败；全量 288 局 0 失败（8m13s，0.6 局/s）。榜单结果：矩阵均衡算法 1730、兵棋推演算法 1692、落点概率算法 1676、同时随机算法 903。
+
 ## 3.8.1
 
 ### 变更

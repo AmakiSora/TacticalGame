@@ -30,14 +30,16 @@ const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json'
  */
 const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRIPT];
 
-// 评估链路当前只实现标准模式：地图池与 round_robin.py 的 DEFAULT_MAPS 保持一致。
+// 评估链路已接入 standard 与 simultaneous：标准模式地图池与 round_robin.py 的
+// DEFAULT_MAPS 保持一致；同时模式使用两张静态地图，且只纳入注册表声明 simultaneous
+// 的算法（RL 模型目前只覆盖标准模式）。
 export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
+export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne'] as const;
 
 /**
- * 控制台展示用地图目录：标准模式是当前唯一可跑批模式，另外三种模式也列出来，
+ * 控制台展示用地图目录：标准/同时回合是当前可跑批模式，另外两种模式也列出来，
  * 让用户能明确看到“模式不同、地图不同、算法不同”，而不是把它们混在一个池里。
- * 标准模式地图与 round_robin.py 的 DEFAULT_MAPS 保持一致；非标准模式地图用于展示该
- * 模式已有哪些地图，跑批入口会明确拒绝。
+ * 歼灭/大逃杀地图用于展示该模式已有哪些地图，跑批入口会明确拒绝。
  */
 export const EVAL_MAPS = [
   { id: 'random', label: '随机图', mode: 'standard' },
@@ -55,14 +57,15 @@ export const EVAL_MAPS = [
 export const EVAL_MODES = [
   { id: 'standard', label: '标准模式', supported: true },
   { id: 'annihilation', label: '歼灭模式', supported: false },
-  { id: 'simultaneous', label: '同时回合', supported: false },
+  { id: 'simultaneous', label: '同时回合', supported: true },
   { id: 'royale', label: '大逃杀', supported: false },
 ] as const;
 
-export const EVAL_MODE_UNSUPPORTED_REASON = '评估跑批目前仅支持标准模式；该模式的地图与算法可在此查看，但尚不能在网页启动跑批。';
+export const EVAL_MODE_UNSUPPORTED_REASON = '评估跑批目前支持标准模式与同时回合；歼灭/大逃杀模式的地图与算法可在此查看，但尚不能在网页启动跑批。';
 
-// 兼容现有调用方：KNOWN_MAPS 仍表示“可跑批的地图”。
-export const KNOWN_MAPS = STANDARD_EVAL_MAPS;
+// 兼容现有调用方：KNOWN_MAPS 表示“可跑批的地图”（标准 + 同时回合）。
+export const KNOWN_MAPS = EVAL_MAPS.filter(map => map.mode === 'standard' || map.mode === 'simultaneous')
+  .map(map => map.id);
 
 /** 控制台的模式目录：每个模式只带自己的地图，供前端切换与地图/算法联动过滤。 */
 export function buildEvalModeCatalog() {
@@ -76,6 +79,8 @@ export function buildEvalModeCatalog() {
 export type EvalRunStatus = 'idle' | 'running' | 'finished' | 'failed' | 'stopped' | 'interrupted';
 
 export interface EvalRunParams {
+  /** 本批对局模式（由地图池推断，同一批不允许混模式）；缺省按 standard 兼容旧调用。 */
+  mode?: string;
   maps: string[];
   /**
    * 参评者过滤：null = 全部可对战模型 + 全部注册算法（round_robin 缺省行为）。
@@ -282,6 +287,7 @@ export class EvalRunner {
     if (this.isRunning) throw new Error('eval run already in progress');
     const args = [
       this.roundRobinScript,
+      '--mode', params.mode ?? 'standard',
       '--maps', params.maps.join(','),
       '--games', String(params.games),
       '--jobs', String(params.jobs),
@@ -510,12 +516,19 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
         code: 'invalid_maps',
       });
     }
-    const unsupportedMaps = mapInfos.filter(
-      (info): info is (typeof EVAL_MAPS)[number] => Boolean(info && info.mode !== 'standard'),
-    );
-    if (unsupportedMaps.length) {
+    const selectedModes = new Set(mapInfos.map(info => info!.mode));
+    if (selectedModes.size > 1) {
       return reply.code(400).send({
-        error: unsupportedMaps.map(info => `「${info.label}」`).join('、') + '不属于标准模式；' + EVAL_MODE_UNSUPPORTED_REASON,
+        error: '同一批只能跑同一模式的地图，不能混合：'
+          + mapInfos.map(info => `「${info!.label}」`).join('、'),
+        code: 'mixed_modes',
+      });
+    }
+    const mode = [...selectedModes][0]!;
+    const modeInfo = EVAL_MODES.find(item => item.id === mode);
+    if (!modeInfo?.supported) {
+      return reply.code(400).send({
+        error: (modeInfo?.label ?? mode) + '尚不支持评估跑批；' + EVAL_MODE_UNSUPPORTED_REASON,
         code: 'mode_not_supported',
       });
     }
@@ -542,21 +555,35 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
           code: 'invalid_participants',
         });
       }
+      const modelFilters = participants.filter(m => !m.startsWith('algo:'));
+      if (mode !== 'standard' && modelFilters.length) {
+        return reply.code(400).send({
+          error: 'RL 模型目前仅支持标准模式，不能参评「' + modeInfo.label + '」：'
+            + modelFilters.join(', ') + '；请只选择该模式声明的内置算法。',
+          code: 'mode_not_supported',
+        });
+      }
       const unsupportedAlgo = participants
         .filter(m => m.startsWith('algo:'))
         .filter(m => {
           const config = ALGORITHM_BOTS[algorithmParticipantId(m.slice('algo:'.length))];
-          return config && !config.modes.includes('standard');
+          return config && !config.modes.includes(mode);
         });
       if (unsupportedAlgo.length) {
         return reply.code(400).send({
-          error: unsupportedAlgo.join(', ') + ' 不支持标准模式；' + EVAL_MODE_UNSUPPORTED_REASON,
+          error: unsupportedAlgo.join(', ') + ` 不支持${modeInfo.label}；请只选择注册表声明该模式的算法。`,
           code: 'mode_not_supported',
+        });
+      }
+      if (mode !== 'standard' && participants.filter(m => m.startsWith('algo:')).length < 2) {
+        return reply.code(400).send({
+          error: `${modeInfo.label}至少需要选择 2 个参评算法（该模式暂无 RL 模型）。`,
+          code: 'invalid_participants',
         });
       }
     }
     const salt = body.salt ? String(body.salt).slice(0, 64) : null;
-    const params: EvalRunParams = { maps, participants, games, jobs, salt, dryRun: Boolean(body.dryRun) };
+    const params: EvalRunParams = { mode, maps, participants, games, jobs, salt, dryRun: Boolean(body.dryRun) };
     try {
       runner.start(params);
     } catch (err) {

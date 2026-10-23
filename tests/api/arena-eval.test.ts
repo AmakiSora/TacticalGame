@@ -82,9 +82,13 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(modeIds).toEqual(['standard', 'annihilation', 'simultaneous', 'royale']);
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'standard').supported).toBe(true);
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'simultaneous')).toMatchObject({
-      supported: false,
-      maps: expect.arrayContaining([expect.objectContaining({ id: 'standoff' })]),
+      supported: true,
+      maps: expect.arrayContaining([
+        expect.objectContaining({ id: 'standoff' }),
+        expect.objectContaining({ id: 'molten-throne' }),
+      ]),
     });
+    expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'annihilation').supported).toBe(false);
   });
 
   it('rejects invalid maps, games and jobs on start', async () => {
@@ -101,11 +105,61 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(badJobs.json().code).toBe('invalid_jobs');
 
     const unsupportedMode = await app.inject({
-      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['standoff'] },
+      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['artillery-zone'] },
     });
     expect(unsupportedMode.statusCode).toBe(400);
     expect(unsupportedMode.json().code).toBe('mode_not_supported');
-    expect(unsupportedMode.json().error).toContain('仅支持标准模式');
+    expect(unsupportedMode.json().error).toContain('歼灭模式尚不支持评估跑批');
+
+    const mixedModes = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random', 'standoff'] },
+    });
+    expect(mixedModes.statusCode).toBe(400);
+    expect(mixedModes.json().code).toBe('mixed_modes');
+  });
+
+  it('starts a simultaneous-mode run with the mode-specific map and algorithm pool', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['standoff'], participants: ['algo:random-sim', 'algo:dest-prob'], games: 4 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({
+      mode: 'simultaneous',
+      maps: ['standoff'],
+      participants: ['algo:random-sim', 'algo:dest-prob'],
+    });
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--mode simultaneous');
+    expect(args).toContain('--maps standoff');
+    expect(args).toContain('--algorithms random-sim,dest-prob');
+    expect(args).not.toContain('--models');
+  });
+
+  it('rejects models and standard-only algorithms in a simultaneous pool', async () => {
+    const model = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['standoff'], participants: ['v3.0.4'] },
+    });
+    expect(model.statusCode).toBe(400);
+    expect(model.json().code).toBe('mode_not_supported');
+    expect(model.json().error).toContain('RL 模型目前仅支持标准模式');
+
+    const standardAlgo = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['standoff'], participants: ['algo:threat'] },
+    });
+    expect(standardAlgo.statusCode).toBe(400);
+    expect(standardAlgo.json().code).toBe('mode_not_supported');
+    expect(standardAlgo.json().error).toContain('不支持同时回合');
+
+    const singleAlgo = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['standoff'], participants: ['algo:dest-prob'] },
+    });
+    expect(singleAlgo.statusCode).toBe(400);
+    expect(singleAlgo.json().code).toBe('invalid_participants');
+    expect(singleAlgo.json().error).toContain('至少需要选择 2 个');
   });
 
   it('rejects a simultaneous-only algorithm in the standard evaluation pool', async () => {
@@ -125,6 +179,7 @@ describe('AI 竞技场评估控制台 API', () => {
     });
     expect(mixed.statusCode).toBe(200);
     const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--mode standard');
     expect(args).toContain('--models v3.0');
     expect(args).toContain('--algorithms threat,greedy');
   });
@@ -159,7 +214,7 @@ describe('AI 竞技场评估控制台 API', () => {
   });
 
   it('buildParticipantArgs handles the null (all) case', () => {
-    expect(buildParticipantArgs({ maps: ['random'], participants: null, games: 24, jobs: 1, salt: null, dryRun: false })).toEqual([]);
+    expect(buildParticipantArgs({ mode: 'standard', maps: ['random'], participants: null, games: 24, jobs: 1, salt: null, dryRun: false })).toEqual([]);
   });
 
   it('serves the merged participant catalog', async () => {
@@ -190,6 +245,7 @@ describe('AI 竞技场评估控制台 API', () => {
     const spawnCall = spawner.calls[0];
     expect(spawnCall.cmd).toBe('python-test');
     expect(spawnCall.args.join(' ')).toContain('round_robin.py');
+    expect(spawnCall.args.join(' ')).toContain('--mode standard');
     expect(spawnCall.args.join(' ')).toContain('--maps random');
 
     const child = spawner.children[0];

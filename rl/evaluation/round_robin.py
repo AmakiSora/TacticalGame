@@ -10,15 +10,23 @@
 - 复用 rl/evaluation/evaluate_cross.py 子进程，原样保留其跨版本编码路由与配对换座逻辑；
 - 算法参与者的名字以 ``algo_`` 前缀 + 版本写入 matches.jsonl（如 algo_threat@v1），
   传参规格为 ``algo:<name>@<version>``（版本取 registry.mjs 的当前标注，保证
-  算法升版后历史对局仍归属旧版本 id）；--algorithms none 可退回纯模型循环赛。
+  算法升版后历史对局仍归属旧版本 id）；--algorithms none 可退回纯模型循环赛；
+- 地图模式从 maps/<id>.json 的 ``mode`` 字段推断（random 固定 standard）；同一批
+  只能跑同一模式。standard 之外的模式按注册表 ``ALGORITHM_META.modes`` 只纳入该模式
+  算法（同时回合当前有 random-sim / dest-prob / kriegspiel / matrix-eq），RL 模型
+  仅支持标准模式，不参与同时模式跑批。
 
 用法示例：
 
-    # 全量（模型+算法两两 × 7 图 × 24 局，可分批跑）
+    # 全量标准模式（模型+算法两两 × 5 图 × 24 局，可分批跑）
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py
 
     # 先跑随机图池
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random
+
+    # 同时回合（仅内置算法；两张同时模式地图）
+    rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py \
+        --maps standoff,molten-throne --games 24
 
     # 冒烟测试
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default \
@@ -46,6 +54,9 @@ MODEL_RE = re.compile(r"^hex_ppo_(v\d+\.\d+\.\d+)_")
 EXCLUDED_VERSIONS = {"v1.0.0"}
 DEFAULT_MAPS = "random,default,breach,danger-close,dual-lanes"
 DEFAULT_STATS_FILE = Path("arena/matches.jsonl")
+# 评估链路已接入的模式：standard 走逐动作执行，simultaneous 走计划入队/提交；
+# annihilation / royale 的炮火缩圈与淘汰流程尚未接入。
+SUPPORTED_EVAL_MODES = ("standard", "simultaneous")
 # 模型批次的固定开销（torch 导入 + tsx worker 启动 + 模型加载）与单局耗时；
 # 纯算法批次不加载模型，开销与单局都低一档。用于预估耗时。
 TASK_OVERHEAD_SEC_MODEL = 15
@@ -58,6 +69,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--maps", default=DEFAULT_MAPS,
                         help=f"逗号分隔地图池（默认 {DEFAULT_MAPS}）")
+    parser.add_argument("--mode", choices=("auto",) + SUPPORTED_EVAL_MODES, default="auto",
+                        help="对局模式（默认 auto：按所选地图的 mode 字段推断；同一批不能混模式）")
     parser.add_argument("--games", type=int, default=24,
                         help="每对参与者 × 地图的目标总局数（含已跑局数，默认 24）")
     parser.add_argument("--stats-file", default=None,
@@ -70,7 +83,7 @@ def parse_args():
     parser.add_argument("--models", default=None,
                         help="逗号分隔的文件名子串过滤，只评测匹配的模型（冒烟测试用）")
     parser.add_argument("--algorithms", default=None,
-                        help="逗号分隔算法名（缺省=全部注册算法；none=不带算法，纯模型循环赛）")
+                        help="逗号分隔算法名（缺省=当前模式全部注册算法；none=不带算法，纯模型循环赛）")
     parser.add_argument("--policy-stats", action="store_true",
                         help="透传给 evaluate_cross：每步额外记录价值估计/策略熵，跑批耗时约翻倍")
     parser.add_argument("--dry-run", action="store_true", help="只打印任务计划，不实际对战")
@@ -99,16 +112,50 @@ def discover_models(models_dir: Path) -> tuple[list[Path], list[Path]]:
     return included, excluded
 
 
-def discover_algorithms(root: Path) -> list[tuple[str, str]]:
+def load_map_modes(root: Path) -> dict[str, str]:
+    """读取 maps/*.json 的 mode 字段；random 固定 standard，缺省字段按 standard。"""
+    modes = {"random": "standard"}
+    for path in sorted((root / "maps").glob("*.json")):
+        try:
+            config = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"无法读取地图 {path.name}：{exc}") from exc
+        mode = config.get("mode") if isinstance(config, dict) else None
+        modes[path.stem] = mode if isinstance(mode, str) and mode else "standard"
+    return modes
+
+
+def resolve_mode(root: Path, maps: list[str], requested: str) -> str:
+    """把地图池解析成唯一对局模式；混模式/未知地图/未接入模式一律拒绝。"""
+    if not maps:
+        raise ValueError("地图池不能为空")
+    map_modes = load_map_modes(root)
+    unknown = [map_id for map_id in maps if map_id not in map_modes]
+    if unknown:
+        raise ValueError(f"未知地图：{', '.join(unknown)}")
+    modes = {map_modes[map_id] for map_id in maps}
+    if len(modes) != 1:
+        detail = "、".join(f"{map_id}={map_modes[map_id]}" for map_id in maps)
+        raise ValueError(f"同一批只能跑同一模式，不能混合：{detail}")
+    mode = modes.pop()
+    if mode not in SUPPORTED_EVAL_MODES:
+        raise ValueError(f"地图模式 {mode} 尚未接入评估跑批（当前支持 {' / '.join(SUPPORTED_EVAL_MODES)}）")
+    if requested != "auto" and requested != mode:
+        raise ValueError(f"--mode {requested} 与地图模式 {mode} 不一致")
+    return mode
+
+
+def discover_algorithms(root: Path, mode: str = "standard") -> list[tuple[str, str]]:
     """读取 algorithms/registry.mjs 的注册算法及当前版本（经 node，避免手工维护第二份名单）。
 
     返回 (注册名, 版本) 对，两者拼成竞技场参与者 id ``algo_<注册名>@<版本>``。
-    只发现支持 standard 的算法：评估地图池全是标准模式图，且不同模式不能混用算法
-    （注册表 ALGORITHM_META.modes 是唯一口径）。
+    只发现支持当前地图模式的算法（注册表 ALGORITHM_META.modes 是唯一口径）；
+    不同模式不能混用算法。
     """
     registry_url = (root / "algorithms" / "registry.mjs").as_posix()
+    mode_literal = json.dumps(mode)
     script = (f"import('file:///{registry_url}').then(r => console.log("
-              "r.listAlgorithmInfo().filter(i => i.modes.includes('standard'))"
+              f"r.listAlgorithmInfo().filter(i => i.modes.includes({mode_literal}))"
               ".map(i => i.name + '@' + i.version).join(',')))")
     result = subprocess.run(
         ["node", "--input-type=module", "-e", script],
@@ -127,12 +174,12 @@ def discover_algorithms(root: Path) -> list[tuple[str, str]]:
     return pairs
 
 
-def resolve_algorithms(root: Path, raw: str | None) -> tuple[list[tuple[str, str]], str | None]:
+def resolve_algorithms(root: Path, raw: str | None, mode: str = "standard") -> tuple[list[tuple[str, str]], str | None]:
     """把 --algorithms 参数解析成 (注册名, 版本) 清单；node 不可用时降级为空清单并给出警告。"""
     if raw is not None and raw.strip().lower() in ("none", "off", ""):
         return [], None
     try:
-        registered = discover_algorithms(root)
+        registered = discover_algorithms(root, mode)
     except (OSError, RuntimeError) as exc:
         return [], f"无法读取算法注册表（node 不可用？）：{exc}；本轮不带算法参与者。"
     if raw is None:
@@ -266,14 +313,27 @@ def main():
     stats_file = root / args.stats_file if args.stats_file else root / DEFAULT_STATS_FILE
     maps = [m.strip() for m in args.maps.split(",") if m.strip()]
 
-    included, excluded = discover_models(models_dir)
-    if args.models:
-        needles = [n.strip() for n in args.models.split(",") if n.strip()]
-        included = [m for m in included if any(n in m.name for n in needles)]
-        excluded = [m for m in excluded if any(n in m.name for n in needles)]
+    try:
+        mode = resolve_mode(root, maps, args.mode)
+    except ValueError as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        return 1
+
+    if mode == "standard":
+        included, excluded = discover_models(models_dir)
+        if args.models:
+            needles = [n.strip() for n in args.models.split(",") if n.strip()]
+            included = [m for m in included if any(n in m.name for n in needles)]
+            excluded = [m for m in excluded if any(n in m.name for n in needles)]
+    else:
+        if args.models:
+            print(f"错误：{mode} 模式暂不支持 RL 模型参评（现有模型仅覆盖 standard）。",
+                  file=sys.stderr)
+            return 1
+        included, excluded = [], []
 
     try:
-        algorithm_infos, algo_warning = resolve_algorithms(root, args.algorithms)
+        algorithm_infos, algo_warning = resolve_algorithms(root, args.algorithms, mode)
     except ValueError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 1
@@ -292,7 +352,8 @@ def main():
     python = resolve_python(root)
     evaluate_script = root / "rl" / "evaluation" / "evaluate_cross.py"
 
-    print(f"参评模型 {len(included)} 个：")
+    print(f"对局模式：{mode}")
+    print(f"参评模型 {len(included)} 个：" if included else "参评模型：无（该模式不参评）")
     for path in included:
         version = MODEL_RE.match(path.name).group(1)
         print(f"  {version:<8} {path.name}")

@@ -18,6 +18,8 @@
 | 支持模式 | 仅同时回合（simultaneous） |
 | 镜像的引擎版本 | **3.8.0 / 3.8.1** 的 `src/engine/simultaneousResolve.ts:resolveRoundSteps` + `src/engine/planning.ts` 前缀投影；v1 镜像的是已删除的 `src/engine/simultaneous.ts:resolveRound` |
 | 参考实现状态 | v2：与真实引擎逐点对拍 40 个局面零偏差；standoff / molten-throne 各 30 局 ×3 对手共 180 局零非法动作 |
+| 作者 | Qwen3.8Max0902-QD |
+
 
 ## 算法原理
 

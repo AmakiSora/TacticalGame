@@ -17,6 +17,7 @@
 | 接口类型 | 策略接口（`decide`） |
 | 支持模式 | 仅同时回合（simultaneous） |
 | 镜像的引擎版本 | **3.8.0 / 3.8.1** 的 `src/engine/planning.ts` 队列前缀投影 + 地形寻路 + `attacksPerUnit`，不依赖自建结算器 |
+| 作者 | DeepseekV4.1Flash1017-DSH |
 
 ## 算法原理
 

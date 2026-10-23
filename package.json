@@ -26,7 +26,7 @@
     "version": "node script/bump-version.mjs",
     "sync-version": "node script/bump-version.mjs",
     "check-version": "node script/bump-version.mjs --check",
-    "test:rl": "rl/.venv/Scripts/python.exe -m pytest tests/rl -q"
+    "test:rl": "node script/rl-test.mjs"
   },
   "dependencies": {
     "@fastify/compress": "^9.2.0",

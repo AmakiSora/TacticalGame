@@ -46,7 +46,7 @@ python -m pip install -r rl/requirements.txt
 训练环境的 Python 单元测试（动作空间/掩码/候选一致性/v2.7 映射）：
 
 ```powershell
-npm run test:rl        # 等价于 rl/.venv/Scripts/python.exe -m pytest tests/rl -q
+npm run test:rl        # 经 script/rl-test.mjs 调 rl/.venv 的 pytest 跑 tests/rl（任意 shell 可用）
 ```
 
 ## 安装项目依赖

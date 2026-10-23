@@ -1,6 +1,91 @@
 # 算法 AI 版本发布记录
 
-> 本文档记录算法 AI 系统的版本历史、功能变更和性能进展。
+> 本文档记录算法 AI 侧的版本变化：新增算法、算法版本升级、同时回合镜像适配、算法接口/工具链与相关地图/计分规则变化。
+>
+> **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.1 的算法里程碑，未列出的版本表示没有算法侧变化。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
+>
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2；标准模式算法（greedy / random / mcts / threat / field / verdict）仍为 v1。
+
+## 3.8.1（2026-10-23）— 同时回合算法 v2：3.8.0 分步引擎适配
+
+### 变更
+
+- **random-sim 升级到 v2**：移除“一单位一轮一动作”保守枚举，同一单位可跨行动点连续行动；攻击/治疗/移动按队列前缀的投影站位计算，移动改为只按地形 BFS（单位/总部不挡路），部署/移动按投影后空位判断，并遵守 `balance.attacksPerUnit`（默认 1）。仍保持均匀随机策略，不引入启发式。
+- **kriegspiel 升级到 v2**：镜像对象从旧 `resolveRound` 换成 `simultaneousResolve.ts:resolveRoundSteps`——级联失败、到达判定与依赖传播、同一步腾格/交换、`attackLock` 按计划时刻锁定、逐步死亡、终局轮跳过占点；计划校验改为队列前缀投影，候选生成逐行动点重算，新增 `wait` 与 `demolish`，搜索邻域扩展为换步/删步/插 `wait`/交换相邻步/追加，敌方计划改为有序采样。
+- **matrix-eq 升级到 v2**：重写分步结算镜像、投影站位/地形寻路校验与组合动作生成（move→attack、attack→move、两连移、移动+治疗）；新增自适应利用混合（γ = min(0.45, 0.12×实证轮数)）与池内精修（≤8 个有界变异）；`round_resolved` 按步序重建敌方计划。
+- **dest-prob 升级到 v2**：按 3.8 分步引擎重写候选生成——队列前缀投影站位、同一单位跨行动点连续行动、地形寻路（单位/总部不挡路）、`attacksPerUnit` 攻击上限、投影空位部署与重装爆破；治疗按投影站位并去重。保留解析式对手落点模型，不做整轮模拟。同 harness 对 v1 50/60（83.3%）、对 random-sim 60/60。
+- **算法 runner 支持 `wait`**：`algorithms/lib/api-client.mjs` 新增 `wait()`，`algorithms/lib/interfaces.mjs` 的 `decide` 分发新增 `case 'wait'`，算法可主动把关键动作对齐到更晚行动点。
+
+### 修复
+
+- random-sim 修复 3.8.0 规则下行动点用不满、枚举口径与引擎不一致的问题。
+- kriegspiel v2 修复旧镜像的整轮单发语义；但 `destination_occupied` 候选未排除敌军当前占位，实测 17.1–23.1 次结算失败/局，已记录为已知短板，待 v3 修复（详见 `algorithms/kriegspiel.md`「已知限制 #2」）。
+
+### 测试与验证
+
+- `random-sim`：18 个单测（形状瞄准、治疗瞄格、AP、同单位多动作、`attacksPerUnit`、投影站位、目的格去重、部署预算、炮火过滤、真实 standoff 整轮合法性）。
+- `kriegspiel`：真实引擎逐点对拍 40 个局面零偏差；standoff / molten-throne 各 30 局 ×3 对手共 180 局零非法；对 random-sim 60:0、对 dest-prob 52:8（86.7%）、对 matrix-eq v2 29:31（standoff 27:3、molten-throne 2:28 为已知斩首短板）；v1 同 harness 基线对 dest-prob 43.3%、对 matrix-eq 31.7%，适配价值 +43.4pp / +16.6pp，v1↔v2 直接对打 35:25（p=0.245）未达显著。
+- `matrix-eq`：镜像裁判 v2 vs v1 **23:7（76.7%）**、vs kriegspiel v1 12:18、vs dest-prob v1 13:17、vs random-sim 30:0；90 局零非法，单轮 ≤157ms/侧；冒烟 107 动作零非法、最大 85ms。
+- `dest-prob`：14 个单测覆盖落点分布/冲突规避/预测射击/arc 治疗/部署/原地占点/同单位多动作/队列投影攻击/地形寻路/`attacksPerUnit`/真实两图整轮入队；整局自博弈两图零非法。真实引擎同 harness 30 局/图：对 random-sim 60/60，对 v1 50/60（83.3%），对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（抽样）。
+- `npm run build` 通过；`npm test` 110 文件 / 934 例全绿（dest-prob v2 加入后单测数见主项目测试记录）；四份算法档案新增/补齐 `v1 → v2` 五段式版本说明。
+
+## 3.8.0（2026-10-22）— 同时回合改为按行动点分步结算
+
+### 变更
+
+- **队列位置就是行动点**：所有玩家的第 k 条动作同时结算完再结算第 k+1 条；同一单位可跨行动点连续行动，每个行动点每人仍只能执行一条动作；`round_resolved.results` 与动作事件新增 `step`，`round_resolved` 新增 `steps`。
+- **新增 `wait`**：消耗 1 行动点、不做任何事，用于对齐关键动作；`POST /api/games/:id/plan/wait`。
+- **每单位每轮攻击上限**：地图 `balance.attacksPerUnit`（默认 1），入队/重排/撤回/结算四层校验，超出 `attack_limit_reached`。
+- **到达与失败语义**：同一步先移出再移入，允许交换/链式腾格；硬失败级联作废该单位本轮后续动作（`previous_action_failed`），攻击落空/治疗无人不触发级联；占用/地形判定延迟到结算，计划期只做结构性校验。
+- **计划操作**：新增 `POST /plan/reorder` 原子重排；`plan/revoke` 撤回后按新顺序重放校验，依赖被撤动作的撤回会被拒绝。
+
+### 算法影响
+
+- 所有同时回合算法的旧镜像进入适配期：random-sim、kriegspiel、matrix-eq 在 3.8.1 升 v2；`dest-prob` 在 3.8.0 时仍按旧“一单位一动作”口径运行，3.8.1 已升 v2（见上），3.7 的 100:0 等数据只代表旧规则。
+- 算法档案新增规则镜像章节，明确计划期投影、地形寻路、`attacksPerUnit` 与失败连锁语义。
+
+### 测试与验证
+
+- 新增 `tests/engine/simultaneous-steps.test.ts`，覆盖逐点推进、移动到总部失败、跨步腾格、敌方腾格后进入、移动失败连锁、同步交换/链式腾格、`wait` 对齐、部署填格、爆破后移动、阵亡单位后续动作与提前终局。
+- `npm run build` 通过；`npm test` 110 文件 / 927 例全绿。
+
+## 3.7.5（2026-10-22）— matrix-eq 矩阵均衡算法 v1
+
+### 新增功能
+
+- **matrix-eq v1**：把每轮升维成「计划组合 × 计划组合」矩阵博弈——我方 10 个候选整轮计划（6 种策略人格 + 4 个随机权重）与敌方镜像计划（含 `round_resolved` 事件史重建的真实计划）逐组合跑镜像结算器算支付，用 CFR 自我对弈求均衡混合，再按 ε=0.15 与“对实证分布的纯最优响应”混合后抽样；`decide` 每轮首次调用求解并缓存整轮计划，之后逐动作吐出。
+- 注册键 `algo_matrix-eq`，`modes: ['simultaneous']`；大厅算法下拉与 `/api/algorithms` 由注册表自动带出；档案 `algorithms/docs/algorithms/matrix-eq.md`。
+
+### 测试与验证
+
+- `tests/algorithms/matrix-eq-selfplay.test.ts`：standoff / molten-throne 两人局与 standoff 三人局，整局零非法并正常完赛。
+- 无服务器脚本：`scripts/matrix_eq_smoke.mjs`（116 动作零非法、无 NaN、同局同轮可复现、单轮最大 61ms）与 `scripts/matrix_eq_benchmark.mjs`（镜像裁判、真随机掷骰 + 引擎回合生命周期）。
+- standoff 2 人局各 30 局（交替座位）：matrix-eq 对 random-sim 30:0、对 dest-prob 14:16（顺序对照合计 25:35，p≈0.20）、对 kriegspiel 8:22；150 局零非法，单轮求解最大 173ms。
+- 真实服务器端到端：standoff 双 matrix-eq bot 完成 15 回合裁定（149 个动作、30 次提交，零 `action_failed` / `bot_failed`）；`npm test` 109 文件 / 902 例全绿。
+
+## 3.7.4（2026-10-22）— 竞技场按玩法模式分榜
+
+### 变更
+
+- Arena 榜单数据改为 `modes[]`，按地图 `mode` 拆成独立评分池；页面新增模式切换条，地图池、参评者、对位矩阵、KPI 与玩法统计跟随模式。
+- 算法按 `ALGORITHM_META.modes` 只进入支持的模式；`/api/arena/participants` 返回算法 modes；评估控制台按模式分组，但进程内跑批仍只支持 standard。
+
+### 测试与验证
+
+- 新增 `tests/public/arena-mode.test.ts`，扩展 `generateArenaLeaderboard` / `generateArenaStats` 的模式分组、算法隔离与档案评分测试；`npm test` 108 文件 / 898 例全绿。
+
+## 3.7.3（2026-10-22）— kriegspiel 兵棋推演算法 v1
+
+### 新增功能
+
+- **kriegspiel v1**：把整份计划放入镜像 `resolveRound` 的 JS 单轮结算器真实结算，按 `objective` / `aggressive` / `random` 三种对手性格做蒙特卡洛 rollout，以「均值 − λ·标准差」风险调整分选择计划并爬山精修；复用 dest-prob 的 `computeAim` / `enumerateAims` 与落点模型。
+- 注册键 `algo_kriegspiel`，`modes: ['simultaneous']`；档案 `algorithms/docs/algorithms/kriegspiel.md`。
+
+### 测试与验证
+
+- `tests/algorithms/kriegspiel-selfplay.test.ts`：真实 standoff / molten-throne 对局中每个 `decide` 输出均可入队，零非法动作。
+- headless 标定（交替先手，各 30 局 ×2 地图 ×2 对手）：对 random-sim 60/60、对 dest-prob 34/60（56.7%），240 局零非法；单轮搜索约 20ms、缓存命中时 `decide` 约 2–3ms。
+- `npm test` 107 文件 / 888 例全绿。
 
 ## 3.7.2（2026-10-22）— Destination Probability 落点概率算法
 
@@ -13,8 +98,32 @@
 
 - 新增 `tests/algorithms/dest-prob.test.ts` 9 例：敌军落点分布把可占据点排在原地之前、冲突规避、预测射击空格、arc 治疗、部署、原地占点、提交/无座位/AP 短路，以及真实 standoff / molten-throne 的整轮入队校验。
 - 新增 `tests/algorithms/dest-prob-selfplay.test.ts` 2 例：standoff 与 molten-throne 整局互相对弈，零非法动作并正常完赛。
-- `tests/algorithms/registry.test.ts` 与 `tests/api/bots.test.ts` 补 dest-prob 的 modes、展示名与大厅添加断言。
+- `tests/algorithms/registry.test.ts` 与 `tests/api/bots.test.ts` 补 dest-prob 的 modes、展示名、版本与大厅添加断言；dest-prob 测试补同单位多动作、队列投影攻击、地形寻路、`attacksPerUnit` 与整局自博弈。
 - headless 自博弈（`temp/dest-prob-100.mts`，逐局交替先手、种子基 1000）：vs random-sim 在 standoff / molten-throne 各 100 局 **100:0**、零非法动作；两图场均击杀 3.10 / 0.96（random-sim 0.23 / 0.01），场均裁定分 1105.10 : 280.13 / 3503.22 : 671.14；种子基 5000 复测各 100 局同样 100:0；3 人 standoff 10:0、6 人 standoff 5:0（零非法冒烟）。
+
+## 3.7.0（2026-10-20）— 算法客户端幂等与长轮询
+
+### 变更
+
+- 所有玩法写接口支持可选 `Idempotency-Key`，同键同 body 回放首次响应，同键不同 body 返回 409；算法客户端与 RL 环境为每个逻辑动作生成并复用键。
+- 新增 AI 长轮询等待端点 `GET /api/games/:id/wait`；`wait-turn.mjs`、算法 runner 与 RL runner 改为优先长轮询、旧服务器回退轮询。
+- bot 子进程监管与凭证传递：token 改环境变量，异常退出退避重启，最多 3 次后写 `bot_failed` 事件。
+
+### 测试与验证
+
+- 新增幂等回放/冲突/降级、wait 超时/唤醒/鉴权、状态投影/304、生命周期归档等 12 例；`npm test` 103 文件 / 869 例全绿。
+
+## 3.6.0（2026-10-10）— 裁决分重构与 verdict 同步
+
+### 变更
+
+- 裁决分改为「对总部伤害 + 己方总部生命 + 据点流量 + 军力价值 + 补给 + 击杀价值」，移除行动功绩分；补给权重归零，新增击杀价值权重；同时回合按 turnOrder 归属致命一击，环境击杀无归属。
+- **verdict** 同步新口径：局势评估加入击杀项与据点流量混合，lethal 打击按目标造价 × 击杀权重加分；竞技场与自动对局统计列由 `merit` 改为 `kills`。
+- 3.5.x 的标准算法胜率全部变成旧计分口径；引用历史数据时必须标注，不可与 3.6.0 之后数据直接比较。
+
+### 测试与验证
+
+- `npm test` 729 例全绿；新增 11 例覆盖击杀归属、过量击杀、炮火击杀无归属、据点流量混合、旧回放口径边界等。
 
 ## 3.5.12（2026-10-06）— 算法按模式注册隔离 + 同时随机算法
 
@@ -34,6 +143,13 @@
 ### 测试
 
 - 新增 `tests/algorithms/random-sim.test.ts`（16 用例：line/arc/single 瞄准合法性、arc 治疗瞄格、AP 门控、已提交短路、无 ctx.owner 短路、一单位一动作、目的格认领、部署预算扣减、炮火危险区过滤四用例（部署出生点 / 落点、治疗施放者 / arc 覆盖扇形，均先用引擎入队校验交叉证实拒绝场景真实存在），以及真实 standoff 对局上「枚举动作全被引擎入队校验接受 + 双座提交后正常结算进下一轮」的整轮回归）；新增 `tests/algorithms/registry.test.ts`（注册算法 modes 完整性）与 `tests/algorithms/interfaces.test.ts`（5 用例：同时模式动作被拒后继续决策入队且最终只提交一次、同一被拒动作按上限重问且不重复请求服务器、连续多个动作被拒有上限兜底、轮流模式失败即断行为不变、429 原样抛出不提交）；`tests/api/bots.test.ts` 补模式隔离三用例与 `/api/algorithms` modes 断言；`tests/api/arena-eval.test.ts` 断言参评清单不含 `algo_random-sim`；`tests/rl/local-worker.test.ts` 补 decide 通道模式混用拒绝用例。
+
+## 3.5.11（2026-10-06）— forge→molten-throne：同时回合地图池变化
+
+### 变更
+
+- 标准图 `forge` 下线并替换为同时回合图 `molten-throne`；旧 `forge` 上的标准算法对拍（含 verdict vs threat 10:20）失效，不能作为当前强度依据。
+- 同时回合地图池定型为 `standoff` / `molten-throne`；后续同时算法（random-sim、dest-prob、kriegspiel、matrix-eq）均按这两张图标定。
 
 ## 3.5.4（2026-09-18）— Verdict 裁决线算法
 
@@ -282,6 +398,14 @@ vs greedy（各图 30 局，逐局交替先手）：
 
 ---
 
+## 附：3.5.5–3.5.8 规则/地图变更对算法口径的影响
+
+| 版本 | 变更 | 对算法的影响 |
+|---|---|---|
+| 3.5.5 | 新增 `balance.deployFromHq` 总部部署开关 | `algorithms/lib/game-utils.mjs` 的 `deployOrigins()` 同步过滤总部；六个标准算法不再在禁总部图浪费部署试探 |
+| 3.5.7 | `four-corners` 下线 | 4 人局旧标定（verdict 2/20）不再可复现 |
+| 3.5.8 | `desert` 下线 | 含 desert 的 7 图合计转为历史口径，不能作为当前强度依据 |
+
 ## 版本号说明
 
-算法 AI 系统的版本号跟随主项目版本。算法本身不单独编版本号，通过文件修改时间和 git 提交记录追溯变更历史。
+算法 AI 系统随主项目版本发布；算法实现自 3.8.1 起在 `algorithms/registry.mjs` 的 `ALGORITHM_META.version` 标注 `vN`，竞技场参与者 id 使用 `algo_<name>@vN`，历史对局仍归属旧版本 id。3.5–3.7 的算法实现未严格版本化，本文中的 v1 为回溯标注，具体变更以文件修改时间和 git 提交记录追溯。当前同时回合算法：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2。

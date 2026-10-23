@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/events/bus.js';
 import { startGame } from '../../src/engine/engine.js';
 import {
-  queueAttackAction, queueDeployAction, queueHealAction, queueMoveAction,
+  queueAttackAction, queueDemolishAction, queueDeployAction, queueHealAction,
+  queueMoveAction, queueWaitAction,
 } from '../../src/engine/planning.js';
 import { commitAndMaybeResolve } from '../../src/engine/simultaneous.js';
 import { addLobbyPlayer, createLobby } from '../../src/state/store.js';
@@ -74,6 +75,7 @@ interface GameOverrides {
   supplies?: number;
   enemySupplies?: number;
   actionsPerTurn?: number;
+  attacksPerUnit?: number;
 }
 
 function makeGame(overrides: GameOverrides = {}) {
@@ -84,6 +86,7 @@ function makeGame(overrides: GameOverrides = {}) {
       units: UNIT_SPECS,
       balance: {
         actionsPerTurn: overrides.actionsPerTurn ?? 5,
+        attacksPerUnit: overrides.attacksPerUnit ?? 1,
         damageVarianceRange: 3,
         healVarianceRange: 6,
         minimumDamage: 1,
@@ -243,6 +246,89 @@ describe('dest-prob planning behavior', () => {
       myQueue: Array.from({ length: 5 }, () => ({ type: 'move', unitId: 'other', q: 5, r: 5 })),
     }), utils, { owner: 'player_a' })).toBeNull();
   });
+
+  it('allows the same unit to plan a second move in a later action point', async () => {
+    const scout = makeUnit('player_a', 'scout', 0, 0, { moveRange: 2 });
+    const game = makeGame({
+      units: [scout],
+      headquarters: farHq,
+      cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }, { q: 4, r: 0 }],
+    });
+
+    const first = await destProb.decide(game, utils, { owner: 'player_a' });
+    expect(first?.type).toBe('move');
+    expect(first?.payload.unitId).toBe(scout.id);
+
+    game.plan.myQueue = [{
+      type: 'move', unitId: scout.id, q: Number(first?.payload.q), r: Number(first?.payload.r),
+    }];
+    const second = await destProb.decide(game, utils, { owner: 'player_a' });
+    expect(second?.type).toBe('move');
+    expect(second?.payload.unitId).toBe(scout.id);
+  });
+
+  it('attacks from the projected position after a queued move', async () => {
+    const scout = makeUnit('player_a', 'scout', 0, 0, { moveRange: 2 });
+    const enemy = makeUnit('player_b', 'scout', 2, 0, { moveRange: 0 });
+    const game = makeGame({
+      units: [scout, enemy],
+      headquarters: farHq,
+      cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }],
+    });
+    game.plan.myQueue = [{ type: 'move', unitId: scout.id, q: 1, r: 0 }];
+
+    const action = await destProb.decide(game, utils, { owner: 'player_a' });
+    expect(action).toEqual({
+      type: 'attack',
+      payload: { attackerId: scout.id, q: 2, r: 0 },
+    });
+  });
+
+  it('uses terrain-only pathing for planned moves, ignoring unit blockers', () => {
+    const scout = makeUnit('player_a', 'scout', 0, 0, { moveRange: 2 });
+    const friend = makeUnit('player_a', 'infantry', 1, 0);
+    const game = makeGame({
+      units: [scout, friend],
+      cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }],
+    });
+    const projection = { positions: new Map(), terrain: new Map(), deployCells: new Set() };
+    const reachable = destProbInternals.terrainReachable(game, scout, 2, projection, utils);
+    expect(reachable).toContainEqual({ q: 2, r: 0 });
+    // 旧的单位挡路 BFS 不会把 (2,0) 当成可达格；这是 3.8 分步引擎的关键差异。
+    expect(utils.reachableCells(game, scout).some((pos: any) => pos.q === 2 && pos.r === 0)).toBe(false);
+  });
+
+  it('stops attacking with a unit after attacksPerUnit is reached', () => {
+    const attacker = makeUnit('player_a', 'infantry', 0, 0);
+    const enemy = makeUnit('player_b', 'scout', 2, 0, { moveRange: 0 });
+    const game = makeGame({
+      units: [attacker, enemy],
+      headquarters: farHq,
+      cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }],
+      attacksPerUnit: 1,
+    });
+    game.plan.myQueue = [{ type: 'attack', attackerId: attacker.id, q: 1, r: 0 }];
+
+    const ctx = destProbInternals.buildContext(game, 'player_a', utils);
+    const options = destProbInternals.attackOptions(ctx);
+    expect(options.some((option: any) => option.payload.attackerId === attacker.id)).toBe(false);
+  });
+
+  it('offers a demolish candidate for a heavy facing a blocker on the objective path', () => {
+    const heavy = makeUnit('player_a', 'heavy', 0, 0);
+    const game = makeGame({
+      units: [heavy],
+      headquarters: farHq,
+      cells: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }],
+    });
+    game.map.terrainCells = [{ q: 1, r: 0, terrain: 'blocker' }];
+
+    const ctx = destProbInternals.buildContext(game, 'player_a', utils);
+    const options = destProbInternals.demolishOptions(ctx);
+    expect(options.some((option: any) =>
+      option.type === 'demolish' && option.payload.unitId === heavy.id &&
+      option.payload.q === 1 && option.payload.r === 0)).toBe(true);
+  });
 });
 
 describe('dest-prob on real simultaneous maps', () => {
@@ -270,6 +356,12 @@ describe('dest-prob on real simultaneous maps', () => {
     }
     if (action.type === 'deploy') {
       return queueDeployAction(game, owner as never, p.unitType as never, String(p.fromId), Number(p.q), Number(p.r));
+    }
+    if (action.type === 'demolish') {
+      return queueDemolishAction(game, owner as never, String(p.unitId), Number(p.q), Number(p.r));
+    }
+    if (action.type === 'wait') {
+      return queueWaitAction(game, owner as never);
     }
     throw new Error(`unexpected action type: ${action.type}`);
   }

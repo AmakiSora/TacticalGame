@@ -9,8 +9,9 @@
 ### 变更
 
 - 版本号提升至 3.8.1。
-- **matrix-eq 升级到 v2（3.8.0 分步引擎适配版）**：重写分步结算镜像、投影站位/地形寻路的结构性计划校验、组合动作生成与按步序的事件史重建，新增池内精修和自适应利用混合；注册表算法版本标注为 `v2`，历史对局仍按版本 id 归档。镜像裁判基准：对 v1 **23:7**、对 kriegspiel v1 **12:18**、对 dest-prob **13:17**、对 random-sim **30:0**，单轮求解 ≤157ms/侧。
+- **matrix-eq 升级到 v2（3.8.0 分步引擎适配版）**：重写分步结算镜像、投影站位/地形寻路的结构性计划校验、组合动作生成与按步序的事件史重建，新增池内精修和自适应利用混合；注册表算法版本标注为 `v2`，历史对局仍按版本 id 归档。镜像裁判基准：对 v1 **23:7**、对 kriegspiel v1 **12:18**、对 dest-prob v1 **13:17**、对 random-sim **30:0**，单轮求解 ≤157ms/侧。
 - **kriegspiel 升级到 v2（3.8.0 分步引擎适配版）**：镜像对象从旧 `resolveRound` 换成 `resolveRoundSteps`——结算器改为按行动点逐步推进（级联失败、到达判定与依赖传播、同一步先移出后移入、`attackLock` 按计划时刻锁定、逐步死亡、终局轮跳过占点）；计划合法性改为队列前缀投影（站位投影 + 自有爆破改写地形 + 只按地形寻路，占用/覆盖类判定与引擎一致推迟到结算）；候选生成改为逐行动点重算，支持同一单位跨行动点连动并新增 `wait`（对齐行动点）与 `demolish`（按可达格增量计价）；搜索邻域扩展为「换步 / 删步 / 插入 `wait` / 交换相邻两步 / 追加」，粗筛用少量 rollout、胜出者再按满额复核；敌方计划采样改为有序。注册表算法版本标注为 `v2`。
+- **dest-prob 升级到 v2（3.8.0 分步引擎适配版）**：候选生成改为队列前缀投影，同一单位可跨行动点连续行动；移动按地形 BFS（单位/总部不挡路）、部署按投影空位、攻击受 `attacksPerUnit` 限制；治疗按投影站位并去重，重装新增低优先级 `demolish`。保留解析式对手落点模型（敌军落点仍用 blocker-aware BFS 保守预测），不做整轮模拟。同 harness 对 v1 **50/60（83.3%）**、对 random-sim **60/60**。
 - **同时回合算法 runner 支持 `wait`**：`algorithms/lib/api-client.mjs` 新增 `wait()`（`POST /api/games/:id/plan/wait`），`algorithms/lib/interfaces.mjs` 新增 `case 'wait'` 分支，算法脚本从此可以主动对齐行动点。
 
 ### 修复
@@ -20,12 +21,13 @@
 ### 测试与验证
 
 - 扩展 `tests/algorithms/random-sim.test.ts`：覆盖同单位多动作、投影位置后的攻击、攻击次数上限、投影后空位枚举与真实 standoff 对局合法性。
+- 扩展 `tests/algorithms/dest-prob.test.ts`（14 例）：落点分布、冲突规避、预测射击、arc 治疗、部署、原地占点、同单位多动作、队列投影后的攻击、地形寻路忽略单位、`attacksPerUnit`、真实 standoff / molten-throne 整轮入队；`tests/algorithms/dest-prob-selfplay.test.ts` 两图整局互搏零非法。
 - 新增 `tests/algorithms/matrix-eq-selfplay.test.ts` 覆盖 v2 在 standoff / molten-throne / 三人局的整局零非法动作；`node scripts/matrix_eq_smoke.mjs` 107 动作零非法、单轮 ≤85ms。
 - 更新 `tests/algorithms/kriegspiel-selfplay.test.ts`：入队口径补上 `demolish` / `wait`，kriegspiel v2 在 standoff / molten-throne 整局自博弈零非法动作。
 - kriegspiel v2 结算保真度对拍：把伤害/治疗方差归零使结算完全确定，让同一份计划分别在真实引擎（`resolveRoundSteps` + `captureControlPoints`）与算法的 JS 分步结算器上跑一遍，逐点比对存活单位 `(owner,type,q,r,hp)`、总部 HP/存活、据点归属、补给与席位状态——standoff / molten-throne 各 20 个局面**零偏差**。
-- kriegspiel v2 headless 标定（真实引擎 harness，逐局交替先手，standoff / molten-throne 各 30 局 ×3 对手，合计 180 局零非法动作，种子 `1000 + i×7919`，2026-10-23）：对 random-sim **60:0**、对 dest-prob **52:8（86.7%，p<0.0001）**、对 matrix-eq v2 **29:31**（standoff 27:3、molten-throne **2:28**；合计 p=0.90，两图方向相反，必须按图读）；`decide` 平均 45ms（standoff）/ 113–169ms（molten-throne）。
-- kriegspiel v1 同口径基线补测：把 `git show 89f3b69^` 的 v1 实现放进同一 harness、同一批种子跑 4 对手 ×2 图 ×30 局。v1 对 dest-prob **43.3%**（standoff 仅 20.0%）、对 matrix-eq **31.7%**，v2 分别为 86.7% 与 48.3%，即适配价值 **+43.4pp / +16.6pp**；v1↔v2 直接对打 **35:25（58.3%，p=0.245）未达显著**。**两项负结果如实记录**：molten-throne 对 matrix-eq 是 v1 6:24 → v2 **2:28** 的负提升（单轮 rollout 无法给「N 轮后总部被斩首」定价，给总部血量加凸性惩罚实测胜负序列完全不变）；按 `action_failed` 事件计数发现 v2 结算期失败 **17.1–23.1/局**（v1 1.3/局、dest-prob 0.6–3.0/局），主因 `destination_occupied`——移动/部署候选不排除敌军当前占位，只按「敌军到达概率」打折。诊断、数据与修法见 `algorithms/docs/algorithms/kriegspiel.md`「已知短板」「代价与边界」「已知限制 #2」。
-- `npm run build` 通过；`npm test` 全量通过（110 文件 / 929 例）。
+- kriegspiel v2 headless 标定（真实引擎 harness，逐局交替先手，standoff / molten-throne 各 30 局 ×3 对手，合计 180 局零非法动作，种子 `1000 + i×7919`，2026-10-23）：对 random-sim **60:0**、对 dest-prob v1 **52:8（86.7%，p<0.0001）**、对 matrix-eq v2 **29:31**（standoff 27:3、molten-throne **2:28**；合计 p=0.90，两图方向相反，必须按图读）；`decide` 平均 45ms（standoff）/ 113–169ms（molten-throne）。dest-prob v2 适配后同 harness 抽样对 kriegspiel v2 为 21/60（35.0%），不再引用旧 52:8 作为当前差距。
+- kriegspiel v1 同口径基线补测：把 `git show 89f3b69^` 的 v1 实现放进同一 harness、同一批种子跑 4 对手 ×2 图 ×30 局。v1 对 dest-prob v1 **43.3%**（standoff 仅 20.0%）、对 matrix-eq **31.7%**，v2 分别为 86.7% 与 48.3%，即适配价值 **+43.4pp / +16.6pp**；v1↔v2 直接对打 **35:25（58.3%，p=0.245）未达显著**。**两项负结果如实记录**：molten-throne 对 matrix-eq 是 v1 6:24 → v2 **2:28** 的负提升（单轮 rollout 无法给「N 轮后总部被斩首」定价，给总部血量加凸性惩罚实测胜负序列完全不变）；按 `action_failed` 事件计数发现 v2 结算期失败 **17.1–23.1/局**（v1 1.3/局、dest-prob v1 0.6–3.0/局），主因 `destination_occupied`——移动/部署候选不排除敌军当前占位，只按「敌军到达概率」打折。诊断、数据与修法见 `algorithms/docs/algorithms/kriegspiel.md`「已知短板」「代价与边界」「已知限制 #2」。
+- `npm run build` 通过；`npm test` 全量通过（110 文件 / 934 例）。
 
 ## 3.8.0
 

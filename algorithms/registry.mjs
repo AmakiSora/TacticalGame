@@ -51,7 +51,7 @@ export const ALGORITHM_META = {
   field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'] },
   verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v1', modes: ['standard'] },
   'random-sim': { displayName: '同时随机算法', description: '同时回合：从所有合法计划动作中随机选择入队，随后提交', version: 'v2', modes: ['simultaneous'] },
-  'dest-prob': { displayName: '落点概率算法', description: '同时回合：建模敌军落点概率，预测射击并规避目的格冲突', version: 'v1', modes: ['simultaneous'] },
+  'dest-prob': { displayName: '落点概率算法', description: '同时回合分步：建模敌军落点概率，预测射击并规避目的格冲突', version: 'v2', modes: ['simultaneous'] },
   kriegspiel: { displayName: '兵棋推演算法', description: '同时回合：分步结算 rollout + 整份计划联合搜索 + 风险规避', version: 'v2', modes: ['simultaneous'] },
   'matrix-eq': { displayName: '矩阵均衡算法', description: '同时回合：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正', version: 'v2', modes: ['simultaneous'] },
 };

@@ -145,7 +145,7 @@ v1 与 v2 直接对打（同 harness、同种子序列）：
 - **只有 2 张图，无法满足 `ALGORITHMS_NOTES.md`「至少 3 张图 × 30 局」的通则**——同时回合模式当前就只有 `standoff` 与 `molten-throne` 两张内置图。因此**单图结论不可外推**：本档案已经出现两张图方向相反的实例（对 matrix-eq：standoff +46.7pp、molten-throne −13.3pp）。
 - **全部为 2 人局**；3/6 人 `standoff` 未做胜率标定。
 - **v1 基线是一次性重建的**：v1 实现不在仓库里，从 git 历史取出加载；harness 与对拍脚本都在 gitignored 的 `temp/` 下，**不是长期复现入口**。引擎分步语义再变时，本节的 v1 对照需要重新搭建才能重跑。
-- **对手适配状态不一致**：dest-prob 仍是 v1 旧镜像，random-sim 与 matrix-eq 已是 v2。对 dest-prob 的 +43.4pp 里含「适配 vs 未适配」的成分，**不能读成纯策略差距**；dest-prob 完成 3.8 适配后必须重测。
+- **对手版本口径**：本节的 dest-prob 数字全部来自 **dest-prob v1**；v2 已于 2026-10-23 适配 3.8 分步引擎，同 harness 抽样对 kriegspiel v2 为 **21/60（35.0%）**（standoff 13/30、molten-throne 8/30），因此不能再把旧 52:8 当作当前差距。random-sim 与 matrix-eq 已是 v2。
 - **未做**：真实服务器（HTTP + runner）口径的整局回归只有 `tests/algorithms/kriegspiel-selfplay.test.ts` 的零非法断言，没有胜率标定；Arena 同时回合跑批仍为 0 局。
 
 ## 决策逻辑
@@ -264,7 +264,7 @@ v1 与 v2 直接对打（同 harness、同种子序列）：
 
 > **对 matrix-eq 的合计 48.3% 没有意义，必须按图拆开看**：standoff 90.0% 与 molten-throne 6.7% 都在 p<0.0001 上显著，方向相反，合并成一个「五五开」会把两个强结论互相抵消。
 >
-> **对 dest-prob 的 86.7% 含「适配 vs 未适配」的成分**：dest-prob 仍是 v1 旧镜像（见 `dest-prob.md`），完成 3.8 适配后必须重测。但**不要把它归因成「dest-prob 的计划在分步引擎下大量失败」——实测相反**：同一批 standoff 对局里 dest-prob 的结算期失败只有 **0.6/局**，而 kriegspiel v2 自己是 **17.1/局**（见「代价与边界」）。可观测的差异在总部与节奏上：dest-prob 对 v1 打出 **55.8** 点总部伤害、对 v2 只有 **5.0**；v1 只回敬 10.7、v2 回敬 30.3。standoff 的 `enemyHqDamage` 权重是 5，仅这一项就相差约 250 裁定分，与 dest-prob 对 v1 拿到 857.2 分、对 v2 只有 533.7 分一致。
+> **对 dest-prob 的 86.7% 是 v1 口径**：dest-prob 已于 2026-10-23 升 v2，同 harness 抽样对 kriegspiel v2 为 21/60（35.0%，standoff 13/30、molten-throne 8/30），因此 52:8 不能作为当前差距。也不要把它归因成「dest-prob 的计划在分步引擎下大量失败」——v1 同批 standoff 对局里 dest-prob 的结算期失败只有 **0.6/局**，而 kriegspiel v2 自己是 **17.1/局**（见「代价与边界」）。可观测的差异在总部与节奏上：dest-prob v1 对 kriegspiel v1 打出 **55.8** 点总部伤害、对 v2 只有 **5.0**；v1 只回敬 10.7、v2 回敬 30.3。standoff 的 `enemyHqDamage` 权重是 5，仅这一项就相差约 250 裁定分，与 dest-prob 对 v1 拿到 857.2 分、对 v2 只有 533.7 分一致。
 
 ### v2 场均统计（同一批 180 局，kriegspiel v2 视角）
 
@@ -325,7 +325,7 @@ v1 时期 molten-throne 上**双方总部伤害均为 0**：该图 `deployFromHq
 
 ## 使用场景
 
-1. **同时回合模式的搜索型内置算法**：大厅「添加 AI → 算法脚本」中与 random-sim、dest-prob、matrix-eq 并列。**选型必须按图看，不能笼统说「最强」**：`standoff` 上它是当前快照里最强的内置算法（对 matrix-eq v2 90.0%、对 dest-prob 86.7%，均 p<0.0001）；`molten-throne` 上它被 matrix-eq v2 的斩首打法压制到 6.7%，该图应优先选 matrix-eq。
+1. **同时回合模式的搜索型内置算法**：大厅「添加 AI → 算法脚本」中与 random-sim、dest-prob、matrix-eq 并列。**选型必须按图看，不能笼统说「最强」**：`standoff` 上它是当前快照里最强的内置算法（对 matrix-eq v2 90.0%、对 dest-prob v1 86.7%，均 p<0.0001；对 dest-prob v2 抽样 13/30）；`molten-throne` 上它被 matrix-eq v2 的斩首打法压制到 6.7%，该图应优先选 matrix-eq。
 2. **分步结算语义的参考镜像**：`simulateRoundSteps` 是 `resolveRoundSteps` 的一份纯 JS 独立实现，且与真实引擎逐点对拍过 40 个局面零偏差，读它可以快速核对级联失败、到达依赖链、`attackLock` 跟随、逐步死亡这些容易踩空的细节。
 3. **联合计划搜索的教学样例**：展示同时回合与「逐动作边际评估」的根本差异——把整份有序计划真实结算一遍，才能发现集火/治疗/封锁/换 tempo/`wait` 对齐的组合拳。
 

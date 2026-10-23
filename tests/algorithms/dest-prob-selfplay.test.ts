@@ -8,7 +8,8 @@ import { addLobbyPlayer, createLobby } from '../../src/state/store.js';
 import { startGame } from '../../src/engine/engine.js';
 import { commitAndMaybeResolve } from '../../src/engine/simultaneous.js';
 import {
-  queueAttackAction, queueDeployAction, queueHealAction, queueMoveAction,
+  queueAttackAction, queueDemolishAction, queueDeployAction, queueHealAction,
+  queueMoveAction, queueWaitAction,
 } from '../../src/engine/planning.js';
 import { globalEventBus } from '../../src/events/bus.js';
 // @ts-expect-error 算法模块为 ESM .mjs，无类型声明
@@ -57,6 +58,8 @@ function enqueue(game: any, owner: string, action: any) {
     case 'heal': return queueHealAction(game, owner as never, p.supportId, p.q, p.r);
     case 'move': return queueMoveAction(game, owner as never, p.unitId, p.q, p.r);
     case 'deploy': return queueDeployAction(game, owner as never, p.unitType, p.fromId, p.q, p.r);
+    case 'demolish': return queueDemolishAction(game, owner as never, p.unitId, p.q, p.r);
+    case 'wait': return queueWaitAction(game, owner as never);
     default: return { ok: false as const, code: 'unknown_action', message: action.type };
   }
 }

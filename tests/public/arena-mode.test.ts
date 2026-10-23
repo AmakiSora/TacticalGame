@@ -28,7 +28,7 @@ describe('AI 竞技场按玩法模式分榜', () => {
     const standard = data.modes.find((mode: { id: string }) => mode.id === 'standard');
     const simultaneous = data.modes.find((mode: { id: string }) => mode.id === 'simultaneous');
     const ids = (mode: any) => mode.maps.all.models.map((m: { id: string }) => m.id);
-    expect(ids(standard)).not.toContain('algo_dest-prob@v1');
+    expect(ids(standard)).not.toContain('algo_dest-prob@v2');
     if (simultaneous) expect(ids(simultaneous)).not.toContain('algo_threat@v1');
   });
 

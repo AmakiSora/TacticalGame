@@ -174,11 +174,11 @@ export const ALGORITHM_META = {
 | 算法 | 计划语义 | 当前状态 |
 |---|---|---|
 | `random-sim` | 同单位多动作、队列投影、`attacksPerUnit` | **v2 已适配（3.8.1）**，作为同时回合基线 |
-| `dest-prob` | 仍按“一单位一动作”的旧镜像生成计划 | 未适配；3.7 的 100:0 等数据只代表旧规则 |
+| `dest-prob` | v2 按队列前缀投影 + 地形寻路 + `attacksPerUnit` 生成计划 | **v2 已适配（3.8.1）**：同 harness 对 v1 50/60（83.3%）、对 random-sim 60/60；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（各 30 局/图抽样）；v1 的旧规则 100:0 只代表旧规则 |
 | `kriegspiel` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配并完成 3.8 真实引擎标定**（分步语义、`wait`、`demolish`、`attacksPerUnit`）：与引擎逐点对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法；旧 3.7 数据只代表旧规则 |
 | `matrix-eq` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配**并按 3.8 镜像裁判标定；真实服务器口径待验证 |
 
-> 在 `dest-prob` 完成 3.8 适配前，不要把它的旧胜率写进“当前最强”结论——`kriegspiel` v2 对它的 52:8 里含「适配 vs 未适配」的成分，不是纯策略差距，dest-prob 适配后必须重测。**但不要把差距归因成「dest-prob 的计划在分步引擎下大量失败」：实测相反。** 同 harness 同种子按 `action_failed` 事件计数（standoff，30 局）：dest-prob 只有 17 次（0.6/局），`kriegspiel` v1 39 次（1.3/局），而 `kriegspiel` **v2 自己是 513 次（17.1/局）**，主因 `destination_occupied=360`——v2 的移动/部署候选不排除敌军当前占位，只按「敌军到达概率」打折（详见 `kriegspiel.md`「已知限制 #2」）。可观测的真实差距在总部与节奏上：dest-prob 对 kriegspiel v1 打出 55.8 点总部伤害、对 v2 只有 5.0。`matrix-eq` v2 的已有数字来自镜像裁判，`kriegspiel` v2 的来自真实引擎 harness，两者口径不同，引用时必须标清。
+> `dest-prob` v2 已完成 3.8.1 分步引擎适配：同 harness、同种子对 v1 为 **50/60（83.3%）**（standoff 30/30、molten-throne 20/30），对 random-sim 两图各 30 局全胜；对 kriegspiel v2 抽样 21/60（35.0%）、对 matrix-eq v2 23/60（38.3%）——后两者是 30 局/图抽样，且 kriegspiel 用真实引擎 harness、matrix-eq 的数字口径需按档案标注。**不要把 v1 的旧 100:0 写入当前强度结论**：旧规则与 3.8 分步引擎不可比较。`kriegspiel` v2 的 `destination_occupied` 短板（17.1–23.1 次/局）仍是它自己的已知问题，不应归因给 dest-prob；dest-prob v2 的结算失败约 1.3–3.4/局。
 
 ## 工具函数（utils）
 
@@ -221,8 +221,8 @@ export const ALGORITHM_META = {
 | **field** | standard | v1 | 势场/梯度下降 | O(单位×格子) | arena 1753 / 76.8%；历史 vs greedy 64.3%；danger-close 强项、multiplayer-ring 短板 | 涌现式走位、慢节奏消耗战 |
 | **verdict** | standard | v1 | 反向规划/期限排程 | O(单位×格子 + 排程回合) | arena 1933 / 90.1%（该快照 standard 第一）；历史 vs greedy 95.7% | 裁决分统一计价、预算内斩首、守成与回防 |
 | **random-sim** | simultaneous | v2 | 随机 | O(n) | v2 已适配分步引擎；同时回合基线（无同口径强度标定） | 基线对照、模式隔离冒烟 |
-| **dest-prob** | simultaneous | v1 | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 3.7 旧规则对 random-sim 100:0；3.8 待重测 | 预测射击、冲突规避样例 |
-| **kriegspiel** | simultaneous | v2 | 分步结算 rollout + 有序计划联合搜索 | O(行动点×候选×种子计划×rollouts×分步结算) | 3.8.1 真实引擎标定（standoff / molten-throne 各 30 局 ×3 对手，2026-10-23）：60:0 vs random-sim、52:8（86.7%，p<0.0001）vs dest-prob、29:31 vs matrix-eq v2（standoff 27:3 / molten-throne **2:28**，斩首短板；合计 p=0.90 不可用，必须按图拆）；与引擎逐点对拍 40 局面零偏差；180 局零非法；`decide` 45–169ms（v1 的 15–40 倍）。**同 harness 同种子的 v1 基线**：vs dest-prob 43.3%、vs matrix-eq 31.7%，即适配带来 +43.4pp / +16.6pp；但 v1↔v2 直接对打 35:25（p=0.245）**未达显著**，且 v2 结算期失败 17.1–23.1/局远高于 v1 的 1.3/局（`destination_occupied` 未修） | 同时回合搜索型内置、分步结算语义参考镜像 |
+| **dest-prob** | simultaneous | v2 | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 3.8.1 真实引擎同 harness（30 局/图，2026-10-23）：对 v1 **50/60（83.3%）**、对 random-sim **60/60**；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（抽样） | 预测射击、冲突规避、分步队列投影样例 |
+| **kriegspiel** | simultaneous | v2 | 分步结算 rollout + 有序计划联合搜索 | O(行动点×候选×种子计划×rollouts×分步结算) | 3.8.1 真实引擎标定（standoff / molten-throne 各 30 局 ×3 对手，2026-10-23）：60:0 vs random-sim、52:8（86.7%，p<0.0001）vs dest-prob v1、29:31 vs matrix-eq v2（standoff 27:3 / molten-throne **2:28**，斩首短板；合计 p=0.90 不可用，必须按图拆）；与引擎逐点对拍 40 局面零偏差；180 局零非法；`decide` 45–169ms（v1 的 15–40 倍）。**同 harness 同种子的 v1 基线**：vs dest-prob 43.3%、vs matrix-eq 31.7%，即适配带来 +43.4pp / +16.6pp；但 v1↔v2 直接对打 35:25（p=0.245）**未达显著**，且 v2 结算期失败 17.1–23.1/局远高于 v1 的 1.3/局（`destination_occupied` 未修） | 同时回合搜索型内置、分步结算语义参考镜像 |
 | **matrix-eq** | simultaneous | v2 | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | 3.8 镜像裁判：23:7 vs v1、12:18 vs kriegspiel **v1**、13:17 vs dest-prob、30:0 vs random-sim；真实引擎待验证（3.8.1 真实引擎口径下被 kriegspiel v2 在 standoff 打到 3:27、在 molten-throne 反打 28:2） | 博弈论混合策略样例 |
 
 > arena 数字来自 `public/data/arena-leaderboard.json`（2026-10-21 UTC 生成，standard，36,000 局，300 对，每人 2,880 局）；评分是 Bradley-Terry 混合池，胜率包含不同对手，不能与单图对拍数字直接比较。
@@ -354,7 +354,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 3.6.0 | 2026-10-10 | 裁决分重构为击杀价值 + 据点流量制 | 3.5.x 标准算法胜率全部变成旧计分口径 |
 | 3.7.4 | 2026-10-22 | Arena 按玩法模式分榜 | 同时回合暂无跑批；评估控制台仍只支持 standard |
 | 3.8.0 | 2026-10-22 | 同时回合改为按行动点分步结算 | 所有同时算法的镜像/模拟器需要重写 |
-| 3.8.1 | 2026-10-23 | random-sim v2、kriegspiel v2、matrix-eq v2 适配分步结算 | `kriegspiel` v2 已完成真实引擎对拍与两图 ×3 对手标定；`dest-prob` 仍按旧镜像运行，需单独适配与重标定 |
+| 3.8.1 | 2026-10-23 | random-sim v2、dest-prob v2、kriegspiel v2、matrix-eq v2 适配分步结算 | `kriegspiel` v2 已完成真实引擎对拍与两图 ×3 对手标定；`dest-prob` v2 已完成同 harness v1→v2 50/60 与 random 60/60 标定；matrix-eq 真实引擎口径待补 |
 
 ## 历史里程碑
 
@@ -374,13 +374,14 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 2026-10-22 | 3.7.5 | 新增 matrix-eq 矩阵均衡算法 v1（同时回合）：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正；旧规则对 random-sim 30:0、对 dest-prob 14:16、对 kriegspiel 8:22 |
 | 2026-10-22 | 3.8.0 | 同时回合改为按行动点分步结算；新增 wait、`attacksPerUnit`、失败连锁、计划重排；同时算法镜像进入适配期 |
 | 2026-10-23 | 3.8.1 | kriegspiel v2（3.8 分步引擎适配）：镜像 `src/engine/simultaneousResolve.ts` 的分步结算（级联失败/到达依赖链/逐步死亡/`attacksPerUnit`/终局轮跳过占点），计划合法性改为队列前缀投影 + 地形寻路，候选生成与爬山改为逐行动点并支持 `wait` / `demolish`，敌方计划改为有序采样。真实引擎对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法：对 random-sim 60:0、对 dest-prob 52:8（86.7%）、对 matrix-eq v2 29:31（standoff 27:3、molten-throne 2:28 斩首短板） |
-| 2026-10-23 | 3.8.1 | kriegspiel v1 同口径基线补测：把 `git show 89f3b69^` 的 v1 实现放进同一真实引擎 harness、同一批种子（`1000 + i×7919`）跑 4 对手 ×2 图 ×30 局。结果——v1 对 dest-prob 43.3%（standoff 仅 20.0%）、对 matrix-eq 31.7%，v2 分别是 86.7% 与 48.3%，**适配价值 +43.4pp / +16.6pp**；但 molten-throne 对 matrix-eq 是 v1 6:24 → v2 2:28 的**负提升**，且 v1↔v2 直接对打 35:25（p=0.245）未达显著。同时按 `action_failed` 事件计数发现 v2 结算期失败 17.1–23.1/局（v1 1.3/局、dest-prob 0.6–3.0/局），主因 `destination_occupied`：候选生成不排除敌军当前占位，已记入 `kriegspiel.md`「已知限制 #2」，未修 |
+| 2026-10-23 | 3.8.1 | kriegspiel v1 同口径基线补测：把 `git show 89f3b69^` 的 v1 实现放进同一真实引擎 harness、同一批种子（`1000 + i×7919`）跑 4 对手 ×2 图 ×30 局。结果——v1 对 dest-prob v1 43.3%（standoff 仅 20.0%）、对 matrix-eq 31.7%，v2 分别是 86.7% 与 48.3%，**适配价值 +43.4pp / +16.6pp**；但 molten-throne 对 matrix-eq 是 v1 6:24 → v2 2:28 的**负提升**，且 v1↔v2 直接对打 35:25（p=0.245）未达显著。同时按 `action_failed` 事件计数发现 v2 结算期失败 17.1–23.1/局（v1 1.3/局、dest-prob 0.6–3.0/局），主因 `destination_occupied`：候选生成不排除敌军当前占位，已记入 `kriegspiel.md`「已知限制 #2」，未修 |
 | 2026-10-23 | 3.8.1 | random-sim v2 适配分步结算：同单位多动作、队列投影、`attacksPerUnit`；同时回合基线恢复可用；无同口径 v1/v2 强度数据 |
-| 2026-10-23 | 3.8.1 | matrix-eq v2（3.8 分步引擎适配）：重写分步结算镜像、计划校验、组合动作生成与事件史按步序重建；镜像裁判对 v1 23:7、对 kriegspiel 12:18、对 dest-prob 13:17、对 random-sim 30:0；真实服务器口径待验证 |
+| 2026-10-23 | 3.8.1 | matrix-eq v2（3.8 分步引擎适配）：重写分步结算镜像、计划校验、组合动作生成与事件史按步序重建；镜像裁判对 v1 23:7、对 kriegspiel 12:18、对 dest-prob v1 13:17、对 random-sim 30:0；真实服务器口径待验证 |
+| 2026-10-23 | 3.8.1 | dest-prob v2（3.8 分步引擎适配）：队列前缀投影、同单位跨行动点多动作、地形寻路、`attacksPerUnit`、投影部署/治疗/爆破；真实引擎同 harness 30 局/图对 v1 50/60（83.3%）、对 random-sim 60/60；对 kriegspiel v2 21/60、matrix-eq v2 23/60（抽样） |
 
 ## 未来方向
 
-1. **同时回合 3.8 适配与重标定（最高优先级）**：完成 dest-prob 的分步语义适配；为 matrix-eq v2 补真实引擎标定，确认镜像裁判结论（kriegspiel v2 已完成：真实引擎对拍零偏差 + 两图 ×3 对手各 30 局）。
+1. **同时回合 3.8 适配与重标定**：dest-prob v2 已完成分步语义适配（v1→v2 直接对拍 50/60）；下一步为 matrix-eq v2 补真实引擎标定，确认镜像裁判结论（kriegspiel v2 已完成：真实引擎对拍零偏差 + 两图 ×3 对手各 30 局）。
 2. **大逃杀 / 歼灭算法空白**：当前 0 个内置算法。先做随机/效用基线，再处理无总部、炮火缩圈、出生据点绑定与淘汰规则。
 3. **多席位标定**：现有标准权重主要在 2 人对局上调出；用 `multiplayer-ring`（多席位）、`snowflake` / `standoff`（3/6 人）补 3–6 人标定。`four-corners` 已下线，不能再用。
 4. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索，可作为 mcts 之外的确定性搜索基线。
@@ -421,6 +422,6 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 2026-10-21 UTC 标准模式快照；按模式分榜，同时回合暂为 0 局 |
 | 合法性回归 | `tests/algorithms/*-selfplay.test.ts` | 整局零非法动作、正常完赛 |
 | 单算法档案 | `algorithms/docs/algorithms/*.md` | 设计细节与逐图数据；本文只保留总览与当前快照 |
-| 版本历史 | 根 `RELEASE_NOTES.md`（权威） / `algorithms/docs/RELEASE_NOTES.md`（旧专题记录） | 后者为旧专题记录，可能滞后；新增版本以根文档与本表“历史里程碑”为准 |
+| 版本历史 | 根 `RELEASE_NOTES.md`（权威） / `algorithms/docs/RELEASE_NOTES.md`（算法专题记录，已补录 3.5.0–3.8.1） | 算法侧细节看专题记录；与根文档冲突时以根文档为准 |
 
 > `temp/threat-bench.mts` 是本机临时标定脚本（gitignored），不能作为长期复现入口；`rl/test-output/stats/algo_vs_rl_random.jsonl` 已不在仓库，旧 48 局数据仅作历史引用。

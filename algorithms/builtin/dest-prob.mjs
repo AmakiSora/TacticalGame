@@ -17,9 +17,16 @@
 // 另外把据点按"裁定权重 × 预计持有回合 + 收入"计价（据点流量分占 0.7），
 // 所以开局会优先铺开占点，而不是像随机基线那样把行动点撒在空地上。
 //
-// 约束：所有枚举镜像 src/engine/planning.ts 的入队校验（攻击/治疗形状、
-// 一单位一轮一动作、己方目的格认领、部署预算扣减、炮火危险区），保证
-// runner 不会因非法动作空耗重问配额。
+// 3.8.0 起同时回合按行动点分步结算：同一单位可以在多个行动点连续行动，
+// 队列顺序就是行动点顺序。v2 的候选生成改为「队列前缀投影」：
+//   - 攻击/治疗/爆破的起点按已排队移动的投影站位计算；
+//   - 移动只按地形 BFS（单位/总部不再挡路），占用留到结算判定；
+//   - 同一单位可重复出招，但攻击次数受 balance.attacksPerUnit 限制；
+//   - 目的格冲突仍按概率规避（同一格多个到达者会在结算时一起失败）。
+//
+// 约束：所有枚举镜像 src/engine/planning.ts 的 3.8 入队校验（形状、
+// 前缀投影、攻击次数上限、部署预算、炮火危险区），保证 runner 不会因
+// 非法动作空耗重问配额。
 
 const HEX_DIRS = [
   { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
@@ -47,6 +54,8 @@ const APPROACH_WEIGHT = 0.18;
 const ACTION_COST = 80;
 /** 部署基准分：新单位价值 + 站位价值，低于一次高价值占点/攻击。 */
 const DEPLOY_BASE = 170;
+/** 重装爆破的低优先级基准分：只在不挤占占点/攻击时使用。 */
+const DEMOLISH_UTILITY = 80;
 const CROWD_PENALTY = 7;
 const GARRISON_BONUS = 35;
 const MIN_SCORE = 0.5;
@@ -215,13 +224,84 @@ function isArtilleryDanger(game, pos) {
 
 // ---------------------------------------------------------------- 计划队列镜像
 
-function plannedUnitIds(queue) {
-  const ids = new Set();
+/**
+ * 队列前缀投影：和 src/engine/planning.ts:projectPlanQueue 同口径。
+ * 只投影自己的移动与爆破；前面的动作失败会在结算时级联作废后续动作，
+ * 但计划期仍按“假设成功”生成候选。
+ */
+function projectPlan(queue) {
+  const positions = new Map();
+  const terrain = new Map();
+  const deployCells = new Set();
   for (const action of queue) {
-    const id = action.unitId ?? action.attackerId ?? action.supportId;
-    if (id) ids.add(id);
+    const unitId = action.unitId ?? action.attackerId ?? action.supportId;
+    if (action.type === 'move' && unitId && Number.isFinite(action.q) && Number.isFinite(action.r)) {
+      positions.set(unitId, { q: action.q, r: action.r });
+    } else if (action.type === 'demolish' && Number.isFinite(action.q) && Number.isFinite(action.r)) {
+      terrain.set(cellKey(action), 'plain');
+    } else if (action.type === 'deploy' && Number.isFinite(action.q) && Number.isFinite(action.r)) {
+      deployCells.add(cellKey(action));
+    }
   }
-  return ids;
+  return { positions, terrain, deployCells };
+}
+
+function projectedPos(projection, unit) {
+  return projection.positions.get(unit.id) ?? { q: unit.q, r: unit.r };
+}
+
+function projectedTerrain(game, projection, pos, utils) {
+  return projection.terrain.get(cellKey(pos)) ?? utils.terrainAt(game, pos);
+}
+
+/** 计划期移动可达格：只受地形限制，单位/总部不挡路（镜像 planning.ts）。 */
+function terrainReachable(game, from, moveRange, projection, utils) {
+  const visited = new Set([cellKey(from)]);
+  const reachable = [];
+  const queue = [{ p: from, d: 0 }];
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i];
+    if (cur.d >= moveRange) continue;
+    for (const next of utils.neighbors(cur.p)) {
+      const key = cellKey(next);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (!utils.isPlayable(game, next)) continue;
+      if (projectedTerrain(game, projection, next, utils) !== 'plain') continue;
+      reachable.push(next);
+      queue.push({ p: next, d: cur.d + 1 });
+    }
+  }
+  return reachable;
+}
+
+/**
+ * 当前步的己方投影占位：
+ * - 己方单位按前缀投影后的位置；
+ * - 之前排队的 deploy 也占住目标格（新单位计划期没有 id）；
+ * - 敌方单位/总部按当前棋盘保守排除（它们是否离开由结算决定）。
+ */
+function projectedEmpty(game, owner, projection, pos, utils) {
+  for (const unit of utils.livingUnits(game, owner)) {
+    const at = projectedPos(projection, unit);
+    if (sameCell(at, pos)) return false;
+  }
+  if (projection.deployCells.has(cellKey(pos))) return false;
+  for (const unit of game.units ?? []) {
+    if (unit.alive && unit.owner !== owner && sameCell(unit, pos)) return false;
+  }
+  for (const hq of Object.values(game.headquarters ?? {})) {
+    if (hq.alive && sameCell(hq, pos)) return false;
+  }
+  return true;
+}
+
+function attackLimitFor(game) {
+  return game.config?.balance?.attacksPerUnit ?? 1;
+}
+
+function queuedAttackCount(queue, unitId) {
+  return queue.filter(action => action.type === 'attack' && action.attackerId === unitId).length;
 }
 
 function claimedCells(queue) {
@@ -281,7 +361,7 @@ function enemyBestAttackAt(ctx, enemy, pos) {
   const covered = coverageUnion(ctx.game, enemy, pos, 'attackShape');
   let best = 0;
   const targets = [
-    ...ctx.myUnits.map(unit => ({ kind: 'unit', entity: unit })),
+    ...ctx.myUnitsForThreat.map(unit => ({ kind: 'unit', entity: unit })),
     ...(ctx.myHq ? [{ kind: 'headquarters', entity: ctx.myHq }] : []),
   ];
   for (const target of targets) {
@@ -299,7 +379,7 @@ function enemyBestAttackAt(ctx, enemy, pos) {
 /** 敌军在我方当前火力下的落点风险（只按当前站位近似，不替敌军做深度推演）。 */
 function enemySafetyAt(ctx, enemy, pos) {
   let threat = 0;
-  for (const unit of ctx.myUnits) {
+  for (const unit of ctx.myUnitsForThreat) {
     if (hexDistance(pos, unit) <= (unit.attackRange ?? 1)) {
       const damage = damageStats(ctx, unit.attack, enemy.defense);
       threat += damage.avg * 0.45;
@@ -335,7 +415,7 @@ function enemyDestinationScore(ctx, enemy, pos) {
   } else {
     // 非占点兵种：向最近的我方单位/总部靠拢。
     let nearest = Infinity;
-    for (const unit of ctx.myUnits) nearest = Math.min(nearest, hexDistance(pos, unit));
+    for (const unit of ctx.myUnitsForThreat) nearest = Math.min(nearest, hexDistance(pos, unit));
     if (ctx.myHq) nearest = Math.min(nearest, hexDistance(pos, ctx.myHq));
     if (Number.isFinite(nearest)) score += 36 / (1 + nearest);
   }
@@ -359,12 +439,13 @@ function buildEnemyModel(ctx) {
   const presence = new Map();
   const claimRisk = new Map();
   const attackEntries = new Map();
-  const enemyCount = Math.max(1, ctx.enemies.length);
-  // 敌军也要受行动点约束：单位数超过 AP 时，部分单位这轮不会动。
-  const actionRate = Math.min(1, ctx.actionsPerTurn / enemyCount);
-
+  // 敌军每步也可能行动；但敌方行动点仍要分给移动/攻击/部署，按单位数摊薄。
+  const actionRate = Math.min(1, ctx.actionsPerTurn / Math.max(1, ctx.enemies.length));
   for (const enemy of ctx.enemies) {
-    const candidates = [{ q: enemy.q, r: enemy.r }, ...ctx.utils.reachableCells(ctx.game, enemy)];
+    const candidates = [
+      { q: enemy.q, r: enemy.r },
+      ...ctx.utils.reachableCells(ctx.game, enemy),
+    ];
     const scored = candidates.map(pos => ({ pos, score: enemyDestinationScore(ctx, enemy, pos) }));
     scored.sort((a, b) => b.score - a.score || cellKey(a.pos).localeCompare(cellKey(b.pos)));
 
@@ -500,20 +581,28 @@ function fireOpportunity(ctx, unit, pos) {
   return best;
 }
 
+/** 当前队列前缀下，单位在“下一个待排动作”开始时的虚拟站位。 */
+function projectedUnit(ctx, unit) {
+  const at = projectedPos(ctx.projection, unit);
+  return { ...unit, q: at.q, r: at.r };
+}
+
 /** 单位留在原地的价值：已站在非己方据点上时，原地也能完成占领。 */
 function stayValue(ctx, unit) {
+  const at = projectedUnit(ctx, unit);
   let value = 0;
-  const cp = ctx.cpByKey.get(cellKey(unit));
-  if (cp && cp.owner !== ctx.owner && unit.canCapture) value += cpValue(ctx, cp, ctx.owner);
+  const cp = ctx.cpByKey.get(cellKey(at));
+  if (cp && cp.owner !== ctx.owner && at.canCapture) value += cpValue(ctx, cp, ctx.owner);
   else if (cp && cp.owner === ctx.owner) value += GARRISON_BONUS;
 
-  value += fireOpportunity(ctx, unit, unit) * 0.45;
-  value -= incomingDamageAt(ctx, unit, unit.defense) * THREAT_SCALE;
+  value += fireOpportunity(ctx, at, at) * 0.45;
+  value -= incomingDamageAt(ctx, at, at.defense) * THREAT_SCALE;
   return value;
 }
 
 /** 单位走到 pos 的静态价值（不含冲突成功率与原地比较）。 */
 function destinationValue(ctx, unit, pos) {
+  const from = projectedUnit(ctx, unit);
   let value = 0;
   const cp = ctx.cpByKey.get(cellKey(pos));
   if (cp && cp.owner !== ctx.owner && unit.canCapture) value += cpValue(ctx, cp, ctx.owner);
@@ -521,7 +610,7 @@ function destinationValue(ctx, unit, pos) {
 
   const objective = ctx.objectives.get(unit.id);
   if (objective) {
-    const before = hexDistance(unit, objective.pos);
+    const before = hexDistance(from, objective.pos);
     const after = hexDistance(pos, objective.pos);
     const progress = before - after;
     if (progress > 0) {
@@ -537,7 +626,7 @@ function destinationValue(ctx, unit, pos) {
 
   let friends = 0;
   for (const friend of ctx.myUnits) {
-    if (friend.id !== unit.id && hexDistance(pos, friend) === 1) friends++;
+    if (friend.id !== unit.id && hexDistance(pos, projectedUnit(ctx, friend)) === 1) friends++;
   }
   value -= Math.max(0, friends - 1) * CROWD_PENALTY;
   return value;
@@ -617,8 +706,10 @@ function exposurePenalty(ctx, attacker) {
 
 function attackOptions(ctx) {
   const options = [];
-  for (const attacker of ctx.availableUnits) {
-    if (!attacker.attackRange) continue;
+  for (const unit of ctx.myUnits) {
+    if (!unit.attackRange) continue;
+    if (queuedAttackCount(ctx.queue, unit.id) >= ctx.attackLimit) continue;
+    const attacker = projectedUnit(ctx, unit);
     const aims = enumerateAims(ctx.game, attacker, 'attackShape');
     const seen = new Set();
     for (const { aim, click } of aims) {
@@ -629,7 +720,7 @@ function attackOptions(ctx) {
       if (score <= MIN_SCORE) continue;
       options.push({
         type: 'attack',
-        payload: { attackerId: attacker.id, q: click.q, r: click.r },
+        payload: { attackerId: unit.id, q: click.q, r: click.r },
         score,
       });
     }
@@ -639,10 +730,11 @@ function attackOptions(ctx) {
 
 function healOptions(ctx) {
   const options = [];
-  for (const support of ctx.availableUnits) {
+  for (const support of ctx.myUnits) {
     if (support.type !== 'support') continue;
-    if (isArtilleryDanger(ctx.game, support)) continue;
-    const aims = enumerateAims(ctx.game, support, 'healShape');
+    const caster = projectedUnit(ctx, support);
+    if (isArtilleryDanger(ctx.game, caster)) continue;
+    const aims = enumerateAims(ctx.game, caster, 'healShape');
     const seen = new Set();
 
     for (const { aim, click } of aims) {
@@ -655,15 +747,15 @@ function healOptions(ctx) {
       let anyWounded = false;
       for (const ally of ctx.myUnits) {
         if (ally.hp >= ally.maxHp) continue;
-        if (ctx.queuedMoves.has(ally.id)) continue;
         if (ctx.healedUnits.has(ally.id)) continue;
-        if (!aim.cells.some(cell => sameCell(cell, ally))) continue;
+        const allyPos = projectedPos(ctx.projection, ally);
+        if (!aim.cells.some(cell => sameCell(cell, allyPos))) continue;
 
         anyWounded = true;
         const missing = ally.maxHp - ally.hp;
         const amount = Math.min(missing, (support.healPower ?? 0) + ctx.healVariance / 2);
         let gain = amount * HEAL_SCALE;
-        const danger = incomingDamageAt(ctx, ally, ally.defense);
+        const danger = incomingDamageAt(ctx, allyPos, ally.defense);
         if (danger >= ally.hp) gain += unitValue(ally) * 0.35;
         else if (danger + amount >= ally.hp) gain += unitValue(ally) * 0.15;
         value += gain;
@@ -682,10 +774,11 @@ function healOptions(ctx) {
 
 function moveOptions(ctx) {
   const options = [];
-  for (const unit of ctx.availableUnits) {
-    if (ctx.healLockedUnits.has(unit.id)) continue;
-    for (const pos of ctx.utils.reachableCells(ctx.game, unit)) {
+  for (const unit of ctx.myUnits) {
+    const from = projectedUnit(ctx, unit);
+    for (const pos of terrainReachable(ctx.game, from, unit.moveRange, ctx.projection, ctx.utils)) {
       if (ctx.claimed.has(cellKey(pos))) continue;
+      if (!projectedEmpty(ctx.game, ctx.owner, ctx.projection, pos, ctx.utils)) continue;
       if (isArtilleryDanger(ctx.game, pos)) continue;
       const score = moveScore(ctx, unit, pos);
       if (score <= MIN_SCORE) continue;
@@ -693,6 +786,28 @@ function moveOptions(ctx) {
         type: 'move',
         payload: { unitId: unit.id, q: pos.q, r: pos.r },
         score,
+      });
+    }
+  }
+  return options;
+}
+
+/** 重装爆破：用于清理通往目标的墙；只做低优先级的空隙利用。 */
+function demolishOptions(ctx) {
+  const options = [];
+  for (const unit of ctx.myUnits) {
+    if (unit.type !== 'heavy') continue;
+    const from = projectedUnit(ctx, unit);
+    const objective = ctx.objectives.get(unit.id);
+    for (const pos of ctx.utils.neighbors(from)) {
+      if (!ctx.utils.isPlayable(ctx.game, pos)) continue;
+      if (projectedTerrain(ctx.game, ctx.projection, pos, ctx.utils) !== 'blocker') continue;
+      if (ctx.utils.occupantAt(ctx.game, pos)) continue;
+      if (objective && hexDistance(pos, objective.pos) >= hexDistance(from, objective.pos)) continue;
+      options.push({
+        type: 'demolish',
+        payload: { unitId: unit.id, q: pos.q, r: pos.r },
+        score: DEMOLISH_UTILITY,
       });
     }
   }
@@ -725,8 +840,9 @@ function deployOptions(ctx) {
       if (cost > remaining) continue;
 
       for (const pos of ctx.utils.neighbors(origin)) {
-        if (!ctx.utils.isEmptyPlain(ctx.game, pos)) continue;
+        if (projectedTerrain(ctx.game, ctx.projection, pos, ctx.utils) !== 'plain') continue;
         if (ctx.claimed.has(cellKey(pos))) continue;
+        if (!projectedEmpty(ctx.game, ctx.owner, ctx.projection, pos, ctx.utils)) continue;
         if (isArtilleryDanger(ctx.game, pos)) continue;
 
         let value = DEPLOY_BASE * deployTypeBonus(ctx, type);
@@ -760,12 +876,13 @@ function deployOptions(ctx) {
 // ---------------------------------------------------------------- 目标与上下文
 
 function objectiveFor(ctx, unit) {
+  const from = projectedUnit(ctx, unit);
   if (unit.canCapture) {
     let best = null;
     for (const cp of ctx.cps) {
       if (cp.owner === ctx.owner) continue;
       const value = cpValue(ctx, cp, ctx.owner);
-      const distance = hexDistance(unit, cp);
+      const distance = hexDistance(from, cp);
       const score = value / (1 + distance * 1.5);
       if (!best || score > best.score) best = { pos: cp, kind: 'cp', value, score };
     }
@@ -776,17 +893,20 @@ function objectiveFor(ctx, unit) {
     const wounded = ctx.myUnits
       .filter(ally => ally.id !== unit.id && ally.hp < ally.maxHp)
       .sort((a, b) => (b.maxHp - b.hp) - (a.maxHp - a.hp));
-    if (wounded[0]) return { pos: wounded[0], kind: 'ally', value: 0 };
+    if (wounded[0]) {
+      const at = projectedPos(ctx.projection, wounded[0]);
+      return { pos: at, kind: 'ally', value: 0 };
+    }
     if (ctx.myHq) return { pos: ctx.myHq, kind: 'hq', value: 0 };
   }
 
   let best = null;
   for (const enemy of ctx.enemies) {
-    const score = 100 / (1 + hexDistance(unit, enemy));
+    const score = 100 / (1 + hexDistance(from, enemy));
     if (!best || score > best.score) best = { pos: enemy, kind: 'unit', value: 0, score };
   }
   for (const hq of ctx.enemyHqs.values()) {
-    const score = (unit.canCapture ? 120 : 90) / (1 + hexDistance(unit, hq));
+    const score = (unit.canCapture ? 120 : 90) / (1 + hexDistance(from, hq));
     if (!best || score > best.score) best = { pos: hq, kind: 'hq', value: 0, score };
   }
   return best;
@@ -798,6 +918,11 @@ function buildContext(game, owner, utils) {
   const myUnits = utils.livingUnits(game, owner);
   const enemySeats = utils.enemySeats(game, owner);
   const enemies = enemySeats.flatMap(seat => utils.livingUnits(game, seat));
+  const projection = projectPlan(queue);
+  const myUnitsForThreat = myUnits.map(unit => {
+    const at = projectedPos(projection, unit);
+    return { ...unit, q: at.q, r: at.r };
+  });
 
   const myTypeCounts = {};
   for (const unit of myUnits) myTypeCounts[unit.type] = (myTypeCounts[unit.type] ?? 0) + 1;
@@ -807,11 +932,16 @@ function buildContext(game, owner, utils) {
     utils,
     owner,
     queue,
+    step: queue.length + 1,
+    projection,
     cps,
     myUnits,
+    myUnitsForThreat,
     enemies,
     enemySeats,
     myTypeCounts,
+    attackLimit: attackLimitFor(game),
+    healedUnits: new Set(),
     myHq: game.headquarters?.[owner] ?? null,
     enemyHqs: new Map(enemySeats
       .map(seat => [seat, game.headquarters?.[seat]])
@@ -819,15 +949,11 @@ function buildContext(game, owner, utils) {
     enemyById: new Map(enemies.map(enemy => [enemy.id, enemy])),
     enemyHqByKey: new Map(),
     cpByKey: new Map(cps.map(cp => [cellKey(cp), cp])),
-    myUnitCells: new Set(myUnits.map(cellKey)),
+    myUnitCells: new Set(myUnitsForThreat.map(cellKey)),
     nearMyUnitCells: new Set(),
     contestedCpCells: new Set(cps.filter(cp => cp.owner !== owner).map(cellKey)),
     myHqCell: game.headquarters?.[owner] ? cellKey(game.headquarters[owner]) : null,
-    used: plannedUnitIds(queue),
     claimed: claimedCells(queue),
-    queuedMoves: new Map(),
-    healLockedUnits: new Set(),
-    healedUnits: new Set(),
     objectives: new Map(),
     maxTurns: game.config?.balance?.maxTurns === null ? null : (game.config?.balance?.maxTurns ?? 15),
     roundNumber: game.turn?.roundNumber ?? game.turn?.turnNumber ?? 1,
@@ -844,33 +970,25 @@ function buildContext(game, owner, utils) {
   };
 
   for (const hq of ctx.enemyHqs.values()) ctx.enemyHqByKey.set(cellKey(hq), hq);
-  for (const unit of myUnits) {
+  for (const unit of myUnitsForThreat) {
     for (const neighbor of utils.neighbors(unit)) ctx.nearMyUnitCells.add(cellKey(neighbor));
   }
-  ctx.availableUnits = myUnits.filter(unit => !ctx.used.has(unit.id));
-  ctx.volleyFactor = enemies.length ? Math.min(1, ctx.actionsPerTurn / enemies.length) : 1;
 
-  // 队列里的移动目的格：治疗评分要跳过这些单位（它们结算时已不在覆盖格上）。
-  // 队列里的治疗：锁定被治疗的友军，后续不再给它排移动（否则治疗必然 fizzle）。
+  // 队列里已有的治疗：按投影覆盖标记目标，后续动作不再重复治疗同一人。
   for (const action of queue) {
-    if (action.type === 'move' && action.unitId) {
-      ctx.queuedMoves.set(action.unitId, { q: action.q, r: action.r });
-    }
-    if (action.type === 'heal' && action.supportId) {
-      const support = myUnits.find(unit => unit.id === action.supportId);
-      if (!support) continue;
-      const aim = computeAim(game, support, 'healShape', { q: action.q, r: action.r });
-      if (!aim) continue;
-      for (const ally of myUnits) {
-        if (ally.hp >= ally.maxHp) continue;
-        if (!aim.cells.some(cell => sameCell(cell, ally))) continue;
-        ctx.healLockedUnits.add(ally.id);
-        ctx.healedUnits.add(ally.id);
-      }
+    if (action.type !== 'heal' || !action.supportId) continue;
+    const support = myUnits.find(unit => unit.id === action.supportId);
+    if (!support) continue;
+    const caster = { ...support, ...projectedPos(projection, support) };
+    const aim = computeAim(game, caster, 'healShape', { q: action.q, r: action.r });
+    if (!aim) continue;
+    for (const ally of myUnits) {
+      const at = projectedPos(projection, ally);
+      if (aim.cells.some(cell => sameCell(cell, at))) ctx.healedUnits.add(ally.id);
     }
   }
 
-  // 敌军模型必须在 ctx 的当前站位/据点集合就绪后构建。
+  // 敌军模型必须在 ctx 的投影站位/据点集合就绪后构建。
   Object.assign(ctx, buildEnemyModel(ctx));
   ctx.enemyDeployRisk = buildEnemyDeployRisk(ctx);
 
@@ -914,12 +1032,13 @@ export default {
     if (queue.length >= limit) return null;
 
     const context = buildContext(game, owner, utils);
-    if (!context.availableUnits.length && !context.utils.deployOrigins(game, owner).length) return null;
+    if (!context.myUnits.length && !context.utils.deployOrigins(game, owner).length) return null;
 
     const options = [
       ...attackOptions(context),
       ...healOptions(context),
       ...moveOptions(context),
+      ...demolishOptions(context),
       ...deployOptions(context),
     ];
     if (!options.length) return null;
@@ -943,4 +1062,13 @@ export const destProbInternals = {
   enumerateAims,
   cpValue,
   hexDistance,
+  moveOptions,
+  attackOptions,
+  healOptions,
+  deployOptions,
+  demolishOptions,
+  moveScore,
+  attackScore,
+  projectedPos,
+  terrainReachable,
 };

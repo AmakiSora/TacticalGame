@@ -33,7 +33,9 @@ describe('algorithm registry modes', () => {
     const destProb = listAlgorithmInfo().find(i => i.name === 'dest-prob');
     expect(destProb?.modes).toEqual(['simultaneous']);
     expect(destProb?.displayName).toBe('落点概率算法');
+    expect(destProb?.version).toBe('v2');
     expect(getAlgorithmMeta('dest-prob')?.modes).toEqual(['simultaneous']);
+    expect(getAlgorithmMeta('dest-prob')?.version).toBe('v2');
     const matrixEq = listAlgorithmInfo().find(i => i.name === 'matrix-eq');
     expect(matrixEq?.modes).toEqual(['simultaneous']);
     expect(matrixEq?.displayName).toBe('矩阵均衡算法');

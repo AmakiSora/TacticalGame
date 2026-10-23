@@ -12,10 +12,14 @@
 - **进程内评估链路接入同时回合计划/结算**：`rl/training/local-worker.ts` 的 `reset` 接受 simultaneous 地图，`apply` 通道把 move/attack/heal/deploy/demolish/wait 映射到 `queue*Action`，`end_turn` 走 `commitAndMaybeResolve`；`decide` 通道按座位传入 `ctx.owner` 并按 REST 同口径隐藏对手计划队列。`rl/evaluation/evaluate_cross.py` 新增同时回合逐轮「各座位入队 → 全员提交 → 统一结算」循环：动作被引擎拒绝时继续重选而不提前提交，行动点/重选上限兜底提交；明细照常记录 timeline/actions/events/derived。
 - **同时回合首轮榜单数据**：完成 4 个同时算法 × `standoff` / `molten-throne` × 每对每图 24 局跑批（288 局，0 失败批），`arena/matches.jsonl` 累积至 36,288 局；`arena-leaderboard.json` / `arena-stats.json` 新增同时回合分区（4 名参与者各 144 局），标准榜评分与局数不变。
 
+### 修复
+
+- `npm run test:rl` 在 Windows cmd（npm 默认 script-shell）下无法启动 `rl/.venv` 解释器（cmd 不接受正斜杠相对路径命令）；改为经 `script/rl-test.mjs` 由 node 解析解释器路径并透传 pytest 参数，cmd / PowerShell / Git Bash 均可用。
+
 ### 测试与验证
 
-- `npm run build` 通过；`npm test` 全量 111 个测试文件 / 943 个用例通过；`rl/.venv/Scripts/python.exe -m pytest tests/rl -q` 69 个用例通过（新增 `tests/rl/test_round_robin_modes.py`：地图模式推断、混模式/未接入模式/`--mode` 不一致拒绝）。
-- `tests/rl/local-worker.test.ts` 新增同时模式用例：`standoff` reset、两个座位入队并提交后自动推进回合、标准算法/大逃杀地图拒绝；`tests/api/arena-eval.test.ts` 覆盖同时模式启动、混模式拒绝、模型与标准算法跨模式拒绝。
+- `npm run build` 通过；`npm test` 全量 111 个测试文件 / 944 个用例通过；`npm run test:rl` 73 个用例通过（新增 `tests/rl/test_round_robin_modes.py`：地图模式推断、混模式/未接入模式/`--mode` 不一致拒绝；`tests/rl/test_evaluate_cross_simultaneous.py`：同时回合循环的拒绝重选、行动点用尽兜底提交与回合推进回归）。
+- `tests/rl/local-worker.test.ts` 新增同时模式用例：`standoff` reset、两个座位入队并提交后自动推进回合、无 viewer 快照剥离计划队列（与 REST 脱敏同口径）、标准算法/大逃杀地图拒绝；`tests/api/arena-eval.test.ts` 覆盖同时模式启动、混模式拒绝、模型与标准算法跨模式拒绝。
 - 同时回合冒烟：`round_robin.py --maps standoff --games 2`（4 算法、12 局）0 失败；全量 288 局 0 失败（8m13s，0.6 局/s）。榜单结果：矩阵均衡算法 1730、兵棋推演算法 1692、落点概率算法 1676、同时随机算法 903。
 
 ## 3.8.1

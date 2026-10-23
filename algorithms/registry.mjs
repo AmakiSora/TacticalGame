@@ -23,6 +23,7 @@ export const ALGORITHMS = {
   'dest-prob': './builtin/dest-prob.mjs',
   kriegspiel: './builtin/kriegspiel.mjs',
   'matrix-eq': './builtin/matrix-eq.mjs',
+  prism: './builtin/prism.mjs',
 };
 
 /**
@@ -54,6 +55,7 @@ export const ALGORITHM_META = {
   'dest-prob': { displayName: '落点概率算法', description: '同时回合分步：建模敌军落点概率，预测射击并规避目的格冲突', version: 'v2', modes: ['simultaneous'] },
   kriegspiel: { displayName: '兵棋推演算法', description: '同时回合：分步结算 rollout + 整份计划联合搜索 + 风险规避', version: 'v2', modes: ['simultaneous'] },
   'matrix-eq': { displayName: '矩阵均衡算法', description: '同时回合：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正', version: 'v2', modes: ['simultaneous'] },
+  prism: { displayName: '棱镜算法', description: '同时回合：多情境联合队列束搜索 + 同步结算镜像 + 风险约束终局评分', version: 'v1', modes: ['simultaneous'] },
 };
 
 /**

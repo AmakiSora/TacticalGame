@@ -111,7 +111,7 @@ describe('local engine worker simultaneous mode', () => {
     config: { mode: string };
     phase: string;
     turn: { roundNumber: number };
-    plan: { committed: string[]; queues: Record<string, unknown[]> } | null;
+    plan: { committed: string[]; queues: Record<string, unknown[]>; myQueue?: unknown[] } | null;
   }
 
   async function planAndCommit(seat: string, algorithm = 'random-sim'): Promise<PlanState> {
@@ -141,6 +141,21 @@ describe('local engine worker simultaneous mode', () => {
     state = await planAndCommit('player_b');
     // 全员提交后引擎自动结算：要么进入下一轮，要么本轮直接终局。
     expect(state.phase === 'game_over' || state.turn.roundNumber > 1).toBe(true);
+  });
+
+  it('strips plan queues from viewer-less snapshots', async () => {
+    await handleCommand({ cmd: 'reset', mapId: 'standoff' });
+    // 排一个确定性动作，保证 player_a 的队列非空，脱敏才有东西可剥。
+    const afterApply = await handleCommand({
+      cmd: 'apply', owner: 'player_a', action: { type: 'wait' },
+    }) as PlanState;
+    expect(afterApply.plan?.queues).toEqual({});
+    expect(afterApply.plan?.myQueue).toEqual([]);
+    const state = await handleCommand({ cmd: 'state' }) as PlanState;
+    expect(state.plan?.queues).toEqual({});
+    expect(state.plan?.myQueue).toEqual([]);
+    // committed 名单不是秘密，保持公开。
+    expect(state.plan?.committed).toEqual([]);
   });
 
   it('honors algorithm modes and rejects unsupported plan modes', async () => {

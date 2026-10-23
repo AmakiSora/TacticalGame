@@ -45,13 +45,15 @@ function snapshot(viewer?: PlayerId): unknown {
     events: snapshotEventTail > 0 ? events.slice(-snapshotEventTail) : [],
     adjudication: buildAdjudicationSnapshot(game),
   }) as Record<string, unknown>;
-  // 同时模式：对手计划队列是秘密。与 src/api/auth.ts 的 sanitizeGameForResponse 同口径，
-  // 只给当前决策座位自己的队列（myQueue），committed 名单保持公开。
-  if (viewer && isSimultaneousMode(game.config.mode) && body.plan && typeof body.plan === 'object') {
+  // 同时模式：计划队列是秘密，与 src/api/auth.ts 的 sanitizeGameForResponse 同口径——
+  // 传 viewer 只暴露该座位自己的队列（myQueue），committed 名单保持公开；不传 viewer
+  // 一律视为无特权，queues 全部剥掉（apply/state/reset 的调用方只读 committed，
+  // 不依赖队列内容）。
+  if (isSimultaneousMode(game.config.mode) && body.plan && typeof body.plan === 'object') {
     const plan = body.plan as { queues?: unknown; committed?: unknown };
-    const myQueue = game.plan?.queues[viewer] ?? [];
+    const myQueue = viewer && game.plan?.queues[viewer] ? game.plan.queues[viewer] : [];
     const queues: Record<string, unknown> = {};
-    if (myQueue.length > 0) queues[viewer] = structuredClone(myQueue);
+    if (viewer && myQueue.length > 0) queues[viewer] = structuredClone(myQueue);
     body.plan = { ...plan, queues, myQueue: structuredClone(myQueue) };
   }
   return body;

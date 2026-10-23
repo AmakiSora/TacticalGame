@@ -804,9 +804,11 @@ def _play_simultaneous(worker: EngineWorker, seat_map: dict[str, SideController]
                 if args.verbose:
                     print(f"  r{round_number} {controller.short}: {action_type} {payload}")
                 if action_type == "end_turn":
-                    entry["commit"] = True
                     try:
                         state = worker.apply(side, "end_turn", {})
+                        # 提交成功才标记 commit：下游按该字段统计提交次数，
+                        # 失败的提交只记 failed/error，不能误计。
+                        entry["commit"] = True
                         acted += 1
                         progressed = True
                         committed_ok = True
@@ -832,8 +834,13 @@ def _play_simultaneous(worker: EngineWorker, seat_map: dict[str, SideController]
                     # （那会把已排队列和剩余行动点一起提交作废）。
                     entry["failed"] = True
                     entry["error"] = str(exc)
-                    print(f"  警告：{controller.short} 动作被引擎拒绝（{exc}），继续重选")
                     rejected += 1
+                    if queued >= budget:
+                        # 队列已满（行动点用尽）时的拒绝说明算法仍想排队，重选无意义：
+                        # 直接转兜底提交，避免在 rejected 上限内空转。队列未满的拒绝继续重选。
+                        print(f"  警告：{controller.short} 行动点已用尽仍尝试排队（{exc}），按已排队列提交")
+                        break
+                    print(f"  警告：{controller.short} 动作被引擎拒绝（{exc}），继续重选")
                     continue
                 if state.get("phase") == "game_over" or int((state.get("turn") or {}).get("roundNumber", 1)) != round_number:
                     break

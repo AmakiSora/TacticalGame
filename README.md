@@ -306,8 +306,9 @@ python rl/evaluate.py --model rl/models/model.zip
 - **落点概率算法（Destination Probability，仅同时回合模式）**：为每个敌军建立落点概率分布，按"覆盖格上敌军出现概率 × 伤害"做预测射击；把敌军认领概率计入移动/部署成功率以规避同时模式的目的格冲突，并按据点裁定流量与收入计价抢点。v2 适配 3.8.0 分步引擎：队列前缀投影、同单位跨行动点连续行动、地形寻路与 `attacksPerUnit`；真实引擎同 harness 对 random-sim **60/60**、对 v1 **50/60（83.3%）**，详细档案见 `algorithms/docs/algorithms/dest-prob.md`
 - **兵棋推演算法（Kriegspiel，仅同时回合模式）**：把整份**有序**计划放进逐字镜像 `resolveRoundSteps` 的 JS 分步结算器真实推演，对多种对手性格做蒙特卡洛 rollout，按「均值 − λ·标准差」选择，再以「换步/删步/插 `wait`/换序/追加」的邻域爬山精修；v2 适配 3.8.0 分步引擎，与真实引擎逐点对拍 40 个局面零偏差，实测对 random-sim **60:0**、对 dest-prob v1 **52:8（86.7%）**、对 matrix-eq **29:31**（standoff 27:3、molten-throne 2:28 为已知斩首短板，合计数字两图方向相反不可用），180 局零非法动作；同 harness 同种子的 v1 基线对 dest-prob 43.3%、对 matrix-eq 31.7%，即适配价值 +43.4pp / +16.6pp（v1↔v2 直接对打 35:25，p=0.245 未达显著），详细档案见 `algorithms/docs/algorithms/kriegspiel.md`
 - **矩阵均衡算法（Matrix Equilibrium，仅同时回合模式）**：把每轮升维成「计划组合 × 计划组合」的矩阵博弈，用镜像结算器计算支付、CFR 自我对弈求均衡混合策略，并从 `round_resolved` 事件史重建敌方计划做实证校正；输出混合策略抽样而非确定性 argmax。v2 适配 3.8.0 分步引擎：镜像裁判（2026-10-23 修复后复跑）对 v1 **24:6**、对 kriegspiel v1 **11:19**、对 dest-prob v1 **14:16**、对 random-sim **30:0**；对当前 v2 kriegspiel / dest-prob 各 **7:23**，详细档案见 `algorithms/docs/algorithms/matrix-eq.md`
-- **棱镜算法（Prism，仅同时回合模式）**：逐行动点联合搜索完整计划队列，对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别镜像 3.8 分步结算（撞格与腾格、部署/移动、锁定射击、范围攻击/治疗、级联失败与淘汰），再按本局裁决权重和“加权均值 + 最差情境惩罚”选择整轮计划；不依赖其它算法、不读取地图 ID，也不使用对手隐藏队列。竞技场 4 对手 ×2 图 ×24 局共 192 局 **181:11**（standoff 96:0、molten-throne 85:11，同时榜评分 1977），真实引擎换座冒烟 7 组 ×2 局全胜（14:0，**样本仅覆盖双人两图，不作稳定优势结论**），详细档案见 `algorithms/docs/algorithms/prism.md`
-- **时序掌控算法（Tempo，仅同时回合模式）**：把「队列位置 = 结算拍」当成决策变量——先给每个敌军推一条最可能的行为剧本（抢点/原地开火/残血撤退/推进）并逐拍投影位置，再把敌方预测射击与可及火力区叠成「第 k 拍 × 格子」的威胁时间线给移动暴露计价，按裁决权重与剩余轮数调节攻守（领先收敛、落后加压、末轮清空补给），最后按价值把动作排进具体拍：斩杀/锁定射击抢早拍（早击杀作废受害者后续动作）、占点与治疗压末拍、部署抢先。真实引擎进程内标定（每对 60 局 = standoff 40 + molten-throne 20，零非法）：对 random-sim **100%**、dest-prob **55.0%**、kriegspiel **50.0%**、matrix-eq **43.3%**（molten-throne 85–90%，standoff 32–40%），详细档案见 `algorithms/docs/algorithms/tempo.md`
+- **棱镜算法（Prism，仅同时回合模式）**：逐行动点联合搜索完整计划队列，对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别镜像 3.8 分步结算（撞格与腾格、部署/移动、锁定射击、范围攻击/治疗、级联失败与淘汰），再按本局裁决权重和“加权均值 + 最差情境惩罚”选择整轮计划；不依赖其它算法、不读取地图 ID，也不使用对手隐藏队列。竞技场 3.8.3 首战 4 对手 ×2 图 ×24 局共 192 局 **181:11**（standoff 96:0、molten-throne 85:11，当时评分 1977），3.8.5 扩至 288 局 **229:59**、评分 **1839**（同时榜第二）；真实引擎换座冒烟 7 组 ×2 局全胜（14:0，**样本仅覆盖双人两图，不作稳定优势结论**），详细档案见 `algorithms/docs/algorithms/prism.md`
+- **时序掌控算法（Tempo，仅同时回合模式）**：把「队列位置 = 结算拍」当成决策变量——先给每个敌军推一条最可能的行为剧本（抢点/原地开火/残血撤退/推进）并逐拍投影位置，再把敌方预测射击与可及火力区叠成「第 k 拍 × 格子」的威胁时间线给移动暴露计价，按裁决权重与剩余轮数调节攻守（领先收敛、落后加压、末轮清空补给），最后按价值把动作排进具体拍：斩杀/锁定射击抢早拍（早击杀作废受害者后续动作）、占点与治疗压末拍、部署抢先。真实引擎进程内标定（每对 60 局 = standoff 40 + molten-throne 20，零非法）：对 random-sim **100%**、dest-prob **55.0%**、kriegspiel **50.0%**、matrix-eq **43.3%**（molten-throne 85–90%，standoff 32–40%）；3.8.5 竞技场 288 局 134W/154L、评分 1444，详细档案见 `algorithms/docs/algorithms/tempo.md`
+- **经纬算法（Tempo-Weave，仅同时回合模式）**：以“哪个单位完成什么任务、需要几个行动点、结束后能否存活”为决策单位——先生成变长任务（直接射击、区域治疗、占点、跨步接敌后射击、脱离火力圈、攻城接近、开路），再在共享行动点预算内按收益/成本竞价排程（按已用行动点分桶的有限宽度搜索，650ms 软预算），并用独立的分步结算镜像做己方队列的静止参照投影；三席及以上按逐敌方席位的火力包络与己方 HQ 剩余 HP 提高回防紧迫度。真实引擎标定（两图 ×4 对手 ×30 局）**240/240**，多席位 standoff 3 人 15/15、6 人 24/6；竞技场首战 **288:0**、同时榜评分 **2355**，详细档案见 `algorithms/docs/algorithms/tempo-weave.md`
 
 添加算法 AI 时可自定义玩家名，默认预填所选算法的中文名。
 
@@ -340,7 +341,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo） |
+| `--algorithm <name>` | 算法名称（greedy, random, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |

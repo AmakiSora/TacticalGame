@@ -183,9 +183,9 @@ export const ALGORITHM_META = {
 | `dest-prob` | v2 按队列前缀投影 + 地形寻路 + `attacksPerUnit` 生成计划 | **v2 已适配（3.8.1）**：同 harness 对 v1 50/60（83.3%）、对 random-sim 60/60；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（各 30 局/图抽样）；v1 的旧规则 100:0 只代表旧规则 |
 | `kriegspiel` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配并完成 3.8 真实引擎标定**（分步语义、`wait`、`demolish`、`attacksPerUnit`）：与引擎逐点对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法；旧 3.7 数据只代表旧规则 |
 | `matrix-eq` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配**并按 3.8 镜像裁判标定；真实服务器口径待验证 |
-| `prism` | 整轮联合队列束搜索；四情境分别镜像分步结算；缓存整轮计划 | **v1（3.8.3）**：真实引擎双人两图整局零非法、standoff 三人四轮零非法；竞技场 4 对手 ×2 图 ×24 局共 192 局 **181:11**（standoff 96:0、molten-throne 85:11，评分 1977）；换座冒烟 14:0（7 组 ×2 局，小样本不作强度结论） |
-| `tempo` | v1 按分步语义排程（队列位置 = 结算拍），前缀投影 + `attacksPerUnit`；含首发前的反折返修复 | **v1 已适配并完成真实引擎进程内标定**（`scripts/tempo_benchmark.mjs`，每对 60 局 = standoff 40 + molten-throne 20，零非法）：对 `random-sim` 100%、`dest-prob` 55.0%、`kriegspiel` 50.0%、`matrix-eq` 43.3%（molten-throne 上 85–90%，standoff 32–40%，详见档案） |
-| `tempo-weave` | 任务竞价 + 变长行动排程；静止参照分步镜像；多席位回防紧迫度 | **v1（3.8.5）**：3.8.2 真实引擎双人两图 ×4 对手 ×30 局 **240/240**（对 random-sim / dest-prob / kriegspiel / matrix-eq 各 30:0）；多席位 standoff 3 人 15/15、6 人 24/6；3.8.5 集成复跑 79 项回归 + 抽样 8:0 |
+| `prism` | 整轮联合队列束搜索；四情境分别镜像分步结算；缓存整轮计划 | **v1（3.8.3）**：真实引擎双人两图整局零非法、standoff 三人四轮零非法；竞技场 3.8.3 首战 4 对手 ×2 图 ×24 局共 192 局 **181:11**（standoff 96:0、molten-throne 85:11，评分 1977），3.8.5 扩至 288 局 **229:59**、评分 1839；换座冒烟 14:0（7 组 ×2 局，小样本不作强度结论） |
+| `tempo` | v1 按分步语义排程（队列位置 = 结算拍），前缀投影 + `attacksPerUnit`；含首发前的反折返修复 | **v1 已适配并完成真实引擎进程内标定**（`scripts/tempo_benchmark.mjs`，每对 60 局 = standoff 40 + molten-throne 20，零非法）：对 `random-sim` 100%、`dest-prob` 55.0%、`kriegspiel` 50.0%、`matrix-eq` 43.3%（molten-throne 上 85–90%，standoff 32–40%，详见档案）；3.8.5 竞技场 288 局 **134W/154L**、评分 1444 |
+| `tempo-weave` | 任务竞价 + 变长行动排程；静止参照分步镜像；多席位回防紧迫度 | **v1（3.8.5）**：3.8.2 真实引擎双人两图 ×4 对手 ×30 局 **240/240**（对 random-sim / dest-prob / kriegspiel / matrix-eq 各 30:0）；多席位 standoff 3 人 15/15、6 人 24/6；3.8.5 集成复跑 79 项回归 + 抽样 8:0；竞技场 288 局 **288:0**、评分 **2355** 第一 |
 
 > `dest-prob` v2 已完成 3.8.1 分步引擎适配：同 harness、同种子对 v1 为 **50/60（83.3%）**（standoff 30/30、molten-throne 20/30），对 random-sim 两图各 30 局全胜；对 kriegspiel v2 抽样 21/60（35.0%）、对 matrix-eq v2 23/60（38.3%）——后两者是 30 局/图抽样，且 kriegspiel 用真实引擎 harness、matrix-eq 的数字口径需按档案标注。**不要把 v1 的旧 100:0 写入当前强度结论**：旧规则与 3.8 分步引擎不可比较。`kriegspiel` v2 的 `destination_occupied` 短板（17.1–23.1 次/局）仍是它自己的已知问题，不应归因给 dest-prob；dest-prob v2 的结算失败约 1.3–3.4/局。
 
@@ -229,14 +229,15 @@ export const ALGORITHM_META = {
 | **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
 | **field** | standard | v1 | 势场/梯度下降 | O(单位×格子) | arena 1753 / 76.8%；历史 vs greedy 64.3%；danger-close 强项、multiplayer-ring 短板 | 涌现式走位、慢节奏消耗战 |
 | **verdict** | standard | v1 | 反向规划/期限排程 | O(单位×格子 + 排程回合) | arena 1933 / 90.1%（该快照 standard 第一）；历史 vs greedy 95.7% | 裁决分统一计价、预算内斩首、守成与回防 |
-| **random-sim** | simultaneous | v2 | 随机 | O(n) | v2 已适配分步引擎；同时回合基线（无同口径强度标定） | 基线对照、模式隔离冒烟 |
-| **dest-prob** | simultaneous | v2 | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 3.8.1 真实引擎同 harness（30 局/图，2026-10-23）：对 v1 **50/60（83.3%）**、对 random-sim **60/60**；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（抽样） | 预测射击、冲突规避、分步队列投影样例 |
-| **kriegspiel** | simultaneous | v2 | 分步结算 rollout + 有序计划联合搜索 | O(行动点×候选×种子计划×rollouts×分步结算) | 3.8.1 真实引擎标定（standoff / molten-throne 各 30 局 ×3 对手，2026-10-23）：60:0 vs random-sim、52:8（86.7%，p<0.0001）vs dest-prob v1、29:31 vs matrix-eq v2（standoff 27:3 / molten-throne **2:28**，斩首短板；合计 p=0.90 不可用，必须按图拆）；与引擎逐点对拍 40 局面零偏差；180 局零非法；`decide` 45–169ms（v1 的 15–40 倍）。**同 harness 同种子的 v1 基线**：vs dest-prob 43.3%、vs matrix-eq 31.7%，即适配带来 +43.4pp / +16.6pp；但 v1↔v2 直接对打 35:25（p=0.245）**未达显著**，且 v2 结算期失败 17.1–23.1/局远高于 v1 的 1.3/局（`destination_occupied` 未修） | 同时回合搜索型内置、分步结算语义参考镜像 |
-| **matrix-eq** | simultaneous | v2 | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | 3.8 镜像裁判：23:7 vs v1、12:18 vs kriegspiel **v1**、13:17 vs dest-prob、30:0 vs random-sim；真实引擎待验证（3.8.1 真实引擎口径下被 kriegspiel v2 在 standoff 打到 3:27、在 molten-throne 反打 28:2） | 博弈论混合策略样例 |
-| **prism** | simultaneous | v1 | 多情境束搜索 + 同步结算镜像 | O(束宽×候选×情境×行动点×单步结算) | 3.8.3 竞技场 4 对手 ×2 图 ×24 局共 **192 局 181:11**（standoff 96:0、molten-throne 85:11；同时榜评分 1977）；真实引擎换座冒烟 14:0（horizon 8:0、matrix-eq 4:0、kriegspiel 2:0；**7 组 ×2 局，仅接口/强度冒烟**）；双人两图整局、三人四轮零非法 | 通用整轮联合规划、风险约束选型 |
-| **tempo-weave** | simultaneous | v1 | 任务排程/期限约束 | O(单位×任务×束宽×行动点×镜像步) | 3.8.2 真实引擎（两图 ×4 对手 ×30 局，2026-10-24）：对 random-sim / dest-prob / kriegspiel / matrix-eq **全部 30:0（240/240）**；多席位 standoff 3 人 15/15、6 人 24/6；3.8.5 集成抽样复验 8:0 | 任务级行动点预算、多席位回防 |
+| **random-sim** | simultaneous | v2 | 随机 | O(n) | v2 已适配分步引擎；同时回合基线（3.8.5 竞技场 288 局 0W/288L、评分 678） | 基线对照、模式隔离冒烟 |
+| **dest-prob** | simultaneous | v2 | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 3.8.1 真实引擎同 harness（30 局/图，2026-10-23）：对 v1 **50/60（83.3%）**、对 random-sim **60/60**；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（抽样）；3.8.5 竞技场 288 局 114W/174L、评分 1379 | 预测射击、冲突规避、分步队列投影样例 |
+| **kriegspiel** | simultaneous | v2 | 分步结算 rollout + 有序计划联合搜索 | O(行动点×候选×种子计划×rollouts×分步结算) | 3.8.1 真实引擎标定（standoff / molten-throne 各 30 局 ×3 对手，2026-10-23）：60:0 vs random-sim、52:8（86.7%，p<0.0001）vs dest-prob v1、29:31 vs matrix-eq v2（standoff 27:3 / molten-throne **2:28**，斩首短板；合计 p=0.90 不可用，必须按图拆）；与引擎逐点对拍 40 局面零偏差；180 局零非法；`decide` 45–169ms（v1 的 15–40 倍）。**同 harness 同种子的 v1 基线**：vs dest-prob 43.3%、vs matrix-eq 31.7%，即适配带来 +43.4pp / +16.6pp；但 v1↔v2 直接对打 35:25（p=0.245）**未达显著**，且 v2 结算期失败 17.1–23.1/局远高于 v1 的 1.3/局（`destination_occupied` 未修）；3.8.5 竞技场 288 局 114W/173L/1D、评分 1380 | 同时回合搜索型内置、分步结算语义参考镜像 |
+| **matrix-eq** | simultaneous | v2 | 矩阵博弈/CFR 均衡 | O(我方计划×敌方场景×单轮结算 + 迭代) | 3.8 镜像裁判：23:7 vs v1、12:18 vs kriegspiel **v1**、13:17 vs dest-prob、30:0 vs random-sim；3.8.1 真实引擎口径下被 kriegspiel v2 在 standoff 打到 3:27、在 molten-throne 反打 28:2；3.8.5 竞技场 288 局 128W/159L/1D、评分 1426 | 博弈论混合策略样例 |
+| **prism** | simultaneous | v1 | 多情境束搜索 + 同步结算镜像 | O(束宽×候选×情境×行动点×单步结算) | 3.8.3 首战 4 对手 ×2 图 ×24 局共 **192 局 181:11**（standoff 96:0、molten-throne 85:11；当时评分 1977）；3.8.5 扩到 6 对手 ×2 图 ×24 局共 **288 局 229:59**、评分 1839（同时榜第二）；真实引擎换座冒烟 14:0（horizon 8:0、matrix-eq 4:0、kriegspiel 2:0；**7 组 ×2 局，仅接口/强度冒烟**）；双人两图整局、三人四轮零非法 | 通用整轮联合规划、风险约束选型 |
+| **tempo** | simultaneous | v1 | 逐拍排程/威胁时间线 | O(单位×候选×拍×威胁投影) | 3.8.4 真实引擎进程内标定（每对 60 局 = standoff 40 + molten-throne 20，2026-10-24，零非法）：对 random-sim **100%**、dest-prob **55.0%**、kriegspiel **50.0%**、matrix-eq **43.3%**（molten-throne 85–90%、standoff 32–40%）；3.8.5 竞技场 288 局 134W/154L、评分 1444 | 结算拍序决策、同时回合通用基线 |
+| **tempo-weave** | simultaneous | v1 | 任务排程/期限约束 | O(单位×任务×束宽×行动点×镜像步) | 3.8.2 真实引擎（两图 ×4 对手 ×30 局，2026-10-24）：对 random-sim / dest-prob / kriegspiel / matrix-eq **全部 30:0（240/240）**；多席位 standoff 3 人 15/15、6 人 24/6；3.8.5 集成抽样复验 8:0；竞技场 288 局 **288:0**、评分 **2355** 第一 | 任务级行动点预算、多席位回防 |
 
-> 表中 standard 行的 arena 数字来自 `public/data/arena-leaderboard.json`（2026-10-21 UTC 生成，standard，36,000 局，300 对，每人 2,880 局）；simultaneous 行的 3.8.3 评分 1977 来自同时回合分区（480 局，2026-10-24 生成）。评分是 Bradley-Terry 混合池，胜率包含不同对手，不能与单图对拍数字直接比较；模式之间也不可混比。
+> 表中 standard 行的 arena 数字来自 `public/data/arena-leaderboard.json`（2026-10-21 UTC 生成，standard，36,000 局，300 对，每人 2,880 局）；simultaneous 行来自 2026-10-24 生成的 1,008 局分区（7 名参与者，tempo / tempo-weave 已入榜）；其中 prism 的 192 局 / 1977 是 3.8.3 首战快照，当前为 288 局 / 1,839。评分是 Bradley-Terry 混合池，胜率包含不同对手，不能与单图对拍数字直接比较；模式之间也不可混比。
 >
 > 历史数字采集于 3.5.x 地图池与 3.6.0 之前的裁决分口径；`forge`、`desert` 已不在当前池，详见“历史标定”。
 
@@ -245,7 +246,7 @@ export const ALGORITHM_META = {
 | 模式 | 内置算法数 | 算法 |
 |---|---:|---|
 | standard | 6 | random / greedy / mcts / threat / field / verdict |
-| simultaneous | 6 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo-weave |
+| simultaneous | 7 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo / tempo-weave |
 | annihilation | 0 | — |
 | royale | 0 | — |
 
@@ -390,6 +391,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 2026-10-23 | 3.8.1 | matrix-eq v2（3.8 分步引擎适配）：重写分步结算镜像、计划校验、组合动作生成与事件史按步序重建；镜像裁判对 v1 23:7、对 kriegspiel 12:18、对 dest-prob v1 13:17、对 random-sim 30:0；真实服务器口径待验证 |
 | 2026-10-23 | 3.8.1 | dest-prob v2（3.8 分步引擎适配）：队列前缀投影、同单位跨行动点多动作、地形寻路、`attacksPerUnit`、投影部署/治疗/爆破；真实引擎同 harness 30 局/图对 v1 50/60（83.3%）、对 random-sim 60/60；对 kriegspiel v2 21/60、matrix-eq v2 23/60（抽样） |
 | 2026-10-24 | 3.8.3 | 新增 prism 棱镜算法 v1（同时回合）：逐行动点联合搜索完整队列，四种对手行为假设分别镜像分步结算，按本局裁决权重 + 最差情境惩罚选择计划；无算法依赖、无地图 ID 分支、不使用对手隐藏队列。真实引擎双人两图整局、三人四轮零非法；竞技场 4 对手 ×2 图 ×24 局共 192 局 **181:11**（standoff 96:0、molten-throne 85:11，评分 1977）；换座冒烟 14:0（7 组 ×2 局，小样本不作强度结论） |
+| 2026-10-24 | 3.8.4 | 新增 tempo 时序掌控算法 v1（同时回合）：把队列位置当结算拍，先给每个敌军推行为剧本并逐拍投影位置，再叠敌方预测射击与可及火力区成「第 k 拍 × 格子」威胁时间线，按裁决分差与剩余轮数调节攻守，最后按价值把动作排进具体拍；首发前修复同一单位反复折返。真实引擎进程内标定（每对 60 局 = standoff 40 + molten-throne 20）：对 random-sim 100%、dest-prob 55.0%、kriegspiel 50.0%、matrix-eq 43.3%，零非法 |
 | 2026-10-24 | 3.8.5 | 新增 tempo-weave 经纬算法 v1（同时回合）：任务竞价与变长行动排程 + 静止参照分步镜像 + 多席位回防紧迫度；零导入、无地图特化、不使用对手隐藏队列。3.8.2 真实引擎双人两图 ×4 对手 ×30 局全胜 **240/240**（random-sim / dest-prob / kriegspiel / matrix-eq 各 30:0），多席位 standoff 3 人 15/15、6 人 24/6；3.8.5 集成复跑回归与抽样对局全胜 |
 
 ## 未来方向
@@ -400,7 +402,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 4. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索，可作为 mcts 之外的确定性搜索基线。
 5. **混合架构**：MCTS + 学习评估函数，或规则算法 + RL 局面评估。
 6. **多线程并行**：利用 Worker 加速搜索；先做可复现的基准，再决定是否值得。
-7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合已接入评估跑批（接入时 4 个同时算法，3.8.3 起 5 个 × standoff / molten-throne，RL 模型不参评），剩余缺口是大逃杀/歼灭跑批。
+7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合已接入评估跑批（接入时 4 个同时算法，3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），剩余缺口是大逃杀/歼灭跑批。
 8. **部署决策继续收敛**：`deployDecision()` 已统一 threat / mcts / field / verdict；还剩 `greedy` 与 `scripts/auto-standard-game.mjs` 两份变体未合并。
 9. **tempo / 兑现率量纲**：verdict 已用行动点预算与“打击分 − 原地承伤 × 姿态系数”补上 danger-close / multiplayer-ring 两个老短板；下一步是把“每一步兑现率”做成可计算量纲，而不是再配一个系数。旧 `forge` 例子已不适用，改用当前短图与多行动点图验证。
 10. **基准数据自动化**：让 `scripts/algorithm-arena.mjs` / `scripts/matrix_eq_benchmark.mjs` 输出带 `engineVersion / mapPool / harness / games / seed / date` 的 JSON，再由脚本生成本文表格，避免手工抄写再次漂移。
@@ -435,9 +437,9 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 同时回合镜像标定 | `scripts/matrix_eq_benchmark.mjs` | 镜像 3.8 分步结算的裁判；矩阵均衡等算法的专用基准 |
 | 同时回合真实引擎对战 | `rl/evaluation/evaluate_cross.py`（`algo:<name>@<version>` + `--swap-sides`） | 经 `rl/training/local-worker.ts` 的 decide 通道驱动真实引擎；prism 冒烟与算法互打均用此入口 |
 | 经纬标定与复跑 | `scripts/tempo-weave-arena.mts`（双人矩阵）、`scripts/tempo-weave-multiseat.mts`（多席位轮换）、`scripts/tempo-weave-http.mjs`（HTTP runner） | 真实引擎、公开快照口径；3.8.2 标定 240+45 局的原始记录随交付包归档，仓库内可直接复跑 |
-| Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 2026-10-21 UTC 标准模式快照；按模式分榜；3.8.2 起同时回合已有独立跑批分区，3.8.3 起参与算法 5 个 |
+| Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 标准模式 36,000 局（2026-10-21 UTC）、同时回合 1,008 局（2026-10-24）；按模式分榜；3.8.5 起同时回合参与算法 7 个 |
 | 合法性回归 | `tests/algorithms/*-selfplay.test.ts` | 整局零非法动作、正常完赛 |
 | 单算法档案 | `algorithms/docs/algorithms/*.md` | 设计细节与逐图数据；本文只保留总览与当前快照 |
-| 版本历史 | 根 `RELEASE_NOTES.md`（权威） / `algorithms/docs/RELEASE_NOTES.md`（算法专题记录，已补录 3.5.0–3.8.1） | 算法侧细节看专题记录；与根文档冲突时以根文档为准 |
+| 版本历史 | 根 `RELEASE_NOTES.md`（权威） / `algorithms/docs/RELEASE_NOTES.md`（算法专题记录，已补录 3.5.0–3.8.5） | 算法侧细节看专题记录；与根文档冲突时以根文档为准 |
 
 > `temp/threat-bench.mts` 是本机临时标定脚本（gitignored），不能作为长期复现入口；`rl/test-output/stats/algo_vs_rl_random.jsonl` 已不在仓库，旧 48 局数据仅作历史引用。

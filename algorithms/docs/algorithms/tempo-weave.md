@@ -92,6 +92,10 @@
 
 集成进 `release/3.8.5` 时在当前引擎复跑（2026-10-24，种子基 3300025）：新增回归 79 项全部通过（含 2/3/6 人整局自博弈与配置扰动）；抽样对局两图 × kriegspiel / dest-prob × 各 2 局换座共 **8:0**、API 拒绝 0，decide 均值 standoff 20–23ms / molten-throne 93–100ms（单次最大 566ms），与 3.8.2 标定量级一致。真实 HTTP 链路（原版 `algorithms/runner.mjs` × `scripts/tempo-weave-http.mjs` 起的独立端口服务器）：standoff 双人 / molten-throne 双人 / standoff 三人共 3 局全部 `game_over`、动作拒绝 0、runner 退出码全 0。抽样只确认集成后行为不变，不改变上表的 3.8.2 标定口径。
 
+### 3.8.5 竞技场
+
+`arena/matches.jsonl` 的 3.8.5 同时回合跑批中，tempo-weave 共 288 局（对 6 个对手 ×2 图 ×24 局）：**288 胜 / 0 负 / 0 平**，standoff 与 molten-throne 各 144:0，Bradley-Terry 评分 **2355** 第一；同批 tempo 134W/154L、prism 229W/59L。样本为双人、两图、固定算法池，不构成三/六人局结论。
+
 ### 开发迭代
 
 同一 v1 交付前的内部迭代，不冒充已经发布过的版本升级：

@@ -2,15 +2,44 @@
 
 > 本文档记录算法 AI 侧的版本变化：新增算法、算法版本升级、同时回合镜像适配、算法接口/工具链与相关地图/计分规则变化。
 >
-> **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.1 的算法里程碑，未列出的版本表示没有算法侧变化。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
+> **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.5 的算法里程碑，未列出的版本表示没有算法侧变化。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）仍为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）仍为 v1。
+
+## 3.8.5（2026-10-24）— tempo-weave 经纬算法 v1
+
+### 新增功能
+
+- **tempo-weave v1**：同时回合模式的第七个内置算法。以「哪个单位完成什么任务、需要几个行动点、结束后能否存活」为决策单位——先生成变长任务（直接射击、区域治疗、占点、跨步接敌后射击、脱离火力圈、攻城接近、开路），再在共享行动点预算内按收益/成本竞价排程（按已用行动点分桶的有限宽度搜索，650ms 软预算），并用独立实现的分步结算镜像做己方队列的静止参照投影；三席及以上按逐敌方席位的火力包络与己方 HQ 剩余 HP 提高回防紧迫度。实现零导入、不读取地图 ID、不使用对手隐藏队列。
+- **注册与档案**：注册名 `tempo-weave`（大厅 bot type `algo_tempo-weave`，竞技场参与者 id `algo_tempo-weave@v1`），`modes: ['simultaneous']`，`version: 'v1'`；档案 `algorithms/docs/algorithms/tempo-weave.md`。
+- **竞技场跑批**：新增 528 局（11 个对阵 ×2 图 ×24 局），`arena/matches.jsonl` 36,480 → **37,008** 局；同时回合分区 480 → **1,008 局**、参与者 5 → **7**。tempo-weave 首战 **288:0**、Bradley-Terry 评分 **2355** 第一；tempo 288 局 **134W/154L**、评分 **1444**；prism 扩至 288 局 **229W/59L**、评分 **1839**（3.8.3 首战 192 局 181:11 / 1977，转为历史快照）。标准榜 36,000 局不变。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/tempo-weave.test.ts`（74 例）：接口与席位短路、信息隔离、前缀缓存与撤回/重排/外部插入 wait 的失效、随机合法计划与镜像对拍、规则边界回归。
+- 新增 `tests/algorithms/tempo-weave-selfplay.test.ts`（5 例）：standoff / molten-throne 双人整局、standoff 三人与六人整局零 API 拒绝并正常完赛；坐标平移、异形缺格、数值与行动点扰动后仍能完赛。
+- 3.8.5 集成复验：新增回归 79 项全部通过；真实引擎抽样两图 × kriegspiel / dest-prob × 各 2 局换座 **8:0**、API 拒绝 0；真实 HTTP 链路 3 局全部正常完赛、动作拒绝 0。
+- `npm run build` 通过；`npm test` 116 文件 / 1040 例全绿。
+
+## 3.8.4（2026-10-24）— tempo 时序掌控算法 v1
+
+### 新增功能
+
+- **tempo v1**：同时回合模式的第六个内置算法。把队列位置（结算拍）当成决策变量：先为每个敌军推一条最可能的行为剧本（抢点 / 原地开火 / 残血撤退 / 推进）并逐拍投影位置；再把敌方预测射击与可及火力区叠成「第 k 拍 × 格子」的威胁时间线，移动候选按落地拍起的累计暴露计价；最后读 `adjudication` 分差与剩余轮数调节攻守（领先收敛避险、落后加压求变、末轮把补给换单位），按价值把动作排进具体拍——斩杀与锁定射击抢早拍，占点到达与治疗压末拍，部署抢先当墙。全部数值读 `config` / `adjudication`，无 `mapId` 分支，同一实现覆盖 `standoff` / `molten-throne`。
+- **注册与档案**：注册名 `tempo`（大厅 bot type `algo_tempo`，竞技场参与者 id `algo_tempo@v1`），`modes: ['simultaneous']`，`version: 'v1'`；档案 `algorithms/docs/algorithms/tempo.md`。首发前修复同一单位反复折返的排程问题。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/tempo.test.ts`（11 例）：无座位 / 已提交 / 行动点用尽短路、锁定射击瞄敌人当前格、移动后按投影站位取瞄准格、支援兵治疗受伤友军、侦察兵抢可达据点、被拒动作重排、反折返，以及真实 `standoff` 双方整轮计划逐条通过引擎入队校验并连续 5 轮零非法。
+- 新增 `scripts/tempo_benchmark.mjs`：真实引擎进程内跑批，投影口径与 `rl/training/local-worker.ts` 的 decide 通道一致，支持算法名或 `.mjs` 路径对打。
+- 2026-10-24 标定（每对 60 局 = standoff 40 + molten-throne 20，双方零非法动作）：对 random-sim **100%**、dest-prob **55.0%**、kriegspiel **50.0%**、matrix-eq **43.3%**；按图 molten-throne 85–90%、standoff 32–40%（40/20 局样本的置信区间约 ±15 个点）。
+- `npm run build` 通过；`npm test` 114 文件 / 961 例全绿。
 
 ## 3.8.3（2026-10-24）— prism 棱镜算法 v1
 
 ### 新增功能
 
-- **prism v1**：同时回合模式的第六个内置算法，路线为**整轮联合队列束搜索**——每层扩展一个行动点的移动/攻击/治疗/部署/爆破/待命候选，对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别运行同步结算镜像，再按本局裁决权重和“加权均值 + 最差情境惩罚”保留完整计划。镜像覆盖队列前缀投影、地形 BFS、同一步到达冲突与腾格依赖、部署/移动、形状攻击、`attackLock`、治疗、`attacksPerUnit`、级联失败、同步死亡与总部淘汰；本回合新部署单位可被攻击但不会在同轮获得后续动作。
+- **prism v1**：同时回合模式的第五个内置算法，路线为**整轮联合队列束搜索**——每层扩展一个行动点的移动/攻击/治疗/部署/爆破/待命候选，对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别运行同步结算镜像，再按本局裁决权重和“加权均值 + 最差情境惩罚”保留完整计划。镜像覆盖队列前缀投影、地形 BFS、同一步到达冲突与腾格依赖、部署/移动、形状攻击、`attackLock`、治疗、`attacksPerUnit`、级联失败、同步死亡与总部淘汰；本回合新部署单位可被攻击但不会在同轮获得后续动作。
 - **通用性约束**：不依赖或路由任何现有算法；不读取 `mapId`、不按地图名分支；仅使用公开快照与己方 `myQueue`。地图差异全部来自 `config` 的兵种、形状、部署、据点、裁决权重与炮火危险区。
 - **注册与档案**：注册名 `prism`（大厅 bot type `algo_prism`，竞技场参与者 id `algo_prism@v1`），`modes: ['simultaneous']`，`version: 'v1'`；档案 `algorithms/docs/algorithms/prism.md`，README / 开发指南 / 算法总览同步。
 - **竞技场跑批**：prism 对 4 个同时算法 ×2 图 × 每对阵 24 局，8 批共 192 局全部入库；**181:11**（standoff 96:0、molten-throne 85:11；对 random-sim 48:0、dest-prob 46:2、kriegspiel 46:2、matrix-eq 41:7），同时榜 Bradley-Terry 评分 **1977** 暂居第一；样本为双人、两图、固定算法池。

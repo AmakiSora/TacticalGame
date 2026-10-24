@@ -42,6 +42,7 @@ algorithms/
 │   ├── dest-prob.mjs     # 落点概率算法（同时回合模式）
 │   ├── kriegspiel.mjs    # 兵棋推演算法（同时回合模式）
 │   ├── matrix-eq.mjs     # 矩阵均衡算法（同时回合模式）
+│   ├── tempo.mjs         # 时序掌控算法（同时回合模式）
 │   └── README.md         # 算法开发指南
 ├── lib/                  # 共享工具库
 │   ├── api-client.mjs    # REST API 客户端
@@ -60,7 +61,8 @@ algorithms/
 │       ├── random-sim.md
 │       ├── dest-prob.md
 │       ├── kriegspiel.md
-│       └── matrix-eq.md
+│       ├── matrix-eq.md
+│       └── tempo.md
 ├── registry.mjs          # 算法注册表与 ALGORITHM_META
 ├── registry.d.mts        # 注册表 TypeScript 类型声明
 └── runner.mjs            # 通用运行器
@@ -177,6 +179,7 @@ export const ALGORITHM_META = {
 | `dest-prob` | v2 按队列前缀投影 + 地形寻路 + `attacksPerUnit` 生成计划 | **v2 已适配（3.8.1）**：同 harness 对 v1 50/60（83.3%）、对 random-sim 60/60；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（各 30 局/图抽样）；v1 的旧规则 100:0 只代表旧规则 |
 | `kriegspiel` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配并完成 3.8 真实引擎标定**（分步语义、`wait`、`demolish`、`attacksPerUnit`）：与引擎逐点对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法；旧 3.7 数据只代表旧规则 |
 | `matrix-eq` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配**并按 3.8 镜像裁判标定；真实服务器口径待验证 |
+| `tempo` | v1 直接按分步语义排程（队列位置 = 结算拍），前缀投影 + `attacksPerUnit` | **v1 已适配分步引擎**：真实 `standoff` 连续 5 轮逐条入队零非法（`tests/algorithms/tempo.test.ts`）；**暂无同口径强度对照** |
 
 > `dest-prob` v2 已完成 3.8.1 分步引擎适配：同 harness、同种子对 v1 为 **50/60（83.3%）**（standoff 30/30、molten-throne 20/30），对 random-sim 两图各 30 局全胜；对 kriegspiel v2 抽样 21/60（35.0%）、对 matrix-eq v2 23/60（38.3%）——后两者是 30 局/图抽样，且 kriegspiel 用真实引擎 harness、matrix-eq 的数字口径需按档案标注。**不要把 v1 的旧 100:0 写入当前强度结论**：旧规则与 3.8 分步引擎不可比较。`kriegspiel` v2 的 `destination_occupied` 短板（17.1–23.1 次/局）仍是它自己的已知问题，不应归因给 dest-prob；dest-prob v2 的结算失败约 1.3–3.4/局。
 

@@ -983,6 +983,9 @@ main {
   border-radius: 8px;
   padding: 12px 14px;
 }
+/* 未选对局时资源 / 回合 / 分数等面板会被清空，不留空壳（布局编辑时保留，便于拖动卡片） */
+body:not(.tg-editing) .tg-zone section:empty,
+body:not(.tg-editing) #sidebar section:empty { display: none; }
 #sidebar h3, .tg-zone h3 { margin: 0 0 8px; font-size: 13px; color: #7a9aaa; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
 
 .resource-grid {
@@ -1413,6 +1416,7 @@ main {
   pointer-events: none;
   white-space: nowrap;
 }
+.cell-info:empty { display: none; }
 
 @media (max-width: 1180px) {
   main {

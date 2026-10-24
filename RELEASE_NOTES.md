@@ -4,6 +4,24 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.8.3
+
+### 新增
+
+- **新增「棱镜算法」（prism）：同时回合模式的通用整轮搜索算法**：每轮从 `plan.myQueue` 前缀开始，逐行动点联合搜索至多 `actionsPerTurn` 条的完整计划队列；对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别镜像 3.8 分步结算（到达冲突与腾格依赖、部署/移动、锁定射击、范围攻击/治疗、级联失败、同步死亡与淘汰），再按本局 `adjudicationWeights` 与“情境加权均值 + 最差情境惩罚”选择风险约束后的计划。同一队列命中缓存后逐动作返回，不再重复搜索。实现不导入或路由其它算法、不读取地图 ID、不使用对手隐藏队列。注册键 `algo_prism`，`modes: ['simultaneous']`；大厅算法下拉、`/api/algorithms` 与竞技场发现由注册表自动带出；详细档案见 `algorithms/docs/algorithms/prism.md`。
+
+### 修复
+
+- **大厅把已结束的对局显示成等待开局**：刷新或退出对局后恢复会话时，`game_over` 房间现在显示「已结束」、胜者与结束回合，隐藏「开始游戏 / 加入战斗 / 进入游戏」并改为提供「查看回放」；恢复房间时建房表单的地图摘要同步为房间实际地图（随机图显示「随机地图」），不再回落到 `/api/maps` 的第一张静态图；已结束房间不再继续轮询开局。`GET /api/games/:id/lobby` 补充 `winner` / `roundNumber`，已结束房间调用 `/start` 返回 `game_over`。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/prism.test.ts`（2 例）：无座位/已提交/行动点用尽短路，以及同一队列复用整轮计划并按计划索引继续入队。
+- 新增 `tests/algorithms/prism-selfplay.test.ts`（3 例）：`standoff` / `molten-throne` 双人整局与 `standoff` 三人前四轮均零非法动作；同时验证快照不包含对手隐藏队列。
+- 真实引擎 `evaluate_cross.py` 换座冒烟（2026-10-24，每对阵每图 2 局）：对 `horizon` 在 `standoff` 三批复跑及 `molten-throne` 共 8:0、对 `matrix-eq` 两图 4:0、对 `kriegspiel` 在 `standoff` 2:0，合计 **14:0**；样本仅 7 组 ×2 局，属于接口与强度冒烟，不构成稳定优势结论。
+- 扩展 `tests/public/lobby-redesign.test.ts` 与 `tests/api/game-over-invariants.test.ts`：覆盖已结束房间的阶段文案、回放入口、房间地图同步与 `/start` 的 `game_over` 返回。
+- `npm run build` 通过；`npm test` 全量 113 个测试文件 / 950 个用例通过。
+
 ## 3.8.2
 
 ### 新增

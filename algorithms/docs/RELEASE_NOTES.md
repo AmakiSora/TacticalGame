@@ -4,7 +4,22 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.1 的算法里程碑，未列出的版本表示没有算法侧变化。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2；标准模式算法（greedy / random / mcts / threat / field / verdict）仍为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）仍为 v1。
+
+## 3.8.3（2026-10-24）— prism 棱镜算法 v1
+
+### 新增功能
+
+- **prism v1**：同时回合模式的第六个内置算法，路线为**整轮联合队列束搜索**——每层扩展一个行动点的移动/攻击/治疗/部署/爆破/待命候选，对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别运行同步结算镜像，再按本局裁决权重和“加权均值 + 最差情境惩罚”保留完整计划。镜像覆盖队列前缀投影、地形 BFS、同一步到达冲突与腾格依赖、部署/移动、形状攻击、`attackLock`、治疗、`attacksPerUnit`、级联失败、同步死亡与总部淘汰；本回合新部署单位可被攻击但不会在同轮获得后续动作。
+- **通用性约束**：不依赖或路由任何现有算法；不读取 `mapId`、不按地图名分支；仅使用公开快照与己方 `myQueue`。地图差异全部来自 `config` 的兵种、形状、部署、据点、裁决权重与炮火危险区。
+- **注册与档案**：注册键 `algo_prism`，`modes: ['simultaneous']`，`version: 'v1'`；档案 `algorithms/docs/algorithms/prism.md`，README / 开发指南 / 算法总览同步。
+
+### 测试与验证
+
+- `tests/algorithms/prism.test.ts` 2 例：接口短路与整轮计划缓存续吐。
+- `tests/algorithms/prism-selfplay.test.ts` 3 例：standoff / molten-throne 双人整局、standoff 三人前四轮，零非法动作。
+- 真实引擎换座冒烟（3.8.3、`evaluate_cross.py`、每对阵每图 2 局）：horizon 8:0、matrix-eq 4:0、kriegspiel 2:0，合计 14:0；仅 7 组 ×2 局，不作稳定优势结论。
+- `npm run build` 通过；`npm test` 113 文件 / 949 例全绿。
 
 ## 3.8.1（2026-10-23）— 同时回合算法 v2：3.8.0 分步引擎适配
 
@@ -408,4 +423,4 @@ vs greedy（各图 30 局，逐局交替先手）：
 
 ## 版本号说明
 
-算法 AI 系统随主项目版本发布；算法实现自 3.8.1 起在 `algorithms/registry.mjs` 的 `ALGORITHM_META.version` 标注 `vN`，竞技场参与者 id 使用 `algo_<name>@vN`，历史对局仍归属旧版本 id。3.5–3.7 的算法实现未严格版本化，本文中的 v1 为回溯标注，具体变更以文件修改时间和 git 提交记录追溯。当前同时回合算法：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2。
+算法 AI 系统随主项目版本发布；算法实现自 3.8.1 起在 `algorithms/registry.mjs` 的 `ALGORITHM_META.version` 标注 `vN`，竞技场参与者 id 使用 `algo_<name>@vN`，历史对局仍归属旧版本 id。3.5–3.7 的算法实现未严格版本化，本文中的 v1 为回溯标注，具体变更以文件修改时间和 git 提交记录追溯。当前同时回合算法：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1。

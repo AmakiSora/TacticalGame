@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { ControlPointKind, GameMode, MapCell, PlayerId, Position, TerrainType, UnitType } from '../types.js';
 import { isAnnihilationMode } from '../types.js';
 import { isValidHex } from '../engine/hex.js';
-import { arePlayableCellsConnected, createMapCells, createRadiusPlayableCells } from './geometry.js';
+import { createMapCells, createRadiusPlayableCells } from './geometry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -299,9 +299,6 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     const key = `${pos.q},${pos.r}`;
     if (playableKeys.has(key)) throw new Error(`playableCells[${i}] duplicates ${key}`);
     playableKeys.add(key);
-  }
-  if (!arePlayableCellsConnected(c.playableCells as Position[])) {
-    throw new Error(`Map "${id}".playableCells must form one connected area`);
   }
   function assertPlayablePosition(obj: Record<string, unknown>, ctx: string): { q: number; r: number } {
     const pos = assertPosition(obj, ctx, radius);

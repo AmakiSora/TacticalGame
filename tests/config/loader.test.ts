@@ -470,9 +470,6 @@ describe('map config loader', () => {
 
   it.each([
     ['duplicate', (map: Record<string, any>) => map.playableCells.push({ ...map.playableCells[0] }), 'duplicates'],
-    ['disconnected', (map: Record<string, any>) => {
-      map.playableCells = [map.playableCells[0], map.playableCells[map.playableCells.length - 1]];
-    }, 'must form one connected area'],
     ['object outside', (map: Record<string, any>) => {
       // 先挖掉一个在半径内的格子，再往该格放地形，才能构造「半径内但不属于 playableCells」。
       map.playableCells = map.playableCells.filter((cell: any) => !(cell.q === 8 && cell.r === 0));
@@ -484,6 +481,24 @@ describe('map config loader', () => {
     mutate(map);
     writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
     expect(() => loadMaps(dir)).toThrow(message);
+    resetConfig();
+  });
+
+  it('loads disconnected maps with multiple islands', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as Record<string, any>;
+    // 两座互不相邻的岛：player_a 与控制点在西岛，player_b 在东岛。
+    map.playableCells = [
+      { q: -2, r: 0 }, { q: -1, r: 0 },
+      { q: 1, r: 0 }, { q: 2, r: 0 },
+    ];
+    map.controlPoints = [{ id: 'cp', name: 'West', kind: 'supply', q: -1, r: 0 }];
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    loadMaps(dir);
+    const loaded = getMapConfig('default');
+    expect(loaded.playableCells).toHaveLength(4);
+    expect(listMaps().find(item => item.id === 'default')!.preview.cells).toHaveLength(4);
     resetConfig();
   });
 

@@ -1,5 +1,5 @@
 import type { MapCell, Position, TerrainType } from '../types.js';
-import { hexKey, hexNeighbors, isValidHex } from '../engine/hex.js';
+import { hexKey, isValidHex } from '../engine/hex.js';
 
 export interface TerrainOverride extends Position {
   terrain: TerrainType;
@@ -30,19 +30,4 @@ export function createMapCells(
     r: cell.r,
     terrain: terrain.get(hexKey(cell)) ?? 'plain',
   }));
-}
-
-export function arePlayableCellsConnected(cells: readonly Position[]): boolean {
-  if (cells.length === 0) return false;
-  const remaining = new Set(cells.map(hexKey));
-  const queue: Position[] = [{ ...cells[0] }];
-  remaining.delete(hexKey(cells[0]));
-  for (let index = 0; index < queue.length; index++) {
-    for (const neighbor of hexNeighbors(queue[index])) {
-      const key = hexKey(neighbor);
-      if (!remaining.delete(key)) continue;
-      queue.push(neighbor);
-    }
-  }
-  return remaining.size === 0;
 }

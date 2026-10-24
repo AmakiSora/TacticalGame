@@ -76,23 +76,6 @@ import './error-text.js';
     return config.playableCells;
   }
 
-  function arePlayableCellsConnected(cells) {
-    if (!Array.isArray(cells) || cells.length === 0) return false;
-    const remaining = new Set(cells.map(hexKey));
-    const queue = [{ ...cells[0] }];
-    remaining.delete(hexKey(cells[0]));
-    const directions = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
-    for (let index = 0; index < queue.length; index++) {
-      for (const [dq, dr] of directions) {
-        const next = { q: queue[index].q + dq, r: queue[index].r + dr };
-        const key = hexKey(next);
-        if (!remaining.delete(key)) continue;
-        queue.push(next);
-      }
-    }
-    return remaining.size === 0;
-  }
-
   function defaultUnits() {
     return {
       infantry: { hp: 100, attack: 30, defense: 8, moveRange: 3, attackRange: 1, cost: 45, canCapture: true },
@@ -554,7 +537,6 @@ import './error-text.js';
         if (playableKeys.has(key)) errors.push(`playableCells[${index}] duplicates ${key}`);
         playableKeys.add(key);
       });
-      if (!arePlayableCellsConnected(sourcePlayableCells)) errors.push(`${mapName}.playableCells must form one connected area`);
     }
 
     const units = record(c.units, `${mapName}.units`);
@@ -857,7 +839,6 @@ import './error-text.js';
     if (error.includes('.controlPointId must reference a control point')) return `出生槽 ${itemNumber(error)} 绑定了不存在的据点。`;
     if (error.includes('.controlPointId must be unique')) return `出生槽 ${itemNumber(error)} 绑定的据点已被其他出生槽使用。`;
     if (error.includes('playableCells must be a non-empty array')) return '地图必须至少包含 1 个可用格子。';
-    if (error.includes('playableCells must form one connected area')) return '所有可用格子必须六向连通。';
     if (error.includes('outside playableCells')) return error.replace('is outside playableCells', '不在可用地图边界内');
     if (error.includes('.spawnSlots must contain 2-8 slots')) return '多人地图必须配置 2–8 个出生槽。';
     if (error.includes('.layouts.') && error.includes('must contain exactly')) return '人数布局选择的出生槽数量不正确。';
@@ -937,7 +918,6 @@ import './error-text.js';
     formatValidationError,
     isValidHex,
     isPlayableCell,
-    arePlayableCellsConnected,
     createCellsFromConfig,
   };
 
@@ -1199,13 +1179,7 @@ import './error-text.js';
     if (tool === 'add-cell') {
       const existed = isPlayableCell(config, pos);
       const cells = materializePlayableCells(config);
-      if (!existed) {
-        cells.push({ q: pos.q, r: pos.r });
-        if (!arePlayableCellsConnected(cells)) {
-          cells.pop();
-          return setStatus('添加该地块后地图不连通，操作已取消', 'err');
-        }
-      }
+      if (!existed) cells.push({ q: pos.q, r: pos.r });
       selected = { type: 'cell', object: { q: pos.q, r: pos.r } };
     } else if (tool === 'remove-cell') {
       removePlayableCell(pos);
@@ -1259,9 +1233,7 @@ import './error-text.js';
     if (!isPlayableCell(config, pos)) return setStatus('该位置已经在地图外', 'err');
     if (objectAt(pos)) return setStatus('该格存在总部、据点或单位，不能移除地块', 'err');
     if (terrainAt(pos) !== 'plain') return setStatus('请先将该格地形恢复为平地，再移除地块', 'err');
-    const next = playableCells(config).filter(cell => cell.q !== pos.q || cell.r !== pos.r);
-    if (!arePlayableCellsConnected(next)) return setStatus('移除后会使地图断开，操作已取消', 'err');
-    config.playableCells = next;
+    config.playableCells = playableCells(config).filter(cell => cell.q !== pos.q || cell.r !== pos.r);
     selected = null;
   }
 

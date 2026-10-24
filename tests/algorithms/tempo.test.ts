@@ -190,6 +190,22 @@ describe('tempo combat planning', () => {
     expect([action?.payload.q, action?.payload.r]).toEqual([2, 0]);
   });
 
+  it('never queues a second move for a unit already moved this round', async () => {
+    // 回归：逐条 decide 时若重排把同一单位派去另一个目标，队列里会出现来回折返的废拍。
+    const scout = makeUnit('player_a', 'scout', 0, 0, { attackRange: 0 });
+    const game = makeGame({
+      units: [scout],
+      headquarters: farHq,
+      controlPoints: [{ id: 'cp_1', name: '补给点', kind: 'supply', q: 2, r: 0, owner: null }],
+      cells: [{ q: 0, r: 0 }, { q: 2, r: 0 }],
+      myQueue: [{ type: 'move', unitId: scout.id, q: 2, r: 0 }],
+    });
+    const action = await tempo.decide(game, utils, { owner: 'player_a' });
+    if (action) {
+      expect(action.type).not.toBe('move');
+    }
+  });
+
   it('re-plans a different action when the previous offer was rejected', async () => {
     const scoutA = makeUnit('player_a', 'scout', 0, 0, { attackRange: 0 });
     const scoutB = makeUnit('player_a', 'scout', 0, 1, { attackRange: 0 });

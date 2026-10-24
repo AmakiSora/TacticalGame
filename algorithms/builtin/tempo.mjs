@@ -239,10 +239,7 @@ function damageValue(ctx, target, dmg) {
   const u = target.entity;
   const kill = dmg >= u.hp;
   const cost = ctx.specs[u.type]?.cost ?? u.cost ?? 50;
-  return (
-    dmg * hpValueOf(ctx, u) +
-    (kill ? 2 + (ctx.weights.kill + ctx.weights.army) * cost : 0)
-  );
+  return dmg * hpValueOf(ctx, u) + (kill ? 2 + (ctx.weights.kill + ctx.weights.army) * cost : 0);
 }
 
 function captureValue(ctx, cp) {
@@ -404,7 +401,8 @@ function generateMissions(ctx, proj, threat, scripts) {
     const attacksUsed = proj.attacks.get(u.id) ?? 0;
     const canAttack = (u.attack ?? spec.attack ?? 0) > 0 && attacksUsed < ctx.attacksPerUnit;
     const range = u.attackRange ?? spec.attackRange ?? 0;
-    const reachable = terrainField(ctx, from, u.moveRange ?? spec.moveRange ?? 0);
+    const moved = (proj.queue ?? []).some(a => a.type === 'move' && a.unitId === u.id);
+    const reachable = moved ? [] : terrainField(ctx, from, u.moveRange ?? spec.moveRange ?? 0);
 
     // ---------- 攻击（原地 / 移动后） ----------
     if (canAttack && range > 0) {

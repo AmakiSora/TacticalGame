@@ -182,7 +182,7 @@ export const ALGORITHM_META = {
 | `kriegspiel` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配并完成 3.8 真实引擎标定**（分步语义、`wait`、`demolish`、`attacksPerUnit`）：与引擎逐点对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法；旧 3.7 数据只代表旧规则 |
 | `matrix-eq` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配**并按 3.8 镜像裁判标定；真实服务器口径待验证 |
 | `prism` | 整轮联合队列束搜索；四情境分别镜像分步结算；缓存整轮计划 | **v1（3.8.3）**：真实引擎双人两图整局零非法、standoff 三人四轮零非法；竞技场 4 对手 ×2 图 ×24 局共 192 局 **181:11**（standoff 96:0、molten-throne 85:11，评分 1977）；换座冒烟 14:0（7 组 ×2 局，小样本不作强度结论） |
-| `tempo` | v1 直接按分步语义排程（队列位置 = 结算拍），前缀投影 + `attacksPerUnit` | **v1 已适配分步引擎**：真实 `standoff` 连续 5 轮逐条入队零非法（`tests/algorithms/tempo.test.ts`）；**暂无同口径强度对照** |
+| `tempo` | v1 按分步语义排程（队列位置 = 结算拍），前缀投影 + `attacksPerUnit`；含首发前的反折返修复 | **v1 已适配并完成真实引擎进程内标定**（`scripts/tempo_benchmark.mjs`，每对 60 局 = standoff 40 + molten-throne 20，零非法）：对 `random-sim` 100%、`dest-prob` 55.0%、`kriegspiel` 50.0%、`matrix-eq` 43.3%（molten-throne 上 85–90%，standoff 32–40%，详见档案） |
 
 > `dest-prob` v2 已完成 3.8.1 分步引擎适配：同 harness、同种子对 v1 为 **50/60（83.3%）**（standoff 30/30、molten-throne 20/30），对 random-sim 两图各 30 局全胜；对 kriegspiel v2 抽样 21/60（35.0%）、对 matrix-eq v2 23/60（38.3%）——后两者是 30 局/图抽样，且 kriegspiel 用真实引擎 harness、matrix-eq 的数字口径需按档案标注。**不要把 v1 的旧 100:0 写入当前强度结论**：旧规则与 3.8 分步引擎不可比较。`kriegspiel` v2 的 `destination_occupied` 短板（17.1–23.1 次/局）仍是它自己的已知问题，不应归因给 dest-prob；dest-prob v2 的结算失败约 1.3–3.4/局。
 

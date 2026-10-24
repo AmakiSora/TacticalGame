@@ -64,6 +64,22 @@ describe('map editor page', () => {
     expect(source).not.toContain("els.canvas.addEventListener('wheel'");
   });
 
+  it('uses 100% zoom as the fit-to-view scale for the whole map', () => {
+    const source = read('public/map-editor.js');
+    const css = read('public/map-editor.css');
+
+    // 100% 是“整图适配”的基准，而不是画布原始像素尺寸。
+    expect(source).toContain('function computeFitScale');
+    expect(source).toContain('let fitScale = 1');
+    expect(source).toContain('fitScale = computeFitScale()');
+    expect(source).toContain('const scale = fitScale * zoom');
+    expect(source).toContain("window.addEventListener('resize', scheduleFitRefresh)");
+
+    // 画布小于容器时居中，避免留白全挤在右侧。
+    expect(css).toMatch(/\.board-wrap\s*\{[^}]*display:\s*flex/s);
+    expect(css).toMatch(/#map-canvas\s*\{[^}]*margin:\s*auto/s);
+  });
+
   it('draws canvas entities with glyphs matching spectator and player pages', () => {
     const source = read('public/map-editor.js');
 

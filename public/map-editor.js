@@ -974,6 +974,10 @@ import './error-text.js';
   let hoverCell = null;
   let selected = null;
   let zoom = 1;
+  // 100% 表示“整张地图刚好铺满可视区域”，实际 CSS 缩放 = fitScale * zoom。
+  // 地图半径变化或窗口尺寸变化时重新计算 fitScale。
+  let fitScale = 1;
+  let fitInitialized = false;
   let layout = { minX: 0, minY: 0, width: 840, height: 840 };
   let annihilationDraft = null;
 
@@ -1017,11 +1021,32 @@ import './error-text.js';
     toast(message, type);
   }
 
+  function computeFitScale() {
+    const wrap = els.canvas.parentElement;
+    if (!wrap) return 1;
+    const style = getComputedStyle(wrap);
+    const padX = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    const padY = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    // 留 2px 余量，避免像素取整后出现滚动条。
+    const availableWidth = wrap.clientWidth - padX - 2;
+    const availableHeight = wrap.clientHeight - padY - 2;
+    if (availableWidth <= 0 || availableHeight <= 0 || !els.canvas.width || !els.canvas.height) return 1;
+    return Math.min(1, availableWidth / els.canvas.width, availableHeight / els.canvas.height);
+  }
+
   function applyZoom() {
-    els.canvas.style.width = `${Math.round(els.canvas.width * zoom)}px`;
-    els.canvas.style.height = `${Math.round(els.canvas.height * zoom)}px`;
+    const scale = fitScale * zoom;
+    els.canvas.style.width = `${Math.max(1, Math.round(els.canvas.width * scale))}px`;
+    els.canvas.style.height = `${Math.max(1, Math.round(els.canvas.height * scale))}px`;
     const label = document.getElementById('zoom-label');
     if (label) label.textContent = `${Math.round(zoom * 100)}%`;
+  }
+
+  function refreshFitScale() {
+    const next = computeFitScale();
+    if (Math.abs(next - fitScale) < 0.001) return;
+    fitScale = next;
+    applyZoom();
   }
 
   function setZoom(nextZoom) {
@@ -1060,8 +1085,13 @@ import './error-text.js';
       width: Math.ceil(Math.max(...xs) - Math.min(...xs) + PAD * 2),
       height: Math.ceil(Math.max(...ys) - Math.min(...ys) + PAD * 2),
     };
+    const sizeChanged = els.canvas.width !== layout.width || els.canvas.height !== layout.height;
     els.canvas.width = layout.width;
     els.canvas.height = layout.height;
+    if (sizeChanged || !fitInitialized) {
+      fitScale = computeFitScale();
+      fitInitialized = true;
+    }
     applyZoom();
   }
 
@@ -1952,6 +1982,21 @@ import './error-text.js';
   document.getElementById('btn-zoom-in').addEventListener('click', () => setZoom(zoom + 0.1));
   document.getElementById('btn-zoom-out').addEventListener('click', () => setZoom(zoom - 0.1));
   document.getElementById('btn-zoom-reset').addEventListener('click', () => setZoom(1));
+
+  // 窗口或棋盘容器尺寸变化时重新适配，保证 100% 始终等于“整图可见”。
+  let fitRefreshFrame = 0;
+  function scheduleFitRefresh() {
+    if (fitRefreshFrame) return;
+    fitRefreshFrame = requestAnimationFrame(() => {
+      fitRefreshFrame = 0;
+      refreshFitScale();
+    });
+  }
+  window.addEventListener('resize', scheduleFitRefresh);
+  if (typeof ResizeObserver === 'function') {
+    const boardPanel = els.canvas.closest('.board-panel');
+    if (boardPanel) new ResizeObserver(scheduleFitRefresh).observe(boardPanel);
+  }
 
   els.mapName.addEventListener('input', () => { config.name = els.mapName.value; renderValidation(); });
   els.mapDescription.addEventListener('input', () => { config.description = els.mapDescription.value; renderValidation(); });

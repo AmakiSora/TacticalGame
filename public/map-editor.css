@@ -298,6 +298,7 @@ button.danger:hover {
 
 .board-wrap {
   min-height: 0;
+  display: flex;
   overflow: auto;
   padding: 16px;
   background:
@@ -311,7 +312,8 @@ button.danger:hover {
 
 #map-canvas {
   display: block;
-  margin: 0 auto;
+  /* 小于容器时水平/垂直居中；放大溢出时 auto 外边距归零，仍可从左上角滚动。 */
+  margin: auto;
   max-width: none;
   background: #0a0e14;
   border: 1px solid #1e2e3e;

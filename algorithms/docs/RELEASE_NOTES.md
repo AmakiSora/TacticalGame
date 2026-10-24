@@ -12,14 +12,15 @@
 
 - **prism v1**：同时回合模式的第六个内置算法，路线为**整轮联合队列束搜索**——每层扩展一个行动点的移动/攻击/治疗/部署/爆破/待命候选，对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别运行同步结算镜像，再按本局裁决权重和“加权均值 + 最差情境惩罚”保留完整计划。镜像覆盖队列前缀投影、地形 BFS、同一步到达冲突与腾格依赖、部署/移动、形状攻击、`attackLock`、治疗、`attacksPerUnit`、级联失败、同步死亡与总部淘汰；本回合新部署单位可被攻击但不会在同轮获得后续动作。
 - **通用性约束**：不依赖或路由任何现有算法；不读取 `mapId`、不按地图名分支；仅使用公开快照与己方 `myQueue`。地图差异全部来自 `config` 的兵种、形状、部署、据点、裁决权重与炮火危险区。
-- **注册与档案**：注册键 `algo_prism`，`modes: ['simultaneous']`，`version: 'v1'`；档案 `algorithms/docs/algorithms/prism.md`，README / 开发指南 / 算法总览同步。
+- **注册与档案**：注册名 `prism`（大厅 bot type `algo_prism`，竞技场参与者 id `algo_prism@v1`），`modes: ['simultaneous']`，`version: 'v1'`；档案 `algorithms/docs/algorithms/prism.md`，README / 开发指南 / 算法总览同步。
+- **竞技场跑批**：prism 对 4 个同时算法 ×2 图 × 每对阵 24 局，8 批共 192 局全部入库；**181:11**（standoff 96:0、molten-throne 85:11；对 random-sim 48:0、dest-prob 46:2、kriegspiel 46:2、matrix-eq 41:7），同时榜 Bradley-Terry 评分 **1977** 暂居第一；样本为双人、两图、固定算法池。
 
 ### 测试与验证
 
 - `tests/algorithms/prism.test.ts` 2 例：接口短路与整轮计划缓存续吐。
 - `tests/algorithms/prism-selfplay.test.ts` 3 例：standoff / molten-throne 双人整局、standoff 三人前四轮，零非法动作。
 - 真实引擎换座冒烟（3.8.3、`evaluate_cross.py`、每对阵每图 2 局）：horizon 8:0、matrix-eq 4:0、kriegspiel 2:0，合计 14:0；仅 7 组 ×2 局，不作稳定优势结论。
-- `npm run build` 通过；`npm test` 113 文件 / 949 例全绿。
+- `npm run build` 通过；`npm test` 113 文件 / 950 例全绿。
 
 ## 3.8.1（2026-10-23）— 同时回合算法 v2：3.8.0 分步引擎适配
 

@@ -8,7 +8,8 @@
 
 ### 新增
 
-- **新增「棱镜算法」（prism）：同时回合模式的通用整轮搜索算法**：每轮从 `plan.myQueue` 前缀开始，逐行动点联合搜索至多 `actionsPerTurn` 条的完整计划队列；对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别镜像 3.8 分步结算（到达冲突与腾格依赖、部署/移动、锁定射击、范围攻击/治疗、级联失败、同步死亡与淘汰），再按本局 `adjudicationWeights` 与“情境加权均值 + 最差情境惩罚”选择风险约束后的计划。同一队列命中缓存后逐动作返回，不再重复搜索。实现不导入或路由其它算法、不读取地图 ID、不使用对手隐藏队列。注册键 `algo_prism`，`modes: ['simultaneous']`；大厅算法下拉、`/api/algorithms` 与竞技场发现由注册表自动带出；详细档案见 `algorithms/docs/algorithms/prism.md`。
+- **新增「棱镜算法」（prism）：同时回合模式的通用整轮搜索算法**：每轮从 `plan.myQueue` 前缀开始，逐行动点联合搜索至多 `actionsPerTurn` 条的完整计划队列；对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别镜像 3.8 分步结算（到达冲突与腾格依赖、部署/移动、锁定射击、范围攻击/治疗、级联失败、同步死亡与淘汰），再按本局 `adjudicationWeights` 与“情境加权均值 + 最差情境惩罚”选择风险约束后的计划。同一队列命中缓存后逐动作返回，不再重复搜索。实现不导入或路由其它算法、不读取地图 ID、不使用对手隐藏队列。注册名 `prism`（大厅 bot type `algo_prism`，竞技场参与者 id `algo_prism@v1`），`modes: ['simultaneous']`；大厅算法下拉、`/api/algorithms` 与竞技场发现由注册表自动带出；详细档案见 `algorithms/docs/algorithms/prism.md`。
+- **同时回合榜单纳入棱镜算法**：完成 prism 对 4 个同时算法 × `standoff` / `molten-throne` × 每对阵每图 24 局的竞技场跑批（8 批 ×24 局 = 192 局，全部入库），`arena/matches.jsonl` 由 36,288 局增至 36,480 局；`arena-leaderboard.json` / `arena-stats.json` 的同时回合分区由 288 局扩至 480 局（5 名参与者、10 个对局组合，标准模式榜单评分与局数不变）。prism 首战 **181 胜 11 负**（standoff 96:0、molten-throne 85:11；对 random-sim 48:0、dest-prob 46:2、kriegspiel 46:2、matrix-eq 41:7），Bradley-Terry 评分 **1977** 暂居同时榜首位；样本为双人、两图、固定算法池，不构成对三/六人局或新地图的强度结论。
 
 ### 修复
 
@@ -20,6 +21,7 @@
 - 新增 `tests/algorithms/prism-selfplay.test.ts`（3 例）：`standoff` / `molten-throne` 双人整局与 `standoff` 三人前四轮均零非法动作；同时验证快照不包含对手隐藏队列。
 - 真实引擎 `evaluate_cross.py` 换座冒烟（2026-10-24，每对阵每图 2 局）：对 `horizon` 在 `standoff` 三批复跑及 `molten-throne` 共 8:0、对 `matrix-eq` 两图 4:0、对 `kriegspiel` 在 `standoff` 2:0，合计 **14:0**；样本仅 7 组 ×2 局，属于接口与强度冒烟，不构成稳定优势结论。
 - 扩展 `tests/public/lobby-redesign.test.ts` 与 `tests/api/game-over-invariants.test.ts`：覆盖已结束房间的阶段文案、回放入口、房间地图同步与 `/start` 的 `game_over` 返回。
+- 竞技场跑批：8 个 detail 批次各 24 局全部入库（192/192），同时回合榜单与统计已刷新；标准模式榜单不变。
 - `npm run build` 通过；`npm test` 全量 113 个测试文件 / 950 个用例通过。
 
 ## 3.8.2

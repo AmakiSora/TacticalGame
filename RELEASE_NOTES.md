@@ -2,99 +2,92 @@
 
 本文档按版本倒序整理主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。
 
-自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
+自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1–3.8.5 已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
 ## 3.8.5
 
 ### 新增
 
-- **新增「经纬算法」（tempo-weave）：同时回合模式的任务排程算法**：以「哪个单位完成什么任务、需要几个行动点、结束后还能否存活」为决策单位——先生成变长任务（直接射击、区域治疗、占点、跨步接敌后射击、脱离火力圈、攻城接近、开路），再在共享行动点预算内按收益/成本竞价排程（按已用行动点分桶的有限宽度搜索，650ms 软预算），并用独立实现的分步结算镜像做己方队列的静止参照投影；三席及以上按逐敌方席位的火力包络与己方 HQ 剩余 HP 提高回防紧迫度。实现零导入、不读取地图 ID、不使用对手隐藏队列，注册名 `tempo-weave`（大厅 bot type `algo_tempo-weave`，竞技场参与者 id `algo_tempo-weave@v1`），`modes: ['simultaneous']`；详细档案见 `algorithms/docs/algorithms/tempo-weave.md`。
-- **标定成绩（3.8.2 真实引擎，两图 ×4 对手 ×30 局、逐局换座，2026-10-24）**：对 random-sim / dest-prob / kriegspiel / matrix-eq **全部 30:0，合计 240/240**；多席位 standoff 三人 15/15、六人 24/6；API 拒绝 0，decide 均值 standoff 15–23ms / molten-throne 70–83ms（实测最大 657.57ms）。标定 harness 入库 `scripts/tempo-weave-arena.mts` / `tempo-weave-multiseat.mts` / `tempo-weave-http.mjs`，原始逐局记录随交付包归档（未入库）。
+- **「经纬算法」（tempo-weave）**：同时回合模式的任务排程算法，按行动点预算竞价排程变长任务，并用独立分步结算镜像做己方队列投影；实现零导入、不读取地图 ID、不使用对手隐藏队列，注册名 `tempo-weave`，详见 [`tempo-weave.md`](algorithms/docs/algorithms/tempo-weave.md)。
+- **真实引擎标定**：两图 ×4 对手 ×30 局全部 30:0（合计 240/240），standoff 三人 15/15、六人 24/6，API 拒绝 0。
+
+### 变更
+
+- **同时回合竞技场扩至 7 名参与者**：新增 528 局后 `arena/matches.jsonl` 共 37,008 局，同时榜扩至 1,008 局；tempo-weave 首战 288:0 / 评分 2355，tempo 134W/154L / 1444，prism 229W/59L / 1839（同时榜第二）。
+
+### 修复
+
+- **观战页未选对局时残留空白面板**：资源、回合、分数面板清空后不再留下空壳，棋盘右下角的空坐标提示也不再绘制；选中对局后各面板正常出现。
 
 ### 测试与验证
 
-- 新增 `tests/algorithms/tempo-weave.test.ts`（74 例）：接口与席位短路、信息隔离（秘密队列/服务器随机状态/地图元数据以抛错 getter 断言不可达）、前缀缓存与撤回/重排/外部插入 wait 的失效、40 组随机合法计划与 20 组非零方差多目标交火的镜像对拍、规则边界回归。
-- 新增 `tests/algorithms/tempo-weave-selfplay.test.ts`（5 例）：`standoff` / `molten-throne` 双人整局、`standoff` 三人与六人整局零 API 拒绝并正常完赛；坐标平移、异形缺格、数值与行动点扰动后仍能完赛。
-- 3.8.5 集成复验（2026-10-24）：新增回归 79 项全部通过；真实引擎抽样两图 × kriegspiel / dest-prob × 各 2 局换座 **8:0**、API 拒绝 0，decide 均值 standoff 20–23ms / molten-throne 93–100ms（单次最大 566ms），与 3.8.2 标定量级一致。抽样仅确认集成后行为不变，不改变 3.8.2 标定口径。
-- 真实 HTTP 链路（`scripts/tempo-weave-http.mjs`，原版 `runner.mjs` × 独立端口服务器）：`standoff` 双人 / `molten-throne` 双人 / `standoff` 三人共 3 局全部正常完赛、动作拒绝 0、runner 退出码全 0；该脚本集成时支持 `TW_HTTP_PORT` 覆盖端口，并在拒绝统计中排除对局终局归档后的 404 轮询噪声。
-- `npm run build` 通过；`npm test` 全量通过（116 个测试文件 / 1040 个用例）。
+- 新增 `tests/algorithms/tempo-weave.test.ts`（74 例）与 `tests/algorithms/tempo-weave-selfplay.test.ts`（5 例），覆盖信息隔离、缓存失效、镜像对拍及双人/三人/六人整局。
+- 3.8.5 集成复验 79 项通过；真实引擎抽样 8:0，HTTP 链路 3 局正常完赛、零拒绝。
+- `npm run build` 通过；`npm test` 全量 116 个测试文件 / 1040 个用例通过。
 
 ## 3.8.4
 
 ### 新增
 
-- **新增「时序掌控算法」（tempo）：同时回合模式的第六个内置算法**：把「队列位置 = 结算拍」当成决策变量，而不是只给每个动作估一次期望收益。算法先为每个敌军推一条最可能的行为剧本（抢点 / 原地开火 / 残血撤退 / 推进）并逐拍投影位置；再把敌方预测射击与可及火力区叠成「第 k 拍 × 格子」的威胁时间线，移动候选按落地拍起的累计暴露计价；然后读 `adjudication` 快照的分差与剩余轮数调节攻守（领先收敛避险、落后加压求变、末轮把补给换单位）；最后按价值把动作排进具体拍——斩杀与锁定射击抢早拍（早击杀会作废受害单位后续动作）、占点到达与治疗压末拍、部署抢先当墙。全部数值读 `config` / `adjudication`，无 `mapId` 分支，同一份实现对两张同时模式地图通用。注册键 `algo_tempo`，`modes: ['simultaneous']`，大厅算法下拉与 `/api/algorithms` 由注册表自动带出，竞技场评估控制台可直接选 `algo:tempo`（首轮跑批后进入榜单）；单算法档案见 `algorithms/docs/algorithms/tempo.md`。
+- **「时序掌控算法」（tempo）**：同时回合模式的内置算法，把队列位置当结算拍，按「第 k 拍 × 格子」的威胁时间线评估移动暴露，并结合比分与剩余轮数调节攻守；实现不读地图 ID，注册名 `algo_tempo`，详见 [`tempo.md`](algorithms/docs/algorithms/tempo.md)。
 
 ### 测试与验证
 
-- 新增 `tests/algorithms/tempo.test.ts`（11 例）：无座位 / 已提交 / 行动点用尽短路、锁定射击瞄敌人当前格、移动后按投影站位取瞄准格、支援兵治疗受伤友军、侦察兵抢可达据点、被拒动作重排后给出不同动作、反折返（已入队前缀里移动过的单位本轮不再排新移动）、真实 `standoff` 双方整轮计划逐条通过引擎入队校验并连续 5 轮零非法。
-- 新增 `scripts/tempo_benchmark.mjs`：真实引擎进程内跑批工具，投影口径与 `rl/training/local-worker.ts` 的 decide 通道一致（只暴露己方 `myQueue`、携带 `adjudication` 快照、`queue*Action` 校验、`commitAndMaybeResolve` 结算），每局交替座位，支持算法名或 `.mjs` 路径对打。2026-10-24 标定（每对 60 局 = `standoff` 40 + `molten-throne` 20，双方零非法动作）：对 `random-sim` **100%**、对 `dest-prob` **55.0%**、对 `kriegspiel` **50.0%**、对 `matrix-eq` **43.3%**；按图看 `molten-throne` 85–90%、`standoff` 32–40%（40/20 局样本的置信区间约 ±15 个点，数字只用于同 harness 复跑对照）。
-- `npm run build` 通过；`npm test` 全量通过（114 个测试文件 / 961 个用例）。
+- 新增 `tests/algorithms/tempo.test.ts`（11 例），覆盖决策短路、锁定射击、治疗、占点与真实 standoff 整轮入队校验。
+- 新增 `scripts/tempo_benchmark.mjs` 真实引擎跑批工具；2026-10-24 标定（每对 60 局）对 random-sim 100%、dest-prob 55.0%、kriegspiel 50.0%、matrix-eq 43.3%。
+- `npm run build` 通过；`npm test` 全量 114 个测试文件 / 961 个用例通过。
 
 ## 3.8.3
 
 ### 新增
 
-- **新增「棱镜算法」（prism）：同时回合模式的通用整轮搜索算法**：每轮从 `plan.myQueue` 前缀开始，逐行动点联合搜索至多 `actionsPerTurn` 条的完整计划队列；对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别镜像 3.8 分步结算（到达冲突与腾格依赖、部署/移动、锁定射击、范围攻击/治疗、级联失败、同步死亡与淘汰），再按本局 `adjudicationWeights` 与“情境加权均值 + 最差情境惩罚”选择风险约束后的计划。同一队列命中缓存后逐动作返回，不再重复搜索。实现不导入或路由其它算法、不读取地图 ID、不使用对手隐藏队列。注册名 `prism`（大厅 bot type `algo_prism`，竞技场参与者 id `algo_prism@v1`），`modes: ['simultaneous']`；大厅算法下拉、`/api/algorithms` 与竞技场发现由注册表自动带出；详细档案见 `algorithms/docs/algorithms/prism.md`。
-- **同时回合榜单纳入棱镜算法**：完成 prism 对 4 个同时算法 × `standoff` / `molten-throne` × 每对阵每图 24 局的竞技场跑批（8 批 ×24 局 = 192 局，全部入库），`arena/matches.jsonl` 由 36,288 局增至 36,480 局；`arena-leaderboard.json` / `arena-stats.json` 的同时回合分区由 288 局扩至 480 局（5 名参与者、10 个对局组合，标准模式榜单评分与局数不变）。prism 首战 **181 胜 11 负**（standoff 96:0、molten-throne 85:11；对 random-sim 48:0、dest-prob 46:2、kriegspiel 46:2、matrix-eq 41:7），Bradley-Terry 评分 **1977** 暂居同时榜首位；样本为双人、两图、固定算法池，不构成对三/六人局或新地图的强度结论。
+- **「棱镜算法」（prism）**：同时回合模式的整轮搜索算法，逐行动点联合搜索完整计划队列，并对四种对手行为假设镜像分步结算；注册名 `prism`，详见 [`prism.md`](algorithms/docs/algorithms/prism.md)。
+- **同时回合榜单纳入 prism**：192 局跑批后 `arena/matches.jsonl` 增至 36,480 局，同时榜 480 局；prism 首战 181:11、评分 1977（样本为双人两图，不构成稳定优势结论）。
 
 ### 修复
 
-- **大厅把已结束的对局显示成等待开局**：刷新或退出对局后恢复会话时，`game_over` 房间现在显示「已结束」、胜者与结束回合，隐藏「开始游戏 / 加入战斗 / 进入游戏」并改为提供「查看回放」；恢复房间时建房表单的地图摘要同步为房间实际地图（随机图显示「随机地图」），不再回落到 `/api/maps` 的第一张静态图；已结束房间不再继续轮询开局。`GET /api/games/:id/lobby` 补充 `winner` / `roundNumber`，已结束房间调用 `/start` 返回 `game_over`。
+- **大厅已结束对局显示成等待开局**：恢复 `game_over` 房间时正确显示「已结束」、胜者与结束回合，隐藏开始/加入/进入按钮并提供「查看回放」，建房表单的地图摘要同步房间实际地图。
 
 ### 测试与验证
 
-- 新增 `tests/algorithms/prism.test.ts`（2 例）：无座位/已提交/行动点用尽短路，以及同一队列复用整轮计划并按计划索引继续入队。
-- 新增 `tests/algorithms/prism-selfplay.test.ts`（3 例）：`standoff` / `molten-throne` 双人整局与 `standoff` 三人前四轮均零非法动作；同时验证快照不包含对手隐藏队列。
-- 真实引擎 `evaluate_cross.py` 换座冒烟（2026-10-24，每对阵每图 2 局）：对 `horizon` 在 `standoff` 三批复跑及 `molten-throne` 共 8:0、对 `matrix-eq` 两图 4:0、对 `kriegspiel` 在 `standoff` 2:0，合计 **14:0**；样本仅 7 组 ×2 局，属于接口与强度冒烟，不构成稳定优势结论。
-- 扩展 `tests/public/lobby-redesign.test.ts` 与 `tests/api/game-over-invariants.test.ts`：覆盖已结束房间的阶段文案、回放入口、房间地图同步与 `/start` 的 `game_over` 返回。
-- 竞技场跑批：8 个 detail 批次各 24 局全部入库（192/192），同时回合榜单与统计已刷新；标准模式榜单不变。
+- 新增 `tests/algorithms/prism.test.ts`（2 例）与 `tests/algorithms/prism-selfplay.test.ts`（3 例），覆盖计划复用、双人整局与三人前四轮零非法。
+- 真实引擎换座冒烟 14:0（7 组 ×2 局，仅接口与强度冒烟）；扩展大厅与 `game_over` 回归测试。
 - `npm run build` 通过；`npm test` 全量 113 个测试文件 / 950 个用例通过。
 
 ## 3.8.2
 
 ### 新增
 
-- **AI 竞技场评估控制台支持同时回合模式**：`/api/arena/eval/start` 现在按所选地图的 `mode` 接受 `simultaneous` 批次（`standoff` / `molten-throne`），同一批混模式直接拒绝；参评者按注册表 `ALGORITHM_META.modes` 过滤，同时模式只纳入 `random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` 四个算法，RL 模型（仅覆盖标准模式）明确不参评。控制台模式条不再把同时回合标为「暂不支持」，地图、算法、模型清单随模式联动；`round_robin.py` 新增 `--mode`（auto/standard/simultaneous），按地图模式自动发现算法。
-- **进程内评估链路接入同时回合计划/结算**：`rl/training/local-worker.ts` 的 `reset` 接受 simultaneous 地图，`apply` 通道把 move/attack/heal/deploy/demolish/wait 映射到 `queue*Action`，`end_turn` 走 `commitAndMaybeResolve`；`decide` 通道按座位传入 `ctx.owner` 并按 REST 同口径隐藏对手计划队列。`rl/evaluation/evaluate_cross.py` 新增同时回合逐轮「各座位入队 → 全员提交 → 统一结算」循环：动作被引擎拒绝时继续重选而不提前提交，行动点/重选上限兜底提交；明细照常记录 timeline/actions/events/derived。
-- **同时回合首轮榜单数据**：完成 4 个同时算法 × `standoff` / `molten-throne` × 每对每图 24 局跑批（288 局，0 失败批），`arena/matches.jsonl` 累积至 36,288 局；`arena-leaderboard.json` / `arena-stats.json` 新增同时回合分区（4 名参与者各 144 局），标准榜评分与局数不变。
+- **AI 竞技场评估控制台支持同时回合模式**：`/api/arena/eval/start` 按地图 `mode` 接受 `simultaneous` 批次（`standoff` / `molten-throne`）并拒绝混模式，地图、算法与模型清单随模式联动；`round_robin.py` 新增 `--mode`。
+- **进程内评估链路接入同时回合**：`rl/training/local-worker.ts` 支持队列动作、按座位脱敏，`evaluate_cross.py` 支持逐轮入队、提交与统一结算。
+- **同时回合首轮榜单**：288 局跑批全部入库，`arena/matches.jsonl` 累积至 36,288 局，新增 4 名参与者各 144 局的同时榜。
 
 ### 修复
 
-- `npm run test:rl` 在 Windows cmd（npm 默认 script-shell）下无法启动 `rl/.venv` 解释器（cmd 不接受正斜杠相对路径命令）；改为经 `script/rl-test.mjs` 由 node 解析解释器路径并透传 pytest 参数，cmd / PowerShell / Git Bash 均可用。
+- **`npm run test:rl` 在 Windows cmd 下无法启动**：改为经 `script/rl-test.mjs` 解析 `rl/.venv` 解释器路径并透传 pytest 参数，cmd / PowerShell / Git Bash 均可用。
 
 ### 测试与验证
 
-- `npm run build` 通过；`npm test` 全量 111 个测试文件 / 944 个用例通过；`npm run test:rl` 73 个用例通过（新增 `tests/rl/test_round_robin_modes.py`：地图模式推断、混模式/未接入模式/`--mode` 不一致拒绝；`tests/rl/test_evaluate_cross_simultaneous.py`：同时回合循环的拒绝重选、行动点用尽兜底提交与回合推进回归）。
-- `tests/rl/local-worker.test.ts` 新增同时模式用例：`standoff` reset、两个座位入队并提交后自动推进回合、无 viewer 快照剥离计划队列（与 REST 脱敏同口径）、标准算法/大逃杀地图拒绝；`tests/api/arena-eval.test.ts` 覆盖同时模式启动、混模式拒绝、模型与标准算法跨模式拒绝。
-- 同时回合冒烟：`round_robin.py --maps standoff --games 2`（4 算法、12 局）0 失败；全量 288 局 0 失败（8m13s，0.6 局/s）。榜单结果：矩阵均衡算法 1730、兵棋推演算法 1692、落点概率算法 1676、同时随机算法 903。
+- `npm run build` 通过；`npm test` 111 个测试文件 / 944 个用例、`npm run test:rl` 73 个用例通过。
+- 新增同时模式评估控制台与 `local-worker` 回归测试；288 局跑批 0 失败，榜单前四：矩阵均衡 1730、兵棋推演 1692、落点概率 1676、同时随机 903。
 
 ## 3.8.1
 
 ### 变更
 
-- 版本号提升至 3.8.1。
-- **matrix-eq 升级到 v2（3.8.0 分步引擎适配版）**：重写分步结算镜像、投影站位/地形寻路的结构性计划校验、组合动作生成与按步序的事件史重建，新增池内精修和自适应利用混合；注册表算法版本标注为 `v2`，历史对局仍按版本 id 归档。镜像裁判基准（2026-10-23 修复后复跑，standoff 30 局、交替座位）：对 v1 **24:6（80.0%）**、对 kriegspiel v1 **11:19（36.7%）**、对 dest-prob v1 **14:16（46.7%）**、对 random-sim **30:0**；对当前 v2 kriegspiel / dest-prob 各 **7:23（23.3%）**，旧 v1 数字不能当作当前强度。本次 smoke 单轮最大 47ms。
-- **kriegspiel 升级到 v2（3.8.0 分步引擎适配版）**：镜像对象从旧 `resolveRound` 换成 `resolveRoundSteps`——结算器改为按行动点逐步推进（级联失败、到达判定与依赖传播、同一步先移出后移入、`attackLock` 按计划时刻锁定、逐步死亡、终局轮跳过占点）；计划合法性改为队列前缀投影（站位投影 + 自有爆破改写地形 + 只按地形寻路，占用/覆盖类判定与引擎一致推迟到结算）；候选生成改为逐行动点重算，支持同一单位跨行动点连动并新增 `wait`（对齐行动点）与 `demolish`（按可达格增量计价）；搜索邻域扩展为「换步 / 删步 / 插入 `wait` / 交换相邻两步 / 追加」，粗筛用少量 rollout、胜出者再按满额复核；敌方计划采样改为有序。注册表算法版本标注为 `v2`。
-- **dest-prob 升级到 v2（3.8.0 分步引擎适配版）**：候选生成改为队列前缀投影，同一单位可跨行动点连续行动；移动按地形 BFS（单位/总部不挡路）、部署按投影空位、攻击受 `attacksPerUnit` 限制；治疗按投影站位并去重，重装新增低优先级 `demolish`。保留解析式对手落点模型（敌军落点仍用 blocker-aware BFS 保守预测），不做整轮模拟。同 harness 对 v1 **50/60（83.3%）**、对 random-sim **60/60**。
-- **同时回合算法 runner 支持 `wait`**：`algorithms/lib/api-client.mjs` 新增 `wait()`（`POST /api/games/:id/plan/wait`），`algorithms/lib/interfaces.mjs` 新增 `case 'wait'` 分支，算法脚本从此可以主动对齐行动点。
+- **matrix-eq / kriegspiel / dest-prob 升级 v2**：三个同时回合算法适配 3.8.0 分步结算——重写镜像结算与队列前缀投影、支持同单位跨行动点连续动作、按 `attacksPerUnit` 限制攻击，并补充 `wait` / `demolish`；详见 [`matrix-eq.md`](algorithms/docs/algorithms/matrix-eq.md)、[`kriegspiel.md`](algorithms/docs/algorithms/kriegspiel.md)、[`dest-prob.md`](algorithms/docs/algorithms/dest-prob.md)。
+- **同时回合算法 runner 支持 `wait`**：`algorithms/lib/api-client.mjs` 与 `interfaces.mjs` 新增 `wait`，算法可主动对齐行动点。
 
 ### 修复
 
-- **同时回合引擎结算的健壮性与事件可追溯性**：`resolveRoundSteps` 部署引用不存在单位类型时记录 `unknown_unit` 失败（原先会在结算期抛错中断本轮）；部署的执行明细补充 `unitType`/`fromId`/`q`/`r`，治疗事件与执行明细补充瞄准格 `q`/`r`，算法与回放可按步序还原完整已执行计划。
-- **同时随机算法（random-sim）升级到 v2 并适配分步结算引擎**：不再按“每单位每轮一动作”保守枚举；同一单位可跨行动点连续行动，攻击/治疗/移动按队列投影站位计算，移动改为地形寻路（单位不挡路），并遵守地图 `balance.attacksPerUnit`（默认 1）。修复随机基线在 3.8.0 规则下行动点用不满、枚举口径与引擎不一致的问题。
+- **同时回合结算健壮性**：部署引用未知单位时记录 `unknown_unit` 而不中断本轮；部署/治疗事件补齐坐标，回放可按步还原完整计划。
+- **random-sim 升级 v2**：适配分步结算，同单位可跨行动点行动，修复行动点用不满与枚举口径不一致。
 
 ### 测试与验证
 
-- 扩展 `tests/algorithms/random-sim.test.ts`：覆盖同单位多动作、投影位置后的攻击、攻击次数上限、投影后空位枚举与真实 standoff 对局合法性。
-- 扩展 `tests/algorithms/dest-prob.test.ts`（14 例）：落点分布、冲突规避、预测射击、arc 治疗、部署、原地占点、同单位多动作、队列投影后的攻击、地形寻路忽略单位、`attacksPerUnit`、真实 standoff / molten-throne 整轮入队；`tests/algorithms/dest-prob-selfplay.test.ts` 两图整局互搏零非法。
-- 新增 `tests/algorithms/matrix-eq-selfplay.test.ts` 覆盖 v2 在 standoff / molten-throne / 三人局的整局零非法动作；`node scripts/matrix_eq_smoke.mjs` 107 动作零非法、单轮 ≤47ms。
-- 新增 `tests/algorithms/matrix-eq-simulator.test.ts`（5 例）钉住 matrix-eq 模拟器/计划队列语义：同一步互换后第三人立即攻击不丢失目标、部署结算 `executed` 且明细含 `unitType`/`fromId`/`q`/`r`、锁定兵种按计划时刻占位锁定（新部署单位不可锁定但会被普通覆盖命中，逃逸目标 → `missed/target_escaped`）、HQ 伤害入账按实际扣血截断（`actual = min(hp, dmg)`）、连续 `wait` 按出现次数逐条吐出。
-- 更新 `tests/algorithms/kriegspiel-selfplay.test.ts`：入队口径补上 `demolish` / `wait`，kriegspiel v2 在 standoff / molten-throne 整局自博弈零非法动作。
-- kriegspiel v2 结算保真度对拍：把伤害/治疗方差归零使结算完全确定，让同一份计划分别在真实引擎（`resolveRoundSteps` + `captureControlPoints`）与算法的 JS 分步结算器上跑一遍，逐点比对存活单位 `(owner,type,q,r,hp)`、总部 HP/存活、据点归属、补给与席位状态——standoff / molten-throne 各 20 个局面**零偏差**。
-- kriegspiel v2 headless 标定（真实引擎 harness，逐局交替先手，standoff / molten-throne 各 30 局 ×3 对手，合计 180 局零非法动作，种子 `1000 + i×7919`，2026-10-23）：对 random-sim **60:0**、对 dest-prob v1 **52:8（86.7%，p<0.0001）**、对 matrix-eq v2 **29:31**（standoff 27:3、molten-throne **2:28**；合计 p=0.90，两图方向相反，必须按图读）；`decide` 平均 45ms（standoff）/ 113–169ms（molten-throne）。dest-prob v2 适配后同 harness 抽样对 kriegspiel v2 为 21/60（35.0%），不再引用旧 52:8 作为当前差距。
-- kriegspiel v1 同口径基线补测：把 `git show 89f3b69^` 的 v1 实现放进同一 harness、同一批种子跑 4 对手 ×2 图 ×30 局。v1 对 dest-prob v1 **43.3%**（standoff 仅 20.0%）、对 matrix-eq **31.7%**，v2 分别为 86.7% 与 48.3%，即适配价值 **+43.4pp / +16.6pp**；v1↔v2 直接对打 **35:25（58.3%，p=0.245）未达显著**。**两项负结果如实记录**：molten-throne 对 matrix-eq 是 v1 6:24 → v2 **2:28** 的负提升（单轮 rollout 无法给「N 轮后总部被斩首」定价，给总部血量加凸性惩罚实测胜负序列完全不变）；按 `action_failed` 事件计数发现 v2 结算期失败 **17.1–23.1/局**（v1 1.3/局、dest-prob v1 0.6–3.0/局），主因 `destination_occupied`——移动/部署候选不排除敌军当前占位，只按「敌军到达概率」打折。诊断、数据与修法见 `algorithms/docs/algorithms/kriegspiel.md`「已知短板」「代价与边界」「已知限制 #2」。
-- `npm run build` 通过；`npm test` 全量通过（111 文件 / 939 例）。
+- 新增/扩展三个算法的单测与自博弈，覆盖队列投影、`attacksPerUnit`、`wait` / `demolish` 及两图整局零非法。
+- kriegspiel 与真实引擎逐点对拍 40 个局面零偏差；标定中 matrix-eq 对 v1 24:6、对当前 v2 kriegspiel/dest-prob 各 7:23，kriegspiel 对 random-sim 60:0、对 dest-prob v1 52:8（180 局零非法），dest-prob 对 v1 50/60（短板与负结果见各算法档案）。
+- `npm run build` 通过；`npm test` 全量 111 文件 / 939 例通过。
 
 ## 3.8.0
 

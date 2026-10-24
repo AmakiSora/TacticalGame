@@ -853,6 +853,12 @@ main {
   overflow: auto;
   max-width: 100%;
 }
+/* 画布定位层：#cell-info 以棋盘（而不是含回放条的整框）为锚点，
+   否则悬停信息会压到下方时间轴/播放按钮上。 */
+#board-canvas {
+  position: relative;
+  flex: none;
+}
 #board {
   background: #0a0e14;
   border: 1px solid #1e2e3e;

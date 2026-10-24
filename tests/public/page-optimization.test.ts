@@ -17,6 +17,17 @@ describe('spectator and player page optimization', () => {
     expect(play).toContain('class="board-panel"');
   });
 
+  it('anchors the spectator cell hover label to the canvas instead of the replay bar', () => {
+    const html = read('public/spectator.html');
+    const css = read('public/style.css');
+
+    // #board-wrap 同时包裹画布和回放条；cell-info 若直接挂在它下面（bottom:8px），
+    // 会落在时间轴上。画布单独放进定位层后，悬停信息才贴在棋盘右下角。
+    expect(html).toContain('<div id="board-canvas">');
+    expect(html).toMatch(/<div id="board-canvas">[\s\S]*?<canvas id="board"[\s\S]*?id="cell-info"[\s\S]*?<\/div>\s*<div id="replay-controls">/);
+    expect(css).toMatch(/#board-canvas\s*\{[^}]*position:\s*relative/);
+  });
+
   it('collapses the spectator picker into one card with merged game / replay tabs', () => {
     const html = read('public/spectator.html');
     const source = read('public/app.js');

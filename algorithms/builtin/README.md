@@ -34,6 +34,7 @@ node algorithms/runner.mjs \
 - **kriegspiel** - 兵棋推演算法（v2）：整份有序计划按行动点分步真实结算 rollout + 联合搜索 + 风险规避（同时回合模式）
 - **matrix-eq** - 矩阵均衡算法：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正（同时回合模式）
 - **prism** - 棱镜算法：整轮联合队列束搜索 + 四种对手情境的分步结算镜像 + 风险约束终局评分；无算法依赖、无地图特化（同时回合模式）
+- **tempo-weave** - 经纬算法：任务竞价、变长行动排程与总部生存期限约束；零导入、无地图特化（同时回合模式）
 
 **算法按对局模式注册，不同模式不能混用**：每个算法在注册表 `ALGORITHM_META.modes` 声明支持的模式（缺省视为 `['standard']`）；大厅 bot 接口、`runner.mjs`、评估链路（local-worker / round_robin）都按它拒绝或过滤不匹配的算法，前端"算法类型"下拉也只列出当前对局模式可用的算法。
 
@@ -111,7 +112,7 @@ export default {
 { type: 'demolish', payload: { unitId: 'u_123', q: 2, r: 1 } }
 ```
 
-**同时回合模式的额外约束**（详见 `skill/simultaneous.md`）：动作入队不立即执行；队列位置即行动点，第 N 条与所有玩家的第 N 条同时结算；单位可跨行动点多次行动（random-sim、dest-prob、kriegspiel、matrix-eq 与 prism 已适配）；每单位每轮攻击次数受 `balance.attacksPerUnit` 限制（默认 1）；己方队列长度即行动点用量（读 `game.plan.myQueue`，上限 `config.balance.actionsPerTurn`）；`endTurn` 即提交并锁定计划。
+**同时回合模式的额外约束**（详见 `skill/simultaneous.md`）：动作入队不立即执行；队列位置即行动点，第 N 条与所有玩家的第 N 条同时结算；单位可跨行动点多次行动（random-sim、dest-prob、kriegspiel、matrix-eq、prism、tempo 与 tempo-weave 已适配）；每单位每轮攻击次数受 `balance.attacksPerUnit` 限制（默认 1）；己方队列长度即行动点用量（读 `game.plan.myQueue`，上限 `config.balance.actionsPerTurn`）；`endTurn` 即提交并锁定计划。
 
 #### 2. 完整控制接口
 

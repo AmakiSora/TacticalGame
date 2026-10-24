@@ -4,6 +4,21 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.0.0 之前的小节保持原始格式；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.8.5
+
+### 新增
+
+- **新增「经纬算法」（tempo-weave）：同时回合模式的任务排程算法**：以「哪个单位完成什么任务、需要几个行动点、结束后还能否存活」为决策单位——先生成变长任务（直接射击、区域治疗、占点、跨步接敌后射击、脱离火力圈、攻城接近、开路），再在共享行动点预算内按收益/成本竞价排程（按已用行动点分桶的有限宽度搜索，650ms 软预算），并用独立实现的分步结算镜像做己方队列的静止参照投影；三席及以上按逐敌方席位的火力包络与己方 HQ 剩余 HP 提高回防紧迫度。实现零导入、不读取地图 ID、不使用对手隐藏队列，注册名 `tempo-weave`（大厅 bot type `algo_tempo-weave`，竞技场参与者 id `algo_tempo-weave@v1`），`modes: ['simultaneous']`；详细档案见 `algorithms/docs/algorithms/tempo-weave.md`。
+- **标定成绩（3.8.2 真实引擎，两图 ×4 对手 ×30 局、逐局换座，2026-10-24）**：对 random-sim / dest-prob / kriegspiel / matrix-eq **全部 30:0，合计 240/240**；多席位 standoff 三人 15/15、六人 24/6；API 拒绝 0，decide 均值 standoff 15–23ms / molten-throne 70–83ms（实测最大 657.57ms）。标定 harness 入库 `scripts/tempo-weave-arena.mts` / `tempo-weave-multiseat.mts` / `tempo-weave-http.mjs`，原始逐局记录随交付包归档（未入库）。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/tempo-weave.test.ts`（74 例）：接口与席位短路、信息隔离（秘密队列/服务器随机状态/地图元数据以抛错 getter 断言不可达）、前缀缓存与撤回/重排/外部插入 wait 的失效、40 组随机合法计划与 20 组非零方差多目标交火的镜像对拍、规则边界回归。
+- 新增 `tests/algorithms/tempo-weave-selfplay.test.ts`（5 例）：`standoff` / `molten-throne` 双人整局、`standoff` 三人与六人整局零 API 拒绝并正常完赛；坐标平移、异形缺格、数值与行动点扰动后仍能完赛。
+- 3.8.5 集成复验（2026-10-24）：新增回归 79 项全部通过；真实引擎抽样两图 × kriegspiel / dest-prob × 各 2 局换座 **8:0**、API 拒绝 0，decide 均值 standoff 20–23ms / molten-throne 93–100ms（单次最大 566ms），与 3.8.2 标定量级一致。抽样仅确认集成后行为不变，不改变 3.8.2 标定口径。
+- 真实 HTTP 链路（`scripts/tempo-weave-http.mjs`，原版 `runner.mjs` × 独立端口服务器）：`standoff` 双人 / `molten-throne` 双人 / `standoff` 三人共 3 局全部正常完赛、动作拒绝 0、runner 退出码全 0；该脚本集成时支持 `TW_HTTP_PORT` 覆盖端口，并在拒绝统计中排除对局终局归档后的 404 轮询噪声。
+- `npm run build` 通过；`npm test` 全量通过（116 个测试文件 / 1040 个用例）。
+
 ## 3.8.4
 
 ### 新增

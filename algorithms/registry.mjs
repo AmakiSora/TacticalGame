@@ -25,6 +25,7 @@ export const ALGORITHMS = {
   'matrix-eq': './builtin/matrix-eq.mjs',
   prism: './builtin/prism.mjs',
   tempo: './builtin/tempo.mjs',
+  'tempo-weave': './builtin/tempo-weave.mjs',
 };
 
 /**
@@ -58,6 +59,7 @@ export const ALGORITHM_META = {
   'matrix-eq': { displayName: '矩阵均衡算法', description: '同时回合：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正', version: 'v2', modes: ['simultaneous'] },
   prism: { displayName: '棱镜算法', description: '同时回合：多情境联合队列束搜索 + 同步结算镜像 + 风险约束终局评分', version: 'v1', modes: ['simultaneous'] },
   tempo: { displayName: '时序掌控算法', description: '同时回合：敌方剧本逐拍投影 + 威胁时间线避险 + 裁决地平线姿态调节', version: 'v1', modes: ['simultaneous'] },
+  'tempo-weave': { displayName: '经纬算法', description: '同时回合：任务竞价、变长行动排程与总部生存期限约束', version: 'v1', modes: ['simultaneous'] },
 };
 
 /**

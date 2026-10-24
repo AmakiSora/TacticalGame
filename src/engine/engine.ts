@@ -68,6 +68,8 @@ function fullReplayPayload(game: GameState) {
 }
 
 export function startGame(game: GameState, bus: EventBus, random: () => number = Math.random): Result {
+  // 已结束的房间和进行中的房间都不能再「开始」；分开报错，前端能给出准确提示。
+  if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: '对局已结束' };
   if (game.phase !== 'lobby') return { ok: false, code: 'game_already_started', message: '对局已经开始' };
   const count = joinedPlayerIds(game).length;
   if (count < 2) return { ok: false, code: 'lobby_not_ready', message: '至少需要 2 名玩家' };

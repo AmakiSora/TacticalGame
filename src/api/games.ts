@@ -32,6 +32,9 @@ export function lobbySummary(game: GameState) {
     mode: game.config.mode,
     maxPlayers: game.maxPlayers, playerCount: players.length, players,
     supportedPlayerCounts: game.config.supportedPlayerCounts,
+    // 已结束的房间在大厅卡里要显示「已结束 · 胜者 · 回合数」，这两项只有结束时才有意义。
+    winner: game.winner,
+    roundNumber: game.turn.roundNumber,
   };
 }
 

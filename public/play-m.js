@@ -56,13 +56,15 @@ const els = {
   btnMapRandomRefresh: $('btn-map-random-refresh'),
   btnCreate: $('btn-create'), btnJoin: $('btn-join'), btnConnectCreate: $('btn-connect-create'), btnConnectJoin: $('btn-connect-join'), btnStartGame: $('btn-start-game'),
   btnHostParticipate: $('btn-host-participate'), btnCreateAgain: $('btn-create-again'), btnJoinAgain: $('btn-join-again'),
+  btnViewReplay: $('btn-view-replay'), btnViewReplayJoin: $('btn-view-replay-join'),
   connStatus: $('conn-status'), createResult: $('create-result'), createdGameId: $('created-game-id'),
   createdHostToken: $('created-host-token'), createdToken: $('created-token'), createdTokenCopy: $('created-token-copy'),
   createdPlayerTokenRow: $('created-player-token-row'), createRoomStatus: $('create-room-status'),
+  createRoomBadge: $('create-room-badge'), createRoomTitle: $('create-room-title'), createRoomHint: $('create-room-hint'),
   lobbySummary: $('lobby-summary'), joinLobbySummary: $('join-lobby-summary'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
   joinMapSummary: $('join-map-summary'), joinMapThumb: $('join-map-thumb'), joinMapLegend: $('join-map-legend'),
   joinMapName: $('join-map-name'), joinMapId: $('join-map-id'), joinMapMeta: $('join-map-meta'), joinMapDesc: $('join-map-desc'),
-  joinRoomStatus: $('join-room-status'),
+  joinRoomStatus: $('join-room-status'), joinRoomBadge: $('join-room-badge'), joinRoomTitle: $('join-room-title'), joinRoomHint: $('join-room-hint'),
   joinPlayerToken: $('join-player-token'), joinPlayerTokenRow: $('join-player-token-row'),
   availableGames: $('available-games'), btnRefreshGames: $('btn-refresh-games'),
   availableGamesModeFilter: $('available-games-mode-filter'), availableGamesMapFilter: $('available-games-map-filter'),
@@ -131,6 +133,7 @@ let rangeHighlights = [];
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
 let availableMaps = [];
 let pendingMapId = null;
+let roomMapId = null; // 当前恢复的房间实际使用的地图，用来校正建房表单的默认选图
 let mapDialogOpen = false;
 let mapDialogTab = 'builtin';
 let lastStaticMapId = null;
@@ -309,8 +312,11 @@ async function loadMapList() {
   availableMaps = maps || [];
   els.mapSelect.innerHTML = `<option value="random">随机地图（参数可配）</option>`
     + maps.map(m => `<option value="${esc(m.id)}">${esc(m.name)} - ${esc(m.description)}</option>`).join('');
-  // 默认仍选中第一张静态地图，保持原有创建习惯。
-  if (maps[0]) els.mapSelect.value = maps[0].id;
+  // 默认仍选中第一张静态地图，保持原有创建习惯；恢复既有房间时以房间地图为准。
+  const restoredMap = roomMapId && (roomMapId === 'random' || maps.some(map => map.id === roomMapId))
+    ? roomMapId
+    : null;
+  els.mapSelect.value = restoredMap || maps[0]?.id || 'default';
   renderMapPicker(maps);
   // 地图表与可用对局是两条并发请求：列表先到时先按 mapId 画，地图表到位后补缩略图和中文名。
   if (availableGamesData.length) renderAvailableGames(availableGamesData);
@@ -318,7 +324,9 @@ async function loadMapList() {
   // 恢复会话可能早于地图表加载完成，等地图表到位后把加入房间的预览补画一次。
   if (joinMapLobby && els.joinMapSummary && !els.joinMapSummary.classList.contains('hidden')) renderJoinMapCard(joinMapLobby);
   syncMaxPlayersOptions();
-  window.RandomMapUI?.setSelected(els.mapSelect.value);
+  // 随机图不在加载时自动生成预览：房间恢复时那会顺手把种子写回参数面板，悄悄固定下一次的随机图。
+  if (roomMapId !== 'random') window.RandomMapUI?.setSelected(els.mapSelect.value);
+  applyRoomMapSelection();
 }
 function persistSession() {
   try {
@@ -632,7 +640,17 @@ function lobbyMapStatRows(map) {
 
 function randomMapStatRows() {
   const preview = window.RandomMapUI?.lastPreview;
-  if (!preview) return [['◈', '随机', '模式'], ['⚑', '2-8', '玩家']];
+  if (!preview) {
+    // 房间模式下拿大厅元信息回显，避免「2-8 人」和房间里实际支持的 6 人对不上。
+    const lobby = isRoomMapView('random') ? latestLobby : null;
+    if (lobby) {
+      return [
+        ['◈', mapModeLabel(lobby.mode), '模式'],
+        ['⚑', lobby.maxPlayers ?? '-', '玩家'],
+      ];
+    }
+    return [['◈', '随机', '模式'], ['⚑', '2-8', '玩家']];
+  }
   const maxTurns = preview.maxTurns === null ? '∞' : (preview.maxTurns ?? '-');
   return [
     ['◈', mapModeLabel(preview.mode), '模式'],
@@ -690,19 +708,49 @@ function renderLobbyMapStage(preview, placeholder) {
   if (els.lobbyMapLegend) els.lobbyMapLegend.innerHTML = lobbyMapLegendMarkup(preview);
 }
 
+/** 房间卡展开时，建房表单的地图摘要代表的是「本局地图」，不是下一局的默认选图（见 isRoomMapView）。 */
+function isRoomMapView(mapId) {
+  return Boolean(els.createForm?.classList.contains('room-active'))
+    && Boolean(latestLobby?.mapId)
+    && latestLobby.mapId === mapId;
+}
+
+/** 恢复既有房间后把建房表单的选图纠正成房间实际地图，避免第一张静态图冒充本局地图。 */
+function applyRoomMapSelection() {
+  if (!roomMapId || !els.mapSelect) return;
+  // 地图表还没回来时先按兵不动，loadMapList 结束时还会再调一次。
+  if (roomMapId !== 'random' && !availableMaps.some(map => map.id === roomMapId)) {
+    if (!availableMaps.length) return;
+    roomMapId = availableMaps[0]?.id || null; // 房间用的地图已下线，退回第一张静态图
+    if (!roomMapId) return;
+  }
+  if (els.mapSelect.value !== roomMapId) {
+    els.mapSelect.value = roomMapId;
+    pendingMapId = roomMapId;
+    syncMapSelection();
+    syncMaxPlayersOptions();
+  }
+  renderLobbyMapSummary();
+}
+
 /** 大厅首屏的「已选地图」摘要：静态图显示真实缩略图，随机图由 RandomMapUI 异步补预览。 */
 function renderLobbyMapSummary() {
   if (!els.lobbyMapThumb) return;
   const mapId = els.mapSelect?.value || '';
   if (mapId === 'random') {
+    // 房间里的随机图可能没有本地预览（刷新后）：此时给说明占位，不拿新生成的预览冒充本局地图。
+    const roomView = isRoomMapView('random');
     const preview = window.RandomMapUI?.lastPreview;
-    els.lobbyMapThumb.setAttribute('data-random-map-preview', '');
-    renderLobbyMapStage(preview, '预览生成中…');
+    if (roomView) els.lobbyMapThumb.removeAttribute('data-random-map-preview');
+    else els.lobbyMapThumb.setAttribute('data-random-map-preview', '');
+    renderLobbyMapStage(preview, roomView ? '本局使用随机地图' : '随机地图（参数可配）');
     if (els.lobbyMapName) els.lobbyMapName.textContent = '随机地图';
     if (els.lobbyMapId) els.lobbyMapId.textContent = 'random';
     if (els.lobbyMapMeta) els.lobbyMapMeta.innerHTML = lobbyMapStatsMarkup(randomMapStatRows());
     if (els.lobbyMapDesc) {
-      els.lobbyMapDesc.textContent = '随机参数在「更换地图 → 随机地图」里调整；留空项由服务端默认。';
+      els.lobbyMapDesc.textContent = roomView
+        ? '本局地图由创建时的随机参数生成，地形以对局内为准。'
+        : '随机参数在「更换地图 → 随机地图」里调整；留空项由服务端默认。';
       els.lobbyMapDesc.title = els.lobbyMapDesc.textContent;
     }
     return;
@@ -2855,6 +2903,29 @@ function subscribeLobbyStart() {
   sse.onopen = () => statusBadge('大厅中', 'idle');
 }
 
+/** 房间阶段文案：大厅卡只区分等待 / 进行中 / 已结束三种。 */
+function lobbyPhaseLabel(lobby) {
+  if (lobby?.phase === 'active') return '已开始';
+  if (lobby?.phase === 'game_over') return '已结束';
+  return '等待开局';
+}
+
+/** 已结束房间的胜者名（拿不到席位时退回玩家 id）。 */
+function lobbyWinnerName(lobby) {
+  if (!lobby?.winner) return '';
+  const winner = (lobby.players || []).find(player => player.id === lobby.winner);
+  return winner?.name || String(lobby.winner);
+}
+
+/** 已结束房间的结局行；未结束不渲染，等待中的房间保持原样。 */
+function lobbyResultMarkup(lobby) {
+  if (lobby?.phase !== 'game_over') return '';
+  const winner = lobbyWinnerName(lobby);
+  const result = winner ? `胜者：${winner}` : '本局无胜者';
+  const round = Number.isFinite(lobby.roundNumber) ? ` · 第 ${lobby.roundNumber} 回合结束` : '';
+  return `<div class="lobby-summary-result">${esc(result + round)}</div>`;
+}
+
 function lobbySummaryMarkup(lobby, canKick = false) {
   const players = lobby.players || [];
   const supported = (lobby.supportedPlayerCounts || []).join('/');
@@ -2875,10 +2946,11 @@ function lobbySummaryMarkup(lobby, canKick = false) {
     ? `<button type="button" class="lobby-count-edit" data-edit-max-players="1" title="更改最大玩家数"><strong>${players.length}/${lobby.maxPlayers}</strong></button>`
     : `<strong>${players.length}/${lobby.maxPlayers}</strong>`;
   return `<div class="lobby-summary-head">
-    <span>${esc(lobby.phase === 'active' ? '已开始' : '等待开局')}</span>
+    <span>${esc(lobbyPhaseLabel(lobby))}</span>
     ${countMarkup}
   </div>
   <div class="lobby-summary-meta">地图 ${esc(lobby.mapId)} · 支持 ${esc(supported)} 人</div>
+  ${lobbyResultMarkup(lobby)}
   <div class="lobby-player-list">${players.map(playerChip).join('')}${canAddBot ? `<button type="button" class="lobby-player lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="ui-icon icon-plus" aria-hidden="true"></span><span>添加 AI</span></button>` : ''}</div>`;
 }
 
@@ -2906,11 +2978,34 @@ function syncCreateFormStatic() {
 /** 房主席位卡：参战与否决定显示 token 还是「未参战」，并切换加入 / 退出战斗按钮。 */
 function syncHostSeatUi() {
   const participating = Boolean(myToken);
+  const lobby = hostLobbySnapshot;
+  const ended = lobby?.phase === 'game_over';
+  const openForPlayers = !lobby || lobby.phase === 'lobby';
   els.createdPlayerTokenRow?.classList.remove('hidden');
   if (els.createdToken) els.createdToken.textContent = participating ? myToken : '未参战';
   els.createdTokenCopy?.classList.toggle('hidden', !participating);
   if (els.createRoomStatus) {
-    els.createRoomStatus.textContent = participating ? '等待玩家加入 · 房主参战' : '等待玩家加入 · 房主未参战';
+    if (ended) {
+      const winner = lobbyWinnerName(lobby);
+      els.createRoomStatus.textContent = winner ? `对局已结束 · ${winner} 获胜` : '对局已结束 · 本局无胜者';
+    } else {
+      els.createRoomStatus.textContent = participating ? '等待玩家加入 · 房主参战' : '等待玩家加入 · 房主未参战';
+    }
+  }
+  if (els.createRoomTitle) els.createRoomTitle.textContent = ended ? '对局已结束' : '房间已创建';
+  if (els.createRoomHint) {
+    els.createRoomHint.textContent = ended
+      ? '本局已结束，可查看回放，或点「重新创建」开新的一局。'
+      : '把 Game ID 发给其他玩家；人齐后点「开始游戏」。';
+  }
+  if (els.createRoomBadge) {
+    els.createRoomBadge.textContent = ended ? '已结束' : '大厅中';
+    els.createRoomBadge.classList.toggle('ok', !ended);
+    els.createRoomBadge.classList.toggle('idle', ended);
+  }
+  if (els.btnStartGame) {
+    els.btnStartGame.classList.toggle('hidden', !openForPlayers);
+    els.btnStartGame.disabled = !openForPlayers;
   }
   if (els.btnHostParticipate) {
     els.btnHostParticipate.textContent = participating ? '退出战斗' : '加入战斗';
@@ -2918,14 +3013,49 @@ function syncHostSeatUi() {
     const full = !participating && Boolean(hostLobbySnapshot)
       && hostLobbySnapshot.phase === 'lobby'
       && hostLobbySnapshot.playerCount >= hostLobbySnapshot.maxPlayers;
-    els.btnHostParticipate.disabled = hostSeatBusy || full;
-    els.btnHostParticipate.title = full
-      ? '房间已满，无法加入战斗'
-      : participating ? '退出战斗（保留房主身份）' : '以玩家身份加入战斗';
+    els.btnHostParticipate.disabled = hostSeatBusy || full || !openForPlayers;
+    els.btnHostParticipate.classList.toggle('hidden', !openForPlayers);
+    els.btnHostParticipate.title = !openForPlayers
+      ? '本局已结束，不能再加入席位'
+      : full ? '房间已满，无法加入战斗'
+        : participating ? '退出战斗（保留房主身份）' : '以玩家身份加入战斗';
   }
   // 未参战就没有可操作的对局席位，隐藏「连接进入游戏」，避免点进去才发现无权操作。
-  els.btnConnectCreate?.classList.toggle('hidden', !participating);
+  els.btnConnectCreate?.classList.toggle('hidden', !participating || !openForPlayers);
+  if (els.btnViewReplay) {
+    els.btnViewReplay.classList.toggle('hidden', !ended || !gameId);
+    if (ended && gameId) els.btnViewReplay.href = `/spectator-m.html?gameId=${encodeURIComponent(gameId)}`;
+  }
   syncCreateFormStatic();
+}
+
+/** 加入者房间卡：对局结束后收起「进入游戏」，改给回放入口。 */
+function syncJoinRoomUi(lobby) {
+  const ended = lobby?.phase === 'game_over';
+  if (els.joinRoomStatus) {
+    if (ended) {
+      const winner = lobbyWinnerName(lobby);
+      els.joinRoomStatus.textContent = winner ? `对局已结束 · ${winner} 获胜` : '对局已结束 · 本局无胜者';
+    } else {
+      els.joinRoomStatus.textContent = '等待房主开始';
+    }
+  }
+  if (els.joinRoomTitle) els.joinRoomTitle.textContent = ended ? '对局已结束' : '已加入房间';
+  if (els.joinRoomHint) {
+    els.joinRoomHint.textContent = ended
+      ? '本局已结束，可查看回放，或点「返回大厅」。'
+      : '房主开始后会自动进入游戏，也可以手动点「进入游戏」。';
+  }
+  if (els.joinRoomBadge) {
+    els.joinRoomBadge.textContent = ended ? '已结束' : '大厅中';
+    els.joinRoomBadge.classList.toggle('ok', !ended);
+    els.joinRoomBadge.classList.toggle('idle', ended);
+  }
+  els.btnConnectJoin?.classList.toggle('hidden', ended);
+  if (els.btnViewReplayJoin) {
+    els.btnViewReplayJoin.classList.toggle('hidden', !ended || !gameId);
+    if (ended && gameId) els.btnViewReplayJoin.href = `/spectator-m.html?gameId=${encodeURIComponent(gameId)}`;
+  }
 }
 
 function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target === els.lobbySummary && Boolean(hostToken)) {
@@ -2939,6 +3069,8 @@ function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target =
   if (target === els.lobbySummary) {
     hostLobbySnapshot = lobby;
     syncHostSeatUi();
+  } else if (target === els.joinLobbySummary) {
+    syncJoinRoomUi(lobby);
   }
 }
 
@@ -3139,6 +3271,8 @@ function startLobbyPolling() {
     try {
       const lobby = await refreshLobbySummary();
       if (handleLobbyRemoval(lobby)) return;
+      // 已结束的房间不会再开局，继续轮询没意义。
+      if (lobby?.phase === 'game_over') { stopLobbyPolling(); return; }
       if (lobby?.phase !== 'active') return;
       stopLobbyPolling();
       if (els.joinStatusText) els.joinStatusText.textContent = '房主已开始，正在进入游戏…';
@@ -3494,6 +3628,8 @@ function setCreateRoomVisible(visible) {
     els.hostParticipate?.closest('.checkbox-field')?.classList.remove('is-room-static');
   }
   syncCreateFormStatic();
+  // 退出房态地图摘要要回到「下一局」的口径，不能继续显示「本局使用随机地图」。
+  if (!visible) renderLobbyMapSummary();
   animateRoomCard(els.createResult, visible);
 }
 
@@ -3513,6 +3649,7 @@ function setJoinRoomVisible(visible) {
 
 function clearCreateRoomView() {
   setCreateRoomVisible(false);
+  roomMapId = null;
   hostLobbySnapshot = null;
   if (els.createdGameId) els.createdGameId.textContent = '';
   if (els.createdHostToken) els.createdHostToken.textContent = '';
@@ -3636,6 +3773,9 @@ async function toggleHostSeat() {
 
 async function startHostedGame() {
   if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
+  if (hostLobbySnapshot && hostLobbySnapshot.phase !== 'lobby') {
+    return toast(hostLobbySnapshot.phase === 'game_over' ? '对局已结束，不能再次开始' : '对局已经开始', 'err');
+  }
   const res = await fetch(`/api/games/${gameId}/start`, {
     method: 'POST',
     headers: { 'X-Host-Token': hostToken },
@@ -3697,7 +3837,9 @@ els.btnCreate.addEventListener('click', async () => {
     els.createdGameId.textContent = gameId;
     els.createdHostToken.textContent = hostToken;
     renderLobbySummary(data.lobby, els.lobbySummary, true);
+    roomMapId = data.lobby?.mapId || null;
     setCreateRoomVisible(true);
+    applyRoomMapSelection();
     if (hadJoinedRoom) toast('已创建新房间，离开此前加入的房间（原房间仍保留）', 'info');
     statusBadge('大厅中', 'idle');
     startLobbyPolling();
@@ -3731,11 +3873,11 @@ els.btnJoin.addEventListener('click', async () => {
   if (hadHostedRoom) toast('已加入新房间，离开自己创建的房间（原房间仍留在等待列表）', 'info');
   else if (hadJoinedRoom && gid !== previousGameId) toast('已切换到新房间，离开此前加入的房间（原房间仍保留）', 'info');
   const roomStatus = data.lobby?.phase === 'active' ? '加入成功，正在进入游戏…' : '加入成功，等待房主开始';
-  if (els.joinRoomStatus) els.joinRoomStatus.textContent = roomStatus;
   els.joinPlayerToken.textContent = myToken;
   els.joinPlayerTokenRow.classList.remove('hidden');
   setJoinRoomVisible(true);
   renderLobbySummary(data.lobby, els.joinLobbySummary);
+  if (els.joinRoomStatus) els.joinRoomStatus.textContent = roomStatus;
   renderJoinMapCard(data.lobby);
   refreshAvailableGames();
   statusBadge(data.lobby?.phase === 'active' ? '正在进入' : '大厅中', 'idle');
@@ -3768,6 +3910,17 @@ async function leaveJoinedRoom() {
   if (!gameId || !myToken) {
     clearJoinRoomView();
     refreshAvailableGames();
+    return;
+  }
+  // 对局已结束：服务器没有可释放的席位，直接清掉本地会话回大厅（回放仍留在观战页）。
+  if (latestLobby?.phase === 'game_over') {
+    stopLobbyPolling();
+    if (sse) { sse.close(); sse = null; }
+    clearSavedSession();
+    clearJoinRoomView();
+    statusBadge('未加入', 'idle');
+    refreshAvailableGames();
+    toast('对局已结束，已返回大厅', 'info');
     return;
   }
   const ok = await window.UIDialog.confirm({
@@ -3889,25 +4042,28 @@ async function reconnectSavedSession() {
 function restoreLobbyView(lobby) {
   if (hostToken) {
     clearJoinRoomView();
+    roomMapId = lobby.mapId || null;
     els.createdGameId.textContent = gameId;
     els.createdHostToken.textContent = hostToken;
     renderLobbySummary(lobby, els.lobbySummary, true);
     setCreateRoomVisible(true);
-    statusBadge('大厅中', 'idle');
+    // 建房表单里的地图摘要就是本局地图：恢复成房间实际用的那张，而不是 /api/maps 的第一张。
+    applyRoomMapSelection();
+    statusBadge(lobby.phase === 'game_over' ? '已结束' : '大厅中', 'idle');
   } else if (myToken) {
     clearCreateRoomView();
     document.querySelector('.lobby-tab[data-tab="join"]')?.click();
-    if (els.joinRoomStatus) els.joinRoomStatus.textContent = '已恢复大厅，等待房主开始';
     if (els.joinPlayerToken) els.joinPlayerToken.textContent = myToken;
     els.joinPlayerTokenRow?.classList.remove('hidden');
     renderLobbySummary(lobby, els.joinLobbySummary);
     renderJoinMapCard(lobby);
     setJoinRoomVisible(true);
-    statusBadge('大厅中', 'idle');
+    statusBadge(lobby.phase === 'game_over' ? '已结束' : '大厅中', 'idle');
   } else {
     return; // 只有 gameId 的观战会话：维持大厅页现状。
   }
-  startLobbyPolling();
+  // 已结束的房间不会再收到开局事件，不必继续轮询。
+  if (lobby.phase === 'lobby') startLobbyPolling();
 }
 function ensureJoinConnectButton() {
   if (!els.joinResult || els.btnConnectJoin) return;

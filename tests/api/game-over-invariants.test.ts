@@ -25,6 +25,23 @@ describe('game_over is the terminal event', () => {
     const eventCount = state.events.length;
     expect(state.events.at(-1)!.type).toBe('game_over');
 
+    // 大厅摘要必须带上终局信息：前端据此把房间卡显示成「已结束 + 胜者」而不是等待开局。
+    const lobbyRes = await app.inject({ method: 'GET', url: `/api/games/${game.gameId}/lobby` });
+    expect(lobbyRes.statusCode).toBe(200);
+    const lobby = lobbyRes.json();
+    expect(lobby.phase).toBe('game_over');
+    expect(lobby.winner).toBe(state.winner);
+    expect(lobby.roundNumber).toBe(state.turn.roundNumber);
+
+    // 已结束的房间不能再次开始；错误码应是 game_over，而不是含糊的「已经开始」。
+    const restart = await app.inject({
+      method: 'POST',
+      url: `/api/games/${game.gameId}/start`,
+      headers: { 'x-host-token': game.hostToken },
+    });
+    expect(restart.statusCode).toBe(409);
+    expect(restart.json().code).toBe('game_over');
+
     const eliminate = await app.inject({
       method: 'POST',
       url: `/api/games/${game.gameId}/host/eliminate`,

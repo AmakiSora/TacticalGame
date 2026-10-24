@@ -135,11 +135,11 @@
       <div class="lobby-room-head">
         <div>
           <div class="lobby-room-kicker">
-            <span class="badge ok">大厅中</span>
+            <span class="badge ok" id="create-room-badge">大厅中</span>
             <span class="lobby-room-kicker-text" id="create-room-status">等待玩家加入</span>
           </div>
-          <h3>房间已创建</h3>
-          <p>把 Game ID 发给其他玩家；人齐后点「开始游戏」。</p>
+          <h3 id="create-room-title">房间已创建</h3>
+          <p id="create-room-hint">把 Game ID 发给其他玩家；人齐后点「开始游戏」。</p>
         </div>
         <button id="btn-create-again" class="btn lobby-room-edit" type="button">重新创建</button>
       </div>
@@ -164,6 +164,7 @@
         <button id="btn-start-game" class="btn success" type="button">开始游戏</button>
         <button id="btn-connect-create" class="btn success" type="button">连接进入游戏</button>
         <button id="btn-host-participate" class="btn" type="button">加入战斗</button>
+        <a id="btn-view-replay" class="btn hidden" href="#" target="_blank" rel="noopener">查看回放</a>
       </div>
     </div>
   </div>
@@ -228,11 +229,11 @@
       <div class="lobby-room-head">
         <div>
           <div class="lobby-room-kicker">
-            <span class="badge ok">大厅中</span>
+            <span class="badge ok" id="join-room-badge">大厅中</span>
             <span class="lobby-room-kicker-text" id="join-room-status">等待房主开始</span>
           </div>
-          <h3>已加入房间</h3>
-          <p>房主开始后会自动进入游戏，也可以手动点「进入游戏」。</p>
+          <h3 id="join-room-title">已加入房间</h3>
+          <p id="join-room-hint">房主开始后会自动进入游戏，也可以手动点「进入游戏」。</p>
         </div>
         <button id="btn-join-again" class="btn lobby-room-edit" type="button">返回大厅</button>
       </div>
@@ -244,6 +245,7 @@
       <div id="join-lobby-summary" class="lobby-summary"></div>
       <div class="lobby-room-actions">
         <button id="btn-connect-join" class="btn success" type="button">进入游戏</button>
+        <a id="btn-view-replay-join" class="btn hidden" href="#" target="_blank" rel="noopener">查看回放</a>
       </div>
     </div>
   </div>

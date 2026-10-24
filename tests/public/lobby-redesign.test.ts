@@ -180,6 +180,41 @@ describe('lobby map dialog and room state', () => {
     expect(ui).toContain("panel.closest('.map-dialog')");
   });
 
+  it('renders a finished room as ended and restores the room map', () => {
+    for (const path of PAGES) {
+      const html = read(path);
+      expect(html, `${path} 缺房间标题位`).toContain('id="create-room-title"');
+      expect(html, `${path} 缺房主状态徽标位`).toContain('id="create-room-badge"');
+      expect(html, `${path} 缺回放入口`).toContain('id="btn-view-replay"');
+      expect(html, `${path} 缺加入者回放入口`).toContain('id="btn-view-replay-join"');
+    }
+    for (const path of CLIENTS) {
+      const source = read(path);
+      // 阶段文案必须区分 game_over；否则已结束的房间会显示「等待开局」并保留开始按钮。
+      expect(source, `${path} 缺阶段文案`).toContain('function lobbyPhaseLabel(');
+      expect(source, `${path} game_over 未标已结束`).toContain("if (lobby?.phase === 'game_over') return '已结束';");
+      expect(source, `${path} 缺胜者/回合摘要`).toContain('function lobbyResultMarkup(');
+      expect(source, `${path} 缺胜者名解析`).toContain('function lobbyWinnerName(');
+      expect(source, `${path} 已结束仍在显示开始按钮`).toContain("els.btnStartGame.classList.toggle('hidden', !openForPlayers)");
+      expect(source, `${path} 已结束未收起加入战斗`).toContain("els.btnHostParticipate.classList.toggle('hidden', !openForPlayers)");
+      expect(source, `${path} 缺回放入口绑定`).toContain("els.btnViewReplay.classList.toggle('hidden', !ended || !gameId)");
+      // 恢复房间时地图摘要要跟着房间地图走，不能停留在 /api/maps 的第一张。
+      expect(source, `${path} 缺房间地图同步`).toContain('function applyRoomMapSelection(');
+      expect(source, `${path} 缺房间地图判定`).toContain('function isRoomMapView(');
+      expect(source, `${path} 加载地图未优先用房间地图`).toContain('els.mapSelect.value = restoredMap || maps[0]?.id');
+      expect(source, `${path} 恢复房间未同步地图`).toMatch(/setCreateRoomVisible\(true\);[\s\S]{0,200}applyRoomMapSelection\(\);/);
+      // 已结束的房间不再轮询开局。
+      expect(source, `${path} 恢复已结束房间仍在轮询`).toContain("if (lobby.phase === 'lobby') startLobbyPolling();");
+    }
+    const replayPath = { 'public/play.js': '/spectator.html?gameId=', 'public/play-m.js': '/spectator-m.html?gameId=' } as Record<string, string>;
+    for (const [path, href] of Object.entries(replayPath)) {
+      expect(read(path), `${path} 回放地址不对`).toContain(href);
+    }
+    for (const path of STYLES) {
+      expect(read(path), `${path} 缺终局摘要样式`).toContain('.lobby-summary-result');
+    }
+  });
+
   it('keeps create and join sessions mutually exclusive', () => {
     for (const path of CLIENTS) {
       const source = read(path);

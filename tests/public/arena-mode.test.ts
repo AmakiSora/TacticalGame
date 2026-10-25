@@ -65,4 +65,21 @@ describe('AI 竞技场按玩法模式分榜', () => {
     expect(source).toContain('evalAlgosForMode');
     expect(source).toContain('该模式暂不支持跑批');
   });
+
+  it('评估控制台提供「清空旧局」弹窗：范围筛选 + 试跑预览 + 确认后直接删除', () => {
+    expect(html).toContain('id="eval-clear"');
+    expect(source).toContain('window.UIDialog.open({');
+    expect(source).toContain("title: '清空旧局并重新累积？'");
+    expect(source).toContain("confirmText: '确认删除'");
+    expect(source).toContain("tone: 'danger'");
+    // 弹窗表单在 JS 里构建：模式/地图/参与者三项 + 试跑预览命中数。
+    expect(source).toContain('data-clear="mode"');
+    expect(source).toContain('data-clear="map"');
+    expect(source).toContain('data-clear="participant"');
+    expect(source).toContain('data-clear="preview"');
+    expect(source).toContain('/api/arena/eval/clear-matches');
+    expect(source).toContain('dryRun: true');
+    expect(source).toContain('function describeClearScope');
+    expect(source).toContain("evalEl['eval-clear'].disabled = st.status === 'running'");
+  });
 });

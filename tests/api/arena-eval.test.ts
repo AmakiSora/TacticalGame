@@ -298,6 +298,94 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(again.json().code).toBe('eval_not_running');
   });
 
+  it('clears the accumulated matches file so a fresh batch can accumulate', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches' });
+    expect(res.statusCode).toBe(200);
+    const data = res.json();
+    expect(data.ok).toBe(true);
+    expect(data.removed).toBe(2);
+    expect(data.total).toBe(2);
+    // 全部行命中时重写为空文件（保留文件本身，局数归零）。
+    expect(readFileSync(statsFile, 'utf8').trim()).toBe('');
+    const status = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
+    expect(status.gamesTotal).toBe(0);
+    expect(status.notes.join()).toContain('已删除 2/2 局');
+  });
+
+  it('dry run only reports hit counts without touching the file', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/clear-matches',
+      payload: { mode: 'standard', dryRun: true },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, removed: 2, total: 2 });
+    expect(readFileSync(statsFile, 'utf8')).toContain('{"map":"random"}');
+  });
+
+  it('clears only matches hit by mode/map/participant filters and keeps the rest', async () => {
+    writeFileSync(statsFile, [
+      { map: 'default', players: { player_a: 'algo_greedy@v1', player_b: 'algo_threat@v1' }, winner: 'algo_threat@v1' },
+      { map: 'standoff', players: { player_a: 'algo_random-sim@v2', player_b: 'algo_threat@v1' }, winner: 'algo_random-sim@v2' },
+      { map: 'standoff', players: { player_a: 'algo_greedy@v1', player_b: 'algo_kriegspiel@v2' }, winner: 'draw' },
+      { map: 'random', players: { player_a: 'algo_greedy@v1', player_b: 'algo_threat@v1' }, winner: 'algo_greedy@v1' },
+    ].map(line => JSON.stringify(line)).join('\n') + '\n');
+
+    // 模式过滤：standoff 属 simultaneous（读真实 maps/*.json 的 mode 字段）。
+    const byMode = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { mode: 'simultaneous' } });
+    expect(byMode.json()).toMatchObject({ ok: true, removed: 2, total: 4 });
+    const leftMaps = readFileSync(statsFile, 'utf8').split('\n').filter(l => l.trim()).map(l => JSON.parse(l).map);
+    expect(leftMaps).toEqual(['default', 'random']);
+
+    // 参与者过滤：精确匹配任一座位（剩余两行都含 algo_greedy@v1，全部命中）。
+    const byParticipant = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { participant: 'algo_greedy@v1' } });
+    expect(byParticipant.json()).toMatchObject({ removed: 2 });
+    expect(readFileSync(statsFile, 'utf8').split('\n').filter(l => l.trim())).toHaveLength(0);
+
+    // 地图过滤。
+    writeFileSync(statsFile, [
+      { map: 'default', players: { player_a: 'a', player_b: 'b' } },
+      { map: 'breach', players: { player_a: 'a', player_b: 'b' } },
+    ].map(line => JSON.stringify(line)).join('\n') + '\n');
+    const byMap = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { map: 'default' } });
+    expect(byMap.json()).toMatchObject({ removed: 1 });
+    expect(readFileSync(statsFile, 'utf8')).toContain('breach');
+    expect(readFileSync(statsFile, 'utf8')).not.toContain('"default"');
+  });
+
+  it('clear-matches validates filter values and combinations', async () => {
+    const badMap = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { map: 'nope' } });
+    expect(badMap.statusCode).toBe(400);
+    expect(badMap.json().code).toBe('invalid_filter');
+
+    const badMode = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { mode: 'nope' } });
+    expect(badMode.statusCode).toBe(400);
+
+    const mismatch = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { mode: 'standard', map: 'standoff' } });
+    expect(mismatch.statusCode).toBe(400);
+    expect(mismatch.json().code).toBe('invalid_filter');
+  });
+
+  it('reports zero removed without touching the file when nothing matches', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { participant: 'nobody@v1' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, removed: 0, total: 2 });
+    expect(readFileSync(statsFile, 'utf8').split('\n').filter(l => l.trim())).toHaveLength(2);
+  });
+
+  it('clear-matches is a no-op when the stats file does not exist', async () => {
+    rmSync(statsFile, { force: true });
+    const res = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, removed: 0, total: 0 });
+  });
+
+  it('rejects clear-matches while a run is in progress', async () => {
+    await app.inject({ method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'] } });
+    const res = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches' });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('eval_already_running');
+  });
+
   it('aims the SIGKILL escalation at the stopped child, not a later run', async () => {
     // SIGKILL 升级在非 Windows 分支，临时改写 platform 并把升级等待调短到 5ms。
     const prevPlatform = process.platform;

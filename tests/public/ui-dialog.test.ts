@@ -30,12 +30,18 @@ describe('shared confirm dialog', () => {
     const source = read('public/ui-dialog.js');
     const css = read('public/ui-dialog.css');
 
-    // 三种语义一套实现：confirm / alert / prompt，挂在 window 上供各页共用。
+    // 四种语义一套实现：confirm / alert / prompt / open（自定义内容），挂在 window 上供各页共用。
     expect(source).toContain('window.UIDialog = {');
     expect(source).toContain('confirm(options)');
     expect(source).toContain('alert(options)');
     expect(source).toContain('prompt(options)');
     expect(source).toContain('Promise');
+    // open() 承载自定义内容表单：只接受调用方构建好的 Node，模块自己不拼内容 HTML。
+    expect(source).toContain('open(options)');
+    expect(source).toContain('options.content instanceof Node');
+    expect(source).toContain("typeof options.onOpen === 'function'");
+    // 下拉/多行输入里的回车是原生交互（选选项、换行），不能当成确认。
+    expect(source).toContain("tag === 'SELECT' || tag === 'TEXTAREA'");
     // 文案一律走 textContent，不能把调用方传进来的字符串当 HTML。
     expect(source).not.toContain('innerHTML');
     // 键盘语义和原生对话框一致：Esc 取消、回车确认（输入法组词时不抢回车）。

@@ -75,6 +75,12 @@
     .eval-row { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: flex-end; }
     .eval-row > label { display: grid; gap: 4px; font-size: 12px; color: #9ab; }
     .eval-row input[type="number"], .eval-row input[type="text"] { background: #141c22; border: 1px solid #2a3a44; color: #dce8f0; border-radius: 4px; padding: 5px 8px; width: 100px; }
+    /* 清空旧局弹窗表单（挂载在 ui-dialog 面板内，宽度跟随面板内容区，避免撑出滚动条） */
+    .eval-clear-form { display: grid; gap: 10px; }
+    .eval-clear-form > label { display: grid; gap: 4px; font-size: 12px; color: #9ab; }
+    .eval-clear-form select { background: #141c22; border: 1px solid #2a3a44; color: #dce8f0; border-radius: 4px; padding: 6px 8px; width: 100%; }
+    .eval-clear-preview { margin: 2px 0 0; font-size: 12px; color: #9ab; }
+    .eval-clear-preview.err { color: #f0a0a0; }
     #eval-salt { width: 250px; }
     .eval-inline { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }
     .eval-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }

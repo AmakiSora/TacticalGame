@@ -68,6 +68,12 @@
       messageEl.textContent = message;
       body.appendChild(messageEl);
 
+      // 自定义内容对话框（UIDialog.open）：调用方传入构建好的 Node（表单等），
+      // 模块只负责弹层语义（层叠 / Esc / 焦点圈 / 回车确认），不碰内容 HTML。
+      if (options.content instanceof Node) {
+        body.appendChild(options.content);
+      }
+
       let input = null;
       if (isPrompt) {
         input = document.createElement('input');
@@ -123,7 +129,7 @@
         backdrop.classList.remove('open');
         // 先回结果，动画结束后再摘除节点，调用方可以立刻继续跳转。
         exitTimer = setTimeout(cleanup, EXIT_MS);
-        if (kind === 'confirm') resolve(action === 'confirm');
+        if (kind === 'confirm' || kind === 'custom') resolve(action === 'confirm');
         else if (isPrompt) resolve(action === 'confirm' ? input.value : null);
         else resolve();
       }
@@ -139,6 +145,9 @@
         if (event.key === 'Enter' && !event.isComposing) {
           // 焦点在取消按钮上时交给按钮自己处理，避免回车反而确认。
           if (document.activeElement === cancelBtn) return;
+          // 下拉 / 多行输入里按回车是原生交互（选选项、换行），不能当成确认。
+          const tag = document.activeElement && document.activeElement.tagName;
+          if (tag === 'SELECT' || tag === 'TEXTAREA') return;
           event.preventDefault();
           event.stopPropagation();
           settle('confirm');
@@ -175,6 +184,8 @@
       document.body.appendChild(backdrop);
       document.body.appendChild(panel);
       document.addEventListener('keydown', onKeyDown, true);
+      // 内容挂载后回调：调用方在这里绑定表单事件、拉取预览数据。
+      if (typeof options.onOpen === 'function') options.onOpen(body, panel);
 
       confirmBtn.addEventListener('click', () => settle('confirm'));
       if (cancelBtn) cancelBtn.addEventListener('click', () => settle('cancel'));
@@ -206,6 +217,10 @@
     },
     prompt(options) {
       return openDialog('prompt', options);
+    },
+    /** 自定义内容对话框：content 传构建好的 Node，确认返回 true / 取消返回 false。 */
+    open(options) {
+      return openDialog('custom', options);
     },
     isOpen() {
       return openCount > 0;

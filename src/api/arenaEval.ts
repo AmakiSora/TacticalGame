@@ -7,7 +7,7 @@
 // 服务端本体（见 Dockerfile 的 script/ COPY 清单），缺跑批链路时写接口返回 501。
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
@@ -74,6 +74,37 @@ export function buildEvalModeCatalog() {
     maps: EVAL_MAPS.filter(map => map.mode === mode.id),
     reason: mode.supported ? null : EVAL_MODE_UNSUPPORTED_REASON,
   }));
+}
+
+/**
+ * maps/*.json 的 mode 字段（random 固定 standard，缺省/损坏按 standard），与
+ * generateArenaLeaderboard.loadMapModes 同规则；「清空旧局」按模式过滤时用它把
+ * 对局记录的 map 字段归到模式。目录不可读时只剩 random 兜底。
+ */
+export function readMapModes(mapsDir = join(PROJECT_ROOT, 'maps')): Map<string, string> {
+  const modes = new Map<string, string>([['random', 'standard']]);
+  try {
+    for (const file of readdirSync(mapsDir)) {
+      if (!file.endsWith('.json')) continue;
+      try {
+        const config = JSON.parse(readFileSync(join(mapsDir, file), 'utf8'));
+        modes.set(file.replace(/\.json$/i, ''), typeof config?.mode === 'string' && config.mode ? config.mode : 'standard');
+      } catch {
+        modes.set(file.replace(/\.json$/i, ''), 'standard');
+      }
+    }
+  } catch {
+    // 地图目录不可读时仅 random 可用；模式过滤会匹配不到未知地图，属安全方向（少删）。
+  }
+  return modes;
+}
+
+/** 「清空旧局」的范围过滤：各维度取交集，留空 = 该维度不限制。 */
+export interface ClearFilter {
+  mode?: string | null;
+  map?: string | null;
+  /** 参与者 id（模型 zip 文件名或 algo_<name>@<version>），精确匹配任一座位。 */
+  participant?: string | null;
 }
 
 export type EvalRunStatus = 'idle' | 'running' | 'finished' | 'failed' | 'stopped' | 'interrupted';
@@ -277,6 +308,58 @@ export class EvalRunner {
       this.gamesCache = null;
       return 0;
     }
+  }
+
+  /**
+   * 清空累积对局：按（模式 ∧ 地图 ∧ 参与者）命中的行直接删除，其余行原样保留
+   * （matches.jsonl 在 git 里，已提交的历史对局仍可从 git 恢复）。round_robin 的
+   * 补跑计划按「(地图, 参与者对) 已累积局数」算差额且与盐无关——旧局把目标局数
+   * 占满后新批次会提示「无需补跑」，清空（全部或定向）即可让带决策计时的新对局
+   * 重新累积。dryRun 只统计不动文件。
+   */
+  clearMatches(filter: ClearFilter = {}, dryRun = false): { removed: number; total: number } {
+    if (this.isRunning) throw new Error('eval run already in progress');
+    const { removed, staying, total } = this.partitionMatches(filter);
+    if (dryRun || !removed.length) {
+      return { removed: removed.length, total };
+    }
+    // 先写临时文件再原子改名，避免写一半时被读侧（status 局数统计/重算脚本）看到残缺。
+    const tmpFile = `${this.statsFile}.tmp`;
+    writeFileSync(tmpFile, staying.join('\n'), 'utf8');
+    renameSync(tmpFile, this.statsFile);
+    this.gamesCache = null;
+    this.pushNote(`已删除 ${removed.length}/${total} 局旧对局；新跑批将从零累积（带决策计时）。`);
+    this.persist();
+    return { removed: removed.length, total };
+  }
+
+  /** 按（模式 ∧ 地图 ∧ 参与者）把 JSONL 行分成 [待删除, 保留] 两组；解析失败的行一律保留。 */
+  private partitionMatches(filter: ClearFilter): { removed: string[]; staying: string[]; total: number } {
+    const removed: string[] = [];
+    const staying: string[] = [];
+    let total = 0;
+    if (!existsSync(this.statsFile)) return { removed, staying, total };
+    const mapModes = filter.mode ? readMapModes() : null;
+    for (const line of readFileSync(this.statsFile, 'utf8').split('\n')) {
+      if (!line.trim()) { staying.push(line); continue; }
+      let record: any;
+      try {
+        record = JSON.parse(line);
+      } catch {
+        staying.push(line);
+        continue;
+      }
+      total += 1;
+      const players = record?.players;
+      const mapId = typeof record?.map === 'string' ? record.map : 'unknown';
+      const hitMode = !filter.mode || mapModes!.get(mapId) === filter.mode;
+      const hitMap = !filter.map || mapId === filter.map;
+      const hitParticipant = !filter.participant || (
+        players && typeof players === 'object'
+        && (players.player_a === filter.participant || players.player_b === filter.participant));
+      (hitMode && hitMap && hitParticipant ? removed : staying).push(line);
+    }
+    return { removed, staying, total };
   }
 
   get isRunning(): boolean {
@@ -598,6 +681,37 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
       return reply.code(409).send({ error: '当前没有进行中的跑批', code: 'eval_not_running' });
     }
     return { ok: true };
+  });
+
+  // 清空旧局（直接删除命中行，matches.jsonl 已提交历史可在 git 找回；dryRun 只预览
+  // 数量）：跑批中拒绝，避免重写 matches.jsonl 与 evaluate_cross 的追加写竞争。
+  app.post('/api/arena/eval/clear-matches', async (req, reply) => {
+    if (!authorizeControlRequest(req, reply)) return;
+    if (!toolchainAvailable) return reply.code(501).send(evalUnavailable);
+    if (runner.isRunning) {
+      return reply.code(409).send({ error: '跑批进行中，请先停止再清空旧局', code: 'eval_already_running' });
+    }
+    const body = (req.body ?? {}) as Partial<ClearFilter> & { dryRun?: boolean };
+    const filter: ClearFilter = {
+      mode: body.mode ? String(body.mode) : null,
+      map: body.map ? String(body.map) : null,
+      participant: body.participant ? String(body.participant).slice(0, 200) : null,
+    };
+    const mapModes = readMapModes();
+    if (filter.mode && ![...mapModes.values()].includes(filter.mode)) {
+      return reply.code(400).send({ error: `未知模式：${filter.mode}`, code: 'invalid_filter' });
+    }
+    if (filter.map && !mapModes.has(filter.map)) {
+      return reply.code(400).send({ error: `未知地图：${filter.map}`, code: 'invalid_filter' });
+    }
+    if (filter.mode && filter.map && mapModes.get(filter.map!) !== filter.mode) {
+      return reply.code(400).send({ error: `地图 ${filter.map} 不属于模式 ${filter.mode}`, code: 'invalid_filter' });
+    }
+    try {
+      return { ok: true, ...runner.clearMatches(filter, Boolean(body.dryRun)) };
+    } catch (err) {
+      return reply.code(500).send({ error: `清空旧局失败：${(err as Error).message}`, code: 'clear_failed' });
+    }
   });
 
   app.post('/api/arena/leaderboard/regenerate', async (req, reply) => {

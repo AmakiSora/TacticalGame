@@ -512,7 +512,7 @@ import './error-text.js';
   const evalEl = {};
   for (const id of ['eval-status-pill', 'eval-modes', 'eval-mode-hint', 'eval-maps', 'eval-algos', 'eval-models', 'eval-model-all', 'eval-model-none',
     'eval-model-count', 'eval-games', 'eval-jobs', 'eval-salt', 'eval-dry', 'eval-start', 'eval-stop',
-    'eval-regen', 'eval-msg', 'eval-progress-wrap', 'eval-progress-fill', 'eval-progress-text', 'eval-output',
+    'eval-regen', 'eval-clear', 'eval-msg', 'eval-progress-wrap', 'eval-progress-fill', 'eval-progress-text', 'eval-output',
     'eval-tab-btn', 'eval-mini-strip', 'eval-mini-text', 'eval-mini-go']) {
     evalEl[id] = document.getElementById(id);
   }
@@ -545,6 +545,20 @@ import './error-text.js';
   function evalMsg(text, kind) {
     evalEl['eval-msg'].textContent = text || '';
     evalEl['eval-msg'].classList.toggle('eval-msg-err', kind === 'err');
+  }
+
+  /* ===== 清空旧局：弹窗里按模式/地图/参与者筛选，试跑预览命中数后归档清空 ===== */
+  const EVAL_FALLBACK_MODES = [
+    ['standard', '标准模式'], ['annihilation', '歼灭模式'],
+    ['simultaneous', '同时回合'], ['royale', '大逃杀'],
+  ];
+
+  function describeClearScope(filter) {
+    const parts = [];
+    if (filter.mode) parts.push(`模式=${evalModeCatalog.find(item => item.id === filter.mode)?.label || filter.mode}`);
+    if (filter.map) parts.push(`地图=${mapLabel(filter.map)}`);
+    if (filter.participant) parts.push(`参与者=${filter.participant}`);
+    return parts.length ? parts.join(' 且 ') : '全部对局';
   }
 
   function currentEvalMode() {
@@ -679,6 +693,7 @@ import './error-text.js';
     evalEl['eval-status-pill'].classList.toggle('err', pill.cls === 'err');
     updateEvalStartState();
     evalEl['eval-stop'].disabled = st.status !== 'running';
+    evalEl['eval-clear'].disabled = st.status === 'running';
 
     const running = st.status === 'running';
     const hasHistory = Boolean(st.params);
@@ -807,6 +822,125 @@ import './error-text.js';
       evalMsg(res.ok ? '停止指令已发送，等待进程退出…' : `停止失败：${data.error || res.status}`, res.ok ? undefined : 'err');
     } catch (err) {
       evalMsg(`停止失败：${window.ErrorText.describe(err)}`, 'err');
+    }
+  });
+
+  evalEl['eval-clear'].addEventListener('click', async () => {
+    if (evalStatus?.status === 'running') {
+      evalMsg('跑批进行中，请先停止再清空旧局', 'err');
+      return;
+    }
+    // 弹窗表单：每次打开重建，模式 → 地图联动，改动即试跑预览命中局数。
+    const form = document.createElement('div');
+    form.className = 'eval-clear-form';
+    form.innerHTML = `
+      <label>模式
+        <select data-clear="mode"></select>
+      </label>
+      <label>地图
+        <select data-clear="map"></select>
+      </label>
+      <label>参与者（精确匹配任一座位）
+        <select data-clear="participant"></select>
+      </label>
+      <p class="eval-clear-preview" data-clear="preview">正在统计命中局数…</p>`;
+    const modeSel = form.querySelector('[data-clear="mode"]');
+    const mapSel = form.querySelector('[data-clear="map"]');
+    const partSel = form.querySelector('[data-clear="participant"]');
+    const previewEl = form.querySelector('[data-clear="preview"]');
+
+    const modes = evalModeCatalog.length
+      ? evalModeCatalog.map(item => [item.id, item.label + (item.supported ? '' : '（暂不支持）')])
+      : EVAL_FALLBACK_MODES;
+    modeSel.innerHTML = '<option value="">全部</option>' +
+      modes.map(([id, label]) => `<option value="${escapeAttr(id)}">${escapeHtml(label)}</option>`).join('');
+    const participantOptions = [
+      ...evalModels.map(m => [m.file, `${m.label || ''} ${m.file}`.trim()]),
+      ...evalAlgos.map(a => [a.id, `${a.name}（${a.id}）`]),
+    ];
+    partSel.innerHTML = '<option value="">全部</option>' +
+      participantOptions.map(([id, label]) => `<option value="${escapeAttr(id)}" title="${escapeAttr(id)}">${escapeHtml(label)}</option>`).join('');
+
+    function renderMapOptions() {
+      const previous = mapSel.value;
+      const maps = modeSel.value
+        ? (evalModeCatalog.find(item => item.id === modeSel.value)?.maps || [])
+        : (evalModeCatalog.length
+          ? evalModeCatalog.flatMap(item => item.maps)
+          : EVAL_FALLBACK_MAPS.map(id => ({ id })));
+      const ids = [...new Set(maps.map(item => item.id))];
+      mapSel.innerHTML = '<option value="">全部</option>' +
+        ids.map(id => `<option value="${escapeAttr(id)}">${escapeHtml(mapLabel(id))}</option>`).join('');
+      mapSel.value = ids.includes(previous) ? previous : '';
+    }
+    renderMapOptions();
+
+    function readFilter() {
+      return {
+        mode: modeSel.value || null,
+        map: mapSel.value || null,
+        participant: partSel.value || null,
+      };
+    }
+
+    let previewSeq = 0;
+    async function refreshPreview() {
+      const seq = ++previewSeq;
+      previewEl.classList.remove('err');
+      previewEl.textContent = '正在统计命中局数…';
+      try {
+        const res = await fetch('/api/arena/eval/clear-matches', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', ...controlHeaders() },
+          body: JSON.stringify({ ...readFilter(), dryRun: true }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (seq !== previewSeq) return;
+        if (!res.ok) {
+          previewEl.textContent = `统计失败：${data.error || res.status}`;
+          previewEl.classList.add('err');
+          return;
+        }
+        previewEl.textContent = `将删除 ${data.removed} / 共 ${data.total} 局（matches.jsonl 已提交的历史可在 git 找回）。`;
+      } catch (err) {
+        if (seq !== previewSeq) return;
+        previewEl.textContent = `统计失败：${window.ErrorText.describe(err)}`;
+        previewEl.classList.add('err');
+      }
+    }
+    modeSel.addEventListener('change', () => { renderMapOptions(); refreshPreview(); });
+    mapSel.addEventListener('change', refreshPreview);
+    partSel.addEventListener('change', refreshPreview);
+    refreshPreview();
+
+    const ok = await window.UIDialog.open({
+      title: '清空旧局并重新累积？',
+      tone: 'danger',
+      confirmText: '确认删除',
+      content: form,
+    });
+    if (!ok) return;
+    const filter = readFilter();
+    evalEl['eval-clear'].disabled = true;
+    try {
+      const res = await fetch('/api/arena/eval/clear-matches', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...controlHeaders() },
+        body: JSON.stringify(filter),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        evalMsg(`清空失败：${data.error || res.status}`, 'err');
+      } else if (data.removed > 0) {
+        evalMsg(`已删除 ${data.removed} / 共 ${data.total} 局（${describeClearScope(filter)}），现在可重新跑批累积计时数据`);
+      } else {
+        evalMsg('没有命中范围可清空的旧对局');
+      }
+      pollEvalStatus();
+    } catch (err) {
+      evalMsg(`清空失败：${window.ErrorText.describe(err)}`, 'err');
+    } finally {
+      evalEl['eval-clear'].disabled = evalStatus?.status === 'running';
     }
   });
 

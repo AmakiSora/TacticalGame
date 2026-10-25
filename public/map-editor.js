@@ -1168,8 +1168,11 @@ import './error-text.js';
     }
     const cpIndex = config.controlPoints.findIndex(point => point.q === pos.q && point.r === pos.r);
     if (cpIndex >= 0) return { type: 'controlPoint', index: cpIndex, object: config.controlPoints[cpIndex] };
-    const unitIndex = config.startingUnits.findIndex(unit => unit.q === pos.q && unit.r === pos.r);
-    if (unitIndex >= 0) return { type: 'startingUnit', index: unitIndex, object: config.startingUnits[unitIndex] };
+    // 出生槽模式下 startingUnits 只是加载时从槽派生的镜像，从未随编辑同步，不能参与命中判定。
+    if (!config.spawnMode) {
+      const unitIndex = config.startingUnits.findIndex(unit => unit.q === pos.q && unit.r === pos.r);
+      if (unitIndex >= 0) return { type: 'startingUnit', index: unitIndex, object: config.startingUnits[unitIndex] };
+    }
     return null;
   }
 

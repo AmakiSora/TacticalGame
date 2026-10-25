@@ -10,7 +10,7 @@ describe('simultaneous skill documentation', () => {
       .filter(map => map.preview.mode === 'simultaneous')
       .map(map => map.id)
       .sort();
-    expect(simultaneousMaps).toEqual(['molten-throne', 'standoff']);
+    expect(simultaneousMaps).toEqual(['mistpine', 'molten-throne', 'standoff']);
 
     for (const path of SIMULTANEOUS_DOCS) {
       const text = await readFile(path, 'utf8');
@@ -37,6 +37,7 @@ describe('simultaneous skill documentation', () => {
     expect(simultaneous).not.toContain('map: `standoff`');
     expect(simultaneous).toContain('Only when `game.mapId === "standoff"`');
     expect(simultaneous).toContain('Only when `game.mapId === "molten-throne"`');
+    expect(simultaneous).toContain('Only when `game.mapId === "mistpine"`');
     expect(review).not.toContain('当前专用地图为');
   });
 });

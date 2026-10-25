@@ -1,0 +1,704 @@
+{
+  "mode": "simultaneous",
+  "name": "雾杉疏林",
+  "description": "同时回合双人纯军队决战地图。半径 9 的疏林原野上，四十株针叶树结成 34 个树群（六组双格簇加单树），最多两格相连，只形成点状障碍（挡路不挡火力）；中心一格水域与南北两组对称的双格水塘（共 5 格）都不构成固定关口，大兵团可以正面平推，也可以分翼穿过林窗。全图没有据点、没有收入、总部不可部署，开局双方各 34 名单位就是全部家底，任何损失都无法补充；所有博弈都来自现有军队的走位、火力形状与同时结算。180° 旋转对称，无先手优势；摧毁对方总部淘汰对手，第 30 回合结束则按总部伤害、残余军力与战损综合裁定。",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 9,
+  "terrainCells": [
+    {
+      "q": -6,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -6,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -6,
+      "r": 8,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 9,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 7,
+      "terrain": "water"
+    },
+    {
+      "q": -4,
+      "r": 9,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 7,
+      "terrain": "water"
+    },
+    {
+      "q": -2,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 8,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 0,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -8,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": -7,
+      "terrain": "water"
+    },
+    {
+      "q": 3,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -9,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -7,
+      "terrain": "water"
+    },
+    {
+      "q": 4,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -9,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": -8,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": -4,
+      "terrain": "blocker"
+    }
+  ],
+  "controlPoints": [],
+  "units": {
+    "infantry": {
+      "hp": 68,
+      "attack": 31,
+      "defense": 7,
+      "moveRange": 2,
+      "attackRange": 2,
+      "cost": 55,
+      "canCapture": true,
+      "attackShape": {
+        "type": "line",
+        "length": 2
+      }
+    },
+    "scout": {
+      "hp": 45,
+      "attack": 16,
+      "defense": 4,
+      "moveRange": 3,
+      "attackRange": 1,
+      "cost": 42,
+      "canCapture": true
+    },
+    "heavy": {
+      "hp": 105,
+      "attack": 40,
+      "defense": 9,
+      "moveRange": 2,
+      "attackRange": 1,
+      "cost": 100,
+      "canCapture": false,
+      "attackShape": {
+        "type": "arc"
+      }
+    },
+    "ranger": {
+      "hp": 51,
+      "attack": 38,
+      "defense": 3,
+      "moveRange": 2,
+      "attackRange": 3,
+      "cost": 80,
+      "canCapture": false,
+      "attackLock": true
+    },
+    "support": {
+      "hp": 57,
+      "attack": 10,
+      "defense": 5,
+      "moveRange": 2,
+      "attackRange": 2,
+      "cost": 68,
+      "canCapture": false,
+      "healPower": 20,
+      "healShape": {
+        "type": "arc"
+      }
+    }
+  },
+  "headquartersSpec": {
+    "hp": 180,
+    "defense": 5
+  },
+  "balance": {
+    "startingSupplies": 0,
+    "baseIncome": 0,
+    "damageVarianceRange": 5,
+    "minimumDamage": 1,
+    "healVarianceRange": 3,
+    "actionsPerTurn": 12,
+    "attacksPerUnit": 1,
+    "maxTurns": 30,
+    "adjudicationWeights": {
+      "enemyHqDamage": 10,
+      "ownHqHp": 3,
+      "controlPoint": 0,
+      "armyValue": 3,
+      "supplies": 0,
+      "killValue": 2
+    },
+    "deployFromHq": false,
+    "controlPointTypes": {
+      "supply": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0,
+        "canDeploy": false
+      },
+      "forward_base": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0,
+        "canDeploy": false
+      },
+      "repair": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 0,
+        "canDeploy": false
+      }
+    }
+  },
+  "spawnSlots": [
+    {
+      "id": "slot_west",
+      "headquarters": {
+        "q": -9,
+        "r": 0
+      },
+      "startingUnits": [
+        {
+          "type": "infantry",
+          "q": -9,
+          "r": 1
+        },
+        {
+          "type": "infantry",
+          "q": -8,
+          "r": 0
+        },
+        {
+          "type": "infantry",
+          "q": -8,
+          "r": -1
+        },
+        {
+          "type": "ranger",
+          "q": -9,
+          "r": 2
+        },
+        {
+          "type": "ranger",
+          "q": -8,
+          "r": 1
+        },
+        {
+          "type": "ranger",
+          "q": -7,
+          "r": 0
+        },
+        {
+          "type": "ranger",
+          "q": -7,
+          "r": -1
+        },
+        {
+          "type": "ranger",
+          "q": -7,
+          "r": -2
+        },
+        {
+          "type": "heavy",
+          "q": -8,
+          "r": 2
+        },
+        {
+          "type": "heavy",
+          "q": -7,
+          "r": 1
+        },
+        {
+          "type": "heavy",
+          "q": -6,
+          "r": 0
+        },
+        {
+          "type": "heavy",
+          "q": -6,
+          "r": -1
+        },
+        {
+          "type": "heavy",
+          "q": -6,
+          "r": -2
+        },
+        {
+          "type": "support",
+          "q": -9,
+          "r": 3
+        },
+        {
+          "type": "support",
+          "q": -9,
+          "r": 4
+        },
+        {
+          "type": "support",
+          "q": -6,
+          "r": -3
+        },
+        {
+          "type": "support",
+          "q": -5,
+          "r": -4
+        },
+        {
+          "type": "scout",
+          "q": -1,
+          "r": -4
+        },
+        {
+          "type": "scout",
+          "q": -5,
+          "r": 4
+        },
+        {
+          "type": "scout",
+          "q": -6,
+          "r": 7
+        },
+        {
+          "type": "scout",
+          "q": 1,
+          "r": -7
+        },
+        {
+          "type": "scout",
+          "q": -4,
+          "r": 0
+        },
+        {
+          "type": "infantry",
+          "q": -8,
+          "r": 3
+        },
+        {
+          "type": "infantry",
+          "q": -7,
+          "r": 2
+        },
+        {
+          "type": "infantry",
+          "q": -5,
+          "r": -2
+        },
+        {
+          "type": "infantry",
+          "q": -5,
+          "r": -3
+        },
+        {
+          "type": "infantry",
+          "q": -5,
+          "r": -1
+        },
+        {
+          "type": "infantry",
+          "q": -6,
+          "r": 1
+        },
+        {
+          "type": "infantry",
+          "q": 1,
+          "r": -8
+        },
+        {
+          "type": "infantry",
+          "q": 0,
+          "r": -7
+        },
+        {
+          "type": "ranger",
+          "q": 0,
+          "r": -8
+        },
+        {
+          "type": "ranger",
+          "q": -8,
+          "r": 8
+        },
+        {
+          "type": "infantry",
+          "q": -7,
+          "r": 7
+        },
+        {
+          "type": "infantry",
+          "q": -7,
+          "r": 8
+        }
+      ]
+    },
+    {
+      "id": "slot_east",
+      "headquarters": {
+        "q": 9,
+        "r": 0
+      },
+      "startingUnits": [
+        {
+          "type": "infantry",
+          "q": 8,
+          "r": 0
+        },
+        {
+          "type": "infantry",
+          "q": 8,
+          "r": 1
+        },
+        {
+          "type": "infantry",
+          "q": 9,
+          "r": -1
+        },
+        {
+          "type": "scout",
+          "q": 4,
+          "r": 0
+        },
+        {
+          "type": "scout",
+          "q": 5,
+          "r": -4
+        },
+        {
+          "type": "scout",
+          "q": 6,
+          "r": -7
+        },
+        {
+          "type": "scout",
+          "q": 1,
+          "r": 4
+        },
+        {
+          "type": "scout",
+          "q": -1,
+          "r": 7
+        },
+        {
+          "type": "ranger",
+          "q": 7,
+          "r": 2
+        },
+        {
+          "type": "ranger",
+          "q": 7,
+          "r": 1
+        },
+        {
+          "type": "ranger",
+          "q": 7,
+          "r": 0
+        },
+        {
+          "type": "ranger",
+          "q": 8,
+          "r": -1
+        },
+        {
+          "type": "ranger",
+          "q": 9,
+          "r": -2
+        },
+        {
+          "type": "support",
+          "q": 6,
+          "r": 3
+        },
+        {
+          "type": "support",
+          "q": 5,
+          "r": 4
+        },
+        {
+          "type": "support",
+          "q": 9,
+          "r": -3
+        },
+        {
+          "type": "support",
+          "q": 9,
+          "r": -4
+        },
+        {
+          "type": "heavy",
+          "q": 6,
+          "r": 2
+        },
+        {
+          "type": "heavy",
+          "q": 6,
+          "r": 1
+        },
+        {
+          "type": "heavy",
+          "q": 6,
+          "r": 0
+        },
+        {
+          "type": "heavy",
+          "q": 7,
+          "r": -1
+        },
+        {
+          "type": "heavy",
+          "q": 8,
+          "r": -2
+        },
+        {
+          "type": "infantry",
+          "q": 5,
+          "r": 2
+        },
+        {
+          "type": "infantry",
+          "q": 5,
+          "r": 3
+        },
+        {
+          "type": "infantry",
+          "q": 8,
+          "r": -3
+        },
+        {
+          "type": "infantry",
+          "q": 7,
+          "r": -2
+        },
+        {
+          "type": "infantry",
+          "q": 6,
+          "r": -1
+        },
+        {
+          "type": "infantry",
+          "q": 5,
+          "r": 1
+        },
+        {
+          "type": "infantry",
+          "q": 0,
+          "r": 7
+        },
+        {
+          "type": "infantry",
+          "q": -1,
+          "r": 8
+        },
+        {
+          "type": "infantry",
+          "q": 7,
+          "r": -7
+        },
+        {
+          "type": "infantry",
+          "q": 7,
+          "r": -8
+        },
+        {
+          "type": "ranger",
+          "q": 0,
+          "r": 8
+        },
+        {
+          "type": "ranger",
+          "q": 8,
+          "r": -8
+        }
+      ]
+    }
+  ],
+  "layouts": {
+    "2": [
+      "slot_west",
+      "slot_east"
+    ]
+  }
+}

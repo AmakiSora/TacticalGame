@@ -130,12 +130,13 @@ describe('spectator and player page optimization', () => {
       expect(source, `${path} 未携带初始单位数据`).toContain('startingUnits: slot.startingUnits');
       expect(source, `${path} 缺初始单位标记`).toContain('preview-marker unit unit-');
       expect(source, `${path} 初始单位未标兵种`).toContain('初始单位');
-      // support 兵种不会作为初始单位产出，渲染时要过滤掉。
-      expect(source, `${path} 缺兵种过滤`).toContain("unit.type !== 'infantry' && unit.type !== 'scout'");
+      // 兵种列表完全跟着 spawnSlots[].startingUnits 走，不做兵种过滤
+      // （雾杉疏林等图支援兵也是初始单位），渲染按 unit.type 动态配色。
+      expect(source, `${path} 初始单位未按兵种动态渲染`).toContain('preview-marker unit unit-${unit.type}');
     }
     for (const path of ['public/play.css', 'public/play-m.css']) {
       const css = read(path);
-      for (const unitType of ['infantry', 'scout', 'heavy', 'ranger']) {
+      for (const unitType of ['infantry', 'scout', 'heavy', 'ranger', 'support']) {
         expect(css, `${path} 缺 unit-${unitType} 配色`).toContain(`.preview-marker.unit-${unitType}`);
       }
     }

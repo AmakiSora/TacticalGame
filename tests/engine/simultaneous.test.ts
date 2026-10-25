@@ -85,6 +85,30 @@ describe('simultaneous mode setup', () => {
     expect(game.units).toHaveLength(18);
   });
 
+  it('starts mistpine with 34 units per side and no way to reinforce', () => {
+    const bus = new EventBus();
+    const game = createLobby('mistpine-setup', 'mistpine', {
+      maxPlayers: 2, participate: true, playerName: 'A',
+    });
+    addLobbyPlayer(game, 'B');
+    expect(startGame(game, bus, () => 0).ok).toBe(true);
+
+    expect(game.controlPoints).toHaveLength(0);
+    expect(game.units).toHaveLength(68);
+    expect(game.resources.player_a!.supplies).toBe(0);
+    expect(game.resources.player_b!.supplies).toBe(0);
+    expect(game.headquarters.player_a!.hp).toBe(180);
+    expect(game.config.balance.actionsPerTurn).toBe(12);
+    expect(game.config.balance.deployFromHq).toBe(false);
+    expect(game.units.filter(unit => unit.owner === 'player_a')).toHaveLength(34);
+    expect(game.units.filter(unit => unit.owner === 'player_b')).toHaveLength(34);
+
+    const hq = game.headquarters.player_a!;
+    expect(queueDeployAction(game, 'player_a', 'infantry', hq.id, hq.q + 1, hq.r))
+      .toMatchObject({ ok: false, code: 'invalid_deploy' });
+    expect(game.plan!.queues.player_a ?? []).toHaveLength(0);
+  });
+
   it('leaves sequential-mode games untouched and rejects plan actions there', () => {
     const bus = new EventBus();
     const game = createLobby('seq-check', 'default', { maxPlayers: 2, participate: true, playerName: 'A' });

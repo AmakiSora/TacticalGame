@@ -514,8 +514,7 @@ function renderMapPreview(preview) {
   const startingUnits = starts
     .flatMap(slot => (slot.startingUnits || []).map(unit => ({ slot, unit })))
     .map(({ slot, unit }) => {
-      // 只画初始兵种（步兵 / 侦察兵 / 重装 / 远程兵），support 等不会作为初始单位出现。
-      if (unit.type !== 'infantry' && unit.type !== 'scout' && unit.type !== 'heavy' && unit.type !== 'ranger') return '';
+      // 兵种列表完全跟着 spawnSlots[].startingUnits 走（雾杉疏林等图支援兵也是初始单位）。
       const p = point(unit);
       const spec = preview.units?.[unit.type];
       const trait = [spec?.canCapture ? '可占点' : '', spec?.attackLock ? '锁定目标' : ''].filter(Boolean).join(' · ');

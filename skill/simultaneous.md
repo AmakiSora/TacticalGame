@@ -1,7 +1,8 @@
 # Simultaneous mode (同时回合)
 
 Use only when `game.config.mode === "simultaneous"`. Current built-in simultaneous maps:
-`standoff` 对峙之地 (2/3/6 players) and `molten-throne` 熔池王座 (2 players); the actual
+`standoff` 对峙之地 (2/3/6 players), `molten-throne` 熔池王座 (2 players) and
+`mistpine` 雾杉疏林 (2 players); the actual
 roster, player count, layout and balance always come from `game.config`.
 If the game is `standard`, `annihilation` or `royale`, stop and read that mode file instead — do not apply this file.
 
@@ -57,7 +58,8 @@ your signal to act is: `phase === "active"` and `plan.committed` does not includ
 - **Queue position = action point**: entry 1 settles at step 1, entry 2 at step 2, and so on.
   Every living player's step-k action settles at the same time; nobody starts step k+1 until
   step k is fully resolved. Each queued action (including `wait`) costs 1 AP; queue length ≤
-  `config.balance.actionsPerTurn` (`standoff`: **5**, `molten-throne`: **4**; always use the live value).
+  `config.balance.actionsPerTurn` (`standoff`: **5**, `molten-throne`: **4**,
+  `mistpine`: **12**; always use the live value).
   In simultaneous mode `turn.currentPlayerId` and `turn.currentOwner` are always `null`; do not use
   `turn.actionsUsed` — use `plan.myQueue.length`.
 - **A unit may act in several steps**: e.g. move at step 1 and attack at step 2, or move → attack →
@@ -199,6 +201,40 @@ Only when `game.mapId === "molten-throne"`; 2-player layout only (no 3/6-player 
   CPs dominate the score, so map control is the primary route to an adjudication win.
 - Win conditions (standard HQ rules): destroy an enemy HQ to eliminate them; last player
   standing wins; at round 20 adjudicate by score. No artillery, no army-wipe elimination.
+
+### `mistpine` (雾杉疏林)
+
+Only when `game.mapId === "mistpine"`; 2-player layout only.
+
+- Radius-9 hexagon (271 cells), 180° rotational symmetry. The map has **no control points at
+  all**. Its 45 impassable cells are 5 water cells (the centre cell plus two mirrored
+  2-cell ponds) and 40 `blocker` trees forming 34 clusters (six 2-cell pairs, 28 singles);
+  no cluster grows beyond two cells, so the forest gives point obstacles (they block movement,
+  not fire) without creating a wall or a fixed choke. The centre water cell keeps the exact middle impassable, and the two HQs
+  sit on the opposite map corners, 18 hexes apart.
+- Deployment: `startingSupplies 0`, `baseIncome 0`, `deployFromHq: false`, no control points and
+  every control-point type has `canDeploy: false` / zero income. There is **no reinforcement
+  and no economy for the whole game** — the 34 starting units are the entire army. Do not queue
+  `/deploy`; it cannot find a legal origin.
+- Spawn: HQ 180 HP / defense 5, with a 34-unit army spread from the home edge into the centre
+  columns: **13 infantry, 5 scouts, 5 heavy, 7 rangers, 4 supports**. Both seats are exact 180°
+  mirrors of each other; four forward units already reach `q >= 0`, so first contact can come
+  early despite the 18-hex HQ gap.
+- Roster (snapshot — re-read `config.units`; all simultaneous combat shapes are enabled):
+  | unit | HP | atk | def | move | range | shape / ability |
+  |---|---:|---:|---:|---:|---:|---|
+  | infantry | 68 | 31 | 7 | 2 | 2 | `line` 2 — 直线轰击前方两格；费用55 |
+  | scout | 45 | 16 | 4 | 3 | 1 | `single` — 单格；费用42 |
+  | heavy | 105 | 40 | 9 | 2 | 1 | `arc` — 横扫周围三格扇形；费用100 |
+  | ranger | 51 | 38 | 3 | 2 | 3 | `single` + **锁定**（未逃出射程必命中）；费用80 |
+  | support | 57 | 10 | 5 | 2 | 2 | `healShape` `arc` — 区域治疗三格，治疗力20；费用68 |
+- Balance: `actionsPerTurn 12`, `attacksPerUnit 1`, `maxTurns 30`, `damageVarianceRange 5`,
+  `healVarianceRange 3`. Adjudication weights: `enemyHqDamage 10`, `ownHqHp 3`,
+  `controlPoint 0`, `armyValue 3`, `supplies 0`, `killValue 2` per killed-unit cost.
+  Because there is no replacement stream, every loss permanently changes the score and the
+  board; preserve high-value units and plan several action points ahead.
+- Win conditions (standard HQ rules): destroy the enemy HQ to eliminate them; last player
+  standing wins; at round 30 adjudicate by HQ damage, surviving army value and kills.
 
 ## Planning checklist
 

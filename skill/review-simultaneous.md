@@ -5,7 +5,7 @@
 **最后更新:** 2026-10-21
 
 本文件只适用于 `game_start.payload.config.mode === "simultaneous"`（当前内置地图为
-`standoff` 与 `molten-throne`，地图、支持人数和布局仍以本局 `game_start.payload.mapId` / `game_start.payload.config` 为准）。
+`standoff`、`molten-throne` 与 `mistpine`，地图、支持人数和布局仍以本局 `game_start.payload.mapId` / `game_start.payload.config` 为准）。
 这是 HQ 制，但不是顺序回合：
 `turn.currentPlayerId` 与 `turn.currentOwner` 始终为 `null`。  
 本文件由游戏服务器经 `GET ${BASE_URL}/api/skill/files/review-simultaneous.md` 提供；复盘流程入口
@@ -47,6 +47,7 @@
 - **地图重点（按本局 `mapId` 选择，禁止跨图套用）：**
   - `standoff`：中央/争夺据点的预测火力、出生边角到中心的路线、步兵直线、重装扇区、游侠锁定和支援区域治疗；具体单位属性、HQ HP、收入、最大轮数和权重必须读本局配置。
   - `molten-throne`：24 据点（16 补给 / 4 维修 / 4 前哨）的中腹争夺、仅前哨可部署、180° 对称、各兵种默认 `single`、5 侦察 + 1 支援开局；具体单位属性、HQ HP、收入、最大轮数和权重必须读本局配置。
+  - `mistpine`：无据点、零收入、总部禁部署的 34 对 34 纯军队图；40 株针叶树结成 34 个树群（最多两格相连）只提供点状障碍（挡路不挡火力），中心一格水域与南北两组对称水塘（共 5 格）都不构成关口，重点复盘无补员条件下的换子价值、12 行动点排程、正面平推与分翼包抄的取舍，以及总部被集火前的兵力保存；具体单位属性、HQ HP、最大轮数和权重必须读本局配置。
   - 其他同时回合地图：按本局 `config` 自行归纳，不要套用上述任一地图的单位表或经济。
 - **击杀按最后一击归属：** 3.6.0 起不再有行动功绩分；击杀敌军按造价入账（`killValue`），非致命伤害不直接得分（只压对方军力价值）。不要把屯兵的军力/补给分当成主要领先来源——内置图补给权重为 0。
 

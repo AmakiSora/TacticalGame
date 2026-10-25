@@ -10,6 +10,7 @@ import './error-text.js';
     random: '随机图', default: '六角前线', breach: '破障行动', 'danger-close': '危险距离',
     'dual-lanes': '双线抉择', 'artillery-zone': '炮火禁区', standoff: '对峙之地',
     'molten-throne': '熔池王座', snowflake: '雪花', 'narrow-road': '狭路相逢',
+    mistpine: '雾杉疏林',
   };
   const STATUS_META = {
     recommended: { label: '当前推荐', cls: 'st-good' },

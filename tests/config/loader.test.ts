@@ -688,6 +688,87 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('loads mistpine as a zero-economy 34-v-34 simultaneous forest battle', () => {
+    resetConfig();
+    loadMaps();
+
+    const map = getMapConfig('mistpine');
+    expect(map.name).toBe('雾杉疏林');
+    expect(map.mode).toBe('simultaneous');
+    expect(map.supportedPlayerCounts).toEqual([2]);
+    expect(map.radius).toBe(9);
+    expect(map.controlPoints).toEqual([]);
+    expect(map.balance.startingSupplies).toBe(0);
+    expect(map.balance.baseIncome).toBe(0);
+    expect(map.balance.deployFromHq).toBe(false);
+    expect(map.balance.comebackSupply).toBeUndefined();
+    expect(map.balance.actionsPerTurn).toBe(12);
+    expect(map.balance.maxTurns).toBe(30);
+    expect(map.balance.adjudicationWeights.controlPoint).toBe(0);
+    for (const spec of Object.values(map.balance.controlPointTypes!)) {
+      expect(spec).toMatchObject({ income: 0, deployDiscount: 0, repairAmount: 0, canDeploy: false });
+    }
+
+    expect(map.headquarters.player_a).toEqual({ q: -9, r: 0 });
+    expect(map.headquarters.player_b).toEqual({ q: 9, r: 0 });
+    expect(hexDistance(map.headquarters.player_a, map.headquarters.player_b)).toBe(18);
+    expect(map.headquartersSpec).toEqual({ hp: 180, defense: 5 });
+
+    const expectedArmy = { infantry: 13, scout: 5, heavy: 5, ranger: 7, support: 4 };
+    expect(map.spawnSlots).toHaveLength(2);
+    for (const slot of map.spawnSlots) {
+      expect(slot.startingUnits).toHaveLength(34);
+      const counts = slot.startingUnits.reduce<Record<string, number>>((acc, unit) => {
+        acc[unit.type] = (acc[unit.type] ?? 0) + 1;
+        return acc;
+      }, {});
+      expect(counts).toEqual(expectedArmy);
+    }
+    // 阵型从己方底线铺到中列：主力压住 q=-9..-5，另有 4 名前哨散进 q>=0 的中列。
+    const west = map.spawnSlots.find(slot => slot.id === 'slot_west')!.startingUnits;
+    expect(Math.min(...west.map(unit => unit.q))).toBe(-9);
+    expect(Math.max(...west.map(unit => unit.q))).toBe(1);
+    expect(west.filter(unit => unit.q >= 0)).toHaveLength(4);
+
+    // 地形、HQ 与整支军队都严格 180° 旋转对称。
+    for (const cell of map.terrainCells) {
+      const mirror = originReflection(cell);
+      const counterpart = map.terrainCells.find(candidate => candidate.q === mirror.q && candidate.r === mirror.r);
+      expect(counterpart, `terrain (${cell.q},${cell.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.terrain).toBe(cell.terrain);
+    }
+    const eastByKey = new Map(
+      map.spawnSlots.find(slot => slot.id === 'slot_east')!.startingUnits.map(unit => [`${unit.q},${unit.r}`, unit]),
+    );
+    for (const unit of west) {
+      const mirror = originReflection(unit);
+      const counterpart = eastByKey.get(`${mirror.q},${mirror.r}`);
+      expect(counterpart, `unit (${unit.q},${unit.r}) should mirror to (${mirror.q},${mirror.r})`).toBeTruthy();
+      expect(counterpart!.type).toBe(unit.type);
+    }
+
+    // 40 株树成 34 簇（6 组双格簇 + 28 株单树），任何一株最多与一株相邻，长不成墙；
+    // 5 格水 = 中心 1 格 + 两个 180° 对称的双格水塘。任何起点都不能落在树/水上。
+    const blockers = map.terrainCells.filter(cell => cell.terrain === 'blocker');
+    expect(blockers).toHaveLength(40);
+    for (const cell of blockers) {
+      const adjacent = blockers.filter(other => hexDistance(cell, other) === 1);
+      expect(adjacent.length, `树 (${cell.q},${cell.r}) 最多与一株相邻`).toBeLessThanOrEqual(1);
+    }
+    const water = map.terrainCells.filter(cell => cell.terrain === 'water');
+    expect(water.map(cell => `${cell.q},${cell.r}`).sort())
+      .toEqual(['-3,7', '-4,7', '0,0', '3,-7', '4,-7']);
+    const impassable = new Set(map.terrainCells.map(cell => `${cell.q},${cell.r}`));
+    for (const unit of map.startingUnits) {
+      expect(impassable.has(`${unit.q},${unit.r}`), `starting unit on terrain at ${unit.q},${unit.r}`).toBe(false);
+    }
+    for (const hq of Object.values(map.headquarters)) {
+      expect(impassable.has(`${hq.q},${hq.r}`), `HQ on terrain at ${hq.q},${hq.r}`).toBe(false);
+    }
+
+    resetConfig();
+  });
+
   it('ships whirlpool with a combat-viable but non-monopolised unit table', () => {
     resetConfig();
     loadMaps();

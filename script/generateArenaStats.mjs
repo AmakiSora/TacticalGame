@@ -119,9 +119,14 @@ export function loadMatchDetails(statsFile, registry, mapModes = new Map()) {
     }
     const seat = side => {
       const d = record?.derived?.[side] ?? null;
+      const sec = record?.decisionSec?.[side];
+      const count = record?.decisionCount?.[side];
       return {
         score: Number.isFinite(record?.scores?.[side]) ? record.scores[side] : null,
         actions: Number.isFinite(record?.actions?.[side]) ? record.actions[side] : null,
+        // 决策耗时 2026-10-25 起随 evaluate_cross 写入；旧记录为 null，聚合时跳过。
+        decisionSec: Number.isFinite(sec) ? sec : null,
+        decisionCount: Number.isFinite(count) ? count : null,
         derived: d && typeof d === 'object' ? d : null,
       };
     };
@@ -217,6 +222,7 @@ export function aggregateGameplay(matches) {
         damageDealt: 0, damageTaken: 0, kills: 0, lossesByType: 0,
         captures: 0, steals: 0, income: 0,
         firstCaptureSum: 0, firstCaptureCount: 0,
+        decisionSum: 0, decisionCount: 0,
         deploysByType: {},
       };
       perModel.set(id, m);
@@ -261,6 +267,11 @@ export function aggregateGameplay(matches) {
       else if (lost) m.losses += 1;
       else m.draws += 1;
       if (seat.score != null) { m.scoreSum += seat.score; m.scoreCount += 1; }
+      // 决策计时独立于 derived，先于 derived 缺失短路聚合。
+      if (seat.decisionSec != null && seat.decisionCount != null && seat.decisionCount > 0) {
+        m.decisionSum += seat.decisionSec;
+        m.decisionCount += seat.decisionCount;
+      }
       const d = seat.derived;
       if (!d) continue;
       seatCount += 1;
@@ -321,6 +332,7 @@ export function aggregateGameplay(matches) {
     avgSteals: m.games > 0 ? round2(m.steals / m.games) : null,
     avgIncome: m.games > 0 ? Math.round(m.income / m.games) : null,
     avgFirstCaptureRound: m.firstCaptureCount > 0 ? round2(m.firstCaptureSum / m.firstCaptureCount) : null,
+    avgDecisionMs: m.decisionCount > 0 ? round2(m.decisionSum / m.decisionCount * 1000) : null,
     topDeploys: Object.entries(m.deploysByType).sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([type, count]) => ({ type, count })),
   })).sort((a, b) => b.games - a.games || a.id.localeCompare(b.id));

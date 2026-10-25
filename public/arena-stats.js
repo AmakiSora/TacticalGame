@@ -198,9 +198,10 @@ import './error-text.js';
         <td class="num" data-label="场均偷点">${m.avgSteals ?? '—'}</td>
         <td class="num" data-label="场均收入">${fmtNum(m.avgIncome)}</td>
         <td class="num" data-label="首占回合">${m.avgFirstCaptureRound ?? '—'}</td>
+        <td class="num" data-label="平均决策耗时">${m.avgDecisionMs != null ? `${m.avgDecisionMs}ms` : '—'}</td>
         <td data-label="主力兵种" class="muted">${escapeHtml(topDeploys || '—')}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="13" class="muted">无数据</td></tr>';
+    }).join('') || '<tr><td colspan="14" class="muted">无数据</td></tr>';
     el['rls-model-table'].querySelectorAll('th[data-sort]').forEach(th => {
       th.classList.toggle('sorted', th.dataset.sort === modelSort.key);
     });

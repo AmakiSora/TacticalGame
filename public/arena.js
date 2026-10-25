@@ -189,7 +189,7 @@ import './error-text.js';
     const sorted = sortRows(rows, sort);
     const body = el.modelTable.querySelector('tbody');
     if (!currentLeague()?.overview?.games) {
-      body.innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（可在评估控制台选择该模式启动跑批）</td></tr>';
+      body.innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（可在评估控制台选择该模式启动跑批）</td></tr>';
       return;
     }
     body.innerHTML = sorted
@@ -207,6 +207,7 @@ import './error-text.js';
           <td class="num" data-label="先手胜率">${pct(r.firstSeatRate)}<span class="rating-ci">(${r.firstSeat?.games ?? 0})</span></td>
           <td class="num" data-label="后手胜率">${pct(r.secondSeatRate)}<span class="rating-ci">(${r.secondSeat?.games ?? 0})</span></td>
           <td class="num" data-label="平均回合">${r.avgRounds ?? '—'}</td>
+          <td class="num" data-label="平均决策耗时">${r.avgDecisionMs != null ? `${r.avgDecisionMs}ms` : '—'}</td>
         </tr>`;
       })
       .join('');

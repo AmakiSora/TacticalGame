@@ -74,6 +74,7 @@ function makeStatsFile(dir: string) {
       endReason: 'last_player_standing',
       scores: { player_a: 100, player_b: 50 }, actions: { player_a: 30, player_b: 20 },
       derived: { player_a: derivedFull, player_b: derivedLight }, durationSec: 2,
+      decisionSec: { player_a: 0.6, player_b: 0.2 }, decisionCount: { player_a: 30, player_b: 20 },
     }) +
     line({
       ts: '2026-09-01 11:00:00', map: 'default',
@@ -112,6 +113,11 @@ describe('loadMatchDetails 过滤与字段保留', () => {
     expect(g.seatA.score).toBe(100);
     expect(g.seatA.derived.deploysByType).toEqual({ infantry: 2 });
     expect(g.seatB.derived.killsByType).toEqual({ infantry: 1 });
+    expect(g.seatA.decisionSec).toBe(0.6);
+    expect(g.seatA.decisionCount).toBe(30);
+    // 旧记录没有决策计时字段 → null，聚合时跳过。
+    expect(matches[1].seatA.decisionSec).toBeNull();
+    expect(matches[1].seatA.decisionCount).toBeNull();
   });
 });
 
@@ -161,10 +167,11 @@ describe('aggregateGameplay 聚合', () => {
       avgKills: 0.5, // (1+0)/2
       avgCaptures: 1, // (2+0)/2
       avgFirstCaptureRound: 3, // 第二局 firstCaptureRound 为 null 不计
+      avgDecisionMs: 20, // 仅第 1 局带计时：0.6s / 30 次
     });
     expect(mA.topDeploys[0]).toEqual({ type: 'infantry', count: 2 });
     const mB = gp.perModel.find((m: { id: string }) => m.id === B);
-    expect(mB).toMatchObject({ games: 2, wins: 0, losses: 1, draws: 1, avgScore: 55 });
+    expect(mB).toMatchObject({ games: 2, wins: 0, losses: 1, draws: 1, avgScore: 55, avgDecisionMs: 10 });
 
     expect(gp.perMap).toHaveLength(1);
     expect(gp.perMap[0]).toMatchObject({
@@ -180,6 +187,28 @@ describe('aggregateGameplay 聚合', () => {
     expect(gp.economy.seatCount).toBe(0);
     expect(gp.units).toEqual([]);
     expect(gp.perModel).toEqual([]);
+  });
+
+  it('avgDecisionMs 按 decisionCount 加权：count=0 / 缺 sec / 旧记录的座位都跳过', () => {
+    const dir = makeModelsDir([A, B]);
+    const file = join(dir, 'matches.jsonl');
+    const line = (obj: unknown) => JSON.stringify(obj) + '\n';
+    writeFileSync(file,
+      // A 计时 0.6s/30 次 → 20ms；B 有 sec 但 count=0，整座跳过。
+      line({ map: 'default', players: { player_a: A, player_b: B }, winner: A,
+        decisionSec: { player_a: 0.6, player_b: 0.4 }, decisionCount: { player_a: 30, player_b: 0 } }) +
+      // B 计时 0.5s/10 次 → 50ms；A 有 count 但缺 sec，整座跳过。
+      line({ map: 'default', players: { player_a: B, player_b: A }, winner: 'draw',
+        decisionSec: { player_a: 0.5 }, decisionCount: { player_a: 10, player_b: 5 } }) +
+      // 旧记录：无任何决策字段。
+      line({ map: 'default', players: { player_a: A, player_b: B }, winner: B }));
+    const { registry } = collectRegistry(dir, []);
+    const { matches } = loadMatchDetails(file, registry);
+    const gp = aggregateGameplay(matches);
+    const mA = gp.perModel.find((m: { id: string }) => m.id === A);
+    const mB = gp.perModel.find((m: { id: string }) => m.id === B);
+    expect(mA.avgDecisionMs).toBe(20);
+    expect(mB.avgDecisionMs).toBe(50);
   });
 });
 

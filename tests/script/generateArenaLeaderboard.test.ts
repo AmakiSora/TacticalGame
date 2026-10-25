@@ -161,6 +161,49 @@ describe('collectRegistry 内置算法混池注册', () => {
   });
 });
 
+describe('决策耗时字段（matches.jsonl decisionSec/decisionCount）', () => {
+  it('loadMatches 保留 per-seat 决策计时，旧记录缺字段记 null', () => {
+    const dir = makeModelsDir([VALID]);
+    const stats = join(dir, 'matches.jsonl');
+    writeFileSync(stats,
+      JSON.stringify({ map: 'default', players: { player_a: VALID, player_b: 'algo_threat@v1' }, winner: VALID,
+        decisionSec: { player_a: 0.9, player_b: 0.1 }, decisionCount: { player_a: 30, player_b: 10 } }) + '\n' +
+      JSON.stringify({ map: 'default', players: { player_a: 'algo_threat@v1', player_b: VALID }, winner: 'algo_threat@v1' }) + '\n');
+    const { registry } = collectRegistry(dir);
+    const { matches, warnings } = loadMatches(stats, registry);
+    expect(warnings).toHaveLength(0);
+    expect(matches[0].decisionSec).toEqual({ player_a: 0.9, player_b: 0.1 });
+    expect(matches[0].decisionCount).toEqual({ player_a: 30, player_b: 10 });
+    expect(matches[1].decisionSec).toEqual({ player_a: null, player_b: null });
+    expect(matches[1].decisionCount).toEqual({ player_a: null, player_b: null });
+  });
+
+  it('主脚本按座位聚合 avgDecisionMs，不带计时的对局不稀释均值', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-decision-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    writeFileSync(statsFile,
+      JSON.stringify({ map: 'default', players: { player_a: VALID, player_b: 'algo_threat@v1' }, winner: VALID,
+        decisionSec: { player_a: 0.9, player_b: 0.1 }, decisionCount: { player_a: 30, player_b: 10 } }) + '\n' +
+      JSON.stringify({ map: 'default', players: { player_a: 'algo_threat@v1', player_b: VALID }, winner: 'algo_threat@v1' }) + '\n');
+
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    const rows = payload.modes.find((m: { id: string }) => m.id === 'standard').maps.all.models;
+    expect(rows.find((m: { id: string }) => m.id === VALID).avgDecisionMs).toBe(30); // 0.9s / 30 次
+    expect(rows.find((m: { id: string }) => m.id === 'algo_threat@v1').avgDecisionMs).toBe(10); // 0.1s / 10 次
+  });
+});
+
 describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
   const line = (a: string, b: string, winner: string) =>
     JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';

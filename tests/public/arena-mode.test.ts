@@ -45,6 +45,17 @@ describe('AI 竞技场按玩法模式分榜', () => {
     expect(statsSource).toContain('renderModeBar()');
   });
 
+  it('评分榜与玩法画像都带「平均决策耗时」列，数据行携带 avgDecisionMs 字段', () => {
+    expect(html).toContain('data-sort="avgDecisionMs"');
+    expect(source).toContain('data-label="平均决策耗时"');
+    expect(statsSource).toContain('data-label="平均决策耗时"');
+    for (const mode of data.modes) {
+      for (const m of mode.maps.all.models) {
+        expect(m).toHaveProperty('avgDecisionMs');
+      }
+    }
+  });
+
   it('评估控制台按模式切换地图与算法，并标出暂不支持跑批的模式', () => {
     expect(html).toContain('id="eval-modes"');
     expect(html).toContain('id="eval-mode-hint"');

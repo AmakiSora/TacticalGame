@@ -649,7 +649,8 @@ def _is_plan_mode(state: dict[str, Any]) -> bool:
 def _build_detail(args, seat_map: dict[str, SideController], state: dict[str, Any],
                   action_log: list[dict[str, Any]], timeline_by_round: dict[int, dict[str, Any]],
                   collector: EventCollector, started_at: float, game_index: int,
-                  map_seed: str | None, rounds_timeout: bool) -> dict[str, Any]:
+                  map_seed: str | None, rounds_timeout: bool,
+                  decision_time: dict[str, float], decision_count: dict[str, int]) -> dict[str, Any]:
     duration = time.perf_counter() - started_at
     if state.get("phase") == "game_over":
         result = state.get("result") or {}
@@ -697,6 +698,11 @@ def _build_detail(args, seat_map: dict[str, SideController], state: dict[str, An
             "rounds": int(state.get("turn", {}).get("roundNumber", 1)),
             "actions": {seat: sum(1 for entry in action_log if entry["seat"] == seat)
                         for seat in _SEATS},
+            # 决策计时不含引擎 apply，按座位累计每次 act 的墙钟；
+            # decisionCount 是 act 调用数（含被拒重选），与 actions 的日志条数在
+            # 逐人模式拒绝路径上可能差 1（失败标记追加一条日志），均值分母用它。
+            "decisionTimeSec": {seat: round(decision_time.get(seat, 0.0), 3) for seat in _SEATS},
+            "decisionCount": {seat: int(decision_count.get(seat, 0)) for seat in _SEATS},
         },
         "final": _final_summary(state),
         "derived": _derive_event_stats(collector),
@@ -710,7 +716,9 @@ def _build_detail(args, seat_map: dict[str, SideController], state: dict[str, An
 def _play_sequential(worker: EngineWorker, seat_map: dict[str, SideController], args,
                      state: dict[str, Any], collector: EventCollector,
                      action_log: list[dict[str, Any]],
-                     timeline_by_round: dict[int, dict[str, Any]]) -> tuple[dict[str, Any], int, bool]:
+                     timeline_by_round: dict[int, dict[str, Any]],
+                     decision_time: dict[str, float],
+                     decision_count: dict[str, int]) -> tuple[dict[str, Any], int, bool]:
     """逐人轮流模式：按 currentPlayerId 逐动作执行，null 即 end_turn。"""
     acted = 0
     rounds_timeout = False
@@ -727,7 +735,10 @@ def _play_sequential(worker: EngineWorker, seat_map: dict[str, SideController], 
         controller = seat_map.get(side)
         if controller is None:
             raise RuntimeError(f"unknown current player: {side!r}")
+        act_started = time.perf_counter()
         action_type, payload, info = controller.act_with_info(state, args.stochastic)
+        decision_time[side] += time.perf_counter() - act_started
+        decision_count[side] += 1
         if args.verbose:
             print(f"  r{round_number} {controller.short}: {action_type} {payload}")
         action_log.append({
@@ -756,7 +767,9 @@ def _play_sequential(worker: EngineWorker, seat_map: dict[str, SideController], 
 def _play_simultaneous(worker: EngineWorker, seat_map: dict[str, SideController], args,
                        state: dict[str, Any], collector: EventCollector,
                        action_log: list[dict[str, Any]],
-                       timeline_by_round: dict[int, dict[str, Any]]) -> tuple[dict[str, Any], int, bool]:
+                       timeline_by_round: dict[int, dict[str, Any]],
+                       decision_time: dict[str, float],
+                       decision_count: dict[str, int]) -> tuple[dict[str, Any], int, bool]:
     """同时回合模式：每轮各座位把动作逐个入队，null 即提交；全员提交后引擎统一结算。
 
     与线上 runner 的语义一致：
@@ -797,7 +810,10 @@ def _play_simultaneous(worker: EngineWorker, seat_map: dict[str, SideController]
             rejected = 0
             committed_ok = False
             while queued <= budget and rejected < 20:
+                act_started = time.perf_counter()
                 action_type, payload, info = controller.act_with_info(state, args.stochastic)
+                decision_time[side] += time.perf_counter() - act_started
+                decision_count[side] += 1
                 entry = {"seat": side, "round": round_number,
                          "action": {"type": action_type, **payload}, **info}
                 action_log.append(entry)
@@ -874,6 +890,8 @@ def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], arg
 
     timeline_by_round: dict[int, dict[str, Any]] = {}
     action_log: list[dict[str, Any]] = []
+    decision_time: dict[str, float] = {seat: 0.0 for seat in _SEATS}
+    decision_count: dict[str, int] = {seat: 0 for seat in _SEATS}
     if _is_plan_mode(state):
         if any(getattr(controller, "kind", "model") == "model" for controller in seat_map.values()):
             raise RuntimeError(
@@ -881,13 +899,16 @@ def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], arg
                 "RL models currently support standard mode only"
             )
         state, acted, rounds_timeout = _play_simultaneous(
-            worker, seat_map, args, state, collector, action_log, timeline_by_round)
+            worker, seat_map, args, state, collector, action_log, timeline_by_round,
+            decision_time, decision_count)
     else:
         state, acted, rounds_timeout = _play_sequential(
-            worker, seat_map, args, state, collector, action_log, timeline_by_round)
+            worker, seat_map, args, state, collector, action_log, timeline_by_round,
+            decision_time, decision_count)
     timeline_by_round[int((state.get("turn") or {}).get("roundNumber", 1))] = _state_snapshot(state)
     detail = _build_detail(args, seat_map, state, action_log, timeline_by_round,
-                           collector, started_at, game_index, map_seed, rounds_timeout)
+                           collector, started_at, game_index, map_seed, rounds_timeout,
+                           decision_time, decision_count)
     return state.get("winner"), acted, detail["summary"]["rounds"], detail
 
 
@@ -971,6 +992,8 @@ def main():
                 # 明细文件本身 gitignored，仅本地留存（2026-09-08）。
                 "derived": detail["derived"],
                 "durationSec": detail["meta"]["durationSec"],
+                "decisionSec": detail["summary"]["decisionTimeSec"],
+                "decisionCount": detail["summary"]["decisionCount"],
                 "seed": detail["meta"]["mapSeed"],
                 "detailFile": detail_path,
             })

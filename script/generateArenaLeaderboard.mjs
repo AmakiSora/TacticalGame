@@ -247,6 +247,15 @@ function registryAlgorithms(registry, algorithms) {
   }
 }
 
+/** matches.jsonl 行的 per-seat 数值字段（decisionSec/decisionCount 等）→ 数值表；缺失记 null。 */
+function numericSeatMap(value) {
+  return ['player_a', 'player_b'].reduce((o, seat) => {
+    const v = value?.[seat];
+    o[seat] = Number.isFinite(v) ? v : null;
+    return o;
+  }, {});
+}
+
 /**
  * 读 JSONL，丢弃玩家名不在注册表/格式非法的行；作废模型（已归档）的对局不计分，
  * 按 retiredDropped 计数。mapModes 为 mapId → 玩法模式；未知地图按 standard 归类。
@@ -299,12 +308,15 @@ export function loadMatches(statsFile, registry, mapModes = new Map()) {
     matches.push({
       ts: record.ts ?? null,
       map,
-      // 历史 JSONL 没有 mode 字段；以地图配置为准，未知地图按标准模式兼容。
+      // 历史 JSONL 没有 mode 字段；以地图配置为准，未知地图按 standard 兼容。
       mode: mapModes.get(map) ?? 'standard',
       playerA: a,
       playerB: b,
       winner: record.winner === 'draw' || registry.has(record.winner) ? record.winner : null,
       rounds: Number.isFinite(record.rounds) ? record.rounds : null,
+      // 决策耗时 2026-10-25 起随 evaluate_cross 写入；旧记录为 null，聚合时跳过。
+      decisionSec: numericSeatMap(record.decisionSec),
+      decisionCount: numericSeatMap(record.decisionCount),
     });
   }
   return { matches, warnings, retiredDropped };
@@ -397,6 +409,7 @@ export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory)
     games: 0, wins: 0, losses: 0, draws: 0,
     firstSeat: { games: 0, wins: 0 }, secondSeat: { games: 0, wins: 0 },
     roundsSum: 0, roundsCount: 0,
+    decisionSum: 0, decisionCount: 0,
     vs: new Map(), perMap: new Map(),
   }]));
 
@@ -421,6 +434,15 @@ export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory)
       if (!pm) { pm = EMPTY_TALLY(); model.perMap.set(g.map, pm); }
       pm.games += 1;
       if (g.rounds != null) { model.roundsSum += g.rounds; model.roundsCount += 1; }
+    }
+    for (const [model, sec, count] of [
+      [mA, g.decisionSec?.player_a, g.decisionCount?.player_a],
+      [mB, g.decisionSec?.player_b, g.decisionCount?.player_b],
+    ]) {
+      if (sec != null && count != null && count > 0) {
+        model.decisionSum += sec;
+        model.decisionCount += count;
+      }
     }
     mA.firstSeat.games += 1;
     mB.secondSeat.games += 1;
@@ -506,6 +528,7 @@ export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory)
         winRate: s.secondSeat.games > 0 ? round4(s.secondSeat.wins / s.secondSeat.games) : null,
       },
       avgRounds: s.roundsCount > 0 ? round2(s.roundsSum / s.roundsCount) : null,
+      avgDecisionMs: s.decisionCount > 0 ? round2(s.decisionSum / s.decisionCount * 1000) : null,
       vs: Object.fromEntries([...s.vs.entries()].map(([opp, v]) => [opp, {
         games: v.games, wins: v.wins, draws: v.draws,
         winRate: v.games > 0 ? round4((v.wins + v.draws * 0.5) / v.games) : null,

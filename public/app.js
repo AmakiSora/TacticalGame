@@ -1433,7 +1433,11 @@ function updateControls() {
   timeline.min = 0;
   timeline.max = Math.max(0, total - 1);
   timeline.value = Math.max(0, currentStep);
-  btnPlay.textContent = playing ? '⏸' : '▶';
+  const playIcon = btnPlay.querySelector('.ui-icon');
+  playIcon?.classList.toggle('icon-play', !playing);
+  playIcon?.classList.toggle('icon-pause', playing);
+  btnPlay.title = playing ? '暂停 (Space)' : '播放 (Space)';
+  btnPlay.setAttribute('aria-label', playing ? '暂停' : '播放');
   btnPlay.classList.toggle('active', playing);
   const turnStarts = turnStartSteps();
   btnPrevTurn.disabled = !turnStarts.some(step => step < currentStep);

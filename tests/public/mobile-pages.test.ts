@@ -60,10 +60,12 @@ describe('mobile website pages', () => {
     expect(read('public/play-m.css')).toContain('body.player-m-shell .bar-btn:disabled');
   });
 
-  it('uses consistent Lucide assets instead of font glyphs for mobile icon buttons', () => {
+  it('uses consistent Lucide assets instead of font glyphs for icon buttons', () => {
     const play = read('public/play-m.html');
     const spectator = read('public/spectator-m.html');
     const spectatorJs = read('public/spectator-m.js');
+    const desktopSpectator = read('public/spectator.html');
+    const desktopJs = read('public/app.js');
     const icons = read('public/mobile-icons.css');
 
     for (const icon of ['settings', 'plus', 'minus', 'reset', 'close']) {
@@ -73,9 +75,15 @@ describe('mobile website pages', () => {
     for (const icon of ['skip-back', 'chevron-left', 'play', 'chevron-right', 'skip-forward']) {
       expect(spectator).toContain(`icon-${icon}`);
     }
+    for (const icon of ['skip-back', 'chevrons-left', 'chevron-left', 'play', 'chevron-right', 'chevrons-right', 'skip-forward']) {
+      expect(desktopSpectator).toContain(`icon-${icon}`);
+    }
     expect(spectatorJs).toContain("classList.toggle('icon-pause', playing)");
+    expect(desktopJs).toContain("classList.toggle('icon-pause', playing)");
+    expect(desktopSpectator).toContain('/mobile-icons.css');
     expect(play).not.toContain('&#9881;');
     expect(spectator).not.toMatch(/[⚙↺⏮◀▶⏭×]/);
+    expect(desktopSpectator).not.toMatch(/[⚙↺⏮◀▶⏭×]/);
     expect(icons).toContain("url('/icons/lucide/settings.svg')");
   });
 

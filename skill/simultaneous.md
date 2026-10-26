@@ -107,6 +107,9 @@ your signal to act is: `phase === "active"` and `plan.committed` does not includ
   path; units and headquarters do **not** block it. The destination may be occupied when you queue
   it — settlement decides whether it was vacated in time. You cannot queue a destination beyond
   `moveRange` or one that needs to cross water/blockers (unless your own earlier demolish cleared it).
+  Queued moves never unlock a path or change this search — it ignores units entirely. The queue
+  only determines each unit's projected start position for later steps and same-step arrivals (a
+  cell vacated in that step can be entered).
 - **Demolish changes terrain from the next step on**: a blocker cleared at step k is walkable at step k+1.
 - **Heals are area effects aimed at a cell/direction**: `POST /heal { "supportId": "...", "q": 1, "r": 0 }`
   (NOT `targetId` — that is the sequential-mode body). The coverage shape comes from

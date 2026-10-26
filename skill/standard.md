@@ -31,7 +31,7 @@ Every action on your turn, inspect:
 - `killValue` = total cost of enemy units **you** killed (last hit). Securing kills beats chip damage: non-lethal damage scores nothing directly.
 - CP scoring is mostly **flow**: holding a point every round is worth far more than grabbing it on the last round (`controlPointFlowRatio`, default 0.7).
 - Read `adjudication.scores.<you>` and rival breakdowns; do not recompute.
-- Movement cannot path through living HQs.
+- **Movement path uses the current board**: water/blockers, all units (**friendly and enemy**), and all living HQs block both the path and the destination. There is no plan queue — moves execute immediately, so a unit that moves away can open a cell for a later unit in the same turn.
 - Prefer HQ pressure when board state and non-zero HQ weights reward it.
 
 ## Decision order

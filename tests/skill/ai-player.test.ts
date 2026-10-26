@@ -244,6 +244,28 @@ describe('AI player skill documentation', () => {
     expect(simultaneous).toContain('Once resolution\n   begins, do not try to revoke or clear');
   });
 
+  it('documents mode-specific movement blocking rules', async () => {
+    const [skill, standard, annihilation, simultaneous, royale] = await Promise.all([
+      readFile('skill/SKILL.md', 'utf8'),
+      readFile('skill/standard.md', 'utf8'),
+      readFile('skill/annihilation.md', 'utf8'),
+      readFile('skill/simultaneous.md', 'utf8'),
+      readFile('skill/royale.md', 'utf8'),
+    ]);
+
+    expect(skill).toContain('Occupancy blocking depends on the mode');
+    expect(skill).not.toContain('Pathfinding blocked by water, blockers, units, and HQs');
+    for (const doc of [standard, annihilation]) {
+      expect(doc).toContain('friendly and enemy');
+      expect(doc).toContain('no plan queue');
+    }
+    expect(standard).toContain('all living HQs');
+    expect(annihilation).toContain('There are no HQs at runtime');
+    for (const doc of [simultaneous, royale]) {
+      expect(doc).toContain('Queued moves never unlock a path');
+    }
+  });
+
   it('documents heavy terrain demolition controls and constraints', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 

@@ -216,7 +216,8 @@ Mode-specific deploy origins, elimination, artillery, and scoring live in the mo
 - Axial pointy-top `{ q, r }`. Distance: `max(|dq|, |dr|, |ds|)` with `s = -q-r`.
 - `game.cells` is the playable set. Do not treat `map.radius` as a walkable disk.
 - Move/deploy/demolish targets must exist in `game.cells`.
-- Pathfinding blocked by water, blockers, units, and HQs **when HQs exist**.
+- Terrain blocks movement: water and uncleared `blocker` cells are never part of a movement path.
+- Occupancy blocking depends on the mode. **Standard/annihilation** pathfind on the current board: units (**friendly and enemy**) and living HQs (standard only) all block both the path and the destination; moves execute immediately and there is no plan queue. **Simultaneous/royale** plan-time ranges are terrain-only: units and HQs do **not** block the path (arrival is settled per step — see the mode file).
 - Attack/heal: range only, no LOS.
 - Standard: income is awarded when the turn is gained (base + owned CP income;
   per-kind amounts live in `controlPointTypes`).

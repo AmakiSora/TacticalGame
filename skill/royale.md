@@ -23,7 +23,8 @@ halves: the plan/commit loop governs *how* you act, the artillery ring and army-
   (`destination_conflict`). Within a step departures happen first, so a cell vacated in the same
   step can be entered (swaps/chains allowed); a destination that stays occupied fails
   (`destination_occupied`). Movement range is a terrain-only path search at plan time — units do
-  not block the path, water/blockers do.
+  not block the path, water/blockers do. Queued moves never unlock a path or change this search;
+  the queue only determines projected start positions and same-step arrivals.
 - **Never hardcode artillery phase rounds** (e.g. "rounds 1–5"). Always derive timing from this
   map's config + live `game.artillery`.
 

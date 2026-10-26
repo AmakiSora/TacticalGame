@@ -44,6 +44,10 @@ Every action on your turn, inspect:
 - **Move + attack/heal** — in either order — costs **1 AP total**.
 - `actionsUsed >= actionsPerTurn` blocks only **new activations** (`action_limit_reached`); units already activated keep their free follow-up action.
 
+### Movement
+
+- **Movement path uses the current board**: water/blockers and all units (**friendly and enemy**) block both the path and the destination. There are no HQs at runtime. Moves execute immediately — there is no plan queue, so a friendly unit that moves away can open a cell for a later unit in the same turn.
+
 ### Artillery — read config, then live state
 
 Do **not** memorize a fixed timetable. Each annihilation map carries its own schedule.

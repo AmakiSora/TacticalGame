@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-26T04:57:01.911Z",
+  "generatedAt": "2026-10-26T22:17:00.902Z",
   "ratingMethod": {
     "model": "Bradley-Terry MLE (MM iteration), draw = 0.5 win",
     "scope": "per game mode; modes are never pooled together",
@@ -9,26 +9,27 @@
   },
   "source": {
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
-    "matchCount": 37008,
+    "matchCount": 37993,
     "retiredMatchesDropped": 0,
     "mapDist": {
       "breach": 7200,
       "danger-close": 7200,
       "default": 7200,
       "dual-lanes": 7200,
-      "molten-throne": 504,
+      "mistpine": 649,
+      "molten-throne": 672,
       "random": 7200,
-      "standoff": 504
+      "standoff": 672
     },
     "modeDist": {
       "standard": 36000,
       "annihilation": 0,
-      "simultaneous": 1008,
+      "simultaneous": 1993,
       "royale": 0
     },
     "targetGamesPerPair": 24,
     "dateMin": "2026-10-21 03:57:34",
-    "dateMax": "2026-10-25 22:44:00"
+    "dateMax": "2026-10-27 06:16:02"
   },
   "registry": {
     "hex_ppo_v1.0.0_20260824_120K.zip": {
@@ -481,6 +482,18 @@
       "algorithm": "tempo-weave",
       "version": "v1",
       "description": "同时回合：任务竞价、变长行动排程与总部生存期限约束",
+      "modes": [
+        "simultaneous"
+      ],
+      "status": "builtin",
+      "statusNote": null
+    },
+    "algo_horizon@v1": {
+      "kind": "algorithm",
+      "short": "视界算法",
+      "algorithm": "horizon",
+      "version": "v1",
+      "description": "同时回合：分步结算镜像 + 多轮视界投影胜率评估 + 同构对手场景 + 束搜索 + 对抗探针",
       "modes": [
         "simultaneous"
       ],
@@ -41977,367 +41990,507 @@
     {
       "id": "simultaneous",
       "label": "同时回合",
-      "games": 1008,
+      "games": 1993,
       "maps": {
         "all": {
           "overview": {
-            "games": 1008,
-            "pairCount": 21,
-            "draws": 2,
-            "drawRate": 0.002,
-            "avgRounds": 12.12
+            "games": 1993,
+            "pairCount": 28,
+            "draws": 3,
+            "drawRate": 0.0015,
+            "avgRounds": 17.58
           },
           "models": [
             {
               "id": "algo_dest-prob@v2",
-              "rating": 1387,
-              "ratingLo": 1358,
-              "ratingHi": 1437,
-              "wilson": 0.3478,
-              "games": 288,
-              "wins": 116,
-              "losses": 172,
+              "rating": 1420,
+              "ratingLo": 1384,
+              "ratingHi": 1432,
+              "wilson": 0.3281,
+              "games": 504,
+              "wins": 186,
+              "losses": 318,
               "draws": 0,
-              "winRate": 0.4028,
+              "winRate": 0.369,
               "firstSeat": {
-                "games": 144,
-                "winRate": 0.3125
+                "games": 252,
+                "winRate": 0.3214
               },
               "secondSeat": {
-                "games": 144,
-                "winRate": 0.4931
+                "games": 252,
+                "winRate": 0.4167
               },
-              "avgRounds": 14.06,
-              "avgDecisionMs": 8.71,
+              "avgRounds": 19.16,
+              "avgDecisionMs": 22.42,
               "vs": {
                 "algo_tempo@v1": {
-                  "games": 48,
-                  "wins": 17,
+                  "games": 72,
+                  "wins": 25,
                   "draws": 0,
-                  "winRate": 0.3542
+                  "winRate": 0.3472
                 },
                 "algo_random-sim@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 72,
                   "draws": 0,
                   "winRate": 1
                 },
                 "algo_matrix-eq@v2": {
-                  "games": 48,
-                  "wins": 23,
+                  "games": 72,
+                  "wins": 33,
                   "draws": 0,
-                  "winRate": 0.4792
+                  "winRate": 0.4583
                 },
                 "algo_tempo-weave@v1": {
-                  "games": 48,
-                  "wins": 0,
+                  "games": 72,
+                  "wins": 3,
                   "draws": 0,
-                  "winRate": 0
+                  "winRate": 0.0417
                 },
                 "algo_kriegspiel@v2": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 24,
                   "draws": 0,
-                  "winRate": 0.5
+                  "winRate": 0.3333
                 },
                 "algo_prism@v1": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 4,
                   "draws": 0,
-                  "winRate": 0.0833
+                  "winRate": 0.0556
+                },
+                "algo_horizon@v1": {
+                  "games": 72,
+                  "wins": 25,
+                  "draws": 0,
+                  "winRate": 0.3472
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 67,
+                  "games": 168,
+                  "wins": 68,
                   "draws": 0,
-                  "winRate": 0.4653
+                  "winRate": 0.4048
                 },
                 "molten-throne": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 49,
                   "draws": 0,
-                  "winRate": 0.3403
+                  "winRate": 0.2917
+                },
+                "mistpine": {
+                  "games": 168,
+                  "wins": 69,
+                  "draws": 0,
+                  "winRate": 0.4107
+                }
+              }
+            },
+            {
+              "id": "algo_horizon@v1",
+              "rating": 1614,
+              "ratingLo": 1569,
+              "ratingHi": 1613,
+              "wilson": 0.5617,
+              "games": 481,
+              "wins": 291,
+              "losses": 189,
+              "draws": 1,
+              "winRate": 0.605,
+              "firstSeat": {
+                "games": 241,
+                "winRate": 0.5892
+              },
+              "secondSeat": {
+                "games": 240,
+                "winRate": 0.6208
+              },
+              "avgRounds": 17.24,
+              "avgDecisionMs": 93.18,
+              "vs": {
+                "algo_tempo@v1": {
+                  "games": 72,
+                  "wins": 46,
+                  "draws": 0,
+                  "winRate": 0.6389
+                },
+                "algo_random-sim@v2": {
+                  "games": 72,
+                  "wins": 72,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 72,
+                  "wins": 44,
+                  "draws": 0,
+                  "winRate": 0.6111
+                },
+                "algo_dest-prob@v2": {
+                  "games": 72,
+                  "wins": 47,
+                  "draws": 0,
+                  "winRate": 0.6528
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 72,
+                  "wins": 6,
+                  "draws": 0,
+                  "winRate": 0.0833
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 72,
+                  "wins": 45,
+                  "draws": 0,
+                  "winRate": 0.625
+                },
+                "algo_prism@v1": {
+                  "games": 49,
+                  "wins": 31,
+                  "draws": 1,
+                  "winRate": 0.6429
+                }
+              },
+              "perMap": {
+                "standoff": {
+                  "games": 168,
+                  "wins": 133,
+                  "draws": 0,
+                  "winRate": 0.7917
+                },
+                "molten-throne": {
+                  "games": 168,
+                  "wins": 128,
+                  "draws": 1,
+                  "winRate": 0.7649
+                },
+                "mistpine": {
+                  "games": 145,
+                  "wins": 30,
+                  "draws": 0,
+                  "winRate": 0.2069
                 }
               }
             },
             {
               "id": "algo_kriegspiel@v2",
-              "rating": 1405,
-              "ratingLo": 1378,
-              "ratingHi": 1449,
-              "wilson": 0.3662,
-              "games": 288,
-              "wins": 121,
-              "losses": 166,
+              "rating": 1516,
+              "ratingLo": 1475,
+              "ratingHi": 1523,
+              "wilson": 0.4339,
+              "games": 504,
+              "wins": 240,
+              "losses": 263,
               "draws": 1,
-              "winRate": 0.4201,
+              "winRate": 0.4762,
               "firstSeat": {
-                "games": 144,
-                "winRate": 0.3194
+                "games": 252,
+                "winRate": 0.4286
               },
               "secondSeat": {
-                "games": 144,
-                "winRate": 0.5208
+                "games": 252,
+                "winRate": 0.5238
               },
-              "avgRounds": 13.73,
-              "avgDecisionMs": 102.53,
+              "avgRounds": 18.81,
+              "avgDecisionMs": 332.81,
               "vs": {
                 "algo_tempo-weave@v1": {
-                  "games": 48,
-                  "wins": 0,
+                  "games": 72,
+                  "wins": 10,
                   "draws": 0,
-                  "winRate": 0
+                  "winRate": 0.1389
                 },
                 "algo_tempo@v1": {
-                  "games": 48,
-                  "wins": 25,
+                  "games": 72,
+                  "wins": 41,
                   "draws": 1,
-                  "winRate": 0.5313
+                  "winRate": 0.5764
                 },
                 "algo_dest-prob@v2": {
-                  "games": 48,
-                  "wins": 24,
+                  "games": 72,
+                  "wins": 48,
                   "draws": 0,
-                  "winRate": 0.5
+                  "winRate": 0.6667
                 },
                 "algo_matrix-eq@v2": {
-                  "games": 48,
-                  "wins": 22,
+                  "games": 72,
+                  "wins": 40,
                   "draws": 0,
-                  "winRate": 0.4583
+                  "winRate": 0.5556
                 },
                 "algo_random-sim@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 72,
                   "draws": 0,
                   "winRate": 1
                 },
                 "algo_prism@v1": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 2,
                   "draws": 0,
-                  "winRate": 0.0417
+                  "winRate": 0.0278
+                },
+                "algo_horizon@v1": {
+                  "games": 72,
+                  "wins": 27,
+                  "draws": 0,
+                  "winRate": 0.375
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 73,
+                  "games": 168,
+                  "wins": 76,
                   "draws": 0,
-                  "winRate": 0.5069
+                  "winRate": 0.4524
                 },
                 "molten-throne": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 48,
                   "draws": 1,
-                  "winRate": 0.3368
+                  "winRate": 0.2887
+                },
+                "mistpine": {
+                  "games": 168,
+                  "wins": 116,
+                  "draws": 0,
+                  "winRate": 0.6905
                 }
               }
             },
             {
               "id": "algo_matrix-eq@v2",
-              "rating": 1410,
-              "ratingLo": 1381,
-              "ratingHi": 1454,
-              "wilson": 0.3713,
-              "games": 288,
-              "wins": 123,
-              "losses": 165,
+              "rating": 1472,
+              "ratingLo": 1432,
+              "ratingHi": 1482,
+              "wilson": 0.3841,
+              "games": 504,
+              "wins": 215,
+              "losses": 289,
               "draws": 0,
-              "winRate": 0.4271,
+              "winRate": 0.4266,
               "firstSeat": {
-                "games": 144,
-                "winRate": 0.4097
+                "games": 252,
+                "winRate": 0.4246
               },
               "secondSeat": {
-                "games": 144,
-                "winRate": 0.4444
+                "games": 252,
+                "winRate": 0.4286
               },
-              "avgRounds": 13.06,
-              "avgDecisionMs": 6.76,
+              "avgRounds": 18.32,
+              "avgDecisionMs": 10.06,
               "vs": {
                 "algo_dest-prob@v2": {
-                  "games": 48,
-                  "wins": 25,
-                  "draws": 0,
-                  "winRate": 0.5208
-                },
-                "algo_kriegspiel@v2": {
-                  "games": 48,
-                  "wins": 26,
+                  "games": 72,
+                  "wins": 39,
                   "draws": 0,
                   "winRate": 0.5417
                 },
+                "algo_kriegspiel@v2": {
+                  "games": 72,
+                  "wins": 32,
+                  "draws": 0,
+                  "winRate": 0.4444
+                },
                 "algo_random-sim@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 72,
                   "draws": 0,
                   "winRate": 1
                 },
                 "algo_tempo@v1": {
-                  "games": 48,
-                  "wins": 21,
+                  "games": 72,
+                  "wins": 38,
                   "draws": 0,
-                  "winRate": 0.4375
+                  "winRate": 0.5278
                 },
                 "algo_tempo-weave@v1": {
-                  "games": 48,
-                  "wins": 0,
+                  "games": 72,
+                  "wins": 2,
                   "draws": 0,
-                  "winRate": 0
+                  "winRate": 0.0278
                 },
                 "algo_prism@v1": {
-                  "games": 48,
-                  "wins": 3,
+                  "games": 72,
+                  "wins": 4,
                   "draws": 0,
-                  "winRate": 0.0625
+                  "winRate": 0.0556
+                },
+                "algo_horizon@v1": {
+                  "games": 72,
+                  "wins": 28,
+                  "draws": 0,
+                  "winRate": 0.3889
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 45,
                   "draws": 0,
-                  "winRate": 0.3125
+                  "winRate": 0.2679
                 },
                 "molten-throne": {
-                  "games": 144,
-                  "wins": 78,
+                  "games": 168,
+                  "wins": 82,
                   "draws": 0,
-                  "winRate": 0.5417
+                  "winRate": 0.4881
+                },
+                "mistpine": {
+                  "games": 168,
+                  "wins": 88,
+                  "draws": 0,
+                  "winRate": 0.5238
                 }
               }
             },
             {
               "id": "algo_prism@v1",
-              "rating": 1860,
-              "ratingLo": 1787,
-              "ratingHi": 1872,
-              "wilson": 0.7541,
-              "games": 288,
-              "wins": 231,
-              "losses": 56,
-              "draws": 1,
-              "winRate": 0.8021,
+              "rating": 1789,
+              "ratingLo": 1732,
+              "ratingHi": 1777,
+              "wilson": 0.7317,
+              "games": 481,
+              "wins": 370,
+              "losses": 109,
+              "draws": 2,
+              "winRate": 0.7692,
               "firstSeat": {
-                "games": 144,
-                "winRate": 0.8056
+                "games": 240,
+                "winRate": 0.775
               },
               "secondSeat": {
-                "games": 144,
-                "winRate": 0.7986
+                "games": 241,
+                "winRate": 0.7635
               },
-              "avgRounds": 10.6,
-              "avgDecisionMs": 221.14,
+              "avgRounds": 16.48,
+              "avgDecisionMs": 1181.36,
               "vs": {
                 "algo_matrix-eq@v2": {
-                  "games": 48,
-                  "wins": 45,
+                  "games": 72,
+                  "wins": 68,
                   "draws": 0,
-                  "winRate": 0.9375
+                  "winRate": 0.9444
                 },
                 "algo_dest-prob@v2": {
-                  "games": 48,
-                  "wins": 44,
+                  "games": 72,
+                  "wins": 68,
                   "draws": 0,
-                  "winRate": 0.9167
+                  "winRate": 0.9444
                 },
                 "algo_random-sim@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 72,
                   "draws": 0,
                   "winRate": 1
                 },
                 "algo_tempo@v1": {
-                  "games": 48,
-                  "wins": 47,
+                  "games": 72,
+                  "wins": 71,
                   "draws": 1,
-                  "winRate": 0.9896
+                  "winRate": 0.9931
                 },
                 "algo_tempo-weave@v1": {
-                  "games": 48,
-                  "wins": 1,
+                  "games": 72,
+                  "wins": 4,
                   "draws": 0,
-                  "winRate": 0.0208
+                  "winRate": 0.0556
                 },
                 "algo_kriegspiel@v2": {
-                  "games": 48,
-                  "wins": 46,
+                  "games": 72,
+                  "wins": 70,
                   "draws": 0,
-                  "winRate": 0.9583
+                  "winRate": 0.9722
+                },
+                "algo_horizon@v1": {
+                  "games": 49,
+                  "wins": 17,
+                  "draws": 1,
+                  "winRate": 0.3571
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 120,
+                  "games": 168,
+                  "wins": 132,
                   "draws": 0,
-                  "winRate": 0.8333
+                  "winRate": 0.7857
                 },
                 "molten-throne": {
-                  "games": 144,
-                  "wins": 111,
-                  "draws": 1,
-                  "winRate": 0.7743
+                  "games": 168,
+                  "wins": 115,
+                  "draws": 2,
+                  "winRate": 0.6905
+                },
+                "mistpine": {
+                  "games": 145,
+                  "wins": 123,
+                  "draws": 0,
+                  "winRate": 0.8483
                 }
               }
             },
             {
               "id": "algo_random-sim@v2",
-              "rating": 681,
-              "ratingLo": 794,
-              "ratingHi": 819,
+              "rating": 673,
+              "ratingLo": 838,
+              "ratingHi": 854,
               "wilson": 0,
-              "games": 288,
+              "games": 504,
               "wins": 0,
-              "losses": 288,
+              "losses": 504,
               "draws": 0,
               "winRate": 0,
               "firstSeat": {
-                "games": 144,
+                "games": 252,
                 "winRate": 0
               },
               "secondSeat": {
-                "games": 144,
+                "games": 252,
                 "winRate": 0
               },
-              "avgRounds": 13.23,
-              "avgDecisionMs": 1.48,
+              "avgRounds": 18.11,
+              "avgDecisionMs": 2.57,
               "vs": {
                 "algo_dest-prob@v2": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "algo_matrix-eq@v2": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "algo_kriegspiel@v2": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "algo_tempo@v1": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "algo_tempo-weave@v1": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "algo_prism@v1": {
-                  "games": 48,
+                  "games": 72,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 72,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -42345,13 +42498,19 @@
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "molten-throne": {
-                  "games": 144,
+                  "games": 168,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "mistpine": {
+                  "games": 168,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -42360,149 +42519,173 @@
             },
             {
               "id": "algo_tempo-weave@v1",
-              "rating": 2326,
-              "ratingLo": 2156,
-              "ratingHi": 2234,
-              "wilson": 0.9806,
-              "games": 288,
-              "wins": 287,
-              "losses": 1,
+              "rating": 2053,
+              "ratingLo": 1952,
+              "ratingHi": 2039,
+              "wilson": 0.9278,
+              "games": 504,
+              "wins": 479,
+              "losses": 25,
               "draws": 0,
-              "winRate": 0.9965,
+              "winRate": 0.9504,
               "firstSeat": {
-                "games": 144,
-                "winRate": 1
+                "games": 252,
+                "winRate": 0.9722
               },
               "secondSeat": {
-                "games": 144,
-                "winRate": 0.9931
+                "games": 252,
+                "winRate": 0.9286
               },
-              "avgRounds": 6.32,
-              "avgDecisionMs": 73.56,
+              "avgRounds": 13.32,
+              "avgDecisionMs": 109,
               "vs": {
                 "algo_dest-prob@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 69,
                   "draws": 0,
-                  "winRate": 1
+                  "winRate": 0.9583
                 },
                 "algo_kriegspiel@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 62,
                   "draws": 0,
-                  "winRate": 1
+                  "winRate": 0.8611
                 },
                 "algo_matrix-eq@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 70,
                   "draws": 0,
-                  "winRate": 1
+                  "winRate": 0.9722
                 },
                 "algo_random-sim@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 72,
                   "draws": 0,
                   "winRate": 1
                 },
                 "algo_tempo@v1": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 72,
                   "draws": 0,
                   "winRate": 1
                 },
                 "algo_prism@v1": {
-                  "games": 48,
-                  "wins": 47,
+                  "games": 72,
+                  "wins": 68,
                   "draws": 0,
-                  "winRate": 0.9792
+                  "winRate": 0.9444
+                },
+                "algo_horizon@v1": {
+                  "games": 72,
+                  "wins": 66,
+                  "draws": 0,
+                  "winRate": 0.9167
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 143,
+                  "games": 168,
+                  "wins": 161,
                   "draws": 0,
-                  "winRate": 0.9931
+                  "winRate": 0.9583
                 },
                 "molten-throne": {
-                  "games": 144,
-                  "wins": 144,
+                  "games": 168,
+                  "wins": 168,
                   "draws": 0,
                   "winRate": 1
+                },
+                "mistpine": {
+                  "games": 168,
+                  "wins": 150,
+                  "draws": 0,
+                  "winRate": 0.8929
                 }
               }
             },
             {
               "id": "algo_tempo@v1",
-              "rating": 1430,
-              "ratingLo": 1400,
-              "ratingHi": 1474,
-              "wilson": 0.3915,
-              "games": 288,
-              "wins": 128,
-              "losses": 158,
+              "rating": 1463,
+              "ratingLo": 1423,
+              "ratingHi": 1476,
+              "wilson": 0.3744,
+              "games": 504,
+              "wins": 209,
+              "losses": 293,
               "draws": 2,
-              "winRate": 0.4444,
+              "winRate": 0.4147,
               "firstSeat": {
-                "games": 144,
-                "winRate": 0.4306
+                "games": 252,
+                "winRate": 0.4008
               },
               "secondSeat": {
-                "games": 144,
-                "winRate": 0.4583
+                "games": 252,
+                "winRate": 0.4286
               },
-              "avgRounds": 13.8,
-              "avgDecisionMs": 2.22,
+              "avgRounds": 19.16,
+              "avgDecisionMs": 5.43,
               "vs": {
                 "algo_dest-prob@v2": {
-                  "games": 48,
-                  "wins": 31,
+                  "games": 72,
+                  "wins": 47,
                   "draws": 0,
-                  "winRate": 0.6458
+                  "winRate": 0.6528
                 },
                 "algo_kriegspiel@v2": {
-                  "games": 48,
-                  "wins": 22,
+                  "games": 72,
+                  "wins": 30,
                   "draws": 1,
-                  "winRate": 0.4688
+                  "winRate": 0.4236
                 },
                 "algo_matrix-eq@v2": {
-                  "games": 48,
-                  "wins": 27,
+                  "games": 72,
+                  "wins": 34,
                   "draws": 0,
-                  "winRate": 0.5625
+                  "winRate": 0.4722
                 },
                 "algo_random-sim@v2": {
-                  "games": 48,
-                  "wins": 48,
+                  "games": 72,
+                  "wins": 72,
                   "draws": 0,
                   "winRate": 1
                 },
                 "algo_tempo-weave@v1": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "algo_prism@v1": {
-                  "games": 48,
+                  "games": 72,
                   "wins": 0,
                   "draws": 1,
-                  "winRate": 0.0104
+                  "winRate": 0.0069
+                },
+                "algo_horizon@v1": {
+                  "games": 72,
+                  "wins": 26,
+                  "draws": 0,
+                  "winRate": 0.3611
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 56,
+                  "games": 168,
+                  "wins": 57,
                   "draws": 0,
-                  "winRate": 0.3889
+                  "winRate": 0.3393
                 },
                 "molten-throne": {
-                  "games": 144,
-                  "wins": 72,
+                  "games": 168,
+                  "wins": 79,
                   "draws": 2,
-                  "winRate": 0.5069
+                  "winRate": 0.4762
+                },
+                "mistpine": {
+                  "games": 168,
+                  "wins": 73,
+                  "draws": 0,
+                  "winRate": 0.4345
                 }
               }
             }
@@ -42511,203 +42694,1088 @@
             {
               "a": "algo_dest-prob@v2",
               "b": "algo_tempo@v1",
-              "games": 48,
-              "aWins": 17,
-              "bWins": 31,
+              "games": 72,
+              "aWins": 25,
+              "bWins": 47,
               "draws": 0
             },
             {
               "a": "algo_dest-prob@v2",
               "b": "algo_random-sim@v2",
-              "games": 48,
-              "aWins": 48,
+              "games": 72,
+              "aWins": 72,
               "bWins": 0,
               "draws": 0
             },
             {
               "a": "algo_dest-prob@v2",
               "b": "algo_matrix-eq@v2",
-              "games": 48,
-              "aWins": 23,
-              "bWins": 25,
+              "games": 72,
+              "aWins": 33,
+              "bWins": 39,
               "draws": 0
             },
             {
               "a": "algo_dest-prob@v2",
               "b": "algo_tempo-weave@v1",
-              "games": 48,
-              "aWins": 0,
-              "bWins": 48,
+              "games": 72,
+              "aWins": 3,
+              "bWins": 69,
               "draws": 0
             },
             {
               "a": "algo_dest-prob@v2",
               "b": "algo_kriegspiel@v2",
-              "games": 48,
+              "games": 72,
               "aWins": 24,
+              "bWins": 48,
+              "draws": 0
+            },
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_prism@v1",
+              "games": 72,
+              "aWins": 4,
+              "bWins": 68,
+              "draws": 0
+            },
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_horizon@v1",
+              "games": 72,
+              "aWins": 25,
+              "bWins": 47,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_tempo@v1",
+              "games": 72,
+              "aWins": 46,
+              "bWins": 26,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_random-sim@v2",
+              "games": 72,
+              "aWins": 72,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_matrix-eq@v2",
+              "games": 72,
+              "aWins": 44,
+              "bWins": 28,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_tempo-weave@v1",
+              "games": 72,
+              "aWins": 6,
+              "bWins": 66,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_kriegspiel@v2",
+              "games": 72,
+              "aWins": 45,
+              "bWins": 27,
+              "draws": 0
+            },
+            {
+              "a": "algo_kriegspiel@v2",
+              "b": "algo_tempo-weave@v1",
+              "games": 72,
+              "aWins": 10,
+              "bWins": 62,
+              "draws": 0
+            },
+            {
+              "a": "algo_kriegspiel@v2",
+              "b": "algo_tempo@v1",
+              "games": 72,
+              "aWins": 41,
+              "bWins": 30,
+              "draws": 1
+            },
+            {
+              "a": "algo_kriegspiel@v2",
+              "b": "algo_matrix-eq@v2",
+              "games": 72,
+              "aWins": 40,
+              "bWins": 32,
+              "draws": 0
+            },
+            {
+              "a": "algo_kriegspiel@v2",
+              "b": "algo_random-sim@v2",
+              "games": 72,
+              "aWins": 72,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_kriegspiel@v2",
+              "b": "algo_prism@v1",
+              "games": 72,
+              "aWins": 2,
+              "bWins": 70,
+              "draws": 0
+            },
+            {
+              "a": "algo_matrix-eq@v2",
+              "b": "algo_random-sim@v2",
+              "games": 72,
+              "aWins": 72,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_matrix-eq@v2",
+              "b": "algo_tempo@v1",
+              "games": 72,
+              "aWins": 38,
+              "bWins": 34,
+              "draws": 0
+            },
+            {
+              "a": "algo_matrix-eq@v2",
+              "b": "algo_tempo-weave@v1",
+              "games": 72,
+              "aWins": 2,
+              "bWins": 70,
+              "draws": 0
+            },
+            {
+              "a": "algo_matrix-eq@v2",
+              "b": "algo_prism@v1",
+              "games": 72,
+              "aWins": 4,
+              "bWins": 68,
+              "draws": 0
+            },
+            {
+              "a": "algo_prism@v1",
+              "b": "algo_random-sim@v2",
+              "games": 72,
+              "aWins": 72,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_prism@v1",
+              "b": "algo_tempo@v1",
+              "games": 72,
+              "aWins": 71,
+              "bWins": 0,
+              "draws": 1
+            },
+            {
+              "a": "algo_prism@v1",
+              "b": "algo_tempo-weave@v1",
+              "games": 72,
+              "aWins": 4,
+              "bWins": 68,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-sim@v2",
+              "b": "algo_tempo@v1",
+              "games": 72,
+              "aWins": 0,
+              "bWins": 72,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-sim@v2",
+              "b": "algo_tempo-weave@v1",
+              "games": 72,
+              "aWins": 0,
+              "bWins": 72,
+              "draws": 0
+            },
+            {
+              "a": "algo_tempo-weave@v1",
+              "b": "algo_tempo@v1",
+              "games": 72,
+              "aWins": 72,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_prism@v1",
+              "games": 49,
+              "aWins": 31,
+              "bWins": 17,
+              "draws": 1
+            }
+          ]
+        },
+        "mistpine": {
+          "overview": {
+            "games": 649,
+            "pairCount": 28,
+            "draws": 0,
+            "drawRate": 0,
+            "avgRounds": 28.88
+          },
+          "models": [
+            {
+              "id": "algo_dest-prob@v2",
+              "rating": 1445,
+              "ratingLo": 1390,
+              "ratingHi": 1489,
+              "wilson": 0.3391,
+              "games": 168,
+              "wins": 69,
+              "losses": 99,
+              "draws": 0,
+              "winRate": 0.4107,
+              "firstSeat": {
+                "games": 84,
+                "winRate": 0.4286
+              },
+              "secondSeat": {
+                "games": 84,
+                "winRate": 0.3929
+              },
+              "avgRounds": 29.92,
+              "avgDecisionMs": 27.63,
+              "vs": {
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 8,
+                  "draws": 0,
+                  "winRate": 0.3333
+                },
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 10,
+                  "draws": 0,
+                  "winRate": 0.4167
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 3,
+                  "draws": 0,
+                  "winRate": 0.125
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_prism@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mistpine": {
+                  "games": 168,
+                  "wins": 69,
+                  "draws": 0,
+                  "winRate": 0.4107
+                }
+              }
+            },
+            {
+              "id": "algo_horizon@v1",
+              "rating": 1154,
+              "ratingLo": 1081,
+              "ratingHi": 1205,
+              "wilson": 0.1489,
+              "games": 145,
+              "wins": 30,
+              "losses": 115,
+              "draws": 0,
+              "winRate": 0.2069,
+              "firstSeat": {
+                "games": 73,
+                "winRate": 0.1781
+              },
+              "secondSeat": {
+                "games": 72,
+                "winRate": 0.2361
+              },
+              "avgRounds": 28.97,
+              "avgDecisionMs": 151.34,
+              "vs": {
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 6,
+                  "draws": 0,
+                  "winRate": 0.25
+                },
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_prism@v1": {
+                  "games": 1,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "mistpine": {
+                  "games": 145,
+                  "wins": 30,
+                  "draws": 0,
+                  "winRate": 0.2069
+                }
+              }
+            },
+            {
+              "id": "algo_kriegspiel@v2",
+              "rating": 1728,
+              "ratingLo": 1679,
+              "ratingHi": 1785,
+              "wilson": 0.617,
+              "games": 168,
+              "wins": 116,
+              "losses": 52,
+              "draws": 0,
+              "winRate": 0.6905,
+              "firstSeat": {
+                "games": 84,
+                "winRate": 0.7262
+              },
+              "secondSeat": {
+                "games": 84,
+                "winRate": 0.6548
+              },
+              "avgRounds": 29.51,
+              "avgDecisionMs": 423.09,
+              "vs": {
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 18,
+                  "draws": 0,
+                  "winRate": 0.75
+                },
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 16,
+                  "draws": 0,
+                  "winRate": 0.6667
+                },
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 10,
+                  "draws": 0,
+                  "winRate": 0.4167
+                },
+                "algo_prism@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mistpine": {
+                  "games": 168,
+                  "wins": 116,
+                  "draws": 0,
+                  "winRate": 0.6905
+                }
+              }
+            },
+            {
+              "id": "algo_matrix-eq@v2",
+              "rating": 1560,
+              "ratingLo": 1501,
+              "ratingHi": 1612,
+              "wilson": 0.4486,
+              "games": 168,
+              "wins": 88,
+              "losses": 80,
+              "draws": 0,
+              "winRate": 0.5238,
+              "firstSeat": {
+                "games": 84,
+                "winRate": 0.5714
+              },
+              "secondSeat": {
+                "games": 84,
+                "winRate": 0.4762
+              },
+              "avgRounds": 28.87,
+              "avgDecisionMs": 11.34,
+              "vs": {
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 14,
+                  "draws": 0,
+                  "winRate": 0.5833
+                },
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 6,
+                  "draws": 0,
+                  "winRate": 0.25
+                },
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 17,
+                  "draws": 0,
+                  "winRate": 0.7083
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 2,
+                  "draws": 0,
+                  "winRate": 0.0833
+                },
+                "algo_prism@v1": {
+                  "games": 24,
+                  "wins": 1,
+                  "draws": 0,
+                  "winRate": 0.0417
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mistpine": {
+                  "games": 168,
+                  "wins": 88,
+                  "draws": 0,
+                  "winRate": 0.5238
+                }
+              }
+            },
+            {
+              "id": "algo_prism@v1",
+              "rating": 1929,
+              "ratingLo": 1892,
+              "ratingHi": 1974,
+              "wilson": 0.781,
+              "games": 145,
+              "wins": 123,
+              "losses": 22,
+              "draws": 0,
+              "winRate": 0.8483,
+              "firstSeat": {
+                "games": 72,
+                "winRate": 0.8611
+              },
+              "secondSeat": {
+                "games": 73,
+                "winRate": 0.8356
+              },
+              "avgRounds": 29.74,
+              "avgDecisionMs": 1525.62,
+              "vs": {
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 23,
+                  "draws": 0,
+                  "winRate": 0.9583
+                },
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 3,
+                  "draws": 0,
+                  "winRate": 0.125
+                },
+                "algo_horizon@v1": {
+                  "games": 1,
+                  "wins": 1,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mistpine": {
+                  "games": 145,
+                  "wins": 123,
+                  "draws": 0,
+                  "winRate": 0.8483
+                }
+              }
+            },
+            {
+              "id": "algo_random-sim@v2",
+              "rating": 753,
+              "ratingLo": 707,
+              "ratingHi": 781,
+              "wilson": 0,
+              "games": 168,
+              "wins": 0,
+              "losses": 168,
+              "draws": 0,
+              "winRate": 0,
+              "firstSeat": {
+                "games": 84,
+                "winRate": 0
+              },
+              "secondSeat": {
+                "games": 84,
+                "winRate": 0
+              },
+              "avgRounds": 27.23,
+              "avgDecisionMs": 2.98,
+              "vs": {
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_prism@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "mistpine": {
+                  "games": 168,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              }
+            },
+            {
+              "id": "algo_tempo-weave@v1",
+              "rating": 1963,
+              "ratingLo": 1886,
+              "ratingHi": 2055,
+              "wilson": 0.837,
+              "games": 168,
+              "wins": 150,
+              "losses": 18,
+              "draws": 0,
+              "winRate": 0.8929,
+              "firstSeat": {
+                "games": 84,
+                "winRate": 0.9286
+              },
+              "secondSeat": {
+                "games": 84,
+                "winRate": 0.8571
+              },
+              "avgRounds": 26.96,
+              "avgDecisionMs": 126.05,
+              "vs": {
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 21,
+                  "draws": 0,
+                  "winRate": 0.875
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 22,
+                  "draws": 0,
+                  "winRate": 0.9167
+                },
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 14,
+                  "draws": 0,
+                  "winRate": 0.5833
+                },
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_prism@v1": {
+                  "games": 24,
+                  "wins": 21,
+                  "draws": 0,
+                  "winRate": 0.875
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mistpine": {
+                  "games": 168,
+                  "wins": 150,
+                  "draws": 0,
+                  "winRate": 0.8929
+                }
+              }
+            },
+            {
+              "id": "algo_tempo@v1",
+              "rating": 1470,
+              "ratingLo": 1411,
+              "ratingHi": 1533,
+              "wilson": 0.3619,
+              "games": 168,
+              "wins": 73,
+              "losses": 95,
+              "draws": 0,
+              "winRate": 0.4345,
+              "firstSeat": {
+                "games": 84,
+                "winRate": 0.4286
+              },
+              "secondSeat": {
+                "games": 84,
+                "winRate": 0.4405
+              },
+              "avgRounds": 29.96,
+              "avgDecisionMs": 6.59,
+              "vs": {
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 16,
+                  "draws": 0,
+                  "winRate": 0.6667
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 8,
+                  "draws": 0,
+                  "winRate": 0.3333
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 7,
+                  "draws": 0,
+                  "winRate": 0.2917
+                },
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_prism@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 18,
+                  "draws": 0,
+                  "winRate": 0.75
+                }
+              },
+              "perMap": {
+                "mistpine": {
+                  "games": 168,
+                  "wins": 73,
+                  "draws": 0,
+                  "winRate": 0.4345
+                }
+              }
+            }
+          ],
+          "h2h": [
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_tempo@v1",
+              "games": 24,
+              "aWins": 8,
+              "bWins": 16,
+              "draws": 0
+            },
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_random-sim@v2",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_matrix-eq@v2",
+              "games": 24,
+              "aWins": 10,
+              "bWins": 14,
+              "draws": 0
+            },
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_tempo-weave@v1",
+              "games": 24,
+              "aWins": 3,
+              "bWins": 21,
+              "draws": 0
+            },
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_kriegspiel@v2",
+              "games": 24,
+              "aWins": 0,
               "bWins": 24,
               "draws": 0
             },
             {
               "a": "algo_dest-prob@v2",
               "b": "algo_prism@v1",
-              "games": 48,
-              "aWins": 4,
-              "bWins": 44,
-              "draws": 0
-            },
-            {
-              "a": "algo_kriegspiel@v2",
-              "b": "algo_tempo-weave@v1",
-              "games": 48,
+              "games": 24,
               "aWins": 0,
-              "bWins": 48,
+              "bWins": 24,
               "draws": 0
             },
             {
-              "a": "algo_kriegspiel@v2",
+              "a": "algo_dest-prob@v2",
+              "b": "algo_horizon@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_random-sim@v2",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_matrix-eq@v2",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
               "b": "algo_tempo@v1",
-              "games": 48,
-              "aWins": 25,
-              "bWins": 22,
-              "draws": 1
+              "games": 24,
+              "aWins": 6,
+              "bWins": 18,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_tempo-weave@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_kriegspiel@v2",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
             },
             {
               "a": "algo_kriegspiel@v2",
               "b": "algo_matrix-eq@v2",
-              "games": 48,
-              "aWins": 22,
-              "bWins": 26,
+              "games": 24,
+              "aWins": 18,
+              "bWins": 6,
+              "draws": 0
+            },
+            {
+              "a": "algo_kriegspiel@v2",
+              "b": "algo_tempo@v1",
+              "games": 24,
+              "aWins": 16,
+              "bWins": 8,
               "draws": 0
             },
             {
               "a": "algo_kriegspiel@v2",
               "b": "algo_random-sim@v2",
-              "games": 48,
-              "aWins": 48,
+              "games": 24,
+              "aWins": 24,
               "bWins": 0,
               "draws": 0
             },
             {
               "a": "algo_kriegspiel@v2",
+              "b": "algo_tempo-weave@v1",
+              "games": 24,
+              "aWins": 10,
+              "bWins": 14,
+              "draws": 0
+            },
+            {
+              "a": "algo_kriegspiel@v2",
               "b": "algo_prism@v1",
-              "games": 48,
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_matrix-eq@v2",
+              "b": "algo_random-sim@v2",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_matrix-eq@v2",
+              "b": "algo_tempo@v1",
+              "games": 24,
+              "aWins": 17,
+              "bWins": 7,
+              "draws": 0
+            },
+            {
+              "a": "algo_matrix-eq@v2",
+              "b": "algo_tempo-weave@v1",
+              "games": 24,
               "aWins": 2,
-              "bWins": 46,
-              "draws": 0
-            },
-            {
-              "a": "algo_matrix-eq@v2",
-              "b": "algo_random-sim@v2",
-              "games": 48,
-              "aWins": 48,
-              "bWins": 0,
-              "draws": 0
-            },
-            {
-              "a": "algo_matrix-eq@v2",
-              "b": "algo_tempo@v1",
-              "games": 48,
-              "aWins": 21,
-              "bWins": 27,
-              "draws": 0
-            },
-            {
-              "a": "algo_matrix-eq@v2",
-              "b": "algo_tempo-weave@v1",
-              "games": 48,
-              "aWins": 0,
-              "bWins": 48,
+              "bWins": 22,
               "draws": 0
             },
             {
               "a": "algo_matrix-eq@v2",
               "b": "algo_prism@v1",
-              "games": 48,
-              "aWins": 3,
-              "bWins": 45,
+              "games": 24,
+              "aWins": 1,
+              "bWins": 23,
               "draws": 0
             },
             {
               "a": "algo_prism@v1",
               "b": "algo_random-sim@v2",
-              "games": 48,
-              "aWins": 48,
+              "games": 24,
+              "aWins": 24,
               "bWins": 0,
               "draws": 0
             },
             {
               "a": "algo_prism@v1",
               "b": "algo_tempo@v1",
-              "games": 48,
-              "aWins": 47,
+              "games": 24,
+              "aWins": 24,
               "bWins": 0,
-              "draws": 1
+              "draws": 0
             },
             {
               "a": "algo_prism@v1",
               "b": "algo_tempo-weave@v1",
-              "games": 48,
-              "aWins": 1,
-              "bWins": 47,
+              "games": 24,
+              "aWins": 3,
+              "bWins": 21,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-sim@v2",
+              "b": "algo_tempo-weave@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
               "draws": 0
             },
             {
               "a": "algo_random-sim@v2",
               "b": "algo_tempo@v1",
-              "games": 48,
+              "games": 24,
               "aWins": 0,
-              "bWins": 48,
-              "draws": 0
-            },
-            {
-              "a": "algo_random-sim@v2",
-              "b": "algo_tempo-weave@v1",
-              "games": 48,
-              "aWins": 0,
-              "bWins": 48,
+              "bWins": 24,
               "draws": 0
             },
             {
               "a": "algo_tempo-weave@v1",
               "b": "algo_tempo@v1",
-              "games": 48,
-              "aWins": 48,
+              "games": 24,
+              "aWins": 24,
               "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_prism@v1",
+              "games": 1,
+              "aWins": 0,
+              "bWins": 1,
               "draws": 0
             }
           ]
         },
         "molten-throne": {
           "overview": {
-            "games": 504,
-            "pairCount": 21,
-            "draws": 2,
-            "drawRate": 0.004,
-            "avgRounds": 12.6
+            "games": 672,
+            "pairCount": 28,
+            "draws": 3,
+            "drawRate": 0.0045,
+            "avgRounds": 12.29
           },
           "models": [
             {
               "id": "algo_dest-prob@v2",
-              "rating": 1339,
-              "ratingLo": 1280,
-              "ratingHi": 1400,
-              "wilson": 0.2679,
-              "games": 144,
+              "rating": 1285,
+              "ratingLo": 1221,
+              "ratingHi": 1338,
+              "wilson": 0.2282,
+              "games": 168,
               "wins": 49,
-              "losses": 95,
+              "losses": 119,
               "draws": 0,
-              "winRate": 0.3403,
+              "winRate": 0.2917,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.2639
+                "games": 84,
+                "winRate": 0.2262
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.4167
+                "games": 84,
+                "winRate": 0.3571
               },
-              "avgRounds": 15.08,
-              "avgDecisionMs": 10.93,
+              "avgRounds": 14.39,
+              "avgDecisionMs": 11.27,
               "vs": {
                 "algo_matrix-eq@v2": {
                   "games": 24,
@@ -42744,38 +43812,118 @@
                   "wins": 3,
                   "draws": 0,
                   "winRate": 0.125
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
                 }
               },
               "perMap": {
                 "molten-throne": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 49,
                   "draws": 0,
-                  "winRate": 0.3403
+                  "winRate": 0.2917
+                }
+              }
+            },
+            {
+              "id": "algo_horizon@v1",
+              "rating": 1779,
+              "ratingLo": 1728,
+              "ratingHi": 1856,
+              "wilson": 0.6953,
+              "games": 168,
+              "wins": 128,
+              "losses": 39,
+              "draws": 1,
+              "winRate": 0.7619,
+              "firstSeat": {
+                "games": 84,
+                "winRate": 0.7262
+              },
+              "secondSeat": {
+                "games": 84,
+                "winRate": 0.7976
+              },
+              "avgRounds": 11.39,
+              "avgDecisionMs": 62.83,
+              "vs": {
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 20,
+                  "draws": 0,
+                  "winRate": 0.8333
+                },
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 17,
+                  "draws": 0,
+                  "winRate": 0.7083
+                },
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_prism@v1": {
+                  "games": 24,
+                  "wins": 19,
+                  "draws": 1,
+                  "winRate": 0.8125
+                }
+              },
+              "perMap": {
+                "molten-throne": {
+                  "games": 168,
+                  "wins": 128,
+                  "draws": 1,
+                  "winRate": 0.7649
                 }
               }
             },
             {
               "id": "algo_kriegspiel@v2",
-              "rating": 1336,
-              "ratingLo": 1271,
-              "ratingHi": 1394,
-              "wilson": 0.2647,
-              "games": 144,
+              "rating": 1282,
+              "ratingLo": 1226,
+              "ratingHi": 1340,
+              "wilson": 0.2255,
+              "games": 168,
               "wins": 48,
-              "losses": 95,
+              "losses": 119,
               "draws": 1,
-              "winRate": 0.3333,
+              "winRate": 0.2857,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.2361
+                "games": 84,
+                "winRate": 0.2024
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.4306
+                "games": 84,
+                "winRate": 0.369
               },
-              "avgRounds": 14.34,
-              "avgDecisionMs": 146.13,
+              "avgRounds": 13.71,
+              "avgDecisionMs": 149.49,
               "vs": {
                 "algo_tempo-weave@v1": {
                   "games": 24,
@@ -42812,38 +43960,44 @@
                   "wins": 2,
                   "draws": 0,
                   "winRate": 0.0833
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
                 }
               },
               "perMap": {
                 "molten-throne": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 48,
                   "draws": 1,
-                  "winRate": 0.3368
+                  "winRate": 0.2887
                 }
               }
             },
             {
               "id": "algo_matrix-eq@v2",
-              "rating": 1529,
-              "ratingLo": 1474,
-              "ratingHi": 1587,
-              "wilson": 0.4603,
-              "games": 144,
-              "wins": 78,
-              "losses": 66,
+              "rating": 1484,
+              "ratingLo": 1436,
+              "ratingHi": 1539,
+              "wilson": 0.4136,
+              "games": 168,
+              "wins": 82,
+              "losses": 86,
               "draws": 0,
-              "winRate": 0.5417,
+              "winRate": 0.4881,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.5278
+                "games": 84,
+                "winRate": 0.4524
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.5556
+                "games": 84,
+                "winRate": 0.5238
               },
-              "avgRounds": 13.44,
-              "avgDecisionMs": 7.81,
+              "avgRounds": 13.32,
+              "avgDecisionMs": 8.08,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -42880,38 +44034,44 @@
                   "wins": 3,
                   "draws": 0,
                   "winRate": 0.125
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 4,
+                  "draws": 0,
+                  "winRate": 0.1667
                 }
               },
               "perMap": {
                 "molten-throne": {
-                  "games": 144,
-                  "wins": 78,
+                  "games": 168,
+                  "wins": 82,
                   "draws": 0,
-                  "winRate": 0.5417
+                  "winRate": 0.4881
                 }
               }
             },
             {
               "id": "algo_prism@v1",
-              "rating": 1783,
-              "ratingLo": 1725,
-              "ratingHi": 1848,
-              "wilson": 0.6994,
-              "games": 144,
-              "wins": 111,
-              "losses": 32,
-              "draws": 1,
-              "winRate": 0.7708,
+              "rating": 1690,
+              "ratingLo": 1648,
+              "ratingHi": 1743,
+              "wilson": 0.617,
+              "games": 168,
+              "wins": 115,
+              "losses": 51,
+              "draws": 2,
+              "winRate": 0.6845,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.7778
+                "games": 84,
+                "winRate": 0.6905
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.7639
+                "games": 84,
+                "winRate": 0.6786
               },
-              "avgRounds": 10.74,
-              "avgDecisionMs": 268.26,
+              "avgRounds": 10.55,
+              "avgDecisionMs": 262.56,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -42948,38 +44108,44 @@
                   "wins": 22,
                   "draws": 0,
                   "winRate": 0.9167
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 4,
+                  "draws": 1,
+                  "winRate": 0.1875
                 }
               },
               "perMap": {
                 "molten-throne": {
-                  "games": 144,
-                  "wins": 111,
-                  "draws": 1,
-                  "winRate": 0.7743
+                  "games": 168,
+                  "wins": 115,
+                  "draws": 2,
+                  "winRate": 0.6905
                 }
               }
             },
             {
               "id": "algo_random-sim@v2",
-              "rating": 795,
-              "ratingLo": 767,
-              "ratingHi": 818,
+              "rating": 769,
+              "ratingLo": 740,
+              "ratingHi": 791,
               "wilson": 0,
-              "games": 144,
+              "games": 168,
               "wins": 0,
-              "losses": 144,
+              "losses": 168,
               "draws": 0,
               "winRate": 0,
               "firstSeat": {
-                "games": 72,
+                "games": 84,
                 "winRate": 0
               },
               "secondSeat": {
-                "games": 72,
+                "games": 84,
                 "winRate": 0
               },
-              "avgRounds": 14.01,
-              "avgDecisionMs": 1.47,
+              "avgRounds": 14.64,
+              "avgDecisionMs": 1.59,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -43016,11 +44182,17 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
                 }
               },
               "perMap": {
                 "molten-throne": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -43029,25 +44201,25 @@
             },
             {
               "id": "algo_tempo-weave@v1",
-              "rating": 2221,
-              "ratingLo": 2182,
-              "ratingHi": 2245,
-              "wilson": 0.974,
-              "games": 144,
-              "wins": 144,
+              "rating": 2238,
+              "ratingLo": 2203,
+              "ratingHi": 2261,
+              "wilson": 0.9776,
+              "games": 168,
+              "wins": 168,
               "losses": 0,
               "draws": 0,
               "winRate": 1,
               "firstSeat": {
-                "games": 72,
+                "games": 84,
                 "winRate": 1
               },
               "secondSeat": {
-                "games": 72,
+                "games": 84,
                 "winRate": 1
               },
-              "avgRounds": 5.17,
-              "avgDecisionMs": 133.77,
+              "avgRounds": 5.14,
+              "avgDecisionMs": 135.6,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -43084,12 +44256,18 @@
                   "wins": 24,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
                 }
               },
               "perMap": {
                 "molten-throne": {
-                  "games": 144,
-                  "wins": 144,
+                  "games": 168,
+                  "wins": 168,
                   "draws": 0,
                   "winRate": 1
                 }
@@ -43097,25 +44275,25 @@
             },
             {
               "id": "algo_tempo@v1",
-              "rating": 1496,
-              "ratingLo": 1446,
-              "ratingHi": 1552,
-              "wilson": 0.4262,
-              "games": 144,
-              "wins": 72,
-              "losses": 70,
+              "rating": 1472,
+              "ratingLo": 1422,
+              "ratingHi": 1522,
+              "wilson": 0.402,
+              "games": 168,
+              "wins": 79,
+              "losses": 87,
               "draws": 2,
-              "winRate": 0.5,
+              "winRate": 0.4702,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.5
+                "games": 84,
+                "winRate": 0.4524
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.5
+                "games": 84,
+                "winRate": 0.4881
               },
-              "avgRounds": 15.38,
-              "avgDecisionMs": 2.32,
+              "avgRounds": 15.21,
+              "avgDecisionMs": 2.49,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -43152,14 +44330,20 @@
                   "wins": 0,
                   "draws": 1,
                   "winRate": 0.0208
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 7,
+                  "draws": 0,
+                  "winRate": 0.2917
                 }
               },
               "perMap": {
                 "molten-throne": {
-                  "games": 144,
-                  "wins": 72,
+                  "games": 168,
+                  "wins": 79,
                   "draws": 2,
-                  "winRate": 0.5069
+                  "winRate": 0.4762
                 }
               }
             }
@@ -43212,6 +44396,62 @@
               "aWins": 3,
               "bWins": 21,
               "draws": 0
+            },
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_horizon@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_tempo-weave@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_matrix-eq@v2",
+              "games": 24,
+              "aWins": 20,
+              "bWins": 4,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_tempo@v1",
+              "games": 24,
+              "aWins": 17,
+              "bWins": 7,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_random-sim@v2",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_kriegspiel@v2",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_prism@v1",
+              "games": 24,
+              "aWins": 19,
+              "bWins": 4,
+              "draws": 1
             },
             {
               "a": "algo_kriegspiel@v2",
@@ -43337,34 +44577,34 @@
         },
         "standoff": {
           "overview": {
-            "games": 504,
-            "pairCount": 21,
+            "games": 672,
+            "pairCount": 28,
             "draws": 0,
             "drawRate": 0,
-            "avgRounds": 11.63
+            "avgRounds": 11.97
           },
           "models": [
             {
               "id": "algo_dest-prob@v2",
-              "rating": 1439,
-              "ratingLo": 1382,
-              "ratingHi": 1509,
-              "wilson": 0.3858,
-              "games": 144,
-              "wins": 67,
-              "losses": 77,
+              "rating": 1399,
+              "ratingLo": 1342,
+              "ratingHi": 1463,
+              "wilson": 0.3335,
+              "games": 168,
+              "wins": 68,
+              "losses": 100,
               "draws": 0,
-              "winRate": 0.4653,
+              "winRate": 0.4048,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.3611
+                "games": 84,
+                "winRate": 0.3095
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.5694
+                "games": 84,
+                "winRate": 0.5
               },
-              "avgRounds": 13.04,
-              "avgDecisionMs": 6.55,
+              "avgRounds": 13.18,
+              "avgDecisionMs": 6.77,
               "vs": {
                 "algo_tempo@v1": {
                   "games": 24,
@@ -43401,38 +44641,118 @@
                   "wins": 1,
                   "draws": 0,
                   "winRate": 0.0417
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 1,
+                  "draws": 0,
+                  "winRate": 0.0417
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 67,
+                  "games": 168,
+                  "wins": 68,
                   "draws": 0,
-                  "winRate": 0.4653
+                  "winRate": 0.4048
+                }
+              }
+            },
+            {
+              "id": "algo_horizon@v1",
+              "rating": 1853,
+              "ratingLo": 1775,
+              "ratingHi": 1932,
+              "wilson": 0.7241,
+              "games": 168,
+              "wins": 133,
+              "losses": 35,
+              "draws": 0,
+              "winRate": 0.7917,
+              "firstSeat": {
+                "games": 84,
+                "winRate": 0.8095
+              },
+              "secondSeat": {
+                "games": 84,
+                "winRate": 0.7738
+              },
+              "avgRounds": 12.96,
+              "avgDecisionMs": 30.37,
+              "vs": {
+                "algo_tempo@v1": {
+                  "games": 24,
+                  "wins": 23,
+                  "draws": 0,
+                  "winRate": 0.9583
+                },
+                "algo_random-sim@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_matrix-eq@v2": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_dest-prob@v2": {
+                  "games": 24,
+                  "wins": 23,
+                  "draws": 0,
+                  "winRate": 0.9583
+                },
+                "algo_tempo-weave@v1": {
+                  "games": 24,
+                  "wins": 6,
+                  "draws": 0,
+                  "winRate": 0.25
+                },
+                "algo_kriegspiel@v2": {
+                  "games": 24,
+                  "wins": 21,
+                  "draws": 0,
+                  "winRate": 0.875
+                },
+                "algo_prism@v1": {
+                  "games": 24,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.5
+                }
+              },
+              "perMap": {
+                "standoff": {
+                  "games": 168,
+                  "wins": 133,
+                  "draws": 0,
+                  "winRate": 0.7917
                 }
               }
             },
             {
               "id": "algo_kriegspiel@v2",
-              "rating": 1480,
-              "ratingLo": 1435,
-              "ratingHi": 1534,
-              "wilson": 0.4262,
-              "games": 144,
-              "wins": 73,
-              "losses": 71,
+              "rating": 1449,
+              "ratingLo": 1395,
+              "ratingHi": 1503,
+              "wilson": 0.379,
+              "games": 168,
+              "wins": 76,
+              "losses": 92,
               "draws": 0,
-              "winRate": 0.5069,
+              "winRate": 0.4524,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.4028
+                "games": 84,
+                "winRate": 0.3571
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.6111
+                "games": 84,
+                "winRate": 0.5476
               },
-              "avgRounds": 13.13,
-              "avgDecisionMs": 62.7,
+              "avgRounds": 13.21,
+              "avgDecisionMs": 65.39,
               "vs": {
                 "algo_tempo-weave@v1": {
                   "games": 24,
@@ -43469,38 +44789,44 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 3,
+                  "draws": 0,
+                  "winRate": 0.125
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 73,
+                  "games": 168,
+                  "wins": 76,
                   "draws": 0,
-                  "winRate": 0.5069
+                  "winRate": 0.4524
                 }
               }
             },
             {
               "id": "algo_matrix-eq@v2",
-              "rating": 1289,
-              "ratingLo": 1223,
-              "ratingHi": 1344,
-              "wilson": 0.2425,
-              "games": 144,
+              "rating": 1251,
+              "ratingLo": 1184,
+              "ratingHi": 1304,
+              "wilson": 0.2066,
+              "games": 168,
               "wins": 45,
-              "losses": 99,
+              "losses": 123,
               "draws": 0,
-              "winRate": 0.3125,
+              "winRate": 0.2679,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.2917
+                "games": 84,
+                "winRate": 0.25
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.3333
+                "games": 84,
+                "winRate": 0.2857
               },
-              "avgRounds": 12.68,
-              "avgDecisionMs": 5.8,
+              "avgRounds": 12.77,
+              "avgDecisionMs": 5.9,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -43537,38 +44863,44 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 45,
                   "draws": 0,
-                  "winRate": 0.3125
+                  "winRate": 0.2679
                 }
               }
             },
             {
               "id": "algo_prism@v1",
-              "rating": 1911,
-              "ratingLo": 1859,
-              "ratingHi": 1955,
-              "wilson": 0.764,
-              "games": 144,
-              "wins": 120,
-              "losses": 24,
+              "rating": 1845,
+              "ratingLo": 1794,
+              "ratingHi": 1903,
+              "wilson": 0.7176,
+              "games": 168,
+              "wins": 132,
+              "losses": 36,
               "draws": 0,
-              "winRate": 0.8333,
+              "winRate": 0.7857,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.8333
+                "games": 84,
+                "winRate": 0.7857
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.8333
+                "games": 84,
+                "winRate": 0.7857
               },
-              "avgRounds": 10.47,
-              "avgDecisionMs": 180.89,
+              "avgRounds": 10.96,
+              "avgDecisionMs": 171.27,
               "vs": {
                 "algo_matrix-eq@v2": {
                   "games": 24,
@@ -43605,38 +44937,44 @@
                   "wins": 24,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.5
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 120,
+                  "games": 168,
+                  "wins": 132,
                   "draws": 0,
-                  "winRate": 0.8333
+                  "winRate": 0.7857
                 }
               }
             },
             {
               "id": "algo_random-sim@v2",
-              "rating": 772,
-              "ratingLo": 749,
-              "ratingHi": 791,
+              "rating": 761,
+              "ratingLo": 728,
+              "ratingHi": 780,
               "wilson": 0,
-              "games": 144,
+              "games": 168,
               "wins": 0,
-              "losses": 144,
+              "losses": 168,
               "draws": 0,
               "winRate": 0,
               "firstSeat": {
-                "games": 72,
+                "games": 84,
                 "winRate": 0
               },
               "secondSeat": {
-                "games": 72,
+                "games": 84,
                 "winRate": 0
               },
-              "avgRounds": 12.44,
-              "avgDecisionMs": 1.49,
+              "avgRounds": 12.48,
+              "avgDecisionMs": 1.61,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -43673,11 +45011,17 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
+                  "games": 168,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -43686,25 +45030,25 @@
             },
             {
               "id": "algo_tempo-weave@v1",
-              "rating": 2244,
-              "ratingLo": 2171,
-              "ratingHi": 2288,
-              "wilson": 0.9617,
-              "games": 144,
-              "wins": 143,
-              "losses": 1,
+              "rating": 2111,
+              "ratingLo": 2051,
+              "ratingHi": 2203,
+              "wilson": 0.9165,
+              "games": 168,
+              "wins": 161,
+              "losses": 7,
               "draws": 0,
-              "winRate": 0.9931,
+              "winRate": 0.9583,
               "firstSeat": {
-                "games": 72,
-                "winRate": 1
+                "games": 84,
+                "winRate": 0.9881
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.9861
+                "games": 84,
+                "winRate": 0.9286
               },
-              "avgRounds": 7.47,
-              "avgDecisionMs": 40.71,
+              "avgRounds": 7.86,
+              "avgDecisionMs": 43.43,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -43741,38 +45085,44 @@
                   "wins": 23,
                   "draws": 0,
                   "winRate": 0.9583
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 18,
+                  "draws": 0,
+                  "winRate": 0.75
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 143,
+                  "games": 168,
+                  "wins": 161,
                   "draws": 0,
-                  "winRate": 0.9931
+                  "winRate": 0.9583
                 }
               }
             },
             {
               "id": "algo_tempo@v1",
-              "rating": 1365,
-              "ratingLo": 1311,
-              "ratingHi": 1408,
-              "wilson": 0.3131,
-              "games": 144,
-              "wins": 56,
-              "losses": 88,
+              "rating": 1330,
+              "ratingLo": 1265,
+              "ratingHi": 1381,
+              "wilson": 0.272,
+              "games": 168,
+              "wins": 57,
+              "losses": 111,
               "draws": 0,
-              "winRate": 0.3889,
+              "winRate": 0.3393,
               "firstSeat": {
-                "games": 72,
-                "winRate": 0.3611
+                "games": 84,
+                "winRate": 0.3214
               },
               "secondSeat": {
-                "games": 72,
-                "winRate": 0.4167
+                "games": 84,
+                "winRate": 0.3571
               },
-              "avgRounds": 12.22,
-              "avgDecisionMs": 2.11,
+              "avgRounds": 12.32,
+              "avgDecisionMs": 2.25,
               "vs": {
                 "algo_dest-prob@v2": {
                   "games": 24,
@@ -43809,14 +45159,20 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_horizon@v1": {
+                  "games": 24,
+                  "wins": 1,
+                  "draws": 0,
+                  "winRate": 0.0417
                 }
               },
               "perMap": {
                 "standoff": {
-                  "games": 144,
-                  "wins": 56,
+                  "games": 168,
+                  "wins": 57,
                   "draws": 0,
-                  "winRate": 0.3889
+                  "winRate": 0.3393
                 }
               }
             }
@@ -43868,6 +45224,62 @@
               "games": 24,
               "aWins": 1,
               "bWins": 23,
+              "draws": 0
+            },
+            {
+              "a": "algo_dest-prob@v2",
+              "b": "algo_horizon@v1",
+              "games": 24,
+              "aWins": 1,
+              "bWins": 23,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_tempo@v1",
+              "games": 24,
+              "aWins": 23,
+              "bWins": 1,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_random-sim@v2",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_matrix-eq@v2",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_tempo-weave@v1",
+              "games": 24,
+              "aWins": 6,
+              "bWins": 18,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_kriegspiel@v2",
+              "games": 24,
+              "aWins": 21,
+              "bWins": 3,
+              "draws": 0
+            },
+            {
+              "a": "algo_horizon@v1",
+              "b": "algo_prism@v1",
+              "games": 24,
+              "aWins": 12,
+              "bWins": 12,
               "draws": 0
             },
             {

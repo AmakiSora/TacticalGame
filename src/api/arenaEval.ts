@@ -31,10 +31,10 @@ const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json'
 const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRIPT];
 
 // 评估链路已接入 standard 与 simultaneous：标准模式地图池与 round_robin.py 的
-// DEFAULT_MAPS 保持一致；同时模式使用两张静态地图，且只纳入注册表声明 simultaneous
+// DEFAULT_MAPS 保持一致；同时模式使用静态地图，且只纳入注册表声明 simultaneous
 // 的算法（RL 模型目前只覆盖标准模式）。
 export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
-export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne'] as const;
+export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne', 'mistpine'] as const;
 
 /**
  * 控制台展示用地图目录：标准/同时回合是当前可跑批模式，另外两种模式也列出来，
@@ -50,6 +50,7 @@ export const EVAL_MAPS = [
   { id: 'artillery-zone', label: '炮火禁区', mode: 'annihilation' },
   { id: 'standoff', label: '对峙之地', mode: 'simultaneous' },
   { id: 'molten-throne', label: '熔池王座', mode: 'simultaneous' },
+  { id: 'mistpine', label: '雾杉疏林', mode: 'simultaneous' },
   { id: 'snowflake', label: '雪花', mode: 'royale' },
   { id: 'narrow-road', label: '狭路相逢', mode: 'royale' },
 ] as const;

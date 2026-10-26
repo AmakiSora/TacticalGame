@@ -76,6 +76,7 @@ describe('AI 竞技场评估控制台 API', () => {
     const data = res.json();
     expect(data.status).toBe('idle');
     expect(data.knownMaps).toContain('random');
+    expect(data.knownMaps).toContain('mistpine');
     expect(data.defaults.games).toBe(24);
     expect(data.gamesTotal).toBe(2);
     const modeIds = data.modeCatalog.map((mode: { id: string }) => mode.id);
@@ -86,6 +87,7 @@ describe('AI 竞技场评估控制台 API', () => {
       maps: expect.arrayContaining([
         expect.objectContaining({ id: 'standoff' }),
         expect.objectContaining({ id: 'molten-throne' }),
+        expect.objectContaining({ id: 'mistpine', label: '雾杉疏林' }),
       ]),
     });
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'annihilation').supported).toBe(false);
@@ -134,6 +136,16 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(args).toContain('--maps standoff');
     expect(args).toContain('--algorithms random-sim,dest-prob');
     expect(args).not.toContain('--models');
+  });
+
+  it('accepts the mistpine map in the simultaneous evaluation pool', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['mistpine'], participants: ['algo:random-sim', 'algo:dest-prob'], games: 4 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({ mode: 'simultaneous', maps: ['mistpine'] });
+    expect(spawner.calls[0].args.join(' ')).toContain('--maps mistpine');
   });
 
   it('rejects models and standard-only algorithms in a simultaneous pool', async () => {

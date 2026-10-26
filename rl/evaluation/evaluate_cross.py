@@ -40,6 +40,22 @@ from typing import Any
 # 纯算法对局不碰推理栈，省下每次子进程启动的数秒 import 开销。
 _ML: dict[str, Any] | None = None
 
+# 每局完成后的进度行前缀：round_robin.py 按此前缀把逐局进度实时透传到评估
+# 控制台，其余输出仍只在批次失败时回显尾部（8 路并发下避免刷屏）。
+GAME_PROGRESS_PREFIX = "进度|"
+
+
+def format_duration(seconds: float) -> str:
+    """秒 → h/m/s 紧凑格式（进度行用，与 round_robin.format_eta 同风格）。"""
+    seconds = max(0, int(seconds))
+    hours, rem = divmod(seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}h{minutes:02d}m{secs:02d}s"
+    if minutes:
+        return f"{minutes}m{secs:02d}s"
+    return f"{secs}s"
+
 
 def _load_ml() -> dict[str, Any]:
     global _ML
@@ -946,6 +962,12 @@ def main():
                        for side in _SEATS}
         tally: dict[str, int] = {name_a: 0, name_b: 0, "draw": 0}
         records: list[dict[str, Any]] = []
+        if args.stats_file:
+            stats_file = Path(args.stats_file)
+            stats_file.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            stats_file = None
+        run_started = time.monotonic()
 
         for game_index in range(1, args.games + 1):
             if args.swap_sides and game_index > 1:
@@ -979,7 +1001,7 @@ def main():
                 tally[winner_name] = tally.get(winner_name, 0) + 1
                 winner_label = winner_name
                 result = f"胜者：{winner_name}"
-            records.append({
+            record = {
                 "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "map": args.map_id,
                 "players": seats,
@@ -996,8 +1018,17 @@ def main():
                 "decisionCount": detail["summary"]["decisionCount"],
                 "seed": detail["meta"]["mapSeed"],
                 "detailFile": detail_path,
-            })
+            }
+            records.append(record)
             print(f"  结果：{result}（{rounds} 回合 / {acted} 动作 / {end_reason}）")
+            # 每局完成立即入库（原为整批结束后一次性追加）：跑批中断时已完成对局
+            # 仍在累积文件里、断点续跑只补差额；编排器也能按行透传逐局进度。
+            if stats_file is not None:
+                with stats_file.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+            print(f"{GAME_PROGRESS_PREFIX}第 {game_index}/{args.games} 局完成"
+                  f"（{detail['meta']['durationSec']:.0f}s，"
+                  f"累计 {format_duration(time.monotonic() - run_started)}）", flush=True)
 
         print("\n===== 总结（本次运行）=====")
         for name in (name_a, name_b, "draw"):
@@ -1006,12 +1037,7 @@ def main():
         for line in seat_breakdown(records):
             print(line)
 
-        if args.stats_file:
-            stats_file = Path(args.stats_file)
-            stats_file.parent.mkdir(parents=True, exist_ok=True)
-            with stats_file.open("a", encoding="utf-8") as handle:
-                for record in records:
-                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        if stats_file is not None:
             cumulative = load_stats(stats_file, {name_a, name_b}, args.map_id)
             print(f"\n===== 累计统计（{stats_file.name}，{len(cumulative)} 局）=====")
             for line in seat_breakdown(cumulative):

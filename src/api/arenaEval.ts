@@ -171,7 +171,9 @@ export function parsePlannedBatches(line: string): { total: number; games: numbe
   return match ? { total: Number(match[1]), games: Number(match[2]) } : null;
 }
 
-/** 每批完成行：`[3/12] OK a vs b @ map（2 局 / 10s，0.2 局/s）| 剩余约 1m30s`（OK 后实为两个空格，label 需 trim） */
+/** 每批完成行：`[3/12] OK a vs b @ map（2 局 / 1m30s，0.2 局/s 或 25s/局）| 剩余约 5m00s`
+ * （OK 后实为两个空格，label 需 trim。round_robin 另透传 `  [label] 第 n/N 局完成（…）`
+ * 形式的逐局进度行：只进 outputTail 供展示，不参与解析）。 */
 export function parseProgressLine(line: string): { done: number; total: number; ok: boolean; label: string } | null {
   const match = line.match(/^\[(\d+)\/(\d+)\] (OK|FAIL) (.+)$/);
   if (!match) return null;

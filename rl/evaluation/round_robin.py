@@ -5,6 +5,8 @@
 供 script/generateArenaLeaderboard.mjs 评分与竞技场页面使用。
 
 - 断点续跑：按（参与者对, 地图）统计 JSONL 已有局数，只补差额，已跑对局不重复；
+- 每局完成即写入累积 JSONL（中断只丢进行中的一局），逐局进度行经 ``进度|`` 前缀
+  实时透传到控制台，批次完成行与剩余耗时预估按各批预估单独计算；
 - 每次运行带随机盐 seed-prefix：重跑 random 图必产生新地图（静态图种子不生效，
   但引擎战斗带随机伤害浮动，每局同样不重复）；
 - 复用 rl/evaluation/evaluate_cross.py 子进程，原样保留其跨版本编码路由与配对换座逻辑；
@@ -58,11 +60,17 @@ DEFAULT_STATS_FILE = Path("arena/matches.jsonl")
 # annihilation / royale 的炮火缩圈与淘汰流程尚未接入。
 SUPPORTED_EVAL_MODES = ("standard", "simultaneous")
 # 模型批次的固定开销（torch 导入 + tsx worker 启动 + 模型加载）与单局耗时；
-# 纯算法批次不加载模型，开销与单局都低一档。用于预估耗时。
+# 纯算法批次不加载模型，开销低一档。单局耗时优先用累积历史均速，缺历史时按
+# 模式兜底：同时回合单局远慢于标准模式且地图间差异大（实测对峙之地 ~6s/局、
+# 雾杉疏林重算法对 ~160s/局），兜底值取偏保守的中间量。
 TASK_OVERHEAD_SEC_MODEL = 15
 SEC_PER_GAME_MODEL = 3.5
 TASK_OVERHEAD_SEC_ALGO = 6
-SEC_PER_GAME_ALGO = 1.0
+SEC_PER_GAME_ALGO_STANDARD = 1.0
+SEC_PER_GAME_ALGO_SIMULTANEOUS = 20.0
+# evaluate_cross.py 每局完成的进度行前缀：实时透传到评估控制台，其余输出仅在
+# 批次失败时回显尾部。字面量与前者保持一致（脚本间不经 import 共享）。
+GAME_PROGRESS_PREFIX = "进度|"
 
 
 def parse_args():
@@ -192,11 +200,22 @@ def resolve_algorithms(root: Path, raw: str | None, mode: str = "standard") -> t
     return [pair for pair in registered if pair[0] in needles], None
 
 
-def count_existing(stats_file: Path) -> dict[tuple[str, str, str], int]:
-    """按（地图, 参与者 A, 参与者 B）统计 JSONL 中已累积的局数。"""
+def _pair_key(map_id: str, name_a: str, name_b: str) -> tuple[str, str, str]:
+    """累积统计的键：地图 + 排序后的参与者显示名（座位次序不敏感）。"""
+    first, second = sorted((name_a, name_b))
+    return (map_id, first, second)
+
+
+def count_existing(stats_file: Path) -> tuple[dict[tuple[str, str, str], int],
+                                              dict[tuple[str, str, str], float]]:
+    """按（地图, 参与者 A, 参与者 B）统计 JSONL 已累积局数与总耗时（秒）。
+
+    耗时取记录的 durationSec，供耗时预估用；早期无计时的旧局只计局数、不进样本。
+    """
     counts: dict[tuple[str, str, str], int] = {}
+    durations: dict[tuple[str, str, str], float] = {}
     if not stats_file.exists():
-        return counts
+        return counts, durations
     for line in stats_file.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -209,10 +228,12 @@ def count_existing(stats_file: Path) -> dict[tuple[str, str, str], int]:
         if not isinstance(players, dict) or len(players) != 2:
             continue
         names = sorted(str(name) for name in players.values())
-        map_id = str(record.get("map", ""))
-        key = (map_id, names[0], names[1])
+        key = (str(record.get("map", "")), names[0], names[1])
         counts[key] = counts.get(key, 0) + 1
-    return counts
+        duration = record.get("durationSec")
+        if isinstance(duration, (int, float)) and duration > 0:
+            durations[key] = durations.get(key, 0.0) + float(duration)
+    return counts, durations
 
 
 def build_command(python: str, script: Path, spec_a: str, spec_b: str,
@@ -234,12 +255,23 @@ def build_command(python: str, script: Path, spec_a: str, spec_b: str,
     return command
 
 
-def estimate_batch_seconds(spec_a: str, spec_b: str, games: int) -> float:
-    """按批次构成粗估耗时：纯算法批不加载模型，明显更快。"""
-    pure_algo = spec_a.startswith("algo:") and spec_b.startswith("algo:")
-    if pure_algo:
-        return TASK_OVERHEAD_SEC_ALGO + games * SEC_PER_GAME_ALGO
-    return TASK_OVERHEAD_SEC_MODEL + games * SEC_PER_GAME_MODEL
+def estimate_batch_seconds(task: dict, counts: dict, durations: dict,
+                           map_avgs: dict[str, float], mode: str) -> float:
+    """逐批次预估耗时（秒）：模型批保持常量；纯算法批单局耗时按
+    同图同对累积历史均速 > 同图均速 > 模式兜底 的顺序取值。"""
+    if not (task["spec_a"].startswith("algo:") and task["spec_b"].startswith("algo:")):
+        return TASK_OVERHEAD_SEC_MODEL + task["games"] * SEC_PER_GAME_MODEL
+    per_game: float | None = None
+    key = _pair_key(task["map"], task["name_a"], task["name_b"])
+    count = counts.get(key, 0)
+    if count and key in durations:
+        per_game = durations[key] / count
+    else:
+        per_game = map_avgs.get(task["map"])
+    if per_game is None:
+        per_game = (SEC_PER_GAME_ALGO_SIMULTANEOUS if mode == "simultaneous"
+                    else SEC_PER_GAME_ALGO_STANDARD)
+    return TASK_OVERHEAD_SEC_ALGO + task["games"] * per_game
 
 
 def format_eta(seconds: float) -> str:
@@ -254,51 +286,81 @@ def format_eta(seconds: float) -> str:
 
 
 class Progress:
-    def __init__(self, total: int):
+    def __init__(self, total: int, estimates: list[float], jobs: int):
         self.total = total
         self.done = 0
         self.failed = 0
         self.elapsed = 0.0
         self.games = 0
+        # 各批预估耗时的副本：完成一批清零一项，剩余 ETA = 未完成批次预估和 / 并发数。
+        # 比「平均批次耗时 × 剩余批数」更贴近慢批次垫底（如重算法对 × 大地图）的收尾。
+        self.remaining_estimates = list(estimates)
+        self.jobs = max(1, jobs)
         self._lock = threading.Lock()
 
-    def report(self, label: str, ok: bool, games: int, duration: float, tail: str = "") -> None:
+    def report(self, index: int, label: str, ok: bool, games: int, duration: float,
+               tail: str = "") -> None:
         with self._lock:
             self.done += 1
             if not ok:
                 self.failed += 1
             self.elapsed += duration
             self.games += games
-            avg = self.elapsed / self.done
-            eta = avg * (self.total - self.done)
+            self.remaining_estimates[index] = 0.0
+            eta = sum(self.remaining_estimates) / self.jobs
             status = "OK " if ok else "FAIL"
-            rate = games / duration if duration > 0 else 0
-            print(f"[{self.done}/{self.total}] {status} {label} "
-                  f"（{games} 局 / {duration:.0f}s，{rate:.1f} 局/s）| 剩余约 {format_eta(eta)}",
+            detail = f"{games} 局 / {format_eta(duration)}"
+            if games > 0 and duration > 0:
+                rate = games / duration
+                # 慢批次按 局/s 会显示成 0.0，低速率改用 s/局 更可读。
+                detail += f"，{rate:.1f} 局/s" if rate >= 0.1 else f"，{duration / games:.0f}s/局"
+            print(f"[{self.done}/{self.total}] {status} {label}（{detail}）| 剩余约 {format_eta(eta)}",
                   flush=True)
             if not ok and tail:
                 for line in tail.strip().splitlines()[-8:]:
                     print(f"    {line}", flush=True)
 
 
-def run_task(command: list[str], label: str, games: int, progress: Progress) -> None:
+def run_task(command: list[str], label: str, games: int, progress: Progress,
+             task_index: int) -> None:
     start = time.monotonic()
     ok, tail = False, ""
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             command,
             cwd=str(Path(__file__).resolve().parent.parent.parent),
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
         )
-        ok = result.returncode == 0
-        tail = result.stderr or result.stdout
+        # stderr 由独立线程排空，避免管道写满阻塞子进程；stdout 逐行读，
+        # 每局完成的进度行即时透传（8 路并发下带 label 才能分清属于哪批），
+        # 其余输出留作失败回显，只保留尾部防长跑积内存。
+        stderr_lines: list[str] = []
+        stderr_thread = threading.Thread(
+            target=lambda: stderr_lines.extend(proc.stderr or []), daemon=True)
+        stderr_thread.start()
+        stdout_tail: list[str] = []
+        for line in proc.stdout or []:
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            if line.startswith(GAME_PROGRESS_PREFIX):
+                print(f"  [{label}] {line[len(GAME_PROGRESS_PREFIX):]}", flush=True)
+            else:
+                stdout_tail.append(line)
+                if len(stdout_tail) > 200:
+                    stdout_tail.pop(0)
+        proc.wait()
+        stderr_thread.join(timeout=5)
+        ok = proc.returncode == 0
+        tail = "\n".join(stderr_lines) or "\n".join(stdout_tail)
     except OSError as exc:
         tail = str(exc)
     duration = time.monotonic() - start
-    progress.report(label, ok, games if ok else 0, duration, tail if not ok else "")
+    progress.report(task_index, label, ok, games if ok else 0, duration, tail if not ok else "")
 
 
 def main():
@@ -372,7 +434,14 @@ def main():
     print(f"目标：每对 × 每图 {args.games} 局；累积文件：{stats_file}")
     print(f"seed 盐：{salt}（断点续跑时请固定 --salt 以跳过已有局数）")
 
-    counts = count_existing(stats_file)
+    counts, durations = count_existing(stats_file)
+    # 同图均速兜底样本：该图全部带计时历史合并平均，覆盖「新对子尚无历史」的场景。
+    map_games: dict[str, int] = {}
+    map_seconds: dict[str, float] = {}
+    for (map_key, _name_a, _name_b), total_sec in durations.items():
+        map_games[map_key] = map_games.get(map_key, 0) + counts.get((map_key, _name_a, _name_b), 0)
+        map_seconds[map_key] = map_seconds.get(map_key, 0.0) + total_sec
+    map_avgs = {mid: map_seconds[mid] / n for mid, n in map_games.items() if n > 0}
     ordered = sorted(participants, key=lambda part: part[1])
     tasks: list[dict] = []
     skipped_games = 0
@@ -399,19 +468,22 @@ def main():
     if not tasks:
         print("所有目标局数已达成，无需补跑。")
         return 0
-    estimated = sum(estimate_batch_seconds(task["spec_a"], task["spec_b"], task["games"])
-                    for task in tasks) / max(1, args.jobs)
+    estimates = [estimate_batch_seconds(task, counts, durations, map_avgs, mode)
+                 for task in tasks]
+    estimated = sum(estimates) / max(1, args.jobs)
+    algo_fallback = (SEC_PER_GAME_ALGO_SIMULTANEOUS if mode == "simultaneous"
+                     else SEC_PER_GAME_ALGO_STANDARD)
     print(f"预估耗时：约 {format_eta(estimated)}"
-          f"（jobs={args.jobs}，模型批 ~{SEC_PER_GAME_MODEL}s/局+{TASK_OVERHEAD_SEC_MODEL}s 启动，"
-          f"纯算法批 ~{SEC_PER_GAME_ALGO}s/局+{TASK_OVERHEAD_SEC_ALGO}s 启动）\n")
+          f"（jobs={args.jobs}，逐批按累积历史均速预估；缺历史时纯算法批 ~{algo_fallback:g}s/局、"
+          f"模型批 ~{SEC_PER_GAME_MODEL:g}s/局兜底，另加批次启动开销）\n")
 
     if args.dry_run:
-        for task in tasks:
+        for task, estimate in zip(tasks, estimates):
             print(f"  {task['name_a']} vs {task['name_b']} "
-                  f"@ {task['map']}：补 {task['games']} 局")
+                  f"@ {task['map']}：补 {task['games']} 局，预估约 {format_eta(estimate)}")
         return 0
 
-    progress = Progress(len(tasks))
+    progress = Progress(len(tasks), estimates, args.jobs)
     commands = [
         (build_command(python, evaluate_script, task["spec_a"], task["spec_b"],
                        task["map"], task["games"], stats_file,
@@ -423,12 +495,12 @@ def main():
 
     start = time.monotonic()
     if args.jobs <= 1:
-        for command, label, games in commands:
-            run_task(command, label, games, progress)
+        for index, (command, label, games) in enumerate(commands):
+            run_task(command, label, games, progress, index)
     else:
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-            futures = [pool.submit(run_task, command, label, games, progress)
-                       for command, label, games in commands]
+            futures = [pool.submit(run_task, command, label, games, progress, index)
+                       for index, (command, label, games) in enumerate(commands)]
             for future in as_completed(futures):
                 future.result()
 

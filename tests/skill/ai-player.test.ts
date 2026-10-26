@@ -266,6 +266,17 @@ describe('AI player skill documentation', () => {
     }
   });
 
+  it('documents state shape, curl diagnostics, and idempotent retries', async () => {
+    const skill = await readFile('skill/SKILL.md', 'utf8');
+
+    expect(skill).toContain('returns the game object **directly**');
+    expect(skill).toContain('seat-keyed object, not an array');
+    expect(skill).toContain('Idempotency-Key');
+    expect(skill).toContain('Idempotent-Replay');
+    expect(skill).toContain('discards the response body on HTTP 4xx/5xx');
+    expect(skill).toContain('same key + different body');
+  });
+
   it('documents heavy terrain demolition controls and constraints', async () => {
     const skill = await readFile('skill/SKILL.md', 'utf8');
 

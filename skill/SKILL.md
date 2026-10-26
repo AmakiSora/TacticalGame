@@ -57,12 +57,12 @@ The create/join response is the **only** time the server ever shows your token. 
 
 ```bash
 # join — the response body's player.token is your seat token:
-curl -fsS -X POST ${BASE_URL}/api/games/:id/join -H 'Content-Type: application/json' \
+curl -sS -X POST ${BASE_URL}/api/games/:id/join -H 'Content-Type: application/json' \
   -d '{"name":"Agent B"}' > "$SCRATCH/join.json"
-jq -r '.player.token // empty' "$SCRATCH/join.json" > "$SCRATCH/token.txt"   # empty file ⇒ an error body; read join.json
+jq -r '.player.token // empty' "$SCRATCH/join.json" > "$SCRATCH/token.txt"   # empty token ⇒ read join.json; never add -f here (it empties the file on 4xx/5xx)
 
 # create with participate:true — save BOTH tokens from the same response:
-curl -fsS -X POST ${BASE_URL}/api/games -H 'Content-Type: application/json' \
+curl -sS -X POST ${BASE_URL}/api/games -H 'Content-Type: application/json' \
   -d '{"mapId":"default","maxPlayers":2,"participate":true,"playerName":"Agent A"}' > "$SCRATCH/create.json"
 jq -r '.player.token // empty' "$SCRATCH/create.json" > "$SCRATCH/token.txt"
 jq -r '.hostToken // empty'    "$SCRATCH/create.json" > "$SCRATCH/host.txt"
@@ -71,7 +71,7 @@ jq -r '.hostToken // empty'    "$SCRATCH/create.json" > "$SCRATCH/host.txt"
 Shell variables do **not** survive between your commands — every later call must re-read the file:
 
 ```bash
-curl -fsS ${BASE_URL}/api/games/:id -H "X-Player-Token: $(cat "$SCRATCH/token.txt")"
+curl -sS ${BASE_URL}/api/games/:id -H "X-Player-Token: $(cat "$SCRATCH/token.txt")"
 node "$SCRATCH/wait-turn.mjs" --url ${BASE_URL} --game <gameId> --player <yourSeat> --token "$(cat "$SCRATCH/token.txt")"
 ```
 
@@ -96,11 +96,11 @@ Keep player/host tokens in headers only. Never put tokens in URLs or print them 
 
 The server serves this skill at `${BASE_URL}/api/skill*` — unauthenticated, read-only. The server copy is the only source of truth, but do **not** blindly re-read the whole skill from it every game either — that wastes a full read when your copy is already current. Once per game, before your **first** game API call, run this cheap freshness check:
 
-1. `curl -fsS ${BASE_URL}/api/skill/manifest` → `{ appVersion, files: [{ name, bytes, sha256 }] }` (a few hundred bytes; read it).
+1. `curl -sS ${BASE_URL}/api/skill/manifest` → `{ appVersion, files: [{ name, bytes, sha256 }] }` (a few hundred bytes; read it).
 2. Compare your copy, strongest signal first:
    - **Hash compare (preferred):** hash the local `SKILL.md` you just loaded (`sha256sum` / `shasum -a 256` / `certutil -hashfile <file> SHA256`) and compare with the manifest's `SKILL.md` entry. Equal → your copy is byte-identical to the server's and **is** canonical: continue with it, no re-fetch.
    - **Version compare (fallback):** if you cannot hash files, compare the `app version` line in your copy's header with `manifest.appVersion`. Equal → treat your copy as canonical.
-   - **Different, missing, or undecidable** → `curl -fsS ${BASE_URL}/api/skill` and follow the **fetched** text from this point on; your local copy is outdated.
+   - **Different, missing, or undecidable** → `curl -sS ${BASE_URL}/api/skill` and follow the **fetched** text from this point on; your local copy is outdated.
 3. If you reached this file by fetching `${BASE_URL}/api/skill` yourself, you already hold the canonical entry — skip the check.
 
 Always fetch these from the server regardless of the check (small files you have not read this game, so there is no double-read to save):
@@ -150,7 +150,7 @@ Run it in the **foreground as a blocking command** immediately after `/end-turn`
 
 Player actions need a player token (`POST /api/games` with `participate: true`, or `POST /join`). That response is the only time the token is shown — save it to `$SCRATCH/token.txt` immediately (see [Player token](#player-token-mandatory)) and read it back from that file in every later call. Host token is separate; `participate: false` hosts never get a player token.
 
-Transient `502`/`503`: back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>`, no token query param.
+Transient `502`/`503`: back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. For action retries, reuse the same `Idempotency-Key` (see API). `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>`, no token query param.
 
 ## Post-game review (复盘)
 
@@ -206,6 +206,37 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 
 Create: `{ gameId, hostToken, player: { id, token } \| null, lobby }`.  
 Join: `{ player: { id, token }, lobby }`.
+
+### State response shape
+
+`GET /api/games/:id` returns the game object **directly** — there is no `{ "game": ... }` wrapper. Top-level fields include `id`, `mapId`, `phase`, `players`, `units`, `cells`, `controlPoints`, `headquarters`, `resources`, `turn`, `plan`, `config`, `adjudication` and `events`.
+
+`players` is a **seat-keyed object, not an array**:
+
+```text
+players = {
+  "player_a": { "id": "player_a", "name": "...", "status": "active", "stats": { ... } },
+  "player_b": { ... }
+}
+```
+
+Use `players[you].status`; use `Object.values(players)` when iterating all seats. `POST /api/games/:id/start` differs: it returns `{ ok: true, game }`.
+
+`GET /api/games/:id?include=state,events,config,adjudication` projects sections; a matching `If-None-Match` returns `304` with no body. Without `include`, all sections are returned.
+
+### Errors, retries, and idempotency
+
+Action failures return JSON `{ "error": "<human-readable reason>", "code": "<machine code>" }` — e.g. `{ "error": "需要 45 补给", "code": "insufficient_supplies" }` or `{ "error": "炮火区内无法部署", "code": "invalid_deploy" }`. Read the body, not just the HTTP status.
+
+`curl -f` **discards the response body on HTTP 4xx/5xx**, so a failed action can look like an empty file plus exit code 22. When diagnosing, use `curl -sS` (no `-f`) or `curl -sS --fail-with-body`; reserve `-f` for script downloads where an error page must not be written to the target file.
+
+All action and plan POST endpoints accept an optional `Idempotency-Key` header (≤200 chars, scoped per player):
+
+- same key + same body → replay the first successful response with `Idempotent-Replay: true` (24h TTL; the action is **not** re-executed);
+- same key + different body → `409 idempotency_conflict`;
+- omitted key → a retry can execute the action twice.
+
+Generate a fresh key per logical action (UUID or random string) and **reuse it only when retrying that exact method + body** after a timeout or `502`/`503`. Never reuse a key for a different action.
 
 `game_already_full` / `game_already_started` → report; do not fetch state without a token. `lobby_not_ready` → wait. `unsupported_player_count` → wrong lobby size for map.
 

@@ -91,111 +91,43 @@ npm run export-state
 
 ## 核心规则
 
-- 地图可声明 `mode: "annihilation"` 进入「歼灭模式」。该模式不生成总部，每名玩家开局拥有一个出生据点和地图配置的初始部队；最后一个单位死亡时立即淘汰，仅剩一名玩家时获胜。
-- 歼灭模式的炮火会先预告、再按配置轮次向地图中心收缩。危险区单位在每个整轮开始时同时受到无视防御的炮火伤害，危险区内禁止部署、治疗和据点维修；炮火同时消灭所有剩余玩家时判定同归于尽。
-- 歼灭模式按有效行动贡献值计算行动分：部署/爆破记 1 点，实际伤害/治疗每 20 HP 向上折算 1 点，占领据点记 2 点，纯移动不计分；贡献值默认每点折算 10 分。玩家淘汰时会冻结其裁决分，终局排名不会因单位清理而把已淘汰玩家全部记为 0 分。
-- 地图可声明 `mode: "simultaneous"` 进入「同时回合模式」（当前内置 `standoff` 对峙之地 2/3/6 人、`molten-throne` 熔池王座 2 人、`mistpine` 雾杉疏林 2 人，均为标准 HQ 胜负规则；支持人数、布局和数值以地图配置为准）。该模式没有行动顺序：每回合所有玩家在**计划阶段**通过普通动作接口把指令**入队而不执行**（可撤回，`POST /api/games/:id/plan/revoke` 撤回单条、`plan/clear` 清空、`plan/reorder` 原子调整队列顺序），`end-turn` 表示确认锁定；全员确认后（或房主 `host/force-resolve` 强制）服务器**按行动点逐步同时结算**。
-- 地图可声明 `mode: "royale"` 进入「大逃杀模式」（当前首发 `snowflake` 雪花，2/3/6 人）：同时回合的全部结算规则 + 歼灭规则——不生成总部、出生槽绑定据点（出生据点归属玩家并作为部署起点）、兵力打光即淘汰、危险区内禁止部署与治疗；炮火配置 `annihilation.artillery` 为必填块。`snowflake` 是半径 9 的雪花战场：六条放射通道被屏障与水域切割，全图只有六个 `forward_base` 出生据点（无补给/维修点，占住基地就是命脉，支援兵是唯一续航）；前 5 回合高经济和平发育（起始补给 500、基础收入 20、每轮 8 行动、放手爆兵），第 5 回合出现炮火预警，第 6 回合起每回合收缩一圈，第 13 回合起安全区收缩至极限——中心格本身是屏障，最终只剩内圈六格立足，幸存者在雪花花心决出唯一赢家；无回合上限，终局只靠淘汰或房主强制裁决。
-  - **队列顺序即行动点**：每个排队动作消耗 1 行动点，队列第 N 条与所有玩家的第 N 条同时结算，全部结算完才进入第 N+1 条；队列长度上限 = `actionsPerTurn`（standoff 为 5，molten-throne 为 4，mistpine 为 12）。同一单位可以跨行动点多次行动（例如先移动再攻击），也可用新增的 `POST /api/games/:id/plan/wait`（待命，1 行动点）把关键动作对齐到更晚的行动点。部署独立计点，新单位当回合没有单位 ID 可引用，因此无法继续排动作。
-  - **失败连锁**：某单位在较早行动点的动作硬失败（移动失败、目标非法、单位已不存在等）后，该单位本轮后续排队的动作全部作废（`action_failed`，reason `previous_action_failed`），行动点照扣；攻击落空/治疗无人可治不算硬失败，不触发连锁。
-  - **攻击改为瞄准格子/方向**：`POST /attack` 请求体为 `{ attackerId, q, r }`，可点击范围由地图为每个兵种配置的 `attackShape` 决定（未配置默认 `single`）：`single` = 射程内任选一格；`line`（步兵）= 点击格须在正六方向射线上，覆盖该方向前 `length` 格（默认 2），**射线上所有敌人各自独立结算伤害**；`arc`（重装）= 点击相邻格定向，覆盖该格及其左右相邻共 3 格扇形。计划期的射程/形状按该单位在队列里的**投影站位**校验（支持先移动后攻击）；结算按本步移动/部署后的实际站位判定覆盖格内敌方单位/敌方总部（友军免伤、空格落空即浪费）。`attackLock: true` 的兵种（游侠）在计划时点击格上若站着敌方单位则**锁定**该单位：结算时只要目标未逃出攻击者的射程圈，无论移动到哪里都命中，逃出射程才落空（`missed`，reason `target_escaped`）——这是反风筝的核心机制。**每单位每轮最多攻击次数由地图 `balance.attacksPerUnit` 决定（默认 1）**，超过时入队即 `attack_limit_reached`，防止单个单位把全部行动点梭哈在同一目标上。
-  - **移动按地形寻路、单位不挡路**：计划期按水/障碍做 BFS（单位与总部不算障碍），目的地当前被占用也可以入队；结算时按该行动点开始时的局面判定，目的地仍是障碍/仍被未移走的单位占用则失败（`destination_blocked` / `destination_occupied`）。同一步内先算所有移出、再算移入：A 离开 X、B 进入 X 可以同时成功，交换位置也允许；若依赖的移出失败，则移入失败。跨玩家同一步指向同一格仍全部失败（`destination_conflict`），不返还行动点、失败部署不扣补给。
-  - 爆破产生的平地从下一步起生效。**治疗为区域效果**：`POST /heal` 请求体为 `{ supportId, q, r }`，覆盖形状由 `healShape` 配置（未配置默认 `single`；standoff 支援兵为 `arc` 三格扇形）；计划期只校验形状/射程，覆盖格内是否有友军、是否有人受伤、是否在炮火区都留到结算判定（炮火区治疗 `fizzled`，reason `artillery_zone`）。
-  - **净血量同时结算**：目标 HP = 当前 HP + 全部治疗 − 全部承受伤害，结果 > 0 则存活；同回合互杀成立，阵亡攻击者的炮弹仍然落地。
-  - 第 1 回合无收入；自第 2 回合起，回合边界给**所有**存活玩家同时发放收入与维修点治疗。占点在结算结束时按单位站位判定。地图数值以本局 `config` 为准：`standoff` 为 15 回合上限、每出生位 2 步兵 + 1 侦察起始（重装/游侠/支援均为部署兵种）、基础收入 8、外围 supply 据点收入 8、总部 200 血，裁决以据点流量（60）和 HQ 伤害（5）为主；`molten-throne` 为 20 回合上限、每出生位 5 侦察 + 1 支援起始、基础收入 5、24 据点（16 补给 / 4 维修 / 4 前哨，仅前哨可部署）、总部 100 血，裁决以据点（75）和 HQ 伤害（7）为主；`mistpine` 为 30 回合上限、双方各 34 单位（13 步兵 / 5 侦察 / 5 重装 / 7 游侠 / 4 支援）、零补给 / 零收入 / 零据点且总部禁部署、每轮 12 行动点、总部 180 血，裁决以 HQ 伤害与残余军力为主。不要跨图套用单位表、收入或权重。
-  - 其他玩家的计划队列严格保密：`GET /api/games/:id` 仅返回 `plan.myQueue`（自己的队列）与 `plan.committed`（已确认名单）。
-- 地图为尖顶六边形，坐标为 `{ q, r }`。
-- 当前内置地图包含旧双人地图、`multiplayer-ring` 多人环形地图、同时回合模式的 `standoff`（对峙之地，2/3/6 人）、`molten-throne`（熔池王座，2 人，24 据点、仅前哨可部署的中腹争夺图）与 `mistpine`（雾杉疏林，2 人，无据点、零经济、总部禁部署的 34 对 34 纯军队图）、大逃杀模式的 `snowflake`（雪花，2/3/6 人，无回合上限）与 `narrow-road`（狭路相逢，2 人，单格宽狭路连接两端基地，两端前哨为唯一部署点，无回合上限）和无回合上限的 `whirlpool`（星海漩涡，半径 8 六旋臂异形图，只能打到全灭或房主强制裁决）；每张地图会声明支持的玩家人数。旧地图默认使用 `radius` 内的完整六边形，异形地图通过 `playableCells` 显式声明实际存在的格子。
-- 地形：`plain` 可通行/部署，`water` 和 `blocker` 不可通行/部署。
-- 每方开局有总部；默认图提供 2 个步兵、1 个侦察兵、80 补给，`dual-lanes` 不提供免费单位而是给 208 补给让玩家自行部署。
-- **每回合最多消耗 5 个行动点**（`config.balance.actionsPerTurn`）。行动点按**单位激活**计算：首次操作一个单位（部署/移动/攻击/治疗/爆破）消耗 1 点并「激活」该单位，同一单位在本回合内的后续合法动作免费（因此移动+攻击只花 1 点）。部署出的新单位当回合已激活：不能移动，但可以立刻攻击/治疗，不再额外扣行动点。行动点用尽后，只能继续操作已激活的单位。这是为防止资源碾压方操作过多单位而设的硬上限。
-- 每个单位每回合可移动一次、行动一次。
-- 移动使用路径搜索，不能穿过水域、阻挡、单位或总部。
-- 攻击/治疗只按六边形距离判断，不做视线阻挡。
-- 只有步兵和侦察兵可占领据点；站在据点上结束己方回合即占领。
-- 回合切换后，新当前玩家获得基础收入 + 己方据点收入，按据点类型分别计算。
-- 可从己方总部或己方据点向相邻空白平地部署单位；`forward_base` 据点可按地图配置降低从该点部署的实际费用。地图可设 `balance.deployFromHq: false` 禁止从总部部署（缺省允许），此时只能从己方据点出兵。类型化据点地图还可按类型关闭部署入口：`balance.controlPointTypes.<类型>.canDeploy: false` 时该类型据点不能作为部署起点（缺省允许）。
-- `repair` 据点会在拥有者行动开始时修复站上或距离 1 格内的己方受伤单位；总部和敌军不会被修复，每个单位每回合最多被据点修复一次。
-- 重装单位可花费本回合行动爆破相邻 `blocker` 地形，将其永久变为 `plain`。爆破遵循行动点上限；已移动但未行动的重装可继续爆破，爆破后不能攻击或治疗。
-- 总部归零的玩家被淘汰，其裁决分会在清场前冻结，随后单位移除、据点转为中立、资源冻结；对局继续。
-- 仅剩一名存活玩家时立即获胜。
-- 达到地图配置的最大轮数时，仅存活玩家参与裁决。分数按地图 `balance.adjudicationWeights` 计算：累计总部伤害×W_dmg + 己方总部当前 HP×W_hp + 据点分×W_cp + 存活部队价值×W_army + 剩余补给×W_sup + 击杀敌军造价×W_kill。据点分按 `controlPointFlowRatio`（默认 0.7）混合「每轮平均持有」与「期末当前持有」；3.6.0 起行动功绩已移除，不再有行动分。权重因图而异；唯一最高分获胜，并列最高则平局。`balance.maxTurns` 为 `null` 的地图（如 `whirlpool`）**无回合上限**，永不按轮数裁决，只能靠淘汰或房主强制裁决结束。
+规则唯一规范源是仓库根 `skill/`（服务器经 `GET /api/skill/files/:name` 下发同一份内容）；对局数值一律以本局 `config` 与 `GET /api/games/:id` 的实时状态为准。本节只做速览，不再复写细则：
+
+| 模式 | 内置地图 | 核心机制 | 规范文件 |
+|---|---|---|---|
+| `standard` 逐人轮流 | `default`、`breach`、`danger-close`、`dual-lanes`、`multiplayer-ring`、`whirlpool` | 有总部、有行动顺序；总部归零淘汰；达到 `maxTurns` 按裁决分定胜负 | [skill/standard.md](skill/standard.md) |
+| `annihilation` 歼灭 | `artillery-zone` | 无总部；炮火预告后逐轮向中心收缩；危险区禁部署/治疗/维修；最后存活者获胜 | [skill/annihilation.md](skill/annihilation.md) |
+| `simultaneous` 同时回合 | `standoff`、`molten-throne`、`mistpine` | 无行动顺序：先秘密排队，再按行动点分步同时结算；攻击/治疗瞄准格子或方向 | [skill/simultaneous.md](skill/simultaneous.md) |
+| `royale` 大逃杀 | `snowflake`、`narrow-road` | 同时回合结算 + 歼灭规则（无总部、炮火收缩、打光即淘汰） | [skill/royale.md](skill/royale.md) |
+
+所有模式共享的速览：
+
+- 尖顶六边形，坐标 `{ q, r }`；`game.cells` 是实际可用格集合（`map.radius` 不等于可走圆盘）；地形只有 `plain` 可通行/部署，`water` 与未爆破的 `blocker` 不可通行。
+- 行动点按**单位激活**计：首次部署/移动/攻击/治疗/爆破耗 1 点，同一单位本回合后续合法动作免费，上限 `config.balance.actionsPerTurn`。
+- 部署来源、占领限制、治疗与爆破的角色限制、收入与维修规则按模式与地图配置，见对应 skill 文件。
+- 裁决公式的权威定义见 [skill/SKILL.md](skill/SKILL.md)「Adjudication score」，实时分数直接读 `GET /api/games/:id` 的 `adjudication`，不要自行重算。
+- 歼灭计分、同时回合的分步结算/失败连锁/攻击形状、大逃杀炮火节奏等模式细则只维护在对应 skill 文件。地图清单与逐图数值以 `maps/*.json` 为准（文件名即 mapId）。
 
 ## 单位
 
-| 类型 | HP | 攻击 | 防御 | 移动 | 射程 | 费用 | 角色 |
-|---|---:|---:|---:|---:|---:|---:|---|
-| `infantry` | 100 | 30 | 8 | 3 | 1 | 45 | 占点与守点 |
-| `scout` | 65 | 16 | 4 | 5 | 1 | 38 | 快速抢点 |
-| `heavy` | 150 | 38 | 13 | 2 | 1 | 92 | 抗线突破 |
-| `ranger` | 72 | 44 | 3 | 2 | 3 | 78 | 远程输出 |
-| `support` | 82 | 10 | 5 | 3 | 1 | 60 | 治疗支援 |
-
-总部：HP 180，防御 6。
-
-> 经济说明：`default` 仍使用基础收入 10/回合、每个己方据点额外 +12；`dual-lanes` 使用类型化据点收入，并以 208 开局补给替代免费初始单位。配合 5 行动点上限，囤积补给无法快速转化为兵力，避免雪球。
+单位与总部数值**按地图配置**，不要跨图套用：同一兵种在不同地图上数值不同（例如 `mistpine` 步兵 68 血，`default` 为 100；`default` 总部 180 血）。每局读 `game.config.units`、`game.units[]` 的实例字段（`hp` / `attack` / `defense` / `moveRange` / `attackRange` / `cost` / `canCapture` / `healPower`）与 `config.headquartersSpec`；读取口径与战斗掷骰公式见 [skill/SKILL.md](skill/SKILL.md)「Units」，逐图数值与经济配置见 `maps/*.json`。
 
 ## REST API
 
-玩家操作类请求需要 `X-Player-Token: <token>`；房主管理请求需要 `X-Host-Token: <hostToken>`。房主身份与玩家身份分离，房主可不参战。
+完整接口参考见 [docs/API.md](docs/API.md)。玩家操作带 `X-Player-Token`，房主管理带 `X-Host-Token`；删除对局、强制裁决、管理员改名与竞技场跑批等控制接口使用 `AUTO_CONTROL_TOKEN`（未设置时仅本机可调用）。
 
-### 对局
+常用入口：
 
-| 方法 | 路径 | 请求体 | 返回 |
-|---|---|---|---|
-| `GET` | `/api/maps` | - | `{ maps }` |
-| `GET` | `/api/games` | - | `{ games }` |
-| `POST` | `/api/games` | `{ mapId, maxPlayers, participate?, playerName? }` | `{ gameId, hostToken, player: { id, token } \| null, lobby }` |
-| `GET` | `/api/games/:id/lobby` | - | 公开大厅摘要，不含凭证 |
-| `POST` | `/api/games/:id/join` | `{ name? }` | `{ player: { id, token }, lobby }` |
-| `POST` | `/api/games/:id/start` | host token header | `{ ok: true, game }` |
-| `GET` | `/api/games/:id` | token header | 完整状态，不含 token |
-| `PATCH` | `/api/games/:id/player` | `{ name }` | `{ ok: true, lobby }` |
-| `POST` | `/api/games/:id/leave` | player token header | `{ ok: true }` |
-| `DELETE` | `/api/games/:id/players/:playerId` | host token header | `{ ok: true, lobby }` |
-| `PATCH` | `/api/games/:id/host/max-players` | `{ maxPlayers }` + host token header | `{ ok: true, lobby }` |
-| `POST` | `/api/games/:id/host/skip-turn` | host token header | `{ ok: true }` |
-| `POST` | `/api/games/:id/host/eliminate` | `{ playerId }` + host token header | `{ ok: true }` |
-| `POST` | `/api/games/:id/force-adjudicate` | control token | `{ ok: true, result }` |
-| `DELETE` | `/api/games/:id` | control token | `{ ok: true }` |
+| 用途 | 接口 |
+|---|---|
+| 对局状态 | `GET /api/games/:id`（支持 `include` 投影与 ETag） |
+| 等待轮次/事件 | `GET /api/games/:id/wait?afterSeq=<seq>&timeout=<seconds>` |
+| 事件流 | `GET /api/games/:id/events`（`Accept: text/event-stream` 时建立 SSE） |
+| 玩法动作 | `POST /api/games/:id/{deploy,move,attack,heal,demolish,end-turn}` |
+| Agent 技能 | `GET /api/skill`、`/api/skill/manifest`、`/api/skill/files/:name` |
+| 健康与指标 | `GET /healthz`、`GET /readyz`、`GET /metrics` |
 
-强制裁决仅适用于进行中的对局，按请求时存活玩家的裁决总分决定胜者；最高分并列则平局。删除、强制裁决和管理员改名接口使用控制权限：设置 `AUTO_CONTROL_TOKEN` 后需要 `X-Control-Token: <token>` 或 `?token=<token>`；未设置时仅允许本机请求。删除对局会同时删除内存状态和持久化文件中的记录。
-
-`GET /api/games` 的每一项带 `gameId`、`mapId`、`mapName`（地图配置里的中文名，随机地图为「随机战场」）、`hostName`（房主名，房主未参战也有）、`createdAt`（建房时间）与 `phase` / `mode` / `maxPlayers` / `playerCount` / `players` 等字段，大厅页按「`mapName` 为主、`mapId` 为辅」展示。
-
-### 操作
-
-| 方法 | 路径 | 请求体 |
-|---|---|---|
-| `POST` | `/api/games/:id/deploy` | `{ unitType, fromId, q, r }` |
-| `POST` | `/api/games/:id/move` | `{ unitId, q, r }` |
-| `POST` | `/api/games/:id/attack` | 顺序模式 `{ attackerId, targetId }`；同时模式 `{ attackerId, q, r }`（指定格子） |
-| `POST` | `/api/games/:id/heal` | 顺序模式 `{ supportId, targetId }`；同时模式 `{ supportId, q, r }`（按 `healShape` 区域治疗） |
-| `POST` | `/api/games/:id/demolish` | `{ unitId, q, r }` |
-| `POST` | `/api/games/:id/end-turn` | `{}`（同时模式 = 确认锁定计划；全员确认即触发结算） |
-| `POST` | `/api/games/:id/plan/revoke` | `{ actionId }`（同时模式专用，撤回一条排队指令） |
-| `POST` | `/api/games/:id/plan/clear` | 无（同时模式专用，清空自己的计划） |
-| `POST` | `/api/games/:id/host/force-resolve` | 无（房主强制立即结算，未确认者按现有队列参与） |
-
-旧版 `/build`、`/produce`、`/sell` 已移除。
-
-所有玩法动作写接口（部署/移动/攻击/治疗/爆破/结束回合，以及同时模式的计划撤回/清空）支持可选 `Idempotency-Key` 请求头：同键同 body 回放首次响应并带 `Idempotent-Replay: true`，同键不同 body 返回 409 `idempotency_conflict`。`GET /api/games/:id` 支持 `include=state,events,config,adjudication` 投影与 `If-None-Match`（304）；AI 可用 `GET /api/games/:id/wait?afterSeq=<seq>&timeout=<seconds>` 长轮询等待新事件，SSE 断线可用 `Last-Event-ID` 续传。
-
-### 事件
-
-`GET /api/games/:id/events?after=<seq>` 返回增量事件；`Accept: text/event-stream` 时建立 SSE。
-
-事件类型：
-
-`player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `round_start`, `round_resolved`, `plan_committed`, `action_failed`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
-
-`game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。`game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。新生成的事件流中 `game_over` 是最后一条，最终回合的 `round_end` / `round_resolved` 必定先于它；既有归档回放仍可能保留 3.7.1 之前的旧顺序（`game_over` 后还有终局 `round_resolved`），读取旧回放时不要只按 `game_over` 截断。
-
-`income` 事件保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。`deploy` 事件中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。`control_point_repair` 事件包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
-
-`demolish` 事件包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。
-
-同时回合模式新增四类事件：`plan_committed`（某玩家确认本回合计划，只含 playerId 不泄露内容）、`round_resolved`（回合结算汇总，含每个玩家每条指令的结果 `executed/failed/missed/fizzled`）、`round_start`（新回合计划阶段开启）、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit` 字段，`hit: false` 表示预测射击落空。
+失败响应统一为 `{ error, code }`；玩法动作支持 `Idempotency-Key` 幂等重试。事件类型与回放格式、AI 机器人、回放库与竞技场评估接口见 [docs/API.md](docs/API.md)。
 
 ## 地图格式
 
@@ -296,19 +228,22 @@ python rl/evaluate.py --model rl/models/model.zip
 
 **算法按对局模式注册，不同模式不能混用**：每个算法在注册表（`algorithms/registry.mjs` 的 `ALGORITHM_META.modes`）声明支持的模式，大厅添加、命令行运行器与竞技场评估都会按此校验；前端"算法类型"下拉只列出当前对局模式可用的算法。
 
-当前内置算法（未标注者为标准模式）：
+当前内置算法（未标注者为标准模式）。每条只写定位，实测战绩与评分以 `/arena.html` 榜单为准，实现细节见各自档案：
 
-- **贪心算法（Greedy）**：优先攻击可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动
-- **随机算法（Random）**：从所有合法动作中随机选择
-- **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 每决策 100 次模拟推演，移动采样偏向 `movementGoal`，支持据点占领与入口部署决策；决策耗时 0.5-1 秒，实测对 greedy 胜率 25%（20 局 5:15），详细档案见 `algorithms/docs/algorithms/mcts.md`
-- **威胁感知算法（Threat）**：效用 AI + 威胁影响图——把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，内置敌方威胁图（落点承伤按敌方行动预算截断），因此集火斩杀、残血避险、走位避炮同时成立；单步决策 p50 0.25ms，实测对 greedy 胜率 70.6%（7 张标准地图 × 40 局）、对 mcts 14:6，为 2 人局最强的内置算法 AI（仅支持标准模式；3-4 人局权重未标定），详细档案见 `algorithms/docs/algorithms/threat.md`
-- **同时随机算法（Random-Sim，仅同时回合模式）**：从所有合法计划动作中随机选择入队（攻击/治疗按形状瞄准格子、支持同单位跨行动点多次行动、攻击次数受 `attacksPerUnit` 限制、队列长度即行动点），随后提交；同时回合模式的基线算法，详细档案见 `algorithms/docs/algorithms/random-sim.md`
-- **落点概率算法（Destination Probability，仅同时回合模式）**：为每个敌军建立落点概率分布，按"覆盖格上敌军出现概率 × 伤害"做预测射击；把敌军认领概率计入移动/部署成功率以规避同时模式的目的格冲突，并按据点裁定流量与收入计价抢点。v2 适配 3.8.0 分步引擎：队列前缀投影、同单位跨行动点连续行动、地形寻路与 `attacksPerUnit`；真实引擎同 harness 对 random-sim **60/60**、对 v1 **50/60（83.3%）**，详细档案见 `algorithms/docs/algorithms/dest-prob.md`
-- **兵棋推演算法（Kriegspiel，仅同时回合模式）**：把整份**有序**计划放进逐字镜像 `resolveRoundSteps` 的 JS 分步结算器真实推演，对多种对手性格做蒙特卡洛 rollout，按「均值 − λ·标准差」选择，再以「换步/删步/插 `wait`/换序/追加」的邻域爬山精修；v2 适配 3.8.0 分步引擎，与真实引擎逐点对拍 40 个局面零偏差，实测对 random-sim **60:0**、对 dest-prob v1 **52:8（86.7%）**、对 matrix-eq **29:31**（standoff 27:3、molten-throne 2:28 为已知斩首短板，合计数字两图方向相反不可用），180 局零非法动作；同 harness 同种子的 v1 基线对 dest-prob 43.3%、对 matrix-eq 31.7%，即适配价值 +43.4pp / +16.6pp（v1↔v2 直接对打 35:25，p=0.245 未达显著），详细档案见 `algorithms/docs/algorithms/kriegspiel.md`
-- **矩阵均衡算法（Matrix Equilibrium，仅同时回合模式）**：把每轮升维成「计划组合 × 计划组合」的矩阵博弈，用镜像结算器计算支付、CFR 自我对弈求均衡混合策略，并从 `round_resolved` 事件史重建敌方计划做实证校正；输出混合策略抽样而非确定性 argmax。v2 适配 3.8.0 分步引擎：镜像裁判（2026-10-23 修复后复跑）对 v1 **24:6**、对 kriegspiel v1 **11:19**、对 dest-prob v1 **14:16**、对 random-sim **30:0**；对当前 v2 kriegspiel / dest-prob 各 **7:23**，详细档案见 `algorithms/docs/algorithms/matrix-eq.md`
-- **棱镜算法（Prism，仅同时回合模式）**：逐行动点联合搜索完整计划队列，对 `press` / `mobile` / `objective` / `hold` 四种对手行为假设分别镜像 3.8 分步结算（撞格与腾格、部署/移动、锁定射击、范围攻击/治疗、级联失败与淘汰），再按本局裁决权重和“加权均值 + 最差情境惩罚”选择整轮计划；不依赖其它算法、不读取地图 ID，也不使用对手隐藏队列。竞技场 3.8.3 首战 4 对手 ×2 图 ×24 局共 192 局 **181:11**（standoff 96:0、molten-throne 85:11，当时评分 1977），3.8.5 扩至 288 局 **229:59**、评分 **1839**（同时榜第二）；真实引擎换座冒烟 7 组 ×2 局全胜（14:0，**样本仅覆盖双人两图，不作稳定优势结论**），详细档案见 `algorithms/docs/algorithms/prism.md`
-- **时序掌控算法（Tempo，仅同时回合模式）**：把「队列位置 = 结算拍」当成决策变量——先给每个敌军推一条最可能的行为剧本（抢点/原地开火/残血撤退/推进）并逐拍投影位置，再把敌方预测射击与可及火力区叠成「第 k 拍 × 格子」的威胁时间线给移动暴露计价，按裁决权重与剩余轮数调节攻守（领先收敛、落后加压、末轮清空补给），最后按价值把动作排进具体拍：斩杀/锁定射击抢早拍（早击杀作废受害者后续动作）、占点与治疗压末拍、部署抢先。真实引擎进程内标定（每对 60 局 = standoff 40 + molten-throne 20，零非法）：对 random-sim **100%**、dest-prob **55.0%**、kriegspiel **50.0%**、matrix-eq **43.3%**（molten-throne 85–90%，standoff 32–40%）；3.8.5 竞技场 288 局 134W/154L、评分 1444，详细档案见 `algorithms/docs/algorithms/tempo.md`
-- **经纬算法（Tempo-Weave，仅同时回合模式）**：以“哪个单位完成什么任务、需要几个行动点、结束后能否存活”为决策单位——先生成变长任务（直接射击、区域治疗、占点、跨步接敌后射击、脱离火力圈、攻城接近、开路），再在共享行动点预算内按收益/成本竞价排程（按已用行动点分桶的有限宽度搜索，650ms 软预算），并用独立的分步结算镜像做己方队列的静止参照投影；三席及以上按逐敌方席位的火力包络与己方 HQ 剩余 HP 提高回防紧迫度。真实引擎标定（两图 ×4 对手 ×30 局）**240/240**，多席位 standoff 3 人 15/15、6 人 24/6；竞技场首战 **288:0**、同时榜评分 **2355**，详细档案见 `algorithms/docs/algorithms/tempo-weave.md`
+- **贪心算法（Greedy）**：按固定优先级选择动作——可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动。[档案](algorithms/docs/algorithms/greedy.md)
+- **随机算法（Random）**：从所有合法动作中均匀随机选择。[档案](algorithms/docs/algorithms/random.md)
+- **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 定次模拟推演的通用搜索，移动采样偏向 `movementGoal`，支持据点占领与入口部署。[档案](algorithms/docs/algorithms/mcts.md)
+- **威胁感知算法（Threat）**：效用 AI + 威胁影响图，把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，无需搜索或模拟。[档案](algorithms/docs/algorithms/threat.md)
+- **势场算法（Field）**：人工势场——斥力井 + 引力井 + 波前距离场塑形走位，无需搜索。[档案](algorithms/docs/algorithms/field.md)
+- **裁决线算法（Verdict）**：反向规划——先从终局倒推「哪条线能赢、还差几回合」，再让全军向该线的期限收束。[档案](algorithms/docs/algorithms/verdict.md)
+- **同时随机算法（Random-Sim，仅同时回合模式）**：从合法计划动作中随机入队，支持同单位跨行动点连续行动，作为对照基线与模式隔离冒烟。[档案](algorithms/docs/algorithms/random-sim.md)
+- **落点概率算法（Destination Probability，仅同时回合模式）**：为敌军建立落点概率分布做预测射击，并把目的格冲突计入移动/部署成功率。[档案](algorithms/docs/algorithms/dest-prob.md)
+- **兵棋推演算法（Kriegspiel，仅同时回合模式）**：在镜像分步结算器上做整份计划的蒙特卡洛 rollout，按「均值 − λ·标准差」选择并邻域爬山精修。[档案](algorithms/docs/algorithms/kriegspiel.md)
+- **矩阵均衡算法（Matrix Equilibrium，仅同时回合模式）**：把每轮升维成计划组合的矩阵博弈，用 CFR 自我对弈求均衡混合策略并抽样输出。[档案](algorithms/docs/algorithms/matrix-eq.md)
+- **棱镜算法（Prism，仅同时回合模式）**：整轮联合队列搜索 + 分步结算镜像 + 风险约束终局评分，对多种对手行为假设做稳健选择。[档案](algorithms/docs/algorithms/prism.md)
+- **时序掌控算法（Tempo，仅同时回合模式）**：把队列位置当作结算拍，预测敌方剧本、构建威胁时间线，再按裁决权重把动作排进具体拍。[档案](algorithms/docs/algorithms/tempo.md)
+- **经纬算法（Tempo-Weave，仅同时回合模式）**：以「单位完成什么任务、几个行动点、能否存活」为决策单位，在共享行动点预算内按收益/成本竞价排程。[档案](algorithms/docs/algorithms/tempo-weave.md)
+- **视界算法（Horizon，仅同时回合模式）**：把一轮结算后的棋盘投影到终局估胜率，用同构对手场景与对抗探针检验计划，再做逐行动点束搜索。[档案](algorithms/docs/algorithms/horizon.md)
 
 添加算法 AI 时可自定义玩家名，默认预填所选算法的中文名。
 

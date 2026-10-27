@@ -68,7 +68,7 @@
 | `POST` | `/api/games/:id/host/force-resolve` | 无（房主强制立即结算，未确认者按现有队列参与） |
 
 - 部署/移动/攻击/治疗/爆破/结束回合、计划撤回/清空/重排均支持 `Idempotency-Key`。
-- 旧版 `/build`、`/produce`、`/sell` 已移除。
+- 服务端不提供旧版 `/build`、`/produce`、`/sell` 接口。
 
 ## 状态、等待与事件
 
@@ -97,7 +97,7 @@
 - `deploy` 中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。
 - `control_point_repair` 包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 - `demolish` 包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。
-- 同时回合新增四类事件：`plan_committed`（只含 playerId，不泄露计划内容）、`round_resolved`（含每条指令的 `executed/failed/missed/fizzled`）、`round_start`、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit`，`hit: false` 表示预测射击落空。
+- 同时回合模式有四类专用事件：`plan_committed`（只含 playerId，不泄露计划内容）、`round_resolved`（含每条指令的 `executed/failed/missed/fizzled`）、`round_start`、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit`，`hit: false` 表示预测射击落空。
 
 ## AI 机器人
 
@@ -146,7 +146,7 @@
 | `salt` | 可选，最长 64 字符 |
 | `dryRun` | 试运行，不写入战报 |
 
-- 目前仅标准模式与同时回合支持跑批；歼灭/大逃杀模式返回 400 `mode_not_supported`。
+- 跑批仅支持标准模式与同时回合；歼灭/大逃杀模式返回 400 `mode_not_supported`。
 - 同时回合没有 RL 模型，`participants` 至少需要 2 个该模式的算法。
 - 已有跑批进行中时 `start` / `clear-matches` 返回 409 `eval_already_running`。
 

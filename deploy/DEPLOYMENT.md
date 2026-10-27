@@ -1,86 +1,86 @@
-# Single-VPS Deployment
+# 单 VPS 部署
 
-This release runs TacticalGame as one Node.js container exposed directly at `http://SERVER_IP:3123`. It is intentionally a single replica: game state and live SSE subscriptions are process-local. Do not add replicas, Docker Swarm, or rolling deployment until the store and event bus are replaced with shared services.
+本项目以单个 Node.js 容器运行，直接暴露在 `http://SERVER_IP:3123`。这是刻意的单副本设计：对局状态与实时 SSE 订阅都在进程内，在把状态存储和事件总线换成共享服务之前，不要加副本、Docker Swarm 或滚动发布。
 
-Deployment is driven from a workstation: `deploy/deploy.py` pushes the working tree over SFTP to the VPS and runs `docker compose up --build --detach` there. The VPS does **not** need a git checkout — rollback is done by checking out an older commit locally and redeploying (see Updating And Rollback).
+部署从工作站发起：`deploy/deploy.py` 通过 SFTP 把工作区上传到 VPS，再在服务器上执行 `docker compose up --build --detach`。VPS **不需要** git 检出——回滚时在本地检出旧提交后重新部署即可（见「更新与回滚」）。
 
-## Security Notice
+## 安全须知
 
-This deployment has no password gateway and uses unencrypted HTTP. Anyone who can reach TCP port `3123` can access public game pages and APIs. `AUTO_CONTROL_TOKEN` protects admin endpoints only (delete game, force adjudication, admin rename); it does not protect game routes or encrypt `X-Player-Token`, `X-Host-Token`, or `X-Control-Token` headers.
+本部署没有密码网关，且使用未加密的 HTTP。任何能访问 TCP `3123` 的人都可以访问公开的游戏页面和 API。`AUTO_CONTROL_TOKEN` 只保护管理接口（删除对局、强制裁决、管理员改名），不保护游戏路由，也不加密 `X-Player-Token`、`X-Host-Token`、`X-Control-Token` 请求头。
 
-Restrict TCP `3123` to trusted source IPs, a VPN, or a private network in the cloud firewall/security group. Do not expose this direct HTTP endpoint broadly on an untrusted network. Add TLS termination and an access policy before broader use.
+请在云防火墙/安全组中把 TCP `3123` 限制到可信来源 IP、VPN 或内网。不要把该 HTTP 端点直接暴露在不可信网络上。需要更广泛使用时，先加 TLS 终结与访问策略。
 
-## Prerequisites
+## 前置条件
 
-Workstation (where `deploy.py` runs):
+工作站（运行 `deploy.py` 的机器）：
 
-- Python 3 with `paramiko` (`pip install paramiko`).
-- SSH reachability of the VPS.
+- Python 3 与 `paramiko`（`pip install paramiko`）。
+- 能通过 SSH 访问 VPS。
 
-VPS:
+VPS：
 
-- Docker Engine and the Docker Compose plugin.
-- A deployment account in the `docker` group (non-root recommended).
-- A firewall/security group that exposes SSH and TCP `3123` only to the intended clients.
+- Docker Engine 与 Docker Compose 插件。
+- 一个位于 `docker` 组的部署账号（建议非 root）。
+- 防火墙/安全组只对预期客户端开放 SSH 与 TCP `3123`。
 
-## Configure deploy/.env.deploy
+## 配置 deploy/.env.deploy
 
-Copy `deploy/.env.deploy.example` to `deploy/.env.deploy` and fill in the values. This file holds server credentials and is gitignored; never commit it.
+复制 `deploy/.env.deploy.example` 为 `deploy/.env.deploy` 并填写。该文件保存服务器凭证，已加入 gitignore，切勿提交。
 
-| Variable | Required | Notes |
+| 变量 | 必填 | 说明 |
 | --- | --- | --- |
-| `DEPLOY_HOST` / `DEPLOY_PORT` | yes | Server address, SSH port (default 22). |
-| `DEPLOY_USER` | no | Defaults to `root`; prefer a dedicated account in the `docker` group. |
-| `DEPLOY_KEY_PATH` | one of | SSH private key; preferred auth method. |
-| `DEPLOY_PASSWORD` | one of | Password auth fallback; also used as the key passphrase. |
-| `DEPLOY_REMOTE_BASE` | no | Remote project directory, default `/srv/tactical-game`. |
-| `CONTROL_TOKEN` | yes | Value written to the remote `.env` as `AUTO_CONTROL_TOKEN`. Must stay stable across deploys so scripts/agents calling admin endpoints keep working. Generate with `openssl rand -hex 32`. |
-| `LOG_LEVEL` | no | Written to the remote `.env` (default `info`). |
-| `METRICS_TOKEN` | no | When set, `/metrics` requires `x-metrics-token` (or `Authorization: Bearer`). Leave unset only on trusted networks. |
-| `TACTICAL_GAME_TOKEN_PEPPER` | no | HMAC pepper for stored player/host tokens. Must stay stable across restarts and backups; if omitted, the server generates `runtime/token-pepper` on the volume. |
-| `DEPLOY_PRUNE` | no | Set `1` to delete remote files under the project directory that no longer exist locally. |
+| `DEPLOY_HOST` / `DEPLOY_PORT` | 是 | 服务器地址、SSH 端口（默认 22）。 |
+| `DEPLOY_USER` | 否 | 默认 `root`；建议改用 `docker` 组内的专用账号。 |
+| `DEPLOY_KEY_PATH` | 二选一 | SSH 私钥，优先使用。 |
+| `DEPLOY_PASSWORD` | 二选一 | 密码认证回退；同时用作私钥口令。 |
+| `DEPLOY_REMOTE_BASE` | 否 | 远程项目目录，默认 `/srv/tactical-game`。 |
+| `CONTROL_TOKEN` | 是 | 写入远程 `.env` 的 `AUTO_CONTROL_TOKEN`。多次部署之间必须保持不变，否则调用管理接口的脚本/agent 会失效。可用 `openssl rand -hex 32` 生成。 |
+| `LOG_LEVEL` | 否 | 写入远程 `.env`（默认 `info`）。 |
+| `METRICS_TOKEN` | 否 | 设置后 `/metrics` 需要 `x-metrics-token`（或 `Authorization: Bearer`）。仅在可信网络中留空。 |
+| `TACTICAL_GAME_TOKEN_PEPPER` | 否 | 存储玩家/房主 token 的 HMAC pepper，跨重启与备份必须保持不变；省略时服务器会在卷上生成 `runtime/token-pepper`。 |
+| `DEPLOY_PRUNE` | 否 | 设为 `1` 时删除远程项目目录下本地已不存在的文件。 |
 
-Host keys are verified against `~/.ssh/known_hosts`. On the first connect (or when the known_hosts file has no entry for the host) the script prompts to accept and save the fingerprint (TOFU); in non-interactive environments an unknown host key aborts the deploy. A changed fingerprint always fails the connection.
+主机密钥按 `~/.ssh/known_hosts` 校验。首次连接（或 known_hosts 中没有该主机记录）时，脚本会提示接受并保存指纹（TOFU）；非交互环境下遇到未知主机密钥会中止部署。指纹发生变化时连接一律失败。
 
-## Deploy
+## 部署
 
-From the repository root:
+在仓库根目录执行：
 
 ```bash
 python deploy/deploy.py
 ```
 
-The script:
+脚本会：
 
-1. Connects over SSH (key preferred, password fallback).
-2. Uploads files under `REMOTE_BASE` incrementally — a file is re-sent only when its size or mtime differs remotely; unchanged files are skipped. The first run uploads everything once to establish the timestamp baseline; afterwards routine deploys transfer only changed files (the bulk of the tree is the ~230 MB `rl/models` payload, which rarely changes).
-3. Rewrites `REMOTE_BASE/.env` from `CONTROL_TOKEN`/`LOG_LEVEL`. This file is fully managed by the script — manual edits on the server do not survive a deploy.
-4. Runs `docker compose up --build --detach` (streamed to the console).
-5. Verifies `/healthz` and `/readyz` return `200` from the server's loopback; the script exits non-zero if either check fails.
+1. 通过 SSH 连接（优先私钥，回退密码）。
+2. 增量上传 `REMOTE_BASE` 下的文件——只有远端大小或 mtime 不同时才重传，未变化的文件跳过。首次运行会全量上传一次以建立时间戳基线，之后常规部署只传变化文件（大头是约 230 MB 的 `rl/models`，很少变化）。
+3. 按 `CONTROL_TOKEN`/`LOG_LEVEL` 重写 `REMOTE_BASE/.env`。该文件完全由脚本管理，服务器上的手工修改不会在下次部署后保留。
+4. 执行 `docker compose up --build --detach`（输出实时回显）。
+5. 从服务器回环地址检查 `/healthz` 与 `/readyz` 返回 `200`；任一检查失败脚本以非零退出码结束。
 
-With `DEPLOY_PRUNE=1`, files left on the server by previous deploys (renamed sources, removed artifacts) are deleted; `.env` and `backups/` are always protected.
+设置 `DEPLOY_PRUNE=1` 时，会删除旧部署遗留的文件（改名后的源码、已移除的产物）；`.env` 与 `backups/` 始终受保护。
 
-## Deploy Logs
+## 部署日志
 
-Every run writes `deploy/logs/deploy-<YYYYMMDD-HHMMSS>.log` (the console output is mirrored there). The log records:
+每次运行都会写入 `deploy/logs/deploy-<YYYYMMDD-HHMMSS>.log`（控制台输出同步镜像到该文件）。日志包含：
 
-- Stage start/finish lines with timestamps: 连接 / 文件传输 / 写入 .env / 构建启动 / 健康检查.
-- Streamed remote build output, line by line with timestamps — if a deploy hangs, the log tail shows exactly where.
-- A final summary listing each stage's duration, the overall result (成功/失败), and on failure the stage that failed; health check failures include the observed status codes.
+- 带时间戳的阶段起止行：连接 / 文件传输 / 写入 .env / 构建启动 / 健康检查。
+- 逐行带时间戳的远程构建输出——部署卡住时，看日志尾部即可定位到具体步骤。
+- 结束汇总：各阶段耗时、总体结果（成功/失败），失败时标明出错的阶段；健康检查失败会附带观察到的状态码。
 
-The 30 most recent logs are kept; `deploy/logs/` is gitignored and excluded from upload.
+最多保留最近 30 份日志；`deploy/logs/` 已加入 gitignore，也不会上传。
 
-## State, Backups, And Restarts
+## 状态、备份与重启
 
-Game state is stored per game under `/app/runtime/store/<gameId>.json`, backed by the named `tactical-game-runtime` Docker volume. Each write goes to a temporary file, is `fsync`ed, and atomically replaces that game's snapshot; the previous snapshot is kept as `<gameId>.json.prev`. `/app/runtime/games.json` is now the legacy/export format: it is imported on first upgrade and written by `npm run export-state` or on shutdown, so you can roll back to 3.6.x with the exported file. Corrupt snapshots or a corrupt legacy file are archived as `*.corrupt-*` instead of silently clearing state, and plaintext tokens from 3.6.x are migrated to hashes on load. The volume also holds `runtime/records-index.json`, `runtime/token-pepper`, and `runtime/archive/` (expired lobby / finished games).
+对局状态按局存放在 `/app/runtime/store/<gameId>.json`，由名为 `tactical-game-runtime` 的 Docker 卷承载。每次写入先写临时文件、`fsync`，再原子替换该对局的快照；上一份快照保留为 `<gameId>.json.prev`。`/app/runtime/games.json` 是旧版单文件格式，同时用作导出格式：首次升级时导入，`npm run export-state` 或正常关闭时写出，因此可以用导出的文件回滚到 3.6.x。损坏的快照或损坏的旧版文件会归档为 `*.corrupt-*`，而不是静默清空状态；3.6.x 的明文 token 会在加载时迁移为哈希。该卷还保存 `runtime/records-index.json`、`runtime/token-pepper` 与 `runtime/archive/`（过期大厅 / 已结束对局）。
 
-Expired lobbies (default 24h) and finished games (default 7 days) are archived to `runtime/archive/` and removed every 10 minutes. Override with `TACTICAL_GAME_LOBBY_TTL_HOURS` / `TACTICAL_GAME_OVER_TTL_HOURS` (0 disables that sweep); active games are never auto-deleted. If you set `TACTICAL_GAME_TOKEN_PEPPER`, keep it stable across restarts and include it in your secret backup, otherwise existing tokens stop authenticating.
+过期大厅（默认 24 小时）与已结束对局（默认 7 天）会归档到 `runtime/archive/`，每 10 分钟清理一次。可用 `TACTICAL_GAME_LOBBY_TTL_HOURS` / `TACTICAL_GAME_OVER_TTL_HOURS` 覆盖（设为 0 关闭对应的清理）；进行中的对局永不自动删除。若设置了 `TACTICAL_GAME_TOKEN_PEPPER`，请跨重启保持不变并纳入密钥备份，否则现有 token 将无法通过认证。
 
-A normal app-container restart restores state, but immediately disconnects every SSE client. A process crash can lose only changes that have not completed their synchronous snapshot write.
+应用容器正常重启会恢复状态，但会立即断开所有 SSE 客户端。进程崩溃只会丢失尚未完成同步快照写入的改动。
 
-`/readyz` now performs a light deep check: map table loaded and the state directory writable. It still returns exactly `{"status":"ready"}` on success; a write-permission or map-load failure returns `503` with `status: degraded`, so a deploy that cannot persist state fails its health check instead of running half-broken.
+`/readyz` 会做一次轻量深度检查：地图表已加载且状态目录可写。成功时仍精确返回 `{"status":"ready"}`；写权限或地图加载失败返回 `503` 与 `status: degraded`，从而让无法持久化状态的部署在健康检查阶段失败，而不是带病运行。
 
-Back up the volume before upgrades and regularly thereafter (run on the VPS, from the project directory):
+升级前以及之后定期备份该卷（在 VPS 上、项目目录内执行）：
 
 ```bash
 mkdir -p backups
@@ -90,9 +90,9 @@ docker run --rm \
   alpine:3.21 sh -c 'tar czf /backup/tactical-game-runtime-$(date +%F-%H%M%S).tgz -C /data .'
 ```
 
-`backups/` is excluded from upload and from pruning.
+`backups/` 不会上传，也不会被清理。
 
-Restore only while the stack is stopped:
+只在堆栈停止时恢复：
 
 ```bash
 docker compose down
@@ -103,13 +103,13 @@ docker run --rm \
 docker compose up --detach
 ```
 
-Never run `docker compose down --volumes` unless intentionally deleting every saved game.
+除非明确要删除全部已保存对局，否则不要执行 `docker compose down --volumes`。
 
-## Updating And Rollback
+## 更新与回滚
 
-To deploy the latest committed state of the local checkout, run `python deploy/deploy.py` again. A replacement app container causes a brief interruption and closes all active event streams; saved games are loaded from the persistent volume.
+部署本地检出的最新提交：再次执行 `python deploy/deploy.py`。替换应用容器会造成短暂中断，并关闭所有活动事件流；已保存的对局会从持久卷恢复。
 
-To roll back, check out the previous verified commit on the workstation and redeploy:
+回滚：在工作站检出上一个已验证提交并重新部署：
 
 ```bash
 git log --oneline -5
@@ -117,19 +117,19 @@ git checkout <previous-verified-commit>
 python deploy/deploy.py
 ```
 
-Files that only exist in newer revisions are ignored by the old build (the image only consumes the files it copies), but they stay on the server; clean them up with `DEPLOY_PRUNE=1` on the next deploy. Restore a volume backup only when an incompatible game-state format or data corruption requires it.
+只存在于新版本的文件不会影响旧构建（镜像只读取自身 COPY 的文件），但仍留在服务器上；可在下次部署时用 `DEPLOY_PRUNE=1` 清理。只有在旧版状态格式不兼容或数据损坏时，才需要恢复卷备份。
 
-3.7.0 stores game state as per-game snapshots under `runtime/store/`; pre-3.7 builds only read `runtime/games.json`. Before rolling back to an older build, let the container stop gracefully (SIGTERM exports `games.json`) or run `docker compose exec app npm run export-state`; otherwise restore a volume backup.
+当前状态格式是 `runtime/store/` 下的逐局快照；3.7 之前的构建只读 `runtime/games.json`。回滚到更旧的构建前，先让容器优雅停止（SIGTERM 会导出 `games.json`），或执行 `docker compose exec app npm run export-state`；否则请恢复卷备份。
 
-## Smoke Test
+## 冒烟检查
 
-After every deployment, verify directly through port `3123`:
+每次部署后，直接通过 `3123` 端口验证：
 
-1. `/healthz` and `/readyz` return `200` (the deploy script asserts this; check `docker compose logs app` on failure).
-2. `/play.html` and `/spectator.html` load.
-3. `/api/maps` returns configured maps.
-4. A game can be created, joined, started, and changed with `X-Player-Token`.
-5. Player and spectator pages receive new events while left open for more than 30 seconds.
-6. Admin endpoints (delete game, force adjudication, admin rename) reject external requests without `X-Control-Token: $AUTO_CONTROL_TOKEN`.
+1. `/healthz` 与 `/readyz` 返回 `200`（部署脚本会断言；失败时查看 `docker compose logs app`）。
+2. `/play.html` 与 `/spectator.html` 能正常加载。
+3. `/api/maps` 返回已配置的地图。
+4. 能创建、加入、开始一局，并用 `X-Player-Token` 完成操作。
+5. 玩家页与观战页保持打开 30 秒以上时能收到新事件。
+6. 管理接口（删除对局、强制裁决、管理员改名）在不带 `X-Control-Token: $AUTO_CONTROL_TOKEN` 时拒绝外部请求。
 
-When secure public access is needed, place a TLS-terminating reverse proxy, cloud load balancer, VPN, or firewall allowlist in front of this service. Keep the application as one replica until game state and SSE fan-out are backed by shared services.
+需要安全的公网访问时，在本服务前放置 TLS 终结反向代理、云负载均衡、VPN 或防火墙白名单。在状态与 SSE 扇出改为共享服务之前，保持单副本运行。

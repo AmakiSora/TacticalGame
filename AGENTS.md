@@ -23,7 +23,7 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 ## 约束
 
 - **单副本**：状态与 SSE 均为进程内，勿引入多副本/负载均衡。
-- **`skill/` 是规范源**：服务器经 `/api/skill/files/:name` 提供；`.zcode`/`.pi`/`.qoder` 下只是拷贝。
+- **`skill/` 是规范源**：服务器经 `/api/skill/files/:name` 提供，agent 应始终从服务器拉取；仓库内不维护 IDE 本地拷贝目录。
 - gitignored 勿提交：`runtime/`、`deploy/logs/`、`.env*`、`rl/models/`、`temp/`、`arena/details/`、根目录临时 `*.json`。
 - **版本号由当前分支决定**：`release/x.y.z` 分支上版本必须等于 `x.y.z`，新建 release 分支后先 `npm run version x.y.z` 对齐（脚本会同步 package.json/README/skill 等全部引用处）；feature 等开发分支不主动 bump 版本。交付前可 `npm run check-version` 校验一致性。
 - **发版日志**：`RELEASE_NOTES.md` 按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写；只写相对上一个已发布版本的对外变化，每条 1-2 句、细节链接专题文档，测试结果每版汇总一次。`## x.y.z` 标题格式不可改，bump 脚本依赖它插入占位小节。

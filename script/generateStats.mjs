@@ -33,6 +33,8 @@ export const AGENT_NAMES = new Map([
   ['CC', 'ClaudeCode'],
   ['CX', 'Codex'],
   ['WEB', 'WebAgent'],
+  ['TE', 'Trae'],
+  ['OC', 'OpenCode'],
 ]);
 
 export const KNOWN_AGENTS = new Set([...AGENT_NAMES.keys(), 'SCRIPT']);

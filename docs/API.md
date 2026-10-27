@@ -33,7 +33,7 @@
 |---|---|---|---|
 | `GET` | `/api/games` | - | `{ games }` |
 | `POST` | `/api/games` | `{ mapId, maxPlayers, participate?, playerName? }` | `{ gameId, hostToken, player: { id, token } \| null, lobby }` |
-| `GET` | `/api/games/:id/lobby` | - | 公开大厅摘要，不含凭证 |
+| `GET` | `/api/games/:id/lobby` | - | 公开大厅摘要，不含凭证；含座位字段 `seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots`（见下） |
 | `POST` | `/api/games/:id/join` | `{ name? }` | `{ player: { id, token }, lobby }` |
 | `POST` | `/api/games/:id/start` | host token header | `{ ok: true, game }` |
 | `GET` | `/api/games/:id` | token header | 完整状态，不含 token |
@@ -42,6 +42,8 @@
 | `POST` | `/api/games/:id/leave` | player token header | `{ ok: true }` |
 | `DELETE` | `/api/games/:id/players/:playerId` | host token header | `{ ok: true, lobby }` |
 | `PATCH` | `/api/games/:id/host/max-players` | `{ maxPlayers }` + host token header | `{ ok: true, lobby }` |
+| `PUT` | `/api/games/:id/host/seats` | `{ order, firstSeat?, ifVersion? }` + host token header | `{ ok: true, seatVersion, firstSeat, lobby }`（仅 lobby 期；响应顶层不含 `seats`，最新座位表在 `lobby.seats`；`ifVersion` 失配 → `409 seat_conflict`；`simultaneous` / `royale` 下 `firstSeat` 恒为 `0`，见下） |
+| `DELETE` | `/api/games/:id/host/seats` | host token header | `{ ok: true, seatVersion, lobby }`（唯一清理编排的接口，回到开局随机） |
 | `POST` | `/api/games/:id/host/skip-turn` | host token header | `{ ok: true }` |
 | `POST` | `/api/games/:id/host/eliminate` | `{ playerId }` + host token header | `{ ok: true }` |
 | `POST` | `/api/games/:id/force-adjudicate` | control token | `{ ok: true, result }` |
@@ -49,6 +51,13 @@
 
 - 强制裁决仅适用于进行中的对局，按请求时存活玩家的裁决总分决定胜者；最高分并列则平局。
 - 删除对局会同时删除内存状态和持久化文件中的记录。
+- 座位编排（3.8.8）：大厅期房主用 `PUT /api/games/:id/host/seats` 编排座位，`DELETE` 取消编排、回到开局随机。`order` 必须是**当前已加入玩家的一次排列**（长度不符 / 重复 / 含未加入玩家 / 缺人，任一即 `400 invalid_seat_layout`）；房间内还没有玩家时无座位可编排，同样 `400 invalid_seat_layout`（文案「当前没有已加入玩家，无法编排座位」）；`ifVersion` 必须是整数，与当前 `seatVersion` 不等时 → `409 seat_conflict`，响应体带最新 `seatVersion` 与完整 `lobby`，前端可直接重绘、不必重放请求。开局后调用一律 `409 game_already_started`。
+- `firstSeat` **按模式区分**：仅顺序模式（`standard` / `annihilation`）有意义，是 0 起的先手座位下标、缺省 0，`turnOrder` 从该座位循环展开；越界（`<0` 或 `>=已加入人数`）→ `400 invalid_seat_layout`（错误文案「先手座位号越界」只会在顺序模式出现）。`simultaneous` / `royale` **没有先手概念**（`turnOrder` 只是同一步内的并列处理顺序），服务端忽略该字段、一律存 `0` 并在响应里回 `0`，不报错也不做越界校验；`GET /api/games/:id/lobby` 的 `firstSeat` 在这两个模式下同样恒为 `0`。
+- 大厅摘要的座位字段：`seatMode`（`'random'` / `'manual'`）、`seatVersion`、`firstSeat`（0 起；`random` 态恒 0，`simultaneous` / `royale` 也恒 0）、`seats[]`（`{ seat, playerId, name, spawnSlotId }`，`seat` 从 1 起、按座位号升序）。`seatMode='random'`（未编排）时出生点（以及顺序模式下的先手）**都还没决定**，`seats[].spawnSlotId` **恒为 `null`**，`seats` 只按加入顺序给座位号；`seatMode='manual'` 时才把 `spawnSlotId` 映射成 `config.layouts[人数][座位下标]`，该人数没有 `layouts` 条目时仍为 `null`。席位 id（`player_a`…）恒按加入顺序分配且不可变，座位号只决定「谁坐哪个出生点」；行动顺位只存在于顺序模式，同时 / 大逃杀里座位号只是同一步内的结算处理顺序。
+- `layoutSlots` 是「本局人数对应的出生点槽位 id 顺序」（即 `config.layouts[已加入人数]`）：与 `seatMode` 无关、**恒给值**，0 人或该人数没有 `layouts` 条目时为 `[]`；`seatMode='manual'` 时 `seats[i].spawnSlotId` 恒等于 `layoutSlots[i]`。关键约束：**槽位 id 是地图 `spawnSlots` 的非连续子序列，不是前 n 个**（例：`multiplayer-ring` 三人局是 `['slot_1','slot_3','slot_5']`，对应 `spawnSlots` 下标 0/2/4），前端做座位→出生点的映射必须按 `slot.id` 匹配，**不能按数组下标**。
+- 两套版本线是**独立计数**，但别理解成「成员变动不影响 `stateVersion`」：`PUT` / `DELETE /host/seats` 自身同时推进 `seatVersion` 与 `stateVersion`；成员变动（加入 / 退出 / 被踢）使 `seatVersion` +1，其 `stateVersion` 由 `player_joined` / `player_left` 事件推进（写入事件本身就会推进 `stateVersion`）；开局降级只推进 `seatVersion`，`stateVersion` 随后由 `game_start` 事件推进。因此 join / leave 之后带旧 `If-None-Match` 请求 `GET /api/games/:id` **不会** 304，而是 200 返回含新玩家与最新座位表的状态。
+- 座位字段的**结构化形态**（`seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots`）只由 `GET /api/games/:id/lobby` 提供；状态接口里虽有 `seatPlan` 原始字段，但房间页的座位区一律读 `/lobby`，不要从状态接口自己拼座位列表。
+- `seatVersion` 的语义是「座位视图可能已变」：`PUT` 成功、`DELETE` 成功、成员进出（`seatPlan` 为空时也一样）都 `+1`。`DELETE` 在本来就未编排时也 `+1`——幂等只承诺最终状态不变，不承诺版本号不变。
 - `GET /api/games` 的每一项带 `gameId`、`mapId`、`mapName`（随机地图为「随机战场」）、`hostName`、`createdAt` 与 `phase` / `mode` / `maxPlayers` / `playerCount` / `players` 等字段。
 
 ## 操作

@@ -3,6 +3,8 @@
 Use only when `game.config.mode === "standard"`.  
 If the game is `annihilation`, stop and read `annihilation.md` instead — do not apply this file.
 
+Turn order is settled at start: read `turnOrder` from the opening `game_start` event (or `game.turn`) instead of assuming join order — the host may reorder lobby seats, which reorders turns. Seat ids (`player_a`…) and tokens never change, only the order.
+
 ## Turn checklist
 
 Every action on your turn, inspect:

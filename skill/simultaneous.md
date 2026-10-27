@@ -124,7 +124,9 @@ your signal to act is: `phase === "active"` and `plan.committed` does not includ
   same step; an attacker that dies in the step still fires its own shot.
 - **Deterministic step phases**: queue-list order is execution priority by step, and within a step the
   server resolves fixed sub-phases in the opening `turnOrder` when a tie needs an order, so replays are
-  deterministic. Each step: cascade check → deployments and movements (arrival solver) → demolish →
+  deterministic. That `turnOrder` follows the lobby seat order, so a host who arranges seats also sets the
+  tie-break order. There is **no first player** in this mode: seat order means spawn slot + in-step tie-break
+  only, and `firstSeat` is always 0. Each step: cascade check → deployments and movements (arrival solver) → demolish →
   attacks and net healing → deaths/elimination. After the last step: control-point capture → round
   adjudication → comeback supplies → next-round income and repair. `round_resolved` carries a `steps`
   count and each outcome carries its `step`.

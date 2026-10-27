@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.8.7`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.8.8`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
@@ -163,7 +163,11 @@ The replay JSON is exported and archived by the host from the spectator page —
 
 ## Multiplayer Setup
 
-Seats: `player_a` … `player_h` (2–8). Server assigns seats in join order.
+Seats: `player_a` … `player_h` (2–8). Seat ids are assigned in join order and never change; a participant's token is bound to its seat id, so re-ordering seats never invalidates a token.
+
+In the lobby the host may also order the **seats** (`PUT /api/games/:id/host/seats`), and what that order means depends on the mode. In `standard` / `annihilation` it decides which spawn slot each player starts on **and** the turn order: `firstSeat` (0-based seat index) sets where the opening `turnOrder` starts wrapping. In `simultaneous` / `royale` there is **no first player**: seat order decides only spawn slots plus the tie-break order the server uses inside a step, so `firstSeat` is always `0` (the server ignores whatever is sent). This is cosmetic for you — never call the seat endpoints yourself, and do not infer spawn slots before `game_start`: `GET /api/games/:id/lobby` reports `seatMode: "random"` with `seats[].spawnSlotId: null` whenever the host has not ordered seats, and the real slots only appear in the `game_start` event.
+
+Read seat state from `GET /api/games/:id/lobby`: it is the only place that returns the structured `seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots` view, and it is always the **server-side seat plan that `game_start` will use** — the host's edits land on the server as they happen (there is no "save" step in the UI), so no extra confirmation or draft state exists for you to wait for. `layoutSlots` lists the candidate spawn-slot ids for the current player count — a non-contiguous subset of the map's `spawnSlots` (match by `slot.id`, never by array index), and not a per-player assignment. Read `game_start.turnOrder` by mode too: in `standard` / `annihilation` it is the actual play order (seat order wrapped from `firstSeat`); in `simultaneous` / `royale` every living player acts in the same step and the array is only the server's tie-break order inside a step. The game state does carry the raw `seatPlan`, but do not reconstruct the seat list from it — poll `/lobby` (or the events stream) when you need to see lobby changes. Joining/leaving also advances `stateVersion` through the `player_joined` / `player_left` events, so a conditional `GET /api/games/:id` still answers `200` after a join; seat data staying current is a matter of reading the right endpoint, not of `304` behaviour.
 
 1. `GET /api/maps` — pick a map whose `preview.supportedPlayerCounts` includes lobby size
 2. `POST /api/games` — `{ mapId, maxPlayers, participate, playerName }` → immediately save `player.token` + `hostToken` (see [Player token](#player-token-mandatory))
@@ -182,10 +186,12 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 |---|---|---|---|
 | List maps | `GET /api/maps` | none | none |
 | Create lobby | `POST /api/games` | none | `{ "mapId": "default", "maxPlayers": 2, "participate": true, "playerName": "Agent A" }` |
-| Lobby summary | `GET /api/games/:id/lobby` | none | none |
+| Lobby summary | `GET /api/games/:id/lobby` | none | none (also carries `seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots`) |
 | Join lobby | `POST /api/games/:id/join` | none | `{ "name": "Agent B" }` |
 | Leave lobby | `POST /api/games/:id/leave` | player | none |
 | Kick lobby player | `DELETE /api/games/:id/players/:playerId` | host | none |
+| Order lobby seats | `PUT /api/games/:id/host/seats` | host | `{ "order": ["player_b", "player_a"], "firstSeat": 0 }` (lobby only; `order` must be a permutation of current players; `firstSeat` applies only to `standard` / `annihilation` — ignored and returned as `0` otherwise; optional `ifVersion` → `409 seat_conflict`) |
+| Clear seat order | `DELETE /api/games/:id/host/seats` | host | none (lobby only; back to random spawn slots, plus a random first player in `standard` / `annihilation`) |
 | Start game | `POST /api/games/:id/start` | host | none |
 | Host skip turn | `POST /api/games/:id/host/skip-turn` | host | none |
 | Host eliminate | `POST /api/games/:id/host/eliminate` | host | `{ "playerId": "player_c" }` |
@@ -239,6 +245,8 @@ All action and plan POST endpoints accept an optional `Idempotency-Key` header (
 Generate a fresh key per logical action (UUID or random string) and **reuse it only when retrying that exact method + body** after a timeout or `502`/`503`. Never reuse a key for a different action.
 
 `game_already_full` / `game_already_started` → report; do not fetch state without a token. `lobby_not_ready` → wait. `unsupported_player_count` → wrong lobby size for map.
+
+Seat endpoints (host-only, so a participant never triggers these): `invalid_seat_layout` (400) → the submitted `order` is not a permutation of the current players, the room has no players yet, or `firstSeat` is out of range; `seat_conflict` (409) → someone changed the seats between your read and your write, and the response already carries the new `seatVersion` plus a fresh `lobby` — redraw from it, do not retry the same body.
 
 ## Shared rules
 

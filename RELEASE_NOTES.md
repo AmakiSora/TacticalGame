@@ -2,7 +2,7 @@
 
 本文档按版本倒序整理 3.x 的主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。3.0.0 之前的 1.x / 2.x 说明归档在 [docs/release-notes-archive.md](docs/release-notes-archive.md)，内容保持原样。
 
-自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1–3.8.5 已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
+自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
 ## 3.8.7
 
@@ -15,6 +15,7 @@
 
 - **README 瘦身为入口文档**：核心规则改为模式速览表并指向 `skill/`，算法列表只留一句定位 + 档案链接（战绩交给 `/arena.html` 与算法档案），单位表与逐图数值不再复写；REST API 章节拆到 [`docs/API.md`](docs/API.md)（补齐 `plan/wait`、`plan/reorder`、skill/健康/指标、长轮询、回放库、AI 机器人与竞技场评估等接口），AI 用法、地图格式与统计说明分别拆到 [`docs/AI_PLAYERS.md`](docs/AI_PLAYERS.md)、[`docs/MAP_FORMAT.md`](docs/MAP_FORMAT.md) 与 [`docs/STATS.md`](docs/STATS.md)。
 - **参考文档改为中性陈述**：`deploy/DEPLOYMENT.md` 全文中文化，并去掉「now performs」「is now the legacy format」等随时间失效的变更语气；`docs/API.md` 同步去掉「新增」「目前」等表述，变更说明统一留在本文件。
+- **文档同步校正**：RL 迭代日志补齐 3.7.0 / 3.7.1 的训练环境与模型接口变更；API 事件表补 `wait` / `bot_failed`；`AGENTS.md`、`skill/SKILL.md` 与 `skill/review-royale.md` 补齐 `narrow-road` 地图信息；删除根目录旧 `standard.md` 拷贝；算法日志注明 3.6.1–3.6.5 无算法侧变化。
 - **发版日志归档**：1.x / 2.x 的 15 个小节拆到 [`docs/release-notes-archive.md`](docs/release-notes-archive.md)，主文件只保留 3.x；规范文件同步注明归档边界与「归档内容不回改」。
 - **移除过期文档**：删除 `VITE_MIGRATION.md`（Vite 早已进入生产构建）、`docs/IMPROVEMENTS.md`（2026-09-13 审计快照）、`docs/forge-balance-review.html`、`docs/rl-next-generation-training.md`（基于 3.0.3 的旧规划）以及未跟踪的 `docs/map-drafts/` 地图草稿；同时修正 `AGENTS.md` 中指向不存在的 `.zcode`/`.pi`/`.qoder` 拷贝目录的说明。
 

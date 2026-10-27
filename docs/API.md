@@ -89,7 +89,7 @@
 
 事件类型：
 
-`player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `round_start`, `round_resolved`, `plan_committed`, `action_failed`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`
+`player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `round_start`, `round_resolved`, `plan_committed`, `wait`, `action_failed`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`, `bot_failed`
 
 - `game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。
 - `game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。新生成的事件流中 `game_over` 是最后一条，最终回合的 `round_end` / `round_resolved` 必定先于它；既有归档回放仍可能保留 3.7.1 之前的旧顺序（`game_over` 后还有终局 `round_resolved`），读取旧回放时不要只按 `game_over` 截断。
@@ -97,7 +97,9 @@
 - `deploy` 中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。
 - `control_point_repair` 包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 - `demolish` 包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。
-- 同时回合模式有四类专用事件：`plan_committed`（只含 playerId，不泄露计划内容）、`round_resolved`（含每条指令的 `executed/failed/missed/fizzled`）、`round_start`、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit`，`hit: false` 表示预测射击落空。
+- 同时回合模式有以下专用事件：`plan_committed`（只含 playerId，不泄露计划内容）、`round_resolved`（含每条指令的 `executed/failed/missed/fizzled`）、`round_start`、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit`，`hit: false` 表示预测射击落空。
+- `wait` 是同时回合待命动作的结算事件，payload 含 `owner`、`actionId`、`roundNumber`、`step`、`actionsUsed`、`actionsRemaining`。
+- `bot_failed` 表示 bot 进程异常，payload 含 `playerId`、`bot`（`rl` / `algorithm`）、`reason`、`restarts`。
 
 ## AI 机器人
 

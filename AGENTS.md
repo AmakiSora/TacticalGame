@@ -1,6 +1,6 @@
 # AGENTS.md
 
-TacticalGame：六角战棋（Node.js + TypeScript + Fastify，前端原生 JS + Canvas）。四种模式：`standard` 逐人轮流、`annihilation` 歼灭（炮火收缩圈）、`simultaneous` 同时回合（地图 `standoff`、`molten-throne`、`mistpine`）、`royale` 大逃杀（同时回合 × 歼灭缩圈组合，地图 `snowflake`）。详情见 [README.md](README.md)。
+TacticalGame：六角战棋（Node.js + TypeScript + Fastify，前端原生 JS + Canvas）。四种模式：`standard` 逐人轮流、`annihilation` 歼灭（炮火收缩圈）、`simultaneous` 同时回合（地图 `standoff`、`molten-throne`、`mistpine`）、`royale` 大逃杀（同时回合 × 歼灭缩圈组合，地图 `snowflake`、`narrow-road`）。详情见 [README.md](README.md)。
 
 ## 命令
 
@@ -15,7 +15,7 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 
 ## 结构
 
-- `src/api/` 路由（games/actions/auth/events/skill），`src/engine/` 纯规则引擎，`src/state/store.ts` 内存状态 + 落盘 `runtime/games.json`
+- `src/api/` 路由（games/actions/auth/events/skill/maps/bots/records/wait/arenaEval），`src/engine/` 纯规则引擎，`src/state/store.ts` 内存状态 + 逐局落盘 `runtime/store/<gameId>.json`（`runtime/games.json` 仅旧版导出格式）
 - `maps/*.json` 地图（文件名即 mapId），`public/` 前端，`skill/` 玩法技能规范源，`tests/` vitest 与 src 镜像
 - `deploy/` 单 VPS 部署（[DEPLOYMENT.md](deploy/DEPLOYMENT.md)），`rl/` 强化学习训练，`records/` 回放存档
 - `arena/` AI 竞技场数据（`matches.jsonl` 对战记录入 git，`details/` 每局明细 gitignored）；页面 `/arena.html`（RL 模型 × 内置算法按玩法模式分榜 + 评估控制台，后端 `src/api/arenaEval.ts`）；算法注册表 `algorithms/registry.mjs`（含展示名，bot 清单/榜单/控制台同源）

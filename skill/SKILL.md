@@ -1,6 +1,6 @@
 ---
 name: play-hex-api-game
-description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, the simultaneous-turn maps standoff, molten-throne and mistpine, and the royale snowflake map.
+description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, the simultaneous-turn maps standoff, molten-throne and mistpine, and the royale maps snowflake and narrow-road.
 ---
 
 # Play Hex API Game

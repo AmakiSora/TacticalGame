@@ -41,6 +41,21 @@ describe('algorithm registry modes', () => {
     expect(matrixEq?.displayName).toBe('矩阵均衡算法');
     expect(getAlgorithmMeta('matrix-eq')?.modes).toEqual(['simultaneous']);
     expect(getAlgorithmMeta('greedy')?.modes).toEqual(['standard']);
+    // 三个随机基线是独立条目：注册名、展示名、版本与模式各自独立，避免同名混记。
+    const randomInfo = listAlgorithmInfo().find(i => i.name === 'random');
+    expect(randomInfo).toMatchObject({ displayName: '随机算法', version: 'v1', modes: ['standard'] });
+    const randomAnnihilation = getAlgorithmMeta('random-annihilation');
+    expect(randomAnnihilation).toMatchObject({
+      displayName: '歼灭随机算法',
+      version: 'v1',
+      modes: ['annihilation'],
+    });
+    const randomRoyale = getAlgorithmMeta('random-royale');
+    expect(randomRoyale).toMatchObject({
+      displayName: '大逃杀随机算法',
+      version: 'v1',
+      modes: ['royale'],
+    });
   });
 
   it('defaults unregistered/undeclared algorithms to standard mode', () => {
@@ -56,5 +71,12 @@ describe('algorithm registry modes', () => {
     expect(algorithmSupportsMode('matrix-eq', 'standard')).toBe(false);
     expect(algorithmSupportsMode('greedy', 'standard')).toBe(true);
     expect(algorithmSupportsMode('greedy', 'simultaneous')).toBe(false);
+    // 模式隔离：标准 / 歼灭 / 大逃杀各有一个独立随机基线，互不覆盖。
+    expect(algorithmSupportsMode('random', 'standard')).toBe(true);
+    expect(algorithmSupportsMode('random', 'annihilation')).toBe(false);
+    expect(algorithmSupportsMode('random-annihilation', 'annihilation')).toBe(true);
+    expect(algorithmSupportsMode('random-annihilation', 'standard')).toBe(false);
+    expect(algorithmSupportsMode('random-royale', 'royale')).toBe(true);
+    expect(algorithmSupportsMode('random-royale', 'simultaneous')).toBe(false);
   });
 });

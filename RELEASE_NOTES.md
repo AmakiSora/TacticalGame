@@ -4,6 +4,24 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.8.10
+
+### 新增
+
+- **歼灭随机算法（`random-annihilation`）**：歼灭模式的随机基线，逐人轮流语义；与标准 `random` 共用轮流枚举，并按引擎口径跳过炮火危险区内的部署（起点/落点）与治疗（支援兵/目标），走进危险区仍合法。独立注册名、展示名与参与者 id `algo_random-annihilation@v1`，详见 [`random-annihilation.md`](algorithms/docs/algorithms/random-annihilation.md)。
+- **大逃杀随机算法（`random-royale`）**：大逃杀模式的随机基线，同时回合计划队列；攻/治瞄向格子、同一单位可跨行动点连续行动，枚举层与「同时随机算法」共用 `algorithms/lib/random-plan.mjs`。参与者 id `algo_random-royale@v1`，详见 [`random-royale.md`](algorithms/docs/algorithms/random-royale.md)。
+
+### 变更
+
+- **三个随机基线拆成独立条目**：标准 `random` 回归仅标准模式，与 `random-annihilation`、`random-royale` 的注册名、展示名、版本与竞技场参与者 id 全部分开；历史 `algo_random@v1` 的战绩归属不变。
+- **竞技场榜单只显示有对局的模式**：注册表声明了某模式、但一局都没打过的基线，不再在页面上生成 0 局空榜。
+
+### 测试与验证
+
+- 新增 [`random.test.ts`](tests/algorithms/random.test.ts)（12 例）：三个条目的载荷形态与短路、炮火区部署与治疗过滤（含「走进危险区仍合法」对照），以及 `artillery-zone` 整局零非法并正常完赛、`snowflake` 跑满 6 轮零入队拒绝且炮火圈收缩。
+- 大厅 bot 接口补三个条目的准入/拒绝与目录回归；注册表、工具函数与算法下拉测试同步。
+- `npm run build` 通过，`npm test` 全量 127 文件 / 1251 例全绿。
+
 ## 3.8.8
 
 ### 新增

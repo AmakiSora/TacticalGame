@@ -15,6 +15,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export const ALGORITHMS = {
   greedy: './builtin/greedy.mjs',
   random: './builtin/random.mjs',
+  'random-annihilation': './builtin/random-annihilation.mjs',
+  'random-royale': './builtin/random-royale.mjs',
   mcts: './builtin/mcts.mjs',
   threat: './builtin/threat.mjs',
   field: './builtin/field.mjs',
@@ -50,6 +52,8 @@ export const ALGORITHMS = {
 export const ALGORITHM_META = {
   greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动', version: 'v1', modes: ['standard'] },
   random: { displayName: '随机算法', description: '从所有合法动作中随机选择', version: 'v1', modes: ['standard'] },
+  'random-annihilation': { displayName: '歼灭随机算法', description: '歼灭：从所有合法动作中随机选择，跳过炮火危险区内的部署与治疗', version: 'v1', modes: ['annihilation'] },
+  'random-royale': { displayName: '大逃杀随机算法', description: '大逃杀：从所有合法计划动作中随机入队，随后提交', version: 'v1', modes: ['royale'] },
   mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1', modes: ['standard'] },
   threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1', modes: ['standard'] },
   field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'] },

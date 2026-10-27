@@ -14,6 +14,7 @@
 | 实现日期 | 2026-09-13（v3.5.0） |
 | 语言 | JavaScript (ESM) |
 | 接口类型 | 策略接口（`decide`） |
+| 支持模式 | 标准（standard）—— 歼灭/大逃杀为独立条目，见「相关算法条目」 |
 
 ## 算法原理
 
@@ -28,7 +29,8 @@
 
 ## 决策逻辑
 
-每个回合开始时，收集所有合法动作并随机选择：
+本条目只覆盖标准模式（逐人轮流）：动作立即执行，攻击/治疗按目标 id。每个回合开始时，
+收集所有合法动作并随机选择：
 
 ### 1. 收集攻击动作
 
@@ -60,22 +62,7 @@ for (const supporter of mySupporters) {
 }
 ```
 
-### 3. 收集爆破动作
-
-遍历所有己方重装单位，找出可爆破的相邻障碍物：
-
-```javascript
-for (const heavy of myHeavies) {
-  if (heavy.hasActed) continue;
-  for (const neighbor of neighbors(heavy)) {
-    if (terrain[neighbor] === 'blocker') {
-      actions.push({ type: 'demolish', unit: heavy, target: neighbor });
-    }
-  }
-}
-```
-
-### 4. 收集部署动作
+### 3. 收集部署动作
 
 遍历所有部署点，找出可部署的位置和兵种：
 
@@ -93,7 +80,7 @@ for (const deployPoint of myDeployPoints) {
 }
 ```
 
-### 5. 收集移动动作
+### 4. 收集移动动作
 
 遍历所有己方单位，找出可移动到的位置：
 
@@ -106,7 +93,7 @@ for (const unit of myUnits) {
 }
 ```
 
-### 6. 随机选择
+### 5. 随机选择
 
 ```javascript
 if (actions.length === 0) {
@@ -115,6 +102,19 @@ if (actions.length === 0) {
 const randomIndex = Math.floor(Math.random() * actions.length);
 return actions[randomIndex];
 ```
+
+## 相关算法条目（歼灭 / 大逃杀）
+
+3.8.10 起，歼灭与大逃杀各有**独立注册**的随机基线：注册名、展示名、版本与竞技场
+参与者 id 全部分开，战绩不会与标准模式的 `algo_random@v1` 混记。
+
+| 条目 | 显示名 | 模式 | 参与者 id | 实现 |
+|---|---|---|---|---|
+| `random-annihilation` | 歼灭随机算法 | annihilation | `algo_random-annihilation@v1` | 复用 `algorithms/lib/random-turn.mjs`，按引擎口径跳过炮火危险区内的部署（起点/落点）与治疗（支援兵/目标）；走进危险区仍合法 |
+| `random-royale` | 大逃杀随机算法 | royale | `algo_random-royale@v1` | 复用 `algorithms/lib/random-plan.mjs`（与 `random-sim` 同源）的计划队列枚举：形状瞄准、队列前缀投影、地形寻路、`attacksPerUnit`、炮火过滤 |
+
+标准模式本身的行为、版本（v1）与历史对局不受影响；各自档案见
+[`random-annihilation.md`](random-annihilation.md) 与 [`random-royale.md`](random-royale.md)。
 
 ## 实现细节
 
@@ -157,6 +157,9 @@ return actions[randomIndex];
 如需可复现的随机对局，可替换为带种子的 PRNG（如 `seedrandom` 库）。
 
 ## 性能表现
+
+> 歼灭与大逃杀的数据见各自档案（`random-annihilation.md` / `random-royale.md`），
+> 目前均无对局；本页数字只代表标准模式。
 
 ### vs 其他算法（default 地图）
 
@@ -297,15 +300,15 @@ const validActions = allActions.filter(a => !recentActions.has(hash(a)));
 ## 兼容性
 
 - **支持模式**：仅标准模式（standard）
-- **不支持模式**：歼灭模式（annihilation）、同时回合模式（simultaneous）
-- **地图兼容性**：所有标准模式地图（default、random、dual-lanes、desert 等）
+- **不支持模式**：歼灭（annihilation）、大逃杀（royale）、同时回合（simultaneous）——前两者是独立的随机基线条目，后者由 `random-sim` 覆盖
+- **地图兼容性**：所有标准模式地图（default、random、breach、danger-close、dual-lanes 等）
 - **运行环境**：Node.js ≥ 24，纯 JavaScript，无外部依赖
 
 ## 使用方式
 
 ### 通过前端添加
 
-1. 创建对局，选择标准模式地图
+1. 创建标准模式对局（歼灭/大逃杀请选对应条目「歼灭随机算法」「大逃杀随机算法」）
 2. 点击"添加 AI"按钮
 3. 切换到"算法脚本"标签
 4. 下拉菜单选择"随机算法（Random）"
@@ -347,9 +350,6 @@ function collectAllActions(game, owner, utils) {
   // 治疗动作
   for (const supporter of supporters) { ... }
   
-  // 爆破动作
-  for (const heavy of heavies) { ... }
-  
   // 部署动作
   for (const deployPoint of deployPoints) { ... }
   
@@ -359,23 +359,21 @@ function collectAllActions(game, owner, utils) {
   return actions;
 }
 
-// 导出接口
+// 导出接口（标准模式）
 export default {
   name: 'random',
   description: '从所有合法动作中随机选择',
-  
+
   async decide(game, utils) {
-    const actions = collectAllActions(game, owner, utils);
-    if (actions.length === 0) return null;
-    
-    const index = Math.floor(Math.random() * actions.length);
-    return actions[index];
+    return decideImmediateAction(game, utils); // 立即执行；null = 结束回合
   }
 }
 ```
 
-完整源码见 `algorithms/builtin/random.mjs`（约 140 行）。
+完整源码见 `algorithms/builtin/random.mjs`；轮流枚举在
+`algorithms/lib/random-turn.mjs`（`random-annihilation` 共用），计划队列枚举在
+`algorithms/lib/random-plan.mjs`（`random-sim` 与 `random-royale` 共用）。
 
 ## 一句话总结
 
-random 算法从所有合法动作中随机选择（耗时 < 0.1 秒），对任何有意义的算法胜率都 < 5%（对 greedy 3.1%、对 mcts 0%、对 v2.7.0 4.2%），仅作为性能下界基准、接口测试工具和边界探索手段，不具备任何实战价值但在算法研究中不可或缺。
+random 从所有合法动作中均匀随机选择（耗时 < 0.1 秒），对任何有意义的算法胜率都 < 5%（对 greedy 3.1%、对 mcts 0%、对 v2.7.0 4.2%），仅作为性能下界基准、接口测试工具和边界探索手段，不具备任何实战价值但在算法研究中不可或缺。歼灭与大逃杀的同源基线是独立条目 `random-annihilation` 与 `random-royale`，不与本条目混记战绩。

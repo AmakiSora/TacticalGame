@@ -10,11 +10,11 @@
 
 | 项目 | 当前值 |
 |---|---|
-| 代码版本 | 3.8.5 |
+| 代码版本 | 3.8.10 |
 | 标准图池 | `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `whirlpool` |
 | 同时回合图 | `standoff` / `molten-throne` |
-| 大逃杀图 | `snowflake` / `narrow-road`（暂无内置算法） |
-| 歼灭图 | `artillery-zone`（暂无内置算法） |
+| 大逃杀图 | `snowflake` / `narrow-road`（内置基线：`random-royale`） |
+| 歼灭图 | `artillery-zone`（内置基线：`random-annihilation`） |
 | 同时回合规则 | 3.8.0 起按行动点**分步结算**，不是“一单位一轮一动作” |
 | 裁决分 | 3.6.0 起为击杀价值 + 据点流量制 |
 | 已退役地图 | `forge` → `molten-throne`（3.5.11，同时回合）、`desert`（3.5.8 下线）、`four-corners`（3.5.7 下线） |
@@ -34,6 +34,8 @@ algorithms/
 ├── builtin/              # 内置算法实现
 │   ├── greedy.mjs        # 贪心算法（标准模式）
 │   ├── random.mjs        # 随机算法（标准模式）
+│   ├── random-annihilation.mjs  # 歼灭随机算法（歼灭模式）
+│   ├── random-royale.mjs # 大逃杀随机算法（大逃杀模式）
 │   ├── mcts.mjs          # 蒙特卡洛树搜索（标准模式）
 │   ├── threat.mjs        # 威胁感知算法（标准模式）
 │   ├── field.mjs         # 势场算法（标准模式）
@@ -50,13 +52,17 @@ algorithms/
 ├── lib/                  # 共享工具库
 │   ├── api-client.mjs    # REST API 客户端
 │   ├── game-utils.mjs    # 游戏工具函数
-│   └── interfaces.mjs    # 算法接口适配器
+│   ├── interfaces.mjs    # 算法接口适配器
+│   ├── random-turn.mjs   # 轮流模式随机枚举（random / random-annihilation）
+│   └── random-plan.mjs   # 计划模式随机枚举（random-sim / random-royale）
 ├── docs/                 # 算法文档
 │   ├── ALGORITHMS_NOTES.md   # 本文件
 │   ├── RELEASE_NOTES.md      # 版本发布记录
 │   └── algorithms/           # 单算法详细档案
 │       ├── greedy.md
 │       ├── random.md
+│       ├── random-annihilation.md
+│       ├── random-royale.md
 │       ├── mcts.md
 │       ├── threat.md
 │       ├── field.md
@@ -182,6 +188,7 @@ export const ALGORITHM_META = {
 | 算法 | 计划语义 | 当前状态 |
 |---|---|---|
 | `random-sim` | 同单位多动作、队列投影、`attacksPerUnit` | **v2 已适配（3.8.1）**，作为同时回合基线 |
+| `random-royale` | 复用 `lib/random-plan.mjs`：队列投影 + 地形寻路 + `attacksPerUnit` + 炮火区部署/治疗过滤 | **v1（3.8.10 新条目）**：`snowflake` 真实对局多轮零入队拒绝；不做强度声明（随机基线即下界） |
 | `dest-prob` | v2 按队列前缀投影 + 地形寻路 + `attacksPerUnit` 生成计划 | **v2 已适配（3.8.1）**：同 harness 对 v1 50/60（83.3%）、对 random-sim 60/60；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（各 30 局/图抽样）；v1 的旧规则 100:0 只代表旧规则 |
 | `kriegspiel` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配并完成 3.8 真实引擎标定**（分步语义、`wait`、`demolish`、`attacksPerUnit`）：与引擎逐点对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法；旧 3.7 数据只代表旧规则 |
 | `matrix-eq` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配**并按 3.8 镜像裁判标定；真实服务器口径待验证 |
@@ -218,6 +225,7 @@ export const ALGORITHM_META = {
 | `deployOrigins(game, owner)` | 部署源（遵守 `deployFromHq` 与 `canDeploy`） |
 | `effectiveDeployCost(game, type, origin)` | 考虑据点折扣后的部署费用 |
 | `actionsRemaining(game)` | 剩余行动点（标准模式；同时回合用队列长度/`actionsPerTurn`） |
+| `inArtilleryDanger(game, pos)` | 是否在炮火危险区（歼灭/大逃杀；无炮火模式恒 false） |
 | `deployDecision(game, owner)` | 共用部署决策（threat/mcts/field/verdict 已接入） |
 
 > 同时回合的计划期寻路只按地形，不把单位/总部当障碍；不要直接用 `reachableCells` 的“单位挡路”口径推导计划队列。计划模式请按 `src/engine/planning.ts` 的前缀投影语义实现。
@@ -227,6 +235,8 @@ export const ALGORITHM_META = {
 | 算法 | 模式 | 版本 | 类型 | 复杂度 | 强度 / 状态 | 用途 |
 |---|---|---|---|---|---|---|
 | **random** | standard | v1 | 随机 | O(n) | arena 756 / 1.3%（2026-10-21 UTC） | 基准对照、测试 |
+| **random-annihilation** | annihilation | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 歼灭模式基线、炮火合法性冒烟 |
+| **random-royale** | royale | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 大逃杀模式基线、计划队列冒烟 |
 | **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
 | **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
 | **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
@@ -251,10 +261,13 @@ export const ALGORITHM_META = {
 |---|---:|---|
 | standard | 6 | random / greedy / mcts / threat / field / verdict |
 | simultaneous | 8 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo / tempo-weave / horizon |
-| annihilation | 0 | — |
-| royale | 0 | — |
+| annihilation | 1 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像） |
+| royale | 1 | random-royale（同时回合计划队列，与 random-sim 同源枚举） |
 
-> 歼灭与大逃杀目前没有内置算法；这是当前最大的模式空白，优先于继续打磨 2 人标准图。
+> 三个随机基线是**独立条目**：注册名、展示名、版本与竞技场参与者 id 全部分开
+> （`algo_random@v1` / `algo_random-annihilation@v1` / `algo_random-royale@v1`），
+> 战绩不会混名；标准模式的实现与历史不受影响。
+> 歼灭与大逃杀目前只有随机基线，仍缺有强度的算法——这是当前最大的模式空白，优先于继续打磨 2 人标准图。
 
 ## 当前强度快照（standard，2026-10-21 UTC）
 
@@ -402,7 +415,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 ## 未来方向
 
 1. **同时回合 3.8 适配与重标定**：dest-prob v2 已完成分步语义适配（v1→v2 直接对拍 50/60）；下一步为 matrix-eq v2 补真实引擎标定，确认镜像裁判结论（kriegspiel v2 已完成：真实引擎对拍零偏差 + 两图 ×3 对手各 30 局）。
-2. **大逃杀 / 歼灭算法空白**：当前 0 个内置算法。先做随机/效用基线，再处理无总部、炮火缩圈、出生据点绑定与淘汰规则。
+2. **大逃杀 / 歼灭缺强度算法**：3.8.10 起 `random-annihilation` 与 `random-royale` 已覆盖两种模式的基线（前者走轮流枚举 + 炮火合法镜像，后者走计划队列，与 random-sim 同源），但还没有有强度的对手。下一步是在该基线上补效用/搜索型算法，复用无总部、炮火缩圈、出生据点绑定与淘汰规则。
 3. **多席位标定**：现有标准权重主要在 2 人对局上调出；用 `multiplayer-ring`（多席位）、`snowflake` / `standoff`（3/6 人）补 3–6 人标定。`four-corners` 已下线，不能再用。
 4. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索，可作为 mcts 之外的确定性搜索基线。
 5. **混合架构**：MCTS + 学习评估函数，或规则算法 + RL 局面评估。

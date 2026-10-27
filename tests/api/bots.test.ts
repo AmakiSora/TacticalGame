@@ -431,6 +431,46 @@ describe('Algorithm bot endpoints', () => {
     expect(body.bot.name).toBe('矩阵均衡算法');
   });
 
+  it('allows the annihilation random bot on annihilation maps', async () => {
+    const created = await createTwoPlayerLobby(app, { mapId: 'artillery-zone' });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_random-annihilation' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { bot: { name: string; algorithm: string } };
+    expect(body.bot.algorithm).toBe('random-annihilation');
+    expect(body.bot.name).toBe('歼灭随机算法');
+  });
+
+  it('allows the royale random bot on royale maps (plan-queue path)', async () => {
+    const created = await createTwoPlayerLobby(app, { mapId: 'snowflake' });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_random-royale' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { bot: { name: string; algorithm: string } };
+    expect(body.bot.algorithm).toBe('random-royale');
+    expect(body.bot.name).toBe('大逃杀随机算法');
+  });
+
+  it('still rejects the standard random bot on annihilation maps (separate entries)', async () => {
+    const created = await createTwoPlayerLobby(app, { mapId: 'artillery-zone' });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/games/${created.gameId}/bots/algorithm`,
+      headers: { 'X-Host-Token': created.hostToken },
+      payload: { botType: 'algo_random' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('bot_not_supported');
+  });
+
   it('lists per-algorithm supported modes in the catalog', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/algorithms' });
     expect(res.statusCode).toBe(200);
@@ -445,6 +485,19 @@ describe('Algorithm bot endpoints', () => {
     expect(matrixEq?.name).toBe('矩阵均衡算法');
     const greedy = algorithms.find(a => a.id === 'algo_greedy');
     expect(greedy?.modes).toEqual(['standard']);
+    // 三个随机基线是独立条目，名字与模式一一对应。
+    expect(algorithms.find(a => a.id === 'algo_random')).toMatchObject({
+      name: '随机算法',
+      modes: ['standard'],
+    });
+    expect(algorithms.find(a => a.id === 'algo_random-annihilation')).toMatchObject({
+      name: '歼灭随机算法',
+      modes: ['annihilation'],
+    });
+    expect(algorithms.find(a => a.id === 'algo_random-royale')).toMatchObject({
+      name: '大逃杀随机算法',
+      modes: ['royale'],
+    });
   });
 
   it('auto-suffixed duplicate bot names stay distinguishable and within the length limit', async () => {

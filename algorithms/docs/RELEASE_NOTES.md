@@ -4,7 +4,26 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）仍为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.10（2026-10-28）— 歼灭与大逃杀随机基线
+
+### 新增功能
+
+- **`random-annihilation`（歼灭随机算法）**：歼灭模式的随机基线，逐人轮流语义。与标准 `random` 共用轮流枚举（`algorithms/lib/random-turn.mjs`），并按引擎口径过滤炮火危险区——危险区内的部署（起点/落点）与治疗（支援兵/目标）不进候选，走进危险区仍合法。`modes: ['annihilation']`、`version: 'v1'`、参与者 id `algo_random-annihilation@v1`；档案 `algorithms/docs/algorithms/random-annihilation.md`。
+- **`random-royale`（大逃杀随机算法）**：大逃杀模式的随机基线，同时回合计划队列。枚举层与 `random-sim` 共用 `algorithms/lib/random-plan.mjs`（形状瞄准、队列前缀投影、地形寻路、`attacksPerUnit`、炮火过滤）。`modes: ['royale']`、`version: 'v1'`、参与者 id `algo_random-royale@v1`；档案 `algorithms/docs/algorithms/random-royale.md`。
+
+### 变更
+
+- **三个随机基线改用独立条目**：标准 `random` 回归 `modes: ['standard']`，与两个新模式条目的注册名、展示名、版本、参与者 id 全部分开；历史 `algo_random@v1` 的战绩归属不变。
+- **共享枚举**：轮流枚举抽到 `algorithms/lib/random-turn.mjs`，计划枚举抽到 `algorithms/lib/random-plan.mjs`；`random-sim` 改为薄入口，行为不变。
+- **竞技场榜单**：`generateArenaLeaderboard` 只输出有对局的模式，声明了模式但零局的新条目不生成 0 局空榜。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/random.test.ts`（12 例）：三个条目的载荷形态与短路、炮火区部署/治疗过滤（含「走进危险区仍合法」对照）；`artillery-zone`（歼灭）整局零非法并正常完赛、`snowflake`（大逃杀）跑满 6 轮零入队拒绝且炮火圈收缩。
+- `tests/api/bots.test.ts` 补三个条目的准入/拒绝与目录回归；`tests/algorithms/registry.test.ts`、`tests/algorithms/game-utils.test.ts`、`tests/public/algorithm-picker.test.ts` 同步。
+- `npm run build` 通过；`npm test` 全量通过（数字见根 `RELEASE_NOTES.md` 3.8.10）。
 
 ## 3.8.7（2026-10-27）— horizon 视界算法 v1
 

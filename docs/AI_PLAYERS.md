@@ -54,7 +54,9 @@ python rl/evaluate.py --model rl/models/model.zip
 当前内置算法（未标注者为标准模式）。每条只写定位，实测战绩与评分以 `/arena.html` 榜单为准，实现细节见各自档案：
 
 - **贪心算法（Greedy）**：按固定优先级选择动作——可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动。[档案](../algorithms/docs/algorithms/greedy.md)
-- **随机算法（Random）**：从所有合法动作中均匀随机选择。[档案](../algorithms/docs/algorithms/random.md)
+- **随机算法（Random，仅标准模式）**：从所有合法动作中均匀随机选择。[档案](../algorithms/docs/algorithms/random.md)
+- **歼灭随机算法（Random Annihilation，仅歼灭模式）**：同一轮流枚举，并按引擎口径跳过炮火危险区内的部署与治疗；走进危险区仍合法。[档案](../algorithms/docs/algorithms/random-annihilation.md)
+- **大逃杀随机算法（Random Royale，仅大逃杀模式）**：从合法计划动作中随机入队（枚举与 random-sim 同源），随后提交。[档案](../algorithms/docs/algorithms/random-royale.md)
 - **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 定次模拟推演的通用搜索，移动采样偏向 `movementGoal`，支持据点占领与入口部署。[档案](../algorithms/docs/algorithms/mcts.md)
 - **威胁感知算法（Threat）**：效用 AI + 威胁影响图，把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，无需搜索或模拟。[档案](../algorithms/docs/algorithms/threat.md)
 - **势场算法（Field）**：人工势场——斥力井 + 引力井 + 波前距离场塑形走位，无需搜索。[档案](../algorithms/docs/algorithms/field.md)
@@ -99,7 +101,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
+| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, random-royale, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |

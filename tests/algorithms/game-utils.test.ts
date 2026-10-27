@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deployOrigins } from '../../algorithms/lib/game-utils.mjs';
+import { deployOrigins, inArtilleryDanger } from '../../algorithms/lib/game-utils.mjs';
 
 describe('game-utils deployOrigins', () => {
   const game = (deployFromHq?: boolean) => ({
@@ -41,5 +41,19 @@ describe('game-utils deployOrigins', () => {
     };
     expect(deployOrigins(g, 'player_a').map((o: { id: string }) => o.id))
       .toEqual(['hq_a', 'cp_supply', 'cp_untyped']);
+  });
+});
+
+describe('game-utils inArtilleryDanger', () => {
+  it('matches cells listed in game.artillery.dangerCells', () => {
+    const g = { artillery: { dangerCells: [{ q: 3, r: -1 }, { q: 0, r: 0 }] } };
+    expect(inArtilleryDanger(g, { q: 3, r: -1 })).toBe(true);
+    expect(inArtilleryDanger(g, { q: 0, r: 0 })).toBe(true);
+    expect(inArtilleryDanger(g, { q: 3, r: 0 })).toBe(false);
+  });
+
+  it('is always false when the mode has no artillery (simultaneous/standard)', () => {
+    expect(inArtilleryDanger({ artillery: null }, { q: 0, r: 0 })).toBe(false);
+    expect(inArtilleryDanger({}, { q: 0, r: 0 })).toBe(false);
   });
 });

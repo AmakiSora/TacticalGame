@@ -597,7 +597,9 @@ function main() {
       games: modeMatches.length,
       maps: leagues,
     };
-  }).filter(mode => mode.games > 0 || mode.maps.all.models.length > 0);
+  // 只保留本批对局里真实出现过的模式：注册表声明了某模式、但一局都没打过的基线
+  // （如刚接入歼灭/大逃杀、尚未跑批的 random）不应在页面上开一个 0 局的空榜。
+  }).filter(mode => mode.games > 0);
 
   const registryMeta = Object.fromEntries([...registry.entries()].map(([id, meta]) => [id, meta.kind === 'algorithm' ? {
     kind: 'algorithm',

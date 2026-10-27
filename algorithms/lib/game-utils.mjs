@@ -56,6 +56,22 @@ export function isPlayable(game, pos) {
 }
 
 /**
+ * 格子是否位于炮火危险区（仅歼灭系模式：annihilation / royale）。
+ *
+ * 引擎在部署校验（deployment.ts，同时模式另有 planning.ts）中拒绝危险区内的部署
+ * （起点或落点），在治疗执行时拒绝危险区内的治疗；算法按同一口径过滤候选，避免把
+ * 必被拒绝的动作发给服务器（runner 在轮流模式收到拒绝会提前结束回合，见
+ * algorithms/lib/interfaces.mjs）。
+ * 同时回合（simultaneous）没有炮火机制，game.artillery 恒为 null，此函数恒 false。
+ * @param {object} game - 游戏状态
+ * @param {{q: number, r: number}} pos - 位置
+ * @returns {boolean}
+ */
+export function inArtilleryDanger(game, pos) {
+  return Boolean(game.artillery?.dangerCells?.some(cell => cell.q === pos.q && cell.r === pos.r));
+}
+
+/**
  * 获取格子的地形类型
  * @param {object} game - 游戏状态
  * @param {{q: number, r: number}} pos - 位置

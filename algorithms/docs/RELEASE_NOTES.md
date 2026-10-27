@@ -2,9 +2,34 @@
 
 > 本文档记录算法 AI 侧的版本变化：新增算法、算法版本升级、同时回合镜像适配、算法接口/工具链与相关地图/计分规则变化。
 >
-> **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.5 的算法里程碑，未列出的版本表示没有算法侧变化。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
+> **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）仍为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）仍为 v1。
+
+## 3.8.7（2026-10-27）— horizon 视界算法 v1
+
+### 新增功能
+
+- **horizon v1**：同时回合模式的第八个内置算法。把单轮分步结算后的棋盘投影到终局估胜率：据点到达时间模型、两轮攻城压力、下一轮威胁场与歼灭风险共同给出胜率；对手用同构贪心 / 静态开火 / 扰动贪心 / 斩首变体四套场景建模，逐行动点束搜索后再用对抗探针校验首选计划。分步结算镜像与 `src/engine/simultaneousResolve.ts` 逐点对拍零偏差；零依赖、不读地图 ID、不使用对手隐藏队列与事件史。
+- **注册与档案**：注册名 `horizon`（大厅 bot type `algo_horizon`，竞技场参与者 id `algo_horizon@v1`），`modes: ['simultaneous']`，`version: 'v1'`；档案 `algorithms/docs/algorithms/horizon.md`。
+- **标定与竞技场**：3.8.2 真实引擎（`scripts/horizon-arena.mts`，standoff / molten-throne ×4 对手 ×30 局，种子基 20261026）合计 **236:4（98.3%）**、零非法；HTTP + runner 23 局零被拒；竞技场首批归档 504 局 **297W/206L/1D（58.9%）**、评分 **1614**（2026-10-27 榜单快照）。molten-throne 对 matrix-eq 的 27:3 为斩首取胜、据点流量低于对手，属已知取舍。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/horizon.test.ts`（24 例）与 `tests/algorithms/horizon-selfplay.test.ts`（4 例）：接口短路、缓存对账、计划期合法性镜像、分步结算逐点对拍、3.8 分步语义（跨步移动后攻击、`attacksPerUnit`、失败连锁、`wait`）、治疗镜像、多席位与通用性自查；双人两图与 3/6 人抽样整局零非法。
+- `npm run build` 通过；`npm test` 118 文件 / 1087 例全绿。
+
+## 3.8.6（2026-10-25）— mistpine 与竞技场工具链
+
+### 新增功能
+
+- **mistpine 进入同时回合算法池**：新增 34v34、零经济、总部禁部署、每轮 12 行动点的同时回合地图；同时回合评估与竞技场地图池扩至 standoff / molten-throne / mistpine。
+- **竞技场平均决策耗时**：模式评分榜与参与者画像新增该列，跑批逐动作记录决策墙钟耗时（含被拒重选与计划提交）。
+- **评估控制台清空旧局**：可按模式 / 地图 / 参与者筛选并 dry-run 预览后删除 `arena/matches.jsonl` 中的命中对局，跑批进行中拒绝。
+
+### 测试与验证
+
+- 新增 mistpine 地图加载与开局回归、决策耗时聚合回归与清空旧局接口回归；`npm run build` 通过，`npm test` 116 文件 / 1056 例通过，`tests/rl` pytest 73 通过。
 
 ## 3.8.5（2026-10-24）— tempo-weave 经纬算法 v1
 
@@ -50,6 +75,18 @@
 - `tests/algorithms/prism-selfplay.test.ts` 3 例：standoff / molten-throne 双人整局、standoff 三人前四轮，零非法动作。
 - 真实引擎换座冒烟（3.8.3、`evaluate_cross.py`、每对阵每图 2 局）：horizon 8:0、matrix-eq 4:0、kriegspiel 2:0，合计 14:0；仅 7 组 ×2 局，不作稳定优势结论。
 - `npm run build` 通过；`npm test` 113 文件 / 950 例全绿。
+
+## 3.8.2（2026-10-23）— 同时回合评估链路
+
+### 新增功能
+
+- **评估控制台支持同时回合**：`/api/arena/eval/start` 按地图 `mode` 接受 `simultaneous` 批次（standoff / molten-throne）并拒绝混模式，地图、算法与模型清单随模式联动；`round_robin.py` 新增 `--mode`。
+- **进程内评估链路适配同时回合**：`rl/training/local-worker.ts` 支持队列动作与按座位脱敏，`evaluate_cross.py` 支持逐轮入队、提交与统一结算。
+- **同时回合首轮榜单**：288 局跑批全部入库，新增 4 名参与者各 144 局；榜首矩阵均衡 1730、兵棋推演 1692、落点概率 1676、同时随机 903（2026-10-23 快照）。
+
+### 测试与验证
+
+- `npm run build` 通过；`npm test` 111 文件 / 944 例、`npm run test:rl` 73 例通过；288 局跑批 0 失败。
 
 ## 3.8.1（2026-10-23）— 同时回合算法 v2：3.8.0 分步引擎适配
 
@@ -145,6 +182,17 @@
 - 新增 `tests/algorithms/dest-prob-selfplay.test.ts` 2 例：standoff 与 molten-throne 整局互相对弈，零非法动作并正常完赛。
 - `tests/algorithms/registry.test.ts` 与 `tests/api/bots.test.ts` 补 dest-prob 的 modes、展示名、版本与大厅添加断言；dest-prob 测试补同单位多动作、队列投影攻击、地形寻路、`attacksPerUnit` 与整局自博弈。
 - headless 自博弈（`temp/dest-prob-100.mts`，逐局交替先手、种子基 1000）：vs random-sim 在 standoff / molten-throne 各 100 局 **100:0**、零非法动作；两图场均击杀 3.10 / 0.96（random-sim 0.23 / 0.01），场均裁定分 1105.10 : 280.13 / 3503.22 : 671.14；种子基 5000 复测各 100 局同样 100:0；3 人 standoff 10:0、6 人 standoff 5:0（零非法冒烟）。
+
+## 3.7.1（2026-10-21）— 取消过期模型机制
+
+### 变更
+
+- **模型参评口径**：`v2.3.2@340K`、`v2.5.0@2M`、`v2.6.0@3.6M` 不再有独立过期状态，`rl/models/` 下 19 个可加载模型全部恢复参评；`GET /api/rl/models` 不再过滤，`round_robin.py` 自动发现不再排除过期模型（单图 300 批 / 7,200 局）。
+- **竞技场与统计**：页面移除「显示已过期」开关与归档表，榜单/统计 JSON 移除 `expired` 系列字段与 `payload.expired` 段；`arena/model-status.json`、`script/expireArenaModels.mjs`、`npm run arena-expire` 及对应测试删除，模型状态只保留推荐 / 历史 / 作废。
+
+### 测试与验证
+
+- 删除 expired 相关测试与脚本；`rl/docs/MODELS_NOTES.md` 与 Docker 打包同步。
 
 ## 3.7.0（2026-10-20）— 算法客户端幂等与长轮询
 
@@ -453,4 +501,4 @@ vs greedy（各图 30 局，逐局交替先手）：
 
 ## 版本号说明
 
-算法 AI 系统随主项目版本发布；算法实现自 3.8.1 起在 `algorithms/registry.mjs` 的 `ALGORITHM_META.version` 标注 `vN`，竞技场参与者 id 使用 `algo_<name>@vN`，历史对局仍归属旧版本 id。3.5–3.7 的算法实现未严格版本化，本文中的 v1 为回溯标注，具体变更以文件修改时间和 git 提交记录追溯。当前同时回合算法：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1。
+算法 AI 系统随主项目版本发布；算法实现自 3.8.1 起在 `algorithms/registry.mjs` 的 `ALGORITHM_META.version` 标注 `vN`，竞技场参与者 id 使用 `algo_<name>@vN`，历史对局仍归属旧版本 id。3.5–3.7 的算法实现未严格版本化，本文中的 v1 为回溯标注，具体变更以文件修改时间和 git 提交记录追溯。当前同时回合算法：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1。

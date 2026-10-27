@@ -6,6 +6,11 @@
 
 ## 3.8.7
 
+### 新增
+
+- **视界算法（`horizon`）**：同时回合模式的多轮视界规划器，把单轮分步结算后的棋盘投影到终局估胜率，用同构对手场景与对抗探针校验计划，再做逐行动点束搜索；只读公开状态，不使用地图 ID 与对手隐藏队列，详见 [`horizon.md`](algorithms/docs/algorithms/horizon.md)。
+- **评估跑批逐局入库**：`evaluate_cross` 每完成一局就追加到累积 JSONL，中断只丢进行中的一局，断点续跑只补差额；控制台逐局透传进度，并按同图同对历史均速预估剩余耗时。
+
 ### 变更
 
 - **README 瘦身为入口文档**：核心规则改为模式速览表并指向 `skill/`，算法列表只留一句定位 + 档案链接（战绩交给 `/arena.html` 与算法档案），单位表与逐图数值不再复写；REST API 章节拆到 [`docs/API.md`](docs/API.md)（补齐 `plan/wait`、`plan/reorder`、skill/健康/指标、长轮询、回放库、AI 机器人与竞技场评估等接口），AI 用法、地图格式与统计说明分别拆到 [`docs/AI_PLAYERS.md`](docs/AI_PLAYERS.md)、[`docs/MAP_FORMAT.md`](docs/MAP_FORMAT.md) 与 [`docs/STATS.md`](docs/STATS.md)。
@@ -22,7 +27,7 @@
 
 ### 测试与验证
 
-- 新增控制台同时回合地图目录与 `mistpine` 起步回归，以及 skill 寻路、响应结构与幂等重试回归；`npm run build` 通过，`npm test` 全量 116 个测试文件 / 1059 个用例通过。
+- 新增控制台同时回合地图目录与 `mistpine` 起步回归，以及 skill 寻路、响应结构与幂等重试回归；`npm run build` 通过，`npm test` 全量 118 个测试文件 / 1087 个用例通过。
 
 ## 3.8.6
 

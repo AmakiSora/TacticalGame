@@ -18,7 +18,7 @@
 | 支持模式 | 仅同时回合（`modes: ['simultaneous']`）；`decide` 遇到其他模式直接返回 `null` |
 | 镜像的引擎版本 | 3.8.2 的 `src/engine/simultaneousResolve.ts:resolveRoundSteps` + `src/engine/planning.ts`（前缀投影与 `coveredCellsFor`） |
 | 参考实现状态 | 分步结算镜像与真实引擎逐点对拍零偏差（单元测试 20 个局面 + 2 个治疗专项 + 对拍脚本 100 个局面）；标定 240 局 + 多席位 66 局 + HTTP 23 局 + `evaluate_cross.py` 16 局全部零非法动作 |
-| 作者 | Opus5.5 max |
+| 作者 | Opus5.5 xhigh |
 
 
 ## 定位

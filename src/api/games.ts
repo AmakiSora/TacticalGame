@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer,
+  clearSeatPlan, isSeatOrderValid, setSeatPlan,
   getRawHostToken, getRawPlayerToken,
 } from '../state/store.js';
 import { verifyToken } from '../state/tokens.js';
@@ -24,14 +25,40 @@ import type { GameState, PlayerId } from '../types.js';
 import { launchBotsForGame, removeBotRecord, clearBotsForGame } from './bots.js';
 
 export function lobbySummary(game: GameState) {
-  const players = joinedPlayerIds(game).map(id => ({
+  const joined = joinedPlayerIds(game);
+  const players = joined.map(id => ({
     id, name: game.players[id]!.name, status: game.players[id]!.status,
   }));
+  // 「座位」只在大厅有意义：编排过（manual）时 order 决定出生点槽位；未编排（random）时
+  // 出生点与先手（仅顺序模式）都还没定，seats 只按加入顺序给出座位号，spawnSlotId 一律 null，
+  // 避免把「开局才随机出来的结果」当成既成事实展示。
+  const plan = game.seatPlan ?? null;
+  // 当前人数在本图上的候选出生位 id 顺序（`config.layouts[n]`）；0 人或该人数不被地图支持时为空。
+  // 前端大厅的「草稿预览」要把座位下标映射到地图标记，只有这个顺序能对上——必须按 id 匹配，
+  // 因为 layouts['3'] 可能是 [slot_1, slot_3, slot_5] 这种跳位子集，按下标必错位。
+  // 拷贝一份再返回：这个数组会随 lobby 摘要发到客户端，不能和 config.layouts 共享引用。
+  const layoutSlots = [...(game.config.layouts[String(joined.length)] ?? [])];
+  const seats = joined.map((id, index) => {
+    const playerId = plan?.order[index] ?? id;
+    return {
+      seat: index + 1,
+      playerId,
+      name: game.players[playerId]?.name ?? '',
+      spawnSlotId: plan ? (layoutSlots[index] ?? null) : null,
+    };
+  });
   return {
     gameId: game.id, mapId: game.mapId, phase: game.phase,
     mode: game.config.mode,
     maxPlayers: game.maxPlayers, playerCount: players.length, players,
     supportedPlayerCounts: game.config.supportedPlayerCounts,
+    // 座位编排：seatMode='manual' 才有意义；firstSeat 为 0 起的座位下标（先手，仅顺序模式）。
+    // 同时回合 / 大逃杀没有先手，这里恒回 0，配合 mode 让前端直接隐藏「先手」控件。
+    seatMode: plan ? 'manual' : 'random',
+    seatVersion: game.seatVersion ?? 0,
+    firstSeat: plan && !isSimultaneousMode(game.config.mode) ? plan.firstSeat : 0,
+    seats,
+    layoutSlots,
     // 已结束的房间在大厅卡里要显示「已结束 · 胜者 · 回合数」，这两项只有结束时才有意义。
     winner: game.winner,
     roundNumber: game.turn.roundNumber,
@@ -229,6 +256,82 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       globalStore.persist(game);
       return { ok: true, lobby: lobbySummary(game) };
     });
+
+  // 大厅内编排座位：仅房主、仅 lobby 期；body 为全量座位表（天然幂等），ifVersion 失配返回 409。
+  app.put<{
+    Params: { id: string };
+    Body: { order?: unknown; firstSeat?: unknown; ifVersion?: unknown };
+  }>('/api/games/:id/host/seats', async (req, reply) => {
+    const game = authenticateHost(req, reply);
+    if (!game) return;
+    if (game.phase !== 'lobby') {
+      return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
+    }
+    const joined = joinedPlayerIds(game);
+    const body = req.body ?? {};
+    // 空房没有可排的对象：不做预留、不占位，等有人加入再排（必须先于 firstSeat 校验，
+    // 否则 0 人房会落到「先手座位号越界」，把真正原因掩盖成参数问题）。
+    if (joined.length === 0) {
+      return reply.code(400).send({ error: '当前没有已加入玩家，无法编排座位', code: 'invalid_seat_layout' });
+    }
+    // 版本校验必须先于载荷校验：陈旧标签页手里的 order 长度必然与当前成员数不符，
+    // 若先查排列就会一律 400，把「有人进出导致座位变了」这个真正原因掩盖成「载荷非法」。
+    const ifVersion = body.ifVersion;
+    if (ifVersion !== undefined && (typeof ifVersion !== 'number' || !Number.isInteger(ifVersion))) {
+      return reply.code(400).send({ error: 'ifVersion 必须是整数', code: 'invalid_seat_layout' });
+    }
+    const currentVersion = game.seatVersion ?? 0;
+    if (ifVersion !== undefined && ifVersion !== currentVersion) {
+      // 两个标签页同改：后来者拿到最新座位表与版本，前端直接重绘，不需要重放请求。
+      return reply.code(409).send({
+        error: '座位已被修改，请刷新后重试',
+        code: 'seat_conflict',
+        seatVersion: currentVersion,
+        lobby: lobbySummary(game),
+      });
+    }
+    // 座位表只能是「当前已加入玩家的一个排列」：陌生人 / 重复 / 缺人 / 长度不符一律 400。
+    if (!isSeatOrderValid(body.order, joined)) {
+      return reply.code(400).send({
+        error: '座位表必须恰好是当前已加入玩家的一次排列',
+        code: 'invalid_seat_layout',
+      });
+    }
+    // 先手（仅 standard / annihilation）：firstSeat 决定 turnOrder 从哪个座位循环展开。
+    // 同时回合 / 大逃杀没有先手 —— 座位序只是「出生点 + 同一步内的结算处理顺序」，
+    // 所以这里忽略传入值、一律归一化为 0（不报 400：firstSeat 对顺序模式合法，
+    // 只是在同时模式不适用；若留着非 0，开局会把结算处理顺序从中间起算）。响应同样回 0。
+    const simultaneousSeats = isSimultaneousMode(game.config.mode);
+    const requestedFirstSeat = body.firstSeat === undefined ? 0 : body.firstSeat;
+    let firstSeat = 0;
+    if (!simultaneousSeats) {
+      if (typeof requestedFirstSeat !== 'number' || !Number.isInteger(requestedFirstSeat)
+        || requestedFirstSeat < 0 || requestedFirstSeat >= joined.length) {
+        return reply.code(400).send({ error: '先手座位号越界', code: 'invalid_seat_layout' });
+      }
+      firstSeat = requestedFirstSeat;
+    }
+    setSeatPlan(game, body.order, firstSeat);
+    // 该接口不发事件但改变状态响应内容；显式推进版本，避免条件 GET 命中旧 ETag。
+    game.stateVersion = (game.stateVersion ?? 0) + 1;
+    globalStore.persist(game);
+    return {
+      ok: true, seatVersion: game.seatVersion ?? 0, firstSeat, lobby: lobbySummary(game),
+    };
+  });
+
+  // 取消编排：回到服务端随机配对 + 随机先手（与从未编排完全一致）。
+  app.delete<{ Params: { id: string } }>('/api/games/:id/host/seats', async (req, reply) => {
+    const game = authenticateHost(req, reply);
+    if (!game) return;
+    if (game.phase !== 'lobby') {
+      return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
+    }
+    clearSeatPlan(game);
+    game.stateVersion = (game.stateVersion ?? 0) + 1;
+    globalStore.persist(game);
+    return { ok: true, seatVersion: game.seatVersion ?? 0, lobby: lobbySummary(game) };
+  });
 
   app.post<{ Params: { id: string }; Body: { playerId?: string } }>('/api/games/:id/host/eliminate', async (req, reply) => {
     const game = authenticateHost(req, reply);

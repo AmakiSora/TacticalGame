@@ -102,23 +102,25 @@
         <div class="info-row">
           <span class="info-label">Game ID</span>
           <code id="created-game-id" class="info-value"></code>
-          <button class="btn-copy" data-copy="created-game-id">复制</button>
+          <button class="btn-copy" data-copy="created-game-id" aria-label="复制 Game ID" title="复制 Game ID"><span class="icon-copy" aria-hidden="true"></span></button>
+          <button id="btn-created-more" class="info-more-toggle" type="button" aria-expanded="false" aria-controls="created-more">凭证 ▾</button>
         </div>
-        <div class="info-row">
-          <span class="info-label">Host</span>
-          <code id="created-host-token" class="info-value"></code>
-          <button class="btn-copy" data-copy="created-host-token">复制</button>
+        <div id="created-more" class="info-more hidden">
+          <div class="info-row">
+            <span class="info-label">Host</span>
+            <code id="created-host-token" class="info-value"></code>
+            <button class="btn-copy" data-copy="created-host-token" aria-label="复制 Host Token" title="复制 Host Token"><span class="icon-copy" aria-hidden="true"></span></button>
+          </div>
+          <div class="info-row" id="created-player-token-row">
+            <span class="info-label">Player</span>
+            <code id="created-token" class="info-value"></code>
+            <button class="btn-copy" data-copy="created-token" id="created-token-copy" aria-label="复制 Player Token" title="复制 Player Token"><span class="icon-copy" aria-hidden="true"></span></button>
+          </div>
         </div>
-        <div class="info-row" id="created-player-token-row">
-          <span class="info-label">Player</span>
-          <code id="created-token" class="info-value"></code>
-          <button class="btn-copy" data-copy="created-token" id="created-token-copy">复制</button>
-        </div>
-        <p class="lobby-hint">请保存 Host Token，将 Game ID 发给其他玩家。</p>
         <div id="lobby-summary" class="lobby-summary"></div>
         <div class="lobby-room-actions">
           <button id="btn-start-game" class="btn success" type="button">开始游戏</button>
-          <button id="btn-connect-create" class="btn success" type="button">连接进入游戏</button>
+          <button id="btn-connect-create" class="btn success hidden" type="button">进入游戏</button>
           <button id="btn-host-participate" class="btn" type="button">加入战斗</button>
           <a id="btn-view-replay" class="btn hidden" href="#" target="_blank" rel="noopener">查看回放</a>
         </div>
@@ -189,7 +191,7 @@
               <span class="lobby-room-kicker-text" id="join-room-status">等待房主开始</span>
             </div>
             <h3 id="join-room-title">已加入房间</h3>
-            <p id="join-room-hint">房主开始后会自动进入游戏，也可以手动点「进入游戏」。</p>
+            <p id="join-room-hint">房主开始后会自动进入游戏。</p>
           </div>
           <button id="btn-join-again" class="btn lobby-room-edit" type="button">返回大厅</button>
         </div>
@@ -200,7 +202,7 @@
         </div>
         <div id="join-lobby-summary" class="lobby-summary"></div>
         <div class="lobby-room-actions">
-          <button id="btn-connect-join" class="btn success" type="button">进入游戏</button>
+          <button id="btn-connect-join" class="btn success hidden" type="button">进入游戏</button>
           <a id="btn-view-replay-join" class="btn hidden" href="#" target="_blank" rel="noopener">查看回放</a>
         </div>
       </div>

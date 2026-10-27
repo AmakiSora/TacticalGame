@@ -27,6 +27,8 @@ const errorStatus: Record<string, number> = {
   model_not_found: 400,
   insufficient_supplies: 400,
   action_limit_reached: 429,
+  invalid_seat_layout: 400,
+  seat_conflict: 409,
 };
 
 export function statusForCode(code: string): number { return errorStatus[code] ?? 400; }

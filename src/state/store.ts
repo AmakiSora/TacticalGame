@@ -7,7 +7,7 @@ import {
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
-  GameState, Headquarters, MapCell, PlayerId, PlayerState, Unit, UnitType,
+  GameState, Headquarters, MapCell, PlayerId, PlayerState, SeatPlan, Unit, UnitType,
 } from '../types.js';
 import { isAnnihilationMode, isPlayerId, isSimultaneousMode, normalizePlayerName, PLAYER_IDS } from '../types.js';
 import { getMapConfig } from '../config/loader.js';
@@ -177,6 +177,8 @@ export function addLobbyPlayer(game: GameState, name?: string): { id: PlayerId; 
   const secrets = rawSecrets.get(game) ?? { hostToken: '', tokens: {} };
   secrets.tokens[id] = token;
   rawSecrets.set(game, secrets);
+  // 已编排座位时，新加入者顺次坐到最后一个座位后面（不预留空位、不重排既有座位）。
+  appendSeatForJoin(game, id);
   return { id, token };
 }
 
@@ -187,7 +189,92 @@ export function removeLobbyPlayer(game: GameState, playerId: PlayerId): boolean 
   delete game.playerNames[playerId];
   const secrets = rawSecrets.get(game);
   if (secrets) delete secrets.tokens[playerId];
+  removeSeatForLeave(game, playerId);
   return true;
+}
+
+/**
+ * 校验一个座位表是否是「当前已加入玩家集合的一个排列」：
+ * 长度相等、元素都是已知席位、无重复、无陌生人。
+ */
+export function isSeatOrderValid(order: unknown, joined: PlayerId[]): order is PlayerId[] {
+  if (!Array.isArray(order) || order.length !== joined.length) return false;
+  const seen = new Set<string>();
+  for (const id of order) {
+    if (!isPlayerId(id) || seen.has(id) || !joined.includes(id)) return false;
+    seen.add(id);
+  }
+  return true;
+}
+
+/** 房主保存座位表（全量替换）；版本 +1。调用方须先校验载荷。 */
+export function setSeatPlan(game: GameState, order: PlayerId[], firstSeat: number): void {
+  game.seatPlan = { order: [...order], firstSeat };
+  game.seatVersion = (game.seatVersion ?? 0) + 1;
+}
+
+/** 房主取消编排：回到服务端随机配对 + 随机先手（仅顺序模式；同时模式本就无先手）。 */
+export function clearSeatPlan(game: GameState): void {
+  game.seatPlan = null;
+  game.seatVersion = (game.seatVersion ?? 0) + 1;
+}
+
+/**
+ * 成员变动时对座位表做跟随性维护：只追加到末尾 / 删除后前移。
+ * 版本无条件 +1：成员进出会改变座位表长度，前端草稿必须据此失效，
+ * 否则旧草稿会带着合法的 ifVersion 提交非法排列（400），提示难懂。
+ */
+function appendSeatForJoin(game: GameState, id: PlayerId): void {
+  const plan = game.seatPlan;
+  if (plan) plan.order.push(id);
+  game.seatVersion = (game.seatVersion ?? 0) + 1;
+}
+
+function removeSeatForLeave(game: GameState, id: PlayerId): void {
+  const plan = game.seatPlan;
+  // 座位版本独立于 stateVersion：大厅期 stateVersion 保持不变是为了 ETag 条件请求，
+  // 座位改动的去重/冲突只看 seatVersion。
+  if (!plan) {
+    game.seatVersion = (game.seatVersion ?? 0) + 1;
+    return;
+  }
+  const index = plan.order.indexOf(id);
+  if (index >= 0) plan.order.splice(index, 1);
+  // 先手（仅顺序模式）被移出时顺位前一格，保住「还是同一个人先手」的直觉；随后再夹到合法范围。
+  // 同时回合 / 大逃杀 firstSeat 恒 0，这段天然 no-op。
+  if (index >= 0 && index < plan.firstSeat) plan.firstSeat -= 1;
+  if (plan.order.length === 0) {
+    game.seatPlan = null;
+  } else if (plan.firstSeat > plan.order.length - 1) {
+    plan.firstSeat = plan.order.length - 1;
+  }
+  game.seatVersion = (game.seatVersion ?? 0) + 1;
+}
+
+/**
+ * 开局入口的一致性闸门：座位表必须恰好是当前在场玩家的一个排列，`firstSeat` 也必须合法。
+ * 任何不一致都只降级为随机开局（记 warning），绝不让 startGame 因为座位表失败。
+ */
+function resolveSeatPlan(game: GameState, joined: PlayerId[]): SeatPlan | null {
+  const plan = game.seatPlan;
+  if (!plan) return null;
+  // 同时回合 / 大逃杀没有先手：旧存档里可能残留非 0 的 firstSeat，这里按 0 处理（不降级、不改库），
+  // 保证 turnOrder 严格等于 order，结算处理顺序从 1 号座位起算。
+  const normalizedFirstSeat = isSimultaneousMode(game.config.mode) ? 0 : plan.firstSeat;
+  const firstSeatOk = Number.isInteger(normalizedFirstSeat)
+    && normalizedFirstSeat >= 0 && normalizedFirstSeat < joined.length;
+  if (!firstSeatOk || !isSeatOrderValid(plan.order, joined)) {
+    logger.warn(`对局 ${game.id} 的座位表与在场玩家不一致，已降级为随机开局`, { tag: 'game:seat' });
+    game.seatPlan = null;
+    game.seatVersion = (game.seatVersion ?? 0) + 1;
+    return null;
+  }
+  return { order: [...plan.order], firstSeat: normalizedFirstSeat };
+}
+
+/** 只推进注入的随机流，不产生结果；用于让 manual 分支与随机分支的取样次数一致。 */
+function consumeRandom(random: () => number, count: number): void {
+  for (let i = 0; i < count; i += 1) void random();
 }
 
 function shuffle<T>(items: T[], random: () => number): T[] {
@@ -204,7 +291,16 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
   const layoutIds = game.config.layouts[String(playerIds.length)];
   if (!layoutIds) throw new Error('不支持该玩家人数');
   const slots = layoutIds.map(id => game.config.spawnSlots.find(slot => slot.id === id)!);
-  const assignedPlayers = shuffle(playerIds, random);
+  const seatPlan = resolveSeatPlan(game, playerIds);
+  // 编排过的座位按房主的表确定性配对、不再洗牌；但仍消费与 shuffle() 相同次数（n-1）的随机数，
+  // 否则同一 seed 的对局会因「房主是否编排过座位」在后续伤害/治疗掷骰序列上漂移（见 §3.3）。
+  let assignedPlayers: PlayerId[];
+  if (seatPlan) {
+    consumeRandom(random, playerIds.length - 1);
+    assignedPlayers = [...seatPlan.order];
+  } else {
+    assignedPlayers = shuffle(playerIds, random);
+  }
 
   game.headquarters = {};
   game.units = [];
@@ -228,7 +324,15 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
       createUnitFromConfig(game.config, owner, unit.type, unit.q, unit.r)));
   }
 
-  const startIndex = Math.floor(random() * assignedPlayers.length);
+  // 先手（仅 standard / annihilation）：编排过就取 firstSeat，同样消费一次随机数与「随机起点」路径对齐。
+  // 同时回合 / 大逃杀没有先手：startIndex 恒 0 → turnOrder 严格等于 order（座位序 = 出生点 + 结算处理顺序）。
+  let startIndex: number;
+  if (seatPlan) {
+    consumeRandom(random, 1);
+    startIndex = seatPlan.firstSeat;
+  } else {
+    startIndex = Math.floor(random() * assignedPlayers.length);
+  }
   const turnOrder = [...assignedPlayers.slice(startIndex), ...assignedPlayers.slice(0, startIndex)];
   turnOrder.forEach((id, index) => { game.players[id]!.turnOrder = index; });
   game.phase = 'active';
@@ -438,6 +542,9 @@ function restoreActionStats(game: GameState): void {
 function normalizeLoadedGame(game: GameState): void {
   // 旧版本持久化档案没有 plan 字段，统一补默认值。
   if (game.plan === undefined) game.plan = null;
+  // 3.8.8 起大厅可编排座位：旧存档没有这两个字段，补默认（缺省 = 未编排 = 开局随机）。
+  if (game.seatPlan === undefined) game.seatPlan = null;
+  if (game.seatVersion === undefined) game.seatVersion = 0;
   // maxTurns 的 null 是合法的「无回合上限」；损坏或降级档案里的非法值回落有限默认，
   // 否则 `roundNumber < undefined` 恒 false，会在下一个回合边界把对局误裁定。
   const balance = game.config?.balance as { maxTurns?: unknown } | undefined;

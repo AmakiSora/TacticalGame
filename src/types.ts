@@ -155,6 +155,21 @@ export interface TurnState {
   currentOwner: PlayerId | null;
 }
 
+/**
+ * 大厅期房主编排的座位表（3.8.8）。缺省 / null = 未编排，开局沿用服务端随机配对与随机先手。
+ * 座位与席位 id 是两套概念：席位 id（player_a..h）恒按加入顺序分配且不可变，
+ * 座位号只表示「谁坐哪个出生点、按什么顺序处理」。
+ */
+export interface SeatPlan {
+  /** 索引即座位号（0 起）：order[i] 坐 config.layouts[人数][i] 出生点。长度恒等于已加入人数。 */
+  order: PlayerId[];
+  /**
+   * 先手座位号（0 起），**仅 standard / annihilation 有意义**：turnOrder = order 从 firstSeat 循环展开。
+   * simultaneous / royale 没有先手（座位序 = 出生点 + 同一步内的结算处理顺序），该字段恒 0。
+   */
+  firstSeat: number;
+}
+
 /** simultaneous 模式下玩家在计划阶段提交的待结算动作。 */
 export interface PendingAction {
   id: string;
@@ -316,6 +331,13 @@ export interface GameState {
   tokens: PlayerRecord<string>;
   playerNames: PlayerRecord<string>;
   turn: TurnState;
+  /**
+   * 大厅期房主编排的座位表；缺省 / null 时开局走原随机路径（对旧行为零影响）。
+   * 旧存档没有这两个字段，读取时由 normalizeLoadedGame 补默认值。
+   */
+  seatPlan?: SeatPlan | null;
+  /** 座位表版本号：每次成功改动 +1，用于并发控制（ifVersion 乐观锁）与前端条件提交。 */
+  seatVersion?: number;
   plan: PlanState | null;
   events: GameEvent[];
   /** 最近的成功动作幂等记录（键为“玩家:原始键”）；有界，旧存档缺省为空。 */
@@ -372,4 +394,6 @@ export type ApiErrorCode =
   | 'not_simultaneous_game'
   | 'already_committed'
   | 'bot_not_supported'
-  | 'model_not_found';
+  | 'model_not_found'
+  | 'invalid_seat_layout'
+  | 'seat_conflict';

@@ -164,6 +164,8 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   border-radius: 10px;
   padding: 28px 32px;
 }
+/* v6 压缩：进房间后整页上移，让地图卡 + 房间卡 + 座位列表一屏可见。 */
+.panel.room-active { margin: 16px auto; }
 .panel h2 { font-size: 17px; margin-bottom: 18px; color: #9ec; }
 
 /* ══════════ fields ══════════ */
@@ -333,8 +335,8 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 
 /* ══════════ lobby result ══════════ */
 .lobby-result {
-  margin-top: 16px;
-  padding: 16px;
+  margin-top: 10px;
+  padding: 12px;
   background: #0f1a24;
   border: 1px solid #2a4a5a;
   border-radius: 8px;
@@ -343,7 +345,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .info-label {
   font-size: 11px;
@@ -365,9 +367,12 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   word-break: break-all;
 }
 .btn-copy {
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
   border: 1px solid #2a3a4a;
   border-radius: 4px;
   background: #1a2a3a;
@@ -376,6 +381,29 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   transition: all .12s;
   flex-shrink: 0;
 }
+/* 复制按钮改用图标（文案进 aria-label），视觉减噪。 */
+.icon-copy {
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+  border-radius: 1px;
+  box-shadow: 2px 2px 0 -1px currentColor, 3px 3px 0 -1px currentColor;
+}
+/* 房间卡「更多 ▾」：凭证折叠（默认只留 Game ID）。 */
+.info-more-toggle {
+  margin-left: auto;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: #7a9aaa;
+  font-size: 11px;
+  cursor: pointer;
+}
+.info-more-toggle:hover { color: #a8c6da; }
+.info-more.hidden { display: none; }
+.info-more .info-row:last-child { margin-bottom: 0; }
+/* 状态与提示合并成一行后，房间卡里那行提示不再单独占位。 */
+#create-result #create-room-hint { display: none; }
 .btn-copy:hover { background: #26384a; color: #b0c8d8; }
 .btn-copy.copied { background: #1a4a2a; border-color: #2a8a4a; color: #8da; }
 .lobby-hint {
@@ -393,8 +421,8 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .lobby-status.err { color: #cc6d6d; }
 .lobby-status.connecting { color: #6cf; }
 .lobby-summary {
-  margin-top: 12px;
-  padding: 10px;
+  margin-top: 8px;
+  padding: 6px 8px;
   border: 1px solid #243545;
   border-radius: 6px;
   background: #0b141d;
@@ -419,11 +447,6 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   cursor: pointer;
 }
 .lobby-count-edit:hover { border-color: #6aa8c8; color: #eaf4fa; }
-.lobby-summary-meta {
-  margin-top: 4px;
-  color: #668495;
-  font-size: 12px;
-}
 .lobby-summary-result {
   margin-top: 6px;
   padding: 6px 9px;
@@ -433,23 +456,6 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   color: #e8c766;
   font-size: 12px;
   font-weight: 700;
-}
-.lobby-player-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-.lobby-player {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 7px;
-  border: 1px solid #2a3a4a;
-  border-radius: 5px;
-  background: #101922;
-  color: #cbd8e2;
-  font-size: 12px;
 }
 .lobby-kick {
   padding: 1px 5px;
@@ -471,6 +477,209 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   cursor: pointer;
 }
 .lobby-rename:hover { border-color: #4a7a9a; background: #1d3040; color: #d0e8f4; }
+/* 座位编排（3.8.8）：成员 chip 上的座位号徽标 + 房主可编辑的座位区。 */
+.lobby-seat-badge {
+  min-width: 16px;
+  padding: 0 3px;
+  border: 1px solid #3a5266;
+  border-radius: 3px;
+  background: #16232e;
+  color: #9cc3d8;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+.lobby-seats {
+  margin-top: 8px;
+  padding-top: 4px;
+  border-top: 1px dashed #2a3a4a;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.lobby-seat-hint { color: #8fa6b8; font-size: 11px; }
+/* 0 人房的空列表态：只有提示行 + 「＋ 添加 AI」，沿用座位区密度，不额外加框或分隔。 */
+.lobby-seats.is-empty { gap: 7px; }
+.lobby-seats.is-empty .lobby-seat-hint { margin: 0; }
+.lobby-seat-row {
+  display: grid;
+  /* 同步点 | 座位号 | 名字(1fr) | 出生位(固定列宽，无值时留空占位) | 操作区(固定槽位宽) */
+  grid-template-columns: 6px 16px minmax(0, 1fr) 78px auto;
+  align-items: center;
+  column-gap: 6px;
+  min-height: 20px;
+  padding: 2px 6px;
+  border: 1px solid #22303d;
+  border-radius: 4px;
+  background: #0e1720;
+  font-size: 12px;
+  line-height: 18px;
+  color: #cbd8e2;
+}
+/* 先手行不挂文字标签：左边框高亮（不占排版宽度，列不会因此错位）+ 右侧「先手」按钮选中态。 */
+.lobby-seat-row.is-first { border-color: #4a6a3a; background: #131d14; box-shadow: inset 3px 0 0 #6f9b4a; }
+.lobby-seat-row.is-self { box-shadow: inset 2px 0 0 #4a7a9a; }
+.lobby-seat-row.is-first.is-self { box-shadow: inset 3px 0 0 #6f9b4a; }
+.lobby-seat-row.is-seat-hover { border-color: #4a7a9a; background: #16232e; }
+/* 提交中：整行压暗，避免用户以为已经落库；回滚时闪一次红边（220ms）。 */
+.lobby-seat-row.is-pending { opacity: .72; }
+.lobby-seat-row.is-reverted { box-shadow: inset 2px 0 0 #c05a5a; }
+/* 同步状态点：灰=已同步 / 琥珀=提交中（呼吸）/ 红=失败（可点重提）。纯圆点，无文字。 */
+.lobby-seat-sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5a7a8a;
+  flex: none;
+}
+[data-seat-sync="pending"] .lobby-seat-sync-dot,
+.lobby-seat-sync-dot[data-seat-sync="pending"] { background: #d8a24a; animation: seat-sync-pulse 1s ease-in-out infinite; }
+[data-seat-sync="error"] .lobby-seat-sync-dot,
+.lobby-seat-sync-dot[data-seat-sync="error"] { background: #c05a5a; }
+@keyframes seat-sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.lobby-seat-sync {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: none;
+  background: none;
+  cursor: default;
+}
+.lobby-seat-sync[data-seat-sync="error"] { cursor: pointer; }
+.lobby-summary-head-ops { display: inline-flex; align-items: center; gap: 6px; }
+/* 读屏专用：同步态只播报，不显示可见文字。 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.toast-action {
+  margin-left: 10px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.lobby-seat-add-bot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px dashed #2f4a44;
+  border-radius: 4px;
+  background: #0f1b20;
+  color: #7fd8c0;
+  font-size: 12px;
+  cursor: pointer;
+}
+.lobby-seat-add-bot:hover { border-color: #57c2a6; color: #aef0dd; background: #14262a; }
+/* R2：地图出生位上的座位号徽标 / 未使用出生位 / 悬停互亮 */
+.map-preview .preview-point.is-unused { opacity: .32; }
+.map-preview .preview-point.is-seat-hover { filter: drop-shadow(0 0 2px rgba(156, 195, 216, .85)); }
+.map-preview .preview-point.is-seat-hover .preview-marker { stroke: #9cc3d8; stroke-width: 1.3; }
+.seat-mark-ring { fill: none; stroke-width: 1.3; stroke-opacity: .9; }
+.seat-mark-ring.is-preview { stroke-dasharray: 2 1.6; stroke-opacity: .55; }
+.seat-mark-no {
+  font-size: 6px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #0b141c;
+  stroke-width: 1.6;
+  pointer-events: none;
+}
+.seat-mark-no.is-preview { opacity: .7; font-style: italic; }
+/* 先手角标（R2-10）：先手那座上方一枚 ▲，不重排座号；草稿态同款，随先手本人移动。 */
+.seat-first-badge {
+  font-size: 6px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #0b141c;
+  stroke-width: 1.6;
+  pointer-events: none;
+}
+.lobby-seat-no {
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #1c2c3a;
+  color: #a8c6da;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+.lobby-seat-row.is-first .lobby-seat-no { background: #2f4a24; color: #cbe6a8; }
+.lobby-seat-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 出生位列：固定宽度 + 省略号，空值也保留位置（行与行才对得齐）。 */
+.lobby-seat-slot {
+  min-width: 0;
+  overflow: hidden;
+  color: #6f8ba0;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 操作区：槽位宽度写死（成员单槽 46px、▲▼ 26px、先手/置顶最宽），缺哪个就放同宽空占位，
+   于是同一张列表里每行的按钮左右边界逐像素对齐。 */
+.lobby-seat-ops { display: flex; align-items: center; gap: 6px; }
+/* 成员操作槽只有一个：宽度落在容器上（占位 / 改名 / 踢出 都填满它），列才对得齐。 */
+.lobby-seat-member { display: flex; gap: 6px; width: 46px; }
+.lobby-seat-member > * { width: 100%; }
+.lobby-seat-actions { display: flex; gap: 6px; }
+.lobby-seat-move,
+.lobby-seat-op-empty[data-seat-op="move"] { width: 26px; }
+.lobby-seat-first,
+.lobby-seat-top,
+.lobby-seat-op-empty[data-seat-op="first"] { width: 74px; }
+.lobby-seat-op-empty { flex: none; display: block; height: 18px; }
+/* 行内按钮当「格子」用：padding 归零 + border-box，宽度才和占位一致。
+   line-height 写死 14px：行高由最高的行内控件决定（实测 26→24px），行距压下来才不撑高整页。 */
+.lobby-rename, .lobby-kick, .lobby-seat-move, .lobby-seat-first, .lobby-seat-top {
+  box-sizing: border-box;
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+  line-height: 14px;
+}
+.lobby-seat-move, .lobby-seat-first, .lobby-seat-top {
+  box-sizing: border-box;
+  padding: 1px 0;
+  border: 1px solid #2f4a5f;
+  border-radius: 3px;
+  background: #16232e;
+  color: #9cc3d8;
+  font-size: 11px;
+  cursor: pointer;
+}
+.lobby-seat-move:disabled, .lobby-seat-first:disabled, .lobby-seat-top:disabled { opacity: .45; cursor: default; }
+.lobby-seat-move:not(:disabled):hover, .lobby-seat-first:not(:disabled):hover, .lobby-seat-top:not(:disabled):hover {
+  border-color: #4a7a9a; background: #1d3040; color: #d0e8f4;
+}
+/* 先手那颗按钮的选中态：绿框绿字（与 is-first 行呼应），不靠额外文字标签。 */
+.lobby-seat-first.is-first { border-color: #3f6a52; background: #12251c; color: #a8e0bd; }
+.lobby-seat-first.is-first:disabled { opacity: 1; cursor: default; }
+.lobby-seat-self { color: #9cc3d8; font-size: 11px; }
+/* 「恢复随机」挪进列表头：小号下划线文字按钮（不弹确认，toast 里给 5 秒撤销）。 */
+.lobby-seat-reset {
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: #7a9aaa;
+  font-size: 11px;
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+.lobby-seat-reset:hover { color: #a8c6da; }
 
 .lobby-add-bot {
   cursor: pointer;
@@ -866,31 +1075,41 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   letter-spacing: .5px;
 }
 .lobby-map-summary {
-  --lobby-map-panel: 220px;
+  --lobby-map-panel: 176px;
   position: relative;
   overflow: hidden;
   border: 1px solid #2a4658;
   border-radius: 9px;
   background: #0b141b;
 }
+/* 宽屏才把信息面板放宽（v6 压缩：默认 176px 让地图多占位）。 */
+@media (min-width: 1200px) {
+  .lobby-map-summary { --lobby-map-panel: 200px; }
+}
 /* 预览台：地图在整卡居中，竖排图例贴左下角，信息面板嵌在右侧——图例和面板都浮在预览上。 */
 .lobby-map-stage {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 310px;
+  height: 196px;
   min-width: 0;
   background: radial-gradient(66% 96% at 50% 48%, #101c26 0%, #0a131a 62%, #060c11 100%);
 }
+/* 窄屏再压一档，保证「地图卡 + 房间卡 + 座位列表」一屏可见。 */
+@media (max-width: 1100px) {
+  .lobby-map-stage { height: 168px; }
+}
 .lobby-map-thumb {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 14px 0;
+  padding: 8px 0;
 }
+/* v6：座位同步态改用状态点（见 .lobby-seat-sync / .lobby-seat-sync-dot），不再有「预览」大标签。 */
 /* 大厅预览比地图卡大一号，同色板压暗会糊成一片，这里单独提亮地形。 */
 .lobby-map-thumb svg { filter: drop-shadow(0 6px 18px rgba(64, 148, 190, .18)); }
 .lobby-map-thumb .preview-hex { stroke: #2c4050; stroke-width: .8; }
@@ -1050,7 +1269,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 }
 /* 创建成功后不换页：地图预览慢慢收小，创建按钮 / 提示 / 更换地图退场，房间卡在预览下方展开 */
 #create-form .lobby-map-stage { transition: height .4s cubic-bezier(.22, .8, .3, 1); }
-#create-form.room-active .lobby-map-stage { height: 246px; }
+#create-form.room-active .lobby-map-stage { height: 196px; }
 #create-form.room-active #btn-create,
 #create-form.room-active > .lobby-hint { display: none; }
 #create-form.room-active .lobby-map-change {
@@ -1076,7 +1295,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 #create-result.lobby-room.room-open,
 #join-result.lobby-room.room-open {
   margin-top: 16px;
-  padding: 16px;
+  padding: 13px;
   border-width: 1px;
   opacity: 1;
   transform: none;
@@ -1102,7 +1321,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .lobby-room-head > div { flex: 1; min-width: 0; }
 .lobby-room-edit {
@@ -1122,7 +1341,7 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .lobby-room-kicker-text { color: #6f8798; font-size: 10px; }
 .lobby-room-head h3 { color: #e4edf4; font-size: 16px; }
 .lobby-room-head p { margin-top: 4px; color: #6f8798; font-size: 11px; line-height: 1.5; }
-.lobby-room-actions { display: flex; gap: 8px; margin-top: 12px; }
+.lobby-room-actions { display: flex; gap: 8px; margin-top: 8px; }
 .lobby-room-actions .btn { flex: 1; justify-content: center; padding: 8px 10px; font-size: 13px; white-space: nowrap; }
 
 #join-form .lobby-status { margin-top: 10px; }
@@ -1308,7 +1527,7 @@ body.map-dialog-open { overflow: hidden; }
 /* 窄窗口（桌面页在 720px 以下会缩成单列）：预览在上、信息与按钮在下，回到普通流。 */
 @media (max-width: 720px) {
   .lobby-map-summary { display: flex; flex-direction: column; }
-  .lobby-map-stage { height: 196px; }
+  .lobby-map-stage { height: 148px; }
   .lobby-map-thumb { padding: 8px 0; }
   .lobby-map-thumb .map-preview { max-width: 100%; }
   .lobby-map-legend { left: 8px; bottom: 8px; }
@@ -2681,3 +2900,26 @@ body.map-dialog-open { overflow: hidden; }
   padding: 0; transition: all .15s;
 }
 #btn-rules:hover { background: #26384a; color: #d8e0e8; }
+
+/* ══════════ 矮屏再压一档（≤860px 高，如 1280×800） ══════════
+   1440×900 靠默认档能放下（底行按钮距底 14px）；1280×800 只有这一档才够。
+   只动纵向间距与块高，不动任何按钮的可点区尺寸（移动端 ≥30px 的约束在 play-m.css）。 */
+@media (max-height: 860px) {
+  #join-panel { padding-top: 20px; padding-bottom: 20px; }
+  .panel h2 { margin-bottom: 10px; }
+  .lobby-tabs { margin-bottom: 12px; }
+  .lobby-map-stage,
+  #create-form.room-active .lobby-map-stage { height: 144px; }
+  #create-result.lobby-room.room-open,
+  #join-result.lobby-room.room-open { padding: 9px; }
+  .lobby-room-head { margin-bottom: 6px; }
+  .info-row { margin-bottom: 4px; }
+  .lobby-summary { margin-top: 6px; padding: 4px 8px; }
+  .lobby-seats { margin-top: 6px; padding-top: 4px; }
+  /* 行高由行内最高元素决定：名字/出生位是行高 18px 的文本，所以矮屏档把整行的 line-height 一起压到 16px。 */
+  .lobby-seat-row { line-height: 16px; }
+  .lobby-rename, .lobby-kick, .lobby-seat-move, .lobby-seat-first, .lobby-seat-top { line-height: 12px; }
+  /* 占位块与行内按钮同高：整行高度由最高的行内控件决定，压占位才压得动行高。 */
+  .lobby-seat-op-empty { height: 16px; }
+  .lobby-room-actions { margin-top: 8px; }
+}

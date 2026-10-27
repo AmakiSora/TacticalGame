@@ -646,7 +646,7 @@ describe('sequential mode regression', () => {
       const gameId = created.gameId;
 
       // 顺序模式 attack 仍要求 targetId；q/r 形态应被拒绝。
-      // 开局先手是随机的，用实际当前玩家的座位发起请求。
+      // 开局行动顺序（当前玩家）是随机的，用实际当前玩家的座位发起请求。
       const state = await getState(app, gameId, created.player.token);
       const current = state.turn.currentPlayerId ?? state.turn.currentOwner;
       const attackerToken = current === created.player.id ? created.player.token : joined.player.token;

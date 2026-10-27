@@ -60,6 +60,7 @@ const els = {
   btnViewReplay: $('btn-view-replay'), btnViewReplayJoin: $('btn-view-replay-join'),
   connStatus: $('conn-status'), createResult: $('create-result'), createdGameId: $('created-game-id'),
   createdHostToken: $('created-host-token'), createdToken: $('created-token'), createdTokenCopy: $('created-token-copy'),
+  createdMore: $('created-more'), btnCreatedMore: $('btn-created-more'),
   createdPlayerTokenRow: $('created-player-token-row'), createRoomStatus: $('create-room-status'),
   createRoomBadge: $('create-room-badge'), createRoomTitle: $('create-room-title'), createRoomHint: $('create-room-hint'),
   lobbySummary: $('lobby-summary'), joinLobbySummary: $('join-lobby-summary'), joinResult: $('join-result'), joinStatusText: $('join-status-text'),
@@ -118,6 +119,30 @@ let lobbyPollTimer = null;
 let hostLobbySnapshot = null;
 // 当前房间的最新摘要（房主 / 加入者共用），改名弹窗用它取当前显示名。
 let latestLobby = null;
+// 房主座位「乐观视图」：非空时座位区按它渲染（= 有未确认意图）；与服务端对齐后清空。
+// 版本基线统一放在 seatSync.baseVersion（座位乐观锁），不再单独维护草稿版本变量。
+let seatDraft = null;
+let seatDraftFirst = 0;
+/**
+ * 座位即时同步状态机（v6）：单飞 + 合并。点击只更新 desired/seq，
+ * 空闲时 180ms 后 flush；飞行中只记意图，回来后再补发一次，序号保证「最后一次意图必胜」。
+ */
+const SEAT_SYNC_DELAY = 180;
+const SEAT_SYNC_RETRY_DELAYS = [400, 900];
+let seatSync = {
+  desired: null,      // 最新意图快照 { order: PlayerId[], firstSeat: number } | null
+  seq: 0,             // 意图序号：每次点击 +1，用来判断「回来的响应是否已过时」
+  baseVersion: null,  // ifVersion 基线（= 上次成功响应的 seatVersion）
+  inFlight: false,
+  timer: null,
+  state: 'idle',      // idle | pending | error
+  stopped: false,     // 对局已开始：停止同步并隐藏控件
+  lastGoodLobby: null,
+  retryIntent: null,  // 失败时留下的意图快照：点状态点可重提
+  failMessage: null,  // 下一次回滚时要用的提示文案（撤销路径会改写）
+};
+// 上次画地图时的座位视图签名：座位顺序/归属没变就不重画 SVG（R2）。
+let lastSeatViewSignature = '';
 // 席位切换请求进行中：避免轮询重绘期间重复点击发出第二次 join/leave。
 let hostSeatBusy = false;
 let availableGamesTimer = null;
@@ -172,9 +197,28 @@ function turnProgressLabel() {
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
 }
 function statusBadge(text, cls) { els.connStatus.textContent = text; els.connStatus.className = `badge ${cls}`; }
-function toast(msg, type = 'info') {
-  const t = $('toast'); t.textContent = msg; t.className = `show ${type}`;
-  clearTimeout(t._timer); t._timer = setTimeout(() => t.className = '', 2400);
+/**
+ * 轻提示。action = { label, onClick, timeout } 时在文案后挂一个可点按钮（如「撤销」）；
+ * 默认 2.4s 自动消失，带 action 的按 action.timeout 停留。
+ */
+function toast(msg, type = 'info', action = null) {
+  const t = $('toast');
+  clearTimeout(t._timer);
+  t.textContent = msg;
+  if (action) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-action';
+    btn.textContent = action.label;
+    btn.addEventListener('click', () => {
+      clearTimeout(t._timer);
+      t.className = '';
+      action.onClick?.();
+    });
+    t.append(btn);
+  }
+  t.className = `show ${type}`;
+  t._timer = setTimeout(() => t.className = '', action?.timeout ?? 2400);
 }
 function hexKey(p) { return `${p.q},${p.r}`; }
 function hexDistance(a, b) { return Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs((-a.q - a.r) - (-b.q - b.r))); }
@@ -430,7 +474,7 @@ function previewUnitStatAttrs(spec) {
     .join('');
 }
 
-function renderMapPreview(preview) {
+function renderMapPreview(preview, seatView = null) {
   if (!preview || !Array.isArray(preview.cells) || preview.cells.length === 0) {
     return '<div class="map-preview empty">暂无预览</div>';
   }
@@ -485,14 +529,34 @@ function renderMapPreview(preview) {
   }));
   const legacyHeadquarters = Object.entries(preview.headquarters || {}).map(([id, pos], index) => ({ id, index, controlPointId: undefined, ...pos }));
   const starts = spawnSlots.length ? spawnSlots : legacyHeadquarters;
+  // 座位标记（R2）：座位下标 → layoutSlots[i] → 按 slot.id 找到出生位标记。
+  // 注意不能按下标对应：layouts['3'] 可能是 [slot_1, slot_3, slot_5]（spawnSlots 下标 0/2/4），
+  // 地图上「第 3 个出生位」并不等于「3 号座位」。
+  const seatCandidates = Array.isArray(seatView?.slots) ? seatView.slots : [];
+  const seatMarkOf = slot => (seatView?.marks instanceof Map ? seatView.marks.get(slot.id) : null) || null;
+  const seatUnused = slot => seatCandidates.length > 0 && !seatCandidates.includes(slot.id);
+  // 悬停互亮的钩子：座位视图在场时每个出生位 marker 都带 data-slot-id（不限已分配/未分配），
+  // 没有座位视图时（地图卡、竞技场等 6 处复用）不输出，既有预览输出保持逐字不变。
+  const seatSlotAttr = slot => (seatCandidates.length > 0 ? ` data-slot-id="${esc(slot.id)}"` : '');
+  const seatBadge = (slot, p) => {
+    const mark = seatMarkOf(slot);
+    if (!mark) return '';
+    const color = mark.color || '#9cc3d8';
+    // 先手角标：不重排座号，只在先手那座上方多一枚 ▲（草稿态同样跟着走）。
+    const first = mark.first
+      ? `<text class="seat-first-badge" x="${p.x.toFixed(1)}" y="${(p.y - 7.4).toFixed(1)}" text-anchor="middle" fill="${esc(color)}">▲</text>`
+      : '';
+    return `<circle class="seat-mark-ring${mark.preview ? ' is-preview' : ''}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6.6" stroke="${esc(color)}"></circle>
+      <text class="seat-mark-no${mark.preview ? ' is-preview' : ''}" x="${p.x.toFixed(1)}" y="${(p.y + 2.4).toFixed(1)}" text-anchor="middle" fill="${esc(color)}">${mark.seat}</text>${first}`;
+  };
   const headquarters = starts.map(slot => {
     const p = point(slot);
     const cpName = slot.controlPointId ? cpNames.get(slot.controlPointId) : '';
     const sub = `出生位 ${slot.index + 1}${cpName ? ` · ${cpName}` : ''}`;
     if (annihilationMode) {
-      return `<g class="preview-point" data-preview-marker data-marker-kind="spawn" data-marker-title="出生点" data-marker-sub="${esc(sub)}" data-marker-token="spawn" data-stat-units="${(slot.startingUnits || []).length}">
+      return `<g class="preview-point${seatUnused(slot) ? ' is-unused' : ''}" data-preview-marker${seatSlotAttr(slot)} data-marker-kind="spawn" data-marker-title="出生点" data-marker-sub="${esc(sub)}" data-marker-token="spawn" data-stat-units="${(slot.startingUnits || []).length}">
         <polygon class="preview-marker-hit" points="${polygon(slot)}"></polygon>
-        <circle class="preview-marker spawn spawn-slot-${slot.index + 1}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.2"></circle>
+        <circle class="preview-marker spawn spawn-slot-${slot.index + 1}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.2"></circle>${seatBadge(slot, p)}
       </g>`;
     }
     // 总部：血量 / 防御来自本图 headquartersSpec，是否可部署来自 balance.deployFromHq。
@@ -501,9 +565,9 @@ function renderMapPreview(preview) {
       hq ? ` data-stat-hp="${hq.hp}" data-stat-defense="${hq.defense}"` : '',
       ` data-stat-deploy="${preview.deployFromHq === false ? '不可部署' : '可用'}"`,
     ].join('');
-    return `<g class="preview-point" data-preview-marker data-marker-kind="headquarters" data-marker-title="总部" data-marker-sub="${esc(sub)}" data-marker-token="headquarters"${stats}>
+    return `<g class="preview-point${seatUnused(slot) ? ' is-unused' : ''}" data-preview-marker${seatSlotAttr(slot)} data-marker-kind="headquarters" data-marker-title="总部" data-marker-sub="${esc(sub)}" data-marker-token="headquarters"${stats}>
       <polygon class="preview-marker-hit" points="${polygon(slot)}"></polygon>
-      <rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"></rect>
+      <rect class="preview-marker hq hq-slot-${slot.index + 1}" x="${(p.x - 4).toFixed(1)}" y="${(p.y - 4).toFixed(1)}" width="8" height="8" rx="1.5"></rect>${seatBadge(slot, p)}
     </g>`;
   }).join('');
   // 初始单位：预览数据一直带着 spawnSlots[].startingUnits（type/q/r），此前没画出来；
@@ -656,11 +720,11 @@ function lobbyMapLegendMarkup(preview) {
   return items.join('');
 }
 
-/** 把预览与图例一起画进摘要卡；没有预览时给一句占位说明。 */
-function renderLobbyMapStage(preview, placeholder) {
+/** 把预览与图例一起画进摘要卡；没有预览时给一句占位说明。seatView 用于叠加座位标记（R2）。 */
+function renderLobbyMapStage(preview, placeholder, seatView = null) {
   if (els.lobbyMapThumb) {
     els.lobbyMapThumb.innerHTML = preview
-      ? renderMapPreview(preview)
+      ? renderMapPreview(preview, seatView)
       : `<div class="map-preview empty">${esc(placeholder || '暂无预览')}</div>`;
   }
   if (els.lobbyMapLegend) els.lobbyMapLegend.innerHTML = lobbyMapLegendMarkup(preview);
@@ -701,7 +765,7 @@ function renderLobbyMapSummary() {
     const preview = window.RandomMapUI?.lastPreview;
     if (roomView) els.lobbyMapThumb.removeAttribute('data-random-map-preview');
     else els.lobbyMapThumb.setAttribute('data-random-map-preview', '');
-    renderLobbyMapStage(preview, roomView ? '本局使用随机地图' : '随机地图（参数可配）');
+    renderLobbyMapStage(preview, roomView ? '本局使用随机地图' : '随机地图（参数可配）', lobbySeatView(false));
     if (els.lobbyMapName) els.lobbyMapName.textContent = '随机地图';
     if (els.lobbyMapId) els.lobbyMapId.textContent = 'random';
     if (els.lobbyMapMeta) els.lobbyMapMeta.innerHTML = lobbyMapStatsMarkup(randomMapStatRows());
@@ -724,7 +788,7 @@ function renderLobbyMapSummary() {
     if (els.lobbyMapDesc) els.lobbyMapDesc.textContent = '';
     return;
   }
-  renderLobbyMapStage(map.preview, '暂无预览');
+  renderLobbyMapStage(map.preview, '暂无预览', lobbySeatView());
   if (els.lobbyMapName) els.lobbyMapName.textContent = map.name;
   if (els.lobbyMapId) els.lobbyMapId.textContent = map.id;
   if (els.lobbyMapMeta) els.lobbyMapMeta.innerHTML = lobbyMapStatsMarkup(lobbyMapStatRows(map));
@@ -2658,32 +2722,464 @@ function lobbyResultMarkup(lobby) {
   return `<div class="lobby-summary-result">${esc(result + round)}</div>`;
 }
 
+/**
+ * 乐观视图：有未确认意图就按它，否则按服务端摘要。列表与地图共用同一份视图。
+ * 座位与席位是两件事——座位号只决定出生点与处理顺序，席位 id 仍按加入顺序。
+ */
+function seatViewOf(lobby) {
+  const seats = Array.isArray(lobby?.seats) ? lobby.seats : [];
+  // 行是「成员视图」：`id` 与 `players[].id` 同名，便于直接当成员用（改名 / 踢出 / 上色）。
+  const live = seats.map(seat => ({ id: seat.playerId, name: seat.name || seat.playerId }));
+  if (!seatDraft) return live;
+  // 成员数变化时合并而不是丢弃意图：在场者保留本地相对顺序，离开者剔除，新加入者追加末尾。
+  const liveIds = new Set(live.map(row => row.id));
+  const kept = seatDraft.filter(row => liveIds.has(row.id));
+  const keptIds = new Set(kept.map(row => row.id));
+  return kept.concat(live.filter(row => !keptIds.has(row.id)));
+}
+
+/** 把本地意图投影到最新成员名单（409 rebase 用；与 seatViewOf 同一套合并规则）。 */
+function rebaseSeatOrder(order, lobby) {
+  const live = (Array.isArray(lobby?.seats) ? lobby.seats : []).map(seat => seat.playerId);
+  const liveIds = new Set(live);
+  const kept = order.filter(id => liveIds.has(id));
+  const keptIds = new Set(kept);
+  return kept.concat(live.filter(id => !keptIds.has(id)));
+}
+
+/** 先手座号夹到合法范围（0 起）；同时回合 / 大逃杀恒 0。 */
+function clampFirstSeat(value, length, simultaneous) {
+  if (simultaneous || !Number.isInteger(value) || value < 0) return 0;
+  return value >= length ? Math.max(0, length - 1) : value;
+}
+
+/** 开始一次本地改动：把当前视图固化成乐观草稿（首次改动时才建）。 */
+function beginSeatEdit(lobby) {
+  if (!seatDraft) {
+    const rows = seatViewOf(lobby);
+    // 名字按 playerId 从 lobby.players 现取，避免别人改名后草稿态残留旧名。
+    const liveNames = lobbyPlayerNames(lobby);
+    const seatNames = new Map((Array.isArray(lobby?.seats) ? lobby.seats : [])
+      .map(seat => [seat.playerId, seat.name || seat.playerId]));
+    seatDraft = rows.map(row => ({
+      id: row.id,
+      name: liveNames.get(row.id) || seatNames.get(row.id) || row.name || row.id,
+    }));
+    const simultaneous = isSimultaneousLobby(lobby);
+    seatDraftFirst = clampFirstSeat(
+      Number.isInteger(lobby?.firstSeat) ? lobby.firstSeat : 0,
+      Math.max(1, rows.length),
+      simultaneous,
+    );
+  }
+  return seatDraft;
+}
+
+/** 与服务端对齐：清掉未确认意图，视图回到服务端值，基线跟随最新 seatVersion。 */
+function adoptServerLobby(lobby) {
+  seatDraft = null;
+  seatDraftFirst = 0;
+  if (lobby && Number.isInteger(lobby.seatVersion)) seatSync.baseVersion = lobby.seatVersion;
+  if (lobby) seatSync.lastGoodLobby = lobby;
+}
+
+/** 当前视图 → PUT 意图（只含 order / firstSeat；layoutSlots 只读、不进 payload）。 */
+function seatIntentOf(lobby) {
+  const rows = seatViewOf(lobby);
+  return {
+    order: rows.map(row => row.id),
+    firstSeat: clampFirstSeat(seatDraftFirst, rows.length, isSimultaneousLobby(lobby)),
+  };
+}
+
+/** 无未确认意图时（轮询 / 成员进出 / 别人保存）把基线与视图跟服务端对齐。 */
+function syncSeatBase(lobby) {
+  if (!lobby) return;
+  if (seatSync.inFlight || seatSync.desired) return; // 有意图在飞：乐观视图优先
+  adoptServerLobby(lobby);
+}
+
+/** 状态点 / 读屏文案：同步态只做「轻量提示」，不出现任何可见文字标签。 */
+function seatSyncLabel() {
+  if (seatSync.state === 'error') return '同步失败，点此重试';
+  if (seatSync.state === 'pending') return '正在同步';
+  return '座位已同步';
+}
+
+function seatSyncText() {
+  if (seatSync.state === 'error') return '座位同步失败';
+  if (seatSync.state === 'pending') return '座位同步中';
+  return '座位已同步';
+}
+
+/**
+ * 点击后推一次意图：乐观视图已经改好，这里只登记 desired/seq 并安排 flush。
+ * 空闲 → 180ms 后发；飞行中 → 什么都不发（回调里会补发最新意图）。
+ */
+function pushIntent(lobby) {
+  if (!hostToken || seatSync.stopped) return;
+  seatSync.desired = seatIntentOf(lobby);
+  seatSync.seq += 1;
+  seatSync.state = 'pending';
+  scheduleSeatFlush();
+}
+
+/** 安排一次 flush：飞行中什么都不排（回调补发），否则 180ms 合并窗口后发。 */
+function scheduleSeatFlush() {
+  if (seatSync.inFlight) return;
+  clearTimeout(seatSync.timer);
+  seatSync.timer = setTimeout(() => { seatSync.timer = null; flushSeatSync(); }, SEAT_SYNC_DELAY);
+}
+
+/** 失败后点状态点重提：把失败的意图放回乐观视图，立即再发一次。 */
+function retrySeatSync() {
+  const lobby = latestLobby;
+  const intent = seatSync.retryIntent;
+  if (!lobby || seatSync.stopped || !intent) return;
+  const names = lobbyPlayerNames(lobby);
+  seatDraft = intent.order.map(id => ({ id, name: names.get(id) || id }));
+  seatDraftFirst = intent.firstSeat;
+  seatSync.retryIntent = null;
+  seatSync.failMessage = null;
+  seatSync.desired = { order: [...intent.order], firstSeat: intent.firstSeat };
+  seatSync.seq += 1;
+  seatSync.state = 'pending';
+  renderLobbySummary(lobby, els.lobbySummary, true);
+  flushSeatSync();
+}
+
+function seatSleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** 发一次 PUT，吃掉各类失败：返回 { kind, data }，不抛。 */
+async function putSeatIntent(desired) {
+  const payload = { order: [...desired.order], firstSeat: desired.firstSeat };
+  if (Number.isInteger(seatSync.baseVersion)) payload.ifVersion = seatSync.baseVersion;
+  let attempt = 0;
+  let rebased = false;
+  for (;;) {
+    let res = null;
+    try {
+      res = await fetch(`/api/games/${encodeURIComponent(gameId)}/host/seats`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Host-Token': hostToken },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      res = null; // 网络失败按同一 payload 退避重试
+    }
+    const data = res ? await res.json().catch(() => ({})) : {};
+    if (res && res.ok) return { kind: 'ok', data };
+    if (data.code === 'game_already_started') return { kind: 'started', data };
+    if (res && res.status === 409 && data.code === 'seat_conflict' && !rebased) {
+      // rebase 一次：把本地意图投影到最新名单，基线换成响应里的 seatVersion，立刻重发。
+      rebased = true;
+      const latest = data.lobby || seatSync.lastGoodLobby;
+      if (Number.isInteger(data.seatVersion)) seatSync.baseVersion = data.seatVersion;
+      if (latest) {
+        seatSync.lastGoodLobby = latest;
+        desired.order = rebaseSeatOrder(desired.order, latest);
+        desired.firstSeat = clampFirstSeat(desired.firstSeat, desired.order.length, isSimultaneousLobby(latest));
+        payload.order = [...desired.order];
+        payload.firstSeat = desired.firstSeat;
+        payload.ifVersion = seatSync.baseVersion;
+      }
+      continue;
+    }
+    if (res && res.status === 400) return { kind: 'invalid', data };
+    if (res && res.status === 409) return { kind: 'conflict', data };
+    if (attempt < SEAT_SYNC_RETRY_DELAYS.length) {
+      await seatSleep(SEAT_SYNC_RETRY_DELAYS[attempt]);
+      attempt += 1;
+      continue;
+    }
+    return { kind: 'failed', data };
+  }
+}
+
+/** flush：单飞执行一次意图；回来后再判断是否还有更新的意图要补发。 */
+async function flushSeatSync() {
+  if (seatSync.inFlight || seatSync.stopped) return;
+  const desired = seatSync.desired;
+  if (!desired) return;
+  const seq = seatSync.seq;
+  seatSync.inFlight = true;
+  let outcome;
+  try {
+    outcome = await putSeatIntent(desired);
+  } finally {
+    seatSync.inFlight = false;
+  }
+  handleSeatOutcome(outcome, seq);
+}
+
+/** 结果处理：成功收敛 / rebase 后补发 / 各类失败回滚。 */
+function handleSeatOutcome(outcome, seq) {
+  const lobby = latestLobby;
+  if (outcome.kind === 'ok') {
+    if (Number.isInteger(outcome.data.seatVersion)) seatSync.baseVersion = outcome.data.seatVersion;
+    const server = outcome.data.lobby || seatSync.lastGoodLobby || lobby;
+    if (outcome.data.lobby) seatSync.lastGoodLobby = outcome.data.lobby;
+    if (seatSync.seq !== seq && seatSync.desired) {
+      // 期间又点了：把服务端基线吸收进来，但保留更新的本地意图。
+      if (Number.isInteger(outcome.data.seatVersion)) seatSync.baseVersion = outcome.data.seatVersion;
+      seatSync.state = 'pending';
+      seatSync.retries = 0;
+      if (server) renderLobbySummary(server, els.lobbySummary, true);
+      flushSeatSync();
+      return;
+    }
+    seatSync.desired = null;
+    seatSync.state = 'idle';
+    seatSync.retries = 0;
+    if (server) {
+      adoptServerLobby(server);
+      // 响应顶层的 seatVersion 才是最新基线（lobby 摘要里的可能旧一拍）。
+      if (Number.isInteger(outcome.data.seatVersion)) seatSync.baseVersion = outcome.data.seatVersion;
+      renderLobbySummary(server, els.lobbySummary, true);
+    }
+    return;
+  }
+  if (outcome.kind === 'started') {
+    stopSeatSync('对局已开始，座位已锁定');
+    return;
+  }
+  if (outcome.kind === 'invalid') {
+    rollbackSeatSync('座位没同步成功：名单已变化，已刷新', outcome.data.lobby);
+    return;
+  }
+  if (outcome.kind === 'conflict') {
+    rollbackSeatSync('座位已被其他人改动，已同步最新', outcome.data.lobby);
+    return;
+  }
+  rollbackSeatSync(seatSync.failMessage || '座位同步失败，已回到服务器上的座位', null);
+}
+
+/** 回滚：视图换成服务端真值 + 红边 220ms + toast；失败的意图留着重提。 */
+function rollbackSeatSync(message, lobby) {
+  if (seatSync.desired) {
+    seatSync.retryIntent = { order: [...seatSync.desired.order], firstSeat: seatSync.desired.firstSeat };
+  }
+  seatSync.desired = null;
+  seatSync.state = 'error';
+  seatSync.retries = 0;
+  seatSync.failMessage = null;
+  const server = lobby || seatSync.lastGoodLobby || latestLobby;
+  adoptServerLobby(server);
+  if (server) renderLobbySummary(server, els.lobbySummary, true);
+  flashSeatReverted();
+  toast(message, 'err');
+}
+
+/** 回滚时给座位行一次红边提示（220ms 后移除），避免用户以为改动生效了。 */
+function flashSeatReverted() {
+  const rows = document.querySelectorAll('.lobby-seat-row');
+  rows.forEach(row => row.classList.add('is-reverted'));
+  setTimeout(() => rows.forEach(row => row.classList.remove('is-reverted')), 220);
+}
+
+/** 对局已开始：停止同步、回滚视图并隐藏全部座位控件。 */
+function stopSeatSync(message) {
+  seatSync.stopped = true;
+  seatSync.desired = null;
+  seatSync.state = 'idle';
+  clearTimeout(seatSync.timer);
+  seatSync.timer = null;
+  seatDraft = null;
+  seatDraftFirst = 0;
+  if (latestLobby) renderLobbySummary(latestLobby, els.lobbySummary, true);
+  toast(message, 'info');
+}
+
+/**
+ * 同时回合 / 大逃杀没有「先手」：座位序只表示 ① 出生点槽位 ② 同一步内的结算处理顺序（tie-break）。
+ * 判据用服务端已返回的 lobby.mode，不新增字段。
+ */
+function isSimultaneousLobby(lobby) {
+  return lobby?.mode === 'simultaneous' || lobby?.mode === 'royale';
+}
+
+/**
+ * 当前生效的先手，口径是**座位下标**而不是人：草稿态用草稿的先手下标，否则用服务端 firstSeat。
+ * 座位重排时 moveSeatRow() 会让先手下标跟着那个人一起挪，所以「下标 → 人」的对应关系
+ * 始终由这里的下标现算，地图「先手」角标与座位列表用的是同一个答案。
+ * 同时回合 / 大逃杀没有先手，恒返回 0（该模式下调用方也不再渲染任何先手标记）。
+ */
+function currentFirstSeat(lobby) {
+  if (isSimultaneousLobby(lobby)) return 0;
+  if (seatDraft) return seatDraftFirst;
+  return Number.isInteger(lobby?.firstSeat) ? lobby.firstSeat : 0;
+}
+
+/** 大厅成员名的实时来源：改名后座位摘要 / 草稿里的旧名字不能顶上来。 */
+function lobbyPlayerNames(lobby) {
+  return new Map((Array.isArray(lobby?.players) ? lobby.players : [])
+    .map(player => [player.id, player.name || player.id]));
+}
+
+/**
+ * 地图「座位 → 出生位」标记视图（R2）：草稿优先且标 preview，否则用已保存的编排；
+ * 未编排（random 且无草稿）时不给任何归属，避免伪造未发生的随机结果。
+ */
+function lobbySeatView(dimUnused = true) {
+  const lobby = latestLobby;
+  if (!lobby || lobby.phase !== 'lobby') return null;
+  const slots = Array.isArray(lobby.layoutSlots) ? lobby.layoutSlots : [];
+  if (!slots.length) return null;
+  const rows = seatViewOf(lobby);
+  const arranged = Boolean(seatDraft) || lobby.seatMode === 'manual';
+  const simultaneous = isSimultaneousLobby(lobby);
+  const firstSeat = currentFirstSeat(lobby);
+  const names = lobbyPlayerNames(lobby);
+  const marks = new Map();
+  if (arranged) {
+    rows.forEach((row, index) => {
+      const slotId = slots[index];
+      if (!slotId) return;
+      marks.set(slotId, {
+        seat: index + 1,
+        name: names.get(row.id) || row.name || row.id,
+        color: OWNER_COLOR[row.id] || '#9cc3d8',
+        preview: Boolean(seatDraft),
+        // 先手角标（R2-10，仅顺序模式）：只标一个人，随座位下标走——重排后角标跟着先手本人移动。
+        // 同时回合 / 大逃杀没有先手，整张地图不挂任何角标。
+        first: !simultaneous && index === firstSeat,
+      });
+    });
+  }
+  // 随机图预览的出生位编号来源不可靠，不对未使用出生位做降透明，避免误导。
+  return { slots: dimUnused ? slots : [], marks };
+}
+
+/**
+ * 座位列表（R1：成员操作与排序操作合成一张列表）。
+ * 房主可上下移动 / 指定先手（仅顺序模式）或置顶（同时回合）/ 改名 / 踢出 / 添加 AI / 保存 / 恢复随机；
+ * 其他成员只读。座位与席位是两件事——座位号只决定出生点与处理顺序，席位 id 仍按加入顺序。
+ */
+function seatPlanMarkup(lobby, canManage) {
+  const seats = Array.isArray(lobby?.seats) ? lobby.seats : [];
+  if (lobby?.phase !== 'lobby') return '';
+  const players = lobby.players || [];
+  // 0 人房（房主建房时不参战）：座位列表整段早退会把「＋ 添加 AI」一起吞掉——那是全仓唯一入口，
+  // 房间就永远开不了局。所以这里只给提示行 + 添加 AI，不渲染座位行 / 保存 / 恢复随机
+  //（0 人时服务端会 400 invalid_seat_layout，也没有可保存的排列）。非房主没内容可看，仍然不渲染。
+  if (seats.length === 0) {
+    if (!canManage) return '';
+    const emptyAddBot = players.length < lobby.maxPlayers
+      ? '<button type="button" class="lobby-seat-add-bot lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="lobby-add-bot-plus">+</span><span>添加 AI</span></button>'
+      : '';
+    return `<div class="lobby-seats is-empty">
+      <div class="lobby-seat-hint">还没有玩家加入：点下方可添加 AI，或把 Game ID 发给其他玩家</div>
+      ${emptyAddBot}
+    </div>`;
+  }
+  const rows = seatViewOf(lobby);
+  const slots = Array.isArray(lobby.layoutSlots) ? lobby.layoutSlots : [];
+  const manual = lobby.seatMode === 'manual';
+  // 同时回合 / 大逃杀没有先手：列表头讲「结算顺序」，第三颗按钮是「置顶」（改 order，不改 firstSeat）。
+  const simultaneous = isSimultaneousLobby(lobby);
+  const firstSeat = currentFirstSeat(lobby);
+  const names = lobbyPlayerNames(lobby);
+  const nameOf = row => names.get(row.id) || row.name || row.id;
+  // 出生点只有「已保存的编排」或「房主草稿」才有确定答案，随机且未编排时不下结论。
+  const arranged = manual || Boolean(seatDraft);
+  // 列表头不再有文字说明（顺序看列表就懂）。三种状态改用非文字线索表达：
+  // · 未编排（random 且无草稿）→ 行内出生位槽为空 + 列表头没有「恢复随机」按钮 + 状态点灰色；
+  // · 预览中 → 行内出生位随草稿即时变化（地图同步预览）+ 状态点琥珀（提交中）；
+  // · 已编排 → 行内出生位有值 + 「恢复随机」按钮出现。
+  const canAddBot = canManage && players.length < lobby.maxPlayers;
+  // 操作槽位：改名 / 踢出 / ▲ / ▼ / 第三格（顺序模式=先手，同时模式=置顶），宽度由 CSS 固定；
+  // 不可用的位置放同宽空占位，这样同一张列表里任意两行的按钮左右边界逐像素对齐。
+  const opEmpty = kind => `<span class="lobby-seat-op-empty" data-seat-op="${kind}" aria-hidden="true"></span>`;
+  // 行内同步态：提交中的行淡一点；状态点颜色见 CSS（灰=已同步 / 琥珀=提交中 / 红=失败）。
+  const syncState = seatSync.stopped ? 'idle' : seatSync.state;
+  const rowMarkup = (player, index) => {
+    const slotId = arranged ? (slots[index] || seats[index]?.spawnSlotId || null) : null;
+    // 同时模式没有先手：行高亮、按钮选中态一律不出现。
+    const first = !simultaneous && index === firstSeat;
+    const isSelf = player.id === myPlayer;
+    const classes = ['lobby-seat-row'];
+    if (first) classes.push('is-first');
+    if (isSelf) classes.push('is-self');
+    if (seatSync.state === 'pending') classes.push('is-pending');
+    // 成员操作槽只有一个（固定 46px，三选一）：自己=改名 / 房主看别人=踢出 / 非房主看别人=空占位。
+    const memberOp = isSelf && Boolean(myToken)
+      ? '<button type="button" class="lobby-rename" data-rename-self="1" title="更改我的名字">改名</button>'
+      : canManage && !isSelf
+        ? `<button type="button" class="lobby-kick" data-kick-player="${esc(player.id)}">踢出</button>`
+        : opEmpty('member');
+    // 第三格：顺序模式 = 指定先手（只改 firstSeat）；同时模式 = 置顶（改 order，把该行挪到 1 号座位）。
+    const third = simultaneous
+      ? `<button type="button" class="lobby-seat-top" data-seat-top="${index}" title="移到 1 号座位"${index === 0 ? ' disabled' : ''}>置顶</button>`
+      : `<button type="button" class="lobby-seat-first${first ? ' is-first' : ''}" data-seat-first="${index}"${first ? ' disabled' : ''}>${first ? '先手' : '设为先手'}</button>`;
+    // 排序三格只给房主；非房主的列表每行都不渲染它们，行与行之间照样对齐。
+    const sort = canManage
+      ? `<span class="lobby-seat-actions">
+          <button type="button" class="lobby-seat-move" data-seat-up="${index}" title="上移"${index === 0 ? ' disabled' : ''}>▲</button>
+          <button type="button" class="lobby-seat-move" data-seat-down="${index}" title="下移"${index === rows.length - 1 ? ' disabled' : ''}>▼</button>
+          ${third}
+        </span>`
+      : '';
+    // 先手不用文字标签表达：行高亮 + 右侧那颗按钮的选中态（「先手」+ 绿框）就够了。
+    return `<div class="${classes.join(' ')}"${slotId ? ` data-slot-id="${esc(slotId)}"` : ''}>
+      <span class="lobby-seat-sync-dot" data-seat-sync="${syncState}" aria-hidden="true"></span>
+      <span class="lobby-seat-no" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}">${index + 1}</span>
+      <span class="lobby-seat-name">${esc(nameOf(player))}</span>
+      <span class="lobby-seat-slot"${slotId ? ` title="${esc(slotId)}"` : ''}>${slotId ? esc(slotId) : ''}</span>
+      <span class="lobby-seat-ops">
+        <span class="lobby-seat-member">${memberOp}</span>
+        ${sort}
+      </span>
+    </div>`;
+  };
+  const mySeat = rows.findIndex(row => row.id === myPlayer);
+  const selfLine = mySeat >= 0 && !canManage
+    ? `<div class="lobby-seat-self">你是 ${mySeat + 1} 号座位${manual
+      ? simultaneous
+        ? ` · 结算序第 ${mySeat + 1} 位`
+        : ` · 第 ${((mySeat - firstSeat + rows.length) % rows.length) + 1} 顺位`
+      : ' · 出生点开局随机'}</div>`
+    : '';
+  const addBotRow = canAddBot
+    ? `<button type="button" class="lobby-seat-add-bot lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="lobby-add-bot-plus">+</span><span>添加 AI</span></button>`
+    : '';
+  // 不再有「保存座位 / 恢复随机」底栏：改动即时提交，恢复随机挪到列表头。
+  return `<div class="lobby-seats">
+    ${rows.map(rowMarkup).join('')}
+    ${addBotRow}
+    ${selfLine}
+  </div>`;
+}
+
 function lobbySummaryMarkup(lobby, canKick = false) {
   const players = lobby.players || [];
-  const supported = (lobby.supportedPlayerCounts || []).join('/');
-  const canManage = canKick && lobby.phase === 'lobby';
-  const canAddBot = canManage && players.length < lobby.maxPlayers;
-  const playerChip = player => {
-    const isSelf = player.id === myPlayer;
-    // 改名只能改自己：自己的名字旁出现入口，别人的名字旁只有房主可见的「踢出」。
-    const rename = isSelf && lobby.phase === 'lobby' && Boolean(myToken)
-      ? '<button type="button" class="lobby-rename" data-rename-self="1" title="更改我的名字">改名</button>' : '';
-    const kick = canManage && !isSelf
-      ? `<button type="button" class="lobby-kick" data-kick-player="${esc(player.id)}">踢出</button>` : '';
-    return `<span class="lobby-player" style="border-color:${esc(OWNER_COLOR[player.id] || '#7f98a9')}"><span>${esc(player.name || player.id)}</span>${rename}${kick}</span>`;
-  };
+  const canManage = canKick && lobby.phase === 'lobby' && !seatSync.stopped;
   const editableCounts = (lobby.supportedPlayerCounts || []).filter(count => count >= players.length);
   const canEditMax = canManage && editableCounts.length > 1;
   const countMarkup = canEditMax
     ? `<button type="button" class="lobby-count-edit" data-edit-max-players="1" title="更改最大玩家数"><strong>${players.length}/${lobby.maxPlayers}</strong></button>`
     : `<strong>${players.length}/${lobby.maxPlayers}</strong>`;
+  // 「恢复随机」：小号下划线文字按钮，放在列表头、人数左侧；本身已随机且无未确认意图时不渲染。
+  const canReset = canManage && (lobby.seatMode === 'manual' || Boolean(seatDraft));
+  const resetMarkup = canReset
+    ? '<button type="button" class="lobby-seat-reset" data-seat-reset="1" title="取消编排，开局由服务端随机分配出生点">恢复随机</button>'
+    : '';
+  // 同步状态点：灰=已同步、琥珀=提交中（呼吸）、红=失败（可点重提）；不出现可见文字标签。
+  const syncState = seatSync.stopped ? 'idle' : seatSync.state;
+  const syncDot = canManage
+    ? `<button type="button" class="lobby-seat-sync" data-seat-sync="${syncState}" title="${esc(seatSyncLabel())}"${syncState === 'error' ? '' : ' disabled'} aria-label="${esc(seatSyncLabel())}"><span class="lobby-seat-sync-dot" aria-hidden="true"></span></button>`
+    : '';
+  const syncLive = canManage
+    ? `<span class="sr-only" aria-live="polite">${esc(seatSyncText())}</span>`
+    : '';
   return `<div class="lobby-summary-head">
     <span>${esc(lobbyPhaseLabel(lobby))}</span>
-    ${countMarkup}
+    <span class="lobby-summary-head-ops">${resetMarkup}${syncDot}${countMarkup}</span>
+    ${syncLive}
   </div>
-  <div class="lobby-summary-meta">地图 ${esc(lobby.mapId)} · 支持 ${esc(supported)} 人</div>
   ${lobbyResultMarkup(lobby)}
-  <div class="lobby-player-list">${players.map(playerChip).join('')}${canAddBot ? `<button type="button" class="lobby-player lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="lobby-add-bot-plus">+</span><span>添加 AI</span></button>` : ''}</div>`;
+  ${seatPlanMarkup(lobby, canManage)}`;
 }
 
 /** 房间创建后：名称 / 最大玩家数改为只读展示，参战开关跟随实际席位并禁用。 */
@@ -2707,6 +3203,15 @@ function syncCreateFormStatic() {
   if (els.createMaxPlayersStatic) els.createMaxPlayersStatic.textContent = `${maxPlayers} 人`;
 }
 
+/** 房间卡「更多 ▾」：展开 / 收起 HOST、PLAYER 凭证行（v6 压缩，默认只留 Game ID）。 */
+function toggleCreatedMore() {
+  if (!els.createdMore || !els.btnCreatedMore) return;
+  const open = els.createdMore.classList.toggle('hidden') === false;
+  els.btnCreatedMore.setAttribute('aria-expanded', String(open));
+  const label = (els.btnCreatedMore.textContent || '').replace(/\s*[▾▴]\s*$/, '');
+  els.btnCreatedMore.textContent = `${label} ${open ? '▴' : '▾'}`;
+}
+
 /** 房主席位卡：参战与否决定显示 token 还是「未参战」，并切换加入 / 退出战斗按钮。 */
 function syncHostSeatUi() {
   const participating = Boolean(myToken);
@@ -2717,11 +3222,12 @@ function syncHostSeatUi() {
   if (els.createdToken) els.createdToken.textContent = participating ? myToken : '未参战';
   els.createdTokenCopy?.classList.toggle('hidden', !participating);
   if (els.createRoomStatus) {
+    // v6 压缩：状态与提示合并成一行（原来是两行）。
     if (ended) {
       const winner = lobbyWinnerName(lobby);
       els.createRoomStatus.textContent = winner ? `对局已结束 · ${winner} 获胜` : '对局已结束 · 本局无胜者';
     } else {
-      els.createRoomStatus.textContent = participating ? '等待玩家加入 · 房主参战' : '等待玩家加入 · 房主未参战';
+      els.createRoomStatus.textContent = `${participating ? '等待玩家加入 · 房主参战' : '等待玩家加入 · 房主未参战'} · 把 Game ID 发给其他玩家`;
     }
   }
   if (els.createRoomTitle) els.createRoomTitle.textContent = ended ? '对局已结束' : '房间已创建';
@@ -2752,8 +3258,13 @@ function syncHostSeatUi() {
       : full ? '房间已满，无法加入战斗'
         : participating ? '退出战斗（保留房主身份）' : '以玩家身份加入战斗';
   }
-  // 未参战就没有可操作的对局席位，隐藏「连接进入游戏」，避免点进去才发现无权操作。
-  els.btnConnectCreate?.classList.toggle('hidden', !participating || !openForPlayers);
+  // 「进入游戏」只在对局 active 时出现：大厅期房主只用「开始游戏」（开局成功后自动进棋盘），
+  // 对局结束走「查看回放」，都不该再出现这颗按钮。
+  const active = lobby?.phase === 'active';
+  if (els.btnConnectCreate) {
+    els.btnConnectCreate.textContent = '进入游戏';
+    els.btnConnectCreate.classList.toggle('hidden', !active);
+  }
   if (els.btnViewReplay) {
     els.btnViewReplay.classList.toggle('hidden', !ended || !gameId);
     if (ended && gameId) els.btnViewReplay.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
@@ -2761,29 +3272,34 @@ function syncHostSeatUi() {
   syncCreateFormStatic();
 }
 
-/** 加入者房间卡：对局结束后收起「进入游戏」，改给回放入口。 */
+/** 加入者房间卡：大厅期不给「进入游戏」（房主开局后会自动进棋盘），active 才显示，结束走回放入口。 */
 function syncJoinRoomUi(lobby) {
   const ended = lobby?.phase === 'game_over';
+  const active = lobby?.phase === 'active';
   if (els.joinRoomStatus) {
     if (ended) {
       const winner = lobbyWinnerName(lobby);
       els.joinRoomStatus.textContent = winner ? `对局已结束 · ${winner} 获胜` : '对局已结束 · 本局无胜者';
     } else {
-      els.joinRoomStatus.textContent = '等待房主开始';
+      els.joinRoomStatus.textContent = active ? '对局已开始' : '等待房主开始';
     }
   }
-  if (els.joinRoomTitle) els.joinRoomTitle.textContent = ended ? '对局已结束' : '已加入房间';
+  if (els.joinRoomTitle) els.joinRoomTitle.textContent = ended ? '对局已结束' : active ? '对局已开始' : '已加入房间';
   if (els.joinRoomHint) {
     els.joinRoomHint.textContent = ended
       ? '本局已结束，可查看回放，或点「返回大厅」。'
-      : '房主开始后会自动进入游戏，也可以手动点「进入游戏」。';
+      : active ? '对局已开始，点「进入游戏」回到棋盘。'
+        : '房主开始后会自动进入游戏。';
   }
   if (els.joinRoomBadge) {
-    els.joinRoomBadge.textContent = ended ? '已结束' : '大厅中';
+    els.joinRoomBadge.textContent = ended ? '已结束' : active ? '进行中' : '大厅中';
     els.joinRoomBadge.classList.toggle('ok', !ended);
     els.joinRoomBadge.classList.toggle('idle', ended);
   }
-  els.btnConnectJoin?.classList.toggle('hidden', ended);
+  if (els.btnConnectJoin) {
+    els.btnConnectJoin.textContent = '进入游戏';
+    els.btnConnectJoin.classList.toggle('hidden', !active);
+  }
   if (els.btnViewReplayJoin) {
     els.btnViewReplayJoin.classList.toggle('hidden', !ended || !gameId);
     if (ended && gameId) els.btnViewReplayJoin.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
@@ -2801,10 +3317,46 @@ function renderLobbySummary(lobby, target = els.lobbySummary, canKick = target =
   if (target === els.lobbySummary) {
     hostLobbySnapshot = lobby;
     syncHostSeatUi();
+    // 没有未确认意图时，基线与乐观视图跟服务端对齐（成员进出 / 别人保存都能吸收）。
+    syncSeatBase(lobby);
+    // 座位视图变了才重画地图（悬停高亮走 class 切换，不进这里，避免 1.5s 轮询整段重绘掉帧）。
+    const signature = seatViewSignature();
+    if (signature !== lastSeatViewSignature) {
+      lastSeatViewSignature = signature;
+      renderLobbyMapSummary();
+    }
   } else if (target === els.joinLobbySummary) {
     syncJoinRoomUi(lobby);
   }
 }
+
+/** 座位视图签名：地图只在座位归属 / 乐观视图 / 同步态变化时重画。 */
+function seatViewSignature() {
+  const lobby = latestLobby;
+  if (!lobby) return '';
+  const rows = lobby.phase === 'lobby' ? seatViewOf(lobby) : [];
+  return [
+    lobby.mapId || '', lobby.phase || '', lobby.seatMode || '',
+    lobby.seatVersion ?? 0, seatDraft ? 'draft' : 'saved', seatSync.state || 'idle',
+    rows.map(row => row.id).join(','),
+  ].join('|');
+}
+
+/** 座位行 ↔ 地图标记双向高亮：只切 class，不触发重绘。 */
+function setSeatHover(slotId) {
+  document.querySelectorAll('[data-slot-id]').forEach(el => {
+    el.classList.toggle('is-seat-hover', Boolean(slotId) && el.dataset.slotId === slotId);
+  });
+}
+
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest?.('[data-slot-id]');
+  if (el) setSeatHover(el.dataset.slotId);
+});
+document.addEventListener('mouseout', e => {
+  const el = e.target.closest?.('[data-slot-id]');
+  if (el) setSeatHover(null);
+});
 
 function availableGameModeLabel(mode) {
   return mode === 'simultaneous' ? '同时' : mode === 'annihilation' ? '歼灭' : mode === 'royale' ? '大逃杀' : '标准';
@@ -3066,6 +3618,91 @@ async function changeLobbyMaxPlayers() {
   if (data.lobby) renderLobbySummary(data.lobby, els.lobbySummary, true);
   else await refreshLobbySummary();
   toast(`最大玩家数已改为 ${maxPlayers} 人`, 'ok');
+}
+
+/** 上移 / 下移一行座位；先手跟着那个人一起移动，避免「移了先手座位却没换人」。 */
+function moveSeatRow(index, delta) {
+  const lobby = latestLobby;
+  if (!lobby || !Number.isInteger(index)) return;
+  const rows = beginSeatEdit(lobby);
+  const target = index + delta;
+  if (target < 0 || target >= rows.length) return;
+  [rows[index], rows[target]] = [rows[target], rows[index]];
+  if (seatDraftFirst === index) seatDraftFirst = target;
+  else if (seatDraftFirst === target) seatDraftFirst = index;
+  afterSeatEdit(lobby);
+}
+
+/** 指定某一行为先手（其余顺位仍然按座位序循环）。仅标准 / 歼灭模式。 */
+function setSeatFirstRow(index) {
+  const lobby = latestLobby;
+  if (!lobby || !Number.isInteger(index)) return;
+  beginSeatEdit(lobby);
+  seatDraftFirst = index;
+  afterSeatEdit(lobby);
+}
+
+/**
+ * 「置顶」（同时回合 / 大逃杀）：把该行挪到 1 号座位——改 order，不动 firstSeat（恒 0）。
+ * 出生点跟着 order 走，所以地图会当场重排；这里不引入「先手」概念。
+ */
+function moveSeatRowToTop(index) {
+  const lobby = latestLobby;
+  if (!lobby || !Number.isInteger(index) || index <= 0) return;
+  const rows = beginSeatEdit(lobby);
+  if (index >= rows.length) return;
+  const [row] = rows.splice(index, 1);
+  rows.unshift(row);
+  // 同时模式没有先手：1 号座位就是结算处理顺序的第一位。
+  seatDraftFirst = 0;
+  afterSeatEdit(lobby);
+}
+
+/** 本地改动之后：先登记意图（否则渲染时的对齐会覆盖乐观视图），再重绘 + 安排发送。 */
+function afterSeatEdit(lobby) {
+  pushIntent(lobby);
+  renderLobbySummary(lobby, els.lobbySummary, true);
+}
+
+/** 恢复随机（不改确认）：DELETE 后 toast 带「撤销」，5 秒内可用点击前的快照再 PUT 一次。 */
+async function resetSeatOrder() {
+  if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
+  const lobby = latestLobby;
+  if (!lobby) return;
+  const snapshot = seatIntentOf(lobby); // 点击前的 { order, firstSeat }
+  const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/host/seats`, {
+    method: 'DELETE',
+    headers: { 'X-Host-Token': hostToken },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (data.lobby) renderLobbySummary(data.lobby, els.lobbySummary, true);
+    return toast(data.error || '恢复随机失败', 'err');
+  }
+  const version = Number.isInteger(data.seatVersion) ? data.seatVersion : seatSync.baseVersion;
+  seatSync.baseVersion = version;
+  seatSync.state = 'idle';
+  if (data.lobby) {
+    adoptServerLobby(data.lobby);
+    renderLobbySummary(data.lobby, els.lobbySummary, true);
+  }
+  toast('已恢复随机座位', 'ok', {
+    label: '撤销',
+    timeout: 5000,
+    onClick: () => undoSeatReset(snapshot, version),
+  });
+}
+
+/** 撤销「恢复随机」：用点击前的快照再 PUT 一次，ifVersion 取 DELETE 响应里的版本。 */
+function undoSeatReset(snapshot, version) {
+  if (!gameId || !hostToken || seatSync.stopped) return;
+  if (Number.isInteger(version)) seatSync.baseVersion = version;
+  seatSync.failMessage = '撤销失败，座位已随机';
+  seatSync.desired = { order: [...snapshot.order], firstSeat: snapshot.firstSeat };
+  seatSync.seq += 1;
+  seatSync.state = 'pending';
+  if (latestLobby) renderLobbySummary(latestLobby, els.lobbySummary, true);
+  flushSeatSync(); // 撤销要即时，不等 180ms 合并窗口
 }
 
 function lobbyPlayerName(playerId) {
@@ -3347,6 +3984,9 @@ function setCreateRoomVisible(visible) {
   if (!els.createResult) return;
   // 不整页切换：创建表单留在原地，房态把名称 / 人数换成只读值、地图收小、按钮退场。
   els.createForm?.classList.toggle('room-active', visible);
+  // 房间卡展开时整页上移一档（`.panel.room-active { margin: 16px auto }`）：
+  // 之前只给 create-form 加了 class，面板一直停在大厅态的 32px 边距上，白吃 16px。
+  els.joinPanel?.classList.toggle('room-active', visible);
   els.createName?.classList.toggle('hidden', visible);
   els.createNameStatic?.classList.toggle('hidden', !visible);
   els.maxPlayers?.classList.toggle('hidden', visible);
@@ -3367,6 +4007,8 @@ function setCreateRoomVisible(visible) {
 
 function setJoinRoomVisible(visible) {
   els.joinForm?.classList.toggle('hidden', visible);
+  // 与房主卡同款：加入者卡展开时整页上移一档，别把大厅态的 32px 边距留在屏幕上。
+  els.joinPanel?.classList.toggle('room-active', visible);
   if (visible) {
     animateRoomCard(els.joinResult, true);
   } else {
@@ -3726,9 +4368,9 @@ async function enterGame() {
   closeMapDialog();
   const ok = await loadFullState();
   if (!ok || !state.cells.length) {
-    const lobby = await refreshLobbySummary();
-    if (handleLobbyRemoval(lobby)) return;
-    return toast('对局尚未开始', 'info');
+    // 这颗按钮只在对局 active 时出现，正常不会走到这里：只可能是开局瞬间事件流还没就绪的竞态。
+    // 不回读大厅、不刷新整页，提示后让用户稍后再点。
+    return toast('获取对局状态失败，请稍后重试', 'err');
   }
   if (!myToken) {
     // 未参战（房主默认旁观）或只有观战会话：对局开始后转到观战页。
@@ -3861,6 +4503,49 @@ document.addEventListener('click', e => {
   if (maxPlayersButton) {
     e.preventDefault();
     changeLobbyMaxPlayers();
+    return;
+  }
+  const seatUp = e.target.closest?.('[data-seat-up]');
+  if (seatUp) {
+    e.preventDefault();
+    moveSeatRow(Number(seatUp.dataset.seatUp), -1);
+    return;
+  }
+  const seatDown = e.target.closest?.('[data-seat-down]');
+  if (seatDown) {
+    e.preventDefault();
+    moveSeatRow(Number(seatDown.dataset.seatDown), 1);
+    return;
+  }
+  const seatFirstButton = e.target.closest?.('[data-seat-first]');
+  if (seatFirstButton) {
+    e.preventDefault();
+    setSeatFirstRow(Number(seatFirstButton.dataset.seatFirst));
+    return;
+  }
+  const seatTopButton = e.target.closest?.('[data-seat-top]');
+  if (seatTopButton) {
+    e.preventDefault();
+    moveSeatRowToTop(Number(seatTopButton.dataset.seatTop));
+    return;
+  }
+  const seatResetButton = e.target.closest?.('[data-seat-reset]');
+  if (seatResetButton) {
+    e.preventDefault();
+    resetSeatOrder();
+    return;
+  }
+  // 同步状态点的失败态可点：用当前视图重提一次。
+  const seatSyncButton = e.target.closest?.('.lobby-seat-sync');
+  if (seatSyncButton) {
+    e.preventDefault();
+    if (seatSyncButton.dataset.seatSync === 'error') retrySeatSync();
+    return;
+  }
+  // 房间卡「更多 ▾」：HOST / PLAYER 凭证默认收起（v6 省 ~72px）。
+  if (e.target.closest?.('#btn-created-more')) {
+    e.preventDefault();
+    toggleCreatedMore();
     return;
   }
   const button = e.target.closest?.('[data-kick-player]');

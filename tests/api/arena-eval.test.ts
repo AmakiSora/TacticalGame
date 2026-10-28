@@ -155,6 +155,19 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(args).not.toContain('--models');
   });
 
+  it('starts royale evaluation with apex and its mode-specific baseline', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['snowflake', 'narrow-road'], participants: ['algo:random-royale', 'algo:apex'], games: 4 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({ mode: 'royale', participants: ['algo:random-royale', 'algo:apex'] });
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--mode royale');
+    expect(args).toContain('--algorithms random-royale,apex');
+    expect(args).not.toContain('--models');
+  });
+
   it('starts a simultaneous-mode run with the mode-specific map and algorithm pool', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',

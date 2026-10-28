@@ -32,8 +32,8 @@ const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRI
 
 // 评估链路已接入全部四种模式：标准模式地图池与 round_robin.py 的 DEFAULT_MAPS
 // 保持一致；其余模式使用静态地图，且只纳入注册表声明该模式的算法（RL 模型目前
-// 只覆盖标准模式）。歼灭已有 2 个算法条目，大逃杀仍只有 1 个、控制台会拦住"少于 2 个
-// 参评算法"的启动请求，等第二个算法落地即可直接跑批。
+// 只覆盖标准模式）。歼灭已有 3 个、大逃杀已有 2 个算法条目，「少于 2 个参评算法」
+// 的启动请求仍会被拦下。
 export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
 export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne', 'mistpine'] as const;
 
@@ -662,7 +662,7 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
       }
     }
     // 非标准模式没有 RL 模型可参评，至少需要两个该模式算法才能组成对阵批次；
-    // 歼灭（random-annihilation + vortex）有 2 个。
+    // 歼灭（random-annihilation + shrinkroll + vortex）3 个、大逃杀（random-royale + apex）2 个。
     if (mode !== 'standard') {
       const modeAlgoCount = Object.values(ALGORITHM_BOTS)
         .filter(config => config.modes.includes(mode)).length;

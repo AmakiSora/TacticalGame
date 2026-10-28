@@ -59,6 +59,7 @@ python rl/evaluate.py --model rl/models/model.zip
 - **缩圈推演算法（Shrink Roll，仅歼灭模式）**：回合内束搜索，按缩圈时间线推演安全区并投影轮界裁决，多人局压制领先者。[档案](../algorithms/docs/algorithms/shrinkroll.md)
 - **旋涡算法（Vortex，仅歼灭模式）**：炮火收缩圈预判疏散、威胁图稳杀集火、走位风筝与激进补员。[设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#vortex旋涡算法)
 - **大逃杀随机算法（Random Royale，仅大逃杀模式）**：从合法计划动作中随机入队（枚举与 random-sim 同源），随后提交。[档案](../algorithms/docs/algorithms/random-royale.md)
+- **绝境算法（Apex，仅大逃杀模式）**：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验。[档案](../algorithms/docs/algorithms/apex.md)
 - **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 定次模拟推演的通用搜索，移动采样偏向 `movementGoal`，支持据点占领与入口部署。[档案](../algorithms/docs/algorithms/mcts.md)
 - **威胁感知算法（Threat）**：效用 AI + 威胁影响图，把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，无需搜索或模拟。[档案](../algorithms/docs/algorithms/threat.md)
 - **势场算法（Field）**：人工势场——斥力井 + 引力井 + 波前距离场塑形走位，无需搜索。[档案](../algorithms/docs/algorithms/field.md)
@@ -103,7 +104,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, random-royale, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
+| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, random-royale, apex, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |

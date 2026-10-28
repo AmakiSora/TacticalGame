@@ -17,7 +17,7 @@ npm run stats-all
 
 ## 竞技场数据
 
-竞技场数据独立成链：对战记录在 `arena/matches.jsonl`（由 `rl/evaluation/round_robin.py` 累积，页面内评估控制台可网页发起跑批——标准模式跑模型与算法混合循环赛，其余三种模式跑该模式注册的算法，歼灭已有 random-annihilation / vortex 两个条目、可组批，大逃杀仍只有 1 个随机基线）。跑批依赖仓库里的 `round_robin.py`、`script/generateArena*.mjs` 与本地模型，属本地开发功能，Docker 镜像不携带，线上相关写接口返回 `501 arena_eval_unavailable`。榜单与统计由 `npm run arena-leaderboard` / `npm run arena-stats` 生成，详见 [rl/README.md](../rl/README.md)「AI 竞技场」节。
+竞技场数据独立成链：对战记录在 `arena/matches.jsonl`（由 `rl/evaluation/round_robin.py` 累积，页面内评估控制台可网页发起跑批——标准模式跑模型与算法混合循环赛，其余三种模式跑该模式注册的算法，大逃杀可用 random-royale / apex、歼灭可用 random-annihilation / shrinkroll / vortex 组批）。跑批依赖仓库里的 `round_robin.py`、`script/generateArena*.mjs` 与本地模型，属本地开发功能，Docker 镜像不携带，线上相关写接口返回 `501 arena_eval_unavailable`。榜单与统计由 `npm run arena-leaderboard` / `npm run arena-stats` 生成，详见 [rl/README.md](../rl/README.md)「AI 竞技场」节。
 
 ## 性能基线
 

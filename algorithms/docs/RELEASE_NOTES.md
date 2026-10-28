@@ -4,7 +4,20 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`apex` v1、`vortex` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.14（2026-10-29）— apex 绝境算法 v1
+
+### 新增功能
+
+- **`apex`（绝境算法）**：仅参与大逃杀，按地图数值与地形推导缩圈撤离、连续爆破开路、射程/机动/支援价值与可用行动点下的兵力规模；多情境逐步束搜索后用双人针对性回应检验计划。不调用其他策略、不读地图名称或对手隐藏队列；档案 `algorithms/docs/algorithms/apex.md`，设计与评估见 [开发笔记](ALGORITHMS_NOTES.md#apex绝境算法)。
+- **注册与评估**：`algo_apex` / `algo_apex@v1`，`modes: ['royale']`，大厅与评估控制台由注册表自动接入；大逃杀可与 `random-royale` 组批。新增真实引擎本地评估脚本，支持成对换座、随机新图、独立启发式压力对手和多人自博弈，未结束局单列、不写竞技场历史。
+
+### 测试与验证
+
+- 35 项规则模型对拍与 19 项策略回归覆盖分步结算、炮火轮界、小数波动、信息隔离、队列缓存、残兵估值、连续障碍及重复碰撞；大厅与评估 API、桌面/移动端算法清单同步回归。
+- 3.8.14 真实引擎本地标定：固定两图对随机/独立启发式各 60 胜，新随机 15 图对随机 30 胜、对启发式 29 胜 1 平，均零非法入队；六人自博弈 2 局完赛，三人 3 局到 80 轮仍未结束。种子、预算、耗时与已知败局见 [开发笔记](ALGORITHMS_NOTES.md#apex绝境算法)，不作未来必胜承诺。
+- `npm run build`、`npm run check-version` 与新增脚本/测试的严格类型检查通过，全量 139 文件 / 1450 用例通过；浏览器大厅及评估选择验证通过，真实 HTTP + runner 对局绝境获胜、双方零拒绝/运行错误，未写竞技场历史。
 
 ## 3.8.13（2026-10-29）— vortex 旋涡算法 v1
 

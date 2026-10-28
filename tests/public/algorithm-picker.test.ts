@@ -8,18 +8,17 @@ function read(path: string): string {
 
 const PLAYER_CLIENTS = ['public/play.js', 'public/play-m.js'];
 
-// /api/algorithms 返回的清单形状（src/api/bots.ts 由注册表 ALGORITHM_META 生成），
-// 内联等价样本：标准算法 + 三个独立随机基线（标准/歼灭/大逃杀）+ 仅同时回合的 random-sim。
 const ALGORITHMS = [
-  { id: 'greedy', name: '贪心算法', modes: ['standard'] },
-  { id: 'random', name: '随机算法', modes: ['standard'] },
-  { id: 'random-annihilation', name: '歼灭随机算法', modes: ['annihilation'] },
-  { id: 'random-royale', name: '大逃杀随机算法', modes: ['royale'] },
-  { id: 'mcts', name: '蒙特卡洛树搜索', modes: ['standard'] },
-  { id: 'threat', name: '威胁感知算法', modes: ['standard'] },
-  { id: 'field', name: '势场算法', modes: ['standard'] },
-  { id: 'verdict', name: '裁决线算法', modes: ['standard'] },
-  { id: 'random-sim', name: '同时随机算法', modes: ['simultaneous'] },
+  { id: 'algo_greedy', algorithm: 'greedy', name: '贪心算法', modes: ['standard'] },
+  { id: 'algo_random', algorithm: 'random', name: '随机算法', modes: ['standard'] },
+  { id: 'algo_random-annihilation', algorithm: 'random-annihilation', name: '歼灭随机算法', modes: ['annihilation'] },
+  { id: 'algo_random-royale', algorithm: 'random-royale', name: '大逃杀随机算法', modes: ['royale'] },
+  { id: 'algo_apex', algorithm: 'apex', name: '绝境算法', modes: ['royale'] },
+  { id: 'algo_mcts', algorithm: 'mcts', name: '蒙特卡洛树搜索', modes: ['standard'] },
+  { id: 'algo_threat', algorithm: 'threat', name: '威胁感知算法', modes: ['standard'] },
+  { id: 'algo_field', algorithm: 'field', name: '势场算法', modes: ['standard'] },
+  { id: 'algo_verdict', algorithm: 'verdict', name: '裁决线算法', modes: ['standard'] },
+  { id: 'algo_random-sim', algorithm: 'random-sim', name: '同时随机算法', modes: ['simultaneous'] },
 ];
 
 interface Rendered {
@@ -66,12 +65,12 @@ describe('add-AI dialog algorithm list', () => {
       // gameConfig 只在开局后的 game_start 事件赋值，而添加 AI 弹窗仅存在于大厅阶段，
       // 须回退到大厅快照 mode：同时回合大厅只列 random-sim。
       expect(await renderAlgorithmOptions(file, { gameConfig: null, botLobbyMode: 'simultaneous' }))
-        .toMatchObject({ values: ['random-sim'] });
-      // 歼灭/大逃杀大厅各只列自己那个随机基线，不列会被服务端 400 拒的标准算法。
+        .toMatchObject({ values: ['algo_random-sim'] });
+      // 各模式只显示可用算法，不列会被服务端拒绝的其他模式算法。
       expect((await renderAlgorithmOptions(file, { gameConfig: null, botLobbyMode: 'annihilation' })).values)
-        .toEqual(['random-annihilation']);
+        .toEqual(['algo_random-annihilation']);
       const royaleLobby = await renderAlgorithmOptions(file, { gameConfig: null, botLobbyMode: 'royale' });
-      expect(royaleLobby.values).toEqual(['random-royale']);
+      expect(royaleLobby.values).toEqual(['algo_random-royale', 'algo_apex']);
       expect(royaleLobby.html).not.toContain('当前模式无可用算法');
     }
   });
@@ -79,20 +78,20 @@ describe('add-AI dialog algorithm list', () => {
   it('falls back to the standard algorithm list only without any lobby snapshot', async () => {
     for (const file of PLAYER_CLIENTS) {
       const rendered = await renderAlgorithmOptions(file, { gameConfig: null, botLobbyMode: '' });
-      expect(rendered.values).toEqual(['greedy', 'random', 'mcts', 'threat', 'field', 'verdict']);
+      expect(rendered.values).toEqual(['algo_greedy', 'algo_random', 'algo_mcts', 'algo_threat', 'algo_field', 'algo_verdict']);
     }
   });
 
   it('prefers the started game mode over the lobby snapshot', async () => {
     for (const file of PLAYER_CLIENTS) {
       const standard = await renderAlgorithmOptions(file, { gameConfig: { mode: 'standard' }, botLobbyMode: 'simultaneous' });
-      expect(standard.values).toEqual(['greedy', 'random', 'mcts', 'threat', 'field', 'verdict']);
+      expect(standard.values).toEqual(['algo_greedy', 'algo_random', 'algo_mcts', 'algo_threat', 'algo_field', 'algo_verdict']);
       const simultaneous = await renderAlgorithmOptions(file, { gameConfig: { mode: 'simultaneous' }, botLobbyMode: '' });
-      expect(simultaneous.values).toEqual(['random-sim']);
+      expect(simultaneous.values).toEqual(['algo_random-sim']);
       const royale = await renderAlgorithmOptions(file, { gameConfig: { mode: 'royale' }, botLobbyMode: '' });
-      expect(royale.values).toEqual(['random-royale']);
+      expect(royale.values).toEqual(['algo_random-royale', 'algo_apex']);
       const annihilation = await renderAlgorithmOptions(file, { gameConfig: { mode: 'annihilation' }, botLobbyMode: '' });
-      expect(annihilation.values).toEqual(['random-annihilation']);
+      expect(annihilation.values).toEqual(['algo_random-annihilation']);
     }
   });
 

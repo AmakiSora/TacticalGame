@@ -146,7 +146,7 @@
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `GET` | `/api/arena/participants` | `{ models, algorithms }`，按模式过滤的参评者清单 |
+| `GET` | `/api/arena/participants` | `{ models, algorithms }`，含 `modes` 的完整参评者清单，由客户端按模式过滤 |
 | `GET` | `/api/arena/eval/status` | 当前跑批状态快照（含命令行、路径与输出尾） |
 | `POST` | `/api/arena/eval/start` | 启动跑批，返回 `{ ok, status }` |
 | `POST` | `/api/arena/eval/stop` | 停止当前跑批，返回 `{ ok: true }` |
@@ -165,7 +165,7 @@
 | `dryRun` | 试运行，不写入战报 |
 
 - 四种模式均已接入跑批：`standard` / `annihilation` 逐动作执行，`simultaneous` / `royale` 计划入队后统一结算。
-- 非标准模式没有 RL 模型参评，`participants` 至少需要 2 个该模式算法；不足时返回 400 `invalid_participants`（歼灭已有 `algo:random-annihilation` 与 `algo:vortex` 两个算法，大逃杀仍只有 1 个随机基线）。
+- 非标准模式没有 RL 模型参评，`participants` 至少需要 2 个该模式算法；不足时返回 400 `invalid_participants`。大逃杀支持 `algo:random-royale` 与 `algo:apex`，歼灭支持 `algo:random-annihilation`、`algo:shrinkroll` 与 `algo:vortex`。
 - 已有跑批进行中时 `start` / `clear-matches` 返回 409 `eval_already_running`。
 
 ## 运维与 Agent

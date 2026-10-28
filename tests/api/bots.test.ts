@@ -459,6 +459,21 @@ describe('Algorithm bot endpoints', () => {
     expect(body.bot.name).toBe('大逃杀随机算法');
   });
 
+  it('allows apex on royale maps and rejects it in other modes', async () => {
+    for (const mapId of ['snowflake', 'standoff', 'artillery-zone']) {
+      const created = await createTwoPlayerLobby(app, { mapId });
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/games/${created.gameId}/bots/algorithm`,
+        headers: { 'X-Host-Token': created.hostToken },
+        payload: { botType: 'algo_apex' },
+      });
+      expect(res.statusCode).toBe(mapId === 'snowflake' ? 200 : 400);
+      if (mapId === 'snowflake') expect(res.json().bot).toMatchObject({ algorithm: 'apex', name: '绝境算法' });
+      else expect(res.json().code).toBe('bot_not_supported');
+    }
+  });
+
   it('still rejects the standard random bot on annihilation maps (separate entries)', async () => {
     const created = await createTwoPlayerLobby(app, { mapId: 'artillery-zone' });
     const res = await app.inject({

@@ -31,6 +31,7 @@ export const ALGORITHMS = {
   horizon: './builtin/horizon.mjs',
   shrinkroll: './builtin/shrinkroll.mjs',
   vortex: './builtin/vortex.mjs',
+  apex: './builtin/apex.mjs',
 };
 
 /**
@@ -70,6 +71,7 @@ export const ALGORITHM_META = {
   horizon: { displayName: '视界算法', description: '同时回合：分步结算镜像 + 多轮视界投影胜率评估 + 同构对手场景 + 束搜索 + 对抗探针', version: 'v1', modes: ['simultaneous'] },
   shrinkroll: { displayName: '缩圈推演算法', description: '歼灭：回合内束搜索 + 缩圈时间线推演 + 轮界裁决投影', version: 'v1', modes: ['annihilation'] },
   vortex: { displayName: '旋涡算法', description: '歼灭：炮火收缩圈预判疏散、稳杀集火、走位风筝与激进补员', version: 'v1', modes: ['annihilation'] },
+  apex: { displayName: '绝境算法', description: '大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验', version: 'v1', modes: ['royale'] },
 };
 
 /**

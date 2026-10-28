@@ -50,7 +50,7 @@ interface UiHarness {
   setSelf(playerId: string | null, token?: string): void;
   setDraft(rows: Array<{ id: string; name: string }> | null, first?: number): void;
   setSync(state: string, stopped?: boolean): void;
-  seatPlanMarkup(lobby: unknown, canManage: boolean): string;
+  seatPlanMarkup(lobby: unknown, canManage: boolean, canKick?: boolean): string;
   lobbySummaryMarkup(lobby: unknown, canKick: boolean): string;
 }
 
@@ -308,6 +308,31 @@ describe('seat list: permissions and empty room (V6-10)', () => {
       const summary = ui.lobbySummaryMarkup(seatsLobby(), false);
       expect(summary).not.toContain('data-seat-reset');
       expect(summary).not.toContain('class="lobby-seat-sync"');
+    });
+  }
+});
+
+
+describe('添加 AI is not gated by the seat-sync stop flag (#20)', () => {
+  for (const path of CLIENTS) {
+    it(`keeps the add-AI entry when seat controls are stopped (${path})`, () => {
+      const ui = harness(path);
+      ui.setSync('idle', true); // 开局后停机：canManage 变 false
+      // 有人时：座位控件收起，但「添加 AI」仍要能点（否则新房间再也加不进人）。
+      const html = ui.seatPlanMarkup(seatsLobby(), false, true);
+      expect(html).toContain('data-add-bot="1"');
+      expect(html).not.toContain('data-seat-up');
+      expect(html).not.toContain('data-seat-reset');
+    });
+
+    it(`keeps the add-AI entry in an empty room when seat controls are stopped (${path})`, () => {
+      const ui = harness(path);
+      ui.setSync('idle', true);
+      const html = ui.seatPlanMarkup(emptyLobby(), false, true);
+      expect(html).toContain('data-add-bot="1"');
+      expect(html).toContain('还没有玩家加入');
+      // 非房主（canKick=false）仍然什么都看不到。
+      expect(ui.seatPlanMarkup(emptyLobby(), false, false)).toBe('');
     });
   }
 });

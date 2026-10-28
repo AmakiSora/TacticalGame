@@ -2818,6 +2818,10 @@ function seatSyncText() {
  */
 function pushIntent(lobby) {
   if (!hostToken || seatSync.stopped) return;
+  // 座位同步只在大厅期有意义：对局已经开始就别再发请求了。
+  if (lobby?.phase !== 'lobby') return;
+  // 新的改动意味着「恢复随机」的撤销入口已经过时，先摘掉它。
+  dismissSeatUndo();
   seatSync.desired = seatIntentOf(lobby);
   seatSync.seq += 1;
   seatSync.state = 'pending';
@@ -2831,19 +2835,20 @@ function scheduleSeatFlush() {
   seatSync.timer = setTimeout(() => { seatSync.timer = null; flushSeatSync(); }, SEAT_SYNC_DELAY);
 }
 
-/** 失败后点状态点重提：把失败的意图放回乐观视图，立即再发一次。 */
+/** 失败后点状态点重提：把失败的意图**按当前名单合并**后放回乐观视图，立即再发一次。 */
 function retrySeatSync() {
   const lobby = latestLobby;
   const intent = seatSync.retryIntent;
   if (!lobby || seatSync.stopped || !intent) return;
+  // 失败期间名单可能变过（有人离开/加入）：和撤销一样走 rebase + seatIntentOf 的合并口径，
+  // 不能拿裸快照直接重发。
+  const order = rebaseSeatOrder(intent.order, lobby);
   const names = lobbyPlayerNames(lobby);
-  seatDraft = intent.order.map(id => ({ id, name: names.get(id) || id }));
-  seatDraftFirst = intent.firstSeat;
+  seatDraft = order.map(id => ({ id, name: names.get(id) || id }));
+  seatDraftFirst = clampFirstSeat(intent.firstSeat, order.length, isSimultaneousLobby(lobby));
   seatSync.retryIntent = null;
   seatSync.failMessage = null;
-  seatSync.desired = { order: [...intent.order], firstSeat: intent.firstSeat };
-  seatSync.seq += 1;
-  seatSync.state = 'pending';
+  pushIntent(lobby);
   renderLobbySummary(lobby, els.lobbySummary, true);
   flushSeatSync();
 }
@@ -2901,6 +2906,8 @@ async function putSeatIntent(desired) {
 /** flush：单飞执行一次意图；回来后再判断是否还有更新的意图要补发。 */
 async function flushSeatSync() {
   if (seatSync.inFlight || seatSync.stopped) return;
+  // 只在大厅期发请求：进入对局后残留的意图一律作废（服务端也会 409）。
+  if (latestLobby?.phase !== 'lobby') return;
   const desired = seatSync.desired;
   if (!desired) return;
   const seq = seatSync.seq;
@@ -2979,7 +2986,7 @@ function flashSeatReverted() {
   setTimeout(() => rows.forEach(row => row.classList.remove('is-reverted')), 220);
 }
 
-/** 对局已开始：停止同步、回滚视图并隐藏全部座位控件。 */
+/** 对局已开始：停止同步、回滚视图并隐藏全部座位控件。message 传 null = 静默停机。 */
 function stopSeatSync(message) {
   seatSync.stopped = true;
   seatSync.desired = null;
@@ -2989,7 +2996,25 @@ function stopSeatSync(message) {
   seatDraft = null;
   seatDraftFirst = 0;
   if (latestLobby) renderLobbySummary(latestLobby, els.lobbySummary, true);
-  toast(message, 'info');
+  if (message) toast(message, 'info');
+}
+
+/**
+ * 停机开关的**唯一复位入口**：新建 / 加入 / 恢复房间、以及进入对局前都调它。
+ * stopped 只是「这台客户端不再同步座位」的一次性闸门，不能变成单向门——
+ * 一旦某局开局把它设成 true，之后所有新房间都会失去座位控件与「添加 AI」。
+ */
+function startSeatSync() {
+  seatSync.stopped = false;
+  seatSync.desired = null;
+  seatSync.retryIntent = null;
+  seatSync.failMessage = null;
+  seatSync.state = 'idle';
+  seatSync.retries = 0;
+  seatSync.lastGoodLobby = null;
+  clearTimeout(seatSync.timer);
+  seatSync.timer = null;
+  seatSync.seq += 1;
 }
 
 /**
@@ -3057,18 +3082,19 @@ function lobbySeatView(dimUnused = true) {
  * 房主可上下移动 / 指定先手（仅顺序模式）或置顶（同时回合）/ 改名 / 踢出 / 添加 AI / 保存 / 恢复随机；
  * 其他成员只读。座位与席位是两件事——座位号只决定出生点与处理顺序，席位 id 仍按加入顺序。
  */
-function seatPlanMarkup(lobby, canManage) {
+function seatPlanMarkup(lobby, canManage, canKick = canManage) {
   const seats = Array.isArray(lobby?.seats) ? lobby.seats : [];
   if (lobby?.phase !== 'lobby') return '';
   const players = lobby.players || [];
   // 0 人房（房主建房时不参战）：座位列表整段早退会把「＋ 添加 AI」一起吞掉——那是全仓唯一入口，
   // 房间就永远开不了局。所以这里只给提示行 + 添加 AI，不渲染座位行 / 保存 / 恢复随机
   //（0 人时服务端会 400 invalid_seat_layout，也没有可保存的排列）。非房主没内容可看，仍然不渲染。
+  // 「添加 AI」只看房主身份，不看座位控件是否可用：开局后 seatSync 停机也不该把入口一起收走。
   if (seats.length === 0) {
-    if (!canManage) return '';
-    const emptyAddBot = players.length < lobby.maxPlayers
+    const emptyAddBot = canKick && players.length < lobby.maxPlayers
       ? '<button type="button" class="lobby-seat-add-bot lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="lobby-add-bot-plus">+</span><span>添加 AI</span></button>'
       : '';
+    if (!emptyAddBot) return '';
     return `<div class="lobby-seats is-empty">
       <div class="lobby-seat-hint">还没有玩家加入：点下方可添加 AI，或把 Game ID 发给其他玩家</div>
       ${emptyAddBot}
@@ -3088,7 +3114,7 @@ function seatPlanMarkup(lobby, canManage) {
   // · 未编排（random 且无草稿）→ 行内出生位槽为空 + 列表头没有「恢复随机」按钮 + 状态点灰色；
   // · 预览中 → 行内出生位随草稿即时变化（地图同步预览）+ 状态点琥珀（提交中）；
   // · 已编排 → 行内出生位有值 + 「恢复随机」按钮出现。
-  const canAddBot = canManage && players.length < lobby.maxPlayers;
+  const canAddBot = canKick && players.length < lobby.maxPlayers;
   // 操作槽位：改名 / 踢出 / ▲ / ▼ / 第三格（顺序模式=先手，同时模式=置顶），宽度由 CSS 固定；
   // 不可用的位置放同宽空占位，这样同一张列表里任意两行的按钮左右边界逐像素对齐。
   const opEmpty = kind => `<span class="lobby-seat-op-empty" data-seat-op="${kind}" aria-hidden="true"></span>`;
@@ -3179,7 +3205,7 @@ function lobbySummaryMarkup(lobby, canKick = false) {
     ${syncLive}
   </div>
   ${lobbyResultMarkup(lobby)}
-  ${seatPlanMarkup(lobby, canManage)}`;
+  ${seatPlanMarkup(lobby, canManage, canKick)}`;
 }
 
 /** 房间创建后：名称 / 最大玩家数改为只读展示，参战开关跟随实际席位并禁用。 */
@@ -3407,7 +3433,7 @@ function renderAvailableGames(games) {
     .filter(game => game.phase === 'lobby' && game.playerCount < game.maxPlayers);
   if (!joinableGames.length) {
     availableGamesPage = 1;
-    els.availableGames.innerHTML = '<p class="available-games-state">暂无等待加入的对局</p>';
+    els.availableGames.innerHTML = `<p class="available-games-state">暂无等待加入的对局</p>`;
     return;
   }
   const modeFilter = els.availableGamesModeFilter?.value || '';
@@ -3418,7 +3444,7 @@ function renderAvailableGames(games) {
   const visibleGames = filteredGames
     .filter(game => !mapFilter || (game.mapId || 'default') === mapFilter);
   if (!visibleGames.length) {
-    els.availableGames.innerHTML = '<p class="available-games-state">没有符合筛选条件的对局</p>';
+    els.availableGames.innerHTML = `<p class="available-games-state">没有符合筛选条件的对局</p>`;
     return;
   }
   const pageCount = Math.max(1, Math.ceil(visibleGames.length / AVAILABLE_GAMES_PAGE_SIZE));
@@ -3510,15 +3536,32 @@ function stopAvailableGamesRefresh() {
 
 async function refreshLobbySummary() {
   if (!gameId) return null;
-  const res = await fetch(`/api/games/${gameId}/lobby`);
-  const data = await res.json();
-  if (res.ok) {
-    // 只更新当前身份对应的房间卡：房主 / 加入者共用同一 gameId，两份摘要同时刷新会让
-    // 「创建」页签显示别人房间的成员与地图（旧 bug 的根源）。
-    if (hostToken) renderLobbySummary(data, els.lobbySummary, true);
-    else if (myToken) renderLobbySummary(data, els.joinLobbySummary);
-  }
-  return res.ok ? data : null;
+  // 请求发起时快照 gameId：响应回来时若已经切到别的房间，整条丢弃——否则旧房间的
+  // 成员/座位会盖到新房间卡片上，甚至把新房间里的自己误判成「已被移出」。
+  const requestGameId = gameId;
+  const res = await fetch(`/api/games/${encodeURIComponent(requestGameId)}/lobby`);
+  const data = await res.json().catch(() => null);
+  if (requestGameId !== gameId) return null;
+  if (!res.ok || !data) return null;
+  if (typeof data.gameId === 'string' && data.gameId !== requestGameId) return null;
+  // 座位版本单调性：比当前基线旧的响应说明是上一拍（或别人的旧快照），整条丢弃，
+  // 否则会把已经提交成功的座位顺序回退掉。
+  if (isStaleSeatVersion(data)) return null;
+  // 只更新当前身份对应的房间卡：房主 / 加入者共用同一 gameId，两份摘要同时刷新会让
+  // 「创建」页签显示别人房间的成员与地图（旧 bug 的根源）。
+  if (hostToken) renderLobbySummary(data, els.lobbySummary, true);
+  else if (myToken) renderLobbySummary(data, els.joinLobbySummary);
+  return data;
+}
+
+/**
+ * 轮询响应是否过期：先比 gameId（新房间的 seatVersion 从 0 起，全局单调比较会误杀），
+ * 再比 seatVersion 是否回退到基线之前。
+ */
+function isStaleSeatVersion(lobby) {
+  if (!Number.isInteger(lobby?.seatVersion)) return false;
+  const base = seatSync.baseVersion;
+  return Number.isInteger(base) && lobby.seatVersion < base;
 }
 
 function handleLobbyRemoval(lobby) {
@@ -3553,7 +3596,11 @@ function startLobbyPolling() {
   stopLobbyPolling();
   lobbyPollTimer = setInterval(async () => {
     try {
+      // 发起时快照房间号：响应回来时若已经换了房间，这条轮询结果一律丢弃，
+      // 也不能拿它去做「我被移出」的判定（那会清掉新房间的 token）。
+      const polledGameId = gameId;
       const lobby = await refreshLobbySummary();
+      if (polledGameId !== gameId) return;
       if (handleLobbyRemoval(lobby)) return;
       // 已结束的房间不会再开局，继续轮询没意义。
       if (lobby?.phase === 'game_over') { stopLobbyPolling(); return; }
@@ -3664,12 +3711,41 @@ function afterSeatEdit(lobby) {
   renderLobbySummary(lobby, els.lobbySummary, true);
 }
 
-/** 恢复随机（不改确认）：DELETE 后 toast 带「撤销」，5 秒内可用点击前的快照再 PUT 一次。 */
+/** 「恢复随机」的撤销入口是否还挂着：出现新意图时要先摘掉它，免得撤销把新顺序覆盖掉。 */
+let seatUndoPending = false;
+
+function dismissSeatUndo() {
+  if (!seatUndoPending) return;
+  seatUndoPending = false;
+  const t = $('toast');
+  if (!t?.querySelector('.toast-action')) return;
+  clearTimeout(t._timer);
+  t.className = '';
+}
+
+/**
+ * 恢复随机（不弹确认）：先作废所有未确认意图（含在途 PUT），再 DELETE 座位表；
+ * DELETE 响应里的 seatVersion 成为新基线，之后 toast 带「撤销」，5 秒内可点。
+ */
 async function resetSeatOrder() {
   if (!gameId || !hostToken) return toast('缺少房主凭证', 'err');
   const lobby = latestLobby;
   if (!lobby) return;
-  const snapshot = seatIntentOf(lobby); // 点击前的 { order, firstSeat }
+  const snapshot = seatIntentOf(lobby); // 点击前的视图（撤销时还会按最新名单再合并一次）
+  // ① 作废队列里的意图：清 desired / timer 并推进 seq（在途回调看到 seq 变了就不再补发）。
+  seatSync.seq += 1;
+  seatSync.desired = null;
+  seatSync.retryIntent = null;
+  clearTimeout(seatSync.timer);
+  seatSync.timer = null;
+  seatSync.state = 'idle';
+  dismissSeatUndo();
+  const resetSeq = seatSync.seq;
+  // ② 有在途 PUT 时先等它 settle：DELETE 先落、旧 PUT 后落会把座位又建出来。
+  for (let waited = 0; seatSync.inFlight && waited < 3000; waited += 60) {
+    await seatSleep(60);
+  }
+  if (seatSync.seq !== resetSeq) return; // 等待期间又有新操作：交给那次操作决定
   const res = await fetch(`/api/games/${encodeURIComponent(gameId)}/host/seats`, {
     method: 'DELETE',
     headers: { 'X-Host-Token': hostToken },
@@ -3680,28 +3756,42 @@ async function resetSeatOrder() {
     return toast(data.error || '恢复随机失败', 'err');
   }
   const version = Number.isInteger(data.seatVersion) ? data.seatVersion : seatSync.baseVersion;
+  // ③ 新基线 + 再推进一次 seq：DELETE 之前登记过的意图全部作废。
+  seatSync.seq += 1;
   seatSync.baseVersion = version;
+  seatSync.desired = null;
+  seatSync.retryIntent = null;
+  seatSync.failMessage = null;
   seatSync.state = 'idle';
   if (data.lobby) {
     adoptServerLobby(data.lobby);
     renderLobbySummary(data.lobby, els.lobbySummary, true);
   }
+  seatUndoPending = true;
   toast('已恢复随机座位', 'ok', {
     label: '撤销',
     timeout: 5000,
-    onClick: () => undoSeatReset(snapshot, version),
+    onClick: () => {
+      seatUndoPending = false;
+      undoSeatReset(snapshot, version);
+    },
   });
 }
 
-/** 撤销「恢复随机」：用点击前的快照再 PUT 一次，ifVersion 取 DELETE 响应里的版本。 */
+/** 撤销「恢复随机」：快照按最新名单合并后，走与点击同一套意图登记逻辑再 PUT 一次。 */
 function undoSeatReset(snapshot, version) {
   if (!gameId || !hostToken || seatSync.stopped) return;
-  if (Number.isInteger(version)) seatSync.baseVersion = version;
+  const lobby = latestLobby;
+  if (!lobby) return;
+  // DELETE 之后名单可能变过（有人进出）：裸快照会带上已经离开的人，必须 rebase。
+  const order = rebaseSeatOrder(snapshot.order, lobby);
+  const names = lobbyPlayerNames(lobby);
+  seatDraft = order.map(id => ({ id, name: names.get(id) || id }));
+  seatDraftFirst = clampFirstSeat(snapshot.firstSeat, order.length, isSimultaneousLobby(lobby));
   seatSync.failMessage = '撤销失败，座位已随机';
-  seatSync.desired = { order: [...snapshot.order], firstSeat: snapshot.firstSeat };
-  seatSync.seq += 1;
-  seatSync.state = 'pending';
-  if (latestLobby) renderLobbySummary(latestLobby, els.lobbySummary, true);
+  if (Number.isInteger(version)) seatSync.baseVersion = version;
+  pushIntent(lobby);
+  renderLobbySummary(lobby, els.lobbySummary, true);
   flushSeatSync(); // 撤销要即时，不等 180ms 合并窗口
 }
 
@@ -4180,6 +4270,8 @@ const rulesSheet = window.RulesSheet?.attach({ triggerEl: els.btnRules, getConfi
 els.btnRefresh.addEventListener('click', async () => { await loadFullState(); drawBoard(); renderSidebar(); toast('状态已刷新', 'ok'); });
 els.btnCreate.addEventListener('click', async () => {
   if (!(await confirmLobbySwitch('create'))) return;
+  // 换房间前先停掉旧房间的轮询：否则旧响应会落到新房间的卡片上。
+  stopLobbyPolling();
   const hadJoinedRoom = Boolean(myToken && !hostToken && gameId);
   els.btnCreate.disabled = true;
   try {
@@ -4203,6 +4295,8 @@ els.btnCreate.addEventListener('click', async () => {
     hostToken = data.hostToken;
     myToken = data.player?.token || null;
     myPlayer = data.player?.id || null;
+    // 新房间：旧房间的座位同步状态（含 stopped 停机门）一律复位。
+    startSeatSync();
     sessionName = data.lobby?.players?.find(player => player.id === myPlayer)?.name
       || els.createName.value.trim() || null;
     if (sessionName) els.createName.value = sessionName;
@@ -4227,6 +4321,8 @@ els.btnCreate.addEventListener('click', async () => {
 els.btnJoin.addEventListener('click', async () => {
   const gid = els.gameId.value.trim(); if (!gid) return;
   if (!(await confirmLobbySwitch('join', gid))) return;
+  // 同 btnCreate：换房间前停掉旧轮询。
+  stopLobbyPolling();
   const hadHostedRoom = Boolean(hostToken);
   const hadJoinedRoom = Boolean(myToken && !hostToken && gameId);
   const previousGameId = gameId;
@@ -4255,6 +4351,8 @@ els.btnJoin.addEventListener('click', async () => {
   renderJoinMapCard(data.lobby);
   refreshAvailableGames();
   statusBadge(data.lobby?.phase === 'active' ? '正在进入' : '大厅中', 'idle');
+  // 新房间：座位同步状态复位（旧房间的 stopped 停机门不能带过来）。
+  startSeatSync();
   if (data.lobby?.phase === 'active') await enterGame();
   else {
     startLobbyPolling();
@@ -4366,6 +4464,12 @@ els.maxPlayers?.addEventListener('change', () => {
 });
 async function enterGame() {
   closeMapDialog();
+  // 进对局：复位座位同步状态（清待发意图 / 失败态 / 定时器，并推进 seq 作废在途回调）。
+  // 这里不设 stopped 闸门：进对局后不再发请求由 flushSeatSync 里的 `latestLobby.phase !== 'lobby'`
+  // 门槛负责；stopped 只因「对局已开始」事件设置（handleSeatOutcome 的 started 分支），且必须可复位，
+  // 否则会变成单向门，把之后所有新房间的座位控件和「添加 AI」都锁死。
+  // 草稿视图这里不清：下次大厅摘要对账时 adoptServerLobby() 会清，对局内也用不到。
+  startSeatSync();
   const ok = await loadFullState();
   if (!ok || !state.cells.length) {
     // 这颗按钮只在对局 active 时出现，正常不会走到这里：只可能是开局瞬间事件流还没就绪的竞态。
@@ -4411,6 +4515,8 @@ async function reconnectSavedSession() {
 }
 
 function restoreLobbyView(lobby) {
+  // 刷新/重开恢复房间：座位同步状态复位，别把上一个对局留下的停机门带进来。
+  startSeatSync();
   if (hostToken) {
     clearJoinRoomView();
     roomMapId = lobby.mapId || null;

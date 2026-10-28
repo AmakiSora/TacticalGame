@@ -19,6 +19,8 @@ import { seedGameRandom } from '../engine/random.js';
 import { logger } from '../utils/logger.js';
 import { inc, observe } from '../utils/metrics.js';
 import { generateToken, hashToken, migrateToken } from './tokens.js';
+import { isRetentionExpired } from './retention.js';
+import type { RetentionTtls } from './retention.js';
 
 export { generateToken } from './tokens.js';
 
@@ -26,8 +28,29 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const PERSISTENCE_SCHEMA_VERSION = 2;
 
+/** 全量 games.json 的写盘节奏：trailing 250ms 合并 + 最长 2s 必写一次。 */
+const FLUSH_DELAY_MS = 250;
+const FLUSH_MAX_WAIT_MS = 2000;
+/** 活跃大厅上限默认值；`TACTICAL_GAME_MAX_LOBBIES` 可覆盖（见 maxLobbyGames）。 */
+export const DEFAULT_MAX_LOBBY_GAMES = 200;
+
 interface GameStoreOptions {
   persistenceFile?: string | null;
+  /** 全量落盘的去抖窗口；测试可传 0 或配合 fake timers。 */
+  flushDelayMs?: number;
+  flushMaxWaitMs?: number;
+  /** 是否同步 flush（VITEST 默认 true，避免用例靠 sleep 等定时器）。 */
+  synchronousFlush?: boolean;
+}
+
+/** 活跃大厅数量上限（只校验，不缓存；启动时先调一次即可把错误提前）。 */
+export function maxLobbyGames(value: string | undefined = process.env.TACTICAL_GAME_MAX_LOBBIES): number {
+  if (value === undefined || value.trim() === '') return DEFAULT_MAX_LOBBY_GAMES;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error('TACTICAL_GAME_MAX_LOBBIES must be a positive integer');
+  }
+  return parsed;
 }
 
 interface PersistedGamesFile {
@@ -144,6 +167,7 @@ export function createLobbyWithConfig(id: string, mapId: string, config: MapConf
     turn: {
       roundNumber: 1, currentPlayerId: null, turnOrder: [], actedThisRound: [],
       phase: 'lobby', actionsUsed: 0, turnNumber: 1, currentOwner: null,
+      resolvedRound: null, skipGuard: null,
     },
     plan: null,
     events: [], winner: null, result: null,
@@ -347,6 +371,8 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
     actionsUsed: 0,
     turnNumber: 1,
     currentOwner: simultaneous ? null : turnOrder[0],
+    resolvedRound: null,
+    skipGuard: null,
   };
   game.plan = simultaneous ? { queues: {}, committed: [] } : null;
   game.artillery = artilleryStateForRound(game, 1);
@@ -545,6 +571,10 @@ function normalizeLoadedGame(game: GameState): void {
   // 3.8.8 起大厅可编排座位：旧存档没有这两个字段，补默认（缺省 = 未编排 = 开局随机）。
   if (game.seatPlan === undefined) game.seatPlan = null;
   if (game.seatVersion === undefined) game.seatVersion = 0;
+  // 3.8.9 起同时回合有轮次守卫：旧档没有该字段时保守认为「本轮已结算」（= 本轮号），
+  // 否则重启后第一次 force-resolve 仍可能把同一轮多推一次；玩家下一次输入会把它清空。
+  if (game.turn && game.turn.resolvedRound === undefined) game.turn.resolvedRound = game.turn.roundNumber;
+  if (game.turn && game.turn.skipGuard === undefined) game.turn.skipGuard = null;
   // maxTurns 的 null 是合法的「无回合上限」；损坏或降级档案里的非法值回落有限默认，
   // 否则 `roundNumber < undefined` 恒 false，会在下一个回合边界把对局误裁定。
   const balance = game.config?.balance as { maxTurns?: unknown } | undefined;
@@ -574,14 +604,35 @@ function normalizeLoadedGame(game: GameState): void {
 export class GameStore {
   private games: Map<string, GameState> = new Map();
   private persistenceFileOverride: string | null | undefined;
+  private flushDelayMs = FLUSH_DELAY_MS;
+  private flushMaxWaitMs = FLUSH_MAX_WAIT_MS;
+  private synchronousFlush = Boolean(process.env.VITEST);
+  private flushTimer: NodeJS.Timeout | null = null;
+  private flushPendingSince = 0;
+  /** 全量 flush 次数：给测试与运维计数用（去抖是否真的合并了写在它上面体现）。 */
+  private flushWrites = 0;
 
   constructor(options: GameStoreOptions = {}) {
     if ('persistenceFile' in options) this.persistenceFileOverride = options.persistenceFile;
+    if (options.flushDelayMs !== undefined) this.flushDelayMs = Math.max(0, options.flushDelayMs);
+    if (options.flushMaxWaitMs !== undefined) this.flushMaxWaitMs = Math.max(0, options.flushMaxWaitMs);
+    if (options.synchronousFlush !== undefined) this.synchronousFlush = options.synchronousFlush;
+  }
+
+  /** 已发生的全量 flush 次数（每局快照写入不计入）。 */
+  get flushCount(): number {
+    return this.flushWrites;
+  }
+
+  /** 当前是否有排队中的全量 flush。 */
+  get flushScheduled(): boolean {
+    return this.flushTimer !== null;
   }
 
   save(game: GameState): void {
     game.lastActivityAt = Date.now();
     this.games.set(game.id, game);
+    // 每局快照同步原子写：请求返回时这一局的内容必须已经在盘上。
     this.writeSnapshot(game);
     this.flush();
   }
@@ -593,7 +644,8 @@ export class GameStore {
     this.games.delete(id);
     const snapshotRemoved = this.removeSnapshot(id);
     try {
-      this.flush();
+      // 删除必须同步落定：去抖窗口里崩溃会让已删的对局在重启后复活。
+      this.flushNow();
     } catch (err) {
       // 导出旧格式失败时不要把内存条目丢掉；快照已删除则立即补写回去。
       this.games.set(id, game);
@@ -606,7 +658,7 @@ export class GameStore {
       // 快照删除失败（Windows 文件占用/只读）不能静默成功，否则重启会复活。
       // 恢复内存并重写一份可用快照，让调用方收到失败而不是假成功。
       this.games.set(id, game);
-      try { this.writeSnapshot(game); this.flush(); } catch { /* 保留内存状态 */ }
+      try { this.writeSnapshot(game); this.flushNow(); } catch { /* 保留内存状态 */ }
       throw new Error(`failed to remove snapshot for game ${id}`);
     }
   }
@@ -818,9 +870,56 @@ export class GameStore {
     }
   }
 
+  /** 取消排队中的全量 flush（进程退出/测试清理时用）。 */
+  cancelScheduledFlush(): void {
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = null;
+    this.flushPendingSince = 0;
+  }
+
+  /**
+   * 全量落盘调度：trailing 去抖 250ms（每次新变更都重排），最长等 2s 必写一次
+   * ——持续有活动也不会被饿死。每局快照仍由 writeSnapshot 同步原子写，
+   * 这里只合并导出用的 games.json。
+   */
   flush(): void {
     const file = this.persistenceFile();
     if (!file) return;
+    if (this.synchronousFlush) {
+      this.flushNow();
+      return;
+    }
+    const now = Date.now();
+    if (this.flushPendingSince === 0) this.flushPendingSince = now;
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    const waited = now - this.flushPendingSince;
+    const delay = Math.max(0, Math.min(this.flushDelayMs, this.flushMaxWaitMs - waited));
+    if (delay === 0) {
+      this.flushTimer = null;
+      this.flushPendingSince = 0;
+      this.flushNow();
+      return;
+    }
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      this.flushPendingSince = 0;
+      try {
+        this.flushNow();
+      } catch (err) {
+        // 定时器里的失败不能变成未捕获异常：下一轮变更会再写一次。
+        logger.error('定时全量落盘失败', err);
+      }
+    }, delay);
+    // 后台任务不该把进程拖住不退出。
+    this.flushTimer.unref?.();
+  }
+
+  /** 立刻同步写一份全量 games.json（退出、删除、归档等「必须落定」的路径用它）。 */
+  flushNow(): void {
+    const file = this.persistenceFile();
+    if (!file) return;
+    // 已经写过就不再需要排队中的那次。
+    this.cancelScheduledFlush();
     const started = Date.now();
     try {
       mkdirSync(dirname(file), { recursive: true });
@@ -848,6 +947,7 @@ export class GameStore {
         }
       }
       renameSync(tmp, file);
+      this.flushWrites += 1;
       inc('tactical_persist_total', { result: 'ok' });
     } catch (err) {
       inc('tactical_persist_total', { result: 'error' });
@@ -857,23 +957,30 @@ export class GameStore {
     }
   }
 
+  /** 活跃大厅数量（容量上限校验用）。 */
+  lobbyCount(): number {
+    let count = 0;
+    for (const game of this.games.values()) if (game.phase === 'lobby') count += 1;
+    return count;
+  }
+
+  /** 对局总数（用于「总量接近磁盘上限」的 warning）。 */
+  size(): number {
+    return this.games.size;
+  }
+
   /**
    * 归档并删除超期未活动的 lobby / 终局对局；active 对局永不自动删除。
    * 返回被删除的 id 列表；归档失败的对局保留并留给下一次重试。
    */
   pruneInactive(options: { lobbyTtlMs: number; gameOverTtlMs: number; now?: number }): string[] {
     const now = options.now ?? Date.now();
+    const ttls: RetentionTtls = { lobbyTtlMs: options.lobbyTtlMs, gameOverTtlMs: options.gameOverTtlMs };
     const removed: string[] = [];
     const removedGames: GameState[] = [];
     for (const game of [...this.games.values()]) {
-      const ttl = game.phase === 'lobby'
-        ? options.lobbyTtlMs
-        : game.phase === 'game_over'
-          ? options.gameOverTtlMs
-          : 0;
-      if (!ttl || ttl <= 0) continue;
-      const last = game.lastActivityAt ?? game.createdAt ?? 0;
-      if (now - last < ttl) continue;
+      // 判定收敛到 retention.ts 的纯函数（同一套逻辑有单测覆盖 2h / 3d 与 env 覆盖）。
+      if (!isRetentionExpired(game, now, ttls)) continue;
       if (!this.archiveGame(game)) continue;
       this.games.delete(game.id);
       removed.push(game.id);
@@ -882,8 +989,9 @@ export class GameStore {
     if (removed.length > 0) {
       // 先导出一致性 games.json，再删快照；flush 失败时把内存条目放回去，
       // 避免一次磁盘故障让对局从服务内存中消失（调用方会重试下一轮）。
+      // 归档删除同样必须同步落定，不能等在去抖窗口里。
       try {
-        this.flush();
+        this.flushNow();
       } catch (err) {
         for (const game of removedGames) this.games.set(game.id, game);
         throw err;
@@ -897,7 +1005,7 @@ export class GameStore {
           this.games.set(id, game);
           try { this.writeSnapshot(game); } catch { /* 保留内存状态 */ }
         }
-        try { this.flush(); } catch (err) { logger.error('恢复未删除对局的 games.json 失败', err); }
+        try { this.flushNow(); } catch (err) { logger.error('恢复未删除对局的 games.json 失败', err); }
         return removed.filter(id => !failed.includes(id));
       }
     }

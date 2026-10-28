@@ -43,7 +43,8 @@ describe('game retention', () => {
     lobby.phase = 'lobby';
     store.save(lobby);
     lobby.lastActivityAt = 0;
-    const flush = vi.spyOn(store, 'flush').mockImplementation(() => {
+    // 归档删除走的是同步 flushNow（3.8.9 起 flush 变成去抖调度，不再抛写盘错误）。
+    const flush = vi.spyOn(store, 'flushNow').mockImplementation(() => {
       throw new Error('disk full');
     });
     try {

@@ -12,9 +12,11 @@
 | 指标 token | `X-Metrics-Token: <token>` 或 `Authorization: Bearer <token>` | `GET /metrics`（仅在设置 `METRICS_TOKEN` 后启用） |
 
 - `create` 响应同时返回 `hostToken` 与参战玩家的 `player.token`；`join` 只返回玩家 token。
-- 控制权限由环境变量 `AUTO_CONTROL_TOKEN` 决定：设置后必须携带上述控制 token；未设置时仅允许本机请求。
+- 控制权限由环境变量 `AUTO_CONTROL_TOKEN` 决定。设置后所有控制请求都必须携带控制 token（常量时间比较；空白值等同未设置），经反向代理转来的请求也一样；未设置时只放行「本机直连」——socket 对端必须是回环地址（`::1`、`::ffff:127.0.0.1`、整段 `127.0.0.0/8`）**且**请求不带任何转发头（`X-Forwarded-For` / `Forwarded` / `X-Real-IP`），与 `TRUST_PROXY` 取值无关；socket 地址缺失（unix socket、已断连）按非本机处理。未配置 token 且非本机 → 401 `control_token_required`；凭证不符 → 401 `invalid_control_token`。
+- `TRUST_PROXY=true` 时 `req.ip` 取自客户端可写的转发头，只影响限流分桶与 SSE 的每 IP 配额（控制鉴权不看它）；因此它只能接在你信任的反向代理后面，由代理自己写入转发头，且不要直接暴露应用端口。
+- 控制权限覆盖删除对局、强制裁决、管理员改名与竞技场评估的 5 个端点（`/api/arena/eval/status`、`/start`、`/stop`、`/clear-matches`、`/api/arena/leaderboard/regenerate`）；`?token=` 形式仅用于调试，会随请求 URL 进访问日志。
 - 失败响应统一为 `{ "error": "<中文说明>", "code": "<英文错误码>" }`。
-- 玩法动作接口支持可选 `Idempotency-Key` 请求头：同键同 body 回放首次响应并带 `Idempotent-Replay: true`，同键不同 body 返回 409 `idempotency_conflict`。
+- 玩法动作接口与 `host/force-resolve`、`host/skip-turn` 支持可选 `Idempotency-Key` 请求头（最长 200 字符，超长 → 400 `invalid_idempotency_key`）：同键同 body 回放首次成功响应、不重复执行（记录保留 24 小时），同键不同 body 返回 409 `idempotency_conflict`；动作按玩家、房主接口按房主分别隔离。
 - 读接口支持 `If-None-Match` / `ETag`（`GET /api/games/:id`、skill、回放、RL 模型），命中返回 304。
 
 ## 地图
@@ -44,13 +46,17 @@
 | `PATCH` | `/api/games/:id/host/max-players` | `{ maxPlayers }` + host token header | `{ ok: true, lobby }` |
 | `PUT` | `/api/games/:id/host/seats` | `{ order, firstSeat?, ifVersion? }` + host token header | `{ ok: true, seatVersion, firstSeat, lobby }`（仅 lobby 期；响应顶层不含 `seats`，最新座位表在 `lobby.seats`；`ifVersion` 失配 → `409 seat_conflict`；`simultaneous` / `royale` 下 `firstSeat` 恒为 `0`，见下） |
 | `DELETE` | `/api/games/:id/host/seats` | host token header | `{ ok: true, seatVersion, lobby }`（唯一清理编排的接口，回到开局随机） |
-| `POST` | `/api/games/:id/host/skip-turn` | host token header | `{ ok: true }` |
+| `POST` | `/api/games/:id/host/skip-turn` | host token header（可选 `Idempotency-Key`） | `{ ok: true }`（仅顺序模式；同一轮不能重复跳同一玩家，见下） |
 | `POST` | `/api/games/:id/host/eliminate` | `{ playerId }` + host token header | `{ ok: true }` |
 | `POST` | `/api/games/:id/force-adjudicate` | control token | `{ ok: true, result }` |
 | `DELETE` | `/api/games/:id` | control token | `{ ok: true }` |
 
 - 强制裁决仅适用于进行中的对局，按请求时存活玩家的裁决总分决定胜者；最高分并列则平局。
 - 删除对局会同时删除内存状态和持久化文件中的记录。
+- 活跃大厅数受 `TACTICAL_GAME_MAX_LOBBIES` 限制（默认 200，设为非正整数时进程启动即报错）：达到上限后建房返回 503 `lobby_capacity`（文案「大厅数量已达上限（<上限>），请等空闲大厅过期后再建房」）并计入 `tactical_lobby_capacity_rejected_total`，用到 80% 起写 warning。
+- 保留期：无活动的大厅默认 2 小时（部署用的 `compose.yml` 未显式设置时传 24 小时）、终局对局默认 3 天后归档到 `runtime/archive/`，进行中的对局永不按 TTL 回收；用 `TACTICAL_GAME_LOBBY_TTL_HOURS` / `TACTICAL_GAME_OVER_TTL_HOURS` 覆盖（`0` 关闭对应清理，非法或负数回落默认值并告警）。
+- 落盘：每次改动同步原子写 `runtime/store/<gameId>.json`，响应返回时该局快照已在盘上；`runtime/games.json` 是导出与旧版兼容格式，去抖合并写（trailing 250ms、最长 2s 必写），删除对局、归档与进程退出时强制 flush。部署侧取值见 [deploy/DEPLOYMENT.md](../deploy/DEPLOYMENT.md)。
+- `host/skip-turn` 只在顺序模式有意义（同时 / 大逃杀没有当前行动玩家，调用返回 409 `game_not_started`，文案「对局不在进行中」）；同一轮内不能重复跳过同一玩家，重复调用返回 409 `round_already_resolved`（文案「本轮已经跳过该玩家，不能重复跳过」）。
 - 座位编排（3.8.8）：大厅期房主用 `PUT /api/games/:id/host/seats` 编排座位，`DELETE` 取消编排、回到开局随机。`order` 必须是**当前已加入玩家的一次排列**（长度不符 / 重复 / 含未加入玩家 / 缺人，任一即 `400 invalid_seat_layout`）；房间内还没有玩家时无座位可编排，同样 `400 invalid_seat_layout`（文案「当前没有已加入玩家，无法编排座位」）；`ifVersion` 必须是整数，与当前 `seatVersion` 不等时 → `409 seat_conflict`，响应体带最新 `seatVersion` 与完整 `lobby`，前端可直接重绘、不必重放请求。开局后调用一律 `409 game_already_started`。
 - `firstSeat` **按模式区分**：仅顺序模式（`standard` / `annihilation`）有意义，是 0 起的先手座位下标、缺省 0，`turnOrder` 从该座位循环展开；越界（`<0` 或 `>=已加入人数`）→ `400 invalid_seat_layout`（错误文案「先手座位号越界」只会在顺序模式出现）。`simultaneous` / `royale` **没有先手概念**（`turnOrder` 只是同一步内的并列处理顺序），服务端忽略该字段、一律存 `0` 并在响应里回 `0`，不报错也不做越界校验；`GET /api/games/:id/lobby` 的 `firstSeat` 在这两个模式下同样恒为 `0`。
 - 大厅摘要的座位字段：`seatMode`（`'random'` / `'manual'`）、`seatVersion`、`firstSeat`（0 起；`random` 态恒 0，`simultaneous` / `royale` 也恒 0）、`seats[]`（`{ seat, playerId, name, spawnSlotId }`，`seat` 从 1 起、按座位号升序）。`seatMode='random'`（未编排）时出生点（以及顺序模式下的先手）**都还没决定**，`seats[].spawnSlotId` **恒为 `null`**，`seats` 只按加入顺序给座位号；`seatMode='manual'` 时才把 `spawnSlotId` 映射成 `config.layouts[人数][座位下标]`，该人数没有 `layouts` 条目时仍为 `null`。席位 id（`player_a`…）恒按加入顺序分配且不可变，座位号只决定「谁坐哪个出生点」；行动顺位只存在于顺序模式，同时 / 大逃杀里座位号只是同一步内的结算处理顺序。
@@ -74,9 +80,10 @@
 | `POST` | `/api/games/:id/plan/reorder` | `{ actionIds }`（同时模式专用，原子重排队列；必须是当前队列的一个排列） |
 | `POST` | `/api/games/:id/plan/revoke` | `{ actionId }`（同时模式专用，撤回一条排队指令） |
 | `POST` | `/api/games/:id/plan/clear` | 无（同时模式专用，清空自己的计划） |
-| `POST` | `/api/games/:id/host/force-resolve` | 无（房主强制立即结算，未确认者按现有队列参与） |
+| `POST` | `/api/games/:id/host/force-resolve` | host token header；可选 `{ "repeat": true }`（同时回合专用；可选 `Idempotency-Key`） |
 
 - 部署/移动/攻击/治疗/爆破/结束回合、计划撤回/清空/重排均支持 `Idempotency-Key`。
+- `host/force-resolve` 是同时回合专用（其它模式 400 `not_simultaneous_game`），响应 `{ ok, resolved, roundNumber, repeated, phase }`。同一轮已结算、之后又没有新输入（入队 / 提交）时返回 409 `round_already_resolved`（文案「本轮已经结算，等待下一次行动提交后再结算」）；房主可带 `{ "repeat": true }` 显式跳过这一次守卫（响应 `repeated: true`，计入 `tactical_round_force_repeat_total` 并写 warning），用于人工解锁推不动的存量对局。该参数只作用于本次请求（不带它仍然 409），房主可连续调用多次、每次推进一轮，服务端不设次数上限。
 - 服务端不提供旧版 `/build`、`/produce`、`/sell` 接口。
 
 ## 状态、等待与事件

@@ -20,6 +20,7 @@ const errorStatus: Record<string, number> = {
   lobby_not_ready: 409,
   already_committed: 409,
   idempotency_conflict: 409,
+  invalid_idempotency_key: 400,
   persistence_degraded: 503,
   not_simultaneous_game: 400,
   unsupported_player_count: 400,
@@ -29,6 +30,8 @@ const errorStatus: Record<string, number> = {
   action_limit_reached: 429,
   invalid_seat_layout: 400,
   seat_conflict: 409,
+  round_already_resolved: 409,
+  lobby_capacity: 503,
 };
 
 export function statusForCode(code: string): number { return errorStatus[code] ?? 400; }
@@ -97,6 +100,13 @@ export function sanitizeGameForResponse(
     idempotency: _idempotency, events, config, ...rest
   } = game;
   const body = structuredClone(rest) as Record<string, unknown>;
+  // 轮次守卫是服务端内部状态（resolvedRound / lastSkippedTurn）：不对外暴露，
+  // 免得客户端拿它当「本轮能否结算」的契约。
+  if (body.turn && typeof body.turn === 'object') {
+    const turn = body.turn as Record<string, unknown>;
+    delete turn.resolvedRound;
+    delete turn.skipGuard;
+  }
   body.lastEventSeq = events.at(-1)?.seq ?? 0;
   if (projection.events !== false) body.events = structuredClone(events);
   if (projection.config !== false) body.config = structuredClone(config);

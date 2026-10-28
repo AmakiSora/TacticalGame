@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer,
-  clearSeatPlan, isSeatOrderValid, setSeatPlan,
+  clearSeatPlan, isSeatOrderValid, setSeatPlan, maxLobbyGames,
   getRawHostToken, getRawPlayerToken,
 } from '../state/store.js';
 import { verifyToken } from '../state/tokens.js';
@@ -15,7 +15,10 @@ import { eliminateFromPlanAndMaybeResolve, forceResolveRound } from '../engine/s
 import {
   authenticate, authenticateHost, sanitizeGameForResponse, statusForCode,
 } from './auth.js';
-import { authorizeControlRequest } from './controlAuth.js';
+import { authorizeControlRequest, controlSocketAddressOf } from './controlAuth.js';
+import { actionBodyHash, findReplay, rememberAction, scopedIdempotencyKey } from './actions.js';
+import { logger } from '../utils/logger.js';
+import { inc } from '../utils/metrics.js';
 import { listMaps } from '../config/loader.js';
 import { generateRandomMapConfig, sanitizeRandomOptions } from '../config/randomMap.js';
 import type { RandomParamValues } from '../config/randomMap.js';
@@ -23,6 +26,46 @@ import { getCachedRandomMap, setCachedRandomMap } from '../config/randomMapCache
 import { isPlayerId, isSimultaneousMode, normalizePlayerName } from '../types.js';
 import type { GameState, PlayerId } from '../types.js';
 import { launchBotsForGame, removeBotRecord, clearBotsForGame } from './bots.js';
+
+type HostIdempotency =
+  | { kind: 'none' }
+  | { kind: 'too_long' }
+  | { kind: 'conflict' }
+  | { kind: 'replay'; response: unknown }
+  | { kind: 'store'; key: string; hash: string };
+
+/**
+ * 房主结算类接口的幂等键：与动作接口同款语义——
+ * 相同 key + 相同请求 → 回放首次成功响应；相同 key + 不同请求 → 409 idempotency_conflict。
+ * 房主身份用 `host:` 前缀进同一张记录表，和玩家动作的 key 互不干扰。
+ */
+function hostIdempotency(
+  req: { headers: Record<string, unknown> },
+  game: GameState,
+  action: string,
+  body: unknown,
+): HostIdempotency {
+  const raw = req.headers['idempotency-key'];
+  const key = typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+  if (!key) return { kind: 'none' };
+  if (key.length > 200) return { kind: 'too_long' };
+  const hash = actionBodyHash(action, body ?? null);
+  const scoped = scopedIdempotencyKey('host', key);
+  const found = findReplay(game, scoped, hash);
+  if (!found) return { kind: 'store', key: scoped, hash };
+  if ('conflict' in found) return { kind: 'conflict' };
+  return { kind: 'replay', response: found.response };
+}
+
+function hostIdempotencyError(reply: { code: (n: number) => { send: (b: unknown) => unknown } }, idem: HostIdempotency): unknown {
+  if (idem.kind === 'too_long') {
+    return reply.code(400).send({ error: 'Idempotency-Key 不能超过 200 个字符', code: 'invalid_idempotency_key' });
+  }
+  if (idem.kind === 'conflict') {
+    return reply.code(409).send({ error: '同一个 Idempotency-Key 被用于不同的请求', code: 'idempotency_conflict' });
+  }
+  return null;
+}
 
 export function lobbySummary(game: GameState) {
   const joined = joinedPlayerIds(game);
@@ -115,6 +158,20 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 8) {
         return reply.code(400).send({ error: '不支持该玩家人数', code: 'unsupported_player_count' });
       }
+      // 活跃大厅上限：每个大厅都要占一份全量快照与内存，必须有个硬闸（默认 200）。
+      const lobbyLimit = maxLobbyGames();
+      const lobbyCount = globalStore.lobbyCount();
+      if (lobbyCount >= lobbyLimit) {
+        inc('tactical_lobby_capacity_rejected_total');
+        return reply.code(503).send({
+          error: `大厅数量已达上限（${lobbyLimit}），请等空闲大厅过期后再建房`,
+          code: 'lobby_capacity',
+        });
+      }
+      if (lobbyCount >= Math.ceil(lobbyLimit * 0.8)) {
+        // 接近上限先提醒：真撞线了只会 503，运维需要提前看到。
+        logger.warn(`活跃大厅 ${lobbyCount}/${lobbyLimit}，接近上限`, { tag: 'game:capacity' });
+      }
       const lobbyOptions = {
         maxPlayers,
         participate: req.body?.participate !== false,
@@ -147,6 +204,13 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         game = createLobby(randomUUID(), mapId, lobbyOptions);
       }
       globalStore.save(game);
+      // 总对局数（大厅 + 进行中 + 终局）超阈值时也要提醒：磁盘与内存都是按局数线性增长的，
+      // 只盯大厅数会漏掉「进行中/终局堆积」这一类膨胀。
+      const totalGames = globalStore.size();
+      if (totalGames >= lobbyLimit * 2) {
+        inc('tactical_games_over_threshold_total');
+        logger.warn(`对局总数 ${totalGames} 已超过 ${lobbyLimit * 2}（大厅上限 ${lobbyLimit} 的 2 倍），请检查归档 TTL 与磁盘占用`, { tag: 'game:capacity' });
+      }
       const creatorId = joinedPlayerIds(game)[0];
       return {
         gameId: game.id,
@@ -219,10 +283,16 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string } }>('/api/games/:id/host/skip-turn', async (req, reply) => {
     const game = authenticateHost(req, reply);
     if (!game) return;
+    const idem = hostIdempotency(req, game, 'host_skip_turn', null);
+    const idemError = hostIdempotencyError(reply, idem);
+    if (idemError) return idemError;
+    if (idem.kind === 'replay') return idem.response;
     const result = skipTurn(game, globalEventBus);
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     globalStore.persist(game);
-    return { ok: true };
+    const response = { ok: true };
+    if (idem.kind === 'store') rememberAction(game, idem.key, idem.hash, response);
+    return response;
   });
 
   // 大厅内修改最大玩家数：须为地图支持的人数，且不少于当前已加入人数。
@@ -346,13 +416,39 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // simultaneous 模式专用：房主强制以当前队列立即结算（未确认玩家按现有队列参与）。
-  app.post<{ Params: { id: string } }>('/api/games/:id/host/force-resolve', async (req, reply) => {
+  // body 可选 { "repeat": true }：显式跳过轮次守卫（旧存档里 resolvedRound 保守设在当前轮，
+  // 这类存量对局在有人做新输入前推不动，房主用它可以手动解锁一次）。
+  app.post<{ Params: { id: string }; Body: { repeat?: unknown } }>(
+    '/api/games/:id/host/force-resolve', async (req, reply) => {
     const game = authenticateHost(req, reply);
     if (!game) return;
-    const result = forceResolveRound(game, globalEventBus);
+    const repeat = req.body?.repeat === true;
+    // 幂等键要覆盖 repeat：带与不带是两个不同请求，同键异体应报 idempotency_conflict。
+    const idem = hostIdempotency(req, game, 'host_force_resolve', { repeat });
+    const idemError = hostIdempotencyError(reply, idem);
+    if (idemError) return idemError;
+    if (idem.kind === 'replay') return idem.response;
+    const result = forceResolveRound(game, globalEventBus, { repeat });
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
+    if (result.data?.repeated) {
+      // 守卫真被跳过才计数 + 告警：这是「房主手动推掉一次已结算轮」的审计线索。
+      inc('tactical_round_force_repeat_total');
+      logger.warn('房主用 repeat 强制结算了已结算的回合', {
+        tag: 'game:force-resolve',
+        gameId: game.id,
+        roundNumber: result.data.roundNumber,
+        peer: controlSocketAddressOf(req),
+      });
+    }
     globalStore.persist(game);
-    return { ok: true, resolved: true, roundNumber: result.data ? result.data.roundNumber : null, phase: game.phase };
+    const response = {
+      ok: true, resolved: true,
+      roundNumber: result.data ? result.data.roundNumber : null,
+      repeated: Boolean(result.data?.repeated),
+      phase: game.phase,
+    };
+    if (idem.kind === 'store') rememberAction(game, idem.key, idem.hash, response);
+    return response;
   });
 
   app.patch<{ Params: { id: string }; Body: { name?: string } }>('/api/games/:id/player', async (req, reply) => {

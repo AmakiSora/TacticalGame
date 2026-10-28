@@ -43,14 +43,33 @@ export function commitAndMaybeResolve(game: GameState, bus: EventBus, owner: Pla
   return { ok: true, data: { resolved } };
 }
 
-/** 房主强制结算：未确认的玩家按其当前队列（可能为空）参与结算。 */
-export function forceResolveRound(game: GameState, bus: EventBus): Result<{ roundNumber: number }> {
+/**
+ * 房主强制结算：未确认的玩家按其当前队列（可能为空）参与结算。
+ * options.repeat=true 时跳过轮次守卫（房主明确要再推一次，用于旧存档卡住的存量对局）；
+ * 每次调用只放行一次，调用方负责打 warning + metrics。
+ */
+export function forceResolveRound(
+  game: GameState,
+  bus: EventBus,
+  options: { repeat?: boolean } = {},
+): Result<{ roundNumber: number; repeated: boolean }> {
   if (!isSimultaneous(game)) return notSimultaneous();
   if (game.phase === 'game_over') return { ok: false, code: 'game_over', message: '对局已结束' };
   if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
+  // 轮次守卫：本轮已经结算过、且之后没有任何新输入（入队/提交会清空 resolvedRound）
+  // 时拒绝重复结算，避免一次误重试把同一轮推两次（补给/收入会多发一份）。
+  // 房主带 repeat=true 时显式放行（默认防误触，不是防房主）。
+  const guarded = alreadyResolvedThisRound(game);
+  if (guarded && !options.repeat) {
+    return { ok: false, code: 'round_already_resolved', message: '本轮已经结算，等待下一次行动提交后再结算' };
+  }
   const roundNumber = game.turn.roundNumber;
-  resolveRound(game, bus);
-  return { ok: true, data: { roundNumber } };
+  resolveRound(game, bus, { force: Boolean(options.repeat) });
+  return { ok: true, data: { roundNumber, repeated: guarded } };
+}
+
+function alreadyResolvedThisRound(game: GameState): boolean {
+  return game.turn.resolvedRound === game.turn.roundNumber;
 }
 
 /** 计划期玩家被淘汰后调用：清出计划状态；若其余玩家均已确认则立即结算。 */
@@ -60,7 +79,10 @@ export function eliminateFromPlanAndMaybeResolve(game: GameState, bus: EventBus,
   if (shouldAutoResolve(game)) resolveRound(game, bus);
 }
 
-export function resolveRound(game: GameState, bus: EventBus): void {
+export function resolveRound(game: GameState, bus: EventBus, options: { force?: boolean } = {}): void {
+  // 双保险：自动结算路径（全员确认）与房主强制结算共用这里，已经结算过的轮次直接跳过。
+  // options.force 只由「房主显式 repeat」传入——那是他明确要推，守卫不该拦。
+  if (!options.force && alreadyResolvedThisRound(game)) return;
   const roundNumber = game.turn.roundNumber;
   const order = game.turn.turnOrder.filter(id => game.players[id]?.status === 'active');
   const queues = new Map<PlayerId, PendingAction[]>(
@@ -110,6 +132,8 @@ export function resolveRound(game: GameState, bus: EventBus): void {
   grantComebackSupplies(game, bus);
   game.turn.roundNumber += 1;
   game.turn.turnNumber = game.turn.roundNumber;
+  // 轮次守卫写成**新**轮号（先自增再记）：下一轮等玩家有新的输入（会清成 null）才允许结算。
+  game.turn.resolvedRound = game.turn.roundNumber;
   // 轮界炮火收缩（annihilation/royale）：与顺序版 advanceTurn 同序——轮号自增后
   // 立即缩圈、对圈外单位造成伤害并清场淘汰；若就此终局则不再进入新一轮。
   if (updateArtilleryForRound(game, bus)) return;

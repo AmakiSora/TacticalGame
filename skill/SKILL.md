@@ -150,7 +150,7 @@ Run it in the **foreground as a blocking command** immediately after `/end-turn`
 
 Player actions need a player token (`POST /api/games` with `participate: true`, or `POST /join`). That response is the only time the token is shown — save it to `$SCRATCH/token.txt` immediately (see [Player token](#player-token-mandatory)) and read it back from that file in every later call. Host token is separate; `participate: false` hosts never get a player token.
 
-Transient `502`/`503`: back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. For action retries, reuse the same `Idempotency-Key` (see API). `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>`, no token query param.
+Transient `502`/`503` (except `lobby_capacity`): back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. For action retries, reuse the same `Idempotency-Key` (see API). `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>`, no token query param.
 
 ## Post-game review (复盘)
 
@@ -193,7 +193,7 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Order lobby seats | `PUT /api/games/:id/host/seats` | host | `{ "order": ["player_b", "player_a"], "firstSeat": 0 }` (lobby only; `order` must be a permutation of current players; `firstSeat` applies only to `standard` / `annihilation` — ignored and returned as `0` otherwise; optional `ifVersion` → `409 seat_conflict`) |
 | Clear seat order | `DELETE /api/games/:id/host/seats` | host | none (lobby only; back to random spawn slots, plus a random first player in `standard` / `annihilation`) |
 | Start game | `POST /api/games/:id/start` | host | none |
-| Host skip turn | `POST /api/games/:id/host/skip-turn` | host | none |
+| Host skip turn | `POST /api/games/:id/host/skip-turn` | host | none (sequential modes only; the same player cannot be skipped twice in one round → `409 round_already_resolved`) |
 | Host eliminate | `POST /api/games/:id/host/eliminate` | host | `{ "playerId": "player_c" }` |
 | Rename self | `PATCH /api/games/:id/player` | player | `{ "name": "New Name" }` |
 | Read state | `GET /api/games/:id` | player | none |
@@ -207,7 +207,7 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Revoke planned action | `POST /api/games/:id/plan/revoke` | player | `{ "actionId": "..." }` (simultaneous only; revalidates remaining steps, rejects if a later action depends on it) |
 | Reorder plan | `POST /api/games/:id/plan/reorder` | player | `{ "actionIds": ["...", "..."] }` (simultaneous only; must be a permutation of the current queue; atomic) |
 | Clear plan | `POST /api/games/:id/plan/clear` | player | none (simultaneous only) |
-| Host force resolve | `POST /api/games/:id/host/force-resolve` | host | none (simultaneous only) |
+| Host force resolve | `POST /api/games/:id/host/force-resolve` | host | none (simultaneous only; host `Idempotency-Key` supported; `{"repeat": true}` is operator-only) |
 | Events | `GET /api/games/:id/events?after=<seq>` | none/SSE | none |
 
 Create: `{ gameId, hostToken, player: { id, token } \| null, lobby }`.  
@@ -245,6 +245,10 @@ All action and plan POST endpoints accept an optional `Idempotency-Key` header (
 Generate a fresh key per logical action (UUID or random string) and **reuse it only when retrying that exact method + body** after a timeout or `502`/`503`. Never reuse a key for a different action.
 
 `game_already_full` / `game_already_started` → report; do not fetch state without a token. `lobby_not_ready` → wait. `unsupported_player_count` → wrong lobby size for map.
+
+`409 round_already_resolved` → that simultaneous round was already resolved: do not retry the same resolution, wait for the next action/commit (or leave it to the host). `503 lobby_capacity` → the server's active-lobby cap is full: wait for idle lobbies to expire or join an existing room instead of creating in a tight loop. Neither is `game_already_started`.
+
+The optional `{"repeat": true}` body on `host/force-resolve` is a host-only operator unlock for stuck games — never send it yourself.
 
 Seat endpoints (host-only, so a participant never triggers these): `invalid_seat_layout` (400) → the submitted `order` is not a permutation of the current players, the room has no players yet, or `firstSeat` is out of range; `seat_conflict` (409) → someone changed the seats between your read and your write, and the response already carries the new `seatVersion` plus a fresh `lobby` — redraw from it, do not retry the same body.
 

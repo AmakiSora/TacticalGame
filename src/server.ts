@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { loadMaps, mapCount } from './config/loader.js';
 import { gamesRoutes } from './api/games.js';
+import { controlTokenWarnings } from './api/controlAuth.js';
 import { botsRoutes } from './api/bots.js';
 import { arenaEvalRoutes } from './api/arenaEval.js';
 import { actionsRoutes } from './api/actions.js';
@@ -16,7 +17,8 @@ import { globalEventBus } from './events/bus.js';
 import { mapsRoutes } from './api/maps.js';
 import { skillRoutes } from './api/skill.js';
 import { recordsRoutes } from './api/records.js';
-import { globalStore } from './state/store.js';
+import { globalStore, maxLobbyGames } from './state/store.js';
+import { retentionTtlsFromEnv } from './state/retention.js';
 import { logger } from './utils/logger.js';
 import { inc, observe, renderMetrics } from './utils/metrics.js';
 
@@ -84,6 +86,11 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   loadMaps();
   globalStore.loadFromDisk();
+  const runtimeConfig = readRuntimeConfig();
+  // 部署自检：trustProxy / 控制凭证 / 指标凭证的组合最容易配错成「控制接口对公网敞开」。
+  for (const warning of controlTokenWarnings()) logger.warn(warning);
+  // 大厅容量上限的取值在启动时就要校验，别等到第一个建房请求才炸。
+  maxLobbyGames();
   const app = Fastify({
     logger: {
       level: logLevel,
@@ -97,19 +104,27 @@ export async function buildServer(): Promise<FastifyInstance> {
       serializers: {
         // pino 默认 req serializer 会输出完整 req.url；控制 token/SSE token 允许走
         // 查询串，因此必须在这里按参数名脱敏，而不是只依赖上面的 redact 路径。
-        req(request: { method?: string; url?: string; host?: string; ip?: string; socket?: { remotePort?: number } }) {
+        // 同时记 peer（不可伪造的 socket 对端）与 claimed（客户端自称的 XFF），
+        // 两者不一致就是「经过反代 / 有人在伪造转发头」，排障时一眼能看出来。
+        req(request: {
+          method?: string; url?: string; host?: string;
+          headers?: Record<string, string | string[] | undefined>;
+          socket?: { remotePort?: number; remoteAddress?: string };
+        }) {
           const rawUrl = typeof request.url === 'string' ? request.url : '';
+          const claimed = request.headers?.['x-forwarded-for'];
           return {
             method: request.method,
             url: rawUrl.replace(/([?&](?:token|access_token)=)[^&]*/gi, '$1[REDACTED]'),
             host: request.host,
-            remoteAddress: request.ip,
+            peer: request.socket?.remoteAddress,
+            claimed: Array.isArray(claimed) ? claimed.join(',') : claimed,
             remotePort: request.socket?.remotePort,
           };
         },
       },
     },
-    trustProxy: readRuntimeConfig().trustProxy,
+    trustProxy: runtimeConfig.trustProxy,
     bodyLimit: 64 * 1024,
   });
 
@@ -231,13 +246,8 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // 生命周期 GC：lobby / 终局对局按最后活动时间归档并移除；active 不自动删除。
   if (!process.env.VITEST) {
-    const hours = (value: string | undefined, fallback: number): number => {
-      if (value === undefined || value === '') return fallback;
-      const parsed = Number(value);
-      return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-    };
-    const lobbyTtlMs = hours(process.env.TACTICAL_GAME_LOBBY_TTL_HOURS, 24) * 3_600_000;
-    const gameOverTtlMs = hours(process.env.TACTICAL_GAME_OVER_TTL_HOURS, 7 * 24) * 3_600_000;
+    // 保留期解析收敛到 state/retention.ts 的纯函数（默认 2h / 3d，环境变量可覆盖）。
+    const { lobbyTtlMs, gameOverTtlMs } = retentionTtlsFromEnv(process.env, message => logger.warn(message, { tag: 'game:retention' }));
     if (lobbyTtlMs > 0 || gameOverTtlMs > 0) {
       const retentionTimer = setInterval(() => {
         try {
@@ -260,6 +270,14 @@ export async function buildServer(): Promise<FastifyInstance> {
   }
 
   ready = true;
+  // 服务 close() 时强制落定一次全量 games.json（去抖窗口里关服务不该丢最后几次变更）。
+  app.addHook('onClose', async () => {
+    try {
+      globalStore.flushNow();
+    } catch (err) {
+      logger.error('服务关闭时落盘 games.json 失败', err);
+    }
+  });
   return app;
 }
 
@@ -275,7 +293,7 @@ if (isMain) {
         app.log.info({ signal }, 'shutting down server');
         // 退出前导出一份旧格式 games.json，便于回滚到 3.6.x；失败不阻止关闭。
         try {
-          globalStore.flush();
+          globalStore.flushNow();
         } catch (err) {
           app.log.error(err, 'failed to export legacy games.json on shutdown');
         }

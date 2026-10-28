@@ -23,7 +23,31 @@
 - 新增 [`random.test.ts`](tests/algorithms/random.test.ts)（12 例）：三个条目的载荷形态与短路、炮火区部署与治疗过滤（含「走进危险区仍合法」对照），以及 `artillery-zone` 整局零非法并正常完赛、`snowflake` 跑满 6 轮零入队拒绝且炮火圈收缩。
 - 生命周期与跑批链路：`local-worker` 补大逃杀整轮计划与歼灭逐动作回合、模式隔离；`test_round_robin_modes.py` 覆盖四模式解析；`test_evaluate_cross_simultaneous.py` 补 `random-royale` 两轮结算与 `random-annihilation` 零拒绝；评估控制台接口与前端提示同步。
 - 大厅 bot 接口补三个条目的准入/拒绝与目录回归；注册表、工具函数与算法下拉测试同步。
-- `npm run build` 通过，`npm test` 全量 127 文件 / 1253 例全绿；`python -m pytest tests/rl -q` 76 例通过。
+- `npm run build` 通过，`npm test` 全量 133 文件 / 1334 例全绿；`python -m pytest tests/rl -q` 76 例通过。
+
+## 3.8.9
+
+### 新增
+
+- **大厅容量上限**：活跃大厅数达到 `TACTICAL_GAME_MAX_LOBBIES`（默认 200）时建房返回 503 `lobby_capacity`。上限与部署见 [docs/API.md](docs/API.md)。
+- **房主结算幂等**：`host/force-resolve`、`host/skip-turn` 支持 `Idempotency-Key`；`force-resolve` 带 `{"repeat": true}` 可跳过守卫并推进一轮。
+
+### 变更
+
+- **保留期**：代码默认值改为大厅 2 小时、终局 3 天（原 24 小时 / 7 天，均可用环境变量覆盖）；`compose.yml` 的大厅仍传 24，部署需显式设 `2`。
+- **重启后的存量同时回合局**：存档缺省视为「本轮已结算」，不自动推进；需玩家新一次入队 / 提交，或房主显式带 `{"repeat": true}` 解锁。
+
+### 修复
+
+- **控制接口鉴权**：转发头（`X-Forwarded-For` 等）可把远程请求伪装成本机，绕过 `AUTO_CONTROL_TOKEN`（含竞技场 5 个端点）。现只认回环 socket 且不带任何转发头，地址缺失按非本机。
+- **同时回合结算**：同一轮可被重复结算（补给多发、缩圈多推一轮），锁定射击还会命中已淘汰单位的残留目标、虚增击杀分。现重复结算返回 409 `round_already_resolved`，淘汰时同步把单位置为死亡。
+- **建房落盘**：建房时同步重写全量 `games.json`，对局多时拖慢创建；现改为去抖合并写（250ms，最长 2s），单局快照仍在响应返回前落盘。
+- **大厅座位同步**：迟到的旧大厅响应会把已提交的座位顺序回退、「恢复随机」被在途请求撤销、座位控件与「添加 AI」在开局后永久消失。现按 `gameId` 与 `seatVersion` 丢弃过期响应，恢复随机先作废排队中的请求。
+
+### 测试与验证
+
+- 新增控制鉴权、大厅容量、轮次守卫、落盘与座位同步的回归；`npm run build` 通过，全量 **132 文件 / 1315 测试全绿**（退出码 0）。
+
 
 ## 3.8.8
 

@@ -59,7 +59,7 @@ npm run export-state
 | 模式 | 内置地图 | 核心机制 | 规范文件 |
 |---|---|---|---|
 | `standard` 逐人轮流 | `default`、`breach`、`danger-close`、`dual-lanes`、`multiplayer-ring`、`whirlpool` | 有总部、有行动顺序；总部归零淘汰；达到 `maxTurns` 按裁决分定胜负 | [skill/standard.md](skill/standard.md) |
-| `annihilation` 歼灭 | `artillery-zone` | 无总部；炮火预告后逐轮向中心收缩；危险区禁部署/治疗/维修；最后存活者获胜 | [skill/annihilation.md](skill/annihilation.md) |
+| `annihilation` 歼灭 | `artillery-zone`、`trench-run`（战壕） | 无总部；炮火预告后逐轮向中心收缩；危险区禁部署/治疗/维修；最后存活者获胜 | [skill/annihilation.md](skill/annihilation.md) |
 | `simultaneous` 同时回合 | `standoff`、`molten-throne`、`mistpine` | 无行动顺序：先秘密排队，再按行动点分步同时结算；攻击/治疗瞄准格子或方向 | [skill/simultaneous.md](skill/simultaneous.md) |
 | `royale` 大逃杀 | `snowflake`、`narrow-road` | 同时回合结算 + 歼灭规则（无总部、炮火收缩、打光即淘汰） | [skill/royale.md](skill/royale.md) |
 

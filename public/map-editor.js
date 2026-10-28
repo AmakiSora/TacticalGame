@@ -53,6 +53,14 @@ import './error-text.js';
     return `${pos.q},${pos.r}`;
   }
 
+  // 轴向六角距离：与 src/engine/hex.ts 的 hexDistance 同式（max 形式，等价于 (|dq|+|dr|+|dq+dr|)/2）。
+  function hexDistance(a, b) {
+    const dq = a.q - b.q;
+    const dr = a.r - b.r;
+    const ds = -a.q - a.r - (-b.q - b.r);
+    return Math.max(Math.abs(dq), Math.abs(dr), Math.abs(ds));
+  }
+
   function allCells(radius) {
     const cells = [];
     for (let q = -radius; q <= radius; q++) {
@@ -906,6 +914,89 @@ import './error-text.js';
     return playableCells(config).map(cell => ({ ...cell, terrain: terrain.get(hexKey(cell)) || 'plain' }));
   }
 
+  /**
+   * 炮火缩圈时间线：逐字复刻 src/engine/artillery.ts:6-32 的口径（不 import 服务端模块，避免浏览器端
+   * 依赖 Node 侧代码；一致性由单测对拍锁住）。非歼灭 / 大逃杀或没有炮火配置时返回 null，不抛错。
+   * kMax = 从初始半径收到最小安全半径需要的收缩次数（至少 1，`radius <= minRadius` 时兜底为 1）。
+   */
+  function artilleryTimeline(config) {
+    if (!config || !isAnnihilationMode(config.mode)) return null;
+    const artillery = config.annihilation?.artillery;
+    if (!artillery) return null;
+    const radius = Number(config.radius);
+    const startRound = Number(artillery.startRound);
+    const intervalRaw = Number(artillery.intervalRounds);
+    const minRadius = Number(artillery.minimumSafeRadius);
+    if (![radius, startRound, intervalRaw, minRadius].every(value => Number.isFinite(value))) return null;
+    // 编辑器里收缩间隔的最小值是 1；这里再兜底一次，避免异常档导入后除零得到 Infinity。
+    const intervalRounds = Math.max(1, Math.trunc(intervalRaw));
+    const kMax = Math.max(1, radius - minRadius);
+    const shrinkRounds = Array.from({ length: kMax }, (_, index) => startRound + index * intervalRounds);
+    const lastShrinkRound = shrinkRounds[shrinkRounds.length - 1];
+    return {
+      radius,
+      startRound,
+      intervalRounds,
+      minRadius,
+      shrinkRounds,
+      lastShrinkRound,
+      maxRound: lastShrinkRound + intervalRounds,
+    };
+  }
+
+  /**
+   * 预览轮次夹取（纯函数）：非有限数（NaN / undefined / Infinity）回落到 timeline.startRound；
+   * 其余先四舍五入再夹到 [1, timeline.maxRound]——maxRound 是唯一上限来源。
+   */
+  function clampPreviewRound(round, timeline) {
+    if (!Number.isFinite(round)) return timeline.startRound;
+    return Math.min(timeline.maxRound, Math.max(1, Math.round(round)));
+  }
+
+  /**
+   * 某一轮的炮火覆盖预览：公式与引擎 artilleryStateForRound 一致——
+   * shrinkCount = round < startRound ? 0 : floor((round - startRound) / intervalRounds) + 1；
+   * safeRadius = max(minimumSafeRadius, radius - shrinkCount)；
+   * nextShrinkRound 到底为 null；warning 只在「下一轮就要收缩」时给出即将进入危险区的那一圈。
+   * danger 只遍历 playableCells（引擎里的 game.cells 就是可用格子集合）。
+   */
+  function artilleryPreviewAt(config, round) {
+    const timeline = artilleryTimeline(config);
+    if (!timeline) return null;
+    const { startRound, intervalRounds, minRadius, radius } = timeline;
+    const current = Math.max(1, Math.min(timeline.maxRound, Math.trunc(Number(round) || 1)));
+    const shrinkCount = current < startRound
+      ? 0
+      : Math.floor((current - startRound) / intervalRounds) + 1;
+    const safeRadius = Math.max(minRadius, radius - shrinkCount);
+    const nextShrinkRound = safeRadius <= minRadius
+      ? null
+      : shrinkCount === 0
+        ? startRound
+        : startRound + shrinkCount * intervalRounds;
+    const center = { q: 0, r: 0 };
+    const cells = playableCells(config);
+    const danger = cells
+      .filter(cell => hexDistance(cell, center) > safeRadius)
+      .map(({ q, r }) => ({ q, r }));
+    const warning = nextShrinkRound !== null && nextShrinkRound - current === 1
+      ? cells
+        .filter(cell => {
+          const distance = hexDistance(cell, center);
+          return distance > Math.max(minRadius, safeRadius - 1) && distance <= safeRadius;
+        })
+        .map(({ q, r }) => ({ q, r }))
+      : [];
+    return {
+      round: current,
+      safeRadius,
+      nextShrinkRound,
+      settled: nextShrinkRound === null,
+      danger,
+      warning,
+    };
+  }
+
   const core = {
     createDefaultMapConfig,
     configureMapMode,
@@ -919,6 +1010,10 @@ import './error-text.js';
     isValidHex,
     isPlayableCell,
     createCellsFromConfig,
+    hexDistance,
+    artilleryTimeline,
+    clampPreviewRound,
+    artilleryPreviewAt,
   };
 
   global.MapEditorCore = core;
@@ -942,6 +1037,9 @@ import './error-text.js';
     mapMode: $('map-mode'),
     annihilationPanel: $('annihilation-panel'),
     artilleryFields: $('artillery-fields'),
+    artilleryPreview: $('artillery-preview'),
+    artilleryRound: $('artillery-round'),
+    artilleryPreviewLabel: $('artillery-preview-label'),
     toolOwner: $('tool-owner'),
     toolUnitType: $('tool-unit-type'),
     toolControlKind: $('tool-control-kind'),
@@ -974,6 +1072,11 @@ import './error-text.js';
   let hoverCell = null;
   let selected = null;
   let zoom = 1;
+  // 炮火缩圈预览状态只活在 DOM 侧：previewRound 绝不写进 config，
+  // 导出 / 校验 / 序列化必须与改动前逐字节一致（有单测锁）。
+  let previewRound = null;
+  // 依赖约定：任何修改 config 的路径都必须走 syncAll()，否则这里会拿着上一个 config 的覆盖层继续画。
+  let artilleryPreviewView = null;
   // 100% 表示“整张地图刚好铺满可视区域”，实际 CSS 缩放 = fitScale * zoom。
   // 地图半径变化或窗口尺寸变化时重新计算 fitScale。
   let fitScale = 1;
@@ -1288,6 +1391,55 @@ import './error-text.js';
     selected = null;
   }
 
+  /**
+   * 同步炮火预览控件：按模式显隐 → 重算 timeline → 夹取轮次 → 回写滑块 min/max/value 与读数。
+   * 预览轮次只活在 DOM 侧，写不进 config；读数只在这一处，不额外加解释文案。
+   */
+  function syncArtilleryPreview() {
+    const timeline = artilleryTimeline(config);
+    if (!timeline) {
+      previewRound = null;
+      artilleryPreviewView = null;
+      if (els.artilleryPreview) els.artilleryPreview.hidden = true;
+      if (els.artilleryRound) els.artilleryRound.value = '1';
+      if (els.artilleryPreviewLabel) els.artilleryPreviewLabel.textContent = '';
+      return;
+    }
+    if (els.artilleryPreview) els.artilleryPreview.hidden = false;
+    // 默认从 startRound 开始（打开就有画面）；改半径 / 改参数 / 导入后自动夹回 [1, maxRound]。
+    const nextRound = clampPreviewRound(previewRound, timeline);
+    previewRound = nextRound;
+    if (els.artilleryRound) {
+      els.artilleryRound.min = '1';
+      els.artilleryRound.max = String(timeline.maxRound);
+      els.artilleryRound.value = String(nextRound);
+    }
+    artilleryPreviewView = artilleryPreviewAt(config, nextRound);
+    renderArtilleryPreviewLabel();
+  }
+
+  function renderArtilleryPreviewLabel() {
+    if (!els.artilleryPreviewLabel) return;
+    const view = artilleryPreviewView;
+    if (!view) {
+      els.artilleryPreviewLabel.textContent = '';
+      return;
+    }
+    els.artilleryPreviewLabel.textContent = view.settled
+      ? `第 ${view.round} 轮 · 已收到底`
+      : `第 ${view.round} 轮 · 半径 ${view.safeRadius} · 下次收缩 ${view.nextShrinkRound}`;
+  }
+
+  /** 拖动滑块只改预览轮次，不走 syncAll（否则每次 pointermove 都重渲染 inspector / 校验列表）。 */
+  function onArtilleryRoundInput() {
+    const raw = Number(els.artilleryRound?.value);
+    if (!Number.isFinite(raw)) return;
+    previewRound = Math.round(raw);
+    artilleryPreviewView = artilleryPreviewAt(config, previewRound);
+    renderArtilleryPreviewLabel();
+    drawBoard();
+  }
+
   function drawBoard() {
     computeLayout();
     ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
@@ -1303,6 +1455,25 @@ import './error-text.js';
       ctx.strokeStyle = playable ? '#20313d' : 'rgba(62,84,99,.3)';
       ctx.lineWidth = 1;
       ctx.stroke();
+    }
+    // 炮火预览覆盖层：插在地形之后、hover / 据点 / 单位之前，颜色与线宽与实战 drawBoard 逐字一致。
+    if (artilleryPreviewView) {
+      for (const cell of artilleryPreviewView.warning) {
+        pathHex(cell.q, cell.r, 2);
+        ctx.fillStyle = 'rgba(244, 177, 66, .22)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 205, 105, .72)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      for (const cell of artilleryPreviewView.danger) {
+        pathHex(cell.q, cell.r, 2);
+        ctx.fillStyle = 'rgba(205, 55, 45, .34)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 95, 75, .68)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
     }
     if (hoverCell) {
       pathHex(hoverCell.q, hoverCell.r, 2);
@@ -1927,6 +2098,8 @@ import './error-text.js';
     renderSpawnLayouts();
     renderSelection();
     renderValidation();
+    // 先算好预览（含滑块读数），再画棋盘，避免画到上一轮的覆盖层。
+    syncArtilleryPreview();
     drawBoard();
   }
 
@@ -1985,6 +2158,8 @@ import './error-text.js';
   document.getElementById('btn-zoom-in').addEventListener('click', () => setZoom(zoom + 0.1));
   document.getElementById('btn-zoom-out').addEventListener('click', () => setZoom(zoom - 0.1));
   document.getElementById('btn-zoom-reset').addEventListener('click', () => setZoom(1));
+  // 炮火预览滑块：只重画覆盖层与读数，不重跑 syncAll。
+  els.artilleryRound?.addEventListener('input', onArtilleryRoundInput);
 
   // 窗口或棋盘容器尺寸变化时重新适配，保证 100% 始终等于“整图可见”。
   let fitRefreshFrame = 0;

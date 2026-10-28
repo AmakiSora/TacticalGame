@@ -251,6 +251,42 @@ button.danger:hover {
   border-bottom: 1px solid #1e2e3e;
 }
 
+/* 炮火缩圈预览：夹在「战场」与缩放之间，宽屏一行放下；窄屏让整条工具栏自己折行。 */
+.artillery-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.artillery-preview[hidden] { display: none; }
+/* 收紧高度，避免工具条被撑高、挤掉画布可用高度；accent-color 跟随站点主色。 */
+.artillery-preview input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 18px;
+  margin: 0;
+  accent-color: #66ccff;
+}
+.artillery-preview-label {
+  flex: none;
+  /* 读数长短随轮次变化（「第 9 轮」到「第 17 轮」/「已收到底」），若让标签宽度自由伸缩，
+     滑块会跟着一长一短地跳。固定到最长常规文案的宽度，拖动时滑块长度保持不动。 */
+  min-width: 152px;
+  color: #7a9aaa;
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .board-toolbar { flex-wrap: wrap; }
+}
+
+/* 空间不足时让预览滑块先缩，别把「战场」挤到换行（会把工具条撑高 10px、挤掉画布高度）。 */
+.board-toolbar .board-context { flex: none; }
+
 .board-context {
   min-width: 0;
   display: flex;

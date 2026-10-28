@@ -157,8 +157,8 @@
 | `salt` | 可选，最长 64 字符 |
 | `dryRun` | 试运行，不写入战报 |
 
-- 跑批仅支持标准模式与同时回合；歼灭/大逃杀模式返回 400 `mode_not_supported`。
-- 同时回合没有 RL 模型，`participants` 至少需要 2 个该模式的算法。
+- 四种模式均已接入跑批：`standard` / `annihilation` 逐动作执行，`simultaneous` / `royale` 计划入队后统一结算。
+- 非标准模式没有 RL 模型参评，`participants` 至少需要 2 个该模式算法；不足时返回 400 `invalid_participants`（歼灭/大逃杀目前各只有 1 个随机基线，等第二个算法落地后可跑）。
 - 已有跑批进行中时 `start` / `clear-matches` 返回 409 `eval_already_running`。
 
 ## 运维与 Agent

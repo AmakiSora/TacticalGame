@@ -30,16 +30,16 @@ const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json'
  */
 const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRIPT];
 
-// 评估链路已接入 standard 与 simultaneous：标准模式地图池与 round_robin.py 的
-// DEFAULT_MAPS 保持一致；同时模式使用静态地图，且只纳入注册表声明 simultaneous
-// 的算法（RL 模型目前只覆盖标准模式）。
+// 评估链路已接入全部四种模式：标准模式地图池与 round_robin.py 的 DEFAULT_MAPS
+// 保持一致；其余模式使用静态地图，且只纳入注册表声明该模式的算法（RL 模型目前
+// 只覆盖标准模式）。歼灭/大逃杀目前各只有 1 个算法条目，控制台会拦住"少于 2 个
+// 参评算法"的启动请求，等第二个算法落地即可直接跑批。
 export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
 export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne', 'mistpine'] as const;
 
 /**
- * 控制台展示用地图目录：标准/同时回合是当前可跑批模式，另外两种模式也列出来，
- * 让用户能明确看到“模式不同、地图不同、算法不同”，而不是把它们混在一个池里。
- * 歼灭/大逃杀地图用于展示该模式已有哪些地图，跑批入口会明确拒绝。
+ * 控制台展示用地图目录：四种模式各自成池，避免把模式混在一个池里。
+ * 每张地图的模式来自这里（与 maps/*.json 的 mode 字段保持一致）。
  */
 export const EVAL_MAPS = [
   { id: 'random', label: '随机图', mode: 'standard' },
@@ -57,23 +57,21 @@ export const EVAL_MAPS = [
 
 export const EVAL_MODES = [
   { id: 'standard', label: '标准模式', supported: true },
-  { id: 'annihilation', label: '歼灭模式', supported: false },
+  { id: 'annihilation', label: '歼灭模式', supported: true },
   { id: 'simultaneous', label: '同时回合', supported: true },
-  { id: 'royale', label: '大逃杀', supported: false },
+  { id: 'royale', label: '大逃杀', supported: true },
 ] as const;
 
-export const EVAL_MODE_UNSUPPORTED_REASON = '评估跑批目前支持标准模式与同时回合；歼灭/大逃杀模式的地图与算法可在此查看，但尚不能在网页启动跑批。';
-
-// 兼容现有调用方：KNOWN_MAPS 表示“可跑批的地图”（标准 + 同时回合）。
-export const KNOWN_MAPS = EVAL_MAPS.filter(map => map.mode === 'standard' || map.mode === 'simultaneous')
-  .map(map => map.id);
+// 可跑批的地图（四种模式全部接入，故即完整目录）；保留导出名兼容既有调用方。
+export const KNOWN_MAPS = EVAL_MAPS.map(map => map.id);
 
 /** 控制台的模式目录：每个模式只带自己的地图，供前端切换与地图/算法联动过滤。 */
 export function buildEvalModeCatalog() {
   return EVAL_MODES.map(mode => ({
     ...mode,
     maps: EVAL_MAPS.filter(map => map.mode === mode.id),
-    reason: mode.supported ? null : EVAL_MODE_UNSUPPORTED_REASON,
+    // supported 恒为 true；字段保留给前端"暂不支持"分支的未来扩展。
+    reason: mode.supported ? null : '该模式暂不支持跑批',
   }));
 }
 
@@ -613,8 +611,9 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
     const mode = [...selectedModes][0]!;
     const modeInfo = EVAL_MODES.find(item => item.id === mode);
     if (!modeInfo?.supported) {
+      // 当前四种模式均已接入；保留分支给未来新增但未接跑批的模式。
       return reply.code(400).send({
-        error: (modeInfo?.label ?? mode) + '尚不支持评估跑批；' + EVAL_MODE_UNSUPPORTED_REASON,
+        error: (modeInfo?.label ?? mode) + '尚不支持评估跑批。',
         code: 'mode_not_supported',
       });
     }
@@ -661,9 +660,18 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
           code: 'mode_not_supported',
         });
       }
-      if (mode !== 'standard' && participants.filter(m => m.startsWith('algo:')).length < 2) {
+    }
+    // 非标准模式没有 RL 模型可参评，至少需要两个该模式算法才能组成对阵批次；
+    // 歼灭/大逃杀目前各只有 1 个基线算法，等第二个算法落地后即可直接跑。
+    if (mode !== 'standard') {
+      const modeAlgoCount = Object.values(ALGORITHM_BOTS)
+        .filter(config => config.modes.includes(mode)).length;
+      const selectedAlgoCount = participants
+        ? participants.filter(m => m.startsWith('algo:')).length
+        : modeAlgoCount;
+      if (selectedAlgoCount < 2) {
         return reply.code(400).send({
-          error: `${modeInfo.label}至少需要选择 2 个参评算法（该模式暂无 RL 模型）。`,
+          error: `${modeInfo.label}至少需要选择 2 个参评算法（该模式暂无 RL 模型；当前该模式注册算法 ${modeAlgoCount} 个）。`,
           code: 'invalid_participants',
         });
       }

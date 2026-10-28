@@ -56,14 +56,17 @@ describe('AI 竞技场按玩法模式分榜', () => {
     }
   });
 
-  it('评估控制台按模式切换地图与算法，并标出暂不支持跑批的模式', () => {
+  it('评估控制台按模式切换地图与算法，并标明非标准模式只有算法参评', () => {
     expect(html).toContain('id="eval-modes"');
     expect(html).toContain('id="eval-mode-hint"');
     expect(source).toContain('function renderEvalModeBar');
     expect(source).toContain('modeCatalog');
     expect(source).toContain('currentEvalMaps');
     expect(source).toContain('evalAlgosForMode');
-    expect(source).toContain('该模式暂不支持跑批');
+    // 四种模式均可跑批；非标准模式仅算法参评，算法不足 2 个时禁用启动并说明原因。
+    expect(source).toContain('仅内置算法（RL 模型暂只支持标准模式）');
+    expect(source).toContain('该模式至少需要选择 2 个参评算法');
+    expect(source).toContain('等第二个算法落地后才能组批');
   });
 
   it('评估控制台提供「清空旧局」弹窗：范围筛选 + 试跑预览 + 确认后直接删除', () => {

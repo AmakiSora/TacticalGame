@@ -420,7 +420,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 4. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索，可作为 mcts 之外的确定性搜索基线。
 5. **混合架构**：MCTS + 学习评估函数，或规则算法 + RL 局面评估。
 6. **多线程并行**：利用 Worker 加速搜索；先做可复现的基准，再决定是否值得。
-7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合已接入评估跑批（接入时 4 个同时算法，3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），剩余缺口是大逃杀/歼灭跑批。
+7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合接入评估跑批（3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），3.8.10 起歼灭 / 大逃杀也已接入（`local-worker` 支持四种模式，控制台可启动）。剩余缺口是这两个模式各有 1 个算法、组不出批次，需要先补第二个歼灭/大逃杀算法。
 8. **部署决策继续收敛**：`deployDecision()` 已统一 threat / mcts / field / verdict；还剩 `greedy` 与 `scripts/auto-standard-game.mjs` 两份变体未合并。
 9. **tempo / 兑现率量纲**：verdict 已用行动点预算与“打击分 − 原地承伤 × 姿态系数”补上 danger-close / multiplayer-ring 两个老短板；下一步是把“每一步兑现率”做成可计算量纲，而不是再配一个系数。旧 `forge` 例子已不适用，改用当前短图与多行动点图验证。
 10. **基准数据自动化**：让 `scripts/algorithm-arena.mjs` / `scripts/matrix_eq_benchmark.mjs` 输出带 `engineVersion / mapPool / harness / games / seed / date` 的 JSON，再由脚本生成本文表格，避免手工抄写再次漂移。

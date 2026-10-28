@@ -658,7 +658,7 @@ class DetailWriter:
 
 
 def _is_plan_mode(state: dict[str, Any]) -> bool:
-    """同时回合机制：simultaneous 与 royale 共享计划队列语义（当前仅 simultaneous 可跑批）。"""
+    """同时回合机制：simultaneous 与 royale 共享计划队列语义（两者均已接入跑批）。"""
     return (state.get("config") or {}).get("mode") in ("simultaneous", "royale")
 
 
@@ -908,12 +908,16 @@ def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], arg
     action_log: list[dict[str, Any]] = []
     decision_time: dict[str, float] = {seat: 0.0 for seat in _SEATS}
     decision_count: dict[str, int] = {seat: 0 for seat in _SEATS}
+    # 现有 RL 模型只覆盖标准模式：任何非标准模式（含逐动作的歼灭与计划队列的大逃杀）
+    # 都不接受模型座位，避免把标准动作空间套到别的规则上。
+    mode = (state.get("config") or {}).get("mode", "standard")
+    if mode != "standard" and any(
+        getattr(controller, "kind", "model") == "model" for controller in seat_map.values()
+    ):
+        raise RuntimeError(
+            f"map {args.map_id!r} uses {mode} mode; RL models currently support standard mode only"
+        )
     if _is_plan_mode(state):
-        if any(getattr(controller, "kind", "model") == "model" for controller in seat_map.values()):
-            raise RuntimeError(
-                f"map {args.map_id!r} uses {state.get('config', {}).get('mode')} mode; "
-                "RL models currently support standard mode only"
-            )
         state, acted, rounds_timeout = _play_simultaneous(
             worker, seat_map, args, state, collector, action_log, timeline_by_round,
             decision_time, decision_count)

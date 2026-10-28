@@ -174,3 +174,37 @@ def test_random_sim_selfplay_resolves_two_rounds(worker):
     for side in ("player_a", "player_b"):
         commits = [entry for entry in seat_log(detail, side) if entry.get("commit")]
         assert len(commits) == 2, "每个座位每轮应提交一次计划"
+
+
+def test_random_royale_plans_royale_rounds(worker):
+    """大逃杀与同时回合共用计划循环：random-royale 入队后全员提交即结算。"""
+    seat_map = {
+        side: evaluate_cross.AlgorithmController(
+            "random-royale", "random-royale", "v1", side, worker)
+        for side in ("player_a", "player_b")
+    }
+    detail = play(worker, seat_map, make_args(map_id="snowflake", max_rounds=2))
+
+    assert detail["summary"]["rounds"] == 3
+    assert detail["summary"]["endReason"] == "max_rounds_exceeded"
+    resolved = [event["payload"]["roundNumber"]
+                for event in detail["events"] if event["type"] == "round_resolved"]
+    assert resolved == [1, 2]
+    for side in ("player_a", "player_b"):
+        commits = [entry for entry in seat_log(detail, side) if entry.get("commit")]
+        assert len(commits) == 2
+
+
+def test_random_annihilation_plays_sequential_annihilation(worker):
+    """歼灭走逐动作执行（轮界炮火由引擎结算），基线不应产出被引擎拒绝的动作。"""
+    seat_map = {
+        side: evaluate_cross.AlgorithmController(
+            "random-annihilation", "random-annihilation", "v1", side, worker)
+        for side in ("player_a", "player_b")
+    }
+    detail = play(worker, seat_map, make_args(map_id="artillery-zone", max_rounds=2))
+
+    failed = [entry for entry in detail["actions"] if entry.get("failed")]
+    assert failed == [], f"歼灭随机基线不应产出被拒动作：{failed[:3]}"
+    assert detail["summary"]["rounds"] >= 2
+    assert seat_log(detail, "player_a") and seat_log(detail, "player_b")

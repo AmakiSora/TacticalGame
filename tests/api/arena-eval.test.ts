@@ -90,7 +90,18 @@ describe('AI 竞技场评估控制台 API', () => {
         expect.objectContaining({ id: 'mistpine', label: '雾杉疏林' }),
       ]),
     });
-    expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'annihilation').supported).toBe(false);
+    // 四种模式全部接入跑批：歼灭与大逃杀各自带地图池。
+    expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'annihilation')).toMatchObject({
+      supported: true,
+      maps: [expect.objectContaining({ id: 'artillery-zone' })],
+    });
+    expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'royale')).toMatchObject({
+      supported: true,
+      maps: expect.arrayContaining([
+        expect.objectContaining({ id: 'snowflake' }),
+        expect.objectContaining({ id: 'narrow-road' }),
+      ]),
+    });
   });
 
   it('rejects invalid maps, games and jobs on start', async () => {
@@ -106,12 +117,22 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(badJobs.statusCode).toBe(400);
     expect(badJobs.json().code).toBe('invalid_jobs');
 
-    const unsupportedMode = await app.inject({
+    // 歼灭/大逃杀已接入跑批，但每模式目前只有 1 个算法：不给参与者时按该模式全部
+    // 算法计数（1 个）拦住启动，并说明还缺第二个算法。
+    const annihilationNoOpponent = await app.inject({
       method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['artillery-zone'] },
     });
-    expect(unsupportedMode.statusCode).toBe(400);
-    expect(unsupportedMode.json().code).toBe('mode_not_supported');
-    expect(unsupportedMode.json().error).toContain('歼灭模式尚不支持评估跑批');
+    expect(annihilationNoOpponent.statusCode).toBe(400);
+    expect(annihilationNoOpponent.json().code).toBe('invalid_participants');
+    expect(annihilationNoOpponent.json().error).toContain('至少需要选择 2 个');
+    expect(annihilationNoOpponent.json().error).toContain('注册算法 1 个');
+
+    const royaleSingleAlgo = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['snowflake'], participants: ['algo:random-royale'] },
+    });
+    expect(royaleSingleAlgo.statusCode).toBe(400);
+    expect(royaleSingleAlgo.json().code).toBe('invalid_participants');
 
     const mixedModes = await app.inject({
       method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random', 'standoff'] },

@@ -158,13 +158,26 @@ describe('local engine worker simultaneous mode', () => {
     expect(state.plan?.committed).toEqual([]);
   });
 
-  it('honors algorithm modes and rejects unsupported plan modes', async () => {
-    await handleCommand({ cmd: 'reset', mapId: 'standoff' });
-    // 标准算法不能坐进同时模式对局。
+  it('accepts royale plan maps and resolves a round after both seats commit', async () => {
+    const initial = await handleCommand({ cmd: 'reset', mapId: 'snowflake' }) as PlanState;
+    expect(initial.config.mode).toBe('royale');
+    expect(initial.phase).toBe('active');
+
+    let state = await planAndCommit('player_a', 'random-royale');
+    expect(state.plan?.committed).toContain('player_a');
+
+    state = await planAndCommit('player_b', 'random-royale');
+    expect(state.phase === 'game_over' || state.turn.roundNumber > 1).toBe(true);
+  });
+
+  it('honors algorithm modes in plan modes', async () => {
+    await handleCommand({ cmd: 'reset', mapId: 'snowflake' });
+    // 标准算法不能坐进大逃杀对局。
     await expect(handleCommand({ cmd: 'decide', owner: 'player_a', algorithm: 'threat' }))
       .rejects.toThrow('mode');
-    // 歼灭/大逃杀尚未接入进程内跑批。
-    await expect(handleCommand({ cmd: 'reset', mapId: 'snowflake' })).rejects.toThrow('simultaneous modes only');
+    // 同时回合算法同样不能跨到大逃杀。
+    await expect(handleCommand({ cmd: 'decide', owner: 'player_a', algorithm: 'random-sim' }))
+      .rejects.toThrow('mode');
   });
 });
 
@@ -204,6 +217,22 @@ describe('local engine worker algorithm decide channel', () => {
     // player_b 开局无行动机会限制：decide 应仍能给出动作或主动结束。
     const result = await handleCommand({ cmd: 'decide', owner: 'player_b', algorithm: 'greedy' }) as DecideResult;
     expect(result.endTurn === true || typeof result.action?.type === 'string').toBe(true);
+  });
+
+  it('plays a legal annihilation turn with the mode-specific baseline', async () => {
+    const initial = await handleCommand({ cmd: 'reset', mapId: 'artillery-zone' }) as {
+      config: { mode: string };
+    };
+    expect(initial.config.mode).toBe('annihilation');
+    await playTurnWithAlgorithm('random-annihilation', 'player_a');
+    const state = await handleCommand({
+      cmd: 'apply', owner: 'player_a', action: { type: 'end_turn' },
+    }) as { turn?: { currentPlayerId?: string } };
+    // 歼灭是逐人轮流：结束回合后轮到 player_b。
+    expect(state.turn?.currentPlayerId).toBe('player_b');
+    // 标准随机算法不能坐进歼灭对局。
+    await expect(handleCommand({ cmd: 'decide', owner: 'player_b', algorithm: 'random' }))
+      .rejects.toThrow('mode');
   });
 
   it('rejects unknown algorithms and missing arguments', async () => {

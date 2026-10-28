@@ -3,6 +3,12 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-10-28 · 3.8.10 评估链路接入歼灭/大逃杀
+
+**一句话**：`rl/training/local-worker.ts` 放开模式门禁——`standard` / `annihilation` 逐动作执行（歼灭轮界由引擎结算炮火与淘汰），`simultaneous` / `royale` 计划入队后统一结算；`round_robin.py` 的 `SUPPORTED_EVAL_MODES` 扩为四种模式、耗时兜底拆成逐动作/计划队列两档，`evaluate_cross.py` 对非标准模式统一拒绝模型座位。歼灭/大逃杀目前各只有 1 个算法条目，跑批仍需至少 2 个该模式算法才能组批。
+
+**测试与验证**：`tests/rl/local-worker.test.ts` 补大逃杀整轮计划与大逃杀/歼灭模式隔离；`tests/rl/test_round_robin_modes.py` 覆盖四模式解析与计划模式常量；`tests/rl/test_evaluate_cross_simultaneous.py` 补 `random-royale` 两轮计划结算与 `random-annihilation` 逐动作零拒绝；全量 vitest / pytest 结果见根 `RELEASE_NOTES.md` 3.8.10。
+
 ## 2026-10-21 · 3.7.1 取消过期模型机制
 
 **一句话**：删除 `arena/model-status.json` 与自动过期流程，`round_robin.py` 不再排除过期模型，`rl/models/` 下 19 个可加载模型全部恢复参评；`rl/docs/MODELS_NOTES.md` 改为推荐 / 历史 / 作废三态。

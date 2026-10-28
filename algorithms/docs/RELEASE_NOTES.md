@@ -18,6 +18,7 @@
 - **三个随机基线改用独立条目**：标准 `random` 回归 `modes: ['standard']`，与两个新模式条目的注册名、展示名、版本、参与者 id 全部分开；历史 `algo_random@v1` 的战绩归属不变。
 - **共享枚举**：轮流枚举抽到 `algorithms/lib/random-turn.mjs`，计划枚举抽到 `algorithms/lib/random-plan.mjs`；`random-sim` 改为薄入口，行为不变。
 - **竞技场榜单**：`generateArenaLeaderboard` 只输出有对局的模式，声明了模式但零局的新条目不生成 0 局空榜。
+- **评估链路接入歼灭/大逃杀**：`round_robin.py` 的 `SUPPORTED_EVAL_MODES` 扩为四种模式，`local-worker` 支持四种模式的进程内跑批（歼灭逐动作 + 轮界炮火、大逃杀计划队列），评估控制台两个模式改为可启动；非标准模式仍需至少 2 个该模式算法，当前各只有 1 个随机基线，启动会被拦下并说明还缺第二个算法。
 
 ### 测试与验证
 

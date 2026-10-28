@@ -10,17 +10,20 @@
 
 - **歼灭随机算法（`random-annihilation`）**：歼灭模式的随机基线，逐人轮流语义；与标准 `random` 共用轮流枚举，并按引擎口径跳过炮火危险区内的部署（起点/落点）与治疗（支援兵/目标），走进危险区仍合法。独立注册名、展示名与参与者 id `algo_random-annihilation@v1`，详见 [`random-annihilation.md`](algorithms/docs/algorithms/random-annihilation.md)。
 - **大逃杀随机算法（`random-royale`）**：大逃杀模式的随机基线，同时回合计划队列；攻/治瞄向格子、同一单位可跨行动点连续行动，枚举层与「同时随机算法」共用 `algorithms/lib/random-plan.mjs`。参与者 id `algo_random-royale@v1`，详见 [`random-royale.md`](algorithms/docs/algorithms/random-royale.md)。
+- **竞技场接入歼灭/大逃杀跑批**：`round_robin.py` 支持四种模式，`evaluate_cross.py` / `local-worker` 打通歼灭（逐动作 + 轮界炮火）与大逃杀（计划队列）的进程内对局；评估控制台这两个模式改为可启动，非标准模式统一拒绝模型座位（RL 模型仍只覆盖标准模式）。
 
 ### 变更
 
 - **三个随机基线拆成独立条目**：标准 `random` 回归仅标准模式，与 `random-annihilation`、`random-royale` 的注册名、展示名、版本与竞技场参与者 id 全部分开；历史 `algo_random@v1` 的战绩归属不变。
 - **竞技场榜单只显示有对局的模式**：注册表声明了某模式、但一局都没打过的基线，不再在页面上生成 0 局空榜。
+- **非标准模式需要两个算法才能跑批**：控制台按「该模式注册/勾选的算法数 < 2」禁用启动并提示；歼灭/大逃杀目前各只有 1 个随机基线，第二个算法落地后即可直接开跑。
 
 ### 测试与验证
 
 - 新增 [`random.test.ts`](tests/algorithms/random.test.ts)（12 例）：三个条目的载荷形态与短路、炮火区部署与治疗过滤（含「走进危险区仍合法」对照），以及 `artillery-zone` 整局零非法并正常完赛、`snowflake` 跑满 6 轮零入队拒绝且炮火圈收缩。
+- 生命周期与跑批链路：`local-worker` 补大逃杀整轮计划与歼灭逐动作回合、模式隔离；`test_round_robin_modes.py` 覆盖四模式解析；`test_evaluate_cross_simultaneous.py` 补 `random-royale` 两轮结算与 `random-annihilation` 零拒绝；评估控制台接口与前端提示同步。
 - 大厅 bot 接口补三个条目的准入/拒绝与目录回归；注册表、工具函数与算法下拉测试同步。
-- `npm run build` 通过，`npm test` 全量 127 文件 / 1251 例全绿。
+- `npm run build` 通过，`npm test` 全量 127 文件 / 1253 例全绿；`python -m pytest tests/rl -q` 76 例通过。
 
 ## 3.8.8
 

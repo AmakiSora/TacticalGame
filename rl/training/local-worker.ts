@@ -154,13 +154,8 @@ export async function handleCommand(command: Record<string, unknown>): Promise<u
     } else {
       game = createInitialGame(randomUUID(), mapId);
     }
-    // apply 通道支持两类语义：standard 逐动作立即执行；simultaneous 动作入队、
-    // end_turn 提交并触发统一结算。歼灭/大逃杀跑批尚未接入（炮火缩圈与淘汰流程）。
-    if (game.config.mode !== 'standard' && game.config.mode !== 'simultaneous') {
-      throw new Error(
-        `map "${mapId}" uses ${game.config.mode} mode; local baseline supports standard and simultaneous modes only`,
-      );
-    }
+    // apply 通道覆盖四种模式：standard / annihilation 逐动作立即执行（轮界由引擎
+    // 结算炮火伤害与淘汰）；simultaneous / royale 动作入队、end_turn 提交并统一结算。
     return snapshot();
   }
   if (command.cmd === 'state') return snapshot();
@@ -198,7 +193,8 @@ async function decideAlgorithmAction(command: Record<string, unknown>): Promise<
   const name = typeof command.algorithm === 'string' ? command.algorithm : '';
   if (!name) throw new Error('decide requires an algorithm name');
   // 不同模式不能混用算法：注册表 ALGORITHM_META.modes 是唯一口径（缺省仅 standard）。
-  // reset 接受 standard 与 simultaneous 两类地图，因此这里同时挡住两个方向的混用。
+  // reset 接受全部四种模式的地图，因此这里双向挡住混用：标准算法进不了歼灭/大逃杀对局，
+  // 歼灭/大逃杀算法也坐不进标准/同时回合对局。
   const declared = ALGORITHM_META[name]?.modes;
   const modes = Array.isArray(declared) && declared.length ? declared : ['standard'];
   if (!modes.includes(game.config.mode)) {

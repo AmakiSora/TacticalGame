@@ -581,8 +581,20 @@ import './error-text.js';
   function updateEvalStartState() {
     const current = currentEvalMode();
     const unsupported = Boolean(current && !current.supported);
-    evalEl['eval-start'].disabled = evalStatus?.status === 'running' || unsupported;
-    evalEl['eval-start'].title = unsupported ? (current.reason || '该模式暂不支持跑批') : '';
+    const { algos, models } = checkedParticipants();
+    // 非标准模式没有 RL 模型可参评，至少需要两个该模式算法才能组成对阵；只剩一个
+    // 算法（如歼灭/大逃杀目前的随机基线）时提前禁用并给出说明，不必等 400 回来。
+    // 未勾选任何参与者 = 全部参评，按该模式全部算法计数。
+    const selectedAlgoCount = algos.length || models.length ? algos.length : evalAlgosForMode().length;
+    const needsMoreAlgorithms = Boolean(
+      current && current.id !== 'standard' && !unsupported && selectedAlgoCount < 2,
+    );
+    evalEl['eval-start'].disabled = evalStatus?.status === 'running' || unsupported || needsMoreAlgorithms;
+    evalEl['eval-start'].title = unsupported
+      ? (current.reason || '该模式暂不支持跑批')
+      : needsMoreAlgorithms
+        ? '该模式至少需要选择 2 个参评算法（暂无 RL 模型）'
+        : '';
   }
 
   function renderEvalModeBar() {
@@ -595,7 +607,10 @@ import './error-text.js';
     evalEl['eval-mode-hint'].textContent = current
       ? current.supported
         ? `${current.maps?.length ?? 0} 张地图 · 该模式独立榜单与评分`
-          + (current.id === 'simultaneous' ? ' · 仅内置算法（RL 模型暂只支持标准模式）' : '')
+          + (current.id !== 'standard' ? ' · 仅内置算法（RL 模型暂只支持标准模式）' : '')
+          + (current.id !== 'standard' && evalAlgos.length > 0 && evalAlgosForMode().length < 2
+            ? ' · 该模式目前只有 1 个算法，等第二个算法落地后才能组批'
+            : '')
         : (current.reason || '该模式暂不支持跑批')
       : '';
     updateEvalStartState();
@@ -666,6 +681,8 @@ import './error-text.js';
     evalEl['eval-model-count'].textContent = selected
       ? `已选 ${selected} / ${total} 个（模型 ${models.length} / ${modeModels.length}，算法 ${algos.length} / ${modeAlgos.length}，${modeLabel}）`
       : `共 ${modeModels.length} 个可对战模型 + ${modeAlgos.length} 个算法（${modeLabel}；不选 = 全部参评）`;
+    // 参评算法数直接影响「非标准模式至少 2 个算法」的启动资格。
+    updateEvalStartState();
   }
 
   function formatDuration(iso) {

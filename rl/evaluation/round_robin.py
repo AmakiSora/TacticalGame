@@ -14,9 +14,10 @@
   传参规格为 ``algo:<name>@<version>``（版本取 registry.mjs 的当前标注，保证
   算法升版后历史对局仍归属旧版本 id）；--algorithms none 可退回纯模型循环赛；
 - 地图模式从 maps/<id>.json 的 ``mode`` 字段推断（random 固定 standard）；同一批
-  只能跑同一模式。standard 之外的模式按注册表 ``ALGORITHM_META.modes`` 只纳入该模式
-  算法（同时回合当前有 random-sim / dest-prob / kriegspiel / matrix-eq），RL 模型
-  仅支持标准模式，不参与同时模式跑批。
+  只能跑同一模式，四种模式均已接入：standard / annihilation 逐动作执行（歼灭的炮火
+  缩圈与淘汰由引擎在轮界结算），simultaneous / royale 走计划入队与统一结算。模式内
+  只纳入注册表 ``ALGORITHM_META.modes`` 声明该模式的算法；RL 模型仅支持标准模式，
+  不参与其他模式跑批。歼灭/大逃杀目前各只有 1 个算法条目，需第二个算法落地后才能组批。
 
 用法示例：
 
@@ -56,18 +57,20 @@ MODEL_RE = re.compile(r"^hex_ppo_(v\d+\.\d+\.\d+)_")
 EXCLUDED_VERSIONS = {"v1.0.0"}
 DEFAULT_MAPS = "random,default,breach,danger-close,dual-lanes"
 DEFAULT_STATS_FILE = Path("arena/matches.jsonl")
-# 评估链路已接入的模式：standard 走逐动作执行，simultaneous 走计划入队/提交；
-# annihilation / royale 的炮火缩圈与淘汰流程尚未接入。
-SUPPORTED_EVAL_MODES = ("standard", "simultaneous")
+# 评估链路已接入的模式：standard / annihilation 走逐动作执行（歼灭在轮界由引擎结算
+# 炮火伤害与淘汰），simultaneous / royale 走计划入队/提交；RL 模型只覆盖 standard。
+SUPPORTED_EVAL_MODES = ("standard", "simultaneous", "annihilation", "royale")
+# 计划队列模式：动作入队、全员提交后统一结算（耗时兜底与模式校验共用）。
+PLAN_MODES = ("simultaneous", "royale")
 # 模型批次的固定开销（torch 导入 + tsx worker 启动 + 模型加载）与单局耗时；
 # 纯算法批次不加载模型，开销低一档。单局耗时优先用累积历史均速，缺历史时按
-# 模式兜底：同时回合单局远慢于标准模式且地图间差异大（实测对峙之地 ~6s/局、
+# 模式兜底：计划队列模式单局远慢于逐动作模式且地图间差异大（实测对峙之地 ~6s/局、
 # 雾杉疏林重算法对 ~160s/局），兜底值取偏保守的中间量。
 TASK_OVERHEAD_SEC_MODEL = 15
 SEC_PER_GAME_MODEL = 3.5
 TASK_OVERHEAD_SEC_ALGO = 6
-SEC_PER_GAME_ALGO_STANDARD = 1.0
-SEC_PER_GAME_ALGO_SIMULTANEOUS = 20.0
+SEC_PER_GAME_ALGO_SEQUENTIAL = 1.0
+SEC_PER_GAME_ALGO_PLAN = 20.0
 # evaluate_cross.py 每局完成的进度行前缀：实时透传到评估控制台，其余输出仅在
 # 批次失败时回显尾部。字面量与前者保持一致（脚本间不经 import 共享）。
 GAME_PROGRESS_PREFIX = "进度|"
@@ -269,8 +272,8 @@ def estimate_batch_seconds(task: dict, counts: dict, durations: dict,
     else:
         per_game = map_avgs.get(task["map"])
     if per_game is None:
-        per_game = (SEC_PER_GAME_ALGO_SIMULTANEOUS if mode == "simultaneous"
-                    else SEC_PER_GAME_ALGO_STANDARD)
+        per_game = (SEC_PER_GAME_ALGO_PLAN if mode in PLAN_MODES
+                    else SEC_PER_GAME_ALGO_SEQUENTIAL)
     return TASK_OVERHEAD_SEC_ALGO + task["games"] * per_game
 
 
@@ -407,7 +410,9 @@ def main():
         for name, version in algorithm_infos
     ]
     if len(participants) < 2:
-        print(f"错误：可对战参与者不足 2 个（当前 {len(participants)} 个），无法组成对战。", file=sys.stderr)
+        hint = (f"：{mode} 模式当前注册算法只有 {len(algorithm_infos)} 个，"
+                "补齐第二个该模式算法后才能组批") if mode != "standard" else ""
+        print(f"错误：可对战参与者不足 2 个（当前 {len(participants)} 个）{hint}。", file=sys.stderr)
         return 1
 
     salt = args.salt or f"{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
@@ -471,8 +476,8 @@ def main():
     estimates = [estimate_batch_seconds(task, counts, durations, map_avgs, mode)
                  for task in tasks]
     estimated = sum(estimates) / max(1, args.jobs)
-    algo_fallback = (SEC_PER_GAME_ALGO_SIMULTANEOUS if mode == "simultaneous"
-                     else SEC_PER_GAME_ALGO_STANDARD)
+    algo_fallback = (SEC_PER_GAME_ALGO_PLAN if mode in PLAN_MODES
+                     else SEC_PER_GAME_ALGO_SEQUENTIAL)
     print(f"预估耗时：约 {format_eta(estimated)}"
           f"（jobs={args.jobs}，逐批按累积历史均速预估；缺历史时纯算法批 ~{algo_fallback:g}s/局、"
           f"模型批 ~{SEC_PER_GAME_MODEL:g}s/局兜底，另加批次启动开销）\n")

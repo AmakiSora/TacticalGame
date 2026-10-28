@@ -92,7 +92,7 @@ function mulberry32(seed) {
 function snapshot(game) {
   return {
     id: game.id, phase: game.phase, winner: game.winner,
-    cells: game.cells, map: { terrainCells: game.map.terrainCells },
+    cells: game.cells, map: { terrainCells: game.map.terrainCells, radius: game.map.radius },
     units: game.units.map(u => ({ ...u })),
     headquarters: Object.fromEntries(Object.entries(game.headquarters).map(([k, h]) => [k, { ...h }])),
     controlPoints: (game.controlPoints || []).map(p => ({ ...p })),
@@ -100,6 +100,9 @@ function snapshot(game) {
     playerNames: game.playerNames,
     resources: structuredClone(game.resources),
     turn: { ...game.turn },
+    // 与线上 sanitizeGameForResponse（src/api/auth.ts ...rest 透传）对齐：
+    // 歼灭/大逃杀模式的炮火圈状态对算法可见，缺了它算法会把危险区误判为安全区。
+    artillery: game.artillery ? structuredClone(game.artillery) : null,
     config: game.config,
   };
 }

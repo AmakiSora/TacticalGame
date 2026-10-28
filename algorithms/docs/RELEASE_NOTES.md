@@ -4,7 +4,23 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`vortex` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.13（2026-10-29）— vortex 旋涡算法 v1
+
+### 新增功能
+
+- **`vortex`（旋涡算法）**：仅参与歼灭，效用 AI 单步决策。按引擎公式预判 round+1 炮火安全圈，疏散出圈计正收益、进圈重罚，`hp ≤ 炮伤` 且无法撤离的"注定单位"转为免费输出；敌方 immediate/future 威胁图支撑稳杀集火与走位风筝，补给不计分口径下激进补员。不调用其他算法、不读地图名称或对手隐藏信息；设计与评估见 [开发笔记](ALGORITHMS_NOTES.md#vortex旋涡算法)，档案见 [algorithms/vortex.md](algorithms/vortex.md)。
+- **注册与评估**：`algo_vortex` / `algo_vortex@v1`，`modes: ['annihilation']`，大厅、runner 与评估控制台由注册表自动接入；歼灭模式可与 `random-annihilation` 组批。
+
+### 修复
+
+- **评估 harness 快照缺 `game.artillery`**：headless `scripts/algorithm-arena.mjs` 的 `snapshot()` 未透出炮火区字段（线上 `sanitizeGameForResponse` 是透传的），`utils.inArtilleryDanger` 在竞技场对拍中恒为 false。已按线上口径补齐 `artillery` 与 `map.radius`；修复前 strict 审计报 119 次非法动作均源于此，算法侧镜像无误，修复后两算法均 0 非法。
+
+### 测试与验证
+
+- strict headless 对拍 `scripts/algorithm-arena.mjs --strict`：artillery-zone 与 trench-run 各 20 局 vs `random-annihilation` 全胜（均分 1161 / 953），vortex 席位 0 非法动作（两图合计 4816 次决策全部被引擎接受）。决策耗时 p50 0.08–0.12ms、p95 ≤ 2.03ms、max 8.4ms；战绩、耗时与已知限制详见 [开发笔记](ALGORITHMS_NOTES.md#vortex旋涡算法)。
+- 竞技场 API 套件 `npx vitest run tests/api/arena-eval.test.ts`（33 场景）通过；`npm run build` 与全量 `npm test` 通过。竞技场榜单歼灭模式 vortex rating 1882 ±59（可见窗口 40W/0L）；全史口径 440W/0L（含清理前的镜像标定对局）。
 
 ## 3.8.10（2026-10-28）— 歼灭与大逃杀随机基线
 

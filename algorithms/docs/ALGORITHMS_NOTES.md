@@ -14,7 +14,7 @@
 | 标准图池 | `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `whirlpool` |
 | 同时回合图 | `standoff` / `molten-throne` |
 | 大逃杀图 | `snowflake` / `narrow-road`（内置基线：`random-royale`） |
-| 歼灭图 | `artillery-zone`（内置基线：`random-annihilation`） |
+| 歼灭图 | `artillery-zone` / `trench-run`（`random-annihilation` 基线 / `vortex`） |
 | 同时回合规则 | 3.8.0 起按行动点**分步结算**，不是“一单位一轮一动作” |
 | 裁决分 | 3.6.0 起为击杀价值 + 据点流量制 |
 | 已退役地图 | `forge` → `molten-throne`（3.5.11，同时回合）、`desert`（3.5.8 下线）、`four-corners`（3.5.7 下线） |
@@ -36,6 +36,7 @@ algorithms/
 │   ├── random.mjs        # 随机算法（标准模式）
 │   ├── random-annihilation.mjs  # 歼灭随机算法（歼灭模式）
 │   ├── random-royale.mjs # 大逃杀随机算法（大逃杀模式）
+│   ├── vortex.mjs        # 旋涡算法（歼灭模式）
 │   ├── mcts.mjs          # 蒙特卡洛树搜索（标准模式）
 │   ├── threat.mjs        # 威胁感知算法（标准模式）
 │   ├── field.mjs         # 势场算法（标准模式）
@@ -74,11 +75,39 @@ algorithms/
 │       ├── prism.md
 │       ├── tempo.md
 │       ├── tempo-weave.md
-│       └── horizon.md
+│       ├── horizon.md
+│       └── vortex.md
 ├── registry.mjs          # 算法注册表与 ALGORITHM_META
 ├── registry.d.mts        # 注册表 TypeScript 类型声明
 └── runner.mjs            # 通用运行器
 ```
+
+## vortex：旋涡算法
+
+`vortex` v1 仅参与 `annihilation`，大厅类型为 `algo_vortex`，竞技场参与者为 `algo_vortex@v1`。单文件实现（`builtin/vortex.mjs`，策略接口 `decide`），不调用其他算法，也不读取地图名称、对手隐藏信息或随机数状态。
+
+- **炮火收缩圈预判**：按引擎公式复算 round+1 的安全半径（`shrinkCount = ⌊(r−startRound)/intervalRounds⌋+1`，`safeRadius = max(minimumSafeRadius, radius − shrinkCount)`），把「本轮结束时站位是否在下轮危险圈内」作为位置效用主项——引擎在轮界先 `roundNumber++` 再结算满额炮伤，按 round+1 校验才与真实结算对齐。疏散出圈计正收益、走进下轮危险圈重罚；`hp ≤ 炮伤` 且无法撤离的「注定单位」豁免疏散惩罚并转为免费输出（白给动作加奖励，不再浪费动作治疗或保护）。
+- **威胁图与稳杀集火**：对每个存活敌军预计算 immediate（原地射程环）与 future（BFS 可达格再展开的射程环，×0.7 折扣）两组格子集合，同格预期承伤取各敌军最大值。攻击效用 = 期望伤害 + 稳杀奖励（平均伤害够杀全额计、方差可能不够按 0.6 折扣）− 反击风险（攻击后还有一次免费移动可撤离时打折）。
+- **裁定口径反推**：armyValue ×2、killValue ×0.5、补给/占领/HQ 伤害权重为 0 ⇒ 保存血量比拿击杀值钱（2 : 0.5）、囤补给是纯浪费（激进补员尽快折算成兵力）、对方总部击杀直接终局（压倒一切的效用项）。
+- **统一效用尺度**：1 点期望伤害/血量 ≈ 6 效用，治疗/威胁/疏散/抢点/推进按此校准；每步从攻击/治疗/移动/部署/爆破候选中选全局效用最高者，返回 `null` 结束回合。核心参数表与逐类动作的合法性镜像见 [单算法档案](algorithms/vortex.md)。
+
+评估（headless strict 对拍，直接驱动真实引擎、逐动作审计合法性）：
+
+```bash
+npx tsx scripts/algorithm-arena.mjs --a vortex --b random-annihilation --games 20 --map artillery-zone --strict
+npx tsx scripts/algorithm-arena.mjs --a vortex --b random-annihilation --games 20 --map trench-run --strict
+```
+
+**当前快照（2026-10-29，3.8.13 真实引擎，`scripts/algorithm-arena.mjs --strict` headless 自博弈，vs `random-annihilation` 各 20 局、先手后手各半）**：
+
+| 图 | 战绩 | 均分 | 动作/局 deploy / move / attack / heal | 非法动作 | p50 / p95 / max 耗时 |
+|---|---|---|---|---:|---|
+| artillery-zone | 20:0 | 1161 vs 7 | 8.1 / 32.7 / 15.0 / 1.2 | 0 | 0.12 / 2.03 / 8.4 ms |
+| trench-run | 20:0 | 953 vs 6 | 8.4 / 37.1 / 11.6 / 0.5（另有爆破 0.7） | 0 | 0.08 / 1.32 / 4.0 ms |
+
+两图 40 局全部 `last_player_standing` 终局，vortex 席位合计 4816 次决策全部被引擎接受；先手后手 10:10 全胜。竞技场榜单歼灭模式 rating 1882 ±59（可见窗口 40W/0L；全史 440W/0L 含清理前的镜像标定对局）。排查 strict 初报 119 次非法动作时确认 headless `snapshot()` 缺 `game.artillery` 字段（线上透传、headless 未透），已修复 harness——算法侧镜像无误。
+
+**已知限制**：单步贪心无前瞻；权重按歼灭裁定口径标定、标准模式未评估；收缩圈公式镜像依赖 `config.annihilation.artillery` 配置、royale 未适配；对拍样本均为 2 席位。完整清单与优化方向见 [档案](algorithms/vortex.md)。
 
 ## 算法接口
 
@@ -237,6 +266,7 @@ export const ALGORITHM_META = {
 | **random** | standard | v1 | 随机 | O(n) | arena 756 / 1.3%（2026-10-21 UTC） | 基准对照、测试 |
 | **random-annihilation** | annihilation | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 歼灭模式基线、炮火合法性冒烟 |
 | **random-royale** | royale | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 大逃杀模式基线、计划队列冒烟 |
+| **vortex** | annihilation | v1 | 效用 AI / 威胁图 + 炮火收缩圈预判 | O(单位×格子) | 真实引擎 headless strict 对拍 `random-annihilation` 40:0（两图各 20 局，2026-10-29，零非法），详见 [设计与评估](#vortex旋涡算法)；榜单歼灭模式 40W/0L / 1882 | 歼灭模式强度条目、炮火圈疏散与稳杀集火参考 |
 | **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
 | **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
 | **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
@@ -261,13 +291,13 @@ export const ALGORITHM_META = {
 |---|---:|---|
 | standard | 6 | random / greedy / mcts / threat / field / verdict |
 | simultaneous | 8 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo / tempo-weave / horizon |
-| annihilation | 1 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像） |
+| annihilation | 2 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像）/ vortex（效用 AI + 收缩圈疏散） |
 | royale | 1 | random-royale（同时回合计划队列，与 random-sim 同源枚举） |
 
 > 三个随机基线是**独立条目**：注册名、展示名、版本与竞技场参与者 id 全部分开
 > （`algo_random@v1` / `algo_random-annihilation@v1` / `algo_random-royale@v1`），
 > 战绩不会混名；标准模式的实现与历史不受影响。
-> 歼灭与大逃杀目前只有随机基线，仍缺有强度的算法——这是当前最大的模式空白，优先于继续打磨 2 人标准图。
+> 歼灭已包含独立效用算法 `vortex` 与随机基线；大逃杀仍只有随机基线。跨模式战绩不可用于证明算法强度。
 
 ## 当前强度快照（standard，2026-10-21 UTC）
 
@@ -411,16 +441,17 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 2026-10-24 | 3.8.4 | 新增 tempo 时序掌控算法 v1（同时回合）：把队列位置当结算拍，先给每个敌军推行为剧本并逐拍投影位置，再叠敌方预测射击与可及火力区成「第 k 拍 × 格子」威胁时间线，按裁决分差与剩余轮数调节攻守，最后按价值把动作排进具体拍；首发前修复同一单位反复折返。真实引擎进程内标定（每对 60 局 = standoff 40 + molten-throne 20）：对 random-sim 100%、dest-prob 55.0%、kriegspiel 50.0%、matrix-eq 43.3%，零非法 |
 | 2026-10-24 | 3.8.5 | 新增 tempo-weave 经纬算法 v1（同时回合）：任务竞价与变长行动排程 + 静止参照分步镜像 + 多席位回防紧迫度；零导入、无地图特化、不使用对手隐藏队列。3.8.2 真实引擎双人两图 ×4 对手 ×30 局全胜 **240/240**（random-sim / dest-prob / kriegspiel / matrix-eq 各 30:0），多席位 standoff 3 人 15/15、6 人 24/6；3.8.5 集成复跑回归与抽样对局全胜 |
 | 2026-10-26 | 3.8.7 | 新增 horizon 视界算法 v1（同时回合）：分步结算镜像（与引擎逐点对拍零偏差）+ 终局投影胜率评估（据点到达时间模型、两轮攻城压力、下一轮威胁场、歼灭风险）+ 同构对手四场景（贪心 / 静态开火 / 扰动 / 斩首变体）+ 逐行动点束搜索 + 对抗探针。开发基线 3.8.2、迭代 10 轮，关键修复：攻城投影从"全部剩余回合累加"改为两轮行动点预算（初稿在 molten-throne 不敢出门）、据点争夺期权重修正（占点反而降低持有概率的 bug）、歼灭风险改用未封顶压力（贴脸攻击者不被处理）。3.8.2 真实引擎口径 2 图 ×4 对手 ×30 局 236:4、零非法；HTTP + runner 23 局零被拒；`evaluate_cross.py` 冒烟 16:0 |
+| 2026-10-29 | 3.8.13 | 新增 vortex 旋涡算法 v1（歼灭）：按引擎公式复算 round+1 炮火安全圈做疏散主项，威胁图稳杀集火，按歼灭裁定口径反推权重；真实引擎 headless strict 对拍 `random-annihilation` 40:0（artillery-zone / trench-run 各 20 局，零非法、先手后手 10:10），p95 ≤ 2.03 ms。详见 [设计与评估](#vortex旋涡算法) |
 
 ## 未来方向
 
 1. **同时回合 3.8 适配与重标定**：dest-prob v2 已完成分步语义适配（v1→v2 直接对拍 50/60）；下一步为 matrix-eq v2 补真实引擎标定，确认镜像裁判结论（kriegspiel v2 已完成：真实引擎对拍零偏差 + 两图 ×3 对手各 30 局）。
-2. **大逃杀 / 歼灭缺强度算法**：3.8.10 起 `random-annihilation` 与 `random-royale` 已覆盖两种模式的基线（前者走轮流枚举 + 炮火合法镜像，后者走计划队列，与 random-sim 同源），但还没有有强度的对手。下一步是在该基线上补效用/搜索型算法，复用无总部、炮火缩圈、出生据点绑定与淘汰规则。
+2. **炮火模式算法池**：歼灭已包含 `vortex` 与 `random-annihilation` 两个条目（效用型 + 随机基线），大逃杀仍只有 `random-royale`；下一步是在大逃杀补效用/搜索型算法，并扩大独立对手、多人和新地图的验证。
 3. **多席位标定**：现有标准权重主要在 2 人对局上调出；用 `multiplayer-ring`（多席位）、`snowflake` / `standoff`（3/6 人）补 3–6 人标定。`four-corners` 已下线，不能再用。
 4. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索，可作为 mcts 之外的确定性搜索基线。
 5. **混合架构**：MCTS + 学习评估函数，或规则算法 + RL 局面评估。
 6. **多线程并行**：利用 Worker 加速搜索；先做可复现的基准，再决定是否值得。
-7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合接入评估跑批（3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），3.8.10 起歼灭 / 大逃杀也已接入（`local-worker` 支持四种模式，控制台可启动）。剩余缺口是这两个模式各有 1 个算法、组不出批次，需要先补第二个歼灭/大逃杀算法。
+7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合接入评估跑批（3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），3.8.10 起歼灭 / 大逃杀也已接入（`local-worker` 支持四种模式，控制台可启动）。歼灭已有 `random-annihilation` / `vortex` 两个条目、可组批；大逃杀仍只有 1 个算法，需先补第二个大逃杀算法。
 8. **部署决策继续收敛**：`deployDecision()` 已统一 threat / mcts / field / verdict；还剩 `greedy` 与 `scripts/auto-standard-game.mjs` 两份变体未合并。
 9. **tempo / 兑现率量纲**：verdict 已用行动点预算与“打击分 − 原地承伤 × 姿态系数”补上 danger-close / multiplayer-ring 两个老短板；下一步是把“每一步兑现率”做成可计算量纲，而不是再配一个系数。旧 `forge` 例子已不适用，改用当前短图与多行动点图验证。
 10. **基准数据自动化**：让 `scripts/algorithm-arena.mjs` / `scripts/matrix_eq_benchmark.mjs` 输出带 `engineVersion / mapPool / harness / games / seed / date` 的 JSON，再由脚本生成本文表格，避免手工抄写再次漂移。

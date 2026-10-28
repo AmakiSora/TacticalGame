@@ -117,15 +117,15 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(badJobs.statusCode).toBe(400);
     expect(badJobs.json().code).toBe('invalid_jobs');
 
-    // 歼灭/大逃杀已接入跑批，但每模式目前只有 1 个算法：不给参与者时按该模式全部
-    // 算法计数（1 个）拦住启动，并说明还缺第二个算法。
-    const annihilationNoOpponent = await app.inject({
-      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['artillery-zone'] },
+    // 歼灭现注册 2 个算法（基线 + 旋涡）：显式只选 1 个仍不允许启动。
+    const annihilationSingleAlgo = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['artillery-zone'], participants: ['algo:random-annihilation'] },
     });
-    expect(annihilationNoOpponent.statusCode).toBe(400);
-    expect(annihilationNoOpponent.json().code).toBe('invalid_participants');
-    expect(annihilationNoOpponent.json().error).toContain('至少需要选择 2 个');
-    expect(annihilationNoOpponent.json().error).toContain('注册算法 1 个');
+    expect(annihilationSingleAlgo.statusCode).toBe(400);
+    expect(annihilationSingleAlgo.json().code).toBe('invalid_participants');
+    expect(annihilationSingleAlgo.json().error).toContain('至少需要选择 2 个');
+    expect(annihilationSingleAlgo.json().error).toContain('注册算法 2 个');
 
     const royaleSingleAlgo = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',
@@ -139,6 +139,20 @@ describe('AI 竞技场评估控制台 API', () => {
     });
     expect(mixedModes.statusCode).toBe(400);
     expect(mixedModes.json().code).toBe('mixed_modes');
+  });
+
+  it('starts an annihilation run with the default participant pool (base + vortex)', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['artillery-zone'], games: 4 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({ mode: 'annihilation', maps: ['artillery-zone'] });
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--mode annihilation');
+    expect(args).toContain('--maps artillery-zone');
+    // 不传 participants = 无过滤（round_robin 默认取全部该模式算法），故两者都不出现
+    expect(args).not.toContain('--algorithms');
+    expect(args).not.toContain('--models');
   });
 
   it('starts a simultaneous-mode run with the mode-specific map and algorithm pool', async () => {

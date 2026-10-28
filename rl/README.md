@@ -493,8 +493,10 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --algorithms none
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps standoff,molten-throne --games 2 \
     --algorithms random-sim,dest-prob,kriegspiel,matrix-eq
 
-# 歼灭 / 大逃杀（目前各只有 1 个算法条目，补齐第二个同模式算法后才能组批）
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps artillery-zone --algorithms random-annihilation
+# 歼灭（仅同模式算法）
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps artillery-zone --algorithms random-annihilation,vortex --games 24
+
+# 大逃杀（目前只有 1 个算法条目，补齐第二个同模式算法后才能组批）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps snowflake --algorithms random-royale
 ```
 
@@ -516,8 +518,8 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps snowflake --algo
   小样本另附 Wilson 下界参考列。先手/后手只做展示统计，不进评分。
 - **评估控制台模式视图**：先选玩法模式，再只显示该模式的地图与算法（`ALGORITHM_META.modes`）；
   进程内评估链路四种模式全部接入（standard / annihilation 逐动作，simultaneous / royale
-  计划队列），RL 模型不参评非标准模式。歼灭/大逃杀目前各只有 1 个算法条目，控制台会在
-  「至少需要 2 个参评算法」时禁用启动并给出说明，等第二个算法落地后即可直接跑批。
+  计划队列），RL 模型不参评非标准模式。歼灭可选择 random-annihilation 与 vortex；
+  控制台在所选算法不足 2 个时禁用启动并给出说明。
 - **模式隔离**：先按地图 `mode` 分池，再在每个模式内池化该模式全部地图并给出分图榜单
   （局数少，CI 更宽）；标准、歼灭、同时回合、大逃杀之间不共享评分，也不能跨模式比较。
 - **同池语义**：同一模式内 RL 模型与规则算法共用一个评分池，可直接跨类型比较强弱；

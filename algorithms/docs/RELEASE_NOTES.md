@@ -4,7 +4,21 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.12（2026-10-29）— 缩圈推演算法 shrinkroll v1
+
+### 新增功能
+
+- **`shrinkroll`（缩圈推演算法）**：歼灭模式的搜索型内置算法（shrink + rollout：按炮火缩圈时间线做回合内推演）。回合内束搜索（束宽阶梯 2 → 6 → 8、深度 4/6/8，确定性节点预算：两人局 260–700、多人局 320–620），叶值用本局 `adjudicationWeights` 的裁决分差（我方 − 最强对手，多人局次席按 `ACE_FFA_RIVAL=0.5` 折算），再扣炮火期望损失、对手一个回合内的击杀风险（`multiHitKillProbability`，多对手按 `1−Π(1−p)` 合成，两人/多人分档 `ACE_BETA` / `ACE_BETA_FFA`）与空过罚项；两人局对决赛圈做对手贪心 rollout。另含两处终局建模：炮火前瞻投影未来 K 轮安全半径（仅 `minimumSafeRadius <= 0`、即最终收满全图的图启用，权重 0.4），以及轮界裁决建模（据点流量累加 + `maxTurns` 判定，离上限不足 `ACE_ADJ_H` 轮时按趋势投影）。镜像与 `src/engine/{validation,units,combat,deployment,demolition,engine,artillery}.ts` 逐条对拍。
+- **注册与档案**：注册名 `shrinkroll`（大厅 bot type `algo_shrinkroll`，竞技场参与者 id `algo_shrinkroll@v1`），`version: 'v1'`、`modes: ['annihilation']`；档案 `algorithms/docs/algorithms/shrinkroll.md`。这里的 `v1` 是对外注册版本，档案正文的 v1/v2/v3 为实现迭代编号，不改变参与者 id。
+- **标定（开发期，真实引擎进程内 harness `temp/arena/bench.ts`，`--swap` 交换座位，2026-10-29）**：对 `random-annihilation` 两图各 240 局 **240/240 全胜**；对评测贪婪基线（`temp/arena/opponents/greedy-annihilation.mjs`，非仓库内算法）**100%（160/160）/ 98.75%（158/160）**；自我镜像 **50.0% / 49.7%**（各 160 局 ×2 座位）；3 人局（+2 贪婪）第一名 **90.0%（108/120）**、（+2 随机）**100%（120/120）**；未见过的随机歼灭图 **97.9%（47/48）**、改参数变体 **48/48**、6 人混战 **32/32**；全部对局零非法动作。
+- **接口与耗时**：只实现 `decide`（不实现 `playTurn`），非 `annihilation` 或非 `active` 一律返回 `null`；单次决策 **4.91–10.85ms**（bench 串行）；真实 REST 服务端 + runner 子进程在 trench-run 与 artillery-zone 各跑一局均正常收场（shrinkroll 胜）。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/shrinkroll-mirror.test.ts`（17 例：可达集、移动、攻击与击杀、单刀与多刀击杀概率、AP、部署/治疗/爆破、回合结束、轮界炮火、淘汰、`controlHold` 逐值、集火宏开关、炮火前瞻门控与 `maxTurns` 夹取）、`shrinkroll-determinism.test.ts`（6 例）、`shrinkroll-selfplay.test.ts`（5 例）；`tests/algorithms/registry.test.ts`、`tests/api/arena-eval.test.ts` 同步。
+- `npm run build` 通过；`npm test` 全量 137 文件 / 1393 例全绿（数字见根 `RELEASE_NOTES.md` 3.8.12）。
 
 ## 3.8.10（2026-10-28）— 歼灭与大逃杀随机基线
 

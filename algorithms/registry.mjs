@@ -29,6 +29,7 @@ export const ALGORITHMS = {
   tempo: './builtin/tempo.mjs',
   'tempo-weave': './builtin/tempo-weave.mjs',
   horizon: './builtin/horizon.mjs',
+  shrinkroll: './builtin/shrinkroll.mjs',
   vortex: './builtin/vortex.mjs',
 };
 
@@ -67,6 +68,7 @@ export const ALGORITHM_META = {
   tempo: { displayName: '时序掌控算法', description: '同时回合：敌方剧本逐拍投影 + 威胁时间线避险 + 裁决地平线姿态调节', version: 'v1', modes: ['simultaneous'] },
   'tempo-weave': { displayName: '经纬算法', description: '同时回合：任务竞价、变长行动排程与总部生存期限约束', version: 'v1', modes: ['simultaneous'] },
   horizon: { displayName: '视界算法', description: '同时回合：分步结算镜像 + 多轮视界投影胜率评估 + 同构对手场景 + 束搜索 + 对抗探针', version: 'v1', modes: ['simultaneous'] },
+  shrinkroll: { displayName: '缩圈推演算法', description: '歼灭：回合内束搜索 + 缩圈时间线推演 + 轮界裁决投影', version: 'v1', modes: ['annihilation'] },
   vortex: { displayName: '旋涡算法', description: '歼灭：炮火收缩圈预判疏散、稳杀集火、走位风筝与激进补员', version: 'v1', modes: ['annihilation'] },
 };
 

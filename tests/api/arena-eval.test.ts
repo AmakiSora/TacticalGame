@@ -117,7 +117,7 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(badJobs.statusCode).toBe(400);
     expect(badJobs.json().code).toBe('invalid_jobs');
 
-    // 歼灭现注册 2 个算法（基线 + 旋涡）：显式只选 1 个仍不允许启动。
+    // 歼灭已注册 3 个算法（random-annihilation + shrinkroll + vortex）：显式只选 1 个仍不允许启动。
     const annihilationSingleAlgo = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',
       payload: { maps: ['artillery-zone'], participants: ['algo:random-annihilation'] },
@@ -125,7 +125,7 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(annihilationSingleAlgo.statusCode).toBe(400);
     expect(annihilationSingleAlgo.json().code).toBe('invalid_participants');
     expect(annihilationSingleAlgo.json().error).toContain('至少需要选择 2 个');
-    expect(annihilationSingleAlgo.json().error).toContain('注册算法 2 个');
+    expect(annihilationSingleAlgo.json().error).toContain('注册算法 3 个');
 
     const royaleSingleAlgo = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',
@@ -141,7 +141,7 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(mixedModes.json().code).toBe('mixed_modes');
   });
 
-  it('starts an annihilation run with the default participant pool (base + vortex)', async () => {
+  it('starts an annihilation run with the default participant pool (base + shrinkroll + vortex)', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['artillery-zone'], games: 4 },
     });

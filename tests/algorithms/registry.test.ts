@@ -78,5 +78,30 @@ describe('algorithm registry modes', () => {
     expect(algorithmSupportsMode('random-annihilation', 'standard')).toBe(false);
     expect(algorithmSupportsMode('random-royale', 'royale')).toBe(true);
     expect(algorithmSupportsMode('random-royale', 'simultaneous')).toBe(false);
+    // shrinkroll 只声明歼灭模式，不与同时回合 / 标准混用。
+    expect(algorithmSupportsMode('shrinkroll', 'annihilation')).toBe(true);
+    expect(algorithmSupportsMode('shrinkroll', 'standard')).toBe(false);
+    expect(algorithmSupportsMode('shrinkroll', 'simultaneous')).toBe(false);
+  });
+
+  it('registers shrinkroll with its own identity and profile doc', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { algorithmVersionedId, loadAlgorithm } = await import('../../algorithms/registry.mjs');
+    expect(ALGORITHMS['shrinkroll']).toBe('./builtin/shrinkroll.mjs');
+    expect(ALGORITHM_META['shrinkroll']).toMatchObject({
+      displayName: '缩圈推演算法',
+      version: 'v1',
+      modes: ['annihilation'],
+    });
+    expect(ALGORITHM_META['shrinkroll'].description).toContain('束搜索');
+    expect(algorithmVersionedId('shrinkroll')).toBe('algo_shrinkroll@v1');
+
+    const module = await loadAlgorithm('shrinkroll');
+    expect(module.name).toBe('shrinkroll');
+    expect(typeof module.decide).toBe('function');
+
+    const doc = readFileSync('algorithms/docs/algorithms/shrinkroll.md', 'utf8');
+    expect(doc).toContain('## 身份与文件');
+    expect(doc).toContain('algo_shrinkroll@v1');
   });
 });

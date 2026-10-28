@@ -117,15 +117,16 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(badJobs.statusCode).toBe(400);
     expect(badJobs.json().code).toBe('invalid_jobs');
 
-    // 歼灭/大逃杀已接入跑批，但每模式目前只有 1 个算法：不给参与者时按该模式全部
-    // 算法计数（1 个）拦住启动，并说明还缺第二个算法。
+    // 歼灭已接 2 个算法（random-annihilation + shrinkroll）：显式只选 1 个仍会被
+    // 「至少 2 个参评算法」拦住；错误文案里的「注册算法 N 个」现在应当是 2。
     const annihilationNoOpponent = await app.inject({
-      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['artillery-zone'] },
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['artillery-zone'], participants: ['algo:random-annihilation'] },
     });
     expect(annihilationNoOpponent.statusCode).toBe(400);
     expect(annihilationNoOpponent.json().code).toBe('invalid_participants');
     expect(annihilationNoOpponent.json().error).toContain('至少需要选择 2 个');
-    expect(annihilationNoOpponent.json().error).toContain('注册算法 1 个');
+    expect(annihilationNoOpponent.json().error).toContain('注册算法 2 个');
 
     const royaleSingleAlgo = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',

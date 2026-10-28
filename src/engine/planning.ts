@@ -55,6 +55,14 @@ function queueOf(game: GameState, owner: PlayerId): PendingAction[] {
   return game.plan.queues[owner]!;
 }
 
+/**
+ * 任何新输入都解锁本轮：清掉轮次守卫，让下一次强制结算/自动结算可以正常触发。
+ * 入队、撤回、重排、提交四处调用——它们代表「玩家又对下一轮做了决定」。
+ */
+export function markRoundInput(game: GameState): void {
+  if (game.turn) game.turn.resolvedRound = null;
+}
+
 /** 动作绑定的单位 ID；deploy / wait 没有单位主体。 */
 function actionUnitId(action: PendingAction): string | undefined {
   return action.unitId ?? action.attackerId ?? action.supportId;
@@ -85,6 +93,7 @@ function healRangeFor(game: GameState, support: { type: UnitType; attackRange: n
 
 function enqueue(game: GameState, owner: PlayerId, action: PendingAction): Result<PendingAction> {
   queueOf(game, owner).push(action);
+  markRoundInput(game);
   return { ok: true, data: action };
 }
 
@@ -619,6 +628,7 @@ export function reorderPlanActions(
   const failure = validateQueue(game, owner, ordered);
   if (failure) return failure;
   game.plan!.queues[owner] = ordered;
+  markRoundInput(game);
   return { ok: true, data: [...ordered] };
 }
 
@@ -639,6 +649,7 @@ export function revokePlanAction(game: GameState, owner: PlayerId, actionId: str
     return { ok: false, code: failure.code, message: `撤回后剩余计划不合法：${failure.message}（请先撤回依赖它的后续动作）` };
   }
   game.plan!.queues[owner] = remaining;
+  markRoundInput(game);
   return { ok: true, data: [...remaining] };
 }
 
@@ -646,6 +657,8 @@ export function clearPlanActions(game: GameState, owner: PlayerId): Result<Pendi
   const ready = requirePlanning(game, owner);
   if (!ready.ok) return ready;
   game.plan!.queues[owner] = [];
+  // 清空也是一次新输入（玩家可能想按「这轮什么都不做」重新走一遍）。
+  markRoundInput(game);
   return { ok: true, data: [] };
 }
 
@@ -656,6 +669,7 @@ export function markCommitted(game: GameState, bus: EventBus, owner: PlayerId): 
     return { ok: false, code: 'already_committed', message: '本轮计划已提交' };
   }
   game.plan!.committed.push(owner);
+  markRoundInput(game);
   appendEvent(game, bus, 'plan_committed', {
     playerId: owner,
     roundNumber: game.turn.roundNumber,

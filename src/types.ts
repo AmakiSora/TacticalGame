@@ -153,6 +153,14 @@ export interface TurnState {
   // 旧页面和旧回放仍读取这两个字段，运行时始终与新字段同步。
   turnNumber: number;
   currentOwner: PlayerId | null;
+  /**
+   * 本轮是否已经结算：值 = 结算后**新**的 roundNumber；null = 本轮尚未结算。
+   * 同时回合的强制结算用它做轮次守卫（`resolvedRound === roundNumber` 即拒绝重复结算）；
+   * 任何新输入（入队 / 撤回 / 重排 / 提交）都会把它清成 null，等于「解锁下一轮」。
+   */
+  resolvedRound?: number | null;
+  /** 顺序模式 host/skip-turn 的防重复：同一轮里同一个玩家只跳一次（重试不再继续跳过下一个人）。 */
+  skipGuard?: { roundNumber: number; players: PlayerId[] } | null;
 }
 
 /**
@@ -396,4 +404,7 @@ export type ApiErrorCode =
   | 'bot_not_supported'
   | 'model_not_found'
   | 'invalid_seat_layout'
-  | 'seat_conflict';
+  | 'seat_conflict'
+  /** 本轮已经结算/跳过，等新输入后再来（轮次守卫）。 */
+  | 'round_already_resolved'
+  | 'lobby_capacity';

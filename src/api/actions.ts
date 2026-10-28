@@ -59,7 +59,7 @@ function canonicalValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function actionBodyHash(action: string, body: unknown): string {
+export function actionBodyHash(action: string, body: unknown): string {
   // 只用于比对，不对外暴露；用真哈希避免日志/调试输出里出现完整动作参数。
   return createHash('sha256').update(`${action}|${canonicalValue(body ?? null)}`).digest('hex');
 }
@@ -75,16 +75,16 @@ function pruneIdempotency(records: NonNullable<AuthContext['game']['idempotency'
 }
 
 /** 幂等键按玩家隔离：不同玩家可以用同一个原始键，互不冲突、互不回放。 */
-function scopedIdempotencyKey(player: PlayerId, key: string): string {
+export function scopedIdempotencyKey(player: string, key: string): string {
   return `${player}:${key}`;
 }
 
-type ReplayLookup =
+export type ReplayLookup =
   | { response: unknown; record: IdempotencyRecord }
   | { conflict: true }
   | null;
 
-function findReplay(game: GameState, key: string, bodyHash: string): ReplayLookup {
+export function findReplay(game: GameState, key: string, bodyHash: string): ReplayLookup {
   const records = game.idempotency ?? {};
   const existing = records[key];
   if (!existing) return null;
@@ -107,7 +107,7 @@ function replayWithCurrentQueue(game: GameState, player: PlayerId, response: unk
   return { ...record, queue: [...(game.plan?.queues[player] ?? [])] };
 }
 
-function rememberAction(
+export function rememberAction(
   game: GameState, key: string, bodyHash: string, response: unknown,
 ): IdempotencyRecord {
   const records = game.idempotency ?? {};

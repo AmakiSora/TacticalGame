@@ -518,7 +518,11 @@ function resolveAttacksAndHeals(ctx: ResolveContext, stepActions: QueuedAction[]
     if (spec?.attackLock) {
       const locked = ctx.planTimePositions.find(entry =>
         entry.unit.owner !== item.owner && entry.q === item.action.q && entry.r === item.action.r);
-      if (locked) strike.lockedEntity = locked.unit;
+      // 快照里的锁定目标可能已经在本回合更早的步骤里被淘汰/击杀：必须回到**当前**索引里
+      // 复核它仍然在场且存活，否则会对一个已经下场的单位再结算一次击杀。
+      if (locked && locked.unit.alive && getGameIndex(game).unitById.get(locked.unit.id) === locked.unit) {
+        strike.lockedEntity = locked.unit;
+      }
     }
     strikes.push(strike);
   }

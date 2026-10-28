@@ -374,7 +374,14 @@ export function markPlayerEliminated(
   player.eliminatedBy = eliminatedBy;
   if (eliminatedBy && game.players[eliminatedBy]) game.players[eliminatedBy]!.stats.playersEliminated += 1;
 
-  const removedUnitIds = game.units.filter(unit => unit.owner === playerId).map(unit => unit.id);
+  const removedUnits = game.units.filter(unit => unit.owner === playerId);
+  const removedUnitIds = removedUnits.map(unit => unit.id);
+  // 从数组里删掉不等于「已死」：同时结算拿着计划期的单位快照，删掉的单位若仍 alive=true，
+  // 后续步骤的锁定射击会把它当活目标再杀一次（多一条 unit_death、还白记一次击杀）。
+  for (const unit of removedUnits) {
+    unit.alive = false;
+    unit.hp = 0;
+  }
   game.units = game.units.filter(unit => unit.owner !== playerId);
   const neutralizedPointIds: string[] = [];
   for (const point of game.controlPoints) {
@@ -548,6 +555,17 @@ export function skipTurn(game: GameState, bus: EventBus): Result {
   if (game.phase !== 'active') return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
   const owner = game.turn.currentPlayerId;
   if (!owner) return { ok: false, code: 'game_not_started', message: '对局不在进行中' };
+  // 顺序模式的跳过不共用同时回合的「轮级」守卫（本来就要能连跳多人），
+  // 只防「同一轮里把同一个玩家重复跳过」——那说明调用方在重试同一个请求。
+  const guard = game.turn.skipGuard;
+  const skipped = guard && guard.roundNumber === game.turn.roundNumber
+    ? guard
+    : { roundNumber: game.turn.roundNumber, players: [] as PlayerId[] };
+  if (skipped.players.includes(owner)) {
+    return { ok: false, code: 'round_already_resolved', message: '本轮已经跳过该玩家，不能重复跳过' };
+  }
+  skipped.players.push(owner);
+  game.turn.skipGuard = skipped;
   appendEvent(game, bus, 'turn_skipped', { playerId: owner, roundNumber: game.turn.roundNumber });
   return endTurn(game, bus, owner);
 }

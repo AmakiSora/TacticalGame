@@ -13,8 +13,8 @@
 | 代码版本 | 3.8.16 |
 | 标准图池 | `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `whirlpool` |
 | 同时回合图 | `standoff` / `molten-throne` / `mistpine` |
-| 大逃杀图 | `snowflake` / `narrow-road`（内置基线：`random-royale`；强度算法：`echelon`） |
-| 歼灭图 | `artillery-zone` / `trench-run`（内置基线：`random-annihilation`；强度算法：`shrinkroll` / `vortex`） |
+| 大逃杀图 | `snowflake` / `narrow-road`（内置基线：`random-royale`；强度算法：`echelon` / `apex`） |
+| 歼灭图 | `artillery-zone` / `trench-run`（内置基线：`random-annihilation`；强度算法：`shrinkroll` / `vortex` / `crucible`） |
 | 同时回合规则 | 3.8.0 起按行动点**分步结算**，不是“一单位一轮一动作” |
 | 裁决分 | 3.6.0 起为击杀价值 + 据点流量制 |
 | 已退役地图 | `forge` → `molten-throne`（3.5.11，同时回合）、`desert`（3.5.8 下线）、`four-corners`（3.5.7 下线） |
@@ -37,6 +37,8 @@ algorithms/
 │   ├── random-annihilation.mjs  # 歼灭随机算法（歼灭模式）
 │   ├── shrinkroll.mjs           # 缩圈推演算法（歼灭模式）
 │   ├── random-royale.mjs # 大逃杀随机算法（大逃杀模式）
+│   ├── apex.mjs          # 绝境算法（大逃杀模式）
+│   ├── crucible.mjs      # 熔炉算法（歼灭模式）
 │   ├── vortex.mjs        # 旋涡算法（歼灭模式）
 │   ├── echelon.mjs       # 雁阵算法（大逃杀模式）
 │   ├── mcts.mjs          # 蒙特卡洛树搜索（标准模式）
@@ -57,6 +59,7 @@ algorithms/
 │   ├── game-utils.mjs    # 游戏工具函数
 │   ├── interfaces.mjs    # 算法接口适配器
 │   ├── random-turn.mjs   # 轮流模式随机枚举（random / random-annihilation）
+│   ├── royale-model.mjs # 大逃杀分步结算与轮界模型
 │   └── random-plan.mjs   # 计划模式随机枚举（random-sim / random-royale）
 ├── docs/                 # 算法文档
 │   ├── ALGORITHMS_NOTES.md   # 本文件
@@ -67,6 +70,7 @@ algorithms/
 │       ├── random-annihilation.md
 │       ├── shrinkroll.md
 │       ├── random-royale.md
+│       ├── apex.md
 │       ├── mcts.md
 │       ├── threat.md
 │       ├── field.md
@@ -110,6 +114,45 @@ npx tsx scripts/horizon-arena.mts --a echelon --b random-royale --map snowflake 
 
 **已知限制**：镜像规避对峙可能拖到轮次守卫（等速追逃固有性质）；单拍贪心无跨回合联合推演；预报权重手工标定、未在线拟合；多人局只有 3P 1v2 强度数据。详见 [档案](algorithms/echelon.md)。
 
+## apex：绝境算法
+
+`apex` v1 仅参与 `royale`，大厅类型为 `algo_apex`，竞技场参与者为 `algo_apex@v1`。实现分为 `builtin/apex.mjs`（策略）与 `lib/royale-model.mjs`（规则模型），不调用其他算法，也不读取地图名称、对手隐藏计划或随机数状态。核心参数表、终局估值设计与逐类动作生成见 [单算法档案](algorithms/apex.md)。
+
+- **逃生与建军**：从地图地形和炮火配置计算未来六轮安全区的距离场；有重装时对障碍计入开路代价，连续障碍也能逐步爆破，但实际移动仍严格走平地。火力、射程、机动与治疗共同计价，后备兵力按行动点和未来安全区容量指数递减、站位风险较慢递减，避免过量建军挤占撤离机会；单兵净值平滑映射为非负值，避免把敌方残兵直接算成负资产。
+- **同时博弈**：均衡推进、进攻与原地开火三类对手情境；按行动点展开束搜索，兼顾平均收益与最差情境；双人局对候选计划增加针对性回应校验。公开事件显示相同单位连续两轮同拍互撞时，轮换暂缓冲突移动，减少连续同拍互撞；不假定对手一定配合。规则模型处理冲突、失败连锁、锁定/范围攻击、治疗、全灭和下一轮炮伤。
+- **公开接口**：整轮计划缓存按局面与己方队列对账；撤回、重排、外部插入动作或被拒时重算。配置、地形、资源、单位变化会使缓存失效。
+- **计算预算**：`APEX_TIME_MS` 默认 750 毫秒（搜索软预算，建模及计划补全可超出），`APEX_BEAM` 默认 4，`APEX_NODES` 默认 1600；限制分别为 5000 毫秒、12、20000。无外部包依赖，不需训练或 GPU。
+
+真实引擎本地评估不写竞技场历史，未自然结束的对局单列 `unresolved`，不折算成胜利：
+
+```bash
+npx tsx scripts/apex-arena.mts --maps snowflake,narrow-road --games 30 --opponent random-royale --seed 20261030
+npx tsx scripts/apex-arena.mts --maps snowflake,narrow-road --games 30 --opponent sentinel --seed 20261030
+npx tsx scripts/apex-arena.mts --maps random --games 30 --opponent sentinel --seed 20261101
+npx tsx scripts/apex-arena.mts --maps random --games 30 --opponent random-royale --seed 20261101
+npx tsx scripts/apex-arena.mts --maps snowflake --games 3 --players 3 --opponent self --seed 20261031
+npx tsx scripts/apex-arena.mts --maps snowflake --games 2 --players 6 --opponent self --seed 20261031
+```
+
+`--maps` 接受已注册的大逃杀地图 ID 或 `random`；后者调用项目随机地图生成器，全部参数采用默认随机范围、模式为大逃杀且无回合上限。每 `players` 局共用地图/开局种子并轮换席位，种子递增 7919；双人 30 局即 15 张种子图各换座两局。JSON 包含引擎版本、执行日期、Node 版本、预算环境变量、逐局结果与延迟；软时间预算会使不同机器的搜索截断点存在差异。
+
+**当前快照（2026-10-28，3.8.14 真实引擎，`scripts/apex-arena.mts`，Node 24.16.0，默认预算）**：固定图种子基 `20261030`；未参与调参的随机图种子基 `20261101`，15 张图各换座两局；全部上限 80 轮。决策耗时包含缓存续吐及提交调用，单位毫秒：
+
+| 图池 | 对手 | 局数 | 胜 | 负 | 平 | 未结束 | p95 / 最大耗时 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| snowflake | random-royale | 30 | 30 | 0 | 0 | 0 | 279 / 399 |
+| narrow-road | random-royale | 30 | 30 | 0 | 0 | 0 | 39 / 71 |
+| snowflake | sentinel | 30 | 30 | 0 | 0 | 0 | 299 / 451 |
+| narrow-road | sentinel | 30 | 30 | 0 | 0 | 0 | 28 / 57 |
+| 随机图 15 张 | random-royale | 30 | 30 | 0 | 0 | 0 | 104 / 284 |
+| 随机图 15 张 | sentinel | 30 | 29 | 0 | 1 | 0 | 121 / 229 |
+
+双人合计 **179 胜、0 负、1 平、0 未结束、0 非法入队**；唯一平局为随机种子 `20276939` 的 A 席，第 16 轮同归于尽。结算期仍存在碰撞、目标逃离及失败连锁，不能把“零非法入队”理解成“所有动作都成功”。原始本地 JSON 位于 `temp/apex-calibration/release-{random,sentinel,unseen-random,unseen-sentinel}.json`，该目录不入库，可用上述命令重跑。
+
+**多人及强度边界**：`snowflake`、种子 `20261031` 的六人自博弈 2 局均在第 17 轮完赛，三人自博弈 3 局均到 80 轮仍未结束；所有席位零非法入队，最大决策耗时 634 毫秒。同种子自博弈轮换的是统计席位，不代表独立开局或对外胜率；三人残局僵持尚未解决。开发回归种子 `20316464` 的 A 席对 `sentinel` 仍有败局，因此最终样本零负不等于不存在可击败它的局面。
+
+`sentinel` 是评估脚本内独立启发式压力对手，不是注册算法。随机新图样本每图只有两局，不满足逐图 30 局的稳定选型口径；它与多人、规则对拍、扰动配置回归用于发现过拟合，不能证明对所有未来地图或算法必胜。期望伤害模型不能完全覆盖随机伤害的尾部风险；模型不模拟事件、计分历史或逆风补给（`comebackSupply`），此类自定义配置的强度需额外验证。完整已知限制与优化方向见 [档案](algorithms/apex.md)。
+
 ## vortex：旋涡算法
 
 `vortex` v1 仅参与 `annihilation`，大厅类型为 `algo_vortex`，竞技场参与者为 `algo_vortex@v1`。单文件实现（`builtin/vortex.mjs`，策略接口 `decide`），不调用其他算法，也不读取地图名称、对手隐藏信息或随机数状态。
@@ -136,6 +179,40 @@ npx tsx scripts/algorithm-arena.mjs --a vortex --b random-annihilation --games 2
 两图 40 局全部 `last_player_standing` 终局，vortex 席位合计 4816 次决策全部被引擎接受；先手后手 10:10 全胜。竞技场榜单歼灭模式 rating 1882 ±59（可见窗口 40W/0L；全史 440W/0L 含清理前的镜像标定对局）。排查 strict 初报 119 次非法动作时确认 headless `snapshot()` 缺 `game.artillery` 字段（线上透传、headless 未透），已修复 harness——算法侧镜像无误。
 
 **已知限制**：单步贪心无前瞻；权重按歼灭裁定口径标定、标准模式未评估；收缩圈公式镜像依赖 `config.annihilation.artillery` 配置、royale 未适配；对拍样本均为 2 席位。完整清单与优化方向见 [档案](algorithms/vortex.md)。
+
+## crucible：熔炉算法
+
+`crucible` v1 仅参与 `annihilation`，大厅类型为 `algo_crucible`，竞技场参与者为 `algo_crucible@v1`。单文件自包含实现（`builtin/crucible.mjs`，策略接口 `decide`），**独立设计**：策略全部由歼灭规则推导（单向战斗、击杀计价、炮火无归属、AP 按激活计费），不参考、不调用、不借鉴仓库内其他算法，不读地图名称、对手隐藏信息或随机数状态。核心参数、合法性镜像与逐类评估见 [单算法档案](algorithms/crucible.md)。
+
+- **整回合束搜索**：轻量镜像棋盘上模拟整回合激活序列（束宽 7、深度 ≤8、每单位 4 目的地、部署 6 候选、节点候选 ≤18），移动即时改占据、击杀腾格、部署免费补刀，与引擎即时执行语义一致；空激活剔除不耗 AP。
+- **对抗性评估**：敌方"移动 BFS + 射程环"可达投影 + 贪心斩杀分配估计下回合己方损失（全扣），我方威慑 ×0.45；军力/击杀按本局 `adjudicationWeights` 实时计价；每个单位沿缩圈时间线做向心逃逸推演（h≤5），不可避免圈伤折分（己方全扣、敌方 ×0.85）。
+- **泛化设计**：一切参数取自本局 config 与单位实例；`controlPoint` 权重非零的随机图自动计入持有分；零初始单位图首回合强制部署（`evaluate` 先判己方全灭的回归点）；消耗战图的治疗价值由圈伤推演自然体现（专门的支援兵启发式试验后否决，见下）。
+- **计划缓存**：回合级队列按 `(gameId, seat)` 隔离，逐动作对真实状态校验续吐，不合法即丢弃/重规划；部署补刀按落点解析服务器分配的真实单位 id。
+
+评估（真实引擎进程内 harness `scripts/crucible-arena.mts`，成对换座、不写竞技场历史；固定图种子基 `20261029`，随机图种子基 `90210`，每图换座两局）：
+
+```bash
+npx tsx scripts/crucible-arena.mts --opp shrinkroll --games 40 --maps artillery-zone,trench-run
+npx tsx scripts/crucible-arena.mts --opp vortex --games 40 --maps artillery-zone,trench-run
+npx tsx scripts/crucible-arena.mts --opp shrinkroll --games 0 --random 10 --seed 90210
+```
+
+**当前快照（2026-10-29，3.8.15 真实引擎，`scripts/crucible-arena.mts`，Node 24.18.0）**：
+
+| 图池 | 对手 | 局数 | 胜 | 负 | 平 | 非法动作 |
+|---|---|---:|---:|---:|---:|---:|
+| artillery-zone + trench-run（各 40） | vortex | 80 | 80 | 0 | 0 | 0 |
+| artillery-zone + trench-run（各 40） | shrinkroll | 80 | 75 | 5 | 0 | 0 |
+| 随机新图 10 张（种子基 90210） | vortex | 22 | 21 | 1 | 0 | 0 |
+| 随机新图 10 张（种子基 90210） | shrinkroll | 22 | 20 | 2 | 0 | 0 |
+| artillery-zone + trench-run（各 60） | random-annihilation | 120 | 120 | 0 | 0 | 0 |
+| 随机新图 10 张（种子基 20261029） | random-annihilation | 22 | 22 | 0 | 0 | 0 |
+
+合计 **346 局 338 胜 8 负、零非法动作**；对 shrinkroll 的 5 负全在 trench-run 第 16–18 轮消耗战残局（artillery-zone 40:0）。未写入竞技场历史。
+
+**调参教训（已回退）**：针对 trench-run 全图消耗战试验过"提前部署支援兵"（先放宽到未来半径 ≤1，后收紧到仅 `minimumSafeRadius === 0`）并加治疗 ×1.5、终局补员 +20，同口径标定**全部变差**（vs shrinkroll 固定图 75:5 → 65:15 / 67:13、随机图 20:2 → 17:5），最终回退为通用支援条件。规则级建模（圈伤推演 + 治疗估值）已覆盖消耗战，额外启发式反而过拟合。
+
+**已知限制**：期望伤害按均值（方差尾部未卷积）；对抗回推假设贪心集火；圈伤逃逸为贪心向心近似；固定束宽在 6-8 人混战覆盖受限；随机新图每图仅两局，不满足逐图 30 局稳定选型口径，不能证明对所有未来地图/算法必胜。完整清单与优化方向见 [档案](algorithms/crucible.md)。
 
 ## 算法接口
 
@@ -220,7 +297,7 @@ export const ALGORITHM_META = {
 };
 ```
 
-- `modes` 缺省为 `['standard']`；大厅 bot 接口、runner、`rl/training/local-worker.ts`、`rl/evaluation/round_robin.py` 与 `/api/arena/participants` 都按它校验/过滤。
+- `modes` 缺省为 `['standard']`；大厅 bot 接口、runner、`rl/training/local-worker.ts` 与 `rl/evaluation/round_robin.py` 都按它校验/过滤。`/api/arena/participants` 返回包含 `modes` 的完整清单，由客户端按模式过滤，启动接口再次校验兼容性。
 - `version` 是算法的“当前版本”标注。算法行为被改进后应升版（如 `v1` → `v2`）；竞技场参与者 id 是 `algo_<name>@<version>`，历史对局仍归属旧版本 id。
 - 升版时必须按下面的“版本升级的文档要求”更新单算法档案，不能只改代码和 `version`。
 - 线上 bot type 是 `algo_<name>`，永远指向当前实现；`src/api/bots.ts` 的 `ALGORITHM_BOTS` 由注册表自动生成，前端下拉从 `/api/algorithms` 动态拉取。**不要再手工维护第二份算法清单。**
@@ -246,6 +323,7 @@ export const ALGORITHM_META = {
 |---|---|---|
 | `random-sim` | 同单位多动作、队列投影、`attacksPerUnit` | **v2 已适配（3.8.1）**，作为同时回合基线 |
 | `random-royale` | 复用 `lib/random-plan.mjs`：队列投影 + 地形寻路 + `attacksPerUnit` + 炮火区部署/治疗过滤 | **v1（3.8.10 新条目）**：`snowflake` 真实对局多轮零入队拒绝；不做强度声明（随机基线即下界） |
+| `apex` | 独立大逃杀模型、多情境逐行动点搜索、轮界占点与炮火 | **v1（3.8.14）**：真实引擎分步与轮界对拍；对战数据及局限见 [绝境算法](#apex绝境算法) |
 | `dest-prob` | v2 按队列前缀投影 + 地形寻路 + `attacksPerUnit` 生成计划 | **v2 已适配（3.8.1）**：同 harness 对 v1 50/60（83.3%）、对 random-sim 60/60；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（各 30 局/图抽样）；v1 的旧规则 100:0 只代表旧规则 |
 | `kriegspiel` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配并完成 3.8 真实引擎标定**（分步语义、`wait`、`demolish`、`attacksPerUnit`）：与引擎逐点对拍 40 局面零偏差；两图各 30 局 ×3 对手共 180 局零非法；旧 3.7 数据只代表旧规则 |
 | `matrix-eq` | v2 镜像 `src/engine/simultaneousResolve.ts` 的分步结算 | **v2 已适配**并按 3.8 镜像裁判标定；真实服务器口径待验证 |
@@ -294,9 +372,11 @@ export const ALGORITHM_META = {
 | **random** | standard | v1 | 随机 | O(n) | arena 756 / 1.3%（2026-10-21 UTC） | 基准对照、测试 |
 | **random-annihilation** | annihilation | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 歼灭模式基线、炮火合法性冒烟 |
 | **shrinkroll** | annihilation | v1 | 束搜索 + 缩圈时间线投影 | O(束宽×候选×深度×结算投影) | 3.8.12 开发期真实引擎标定（`temp/arena/bench.ts`，两图各 240 局）：对 random-annihilation **480/480**；对评测贪婪基线 100%（artillery-zone，160/160）/ 98.75%（trench-run，158/160）；自我镜像 50.0% / 49.7%；3 人局第一名 90.0%（108/120）；随机歼灭图 97.9%（47/48）、6 人混战 32/32；单次 decide 4.91–10.85ms、零非法 | 歼灭模式强基线、多席位领先者压制 |
-| **random-royale** | royale | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 大逃杀模式基线、计划队列冒烟 |
+| **random-royale** | royale | v1 | 随机 | O(n) | 独立随机基线，对战见 [apex 评估](#apex绝境算法) 与 [echelon 评估](#echelon雁阵算法) | 大逃杀模式基线、计划队列冒烟 |
 | **echelon** | royale | v1 | 效用 AI / 落点扩散预报 + 击杀概率 + 炮火圈调度 + 爆破距离场 | O(单位×格子 + 敌军×预报扩散) | 3.8.16 真实引擎 headless 对拍 `random-royale`（2026-10-29，逐局换座）：snowflake **30:0**、narrow-road **19:1**、3P 1v2 **6:0**；镜像自博弈稳定、全部对局 0 非法；单轮 p50 2.4–15.8ms、max 39.9ms，详见 [设计与评估](#echelon雁阵算法) | 大逃杀模式强度条目、计划模式逐拍剧本与炮火生存调度参考 |
+| **apex** | royale | v1 | 多情境束搜索 + 缩圈时空寻路 | O(行动点×束宽×候选×情境×单步结算) | 真实引擎本地换座，详见 [设计与评估](#apex绝境算法)；未写入竞技场榜单 | 大逃杀整轮规划、跨图参数适配 |
 | **vortex** | annihilation | v1 | 效用 AI / 威胁图 + 炮火收缩圈预判 | O(单位×格子) | 真实引擎 headless strict 对拍 `random-annihilation` 40:0（两图各 20 局，2026-10-29，零非法），详见 [设计与评估](#vortex旋涡算法)；榜单歼灭模式 40W/0L / 1882 | 歼灭模式强度条目、炮火圈疏散与稳杀集火参考 |
+| **crucible** | annihilation | v1 | 整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演 | O(束宽×候选×深度×(单位×格子)) | 3.8.15 真实引擎本地换座标定，详见 [设计与评估](#crucible熔炉算法)；未写入竞技场榜单 | 歼灭模式整回合规划、跨图/跨权重泛化 |
 | **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
 | **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
 | **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
@@ -321,13 +401,13 @@ export const ALGORITHM_META = {
 |---|---:|---|
 | standard | 6 | random / greedy / mcts / threat / field / verdict |
 | simultaneous | 8 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo / tempo-weave / horizon |
-| annihilation | 3 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像）/ shrinkroll（束搜索 + 缩圈时间线投影 + 轮界裁决投影）/ vortex（效用 AI + 收缩圈疏散） |
-| royale | 2 | random-royale（同时回合计划队列，与 random-sim 同源枚举）/ echelon（效用 AI + 落点扩散预报 + 炮火圈调度 + 爆破距离场） |
+| annihilation | 4 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像）/ shrinkroll（束搜索 + 缩圈时间线投影 + 轮界裁决投影）/ vortex（效用 AI + 收缩圈疏散）/ crucible（整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演） |
+| royale | 3 | random-royale（同时回合计划队列，与 random-sim 同源枚举）/ echelon（效用 AI + 落点扩散预报 + 炮火圈调度 + 爆破距离场）/ apex（多情境束搜索 + 缩圈时空寻路） |
 
 > 三个随机基线是**独立条目**：注册名、展示名、版本与竞技场参与者 id 全部分开
 > （`algo_random@v1` / `algo_random-annihilation@v1` / `algo_random-royale@v1`），
 > 战绩不会混名；标准模式的实现与历史不受影响。
-> 歼灭模式强度算法 `shrinkroll`（3.8.12）/ `vortex`（3.8.13），大逃杀强度算法 `echelon`（3.8.16）。跨模式战绩不可用于证明算法强度。
+> 歼灭模式强度算法 `shrinkroll`（3.8.12）、`vortex`（3.8.13）与 `crucible`（3.8.15）；大逃杀强度算法 `echelon`（3.8.16）与 `apex`（3.8.14）。跨模式战绩不可用于证明算法强度。
 
 ## 当前强度快照（standard，2026-10-21 UTC）
 
@@ -473,16 +553,17 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 2026-10-26 | 3.8.7 | 新增 horizon 视界算法 v1（同时回合）：分步结算镜像（与引擎逐点对拍零偏差）+ 终局投影胜率评估（据点到达时间模型、两轮攻城压力、下一轮威胁场、歼灭风险）+ 同构对手四场景（贪心 / 静态开火 / 扰动 / 斩首变体）+ 逐行动点束搜索 + 对抗探针。开发基线 3.8.2、迭代 10 轮，关键修复：攻城投影从"全部剩余回合累加"改为两轮行动点预算（初稿在 molten-throne 不敢出门）、据点争夺期权重修正（占点反而降低持有概率的 bug）、歼灭风险改用未封顶压力（贴脸攻击者不被处理）。3.8.2 真实引擎口径 2 图 ×4 对手 ×30 局 236:4、零非法；HTTP + runner 23 局零被拒；`evaluate_cross.py` 冒烟 16:0 |
 | 2026-10-29 | 3.8.12 | 新增 shrinkroll 缩圈推演算法 v1（歼灭模式）：回合内束搜索（束宽 2→6→8，确定性节点预算）+ 裁决分叶值（我方 − 最强对手，多人局次席按 `ACE_FFA_RIVAL=0.5` 折算）+ 轮界炮火/裁决投影 + 两人局对手贪心 rollout。镜像与真引擎逐条对拍 17 例零偏差。开发期真实引擎（`temp/arena/bench.ts`，`--swap`）：对 random-annihilation 两图各 240 局 **480/480**；对评测贪婪基线 **100%（160/160）/ 98.75%（158/160）**；自我镜像 50.0% / 49.7%；3 人局第一名 **90.0%（108/120）**、6 人混战 32/32；单次 decide 4.91–10.85ms，全程零非法 |
 | 2026-10-29 | 3.8.13 | 新增 vortex 旋涡算法 v1（歼灭）：按引擎公式复算 round+1 炮火安全圈做疏散主项，威胁图稳杀集火，按歼灭裁定口径反推权重；真实引擎 headless strict 对拍 `random-annihilation` 40:0（artillery-zone / trench-run 各 20 局，零非法、先手后手 10:10），p95 ≤ 2.03 ms。详见 [设计与评估](#vortex旋涡算法) |
+| 2026-10-29 | 3.8.14 | 新增 apex 绝境算法 v1（大逃杀）：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验；大厅与评估控制台接入双算法池。真实引擎换座与随机新图数据见 [设计与评估](#apex绝境算法)，本地验证不写竞技场历史。 |
 
 ## 未来方向
 
 1. **同时回合 3.8 适配与重标定**：dest-prob v2 已完成分步语义适配（v1→v2 直接对拍 50/60）；下一步为 matrix-eq v2 补真实引擎标定，确认镜像裁判结论（kriegspiel v2 已完成：真实引擎对拍零偏差 + 两图 ×3 对手各 30 局）。
-2. **大逃杀缺强度算法**：3.8.10 起 `random-royale` 已覆盖大逃杀基线（计划队列，与 random-sim 同源枚举），3.8.12 起歼灭已有 `shrinkroll`、3.8.13 起有 `vortex`，共两个强度算法。下一步是在大逃杀基线上补同类效用/搜索型算法，复用无总部、炮火缩圈、出生据点绑定与淘汰规则。
+2. **炮火模式算法池**：歼灭已有 `shrinkroll`（3.8.12）与 `vortex`（3.8.13）两个强度算法，大逃杀已有 `apex`（3.8.14）搜索算法与 `random-royale` 基线；下一步是扩大独立对手、多人和新地图的验证。
 3. **多席位标定**：现有标准权重主要在 2 人对局上调出；用 `multiplayer-ring`（多席位）、`snowflake` / `standoff`（3/6 人）补 3–6 人标定。`four-corners` 已下线，不能再用。
 4. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索，可作为 mcts 之外的确定性搜索基线。
 5. **混合架构**：MCTS + 学习评估函数，或规则算法 + RL 局面评估。
 6. **多线程并行**：利用 Worker 加速搜索；先做可复现的基准，再决定是否值得。
-7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合接入评估跑批（3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），3.8.10 起歼灭 / 大逃杀也已接入（`local-worker` 支持四种模式，控制台可启动）。剩余缺口是大逃杀只有 1 个算法、组不出批次；歼灭已有 `random-annihilation` / `shrinkroll` / `vortex` 三个，可以开跑。
+7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合接入评估跑批（3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），3.8.10 起歼灭 / 大逃杀也已接入（`local-worker` 支持四种模式，控制台可启动）。歼灭已有 `random-annihilation` / `shrinkroll` / `vortex` 三个，大逃杀已有 `random-royale` / `apex` 两个，均可组批。
 8. **部署决策继续收敛**：`deployDecision()` 已统一 threat / mcts / field / verdict；还剩 `greedy` 与 `scripts/auto-standard-game.mjs` 两份变体未合并。
 9. **tempo / 兑现率量纲**：verdict 已用行动点预算与“打击分 − 原地承伤 × 姿态系数”补上 danger-close / multiplayer-ring 两个老短板；下一步是把“每一步兑现率”做成可计算量纲，而不是再配一个系数。旧 `forge` 例子已不适用，改用当前短图与多行动点图验证。
 10. **基准数据自动化**：让 `scripts/algorithm-arena.mjs` / `scripts/matrix_eq_benchmark.mjs` 输出带 `engineVersion / mapPool / harness / games / seed / date` 的 JSON，再由脚本生成本文表格，避免手工抄写再次漂移。
@@ -519,6 +600,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 经纬标定与复跑 | `scripts/tempo-weave-arena.mts`（双人矩阵）、`scripts/tempo-weave-multiseat.mts`（多席位轮换）、`scripts/tempo-weave-http.mjs`（HTTP runner） | 真实引擎、公开快照口径；3.8.2 标定 240+45 局的原始记录随交付包归档，仓库内可直接复跑 |
 | 视界标定与复现 | `scripts/horizon-arena.mts`（headless 逐局换种子 + 成对换座）、`scripts/horizon-http-match.mjs`（REST 建房 + 每座位一个 runner） | 真实引擎、算法拿 REST 同口径快照；horizon 档案数字由前者产出，`--a-file` 可加载开发版本；本机多 bot 需 `TACTICAL_GAME_RATE_LIMIT` 调高限流 |
 | 缩圈推演算法标定与复现 | `temp/arena/bench.ts`（进程内真实引擎、`--swap` 换座） | shrinkroll 档案数字由它产出；该 harness 与评测贪婪基线 `temp/arena/opponents/greedy-annihilation.mjs` 目前在 gitignored 的 `temp/` 下，入库前只能按档案参数复跑 |
+| 大逃杀换座评估 | `scripts/apex-arena.mts` | 真实引擎、公开快照，支持随机基线 / 独立启发式 / 多人自博弈，输出未结束局与动作失败统计，不写竞技场历史 |
 | Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 标准模式 36,000 局（2026-10-21 UTC）、同时回合 1,008 局（2026-10-24）；按模式分榜；3.8.5 起同时回合参与算法 7 个 |
 | 合法性回归 | `tests/algorithms/*-selfplay.test.ts` | 整局零非法动作、正常完赛 |
 | 单算法档案 | `algorithms/docs/algorithms/*.md` | 设计细节与逐图数据；本文只保留总览与当前快照 |

@@ -117,7 +117,7 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(badJobs.statusCode).toBe(400);
     expect(badJobs.json().code).toBe('invalid_jobs');
 
-    // 歼灭已注册 3 个算法（random-annihilation + shrinkroll + vortex）：显式只选 1 个仍不允许启动。
+    // 歼灭已注册 4 个算法（random-annihilation + shrinkroll + vortex + crucible）：显式只选 1 个仍不允许启动。
     const annihilationSingleAlgo = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',
       payload: { maps: ['artillery-zone'], participants: ['algo:random-annihilation'] },
@@ -125,7 +125,7 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(annihilationSingleAlgo.statusCode).toBe(400);
     expect(annihilationSingleAlgo.json().code).toBe('invalid_participants');
     expect(annihilationSingleAlgo.json().error).toContain('至少需要选择 2 个');
-    expect(annihilationSingleAlgo.json().error).toContain('注册算法 3 个');
+    expect(annihilationSingleAlgo.json().error).toContain('注册算法 4 个');
 
     const royaleSingleAlgo = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',
@@ -152,6 +152,19 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(args).toContain('--maps artillery-zone');
     // 不传 participants = 无过滤（round_robin 默认取全部该模式算法），故两者都不出现
     expect(args).not.toContain('--algorithms');
+    expect(args).not.toContain('--models');
+  });
+
+  it('starts royale evaluation with apex and its mode-specific baseline', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['snowflake', 'narrow-road'], participants: ['algo:random-royale', 'algo:apex'], games: 4 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({ mode: 'royale', participants: ['algo:random-royale', 'algo:apex'] });
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--mode royale');
+    expect(args).toContain('--algorithms random-royale,apex');
     expect(args).not.toContain('--models');
   });
 

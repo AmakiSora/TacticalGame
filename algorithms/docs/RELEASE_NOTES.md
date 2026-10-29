@@ -4,7 +4,7 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
 
 ## 3.8.16（2026-10-29）— echelon 雁阵算法 v1
 
@@ -22,7 +22,33 @@
 - 新增 `tests/algorithms/echelon.test.ts`（20 例：决策门卫、零兵力部署、前缀感知的幽灵重复入队回归、锁定射击、击杀进度集火、治疗危险区镜像、预警格疏散、链式撤离、爆破开路、确定性、真实 snowflake 整轮入队校验）与 `tests/algorithms/echelon-selfplay.test.ts`（两图整局自博弈 0 非法动作、狭路断言终局）；`tests/algorithms/registry.test.ts` 补 echelon 元数据断言。
 - 强度标定（真实引擎 headless 对拍 `scripts/horizon-arena.mts`，2026-10-29，逐局交换座位）：vs `random-royale` snowflake **30:0**、narrow-road **19:1**、snowflake 3P 1v2 **6:0**；镜像自博弈 snowflake 3:5/4 平（平局为规则允许的规避对峙、round_guard 兜底）、narrow-road 6:6 全部正常终局；全部对局 echelon 席位 **0 非法动作**；决策耗时单轮 p50 2.4–15.8ms、max 39.9ms。
 - **新图开箱即用验证**：临时合成一张全新 royale 地图（开阔盘 + 花心十字墙、attacksPerUnit 2、不同炮火节奏与兵种数值，验证后删除）跑整局自博弈与对拍，echelon 零改动 0 非法；该图暴露并修复了算法地形解析优先级 bug（地形覆盖层"后者优先"语义未对齐引擎 gameIndex）。
-- `npm run build` 通过；`npm test` 全量 139 文件 / 1416 例全绿。
+- `npm run build` 通过；`npm test` 全量 **142 文件 / 1481 例全绿**（已含合入的 3.8.14 / 3.8.15 用例）。
+
+## 3.8.15（2026-10-29）— crucible 熔炉算法 v1
+
+### 新增功能
+
+- **`crucible`（熔炉算法）**：仅参与歼灭，整回合束搜索（束宽 7、深度 ≤8）在即时执行镜像上排激活序列（让路/集火/部署免费补刀），叶值用本局 `adjudicationWeights` 计价军力差与击杀分，扣对手下回合贪心集火回推损失与逐单位缩圈时间线逃逸推演的不可避免圈伤，再加我方威慑折算与据点安全收入。独立设计、单文件零依赖，不参考/不调用其他算法，不读地图名或对手隐藏信息；一切参数取自本局 config，随机新图（含零初始单位、非零占领权重、`minimumSafeRadius: 0` 消耗战）自动适配。档案 `algorithms/docs/algorithms/crucible.md`，设计与评估见 [开发笔记](ALGORITHMS_NOTES.md#crucible熔炉算法)。
+- **注册与评估**：`algo_crucible` / `algo_crucible@v1`，`modes: ['annihilation']`，大厅、runner 与评估控制台由注册表自动接入；歼灭算法池扩至 4 个（random-annihilation / shrinkroll / vortex / crucible）。本地换座标定 harness `scripts/crucible-arena.mts`（真实引擎进程内，成对换座、随机新图、零拒绝审计），不写竞技场历史。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/crucible.test.ts`（9 例：模式隔离、双图双座位整局零拒绝、零初始单位随机图首回合部署回归、集火斩杀记账、危险区疏散、部署补刀真实 id 解析、独立实例确定性）；`tests/api/arena-eval.test.ts` 歼灭注册算法数同步为 4。
+- 3.8.15 真实引擎本地标定（`scripts/crucible-arena.mts`，成对换座，2026-10-29）：固定两图对 vortex **80:0**、对 shrinkroll **75:5**（5 负全在 trench-run 消耗战残局）、对 random-annihilation **120:0**；随机新图 10 张对 vortex **21:1**、对 shrinkroll **20:2**、对 random-annihilation **22:0**；合计 **346 局 338 胜 8 负、零非法动作**，不写竞技场历史。种子、调参回退记录与已知限制见 [开发笔记](ALGORITHMS_NOTES.md#crucible熔炉算法)，不作未来必胜承诺。
+- `npm run build`、`npm run check-version` 通过，全量 **140 文件 / 1459 用例通过**；竞技场评估 API 套件（33 例，含合并参与者目录）通过。
+
+## 3.8.14（2026-10-29）— apex 绝境算法 v1
+
+### 新增功能
+
+- **`apex`（绝境算法）**：仅参与大逃杀，按地图数值与地形推导缩圈撤离、连续爆破开路、射程/机动/支援价值与可用行动点下的兵力规模；多情境逐步束搜索后用双人针对性回应检验计划。不调用其他策略、不读地图名称或对手隐藏队列；档案 `algorithms/docs/algorithms/apex.md`，设计与评估见 [开发笔记](ALGORITHMS_NOTES.md#apex绝境算法)。
+- **注册与评估**：`algo_apex` / `algo_apex@v1`，`modes: ['royale']`，大厅与评估控制台由注册表自动接入；大逃杀可与 `random-royale` 组批。新增真实引擎本地评估脚本，支持成对换座、随机新图、独立启发式压力对手和多人自博弈，未结束局单列、不写竞技场历史。
+
+### 测试与验证
+
+- 35 项规则模型对拍与 19 项策略回归覆盖分步结算、炮火轮界、小数波动、信息隔离、队列缓存、残兵估值、连续障碍及重复碰撞；大厅与评估 API、桌面/移动端算法清单同步回归。
+- 3.8.14 真实引擎本地标定：固定两图对随机/独立启发式各 60 胜，新随机 15 图对随机 30 胜、对启发式 29 胜 1 平，均零非法入队；六人自博弈 2 局完赛，三人 3 局到 80 轮仍未结束。种子、预算、耗时与已知败局见 [开发笔记](ALGORITHMS_NOTES.md#apex绝境算法)，不作未来必胜承诺。
+- `npm run build`、`npm run check-version` 与新增脚本/测试的严格类型检查通过，全量 139 文件 / 1450 用例通过；浏览器大厅及评估选择验证通过，真实 HTTP + runner 对局绝境获胜、双方零拒绝/运行错误，未写竞技场历史。
 
 ## 3.8.13（2026-10-29）— vortex 旋涡算法 v1
 

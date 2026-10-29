@@ -17,8 +17,8 @@
   只能跑同一模式，四种模式均已接入：standard / annihilation 逐动作执行（歼灭的炮火
   缩圈与淘汰由引擎在轮界结算），simultaneous / royale 走计划入队与统一结算。模式内
   只纳入注册表 ``ALGORITHM_META.modes`` 声明该模式的算法；RL 模型仅支持标准模式，
-  不参与其他模式跑批。歼灭已有 random-annihilation 与 vortex 两个条目，大逃杀目前
-  只有 1 个，需第二个算法落地后才能组批。
+  不参与其他模式跑批。歼灭已有 random-annihilation、shrinkroll 与 vortex 三个条目，大逃杀
+  已有 random-royale 与 apex 两个，均可组批。
 
 用法示例：
 

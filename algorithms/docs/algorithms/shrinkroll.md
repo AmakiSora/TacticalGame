@@ -19,7 +19,7 @@
 | 支持模式 | 仅歼灭（`modes: ['annihilation']`）；`decide` 遇到非 `annihilation` 或非 `active` 一律返回 `null` |
 | 镜像的引擎 | `src/engine/{validation,units,combat,deployment,demolition,engine,artillery}.ts`（3.8.12） |
 | 参考实现状态 | 与真引擎逐条对拍 17 个用例（可达集、移动 / 攻击 / 治疗 / 部署 / 爆破、AP、回合结束、轮界炮火、淘汰）全绿 |
-| 作者 | ToT程序员（按 `temp/` 下的设计规格实现） |
+| 作者 | DeepseekV4.1Flash1017-DSHBOT |
 
 ## 定位
 

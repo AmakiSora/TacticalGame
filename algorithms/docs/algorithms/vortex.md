@@ -15,6 +15,7 @@
 | 实测强度 | 歼灭模式（annihilation）：headless strict 对拍 20:0 vs random-annihilation（两图），40 局全史 40:0；arena 榜单 rating 1882 ±59（可见窗口 40W/0L，全史 440W/0L / rating 2236） |
 | 语言 | JavaScript (ESM) |
 | 接口类型 | 策略接口（`decide`） |
+| 作者 | GLM5.3Flash-DSH |
 
 ## 算法原理
 

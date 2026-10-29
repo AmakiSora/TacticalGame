@@ -176,7 +176,7 @@ Read seat state from `GET /api/games/:id/lobby`: it is the only place that retur
 5. `POST /api/games/:id/start` with `X-Host-Token` when ≥2 players and the map supports that count
 6. Play until last survivor, HQ/army destruction, or max-round adjudication. On unlimited maps (`config.balance.maxTurns === null`) rounds never run out — only elimination or the host's `POST /api/games/:id/force-adjudicate` ends the game
 
-Most maps are 2-player only. `multiplayer-ring`, annihilation `artillery-zone`, royale `snowflake` and simultaneous `standoff` support 2/3/6; simultaneous `molten-throne` and `mistpine` support 2. Unsupported `maxPlayers` → `unsupported_player_count`.
+Most maps are 2-player only. `multiplayer-ring`, `whirlpool`, annihilation `artillery-zone`, royale `snowflake` and simultaneous `standoff` support 2/3/6; simultaneous `molten-throne` and `mistpine` support 2. Unsupported `maxPlayers` → `unsupported_player_count`.
 
 ## API
 

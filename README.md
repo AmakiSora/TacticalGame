@@ -87,6 +87,7 @@ npm run export-state
 | 等待轮次/事件 | `GET /api/games/:id/wait?afterSeq=<seq>&timeout=<seconds>` |
 | 事件流 | `GET /api/games/:id/events`（`Accept: text/event-stream` 时建立 SSE） |
 | 玩法动作 | `POST /api/games/:id/{deploy,move,attack,heal,demolish,end-turn}` |
+| 同时回合计划 | `POST /api/games/:id/plan/{wait,revoke,reorder,clear}`（同时回合 / 大逃杀排队阶段的等待、撤回、重排、清空） |
 | Agent 技能 | `GET /api/skill`、`/api/skill/manifest`、`/api/skill/files/:name` |
 | 健康与指标 | `GET /healthz`、`GET /readyz`、`GET /metrics` |
 

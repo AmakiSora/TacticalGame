@@ -1,4 +1,4 @@
-# Apex — 绝境算法
+# apex — 绝境算法
 
 > 单算法档案，遵循 `ALGORITHMS_NOTES.md` 固定模板。
 
@@ -8,7 +8,8 @@
 |---|---|
 | 文件 | `algorithms/builtin/apex.mjs`（策略）+ `algorithms/lib/royale-model.mjs`（规则模型） |
 | 算法名 | `apex` |
-| 注册键 | `algo_apex@v1` |
+| 注册键 | `apex`（`ALGORITHMS['apex']`） |
+| 参与者 id | `algo_apex@v1`（大厅 bot type `algo_apex`） |
 | 显示名称 | 绝境算法（Apex） |
 | 定位 | 独立规则模型 + 多情境逐行动点束搜索 + 双人对抗探针：整轮计划，不读地图名/对手隐藏队列/RNG |
 | 实现日期 | 2026-10-29 |

@@ -489,12 +489,12 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default,breach,d
 # 纯模型循环赛（不带算法，如复现旧口径）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --algorithms none
 
-# 同时回合（仅内置算法；地图池 standoff / molten-throne）
+# 同时回合（仅内置算法；地图池 standoff / molten-throne / mistpine）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps standoff,molten-throne --games 2 \
     --algorithms random-sim,dest-prob,kriegspiel,matrix-eq
 
 # 歼灭（仅同模式算法）
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps artillery-zone --algorithms random-annihilation,shrinkroll,vortex,crucible --games 24
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps artillery-zone --algorithms random-annihilation,shrinkroll,vortex,crucible,sovereign --games 24
 
 # 大逃杀（仅同模式算法）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps snowflake,narrow-road --algorithms random-royale,echelon,apex --games 24

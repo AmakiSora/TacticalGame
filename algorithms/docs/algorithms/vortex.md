@@ -1,4 +1,4 @@
-# Vortex — 旋涡算法
+# vortex — 旋涡算法
 
 > 单算法档案，遵循 `ALGORITHMS_NOTES.md` 固定模板。
 
@@ -8,11 +8,12 @@
 |---|---|
 | 文件 | `algorithms/builtin/vortex.mjs` |
 | 算法名 | `vortex` |
-| 注册键 | `algo_vortex@v1` |
+| 注册键 | `vortex`（`ALGORITHMS['vortex']`） |
+| 参与者 id | `algo_vortex@v1`（大厅 bot type `algo_vortex`） |
 | 显示名称 | 旋涡算法（Vortex） |
 | 定位 | 效用 AI（Utility AI）+ 炮火收缩圈预判：不搜索、不模拟，单步评估全部候选动作 |
 | 实现日期 | 2026-10-29 |
-| 实测强度 | 歼灭模式（annihilation）：headless strict 对拍 20:0 vs random-annihilation（两图），40 局全史 40:0；arena 榜单 rating 1882 ±59（可见窗口 40W/0L，全史 440W/0L / rating 2236） |
+| 实测强度 | 歼灭模式（annihilation）：headless strict 对拍 20:0 vs random-annihilation（两图），40 局全史 40:0；竞技场榜单（2026-10-29）rating **1155**、192 局 48 胜 144 负（25.0%）——3.8.13 发布时口径为 rating 1882 ±59（40W/0L，当时榜上只有随机基线），两套数字不可混用 |
 | 语言 | JavaScript (ESM) |
 | 接口类型 | 策略接口（`decide`） |
 | 作者 | GLM5.3Flash-DSH |
@@ -97,8 +98,8 @@ random-annihilation 只做一层合法性过滤（`deployDecision` 跳过危险�
 
 ### 与其他算法/榜单
 
-- **可见榜单**（post-cleanup 窗口）：vortex rating **1882 ±59**，40W/0L，歼灭模式榜第一；全史口径（含清理前镜像对拍）440W/0L、rating 2236。
-- 其他歼灭系算法为镜像清理后仅剩 `random-annihilation` 一个注册对手（见 `ALGORITHMS_NOTES.md` 清理记录），strict 对拍即上表。
+- **当前榜单（2026-10-29，`public/data/arena-leaderboard.json`）**：vortex rating **1155**，192 局 **48 胜 144 负（25.0%）**；同榜 `sovereign` 2142、`crucible` 1914、`shrinkroll` 1694、`random-annihilation` 595。
+- **3.8.13 发布时口径**：rating 1882 ±59、可见窗口 40W/0L（全史 440W/0L）。当时歼灭榜只有 `random-annihilation` 一个注册对手；3.8.15 / 3.8.17 加入 `crucible` / `sovereign` 后榜单重算，这套数字仅作历史记录，不能与当前值对照。
 
 ## 决策时间
 
@@ -218,4 +219,4 @@ export default {
 ## 一句话总结
 
 Vortex 把歼灭模式的炮火收缩圈当成收益项而不是风险项：按 round+1 安全校验站位，疏散有奖、进圈重罚、注定单位转为免费输出，配合稳杀集火与激进补员。
-strict 对拍 40:0 vs random-annihilation（两图各 20 局、0 非法动作），arena 榜单歼灭模式 rating 1882（40W/0L）。
+strict 对拍 40:0 vs random-annihilation（两图各 20 局、0 非法动作）；竞技场榜单（2026-10-29）rating 1155（192 局 48W/144L）。

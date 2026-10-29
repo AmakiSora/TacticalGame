@@ -27,12 +27,12 @@ node algorithms/runner.mjs \
 - **random** - 随机算法：从所有合法动作中均匀随机选择（标准模式）
 - **random-annihilation** - 歼灭随机算法：同一轮流枚举 + 炮火危险区部署/治疗过滤（歼灭模式）
 - **shrinkroll** - 缩圈推演算法：回合内束搜索 + 缩圈时间线推演 + 轮界裁决投影（歼灭模式）
-- **vortex** - 旋涡算法：预判 round+1 炮火收缩圈疏散、威胁图稳杀集火、走位风筝与激进补员（歼灭模式），设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#vortex旋涡算法)
-- **crucible** - 熔炉算法：整回合束搜索 + 对抗集火回推 + 缩圈时间线逃逸推演（歼灭模式），设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#crucible熔炉算法)
-- **sovereign** - 统御算法：概率齐射竞价 + 多轮炮火逃逸 + 协同让行与移动爆破（歼灭模式），设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#sovereign统御算法)
-- **echelon** - 雁阵算法：落点扩散预报 + 精确击杀概率集火 + 炮火圈生存调度 + 爆破距离场开路（大逃杀模式），设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#echelon雁阵算法)
+- **vortex** - 旋涡算法：预判 round+1 炮火收缩圈疏散、威胁图稳杀集火、走位风筝与激进补员（歼灭模式）；档案 [vortex.md](../docs/algorithms/vortex.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#vortex旋涡算法)
+- **crucible** - 熔炉算法：整回合束搜索 + 对抗集火回推 + 缩圈时间线逃逸推演（歼灭模式）；档案 [crucible.md](../docs/algorithms/crucible.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#crucible熔炉算法)
+- **sovereign** - 统御算法：概率齐射竞价 + 多轮炮火逃逸 + 协同让行与移动爆破（歼灭模式）；档案 [sovereign.md](../docs/algorithms/sovereign.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#sovereign统御算法)
+- **echelon** - 雁阵算法：落点扩散预报 + 精确击杀概率集火 + 炮火圈生存调度 + 爆破距离场开路（大逃杀模式）；档案 [echelon.md](../docs/algorithms/echelon.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#echelon雁阵算法)
 - **random-royale** - 大逃杀随机算法：从合法计划动作中随机入队，随后提交（大逃杀模式）
-- **apex** - 绝境算法：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验（大逃杀模式），设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#apex绝境算法)
+- **apex** - 绝境算法：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验（大逃杀模式）；档案 [apex.md](../docs/algorithms/apex.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#apex绝境算法)
 - **mcts** - 蒙特卡洛树搜索：模拟推演选择最优动作（标准模式）
 - **threat** - 威胁感知算法：威胁图统一效用评估，集火斩杀、避险走位（标准模式）
 - **field** - 势场算法：斥力井（敌方火力）+ 引力井（据点/总部）+ 波前距离场，风筝走位、分头抢点（标准模式）

@@ -179,7 +179,7 @@ npx tsx scripts/algorithm-arena.mjs --a vortex --b random-annihilation --games 2
 | artillery-zone | 20:0 | 1161 vs 7 | 8.1 / 32.7 / 15.0 / 1.2 | 0 | 0.12 / 2.03 / 8.4 ms |
 | trench-run | 20:0 | 953 vs 6 | 8.4 / 37.1 / 11.6 / 0.5（另有爆破 0.7） | 0 | 0.08 / 1.32 / 4.0 ms |
 
-两图 40 局全部 `last_player_standing` 终局，vortex 席位合计 4816 次决策全部被引擎接受；先手后手 10:10 全胜。竞技场榜单歼灭模式 rating 1882 ±59（可见窗口 40W/0L；全史 440W/0L 含清理前的镜像标定对局）。排查 strict 初报 119 次非法动作时确认 headless `snapshot()` 缺 `game.artillery` 字段（线上透传、headless 未透），已修复 harness——算法侧镜像无误。
+两图 40 局全部 `last_player_standing` 终局，vortex 席位合计 4816 次决策全部被引擎接受；先手后手 10:10 全胜。竞技场榜单（2026-10-29）vortex rating **1155**、192 局 48 胜 144 负（25.0%）；3.8.13 发布时口径为 rating 1882 ±59（40W/0L，当时榜上只有随机基线），随后加入 crucible / sovereign 后重算，两套数字不可混用。排查 strict 初报 119 次非法动作时确认 headless `snapshot()` 缺 `game.artillery` 字段（线上透传、headless 未透），已修复 harness——算法侧镜像无误。
 
 **已知限制**：单步贪心无前瞻；权重按歼灭裁定口径标定、标准模式未评估；收缩圈公式镜像依赖 `config.annihilation.artillery` 配置、royale 未适配；对拍样本均为 2 席位。完整清单与优化方向见 [档案](algorithms/vortex.md)。
 
@@ -413,9 +413,9 @@ export const ALGORITHM_META = {
 | **shrinkroll** | annihilation | v1 | 束搜索 + 缩圈时间线投影 | O(束宽×候选×深度×结算投影) | 3.8.12 开发期真实引擎标定（`temp/arena/bench.ts`，两图各 240 局）：对 random-annihilation **480/480**；对评测贪婪基线 100%（artillery-zone，160/160）/ 98.75%（trench-run，158/160）；自我镜像 50.0% / 49.7%；3 人局第一名 90.0%（108/120）；随机歼灭图 97.9%（47/48）、6 人混战 32/32；单次 decide 4.91–10.85ms、零非法 | 歼灭模式强基线、多席位领先者压制 |
 | **random-royale** | royale | v1 | 随机 | O(n) | 独立随机基线，对战见 [apex 评估](#apex绝境算法) 与 [echelon 评估](#echelon雁阵算法) | 大逃杀模式基线、计划队列冒烟 |
 | **echelon** | royale | v1 | 效用 AI / 落点扩散预报 + 击杀概率 + 炮火圈调度 + 爆破距离场 | O(单位×格子 + 敌军×预报扩散) | 3.8.16 真实引擎 headless 对拍 `random-royale`（2026-10-29，逐局换座）：snowflake **30:0**、narrow-road **19:1**、3P 1v2 **6:0**；镜像自博弈稳定、全部对局 0 非法；单轮 p50 2.4–15.8ms、max 39.9ms，详见 [设计与评估](#echelon雁阵算法) | 大逃杀模式强度条目、计划模式逐拍剧本与炮火生存调度参考 |
-| **apex** | royale | v1 | 多情境束搜索 + 缩圈时空寻路 | O(行动点×束宽×候选×情境×单步结算) | 真实引擎本地换座，详见 [设计与评估](#apex绝境算法)；未写入竞技场榜单 | 大逃杀整轮规划、跨图参数适配 |
-| **vortex** | annihilation | v1 | 效用 AI / 威胁图 + 炮火收缩圈预判 | O(单位×格子) | 真实引擎 headless strict 对拍 `random-annihilation` 40:0（两图各 20 局，2026-10-29，零非法），详见 [设计与评估](#vortex旋涡算法)；榜单歼灭模式 40W/0L / 1882 | 歼灭模式强度条目、炮火圈疏散与稳杀集火参考 |
-| **crucible** | annihilation | v1 | 整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演 | O(束宽×候选×深度×(单位×格子)) | 3.8.15 真实引擎本地换座标定，详见 [设计与评估](#crucible熔炉算法)；未写入竞技场榜单 | 歼灭模式整回合规划、跨图/跨权重泛化 |
+| **apex** | royale | v1 | 多情境束搜索 + 缩圈时空寻路 | O(行动点×束宽×候选×情境×单步结算) | 真实引擎本地换座，详见 [设计与评估](#apex绝境算法)；本地标定不入榜，另由竞技场跑批入榜（apex 96 局，2026-10-29） | 大逃杀整轮规划、跨图参数适配 |
+| **vortex** | annihilation | v1 | 效用 AI / 威胁图 + 炮火收缩圈预判 | O(单位×格子) | 真实引擎 headless strict 对拍 `random-annihilation` 40:0（两图各 20 局，2026-10-29，零非法），详见 [设计与评估](#vortex旋涡算法)；当前榜单 rating **1155**（192 局 48W/144L），3.8.13 发布时为 1882（40W/0L） | 歼灭模式强度条目、炮火圈疏散与稳杀集火参考 |
+| **crucible** | annihilation | v1 | 整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演 | O(束宽×候选×深度×(单位×格子)) | 3.8.15 真实引擎本地换座标定，详见 [设计与评估](#crucible熔炉算法)；本地标定不入榜，另由竞技场跑批入榜（crucible 193 局，2026-10-29） | 歼灭模式整回合规划、跨图/跨权重泛化 |
 | **sovereign** | annihilation | v1 | 概率齐射竞价 + 多轮炮火逃逸 + 协同让行/爆破距离场 | O(单位×格子 + 齐射组合×目标 + 部署候选×(单位×格子)) | 3.8.17 真实引擎黑盒跑批（`scripts/sovereign-arena.mts`，2026-10-29）：双人 256 局 225:31、三人 18:6、六人 11:13，合计 **304 局 254:50**、零非法；静态双人对 crucible 30:10，随机新图 8:12、六人对 shrinkroll/crucible 各 0:6，详见 [设计与评估](#sovereign统御算法) | 歼灭模式概率集火与多人风险建模参考 |
 | **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
 | **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
@@ -594,6 +594,8 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 2026-10-29 | 3.8.12 | 新增 shrinkroll 缩圈推演算法 v1（歼灭模式）：回合内束搜索（束宽 2→6→8，确定性节点预算）+ 裁决分叶值（我方 − 最强对手，多人局次席按 `ACE_FFA_RIVAL=0.5` 折算）+ 轮界炮火/裁决投影 + 两人局对手贪心 rollout。镜像与真引擎逐条对拍 17 例零偏差。开发期真实引擎（`temp/arena/bench.ts`，`--swap`）：对 random-annihilation 两图各 240 局 **480/480**；对评测贪婪基线 **100%（160/160）/ 98.75%（158/160）**；自我镜像 50.0% / 49.7%；3 人局第一名 **90.0%（108/120）**、6 人混战 32/32；单次 decide 4.91–10.85ms，全程零非法 |
 | 2026-10-29 | 3.8.13 | 新增 vortex 旋涡算法 v1（歼灭）：按引擎公式复算 round+1 炮火安全圈做疏散主项，威胁图稳杀集火，按歼灭裁定口径反推权重；真实引擎 headless strict 对拍 `random-annihilation` 40:0（artillery-zone / trench-run 各 20 局，零非法、先手后手 10:10），p95 ≤ 2.03 ms。详见 [设计与评估](#vortex旋涡算法) |
 | 2026-10-29 | 3.8.14 | 新增 apex 绝境算法 v1（大逃杀）：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验；大厅与评估控制台接入双算法池。真实引擎换座与随机新图数据见 [设计与评估](#apex绝境算法)，本地验证不写竞技场历史。 |
+| 2026-10-29 | 3.8.15 | 新增 crucible 熔炉算法 v1（歼灭）：整回合束搜索（束宽 7、深度 ≤8）在即时执行镜像上排激活序列，叶值按本局裁决权计价军力差与击杀分，扣对手下回合集火回推与逐单位缩圈逃逸推演的圈伤；独立设计、零依赖、不按地图名分支。真实引擎本地换座（`scripts/crucible-arena.mts`）：固定两图对 vortex 80:0、对 shrinkroll 75:5、对 random-annihilation 120:0，随机新图 10 张对 vortex 21:1 / shrinkroll 20:2 / random-annihilation 22:0，合计 **346 局 338 胜 8 负、零非法**；不写竞技场历史。详见 [设计与评估](#crucible熔炉算法) |
+| 2026-10-29 | 3.8.16 | 新增 echelon 雁阵算法 v1（大逃杀）：逐拍效用决策——敌军落点扩散预报、均匀方差解析击杀概率与集火、炮火圈生存调度、爆破距离场开路、编成缺口与兵力上限；不读地图名或对手隐藏信息。真实引擎 headless 对拍（`scripts/horizon-arena.mts`，逐局换座）：对 random-royale snowflake **30:0**、narrow-road **19:1**、snowflake 3P 1v2 **6:0**，全部 0 非法；单轮 p50 2.4–15.8ms、max 39.9ms。详见 [设计与评估](#echelon雁阵算法) |
 | 2026-10-29 | 3.8.17 | 新增 sovereign 统御算法 v1（歼灭）：概率齐射竞价（精确离散伤害分布卷积、2–4 单位联合击杀概率）、多轮炮火逃逸动态规划、最终安全区让行与移动后爆破、按本局配置的部署/据点经济；单文件零导入、独立设计，不参考其他算法。真实引擎黑盒跑批（`scripts/sovereign-arena.mts`，换座）：双人 256 局 225:31、三人 18:6、六人 11:13，合计 **304 局 254:50**、零非法/零未完成；随机新图对 crucible 8:12、六人对 shrinkroll/crucible 各 0:6。详见 [设计与评估](#sovereign统御算法) |
 
 ## 未来方向
@@ -642,7 +644,9 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 视界标定与复现 | `scripts/horizon-arena.mts`（headless 逐局换种子 + 成对换座）、`scripts/horizon-http-match.mjs`（REST 建房 + 每座位一个 runner） | 真实引擎、算法拿 REST 同口径快照；horizon 档案数字由前者产出，`--a-file` 可加载开发版本；本机多 bot 需 `TACTICAL_GAME_RATE_LIMIT` 调高限流 |
 | 缩圈推演算法标定与复现 | `temp/arena/bench.ts`（进程内真实引擎、`--swap` 换座） | shrinkroll 档案数字由它产出；该 harness 与评测贪婪基线 `temp/arena/opponents/greedy-annihilation.mjs` 目前在 gitignored 的 `temp/` 下，入库前只能按档案参数复跑 |
 | 大逃杀换座评估 | `scripts/apex-arena.mts` | 真实引擎、公开快照，支持随机基线 / 独立启发式 / 多人自博弈，输出未结束局与动作失败统计，不写竞技场历史 |
-| Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 标准模式 36,000 局（2026-10-21 UTC）、同时回合 1,008 局（2026-10-24）；按模式分榜；3.8.5 起同时回合参与算法 7 个 |
+| 熔炉标定与复现 | `scripts/crucible-arena.mts` | 真实引擎进程内、成对换座、随机新图，审计零拒绝；不写竞技场历史 |
+| 统御黑盒评估 | `scripts/sovereign-arena.mts` | 真实引擎黑盒对战、成对共享战斗种子并换座，支持 2–8 人与额外随机图；报告只写 `temp/`，不写竞技场历史 |
+| Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 标准 36,000 局、歼灭 481 局、同时回合 2,016 局、大逃杀 144 局（`generatedAt` 2026-10-29T06:24:28Z）；按模式分榜，不同模式不混榜 |
 | 合法性回归 | `tests/algorithms/*-selfplay.test.ts` | 整局零非法动作、正常完赛 |
 | 单算法档案 | `algorithms/docs/algorithms/*.md` | 设计细节与逐图数据；本文只保留总览与当前快照 |
 | 版本历史 | 根 `RELEASE_NOTES.md`（权威） / `algorithms/docs/RELEASE_NOTES.md`（算法专题记录，已补录 3.5.0–3.8.5） | 算法侧细节看专题记录；与根文档冲突时以根文档为准 |

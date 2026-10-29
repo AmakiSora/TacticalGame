@@ -1,4 +1,4 @@
-# Echelon — 雁阵算法
+# echelon — 雁阵算法
 
 > 单算法档案，遵循 `ALGORITHMS_NOTES.md` 固定模板。设计完全从引擎规则第一性原理推导，
 > 实现期间未阅读仓库内其他强度算法（shrinkroll / vortex / horizon 等）的源码；规则输入
@@ -10,11 +10,12 @@
 |---|---|
 | 文件 | `algorithms/builtin/echelon.mjs` |
 | 算法名 | `echelon` |
-| 注册键 | `algo_echelon@v1` |
+| 注册键 | `echelon`（`ALGORITHMS['echelon']`） |
+| 参与者 id | `algo_echelon@v1`（大厅 bot type `algo_echelon`） |
 | 显示名称 | 雁阵算法（Echelon） |
 | 定位 | 效用 AI + 敌军落点扩散预报 + 精确击杀概率 + 炮火圈生存调度 + 爆破距离场开路 |
 | 实现日期 | 2026-10-29（3.8.16） |
-| 实测强度 | 大逃杀模式（royale）：headless 对拍 vs `random-royale` snowflake 30:0 / narrow-road 19:20 局中 19 胜（95%）、3 人局 1v2 6:0；镜像自博弈稳定、0 非法动作 |
+| 实测强度 | 大逃杀模式（royale）：headless 对拍 vs `random-royale` snowflake 30:0 / narrow-road 19:1（95%）、3 人局 1v2 6:0；镜像自博弈稳定、0 非法动作 |
 | 语言 | JavaScript (ESM) |
 | 接口类型 | 策略接口（`decide`） |
 | 作者 | GLM5.3Flash-Zcode |
@@ -80,6 +81,7 @@ Echelon 是大逃杀模式（同时回合 × 歼灭缩圈）的**逐拍效用决
 | `FORECAST_ALIGN` | 1.3 | 朝目标方向格的加权倍率 |
 | `FORECAST_DANGER_SHRINK` / `_FLEE_STAY` | 0.35 / 0.2 | 敌人视角危险格降权 / 危险中停留骤降 |
 | `LOCK_ESCAPE_MOVES` | 0.55 | 锁定建模：目标不动的概率之外的逃逸面权重 |
+| `LOCK_ESCAPE_SLACK` | 1 | 锁定逃逸的富余格数：目标多跑 1 格即视为基本逃出 |
 | `W_CHIP` | 1.4 | 期望伤害权重（压过站桩） |
 | `W_CHIP_FINISH` | 2.0 | 击杀进度价值倍率（残血目标单次命中更值钱） |
 | `W_RISK` | 1.0 | 反击风险权重（位置效用内计一次，攻击候选不重复扣） |
@@ -89,9 +91,11 @@ Echelon 是大逃杀模式（同时回合 × 歼灭缩圈）的**逐拍效用决
 | `STAGE_MARGIN` / `W_ADVANCE` | 1 / 1.6 | 驻屯内圈余量 / 推进与接敌拉力（不封顶） |
 | `BLAST_COST` / `W_ROUTE` / `W_BLAST_PROGRESS` / `BLAST_EV_CAP` | 5 / 0.35 / 1.2 / 30 | 爆破传送代价 / 路线牵引 / 爆破进度 / 爆破效用上限 |
 | `W_COHESION` / `W_HEAL_STATION` | 0.08 / 1.1 | 编队凝聚 / 治疗者驻疗位（贴伤兵治疗范围） |
+| `W_CROWD` | 1.0 | 与友军或自队声明格重叠的拥挤惩罚（声明格冲突时再 ×2） |
 | `W_EXPOSED` / `BONUS_KITE` / `ENGAGE_REACH` | 1.2 / 0.6 / 2 | 接敌暴露罚 / 安全风筝奖 / 接敌判定余量 |
 | `W_CP_INCOME` / `CP_PAD_BASE` / `CP_GUARD` | 2.2 / 14 / 10 | 占领价值（收入折算+基础）/ 守巢 |
 | `DEPLOY_BASE` / `DEPLOY_WARTIME` / `DEPLOY_NEXT_DANGER` | 20 / 0.8 / 0.55 | 部署基础效用 / 接敌折减 / 下轮圈落点折减 |
+| `UNBLOCK_BONUS` | 10 | 让位奖励：站在己方可部署据点旁堵死补员落点时，挪一格的额外效用 |
 | `POCKET_CROWD_LIMIT` | 5 | 出生据点 2 环拥挤上限（超则停补员；零兵力豁免） |
 | `HEALER_RATIO` / `HEALER_CAP` / `SNIPER_RATIO` / `FRONT_RATIO` / `RUNNER_TARGET` | 4 / 3 / 3 / 3 / 2 | 编成缺口目标 |
 | `COMMIT_THRESHOLD` | 1.0 | 效用低于此值直接提交（`null`） |
@@ -197,4 +201,4 @@ royale 地图无需改动本算法"的口径成立。
   前缀感知、锁定、击杀进度、治疗危险区镜像、疏散、爆破、确定性、真实 snowflake 整轮）。
 - 整局自博弈合法性：`npx vitest run tests/algorithms/echelon-selfplay.test.ts`（两图、
   0 非法动作、终局性按图断言）。
-- 全量：`npm run build && npm test`（3.8.16 交付口径 139 文件 / 1416 例全绿）。
+- 全量：`npm run build && npm test`（3.8.16 交付口径 142 文件 / 1482 例全绿）。

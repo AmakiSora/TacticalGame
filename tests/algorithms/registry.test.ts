@@ -15,6 +15,20 @@ import {
 const KNOWN_MODES = ['standard', 'simultaneous', 'annihilation', 'royale'];
 
 describe('algorithm registry modes', () => {
+  it('registers ark only for royale', async () => {
+    const { algorithmVersionedId, loadAlgorithm } = await import('../../algorithms/registry.mjs');
+    expect(ALGORITHMS.ark).toBe('./builtin/ark.mjs');
+    expect(getAlgorithmMeta('ark')).toMatchObject({
+      displayName: '方舟算法', version: 'v1', modes: ['royale'],
+    });
+    expect(algorithmVersionedId('ark')).toBe('algo_ark@v1');
+    expect(listAlgorithmInfo().find(i => i.name === 'ark')?.modes).toEqual(['royale']);
+    for (const mode of KNOWN_MODES) expect(algorithmSupportsMode('ark', mode)).toBe(mode === 'royale');
+    const algorithm = await loadAlgorithm('ark');
+    expect(algorithm.name).toBe('ark');
+    expect(typeof algorithm.decide).toBe('function');
+  });
+
   it('declares a non-empty modes list for every registered algorithm', () => {
     for (const name of Object.keys(ALGORITHMS)) {
       const modes = ALGORITHM_META[name]?.modes;

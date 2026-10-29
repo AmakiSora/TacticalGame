@@ -36,6 +36,7 @@ export const ALGORITHMS = {
   crucible: './builtin/crucible.mjs',
   sovereign: './builtin/sovereign.mjs',
   parallax: './builtin/parallax.mjs',
+  ark: './builtin/ark.mjs',
 };
 
 /**
@@ -80,6 +81,7 @@ export const ALGORITHM_META = {
   apex: { displayName: '绝境算法', description: '大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验', version: 'v1', modes: ['royale'] },
   crucible: { displayName: '熔炉算法', description: '歼灭：整回合束搜索、对抗集火回推与缩圈时间线逃逸推演', version: 'v1', modes: ['annihilation'] },
   sovereign: { displayName: '统御算法', description: '歼灭：概率齐射竞价、多轮炮火逃逸与协同让行开路，动态权衡兵力和部署窗口', version: 'v1', modes: ['annihilation'] },
+  ark: { displayName: '方舟算法', description: '大逃杀：独立安全格容量分配、行动组合调度与缩圈增援负担评估', version: 'v1', modes: ['royale'] },
 };
 
 /**

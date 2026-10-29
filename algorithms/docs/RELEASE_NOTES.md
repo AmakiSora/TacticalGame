@@ -4,7 +4,42 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.17（2026-10-29）— sovereign 统御算法 v1
+
+### 新增功能
+
+- **`sovereign`（统御算法）**：仅参与歼灭，依据权威规则独立设计，单文件零导入，不使用其他算法实现或策略工具；现有算法只作为不透明对手运行。注册为 `algo_sovereign` / `algo_sovereign@v1`，大厅、runner 与评估控制台由注册表接入，歼灭算法池扩至 5 个。档案见 [algorithms/sovereign.md](algorithms/sovereign.md)。
+- **概率激活竞价**：枚举移动与攻击、治疗、爆破的组合，按精确离散伤害分布卷积评估至多 4 单位的齐射，计入行动点、目标格冲突和击杀后的反击减免；已激活单位及新部署单位可利用零剩余行动点下的免费后续动作。
+- **多轮生存与协作**：最多前瞻 6 轮炮火，以地形路径上的最小累计炮伤估计逃逸成本；向最终安全区让出通道，重装可先移动再爆破。兵种数值、据点收益、部署折扣、行动点、裁决权重与缩圈节奏读取本局配置，不按地图名、对手名或单位 ID 分支。
+- **本地评估工具**：[`scripts/sovereign-arena.mts`](../../scripts/sovereign-arena.mts) 用真实引擎黑盒对战，成对共享战斗种子并换座，支持 2–8 人与额外随机图；只向算法提供公开状态，非法动作、异常或未完成对局均以非零状态退出。报告与可选行动轨迹仅可新建于 `temp/`，不写竞技场历史或正式排行榜。
+
+### 测试与验证
+
+- 新增 **58 项**规则与战术回归，覆盖离散伤害全取值、不可变公共快照、名称无关性、行动点与免费后续动作、治疗范围、地形覆盖及路径阻塞、据点部署折扣、移动后爆破、隔墙让行、连续炮火撤退、增援生存估值，以及三套改变兵种/计分/炮火参数的配置和静态歼灭图全部支持人数的真实引擎短局自博弈。
+- `npm run build`、`npm run check-version`、新增脚本与测试的严格类型检查通过；全量 `npm test` **143 文件 / 1540 用例通过**，评估 API **34 项**回归通过；评估 CLI 参数、输出路径边界与 2–8 人换座不变量检查通过。
+- **冻结策略后的独立评估**：引擎 **3.8.17**、随机图生成器 **v1**、所有参评算法 **v1**，harness 为上述 `sovereign-arena.mts`，日期 **2026-10-29**。下表均为 sovereign 胜:负；双人静态图每图每对手 20 局，10 张随机新图每图每对手 2 局，多人组只用 `artillery-zone`、每对手 6 局，其余席位各自运行同一对手算法。
+
+| 对手 | artillery-zone 双人 | trench-run 双人 | 10 张随机新图双人 | 三人局 | 六人局 |
+|---|---:|---:|---:|---:|---:|
+| random-annihilation | 20:0 | 20:0 | 20:0 | 6:0 | 6:0 |
+| shrinkroll | 20:0 | 17:3 | 18:2 | 3:3 | 0:6 |
+| vortex | 20:0 | 20:0 | 18:2 | 6:0 | 5:1 |
+| crucible | 16:4 | 14:6 | 8:12 | 3:3 | 0:6 |
+| 合计 | 76:4 | 71:9 | 64:16 | 18:6 | 11:13 |
+
+- 种子与复现命令如下；随机图批次还包含默认两张静态图的 16 局（14 胜 2 负），这些局未重复计入表中静态组。全部最终独立批次共 **304 局，254 胜 50 负、0 平局、0 未完成、所有算法 0 非法动作及运行异常**；调参集及最后一次战术回归修正前的战绩均不混入这组评估。
+
+```bash
+node --import tsx scripts/sovereign-arena.mts --games 20 --seed 215501
+node --import tsx scripts/sovereign-arena.mts --games 2 --random-maps 10 --seed 832041
+node --import tsx scripts/sovereign-arena.mts --players 3 --games 6 --seed 312901
+node --import tsx scripts/sovereign-arena.mts --players 6 --games 6 --seed 610101
+```
+
+- sovereign 单次决策 p95：静态双人 **9.94 ms**、随机图批次 **8.80 ms**、三人 **18.59 ms**、六人 **18.98 ms**，四组最大值 **100.16 ms**；为本机并行跑批观测值，不是实时延迟保证。浏览器确认歼灭目录显示统御、单算法不能启动、选择第二算法可启动，标准模式不显示统御，控制台无警告或错误；未启动写入竞技场历史的 UI 跑批。
+- **强度边界**：静态双人对 crucible 为 **30:10**，随机新图为 **8:12**；六人局对 shrinkroll、crucible 各 **0:6**，并未全面压制现有算法，多人混战胜率也不能与双人胜率直接比较。齐射只执行首动作后重算，反击概率、协同收益和忽略未来单位占位的逃逸路径均为估计，不是完整对抗搜索，不承诺战胜未知未来算法或地图。
 
 ## 3.8.16（2026-10-29）— echelon 雁阵算法 v1
 

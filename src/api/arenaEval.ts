@@ -33,7 +33,7 @@ const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRI
 // 评估链路已接入全部四种模式：跑批脚本缺省地图池（STANDARD_EVAL_MAPS）与
 // round_robin.py 的 DEFAULT_MAPS 保持一致；其余模式使用静态地图，且只纳入注册表
 // 声明该模式的算法（RL 模型目前只覆盖标准模式）。四种模式的算法条目：歼灭
-// random-annihilation / shrinkroll / vortex / crucible，大逃杀 random-royale /
+// random-annihilation / shrinkroll / vortex / crucible / sovereign，大逃杀 random-royale /
 // echelon / apex，各模式均 ≥ 2 个可组批；「少于 2 个参评算法」的启动请求仍会被拦下。
 export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
 export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne', 'mistpine'] as const;

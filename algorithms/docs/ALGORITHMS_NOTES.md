@@ -10,11 +10,11 @@
 
 | 项目 | 当前值 |
 |---|---|
-| 代码版本 | 3.8.16 |
+| 代码版本 | 3.8.17 |
 | 标准图池 | `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `whirlpool` |
 | 同时回合图 | `standoff` / `molten-throne` / `mistpine` |
 | 大逃杀图 | `snowflake` / `narrow-road`（内置基线：`random-royale`；强度算法：`echelon` / `apex`） |
-| 歼灭图 | `artillery-zone` / `trench-run`（内置基线：`random-annihilation`；强度算法：`shrinkroll` / `vortex` / `crucible`） |
+| 歼灭图 | `artillery-zone` / `trench-run`（内置基线：`random-annihilation`；强度算法：`shrinkroll` / `vortex` / `crucible` / `sovereign`） |
 | 同时回合规则 | 3.8.0 起按行动点**分步结算**，不是“一单位一轮一动作” |
 | 裁决分 | 3.6.0 起为击杀价值 + 据点流量制 |
 | 已退役地图 | `forge` → `molten-throne`（3.5.11，同时回合）、`desert`（3.5.8 下线）、`four-corners`（3.5.7 下线） |
@@ -40,6 +40,7 @@ algorithms/
 │   ├── apex.mjs          # 绝境算法（大逃杀模式）
 │   ├── crucible.mjs      # 熔炉算法（歼灭模式）
 │   ├── vortex.mjs        # 旋涡算法（歼灭模式）
+│   ├── sovereign.mjs     # 统御算法（歼灭模式）
 │   ├── echelon.mjs       # 雁阵算法（大逃杀模式）
 │   ├── mcts.mjs          # 蒙特卡洛树搜索（标准模式）
 │   ├── threat.mjs        # 威胁感知算法（标准模式）
@@ -84,6 +85,8 @@ algorithms/
 │       ├── tempo-weave.md
 │       ├── horizon.md
 │       ├── vortex.md
+│       ├── crucible.md
+│       ├── sovereign.md
 │       └── echelon.md
 ├── registry.mjs          # 算法注册表与 ALGORITHM_META
 ├── registry.d.mts        # 注册表 TypeScript 类型声明
@@ -213,6 +216,42 @@ npx tsx scripts/crucible-arena.mts --opp shrinkroll --games 0 --random 10 --seed
 **调参教训（已回退）**：针对 trench-run 全图消耗战试验过"提前部署支援兵"（先放宽到未来半径 ≤1，后收紧到仅 `minimumSafeRadius === 0`）并加治疗 ×1.5、终局补员 +20，同口径标定**全部变差**（vs shrinkroll 固定图 75:5 → 65:15 / 67:13、随机图 20:2 → 17:5），最终回退为通用支援条件。规则级建模（圈伤推演 + 治疗估值）已覆盖消耗战，额外启发式反而过拟合。
 
 **已知限制**：期望伤害按均值（方差尾部未卷积）；对抗回推假设贪心集火；圈伤逃逸为贪心向心近似；固定束宽在 6-8 人混战覆盖受限；随机新图每图仅两局，不满足逐图 30 局稳定选型口径，不能证明对所有未来地图/算法必胜。完整清单与优化方向见 [档案](algorithms/crucible.md)。
+
+## sovereign：统御算法
+
+`sovereign` v1 仅参与 `annihilation`，大厅类型为 `algo_sovereign`，竞技场参与者为 `algo_sovereign@v1`。单文件零导入实现（`builtin/sovereign.mjs`，策略接口 `decide`），**独立设计**：只依据歼灭规则、引擎行为与公开接口推导，不读取、不导入、不调用仓库内其他算法或策略辅助实现，现有算法仅作为黑盒对手运行；不按地图名、对手名或实体 id 分支。完整原理、参数与逐项限制见 [单算法档案](algorithms/sovereign.md)。
+
+- **概率齐射竞价**：`damageDistribution` 按引擎公式枚举全部方差结果，`convolve` 在剩余血量处截断；对同一目标组合 2–4 个单位（联合击杀概率 ≥0.65）竞价期望伤害、击杀分与反击减免，只执行首动作并按真实状态重算。
+- **多轮炮火逃逸**：安全半径按配置实时推导；最多前瞻 6 轮，沿相邻平地做至多 `moveRange` 步的 min-plus 松弛，逐轮乘 0.92 折扣并叠加圈外满额炮伤，再折成军力价值与死亡惩罚。
+- **协同让行与开路**：以最终安全区的 Dijkstra 距离场衡量"让开占位后友军可达距离是否缩短"；重装按允许 blocker 代价 3 通过的爆破距离场选墙，支持移动后同激活爆破，也支持行动点耗尽后的免费爆破。
+- **本局经济**：据点收入、可部署窗口、部署折扣、补给权重与终局折现全部取自 config 与裁决快照；低质量兵种的"攒钱"只是软扣分，空场补员另有保底，不会硬性禁止增援。
+- **确定性**：不使用随机数；同一公开快照给出同一动作，重命名实体/地图/座位不改变动作语义。
+
+评估（真实引擎进程内 harness `scripts/sovereign-arena.mts`，成对共享战斗种子并换座，不写竞技场历史）：
+
+```bash
+npx tsx scripts/sovereign-arena.mts --games 20 --seed 215501
+npx tsx scripts/sovereign-arena.mts --games 2 --random-maps 10 --seed 832041
+npx tsx scripts/sovereign-arena.mts --players 3 --games 6 --seed 312901
+npx tsx scripts/sovereign-arena.mts --players 6 --games 6 --seed 610101
+```
+
+**当前快照（2026-10-29，3.8.17 真实引擎，随机图生成器 v1，各算法 v1，Node 24.18.0）**：
+
+| 图池 | 对手 | 局数 | 胜 | 负 | 平 | 非法动作 |
+|---|---|---:|---:|---:|---:|---:|
+| artillery-zone + trench-run（每对手每图 20） | random-annihilation | 40 | 40 | 0 | 0 | 0 |
+| artillery-zone + trench-run（每对手每图 20） | shrinkroll | 40 | 37 | 3 | 0 | 0 |
+| artillery-zone + trench-run（每对手每图 20） | vortex | 40 | 40 | 0 | 0 | 0 |
+| artillery-zone + trench-run（每对手每图 20） | crucible | 40 | 30 | 10 | 0 | 0 |
+| 随机新图 10 张（每图每对手 2） | random-annihilation | 20 | 20 | 0 | 0 | 0 |
+| 随机新图 10 张（每图每对手 2） | shrinkroll | 20 | 18 | 2 | 0 | 0 |
+| 随机新图 10 张（每图每对手 2） | vortex | 20 | 18 | 2 | 0 | 0 |
+| 随机新图 10 张（每图每对手 2） | crucible | 20 | 8 | 12 | 0 | 0 |
+
+双人合计 **256 局（含随机图批次附带的 16 局静态图，14 胜 2 负）225 胜 31 负、零非法动作**；另跑 3 人与 6 人 `artillery-zone` 各 24 局，分别为 18:6 与 11:13，全部完赛。四批合计 **304 局 254 胜 50 负、0 平局、0 未完成、0 非法动作、0 运行异常**。多人局其他席位各自运行同一对手算法，不是联盟；混战胜率不能与双人胜率直接比较。调参阶段的旧种子战绩不计入本表。
+
+**强度边界**：随机新图上对 crucible 仅 8:12，六人局对 shrinkroll / crucible 各 0:6，并未全面压制现有算法；随机图每图每对手仅 2 局，不满足逐图 30 局稳定选型口径。完整已知限制（齐射只执行首动作、反击概率启发式、火力与炮伤未联合卷积、逃逸路径忽略占位等）与优化方向见 [档案](algorithms/sovereign.md)。
 
 ## 算法接口
 
@@ -377,6 +416,7 @@ export const ALGORITHM_META = {
 | **apex** | royale | v1 | 多情境束搜索 + 缩圈时空寻路 | O(行动点×束宽×候选×情境×单步结算) | 真实引擎本地换座，详见 [设计与评估](#apex绝境算法)；未写入竞技场榜单 | 大逃杀整轮规划、跨图参数适配 |
 | **vortex** | annihilation | v1 | 效用 AI / 威胁图 + 炮火收缩圈预判 | O(单位×格子) | 真实引擎 headless strict 对拍 `random-annihilation` 40:0（两图各 20 局，2026-10-29，零非法），详见 [设计与评估](#vortex旋涡算法)；榜单歼灭模式 40W/0L / 1882 | 歼灭模式强度条目、炮火圈疏散与稳杀集火参考 |
 | **crucible** | annihilation | v1 | 整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演 | O(束宽×候选×深度×(单位×格子)) | 3.8.15 真实引擎本地换座标定，详见 [设计与评估](#crucible熔炉算法)；未写入竞技场榜单 | 歼灭模式整回合规划、跨图/跨权重泛化 |
+| **sovereign** | annihilation | v1 | 概率齐射竞价 + 多轮炮火逃逸 + 协同让行/爆破距离场 | O(单位×格子 + 齐射组合×目标 + 部署候选×(单位×格子)) | 3.8.17 真实引擎黑盒跑批（`scripts/sovereign-arena.mts`，2026-10-29）：双人 256 局 225:31、三人 18:6、六人 11:13，合计 **304 局 254:50**、零非法；静态双人对 crucible 30:10，随机新图 8:12、六人对 shrinkroll/crucible 各 0:6，详见 [设计与评估](#sovereign统御算法) | 歼灭模式概率集火与多人风险建模参考 |
 | **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
 | **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
 | **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
@@ -401,13 +441,13 @@ export const ALGORITHM_META = {
 |---|---:|---|
 | standard | 6 | random / greedy / mcts / threat / field / verdict |
 | simultaneous | 8 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo / tempo-weave / horizon |
-| annihilation | 4 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像）/ shrinkroll（束搜索 + 缩圈时间线投影 + 轮界裁决投影）/ vortex（效用 AI + 收缩圈疏散）/ crucible（整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演） |
+| annihilation | 5 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像）/ shrinkroll（束搜索 + 缩圈时间线投影 + 轮界裁决投影）/ vortex（效用 AI + 收缩圈疏散）/ crucible（整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演）/ sovereign（概率齐射竞价 + 多轮炮火逃逸 + 协同让行与移动爆破） |
 | royale | 3 | random-royale（同时回合计划队列，与 random-sim 同源枚举）/ echelon（效用 AI + 落点扩散预报 + 炮火圈调度 + 爆破距离场）/ apex（多情境束搜索 + 缩圈时空寻路） |
 
 > 三个随机基线是**独立条目**：注册名、展示名、版本与竞技场参与者 id 全部分开
 > （`algo_random@v1` / `algo_random-annihilation@v1` / `algo_random-royale@v1`），
 > 战绩不会混名；标准模式的实现与历史不受影响。
-> 歼灭模式强度算法 `shrinkroll`（3.8.12）、`vortex`（3.8.13）与 `crucible`（3.8.15）；大逃杀强度算法 `echelon`（3.8.16）与 `apex`（3.8.14）。跨模式战绩不可用于证明算法强度。
+> 歼灭模式强度算法 `shrinkroll`（3.8.12）、`vortex`（3.8.13）、`crucible`（3.8.15）与 `sovereign`（3.8.17）；大逃杀强度算法 `echelon`（3.8.16）与 `apex`（3.8.14）。跨模式战绩不可用于证明算法强度。
 
 ## 当前强度快照（standard，2026-10-21 UTC）
 
@@ -554,16 +594,17 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 2026-10-29 | 3.8.12 | 新增 shrinkroll 缩圈推演算法 v1（歼灭模式）：回合内束搜索（束宽 2→6→8，确定性节点预算）+ 裁决分叶值（我方 − 最强对手，多人局次席按 `ACE_FFA_RIVAL=0.5` 折算）+ 轮界炮火/裁决投影 + 两人局对手贪心 rollout。镜像与真引擎逐条对拍 17 例零偏差。开发期真实引擎（`temp/arena/bench.ts`，`--swap`）：对 random-annihilation 两图各 240 局 **480/480**；对评测贪婪基线 **100%（160/160）/ 98.75%（158/160）**；自我镜像 50.0% / 49.7%；3 人局第一名 **90.0%（108/120）**、6 人混战 32/32；单次 decide 4.91–10.85ms，全程零非法 |
 | 2026-10-29 | 3.8.13 | 新增 vortex 旋涡算法 v1（歼灭）：按引擎公式复算 round+1 炮火安全圈做疏散主项，威胁图稳杀集火，按歼灭裁定口径反推权重；真实引擎 headless strict 对拍 `random-annihilation` 40:0（artillery-zone / trench-run 各 20 局，零非法、先手后手 10:10），p95 ≤ 2.03 ms。详见 [设计与评估](#vortex旋涡算法) |
 | 2026-10-29 | 3.8.14 | 新增 apex 绝境算法 v1（大逃杀）：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验；大厅与评估控制台接入双算法池。真实引擎换座与随机新图数据见 [设计与评估](#apex绝境算法)，本地验证不写竞技场历史。 |
+| 2026-10-29 | 3.8.17 | 新增 sovereign 统御算法 v1（歼灭）：概率齐射竞价（精确离散伤害分布卷积、2–4 单位联合击杀概率）、多轮炮火逃逸动态规划、最终安全区让行与移动后爆破、按本局配置的部署/据点经济；单文件零导入、独立设计，不参考其他算法。真实引擎黑盒跑批（`scripts/sovereign-arena.mts`，换座）：双人 256 局 225:31、三人 18:6、六人 11:13，合计 **304 局 254:50**、零非法/零未完成；随机新图对 crucible 8:12、六人对 shrinkroll/crucible 各 0:6。详见 [设计与评估](#sovereign统御算法) |
 
 ## 未来方向
 
 1. **同时回合 3.8 适配与重标定**：dest-prob v2 已完成分步语义适配（v1→v2 直接对拍 50/60）；下一步为 matrix-eq v2 补真实引擎标定，确认镜像裁判结论（kriegspiel v2 已完成：真实引擎对拍零偏差 + 两图 ×3 对手各 30 局）。
-2. **炮火模式算法池**：歼灭已有 `shrinkroll`（3.8.12）与 `vortex`（3.8.13）两个强度算法，大逃杀已有 `apex`（3.8.14）搜索算法与 `random-royale` 基线；下一步是扩大独立对手、多人和新地图的验证。
+2. **炮火模式算法池**：歼灭已有 `shrinkroll`（3.8.12）、`vortex`（3.8.13）、`crucible`（3.8.15）与 `sovereign`（3.8.17）四个强度算法及 `random-annihilation` 基线，大逃杀已有 `echelon`（3.8.16）、`apex`（3.8.14）与 `random-royale` 基线；下一步是扩大独立对手、多人和新地图的验证。
 3. **多席位标定**：现有标准权重主要在 2 人对局上调出；用 `multiplayer-ring`（多席位）、`snowflake` / `standoff`（3/6 人）补 3–6 人标定。`four-corners` 已下线，不能再用。
 4. **Minimax + Alpha-Beta 剪枝**：经典对抗搜索，可作为 mcts 之外的确定性搜索基线。
 5. **混合架构**：MCTS + 学习评估函数，或规则算法 + RL 局面评估。
 6. **多线程并行**：利用 Worker 加速搜索；先做可复现的基准，再决定是否值得。
-7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合接入评估跑批（3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），3.8.10 起歼灭 / 大逃杀也已接入（`local-worker` 支持四种模式，控制台可启动）。歼灭已有 `random-annihilation` / `shrinkroll` / `vortex` 三个，大逃杀已有 `random-royale` / `apex` 两个，均可组批。
+7. **Arena 多模式跑批**：`round_robin.py` / leaderboard 已支持多算法轮转与自动排行；3.8.2 起同时回合接入评估跑批（3.8.5 起 7 个 × standoff / molten-throne，RL 模型不参评），3.8.10 起歼灭 / 大逃杀也已接入（`local-worker` 支持四种模式，控制台可启动）。歼灭已有 `random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign` 五个，大逃杀已有 `random-royale` / `echelon` / `apex` 三个，均可组批。
 8. **部署决策继续收敛**：`deployDecision()` 已统一 threat / mcts / field / verdict；还剩 `greedy` 与 `scripts/auto-standard-game.mjs` 两份变体未合并。
 9. **tempo / 兑现率量纲**：verdict 已用行动点预算与“打击分 − 原地承伤 × 姿态系数”补上 danger-close / multiplayer-ring 两个老短板；下一步是把“每一步兑现率”做成可计算量纲，而不是再配一个系数。旧 `forge` 例子已不适用，改用当前短图与多行动点图验证。
 10. **基准数据自动化**：让 `scripts/algorithm-arena.mjs` / `scripts/matrix_eq_benchmark.mjs` 输出带 `engineVersion / mapPool / harness / games / seed / date` 的 JSON，再由脚本生成本文表格，避免手工抄写再次漂移。

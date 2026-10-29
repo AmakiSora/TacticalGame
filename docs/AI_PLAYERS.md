@@ -59,6 +59,7 @@ python rl/evaluate.py --model rl/models/model.zip
 - **缩圈推演算法（Shrink Roll，仅歼灭模式）**：回合内束搜索，按缩圈时间线推演安全区并投影轮界裁决，多人局压制领先者。[档案](../algorithms/docs/algorithms/shrinkroll.md)
 - **旋涡算法（Vortex，仅歼灭模式）**：炮火收缩圈预判疏散、威胁图稳杀集火、走位风筝与激进补员。[设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#vortex旋涡算法)
 - **熔炉算法（Crucible，仅歼灭模式）**：整回合束搜索、对抗集火回推与缩圈时间线逃逸推演。[档案](../algorithms/docs/algorithms/crucible.md)
+- **统御算法（Sovereign，仅歼灭模式）**：概率齐射竞价、多轮炮火逃逸、协同让行与移动爆破，按本局配置权衡兵力和部署窗口。[档案](../algorithms/docs/algorithms/sovereign.md)
 - **大逃杀随机算法（Random Royale，仅大逃杀模式）**：从合法计划动作中随机入队（枚举与 random-sim 同源），随后提交。[档案](../algorithms/docs/algorithms/random-royale.md)
 - **雁阵算法（Echelon，仅大逃杀模式）**：逐拍效用决策——敌军落点扩散预报、精确击杀概率与集火、炮火圈生存调度、爆破距离场开路（重装拆墙进入被隔断的安全区）。[设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#echelon雁阵算法)
 - **绝境算法（Apex，仅大逃杀模式）**：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验。[档案](../algorithms/docs/algorithms/apex.md)
@@ -106,7 +107,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, crucible, random-royale, echelon, apex, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
+| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, crucible, sovereign, random-royale, echelon, apex, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |

@@ -34,6 +34,7 @@ export const ALGORITHMS = {
   echelon: './builtin/echelon.mjs',
   apex: './builtin/apex.mjs',
   crucible: './builtin/crucible.mjs',
+  sovereign: './builtin/sovereign.mjs',
 };
 
 /**
@@ -76,6 +77,7 @@ export const ALGORITHM_META = {
   echelon: { displayName: '雁阵算法', description: '大逃杀：落点扩散预报 + 精确击杀概率 + 炮火圈生存调度的逐拍效用决策', version: 'v1', modes: ['royale'] },
   apex: { displayName: '绝境算法', description: '大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验', version: 'v1', modes: ['royale'] },
   crucible: { displayName: '熔炉算法', description: '歼灭：整回合束搜索、对抗集火回推与缩圈时间线逃逸推演', version: 'v1', modes: ['annihilation'] },
+  sovereign: { displayName: '统御算法', description: '歼灭：概率齐射竞价、多轮炮火逃逸与协同让行开路，动态权衡兵力和部署窗口', version: 'v1', modes: ['annihilation'] },
 };
 
 /**

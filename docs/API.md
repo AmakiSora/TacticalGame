@@ -165,7 +165,7 @@
 | `dryRun` | 试运行，不写入战报 |
 
 - 四种模式均已接入跑批：`standard` / `annihilation` 逐动作执行，`simultaneous` / `royale` 计划入队后统一结算。
-- 非标准模式没有 RL 模型参评，`participants` 至少需要 2 个该模式算法；不足时返回 400 `invalid_participants`。大逃杀支持 `algo:random-royale` 与 `algo:apex`，歼灭支持 `algo:random-annihilation`、`algo:shrinkroll` 与 `algo:vortex`。
+- 非标准模式没有 RL 模型参评，`participants` 至少需要 2 个该模式算法；不足时返回 400 `invalid_participants`。可用算法以 `GET /api/arena/participants` 返回条目的 `modes` 为准，名称与定位见 [算法 AI](AI_PLAYERS.md#3-算法-ai)。
 - 已有跑批进行中时 `start` / `clear-matches` 返回 409 `eval_already_running`。
 
 ## 运维与 Agent

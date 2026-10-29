@@ -4,7 +4,20 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`apex` v1、`vortex` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`apex` v1、`vortex` v1、`crucible` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.15（2026-10-29）— crucible 熔炉算法 v1
+
+### 新增功能
+
+- **`crucible`（熔炉算法）**：仅参与歼灭，整回合束搜索（束宽 7、深度 ≤8）在即时执行镜像上排激活序列（让路/集火/部署免费补刀），叶值用本局 `adjudicationWeights` 计价军力差与击杀分，扣对手下回合贪心集火回推损失与逐单位缩圈时间线逃逸推演的不可避免圈伤，再加我方威慑折算与据点安全收入。独立设计、单文件零依赖，不参考/不调用其他算法，不读地图名或对手隐藏信息；一切参数取自本局 config，随机新图（含零初始单位、非零占领权重、`minimumSafeRadius: 0` 消耗战）自动适配。档案 `algorithms/docs/algorithms/crucible.md`，设计与评估见 [开发笔记](ALGORITHMS_NOTES.md#crucible熔炉算法)。
+- **注册与评估**：`algo_crucible` / `algo_crucible@v1`，`modes: ['annihilation']`，大厅、runner 与评估控制台由注册表自动接入；歼灭算法池扩至 4 个（random-annihilation / shrinkroll / vortex / crucible）。本地换座标定 harness `scripts/crucible-arena.mts`（真实引擎进程内，成对换座、随机新图、零拒绝审计），不写竞技场历史。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/crucible.test.ts`（9 例：模式隔离、双图双座位整局零拒绝、零初始单位随机图首回合部署回归、集火斩杀记账、危险区疏散、部署补刀真实 id 解析、独立实例确定性）；`tests/api/arena-eval.test.ts` 歼灭注册算法数同步为 4。
+- 3.8.15 真实引擎本地标定（`scripts/crucible-arena.mts`，成对换座，2026-10-29）：固定两图对 vortex **80:0**、对 shrinkroll **75:5**（5 负全在 trench-run 消耗战残局）、对 random-annihilation **120:0**；随机新图 10 张对 vortex **21:1**、对 shrinkroll **20:2**、对 random-annihilation **22:0**；合计 **346 局 338 胜 8 负、零非法动作**，不写竞技场历史。种子、调参回退记录与已知限制见 [开发笔记](ALGORITHMS_NOTES.md#crucible熔炉算法)，不作未来必胜承诺。
+- `npm run build`、`npm run check-version` 通过，全量 **140 文件 / 1459 用例通过**；竞技场评估 API 套件（33 例，含合并参与者目录）通过。
 
 ## 3.8.14（2026-10-29）— apex 绝境算法 v1
 

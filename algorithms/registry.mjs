@@ -32,6 +32,7 @@ export const ALGORITHMS = {
   shrinkroll: './builtin/shrinkroll.mjs',
   vortex: './builtin/vortex.mjs',
   apex: './builtin/apex.mjs',
+  crucible: './builtin/crucible.mjs',
 };
 
 /**
@@ -72,6 +73,7 @@ export const ALGORITHM_META = {
   shrinkroll: { displayName: '缩圈推演算法', description: '歼灭：回合内束搜索 + 缩圈时间线推演 + 轮界裁决投影', version: 'v1', modes: ['annihilation'] },
   vortex: { displayName: '旋涡算法', description: '歼灭：炮火收缩圈预判疏散、稳杀集火、走位风筝与激进补员', version: 'v1', modes: ['annihilation'] },
   apex: { displayName: '绝境算法', description: '大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验', version: 'v1', modes: ['royale'] },
+  crucible: { displayName: '熔炉算法', description: '歼灭：整回合束搜索、对抗集火回推与缩圈时间线逃逸推演', version: 'v1', modes: ['annihilation'] },
 };
 
 /**

@@ -46,6 +46,7 @@ algorithms/
 │   ├── threat.mjs        # 威胁感知算法（标准模式）
 │   ├── field.mjs         # 势场算法（标准模式）
 │   ├── verdict.mjs       # 裁决线算法（标准模式）
+│   ├── parallax.mjs      # 视差算法（标准模式）
 │   ├── random-sim.mjs    # 同时随机算法（同时回合模式）
 │   ├── dest-prob.mjs     # 落点概率算法（同时回合模式）
 │   ├── kriegspiel.mjs    # 兵棋推演算法（同时回合模式）
@@ -87,6 +88,7 @@ algorithms/
 │       ├── vortex.md
 │       ├── crucible.md
 │       ├── sovereign.md
+│       ├── parallax.md
 │       └── echelon.md
 ├── registry.mjs          # 算法注册表与 ALGORITHM_META
 ├── registry.d.mts        # 注册表 TypeScript 类型声明
@@ -253,6 +255,32 @@ npx tsx scripts/sovereign-arena.mts --players 6 --games 6 --seed 610101
 
 **强度边界**：随机新图上对 crucible 仅 8:12，六人局对 shrinkroll / crucible 各 0:6，并未全面压制现有算法；随机图每图每对手仅 2 局，不满足逐图 30 局稳定选型口径。完整已知限制（齐射只执行首动作、反击概率启发式、火力与炮伤未联合卷积、逃逸路径忽略占位等）与优化方向见 [档案](algorithms/sovereign.md)。
 
+## parallax：视差算法
+
+`parallax` v1 仅参与 `standard`，大厅类型为 `algo_parallax`，竞技场参与者为 `algo_parallax@v1`。单文件零导入实现（`builtin/parallax.mjs`，策略接口 `decide`），**独立设计**：只依据标准模式规则、引擎行为与公开状态推导，不读取、不导入、不调用仓库内其他算法或策略辅助实现，现有算法仅作为黑盒对手；不按地图名、对手名或实体 id 分支。完整原理、参数、约束与逐项限制见 [单算法档案](algorithms/parallax.md)。
+
+- **单位完整激活宏动作**：移动、移动+攻击、攻击+移动、移动+治疗、治疗+移动、移动/先手爆破、斩杀后进入腾空格、部署+攻击/治疗，按整次激活组合竞价，避免逐动作贪心。
+- **整回合束搜索**：平衡根宽 6、攻城根宽 1，深度随剩余行动点与未完成激活数增长；扩展要求严格正增益，首动作去重并设配额。
+- **风险与回应**：逐单位/总部估计即时与下一步承伤，总部风险四次方放大并计算 2.5 回合围城压力；计划分别接受“平衡”和“压总部”两种假想回应（高伤害分支）检验，取最差情形。
+- **终局边界**：有限局最后一回合、最后一个席位时，先模拟结束回合的占点、持有统计与裁决，再比较真实分差；无限局远目标用有理折扣保留梯度，不做 10 轮硬截断。
+- **本局参数**：地形覆盖与空洞、破障距离场、兵种数值、据点收入/折扣/维修、行动点、伤害/治疗方差、`maxTurns: null`、回流补给与裁决权重全部实时读取；军力舍入严格复刻引擎。
+- **确定性**：不使用随机数，不读取 `rngState`/token，不修改传入快照。
+
+评估（真实引擎进程内 harness `scripts/parallax-arena.mts`，同图同种子成对换座，不写竞技场历史）：
+
+```bash
+npx tsx scripts/parallax-arena.mts --opponents verdict,greedy,random,mcts,threat,field \
+  --maps default,breach,dual-lanes,danger-close --games 2 --seed-base 920731
+npx tsx scripts/parallax-arena.mts --opponents verdict,threat --maps random \
+  --games 4 --seed-base 510947 --random-preset challenge
+npx tsx scripts/parallax-arena.mts --opponents verdict --maps multiplayer-ring \
+  --players 3 --games 2 --seed-base 731017
+```
+
+**当前快照（2026-10-29，3.8.18 真实引擎，各算法 v1）**：共 **70 局 58 胜 10 负 0 平、另 2 局强制截断**，零非法动作、异常或未完成局。四张常规双人图 **45:3**；随机挑战 **8:0**；环形/漩涡双人 **4:2（另 2 截断）**；3/6/8 人自由混战 **1:5**。决策 p50 19–1008 ms、p95 98–2573 ms、最大 3744 ms（6 人局，含并行负载）。完整表格、种子与复现命令见 [档案](algorithms/parallax.md)。
+
+**强度边界**：多人混战仅 1:5，环形图 3 人与 6 人各 2 局全负，尚未达到标准模式全部地图与人数下的全面压制；随机挑战只覆盖两张配置，不是独立留出大样本。已知限制包括多人风险建模薄弱、对手回应只模拟一层、伤害分支用均值/高值抽样而非完整分布、无限大地图无全局最优保证、6 人局延迟接近秒级。开发与中断批次不计入上表。
+
 ## 算法接口
 
 所有算法必须实现 `decide` 或 `playTurn` 之一。算法按对局模式注册（`ALGORITHM_META.modes`，缺省视为 `['standard']`），不同模式不能混用——大厅 bot 接口、runner、评估链路都会按注册表校验，模式不匹配一律拒绝。
@@ -417,6 +445,7 @@ export const ALGORITHM_META = {
 | **vortex** | annihilation | v1 | 效用 AI / 威胁图 + 炮火收缩圈预判 | O(单位×格子) | 真实引擎 headless strict 对拍 `random-annihilation` 40:0（两图各 20 局，2026-10-29，零非法），详见 [设计与评估](#vortex旋涡算法)；当前榜单 rating **1155**（192 局 48W/144L），3.8.13 发布时为 1882（40W/0L） | 歼灭模式强度条目、炮火圈疏散与稳杀集火参考 |
 | **crucible** | annihilation | v1 | 整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演 | O(束宽×候选×深度×(单位×格子)) | 3.8.15 真实引擎本地换座标定，详见 [设计与评估](#crucible熔炉算法)；本地标定不入榜，另由竞技场跑批入榜（crucible 193 局，2026-10-29） | 歼灭模式整回合规划、跨图/跨权重泛化 |
 | **sovereign** | annihilation | v1 | 概率齐射竞价 + 多轮炮火逃逸 + 协同让行/爆破距离场 | O(单位×格子 + 齐射组合×目标 + 部署候选×(单位×格子)) | 3.8.17 真实引擎黑盒跑批（`scripts/sovereign-arena.mts`，2026-10-29）：双人 256 局 225:31、三人 18:6、六人 11:13，合计 **304 局 254:50**、零非法；静态双人对 crucible 30:10，随机新图 8:12、六人对 shrinkroll/crucible 各 0:6，详见 [设计与评估](#sovereign统御算法) | 歼灭模式概率集火与多人风险建模参考 |
+| **parallax** | standard | v1 | 整回合束搜索 + 完整激活宏动作 + 对抗回应检验 | O(束宽×候选×深度×单次激活镜像) | 3.8.18 真实引擎本地换座（`scripts/parallax-arena.mts`，2026-10-29）：双人四图 **45:3**、随机挑战 **8:0**、环形/漩涡 4:2（另 2 截断），3/6/8 人 **1:5**；合计 **70 局 58:10**、零非法；决策 p50 19–1008ms，详见 [设计与评估](#parallax视差算法)；本地标定不入榜 | 标准模式整回合规划、终局裁决与换家压力建模参考 |
 | **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
 | **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
 | **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
@@ -439,7 +468,7 @@ export const ALGORITHM_META = {
 
 | 模式 | 内置算法数 | 算法 |
 |---|---:|---|
-| standard | 6 | random / greedy / mcts / threat / field / verdict |
+| standard | 7 | random / greedy / mcts / threat / field / verdict / parallax |
 | simultaneous | 8 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo / tempo-weave / horizon |
 | annihilation | 5 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像）/ shrinkroll（束搜索 + 缩圈时间线投影 + 轮界裁决投影）/ vortex（效用 AI + 收缩圈疏散）/ crucible（整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演）/ sovereign（概率齐射竞价 + 多轮炮火逃逸 + 协同让行与移动爆破） |
 | royale | 3 | random-royale（同时回合计划队列，与 random-sim 同源枚举）/ echelon（效用 AI + 落点扩散预报 + 炮火圈调度 + 爆破距离场）/ apex（多情境束搜索 + 缩圈时空寻路） |
@@ -447,7 +476,7 @@ export const ALGORITHM_META = {
 > 三个随机基线是**独立条目**：注册名、展示名、版本与竞技场参与者 id 全部分开
 > （`algo_random@v1` / `algo_random-annihilation@v1` / `algo_random-royale@v1`），
 > 战绩不会混名；标准模式的实现与历史不受影响。
-> 歼灭模式强度算法 `shrinkroll`（3.8.12）、`vortex`（3.8.13）、`crucible`（3.8.15）与 `sovereign`（3.8.17）；大逃杀强度算法 `echelon`（3.8.16）与 `apex`（3.8.14）。跨模式战绩不可用于证明算法强度。
+> 歼灭模式强度算法 `shrinkroll`（3.8.12）、`vortex`（3.8.13）、`crucible`（3.8.15）与 `sovereign`（3.8.17）；大逃杀强度算法 `echelon`（3.8.16）与 `apex`（3.8.14）；标准模式强度算法 `parallax`（3.8.18）。跨模式战绩不可用于证明算法强度。
 
 ## 当前强度快照（standard，2026-10-21 UTC）
 
@@ -461,7 +490,7 @@ export const ALGORITHM_META = {
 | `algo_mcts@v1` | 算法 | 1631 | 64.1% | 2,880 |
 | `algo_random@v1` | 算法 | 756 | 1.3% | 2,880 |
 
-> 口径：Arena 标准模式混合池（`default` / `breach` / `danger-close` / `dual-lanes` / `random`），不含 `multiplayer-ring` 与 `whirlpool`；胜率是对混合对手的总体胜率，不是对固定基线的单挑。该快照生成于 3.8.0 之前（`generatedAt` 为 2026-10-21T22:02Z），standard 规则不受同时回合分步结算影响。该快照只能说明“在这个池子里”的强弱，不能外推到全图池、同时回合、大逃杀或歼灭。
+> 口径：Arena 标准模式混合池（`default` / `breach` / `danger-close` / `dual-lanes` / `random`），不含 `multiplayer-ring` 与 `whirlpool`；胜率是对混合对手的总体胜率，不是对固定基线的单挑。该快照生成于 3.8.0 之前（`generatedAt` 为 2026-10-21T22:02Z），standard 规则不受同时回合分步结算影响。该快照只能说明“在这个池子里”的强弱，不能外推到全图池、同时回合、大逃杀或歼灭。`parallax` 于 3.8.18 加入，尚未进入该快照；其本地黑盒结果见 [设计与评估](#parallax视差算法)，本地标定不写竞技场历史。
 
 ## 历史标定（3.5.x 标准模式）
 

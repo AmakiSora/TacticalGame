@@ -35,6 +35,7 @@ export const ALGORITHMS = {
   apex: './builtin/apex.mjs',
   crucible: './builtin/crucible.mjs',
   sovereign: './builtin/sovereign.mjs',
+  parallax: './builtin/parallax.mjs',
 };
 
 /**
@@ -56,6 +57,7 @@ export const ALGORITHMS = {
  * 因"未知参与者"被 loadMatches 过滤掉。
  */
 export const ALGORITHM_META = {
+  parallax: { displayName: '视差算法', description: '标准：独立整回合行动组合搜索、反击情景检验与配置驱动的地图路径规划', version: 'v1', modes: ['standard'] },
   greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动', version: 'v1', modes: ['standard'] },
   random: { displayName: '随机算法', description: '从所有合法动作中随机选择', version: 'v1', modes: ['standard'] },
   'random-annihilation': { displayName: '歼灭随机算法', description: '歼灭：从所有合法动作中随机选择，跳过炮火危险区内的部署与治疗', version: 'v1', modes: ['annihilation'] },

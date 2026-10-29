@@ -4,7 +4,68 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1；标准模式算法（greedy / random / mcts / threat / field / verdict / parallax）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.18（2026-10-29）— parallax 视差算法 v1
+
+### 新增功能
+
+- 新增仅支持 `standard` 的 `parallax` v1（视差算法），从规则与可见状态独立实现，不导入既有算法或其策略工具；现有标准算法仅作为黑盒测试对手。原理、参数、约束与逐项限制见 [单算法档案](algorithms/parallax.md)。
+- 以单位完整行动组合搜索整回合，覆盖移动后攻击、攻击后撤、治疗、部署后攻击、击杀后进入腾空格及重装爆破开路；多首步候选分别接受反击情景检验，每个真实动作后重新规划，不预测或读取引擎随机状态。
+- 按本局配置计算地形路径、兵种价值、据点收入/折扣/维修与裁决期限；总部防守同时考虑即时伤害与后续接敌，反击场景包含偏重攻城的假想对手。无限回合的远目标不按有限期限截断；末轮最后席位在候选排序与剪枝前先模拟占点、持有统计与裁决，不扣除不存在的下一轮反击，不硬编码地图或对手身份。
+- 新增 `scripts/parallax-arena.mts`：完整公开投影、每席位独立 worker、固定随机种子与成对换座，支持多人自由混战及改变尺寸、轮廓、障碍、兵种和经济参数的随机挑战图；无限图达到评估上限时单列截断，不把强制裁决混入正常胜率，输出限制在 `temp/`。
+
+### 测试与验证
+
+- 新增 **67 项**规则差分与决策回归：公开状态不可变、秘密字段/随机状态不可读、行动点复用、部署折扣和免费攻击、治疗范围、地形覆盖与空洞、爆破开路、结束回合占点、维修/收入/持有统计、总部淘汰及裁决；包含无限回合 30 格远目标推进、末轮冒险占点立即获胜、浮点军力舍入顺序、多人末轮停手保平局和真实引擎短局。
+- 浏览器确认评估控制台标准目录可选、歼灭目录不出现；本地 HTTP 创建视差对贪心对局并由真实 runner 完成，视差第 8 轮获胜，无 `bot_failed` / `action_failed`，观战显示正常、控制台无错误。该局仅作接入验证，不计入强度样本。
+- `npm run build`、`npm test`、`npm run check-version` 通过，全量 **144 文件 / 1607 用例通过**；新增测试及评估脚本的严格 TypeScript 检查通过。
+
+### 固定实现评估
+
+引擎 **3.8.18**，日期 **2026-10-29**，harness 为 `scripts/parallax-arena.mts`，参评标准算法均为 **v1**。仅统计最后一次规则修正后的固定实现；开发与中断批次不计入，重复种子作回归验证、不视为独立留出集。同种子成对换座，正常胜负、截断和错误分别计数；计时含并行任务竞争，不作为严格单线程性能基准。
+
+冻结源码 SHA-256：`parallax.mjs` 为 `d9e3576b219afc90175a9d37d705aef7bede45f7ee79dceb463ca41e6f18ffbc`；评估脚本为 `6e4db874d73982ae0b6018785d4d7b16f3fe61d56bb8965d44e1420bb6bada56`。
+
+六个标准对手指 `greedy / random / mcts / threat / field / verdict`。下表按视差所在席位统计正常胜:负:平，截断另列，不折算成胜率。
+
+| 地图 / 人数 | 对手 | 正常胜:负:平 | 截断 |
+|---|---|---:|---:|
+| default / 2 人 | 六个标准对手 | 12:0:0 | 0 |
+| breach / 2 人 | 六个标准对手 | 10:2:0 | 0 |
+| dual-lanes / 2 人 | 六个标准对手 | 11:1:0 | 0 |
+| danger-close / 2 人 | 六个标准对手 | 12:0:0 | 0 |
+| multiplayer-ring / 2 人 | verdict、threat | 2:2:0 | 0 |
+| whirlpool / 2 人 | verdict、threat | 2:0:0 | 2 |
+| random challenge / 2 人 | verdict、threat | 8:0:0 | 0 |
+| multiplayer-ring / 3 人 | 2 个独立 verdict | 0:2:0 | 0 |
+| multiplayer-ring / 6 人 | 5 个独立 verdict | 0:2:0 | 0 |
+| random / 8 人 | 7 个独立 verdict | 1:1:0 | 0 |
+| **合计** | | **58:10:0** | **2** |
+
+- 共 **70 局**，零非法动作、异常或未完成局；两个截断局均为 whirlpool 对 threat，完成 60 轮后强制裁决均落后，单列而不混入正常胜负。
+- 四张常规双人图合计 **45:3（93.75%）**：对 verdict 为 6:2，对 threat 为 7:1，其余四个对手各 8:0。随机挑战为两张不同参数/轮廓的配置（clipped-hex、notched-hex），每图分别对两个对手换座，不能把 8 局当作 8 张独立地图。
+- 决策成本高于轻量启发式算法：默认图 p50/p95 为 **299/560 ms**，破障图 **475/970 ms**，随机挑战 **237/548 ms**；6 人环形图 **1008/2573 ms**，全样本最大 **3744 ms**。包含并行任务竞争，固定种子也不能消除按墙钟时间限额的黑盒对手在不同负载下的变化。
+- 原始报告仅在本地 `temp/parallax-arena/release-*.json`，包含配置、种子、座位、逐局结果与耗时；没有写入正式竞技场战绩。
+
+复现命令（项目根目录；`--games` 为每图每对手局数，偶数代表成对换座）：
+
+```bash
+for map in default breach dual-lanes danger-close; do
+  npx tsx scripts/parallax-arena.mts --opponents verdict,greedy,random,mcts,threat,field --maps "$map" --games 2 --seed-base 920731 --out "temp/parallax-arena/release-$map.json"
+done
+npx tsx scripts/parallax-arena.mts --opponents verdict,threat --maps multiplayer-ring,whirlpool --games 2 --seed-base 720149 --max-rounds 60 --out temp/parallax-arena/release-extended.json
+npx tsx scripts/parallax-arena.mts --opponents verdict,threat --maps random --games 4 --seed-base 510947 --random-preset challenge --out temp/parallax-arena/release-challenge.json
+npx tsx scripts/parallax-arena.mts --opponents verdict --maps multiplayer-ring --players 3 --games 2 --seed-base 731017 --out temp/parallax-arena/release-ffa3.json
+npx tsx scripts/parallax-arena.mts --opponents verdict --maps multiplayer-ring --players 6 --games 2 --seed-base 731019 --out temp/parallax-arena/release-ffa6.json
+npx tsx scripts/parallax-arena.mts --opponents verdict --maps random --players 8 --games 2 --seed-base 731023 --out temp/parallax-arena/release-ffa8.json
+```
+
+### 强度边界
+
+- 有限宽度的搜索和假想反击不能保证全局最优，也不能保证战胜未来算法或任意新增地图；地图适配以现有标准模式规则及公开配置契约不变为前提。
+- 多人自由混战验证仅 **1 胜 5 负**，其中环形图 3/6 人均未获胜；不能将双人优势外推到多人，也未达到标准模式全部地图与人数下的全面压制。
+- 开发阶段对默认图、破障、双线和单行动点地图的黑盒对抗均出现过败局；调参局与后续固定实现的验证局分别记录，不以开发小样本声称全面压制。
 
 ## 3.8.17（2026-10-29）— sovereign 统御算法 v1
 

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T18:37:38.998Z",
+  "generatedAt": "2026-10-29T06:24:28.029Z",
   "ratingMethod": {
     "model": "Bradley-Terry MLE (MM iteration), draw = 0.5 win",
     "scope": "per game mode; modes are never pooled together",
@@ -9,29 +9,31 @@
   },
   "source": {
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
-    "matchCount": 38056,
+    "matchCount": 38641,
     "retiredMatchesDropped": 0,
     "mapDist": {
-      "artillery-zone": 20,
+      "artillery-zone": 241,
       "breach": 7200,
       "danger-close": 7200,
       "default": 7200,
       "dual-lanes": 7200,
       "mistpine": 672,
       "molten-throne": 672,
+      "narrow-road": 72,
       "random": 7200,
+      "snowflake": 72,
       "standoff": 672,
-      "trench-run": 20
+      "trench-run": 240
     },
     "modeDist": {
       "standard": 36000,
-      "annihilation": 40,
+      "annihilation": 481,
       "simultaneous": 2016,
-      "royale": 0
+      "royale": 144
     },
     "targetGamesPerPair": 24,
     "dateMin": "2026-10-21 03:57:34",
-    "dateMax": "2026-10-29 02:25:04"
+    "dateMax": "2026-10-29 14:24:22"
   },
   "registry": {
     "hex_ppo_v1.0.0_20260824_120K.zip": {
@@ -526,6 +528,42 @@
       "status": "builtin",
       "statusNote": null
     },
+    "algo_shrinkroll@v1": {
+      "kind": "algorithm",
+      "short": "缩圈推演算法",
+      "algorithm": "shrinkroll",
+      "version": "v1",
+      "description": "歼灭：回合内束搜索 + 缩圈时间线推演 + 轮界裁决投影",
+      "modes": [
+        "annihilation"
+      ],
+      "status": "builtin",
+      "statusNote": null
+    },
+    "algo_vortex@v1": {
+      "kind": "algorithm",
+      "short": "旋涡算法",
+      "algorithm": "vortex",
+      "version": "v1",
+      "description": "歼灭：炮火收缩圈预判疏散、稳杀集火、走位风筝与激进补员",
+      "modes": [
+        "annihilation"
+      ],
+      "status": "builtin",
+      "statusNote": null
+    },
+    "algo_echelon@v1": {
+      "kind": "algorithm",
+      "short": "雁阵算法",
+      "algorithm": "echelon",
+      "version": "v1",
+      "description": "大逃杀：落点扩散预报 + 精确击杀概率 + 炮火圈生存调度的逐拍效用决策",
+      "modes": [
+        "royale"
+      ],
+      "status": "builtin",
+      "statusNote": null
+    },
     "algo_apex@v1": {
       "kind": "algorithm",
       "short": "绝境算法",
@@ -538,12 +576,24 @@
       "status": "builtin",
       "statusNote": null
     },
-    "algo_vortex@v1": {
+    "algo_crucible@v1": {
       "kind": "algorithm",
-      "short": "旋涡算法",
-      "algorithm": "vortex",
+      "short": "熔炉算法",
+      "algorithm": "crucible",
       "version": "v1",
-      "description": "歼灭：炮火收缩圈预判疏散、稳杀集火、走位风筝与激进补员",
+      "description": "歼灭：整回合束搜索、对抗集火回推与缩圈时间线逃逸推演",
+      "modes": [
+        "annihilation"
+      ],
+      "status": "builtin",
+      "statusNote": null
+    },
+    "algo_sovereign@v1": {
+      "kind": "algorithm",
+      "short": "统御算法",
+      "algorithm": "sovereign",
+      "version": "v1",
+      "description": "歼灭：概率齐射竞价、多轮炮火逃逸与协同让行开路，动态权衡兵力和部署窗口",
       "modes": [
         "annihilation"
       ],
@@ -42040,41 +42090,121 @@
     {
       "id": "annihilation",
       "label": "歼灭模式",
-      "games": 40,
+      "games": 481,
       "maps": {
         "all": {
           "overview": {
-            "games": 40,
-            "pairCount": 1,
+            "games": 481,
+            "pairCount": 10,
             "draws": 0,
             "drawRate": 0,
-            "avgRounds": 11.65
+            "avgRounds": 12.33
           },
           "models": [
             {
+              "id": "algo_crucible@v1",
+              "rating": 1914,
+              "ratingLo": 1831,
+              "ratingHi": 1852,
+              "wilson": 0.6858,
+              "games": 193,
+              "wins": 145,
+              "losses": 48,
+              "draws": 0,
+              "winRate": 0.7513,
+              "firstSeat": {
+                "games": 97,
+                "winRate": 0.7526
+              },
+              "secondSeat": {
+                "games": 96,
+                "winRate": 0.75
+              },
+              "avgRounds": 13.28,
+              "avgDecisionMs": 8.39,
+              "vs": {
+                "algo_random-annihilation@v1": {
+                  "games": 49,
+                  "wins": 49,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_vortex@v1": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_sovereign@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "trench-run": {
+                  "games": 96,
+                  "wins": 72,
+                  "draws": 0,
+                  "winRate": 0.75
+                },
+                "artillery-zone": {
+                  "games": 97,
+                  "wins": 73,
+                  "draws": 0,
+                  "winRate": 0.7526
+                }
+              }
+            },
+            {
               "id": "algo_random-annihilation@v1",
-              "rating": 1118,
-              "ratingLo": 1177,
-              "ratingHi": 1177,
+              "rating": 595,
+              "ratingLo": 738,
+              "ratingHi": 776,
               "wilson": 0,
-              "games": 40,
+              "games": 193,
               "wins": 0,
-              "losses": 40,
+              "losses": 193,
               "draws": 0,
               "winRate": 0,
               "firstSeat": {
-                "games": 20,
+                "games": 96,
                 "winRate": 0
               },
               "secondSeat": {
-                "games": 20,
+                "games": 97,
                 "winRate": 0
               },
-              "avgRounds": 11.65,
-              "avgDecisionMs": 0.86,
+              "avgRounds": 10.33,
+              "avgDecisionMs": 0.96,
               "vs": {
                 "algo_vortex@v1": {
-                  "games": 40,
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_crucible@v1": {
+                  "games": 49,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_sovereign@v1": {
+                  "games": 48,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -42082,13 +42212,13 @@
               },
               "perMap": {
                 "artillery-zone": {
-                  "games": 20,
+                  "games": 97,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "trench-run": {
-                  "games": 20,
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -42096,94 +42226,326 @@
               }
             },
             {
-              "id": "algo_vortex@v1",
-              "rating": 1882,
-              "ratingLo": 1823,
-              "ratingHi": 1823,
-              "wilson": 0.9124,
-              "games": 40,
-              "wins": 40,
-              "losses": 0,
+              "id": "algo_shrinkroll@v1",
+              "rating": 1694,
+              "ratingLo": 1597,
+              "ratingHi": 1671,
+              "wilson": 0.4918,
+              "games": 192,
+              "wins": 108,
+              "losses": 84,
               "draws": 0,
-              "winRate": 1,
+              "winRate": 0.5625,
               "firstSeat": {
-                "games": 20,
-                "winRate": 1
+                "games": 96,
+                "winRate": 0.625
               },
               "secondSeat": {
-                "games": 20,
-                "winRate": 1
+                "games": 96,
+                "winRate": 0.5
               },
-              "avgRounds": 11.65,
-              "avgDecisionMs": 1.73,
+              "avgRounds": 12.53,
+              "avgDecisionMs": 11.35,
               "vs": {
                 "algo_random-annihilation@v1": {
-                  "games": 40,
-                  "wins": 40,
+                  "games": 48,
+                  "wins": 48,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_vortex@v1": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_crucible@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_sovereign@v1": {
+                  "games": 48,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.25
                 }
               },
               "perMap": {
                 "artillery-zone": {
-                  "games": 20,
-                  "wins": 20,
+                  "games": 96,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 0.5
+                },
+                "trench-run": {
+                  "games": 96,
+                  "wins": 60,
+                  "draws": 0,
+                  "winRate": 0.625
+                }
+              }
+            },
+            {
+              "id": "algo_sovereign@v1",
+              "rating": 2142,
+              "ratingLo": 1999,
+              "ratingHi": 2127,
+              "wilson": 0.8939,
+              "games": 192,
+              "wins": 180,
+              "losses": 12,
+              "draws": 0,
+              "winRate": 0.9375,
+              "firstSeat": {
+                "games": 96,
+                "winRate": 1
+              },
+              "secondSeat": {
+                "games": 96,
+                "winRate": 0.875
+              },
+              "avgRounds": 13.05,
+              "avgDecisionMs": 3.98,
+              "vs": {
+                "algo_random-annihilation@v1": {
+                  "games": 48,
+                  "wins": 48,
                   "draws": 0,
                   "winRate": 1
                 },
-                "trench-run": {
-                  "games": 20,
-                  "wins": 20,
+                "algo_vortex@v1": {
+                  "games": 48,
+                  "wins": 48,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_crucible@v1": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 48,
+                  "wins": 36,
+                  "draws": 0,
+                  "winRate": 0.75
+                }
+              },
+              "perMap": {
+                "trench-run": {
+                  "games": 96,
+                  "wins": 84,
+                  "draws": 0,
+                  "winRate": 0.875
+                },
+                "artillery-zone": {
+                  "games": 96,
+                  "wins": 96,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              }
+            },
+            {
+              "id": "algo_vortex@v1",
+              "rating": 1155,
+              "ratingLo": 1185,
+              "ratingHi": 1223,
+              "wilson": 0.1941,
+              "games": 192,
+              "wins": 48,
+              "losses": 144,
+              "draws": 0,
+              "winRate": 0.25,
+              "firstSeat": {
+                "games": 96,
+                "winRate": 0.25
+              },
+              "secondSeat": {
+                "games": 96,
+                "winRate": 0.25
+              },
+              "avgRounds": 12.45,
+              "avgDecisionMs": 1.58,
+              "vs": {
+                "algo_random-annihilation@v1": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_crucible@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_sovereign@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "artillery-zone": {
+                  "games": 96,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 0.25
+                },
+                "trench-run": {
+                  "games": 96,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 0.25
                 }
               }
             }
           ],
           "h2h": [
             {
+              "a": "algo_crucible@v1",
+              "b": "algo_random-annihilation@v1",
+              "games": 49,
+              "aWins": 49,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_vortex@v1",
+              "games": 48,
+              "aWins": 48,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_shrinkroll@v1",
+              "games": 48,
+              "aWins": 48,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_sovereign@v1",
+              "games": 48,
+              "aWins": 0,
+              "bWins": 48,
+              "draws": 0
+            },
+            {
               "a": "algo_random-annihilation@v1",
               "b": "algo_vortex@v1",
-              "games": 40,
+              "games": 48,
               "aWins": 0,
-              "bWins": 40,
+              "bWins": 48,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-annihilation@v1",
+              "b": "algo_shrinkroll@v1",
+              "games": 48,
+              "aWins": 0,
+              "bWins": 48,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-annihilation@v1",
+              "b": "algo_sovereign@v1",
+              "games": 48,
+              "aWins": 0,
+              "bWins": 48,
+              "draws": 0
+            },
+            {
+              "a": "algo_shrinkroll@v1",
+              "b": "algo_vortex@v1",
+              "games": 48,
+              "aWins": 48,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_shrinkroll@v1",
+              "b": "algo_sovereign@v1",
+              "games": 48,
+              "aWins": 12,
+              "bWins": 36,
+              "draws": 0
+            },
+            {
+              "a": "algo_sovereign@v1",
+              "b": "algo_vortex@v1",
+              "games": 48,
+              "aWins": 48,
+              "bWins": 0,
               "draws": 0
             }
           ]
         },
         "artillery-zone": {
           "overview": {
-            "games": 20,
-            "pairCount": 1,
+            "games": 241,
+            "pairCount": 10,
             "draws": 0,
             "drawRate": 0,
-            "avgRounds": 10.55
+            "avgRounds": 11.18
           },
           "models": [
             {
-              "id": "algo_random-annihilation@v1",
-              "rating": 1177,
-              "ratingLo": 1177,
-              "ratingHi": 1177,
-              "wilson": 0,
-              "games": 20,
-              "wins": 0,
-              "losses": 20,
+              "id": "algo_crucible@v1",
+              "rating": 1885,
+              "ratingLo": 1883,
+              "ratingHi": 1883,
+              "wilson": 0.6582,
+              "games": 97,
+              "wins": 73,
+              "losses": 24,
               "draws": 0,
-              "winRate": 0,
+              "winRate": 0.7526,
               "firstSeat": {
-                "games": 10,
-                "winRate": 0
+                "games": 49,
+                "winRate": 0.7551
               },
               "secondSeat": {
-                "games": 10,
-                "winRate": 0
+                "games": 48,
+                "winRate": 0.75
               },
-              "avgRounds": 10.55,
-              "avgDecisionMs": 0.95,
+              "avgRounds": 12.02,
+              "avgDecisionMs": 9.52,
               "vs": {
+                "algo_random-annihilation@v1": {
+                  "games": 25,
+                  "wins": 25,
+                  "draws": 0,
+                  "winRate": 1
+                },
                 "algo_vortex@v1": {
-                  "games": 20,
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_sovereign@v1": {
+                  "games": 24,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -42191,7 +42553,63 @@
               },
               "perMap": {
                 "artillery-zone": {
-                  "games": 20,
+                  "games": 97,
+                  "wins": 73,
+                  "draws": 0,
+                  "winRate": 0.7526
+                }
+              }
+            },
+            {
+              "id": "algo_random-annihilation@v1",
+              "rating": 668,
+              "ratingLo": 674,
+              "ratingHi": 674,
+              "wilson": 0,
+              "games": 97,
+              "wins": 0,
+              "losses": 97,
+              "draws": 0,
+              "winRate": 0,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0
+              },
+              "secondSeat": {
+                "games": 49,
+                "winRate": 0
+              },
+              "avgRounds": 9.59,
+              "avgDecisionMs": 1.08,
+              "vs": {
+                "algo_vortex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_crucible@v1": {
+                  "games": 25,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_sovereign@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "artillery-zone": {
+                  "games": 97,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -42199,88 +42617,308 @@
               }
             },
             {
-              "id": "algo_vortex@v1",
-              "rating": 1823,
-              "ratingLo": 1823,
-              "ratingHi": 1823,
-              "wilson": 0.8389,
-              "games": 20,
-              "wins": 20,
+              "id": "algo_shrinkroll@v1",
+              "rating": 1500,
+              "ratingLo": 1504,
+              "ratingHi": 1504,
+              "wilson": 0.4019,
+              "games": 96,
+              "wins": 48,
+              "losses": 48,
+              "draws": 0,
+              "winRate": 0.5,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.5
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.5
+              },
+              "avgRounds": 11.58,
+              "avgDecisionMs": 14.05,
+              "vs": {
+                "algo_random-annihilation@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_vortex@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_crucible@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_sovereign@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "artillery-zone": {
+                  "games": 96,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 0.5
+                }
+              }
+            },
+            {
+              "id": "algo_sovereign@v1",
+              "rating": 2331,
+              "ratingLo": 2317,
+              "ratingHi": 2317,
+              "wilson": 0.9615,
+              "games": 96,
+              "wins": 96,
               "losses": 0,
               "draws": 0,
               "winRate": 1,
               "firstSeat": {
-                "games": 10,
+                "games": 48,
                 "winRate": 1
               },
               "secondSeat": {
-                "games": 10,
+                "games": 48,
                 "winRate": 1
               },
-              "avgRounds": 10.55,
-              "avgDecisionMs": 2.13,
+              "avgRounds": 11.58,
+              "avgDecisionMs": 5.72,
               "vs": {
                 "algo_random-annihilation@v1": {
-                  "games": 20,
-                  "wins": 20,
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_vortex@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_crucible@v1": {
+                  "games": 24,
+                  "wins": 24,
                   "draws": 0,
                   "winRate": 1
                 }
               },
               "perMap": {
                 "artillery-zone": {
-                  "games": 20,
-                  "wins": 20,
+                  "games": 96,
+                  "wins": 96,
                   "draws": 0,
                   "winRate": 1
+                }
+              }
+            },
+            {
+              "id": "algo_vortex@v1",
+              "rating": 1115,
+              "ratingLo": 1121,
+              "ratingHi": 1121,
+              "wilson": 0.1741,
+              "games": 96,
+              "wins": 24,
+              "losses": 72,
+              "draws": 0,
+              "winRate": 0.25,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.25
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.25
+              },
+              "avgRounds": 11.13,
+              "avgDecisionMs": 2.07,
+              "vs": {
+                "algo_random-annihilation@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_crucible@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_sovereign@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "artillery-zone": {
+                  "games": 96,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 0.25
                 }
               }
             }
           ],
           "h2h": [
             {
+              "a": "algo_crucible@v1",
+              "b": "algo_random-annihilation@v1",
+              "games": 25,
+              "aWins": 25,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_vortex@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_shrinkroll@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_sovereign@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
               "a": "algo_random-annihilation@v1",
               "b": "algo_vortex@v1",
-              "games": 20,
+              "games": 24,
               "aWins": 0,
-              "bWins": 20,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-annihilation@v1",
+              "b": "algo_shrinkroll@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-annihilation@v1",
+              "b": "algo_sovereign@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_shrinkroll@v1",
+              "b": "algo_vortex@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_shrinkroll@v1",
+              "b": "algo_sovereign@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_sovereign@v1",
+              "b": "algo_vortex@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
               "draws": 0
             }
           ]
         },
         "trench-run": {
           "overview": {
-            "games": 20,
-            "pairCount": 1,
+            "games": 240,
+            "pairCount": 10,
             "draws": 0,
             "drawRate": 0,
-            "avgRounds": 12.75
+            "avgRounds": 13.48
           },
           "models": [
             {
-              "id": "algo_random-annihilation@v1",
-              "rating": 1177,
-              "ratingLo": 1177,
-              "ratingHi": 1177,
-              "wilson": 0,
-              "games": 20,
-              "wins": 0,
-              "losses": 20,
+              "id": "algo_crucible@v1",
+              "rating": 1824,
+              "ratingLo": 1818,
+              "ratingHi": 1833,
+              "wilson": 0.6549,
+              "games": 96,
+              "wins": 72,
+              "losses": 24,
               "draws": 0,
-              "winRate": 0,
+              "winRate": 0.75,
               "firstSeat": {
-                "games": 10,
-                "winRate": 0
+                "games": 48,
+                "winRate": 0.75
               },
               "secondSeat": {
-                "games": 10,
-                "winRate": 0
+                "games": 48,
+                "winRate": 0.75
               },
-              "avgRounds": 12.75,
-              "avgDecisionMs": 0.78,
+              "avgRounds": 14.56,
+              "avgDecisionMs": 7.41,
               "vs": {
+                "algo_random-annihilation@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
                 "algo_vortex@v1": {
-                  "games": 20,
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_sovereign@v1": {
+                  "games": 24,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -42288,7 +42926,63 @@
               },
               "perMap": {
                 "trench-run": {
-                  "games": 20,
+                  "games": 96,
+                  "wins": 72,
+                  "draws": 0,
+                  "winRate": 0.75
+                }
+              }
+            },
+            {
+              "id": "algo_random-annihilation@v1",
+              "rating": 789,
+              "ratingLo": 774,
+              "ratingHi": 799,
+              "wilson": 0,
+              "games": 96,
+              "wins": 0,
+              "losses": 96,
+              "draws": 0,
+              "winRate": 0,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0
+              },
+              "avgRounds": 11.08,
+              "avgDecisionMs": 0.86,
+              "vs": {
+                "algo_crucible@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_vortex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_sovereign@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "trench-run": {
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -42296,51 +42990,253 @@
               }
             },
             {
-              "id": "algo_vortex@v1",
-              "rating": 1823,
-              "ratingLo": 1823,
-              "ratingHi": 1823,
-              "wilson": 0.8389,
-              "games": 20,
-              "wins": 20,
-              "losses": 0,
+              "id": "algo_shrinkroll@v1",
+              "rating": 1709,
+              "ratingLo": 1665,
+              "ratingHi": 1755,
+              "wilson": 0.5251,
+              "games": 96,
+              "wins": 60,
+              "losses": 36,
               "draws": 0,
-              "winRate": 1,
+              "winRate": 0.625,
               "firstSeat": {
-                "games": 10,
+                "games": 48,
+                "winRate": 0.75
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.5
+              },
+              "avgRounds": 13.48,
+              "avgDecisionMs": 8.99,
+              "vs": {
+                "algo_crucible@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_random-annihilation@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_vortex@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_sovereign@v1": {
+                  "games": 24,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.5
+                }
+              },
+              "perMap": {
+                "trench-run": {
+                  "games": 96,
+                  "wins": 60,
+                  "draws": 0,
+                  "winRate": 0.625
+                }
+              }
+            },
+            {
+              "id": "algo_sovereign@v1",
+              "rating": 1943,
+              "ratingLo": 1882,
+              "ratingHi": 2008,
+              "wilson": 0.7941,
+              "games": 96,
+              "wins": 84,
+              "losses": 12,
+              "draws": 0,
+              "winRate": 0.875,
+              "firstSeat": {
+                "games": 48,
                 "winRate": 1
               },
               "secondSeat": {
-                "games": 10,
-                "winRate": 1
+                "games": 48,
+                "winRate": 0.75
               },
-              "avgRounds": 12.75,
-              "avgDecisionMs": 1.38,
+              "avgRounds": 14.51,
+              "avgDecisionMs": 2.39,
               "vs": {
                 "algo_random-annihilation@v1": {
-                  "games": 20,
-                  "wins": 20,
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_crucible@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 24,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.5
+                },
+                "algo_vortex@v1": {
+                  "games": 24,
+                  "wins": 24,
                   "draws": 0,
                   "winRate": 1
                 }
               },
               "perMap": {
                 "trench-run": {
-                  "games": 20,
-                  "wins": 20,
+                  "games": 96,
+                  "wins": 84,
+                  "draws": 0,
+                  "winRate": 0.875
+                }
+              }
+            },
+            {
+              "id": "algo_vortex@v1",
+              "rating": 1236,
+              "ratingLo": 1220,
+              "ratingHi": 1245,
+              "wilson": 0.1741,
+              "games": 96,
+              "wins": 24,
+              "losses": 72,
+              "draws": 0,
+              "winRate": 0.25,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.25
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.25
+              },
+              "avgRounds": 13.78,
+              "avgDecisionMs": 1.16,
+              "vs": {
+                "algo_crucible@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_random-annihilation@v1": {
+                  "games": 24,
+                  "wins": 24,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_shrinkroll@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_sovereign@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "trench-run": {
+                  "games": 96,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 0.25
                 }
               }
             }
           ],
           "h2h": [
             {
+              "a": "algo_crucible@v1",
+              "b": "algo_random-annihilation@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_shrinkroll@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_vortex@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_crucible@v1",
+              "b": "algo_sovereign@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-annihilation@v1",
+              "b": "algo_shrinkroll@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
               "a": "algo_random-annihilation@v1",
               "b": "algo_vortex@v1",
-              "games": 20,
+              "games": 24,
               "aWins": 0,
-              "bWins": 20,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_random-annihilation@v1",
+              "b": "algo_sovereign@v1",
+              "games": 24,
+              "aWins": 0,
+              "bWins": 24,
+              "draws": 0
+            },
+            {
+              "a": "algo_shrinkroll@v1",
+              "b": "algo_vortex@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_shrinkroll@v1",
+              "b": "algo_sovereign@v1",
+              "games": 24,
+              "aWins": 12,
+              "bWins": 12,
+              "draws": 0
+            },
+            {
+              "a": "algo_sovereign@v1",
+              "b": "algo_vortex@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
               "draws": 0
             }
           ]
@@ -45765,6 +46661,538 @@
           ]
         }
       }
+    },
+    {
+      "id": "royale",
+      "label": "大逃杀",
+      "games": 144,
+      "maps": {
+        "all": {
+          "overview": {
+            "games": 144,
+            "pairCount": 3,
+            "draws": 1,
+            "drawRate": 0.0069,
+            "avgRounds": 13.1
+          },
+          "models": [
+            {
+              "id": "algo_apex@v1",
+              "rating": 2153,
+              "ratingLo": 2029,
+              "ratingHi": 2059,
+              "wilson": 0.9615,
+              "games": 96,
+              "wins": 96,
+              "losses": 0,
+              "draws": 0,
+              "winRate": 1,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 1
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 1
+              },
+              "avgRounds": 13.09,
+              "avgDecisionMs": 23.23,
+              "vs": {
+                "algo_echelon@v1": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_random-royale@v1": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "narrow-road": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "snowflake": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              }
+            },
+            {
+              "id": "algo_echelon@v1",
+              "rating": 1475,
+              "ratingLo": 1464,
+              "ratingHi": 1500,
+              "wilson": 0.3969,
+              "games": 96,
+              "wins": 47,
+              "losses": 48,
+              "draws": 1,
+              "winRate": 0.4896,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.5
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.4792
+              },
+              "avgRounds": 13.36,
+              "avgDecisionMs": 2.68,
+              "vs": {
+                "algo_random-royale@v1": {
+                  "games": 48,
+                  "wins": 47,
+                  "draws": 1,
+                  "winRate": 0.9896
+                },
+                "algo_apex@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "narrow-road": {
+                  "games": 48,
+                  "wins": 23,
+                  "draws": 1,
+                  "winRate": 0.4896
+                },
+                "snowflake": {
+                  "games": 48,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 0.5
+                }
+              }
+            },
+            {
+              "id": "algo_random-royale@v1",
+              "rating": 872,
+              "ratingLo": 941,
+              "ratingHi": 1007,
+              "wilson": 0.0005,
+              "games": 96,
+              "wins": 0,
+              "losses": 95,
+              "draws": 1,
+              "winRate": 0,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0
+              },
+              "avgRounds": 12.85,
+              "avgDecisionMs": 1.12,
+              "vs": {
+                "algo_echelon@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 1,
+                  "winRate": 0.0104
+                },
+                "algo_apex@v1": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "narrow-road": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 1,
+                  "winRate": 0.0104
+                },
+                "snowflake": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              }
+            }
+          ],
+          "h2h": [
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_echelon@v1",
+              "games": 48,
+              "aWins": 48,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_random-royale@v1",
+              "games": 48,
+              "aWins": 48,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_echelon@v1",
+              "b": "algo_random-royale@v1",
+              "games": 48,
+              "aWins": 47,
+              "bWins": 0,
+              "draws": 1
+            }
+          ]
+        },
+        "narrow-road": {
+          "overview": {
+            "games": 72,
+            "pairCount": 3,
+            "draws": 1,
+            "drawRate": 0.0139,
+            "avgRounds": 13.13
+          },
+          "models": [
+            {
+              "id": "algo_apex@v1",
+              "rating": 2037,
+              "ratingLo": 2010,
+              "ratingHi": 2059,
+              "wilson": 0.9259,
+              "games": 48,
+              "wins": 48,
+              "losses": 0,
+              "draws": 0,
+              "winRate": 1,
+              "firstSeat": {
+                "games": 24,
+                "winRate": 1
+              },
+              "secondSeat": {
+                "games": 24,
+                "winRate": 1
+              },
+              "avgRounds": 12.81,
+              "avgDecisionMs": 7.63,
+              "vs": {
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "narrow-road": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              }
+            },
+            {
+              "id": "algo_echelon@v1",
+              "rating": 1474,
+              "ratingLo": 1440,
+              "ratingHi": 1500,
+              "wilson": 0.3543,
+              "games": 48,
+              "wins": 23,
+              "losses": 24,
+              "draws": 1,
+              "winRate": 0.4792,
+              "firstSeat": {
+                "games": 24,
+                "winRate": 0.5
+              },
+              "secondSeat": {
+                "games": 24,
+                "winRate": 0.4583
+              },
+              "avgRounds": 13.23,
+              "avgDecisionMs": 1.49,
+              "vs": {
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 23,
+                  "draws": 1,
+                  "winRate": 0.9792
+                },
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "narrow-road": {
+                  "games": 48,
+                  "wins": 23,
+                  "draws": 1,
+                  "winRate": 0.4896
+                }
+              }
+            },
+            {
+              "id": "algo_random-royale@v1",
+              "rating": 989,
+              "ratingLo": 941,
+              "ratingHi": 1050,
+              "wilson": 0.0011,
+              "games": 48,
+              "wins": 0,
+              "losses": 47,
+              "draws": 1,
+              "winRate": 0,
+              "firstSeat": {
+                "games": 24,
+                "winRate": 0
+              },
+              "secondSeat": {
+                "games": 24,
+                "winRate": 0
+              },
+              "avgRounds": 13.33,
+              "avgDecisionMs": 0.8,
+              "vs": {
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 1,
+                  "winRate": 0.0208
+                },
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "narrow-road": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 1,
+                  "winRate": 0.0104
+                }
+              }
+            }
+          ],
+          "h2h": [
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_echelon@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_echelon@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 23,
+              "bWins": 0,
+              "draws": 1
+            }
+          ]
+        },
+        "snowflake": {
+          "overview": {
+            "games": 72,
+            "pairCount": 3,
+            "draws": 0,
+            "drawRate": 0,
+            "avgRounds": 13.08
+          },
+          "models": [
+            {
+              "id": "algo_apex@v1",
+              "rating": 2059,
+              "ratingLo": 2059,
+              "ratingHi": 2059,
+              "wilson": 0.9259,
+              "games": 48,
+              "wins": 48,
+              "losses": 0,
+              "draws": 0,
+              "winRate": 1,
+              "firstSeat": {
+                "games": 24,
+                "winRate": 1
+              },
+              "secondSeat": {
+                "games": 24,
+                "winRate": 1
+              },
+              "avgRounds": 13.38,
+              "avgDecisionMs": 35.2,
+              "vs": {
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "snowflake": {
+                  "games": 48,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              }
+            },
+            {
+              "id": "algo_echelon@v1",
+              "rating": 1500,
+              "ratingLo": 1500,
+              "ratingHi": 1500,
+              "wilson": 0.3639,
+              "games": 48,
+              "wins": 24,
+              "losses": 24,
+              "draws": 0,
+              "winRate": 0.5,
+              "firstSeat": {
+                "games": 24,
+                "winRate": 0.5
+              },
+              "secondSeat": {
+                "games": 24,
+                "winRate": 0.5
+              },
+              "avgRounds": 13.5,
+              "avgDecisionMs": 3.9,
+              "vs": {
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "snowflake": {
+                  "games": 48,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 0.5
+                }
+              }
+            },
+            {
+              "id": "algo_random-royale@v1",
+              "rating": 941,
+              "ratingLo": 941,
+              "ratingHi": 941,
+              "wilson": 0,
+              "games": 48,
+              "wins": 0,
+              "losses": 48,
+              "draws": 0,
+              "winRate": 0,
+              "firstSeat": {
+                "games": 24,
+                "winRate": 0
+              },
+              "secondSeat": {
+                "games": 24,
+                "winRate": 0
+              },
+              "avgRounds": 12.38,
+              "avgDecisionMs": 1.35,
+              "vs": {
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "snowflake": {
+                  "games": 48,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              }
+            }
+          ],
+          "h2h": [
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_echelon@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            },
+            {
+              "a": "algo_echelon@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0
+            }
+          ]
+        }
+      }
     }
   ],
   "excluded": [
@@ -45774,406 +47202,5 @@
       "reason": "512 动作旧格式，评估脚本不支持进程内互打"
     }
   ],
-  "warnings": [
-    "line 38057: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38058: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38059: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38060: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38061: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38062: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38063: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38064: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38065: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38066: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38067: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38068: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38069: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38070: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38071: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38072: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38073: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38074: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38075: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38076: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38077: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38078: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38079: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38080: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38081: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38082: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38083: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38084: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38085: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38086: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38087: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38088: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38089: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38090: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38091: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38092: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38093: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38094: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38095: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38096: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38097: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38098: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38099: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38100: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38101: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38102: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38103: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38104: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38105: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38106: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38107: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38108: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38109: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38110: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38111: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38112: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38113: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38114: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38115: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38116: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38117: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38118: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38119: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38120: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38121: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38122: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38123: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38124: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38125: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38126: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38127: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38128: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38129: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38130: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38131: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38132: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38133: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38134: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38135: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38136: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38137: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38138: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38139: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38140: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38141: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38142: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38143: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38144: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38145: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38146: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38147: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38148: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38149: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38150: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38151: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38152: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38153: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38154: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38155: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38156: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38157: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38158: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38159: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38160: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38161: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38162: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38163: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38164: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38165: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38166: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38167: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38168: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38169: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38170: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38171: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38172: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38173: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38174: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38175: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38176: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38177: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38178: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38179: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38180: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38181: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38182: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38183: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38184: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38185: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38186: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38187: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38188: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38189: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38190: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38191: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38192: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38193: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38194: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38195: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38196: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38197: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38198: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38199: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38200: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38201: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38202: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38203: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38204: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38205: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38206: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38207: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38208: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38209: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38210: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38211: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38212: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38213: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38214: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38215: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38216: unknown participant name(s): algo_tempo-weave-mirror@v1",
-    "line 38217: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38218: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38219: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38220: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38221: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38222: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38223: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38224: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38225: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38226: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38227: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38228: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38229: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38230: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38231: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38232: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38233: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38234: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38235: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38236: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38237: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38238: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38239: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38240: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38241: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38242: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38243: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38244: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38245: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38246: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38247: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38248: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38249: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38250: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38251: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38252: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38253: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38254: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38255: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38256: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38257: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38258: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38259: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38260: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38261: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38262: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38263: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38264: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38265: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38266: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38267: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38268: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38269: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38270: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38271: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38272: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38273: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38274: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38275: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38276: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38277: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38278: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38279: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38280: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38281: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38282: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38283: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38284: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38285: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38286: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38287: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38288: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38289: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38290: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38291: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38292: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38293: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38294: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38295: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38296: unknown participant name(s): algo_prism-mirror@v1",
-    "line 38297: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38298: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38299: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38300: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38301: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38302: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38303: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38304: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38305: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38306: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38307: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38308: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38309: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38310: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38311: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38312: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38313: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38314: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38315: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38316: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38317: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38318: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38319: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38320: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38321: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38322: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38323: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38324: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38325: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38326: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38327: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38328: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38329: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38330: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38331: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38332: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38333: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38334: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38335: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38336: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38337: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38338: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38339: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38340: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38341: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38342: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38343: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38344: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38345: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38346: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38347: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38348: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38349: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38350: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38351: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38352: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38353: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38354: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38355: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38356: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38357: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38358: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38359: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38360: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38361: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38362: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38363: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38364: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38365: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38366: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38367: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38368: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38369: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38370: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38371: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38372: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38373: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38374: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38375: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38376: unknown participant name(s): algo_horizon-mirror@v1",
-    "line 38377: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38378: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38379: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38380: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38381: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38382: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38383: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38384: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38385: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38386: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38387: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38388: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38389: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38390: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38391: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38392: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38393: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38394: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38395: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38396: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38397: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38398: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38399: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38400: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38401: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38402: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38403: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38404: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38405: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38406: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38407: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38408: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38409: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38410: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38411: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38412: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38413: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38414: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38415: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38416: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38417: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38418: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38419: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38420: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38421: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38422: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38423: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38424: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38425: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38426: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38427: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38428: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38429: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38430: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38431: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38432: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38433: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38434: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38435: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38436: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38437: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38438: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38439: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38440: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38441: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38442: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38443: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38444: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38445: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38446: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38447: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38448: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38449: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38450: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38451: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38452: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38453: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38454: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38455: unknown participant name(s): algo_threat-mirror@v1",
-    "line 38456: unknown participant name(s): algo_threat-mirror@v1"
-  ]
+  "warnings": []
 }

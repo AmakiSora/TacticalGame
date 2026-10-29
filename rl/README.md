@@ -496,8 +496,8 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps standoff,molten-
 # 歼灭（仅同模式算法）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps artillery-zone --algorithms random-annihilation,vortex --games 24
 
-# 大逃杀（目前只有 1 个算法条目，补齐第二个同模式算法后才能组批）
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps snowflake --algorithms random-royale
+# 大逃杀（random-royale + echelon 两个同模式算法组批）
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps snowflake,narrow-road --algorithms random-royale,echelon --games 20
 ```
 
 要点：

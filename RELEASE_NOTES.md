@@ -4,6 +4,21 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.8.16
+
+### 新增
+
+- **大逃杀雁阵算法（`echelon` v1）**：royale 模式首个强度算法。逐拍效用决策：敌军落点扩散预报（含"躲避者"事件史校正）+ 均匀方差解析击杀概率与集火 + 炮火圈生存调度（疏散/部署/治疗全镜像引擎口径）+ 爆破距离场开路（snowflake 的凹地与花心全靠重装拆墙进入）+ 编成缺口与兵力上限；全部规则参数从对局 config 读取，对未来新增 royale 地图无需改动。设计及评估见 [算法开发笔记](algorithms/docs/ALGORITHMS_NOTES.md#echelon雁阵算法)。
+
+### 变更
+
+- **对拍 harness 支持 royale**：`scripts/horizon-arena.mts` 的算法模式校验从写死 `simultaneous` 改为按地图 `mode` 字段，大逃杀两张图可直接 headless 标定；评估控制台大逃杀模式自此有 `random-royale` + `echelon` 两个条目可组批。
+
+### 测试与验证
+
+- 大逃杀 headless 对拍（真实引擎，逐局交换座位）：`echelon` 对 `random-royale` snowflake 2P **30:0**、narrow-road 2P **19:1**、snowflake 3P 1v2 **6:0**，全部对局 0 非法动作，决策耗时单轮 max 39.9 ms。
+- 新增 `tests/algorithms/echelon.test.ts`（20 例）与 `echelon-selfplay.test.ts`（两图自博弈 0 非法）；`npm run build` 通过、全量 `npm test` 139 文件 / 1416 例全绿。
+
 ## 3.8.13
 
 ### 新增

@@ -4,7 +4,25 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1；标准模式算法（greedy / random / mcts / threat / field / verdict）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.16（2026-10-29）— echelon 雁阵算法 v1
+
+### 新增功能
+
+- **`echelon`（雁阵算法）**：仅参与大逃杀（royale），效用 AI 单步决策。五个信息结构：①敌军落点扩散预报（停留 + 一跳/双跳 BFS 扩散，按"危险中疏散 / 接火原地开火 / 上轮移过的躲避者逃离威胁"三个可观察事实分档修正）；②精确战斗算术（均匀方差解析击杀概率、attackLock 逃逸面建模、前缀期望伤害累计进有效血量的集火、按击杀进度计价的单次命中价值、斩杀最后一单位一票支配）；③炮火圈生存调度（本轮边界挨炮格 = 危险格 ∪ 预警格，疏散效用压倒性；部署/治疗/落点全镜像引擎危险区口径；驻屯半径按全军机动能力前瞻未来安全圈）；④爆破距离场开路（以圈心为源的 Dijkstra 把"共享 blocker 邻居的 plain 格对"连成爆破传送边，牵引全军穿墙、重装拆"显著缩短场值"的墙，对任何地图形状成立）；⑤编成缺口与兵力上限（角色全部从 config.units 推导、在途部署计入缺口、兵力上限 = 行动点 +1、凹地拥挤门防堵塞）。被拒动作靠模块内「轮次 + 队列长度 + 上次发射指纹」记忆轮换次优候选。不参考仓库内其他强度算法实现、不读地图名或对手隐藏信息；设计与校准过程见 [开发笔记](ALGORITHMS_NOTES.md#echelon雁阵算法)，档案见 [algorithms/echelon.md](algorithms/echelon.md)。
+- **注册与评估**：`algo_echelon` / `algo_echelon@v1`，`modes: ['royale']`；大厅、runner 与评估控制台由注册表自动接入。大逃杀模式自此有两个算法条目（`random-royale` + `echelon`）可组批跑榜。
+
+### 变更
+
+- **`scripts/horizon-arena.mts` 模式校验泛化**：从写死 `simultaneous` 改为按 `maps/<id>.json` 的 `mode` 字段校验算法注册模式，royale 地图（snowflake / narrow-road）可直接用于 headless 对拍标定；对既有 simultaneous 用法无行为变化。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/echelon.test.ts`（20 例：决策门卫、零兵力部署、前缀感知的幽灵重复入队回归、锁定射击、击杀进度集火、治疗危险区镜像、预警格疏散、链式撤离、爆破开路、确定性、真实 snowflake 整轮入队校验）与 `tests/algorithms/echelon-selfplay.test.ts`（两图整局自博弈 0 非法动作、狭路断言终局）；`tests/algorithms/registry.test.ts` 补 echelon 元数据断言。
+- 强度标定（真实引擎 headless 对拍 `scripts/horizon-arena.mts`，2026-10-29，逐局交换座位）：vs `random-royale` snowflake **30:0**、narrow-road **19:1**、snowflake 3P 1v2 **6:0**；镜像自博弈 snowflake 3:5/4 平（平局为规则允许的规避对峙、round_guard 兜底）、narrow-road 6:6 全部正常终局；全部对局 echelon 席位 **0 非法动作**；决策耗时单轮 p50 2.4–15.8ms、max 39.9ms。
+- **新图开箱即用验证**：临时合成一张全新 royale 地图（开阔盘 + 花心十字墙、attacksPerUnit 2、不同炮火节奏与兵种数值，验证后删除）跑整局自博弈与对拍，echelon 零改动 0 非法；该图暴露并修复了算法地形解析优先级 bug（地形覆盖层"后者优先"语义未对齐引擎 gameIndex）。
+- `npm run build` 通过；`npm test` 全量 139 文件 / 1416 例全绿。
 
 ## 3.8.13（2026-10-29）— vortex 旋涡算法 v1
 

@@ -10,10 +10,10 @@
 
 | 项目 | 当前值 |
 |---|---|
-| 代码版本 | 3.8.13 |
+| 代码版本 | 3.8.16 |
 | 标准图池 | `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `whirlpool` |
 | 同时回合图 | `standoff` / `molten-throne` / `mistpine` |
-| 大逃杀图 | `snowflake` / `narrow-road`（内置基线：`random-royale`） |
+| 大逃杀图 | `snowflake` / `narrow-road`（内置基线：`random-royale`；强度算法：`echelon`） |
 | 歼灭图 | `artillery-zone` / `trench-run`（内置基线：`random-annihilation`；强度算法：`shrinkroll` / `vortex`） |
 | 同时回合规则 | 3.8.0 起按行动点**分步结算**，不是“一单位一轮一动作” |
 | 裁决分 | 3.6.0 起为击杀价值 + 据点流量制 |
@@ -38,6 +38,7 @@ algorithms/
 │   ├── shrinkroll.mjs           # 缩圈推演算法（歼灭模式）
 │   ├── random-royale.mjs # 大逃杀随机算法（大逃杀模式）
 │   ├── vortex.mjs        # 旋涡算法（歼灭模式）
+│   ├── echelon.mjs       # 雁阵算法（大逃杀模式）
 │   ├── mcts.mjs          # 蒙特卡洛树搜索（标准模式）
 │   ├── threat.mjs        # 威胁感知算法（标准模式）
 │   ├── field.mjs         # 势场算法（标准模式）
@@ -78,11 +79,36 @@ algorithms/
 │       ├── tempo.md
 │       ├── tempo-weave.md
 │       ├── horizon.md
-│       └── vortex.md
+│       ├── vortex.md
+│       └── echelon.md
 ├── registry.mjs          # 算法注册表与 ALGORITHM_META
 ├── registry.d.mts        # 注册表 TypeScript 类型声明
 └── runner.mjs            # 通用运行器
 ```
+
+## echelon：雁阵算法
+
+`echelon` v1 仅参与 `royale`，大厅类型为 `algo_echelon`，竞技场参与者为 `algo_echelon@v1`。单文件实现（`builtin/echelon.mjs`，策略接口 `decide`），不调用其他算法，也不读取地图名称、对手隐藏队列或随机数状态；规则参数（形状/射程/锁定/attacksPerUnit/炮火时刻表/据点收入/裁决权重）全部从对局 config 与公开事件流读取，对未来新增 royale 地图无需改动。
+
+核心机制五件套（完整推导、参数表与校准过程见 [单算法档案](algorithms/echelon.md)）：
+
+- **逐拍贪心剧本**：同时回合队列下标即行动点，前缀即已定剧本；每次 decide 从 `plan.myQueue` 镜像重放投影（站位/地形/攻击次数/已花补给/各步目的格/已打出的期望伤害/已排治疗量），在下一拍上取边际效用最高的动作。被拒动作不改变状态——模块内「轮次 + 队列长度 + 上次发射指纹」记忆识别重问并轮换次优候选。
+- **敌军落点扩散预报**：停留 + 一跳 BFS 扩散 + 双跳扩散的三分量落点分布，按「危险中向外疏散 / 接火原地开火 / 上轮移过的躲避者逃离威胁」三个可观察事实分档修正。
+- **精确战斗算术**：均匀方差解析击杀概率；锁定按逃逸面建模；前缀期望伤害累计进目标有效血量（集火涌现）；单次命中按击杀进度计价（残血更值钱）；斩杀最后一单位一票支配。
+- **炮火圈生存调度**：本轮边界挨炮格 = 当前危险格 ∪（下轮缩圈的）预警格，疏散效用压倒多数动作；部署/治疗全镜像引擎危险区口径；驻屯半径按全军机动能力前瞻未来安全圈，缩圈前就启动行军。
+- **爆破距离场开路**：以圈心为源的 Dijkstra（共享 blocker 邻居的 plain 格对之间连"爆破传送"边）牵引全军穿墙，重装拆"拆掉后显著缩短场值"的墙——snowflake 的凹地/花心全靠它进入。
+
+评估（headless 对拍，计划模式专用 harness `scripts/horizon-arena.mts`，已泛化支持 royale 地图）：
+
+```bash
+npx tsx scripts/horizon-arena.mts --a echelon --b random-royale --map snowflake --games 30 --quiet
+npx tsx scripts/horizon-arena.mts --a echelon --b random-royale --map narrow-road --games 20 --quiet
+npx tsx scripts/horizon-arena.mts --a echelon --b random-royale --map snowflake --players 3 --games 6 --quiet
+```
+
+**当前快照（2026-10-29，3.8.16 真实引擎，vs `random-royale`、逐局交换座位）**：snowflake 2P **30:0**、narrow-road 2P **19:1**、snowflake 3P 1v2 **6:0**；镜像自博弈 snowflake 3:5/4 平（平局为规则允许的规避对峙，round_guard 兜底）、narrow-road 6:6 全部正常终局；全部对局 echelon 席位 **0 非法动作**；决策耗时单轮 p50 2.4–15.8ms、max 39.9ms。
+
+**已知限制**：镜像规避对峙可能拖到轮次守卫（等速追逃固有性质）；单拍贪心无跨回合联合推演；预报权重手工标定、未在线拟合；多人局只有 3P 1v2 强度数据。详见 [档案](algorithms/echelon.md)。
 
 ## vortex：旋涡算法
 
@@ -269,6 +295,7 @@ export const ALGORITHM_META = {
 | **random-annihilation** | annihilation | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 歼灭模式基线、炮火合法性冒烟 |
 | **shrinkroll** | annihilation | v1 | 束搜索 + 缩圈时间线投影 | O(束宽×候选×深度×结算投影) | 3.8.12 开发期真实引擎标定（`temp/arena/bench.ts`，两图各 240 局）：对 random-annihilation **480/480**；对评测贪婪基线 100%（artillery-zone，160/160）/ 98.75%（trench-run，158/160）；自我镜像 50.0% / 49.7%；3 人局第一名 90.0%（108/120）；随机歼灭图 97.9%（47/48）、6 人混战 32/32；单次 decide 4.91–10.85ms、零非法 | 歼灭模式强基线、多席位领先者压制 |
 | **random-royale** | royale | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 大逃杀模式基线、计划队列冒烟 |
+| **echelon** | royale | v1 | 效用 AI / 落点扩散预报 + 击杀概率 + 炮火圈调度 + 爆破距离场 | O(单位×格子 + 敌军×预报扩散) | 3.8.16 真实引擎 headless 对拍 `random-royale`（2026-10-29，逐局换座）：snowflake **30:0**、narrow-road **19:1**、3P 1v2 **6:0**；镜像自博弈稳定、全部对局 0 非法；单轮 p50 2.4–15.8ms、max 39.9ms，详见 [设计与评估](#echelon雁阵算法) | 大逃杀模式强度条目、计划模式逐拍剧本与炮火生存调度参考 |
 | **vortex** | annihilation | v1 | 效用 AI / 威胁图 + 炮火收缩圈预判 | O(单位×格子) | 真实引擎 headless strict 对拍 `random-annihilation` 40:0（两图各 20 局，2026-10-29，零非法），详见 [设计与评估](#vortex旋涡算法)；榜单歼灭模式 40W/0L / 1882 | 歼灭模式强度条目、炮火圈疏散与稳杀集火参考 |
 | **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
 | **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
@@ -295,12 +322,12 @@ export const ALGORITHM_META = {
 | standard | 6 | random / greedy / mcts / threat / field / verdict |
 | simultaneous | 8 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo / tempo-weave / horizon |
 | annihilation | 3 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像）/ shrinkroll（束搜索 + 缩圈时间线投影 + 轮界裁决投影）/ vortex（效用 AI + 收缩圈疏散） |
-| royale | 1 | random-royale（同时回合计划队列，与 random-sim 同源枚举） |
+| royale | 2 | random-royale（同时回合计划队列，与 random-sim 同源枚举）/ echelon（效用 AI + 落点扩散预报 + 炮火圈调度 + 爆破距离场） |
 
 > 三个随机基线是**独立条目**：注册名、展示名、版本与竞技场参与者 id 全部分开
 > （`algo_random@v1` / `algo_random-annihilation@v1` / `algo_random-royale@v1`），
 > 战绩不会混名；标准模式的实现与历史不受影响。
-> 歼灭模式已有强度算法 `shrinkroll`（3.8.12）与 `vortex`（3.8.13）；大逃杀仍只有随机基线，是当前最大的模式空白。跨模式战绩不可用于证明算法强度。
+> 歼灭模式强度算法 `shrinkroll`（3.8.12）/ `vortex`（3.8.13），大逃杀强度算法 `echelon`（3.8.16）。跨模式战绩不可用于证明算法强度。
 
 ## 当前强度快照（standard，2026-10-21 UTC）
 

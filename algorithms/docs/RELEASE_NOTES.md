@@ -4,7 +4,59 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1；标准模式算法（greedy / random / mcts / threat / field / verdict / parallax）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法（greedy / random / mcts / threat / field / verdict / parallax）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+
+## 3.8.19（2026-10-29）— ark 方舟算法 v1
+
+### 新增功能
+
+- 新增仅支持 `royale` 的 `ark` v1（方舟算法），从引擎规则独立编写，单文件零导入，不复用既有算法或策略工具；现有算法仅作为黑盒对战对手。注册为 `algo_ark` / `algo_ark@v1`，大厅、HTTP runner 与评估控制台由注册表接入。原理、参数、约束与逐项限制见 [单算法档案](algorithms/ark.md)。
+- 将友军与可用落脚格建成二分图，以最小费用匹配分配不同避难位置；代价包括地形行军距离、最终安全半径、未来炮火和接敌风险，满图时允许保留原位。随后比较移动、攻击、治疗、爆破及两动作组合的行动点收益，每入队一步重新计算，不缓存跨局状态。
+- 投影自己的计划前缀，计入部署补给、已占目的格、连续移动、爆破地形、攻击次数和预期伤疗；不把预计击杀当成已经腾空。部署按射程、机动、兵力容量和缩圈疏散负担计价，零兵力时优先部署；地形、兵种和炮火节奏均取本局配置及公开状态，不按地图名或对手身份分支。
+- 边界：安全格匹配与两动作估值不是完整同时结算搜索，敌方命中率和威胁是启发式估计，不能保证避开隐藏计划的到达冲突；没有保证战胜全部现有或未来对手，也未实现有限回合裁决的专门末轮搜索。
+
+### 测试与验证
+
+- 新增 **44 项**独立规则回归和 **1 项**注册测试：包含冻结公开快照、秘密字段拒读、己方队列两种接口、零兵力首步部署、据点禁用/折扣/补给预留、投影移动/治疗/爆破、攻次限制、预计击杀避免重复开火、零攻击配置、超大与非整数伤害方差，以及两图 2 人和雪花 3/6 人真实引擎短局。另以枚举分布对闭式伤害计算做 **336 组**差分检查；超出浮点精确整数范围的方差采用连续均匀分布极限近似。
+- `npm run build`、`npm test`、`npm run check-version` 及新增测试严格 TypeScript 检查通过，全量 **145 文件 / 1652 用例通过**。
+- 浏览器确认评估控制台大逃杀可选方舟、标准模式不出现、单算法禁启动而选择对手可启动；真实 HTTP bot runner 完成狭路对随机算法接入局，方舟第 12 轮获胜、无 `bot_failed`。存在规则允许的到达占位/冲突及失败连锁，不将它们误记为非法入队；观战页显示和 Canvas 渲染正常，未启动写入正式榜单的跑批。
+
+### 固定实现黑盒评估
+
+引擎 **3.8.19**，日期 **2026-10-29**，使用未修改的公共真实引擎 harness `scripts/horizon-arena.mts`；方舟及三个对手均为 **v1**。仅统计最终固定实现的 **71 局**，开发调参批次和 HTTP 接入局不计入。下表均从方舟视角列 **胜 / 负 / 平**，多人局为一席方舟对其余同种对手的自由混战，不是组队赛。
+
+| 黑盒对手 | 狭路 2 人（8 局） | 雪花 2 人（8 局） | 雪花 3 人（3 局） | 雪花 6 人 | 合计 |
+| --- | --- | --- | --- | --- | --- |
+| `random-royale` | 8 / 0 / 0 | 8 / 0 / 0 | 3 / 0 / 0 | 6 / 0 / 0（6 局） | 25 / 0 / 0 |
+| `echelon` | 8 / 0 / 0 | 8 / 0 / 0 | 3 / 0 / 0 | 6 / 0 / 0（6 局） | 25 / 0 / 0 |
+| `apex` | 4 / 0 / 4 | 2 / 6 / 0 | 0 / 3 / 0 | 1 / 0 / 1（2 局） | 7 / 9 / 5 |
+
+- 总计 **57 胜 / 9 负 / 5 平**，66 局 `last_player_standing`、5 局 `mutual_annihilation`；双方非法入队均为 **0**，`round_guard` 截断 **0**。方舟结算期仍出现占位失败 130 次、前序失败连锁 117 次、单位已消失 78 次和到达冲突 37 次；这些是隐藏计划统一结算后的动态失败，不代表策略已经能规避碰撞。
+- 双人引擎种子基数 `291903`，多人 `391903`；实际种子为基数加 `floor(index / 2) * 7919`。双人成对换座，多人按席位轮转；对 `apex` 的六人局仅覆盖前两席，不能当作完整座位覆盖。狭路对 `apex` 四组均为 A 席胜、B 席同归于尽，重复轨迹不是四份独立证据；雪花双人和三人对 `apex` 的败局表明对强对手仍有明显短板。
+- harness 在同一进程调用各席位，限制 60 轮并只给公开投影；固定的是引擎种子，不保证黑盒对手内部随机源也被播种。未测试未见地图、混合对手阵容或独立留出集，不由本批次推断泛化胜率。计时与其他评估、全量测试并发，方舟所记录最大单次决策 110.6 ms、最大单轮决策累计 425.7 ms，仅为本批次观测，不作严格性能基准。
+- 原始报告位于本地 gitignored `temp/ark-arena/final-*.jsonl`（12 个文件），未写入正式 `arena/matches.jsonl`。固定源码 SHA-256：`algorithms/builtin/ark.mjs` 为 `3dd2caf62dd81feb287b939072aa7ad12eb54b2240a9f1867ad0109044ff1246`；harness 为 `1478c236ae5f33d08e1e7a69423cbc1717181e0e914602e87869164fba1c23b7`。
+
+复跑相同评估矩阵（使用新目录，避免 harness 追加写导致重复计数；不保证黑盒随机轨迹逐局一致）：
+
+```bash
+out="temp/ark-recheck-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$out"
+for opponent in random-royale echelon apex; do
+  for map in narrow-road snowflake; do
+    node --import tsx scripts/horizon-arena.mts --a ark --b "$opponent" \
+      --map "$map" --players 2 --games 8 --seed-base 291903 \
+      --out "$out/${map}-2-${opponent}.jsonl"
+  done
+  node --import tsx scripts/horizon-arena.mts --a ark --b "$opponent" \
+    --map snowflake --players 3 --games 3 --seed-base 391903 \
+    --out "$out/snowflake-3-${opponent}.jsonl"
+  games=6
+  if [ "$opponent" = apex ]; then games=2; fi
+  node --import tsx scripts/horizon-arena.mts --a ark --b "$opponent" \
+    --map snowflake --players 6 --games "$games" --seed-base 391903 \
+    --out "$out/snowflake-6-${opponent}.jsonl"
+done
+```
 
 ## 3.8.18（2026-10-29）— parallax 视差算法 v1
 

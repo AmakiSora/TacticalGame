@@ -33,10 +33,12 @@ node algorithms/runner.mjs \
 - **echelon** - 雁阵算法：落点扩散预报 + 精确击杀概率集火 + 炮火圈生存调度 + 爆破距离场开路（大逃杀模式）；档案 [echelon.md](../docs/algorithms/echelon.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#echelon雁阵算法)
 - **random-royale** - 大逃杀随机算法：从合法计划动作中随机入队，随后提交（大逃杀模式）
 - **apex** - 绝境算法：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验（大逃杀模式）；档案 [apex.md](../docs/algorithms/apex.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#apex绝境算法)
+- **ark** - 方舟算法：安全格容量匹配（Hungarian 最小费用）+ 单/两动作行动点竞价 + 缩圈增援负担评估（大逃杀模式）；档案 [ark.md](../docs/algorithms/ark.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#ark方舟算法)
 - **mcts** - 蒙特卡洛树搜索：模拟推演选择最优动作（标准模式）
 - **threat** - 威胁感知算法：威胁图统一效用评估，集火斩杀、避险走位（标准模式）
 - **field** - 势场算法：斥力井（敌方火力）+ 引力井（据点/总部）+ 波前距离场，风筝走位、分头抢点（标准模式）
 - **verdict** - 裁决线算法：按引擎裁决权重选"用哪条线赢"（斩首/磨平/裁定），再从终局倒推攻城排程与期限（标准模式）
+- **parallax** - 视差算法：整回合束搜索 + 单位完整激活宏动作 + 对手反击情景检验与终局边界实裁模拟（标准模式）；档案 [parallax.md](../docs/algorithms/parallax.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#parallax视差算法)
 - **random-sim** - 同时随机算法：从所有合法计划动作中随机选择入队，随后提交（同时回合模式）
 - **dest-prob** - 落点概率算法（v2）：队列前缀投影 + 同单位多动作 + 地形寻路 + 攻击次数上限，落点分布预测射击、规避目的格冲突（同时回合模式）
 - **kriegspiel** - 兵棋推演算法（v2）：整份有序计划按行动点分步真实结算 rollout + 联合搜索 + 风险规避（同时回合模式）

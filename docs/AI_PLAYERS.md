@@ -63,10 +63,12 @@ python rl/evaluate.py --model rl/models/model.zip
 - **大逃杀随机算法（Random Royale，仅大逃杀模式）**：从合法计划动作中随机入队（枚举与 random-sim 同源），随后提交。[档案](../algorithms/docs/algorithms/random-royale.md)
 - **雁阵算法（Echelon，仅大逃杀模式）**：逐拍效用决策——敌军落点扩散预报、精确击杀概率与集火、炮火圈生存调度、爆破距离场开路（重装拆墙进入被隔断的安全区）。[档案](../algorithms/docs/algorithms/echelon.md) · [设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#echelon雁阵算法)
 - **绝境算法（Apex，仅大逃杀模式）**：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验。[档案](../algorithms/docs/algorithms/apex.md)
+- **方舟算法（Ark，仅大逃杀模式）**：安全格容量匹配分配互不相同的避难位置，按行动点竞价单/两动作组合，并按缩圈与疏散负担评估增援。[档案](../algorithms/docs/algorithms/ark.md) · [设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#ark方舟算法)
 - **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 定次模拟推演的通用搜索，移动采样偏向 `movementGoal`，支持据点占领与入口部署。[档案](../algorithms/docs/algorithms/mcts.md)
 - **威胁感知算法（Threat）**：效用 AI + 威胁影响图，把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，无需搜索或模拟。[档案](../algorithms/docs/algorithms/threat.md)
 - **势场算法（Field）**：人工势场——斥力井 + 引力井 + 波前距离场塑形走位，无需搜索。[档案](../algorithms/docs/algorithms/field.md)
 - **裁决线算法（Verdict）**：反向规划——先从终局倒推「哪条线能赢、还差几回合」，再让全军向该线的期限收束。[档案](../algorithms/docs/algorithms/verdict.md)
+- **视差算法（Parallax，仅标准模式）**：整回合束搜索 + 单位完整激活宏动作 + 对手反击情景检验与终局边界实裁模拟，按本局配置适配地形与兵种。[档案](../algorithms/docs/algorithms/parallax.md) · [设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#parallax视差算法)
 - **同时随机算法（Random-Sim，仅同时回合模式）**：从合法计划动作中随机入队，支持同单位跨行动点连续行动，作为对照基线与模式隔离冒烟。[档案](../algorithms/docs/algorithms/random-sim.md)
 - **落点概率算法（Destination Probability，仅同时回合模式）**：为敌军建立落点概率分布做预测射击，并把目的格冲突计入移动/部署成功率。[档案](../algorithms/docs/algorithms/dest-prob.md)
 - **兵棋推演算法（Kriegspiel，仅同时回合模式）**：在镜像分步结算器上做整份计划的蒙特卡洛 rollout，按「均值 − λ·标准差」选择并邻域爬山精修。[档案](../algorithms/docs/algorithms/kriegspiel.md)
@@ -107,7 +109,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, crucible, sovereign, random-royale, echelon, apex, mcts, threat, field, verdict, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
+| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, crucible, sovereign, random-royale, echelon, apex, ark, mcts, threat, field, verdict, parallax, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |

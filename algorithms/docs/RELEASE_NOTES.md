@@ -16,13 +16,14 @@
 ### 变更
 
 - **`scripts/horizon-arena.mts` 模式校验泛化**：从写死 `simultaneous` 改为按 `maps/<id>.json` 的 `mode` 字段校验算法注册模式，royale 地图（snowflake / narrow-road）可直接用于 headless 对拍标定；对既有 simultaneous 用法无行为变化。
+- **评估控制台地图池按 `maps/` 自动生成**：控制台目录不再是手写清单，改为读取 `maps/*.json` 的 `name` 与 `mode`，四种模式共 13 张静态地图 + 「随机图」全部可选（此前漏了歼灭 `trench-run`、标准 `multiplayer-ring` / `whirlpool`，新图在界面上还露出英文 mapId）。榜单与玩法统计的地图中文名同步改为取自 `GET /api/maps`，不再各维护一份对照表。
 
 ### 测试与验证
 
 - 新增 `tests/algorithms/echelon.test.ts`（20 例：决策门卫、零兵力部署、前缀感知的幽灵重复入队回归、锁定射击、击杀进度集火、治疗危险区镜像、预警格疏散、链式撤离、爆破开路、确定性、真实 snowflake 整轮入队校验）与 `tests/algorithms/echelon-selfplay.test.ts`（两图整局自博弈 0 非法动作、狭路断言终局）；`tests/algorithms/registry.test.ts` 补 echelon 元数据断言。
 - 强度标定（真实引擎 headless 对拍 `scripts/horizon-arena.mts`，2026-10-29，逐局交换座位）：vs `random-royale` snowflake **30:0**、narrow-road **19:1**、snowflake 3P 1v2 **6:0**；镜像自博弈 snowflake 3:5/4 平（平局为规则允许的规避对峙、round_guard 兜底）、narrow-road 6:6 全部正常终局；全部对局 echelon 席位 **0 非法动作**；决策耗时单轮 p50 2.4–15.8ms、max 39.9ms。
 - **新图开箱即用验证**：临时合成一张全新 royale 地图（开阔盘 + 花心十字墙、attacksPerUnit 2、不同炮火节奏与兵种数值，验证后删除）跑整局自博弈与对拍，echelon 零改动 0 非法；该图暴露并修复了算法地形解析优先级 bug（地形覆盖层"后者优先"语义未对齐引擎 gameIndex）。
-- `npm run build` 通过；`npm test` 全量 **142 文件 / 1481 例全绿**（已含合入的 3.8.14 / 3.8.15 用例）。
+- `npm run build` 通过；`npm test` 全量 **142 文件 / 1482 例全绿**（已含合入的 3.8.14 / 3.8.15 用例）。
 
 ## 3.8.15（2026-10-29）— crucible 熔炉算法 v1
 

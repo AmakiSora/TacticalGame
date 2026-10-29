@@ -14,10 +14,14 @@
 
 - **对拍 harness 支持 royale**：`scripts/horizon-arena.mts` 的算法模式校验从写死 `simultaneous` 改为按地图 `mode` 字段，大逃杀两张图可直接 headless 标定；评估控制台大逃杀模式自此有 `random-royale` + `echelon` 两个条目可组批。
 
+### 修复
+
+- **评估控制台地图池漏列**：控制台地图目录此前是手写清单，新增的歼灭图 `trench-run`（战壕）与标准图 `multiplayer-ring`（六方环线）/ `whirlpool`（星海漩涡）都没进目录，前端另有一份手写 id→中文名表，新图直接露出英文 mapId。现改为启动时读取 `maps/*.json`（显示名取 `name`、分池取 `mode`），四种模式 13 张静态地图 + 「随机图」全部可选；榜单与玩法统计的中文名统一取自 `GET /api/maps`，不再各维护一份对照表。
+
 ### 测试与验证
 
 - 大逃杀 headless 对拍（真实引擎，逐局交换座位）：`echelon` 对 `random-royale` snowflake 2P **30:0**、narrow-road 2P **19:1**、snowflake 3P 1v2 **6:0**，全部对局 0 非法动作，决策耗时单轮 max 39.9 ms。
-- 新增 `tests/algorithms/echelon.test.ts`（20 例）与 `echelon-selfplay.test.ts`（两图自博弈 0 非法）；`npm run build` 通过、全量 `npm test` **142 文件 / 1481 例全绿**（已含合入的 3.8.14 / 3.8.15 用例）。
+- 新增 `tests/algorithms/echelon.test.ts`（20 例）与 `echelon-selfplay.test.ts`（两图自博弈 0 非法）、评估控制台地图目录回归 1 例（每张 `maps/*.json` 必须进目录）；`npm run build` 通过、全量 `npm test` **142 文件 / 1482 例全绿**（已含合入的 3.8.14 / 3.8.15 用例）。
 
 ## 3.8.15
 

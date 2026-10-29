@@ -56,6 +56,12 @@ describe('algorithm registry modes', () => {
       version: 'v1',
       modes: ['royale'],
     });
+    const echelon = getAlgorithmMeta('echelon');
+    expect(echelon).toMatchObject({
+      displayName: '雁阵算法',
+      version: 'v1',
+      modes: ['royale'],
+    });
   });
 
   it('defaults unregistered/undeclared algorithms to standard mode', () => {

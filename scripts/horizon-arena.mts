@@ -27,9 +27,9 @@
 //   --quiet           不打印逐局行
 //   --trace           逐轮打印双方计划、失败、据点与总部
 //   --dump-round N --dump-file F   把 A 方第 N 轮计划前的快照写到 F（调试用）
-import { appendFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadMaps } from '../src/config/loader.js';
 import { addLobbyPlayer, createLobby } from '../src/state/store.js';
 import { buildAdjudicationScores, buildAdjudicationSnapshot, startGame } from '../src/engine/engine.js';
@@ -91,13 +91,19 @@ function mulberry32(seed: number) {
 
 type Decider = { name: string; decide: (game: unknown, u: unknown, ctx: { owner: string }) => Promise<unknown> };
 
-async function loadDecider(name: string, file?: string): Promise<Decider> {
+/** 地图 JSON 的 mode 字段（缺省 standard）——算法注册模式必须覆盖它。 */
+function mapModeOf(mapId: string): string {
+  const config = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'maps', `${mapId}.json`), 'utf8'));
+  return typeof config?.mode === 'string' && config.mode ? config.mode : 'standard';
+}
+
+async function loadDecider(name: string, file?: string, mode = 'simultaneous'): Promise<Decider> {
   if (file) {
     const mod = await import(pathToFileURL(resolve(file)).href);
     return { name: `${name}`, decide: mod.default.decide.bind(mod.default) };
   }
   const modes = ALGORITHM_META[name]?.modes ?? ['standard'];
-  if (!modes.includes('simultaneous')) throw new Error(`${name} 未注册 simultaneous 模式`);
+  if (!modes.includes(mode)) throw new Error(`${name} 未注册 ${mode} 模式`);
   const mod = await loadAlgorithm(name);
   return { name, decide: mod.decide.bind(mod) };
 }
@@ -267,9 +273,10 @@ async function playGame(args: Args, deciders: { A: Decider; B: Decider }, index:
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const mapMode = mapModeOf(args.map);
   const deciders = {
-    A: await loadDecider(args.aFile ? `${args.a}(file)` : args.a, args.aFile),
-    B: await loadDecider(args.bFile ? `${args.b}(file)` : args.b, args.bFile),
+    A: await loadDecider(args.aFile ? `${args.a}(file)` : args.a, args.aFile, mapMode),
+    B: await loadDecider(args.bFile ? `${args.b}(file)` : args.b, args.bFile, mapMode),
   };
   let aWins = 0; let bWins = 0; let draws = 0; let illegalA = 0; let illegalB = 0;
   for (let i = args.start; i < args.start + args.games; i++) {

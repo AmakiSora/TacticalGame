@@ -30,31 +30,13 @@ const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json'
  */
 const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRIPT];
 
-// 评估链路已接入全部四种模式：标准模式地图池与 round_robin.py 的 DEFAULT_MAPS
-// 保持一致；其余模式使用静态地图，且只纳入注册表声明该模式的算法（RL 模型目前
-// 只覆盖标准模式）。四种模式的算法条目：歼灭 random-annihilation / shrinkroll /
-// vortex / crucible，大逃杀 random-royale / echelon / apex，各模式均 ≥ 2 个可组批；
-// 「少于 2 个参评算法」的启动请求仍会被拦下。
+// 评估链路已接入全部四种模式：跑批脚本缺省地图池（STANDARD_EVAL_MAPS）与
+// round_robin.py 的 DEFAULT_MAPS 保持一致；其余模式使用静态地图，且只纳入注册表
+// 声明该模式的算法（RL 模型目前只覆盖标准模式）。四种模式的算法条目：歼灭
+// random-annihilation / shrinkroll / vortex / crucible，大逃杀 random-royale /
+// echelon / apex，各模式均 ≥ 2 个可组批；「少于 2 个参评算法」的启动请求仍会被拦下。
 export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
 export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne', 'mistpine'] as const;
-
-/**
- * 控制台展示用地图目录：四种模式各自成池，避免把模式混在一个池里。
- * 每张地图的模式来自这里（与 maps/*.json 的 mode 字段保持一致）。
- */
-export const EVAL_MAPS = [
-  { id: 'random', label: '随机图', mode: 'standard' },
-  { id: 'default', label: '六角前线', mode: 'standard' },
-  { id: 'breach', label: '破障行动', mode: 'standard' },
-  { id: 'danger-close', label: '危险距离', mode: 'standard' },
-  { id: 'dual-lanes', label: '双线抉择', mode: 'standard' },
-  { id: 'artillery-zone', label: '炮火禁区', mode: 'annihilation' },
-  { id: 'standoff', label: '对峙之地', mode: 'simultaneous' },
-  { id: 'molten-throne', label: '熔池王座', mode: 'simultaneous' },
-  { id: 'mistpine', label: '雾杉疏林', mode: 'simultaneous' },
-  { id: 'snowflake', label: '雪花', mode: 'royale' },
-  { id: 'narrow-road', label: '狭路相逢', mode: 'royale' },
-] as const;
 
 export const EVAL_MODES = [
   { id: 'standard', label: '标准模式', supported: true },
@@ -62,6 +44,62 @@ export const EVAL_MODES = [
   { id: 'simultaneous', label: '同时回合', supported: true },
   { id: 'royale', label: '大逃杀', supported: true },
 ] as const;
+
+export interface EvalMapInfo {
+  id: string;
+  label: string;
+  mode: string;
+}
+
+/** 同一模式内的展示顺序：既有顺序在前，未列出的新地图按 id 追加在后。 */
+const MAP_DISPLAY_ORDER = [
+  'random', 'default', 'breach', 'danger-close', 'dual-lanes',
+  'artillery-zone', 'trench-run',
+  'standoff', 'molten-throne', 'mistpine',
+  'snowflake', 'narrow-road',
+  'multiplayer-ring', 'whirlpool',
+];
+
+/**
+ * 控制台展示用地图目录：直接读 maps/*.json，显示名取地图自身的 name、模式取
+ * mode 字段（缺省 standard），另加虚拟「随机图」。地图文件是唯一事实源——新增或
+ * 下线地图时控制台自动跟随，不再靠手改清单（歼灭图 trench-run 就曾因此漏列）。
+ */
+export function readEvalMaps(mapsDir = join(PROJECT_ROOT, 'maps')): EvalMapInfo[] {
+  const maps: EvalMapInfo[] = [{ id: 'random', label: '随机图', mode: 'standard' }];
+  try {
+    for (const file of readdirSync(mapsDir)) {
+      if (!/\.json$/i.test(file)) continue;
+      const id = file.replace(/\.json$/i, '');
+      let config: Record<string, unknown> | null = null;
+      try {
+        config = JSON.parse(readFileSync(join(mapsDir, file), 'utf8')) as Record<string, unknown>;
+      } catch {
+        config = null;
+      }
+      const name = typeof config?.name === 'string' ? config.name.trim() : '';
+      const mode = typeof config?.mode === 'string' && config.mode ? config.mode : 'standard';
+      maps.push({ id, label: name || id, mode });
+    }
+  } catch {
+    // 地图目录不可读时只剩「随机图」兜底；与 readMapModes 同向（少列，不误判）。
+  }
+  const modeRank = (mode: string) => {
+    const index = EVAL_MODES.findIndex(item => item.id === mode);
+    return index < 0 ? EVAL_MODES.length : index;
+  };
+  const orderRank = (id: string) => {
+    const index = MAP_DISPLAY_ORDER.indexOf(id);
+    return index < 0 ? MAP_DISPLAY_ORDER.length : index;
+  };
+  return maps.sort((a, b) =>
+    modeRank(a.mode) - modeRank(b.mode)
+    || orderRank(a.id) - orderRank(b.id)
+    || a.id.localeCompare(b.id));
+}
+
+/** 控制台地图目录（四种模式各自成池），进程启动时按 maps/ 目录生成一次。 */
+export const EVAL_MAPS = readEvalMaps();
 
 // 可跑批的地图（四种模式全部接入，故即完整目录）；保留导出名兼容既有调用方。
 export const KNOWN_MAPS = EVAL_MAPS.map(map => map.id);

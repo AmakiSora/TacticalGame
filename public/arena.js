@@ -1,17 +1,11 @@
 import './version.js';
 import './ui-dialog.js';
 import './error-text.js';
+import { loadMapLabels, mapLabel } from './map-labels.js';
 
 /* AI 竞技场排行榜 — reads /data/arena-leaderboard.json only. */
 (() => {
   const DATA_URL = '/data/arena-leaderboard.json';
-
-  const MAP_LABELS = {
-    random: '随机图', default: '六角前线', breach: '破障行动', 'danger-close': '危险距离',
-    'dual-lanes': '双线抉择', 'artillery-zone': '炮火禁区', standoff: '对峙之地',
-    'molten-throne': '熔池王座', snowflake: '雪花', 'narrow-road': '狭路相逢',
-    mistpine: '雾杉疏林',
-  };
   const STATUS_META = {
     recommended: { label: '当前推荐', cls: 'st-good' },
     legacy: { label: '历史', cls: 'st-muted' },
@@ -80,10 +74,6 @@ import './error-text.js';
 
   function escapeAttr(s) {
     return escapeHtml(s).replace(/'/g, '&#39;');
-  }
-
-  function mapLabel(map) {
-    return MAP_LABELS[map] || map;
   }
 
   function currentLeague() {
@@ -406,6 +396,8 @@ import './error-text.js';
 
   async function loadData() {
     setStatus('加载中…');
+    // 地图中文名先就位，再渲染榜单/地图筛选（否则会先出现英文 mapId）。
+    await loadMapLabels();
     try {
       const res = await fetch(`${DATA_URL}?t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -567,7 +559,8 @@ import './error-text.js';
   }
 
   function currentEvalMaps() {
-    return currentEvalMode()?.maps?.map(item => item.id) || EVAL_FALLBACK_MAPS;
+    // 服务端目录项自带 label（maps/*.json 的 name）；首屏兜底只有 id，交给 mapLabel 补名。
+    return currentEvalMode()?.maps || EVAL_FALLBACK_MAPS.map(id => ({ id }));
   }
 
   function evalAlgosForMode() {
@@ -616,20 +609,26 @@ import './error-text.js';
     updateEvalStartState();
   }
 
+  // maps 可以是服务端目录项（{ id, label }）或首屏兜底的 id 字符串。
   function renderMapChips(maps, checked) {
     evalEl['eval-maps'].innerHTML = maps
-      .map(map => `<label><input type="checkbox" value="${escapeAttr(map)}"${checked.includes(map) ? ' checked' : ''}/> ${escapeHtml(mapLabel(map))}</label>`)
+      .map(item => {
+        const id = typeof item === 'string' ? item : item.id;
+        const label = typeof item === 'string' ? mapLabel(id) : (item.label || mapLabel(id));
+        return `<label><input type="checkbox" value="${escapeAttr(id)}"${checked.includes(id) ? ' checked' : ''}/> ${escapeHtml(label)}</label>`;
+      })
       .join('');
   }
 
   // 服务端地图池或当前模式变化时才重建 chips，保留用户已勾选项，避免 3s 轮询反复重绘。
   function syncMapChips(maps) {
     if (!Array.isArray(maps) || !maps.length) return;
-    const sig = `${evalMode}\u0001${maps.join('\u0001')}`;
+    const ids = maps.map(item => (typeof item === 'string' ? item : item.id));
+    const sig = `${evalMode}\u0001${ids.join('\u0001')}`;
     if (sig === renderedMapSig) return;
     renderedMapSig = sig;
-    const checked = checkedMaps().filter(map => maps.includes(map));
-    renderMapChips(maps, checked.length ? checked : maps);
+    const checked = checkedMaps().filter(map => ids.includes(map));
+    renderMapChips(maps, checked.length ? checked : ids);
   }
 
   function checkedMaps() {
@@ -886,10 +885,11 @@ import './error-text.js';
         : (evalModeCatalog.length
           ? evalModeCatalog.flatMap(item => item.maps)
           : EVAL_FALLBACK_MAPS.map(id => ({ id })));
-      const ids = [...new Set(maps.map(item => item.id))];
+      const seen = new Set();
+      const options = maps.filter(item => (seen.has(item.id) ? false : Boolean(seen.add(item.id))));
       mapSel.innerHTML = '<option value="">全部</option>' +
-        ids.map(id => `<option value="${escapeAttr(id)}">${escapeHtml(mapLabel(id))}</option>`).join('');
-      mapSel.value = ids.includes(previous) ? previous : '';
+        options.map(item => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.label || mapLabel(item.id))}</option>`).join('');
+      mapSel.value = options.some(item => item.id === previous) ? previous : '';
     }
     renderMapOptions();
 
@@ -990,8 +990,12 @@ import './error-text.js';
     updateModelCount();
   });
 
-  renderMapChips(EVAL_FALLBACK_MAPS, ['random']);
-  renderedMapSig = `${evalMode}\u0001${EVAL_FALLBACK_MAPS.join('\u0001')}`;
+  // 首屏兜底 chips 等地图中文名就位再画；若服务端状态先到，则用服务端目录渲染（含 label）。
+  loadMapLabels().then(() => {
+    if (evalStatus) return;
+    renderMapChips(EVAL_FALLBACK_MAPS, ['random']);
+    renderedMapSig = `${evalMode}\u0001${EVAL_FALLBACK_MAPS.join('\u0001')}`;
+  });
   loadEvalParticipants();
   evalEl['eval-mini-strip'].addEventListener('click', () => switchTab('console'));
   pollEvalStatus();

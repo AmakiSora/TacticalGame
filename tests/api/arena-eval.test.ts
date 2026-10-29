@@ -2,13 +2,13 @@
 // 竞技场评估控制台 API：启动/监控/停止 round_robin 跑批（模型 × 算法）与榜单重算。
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
-  parsePlannedBatches, parseProgressLine, parseSummaryLine, arenaEvalRoutes, buildParticipantArgs,
+  parsePlannedBatches, parseProgressLine, parseSummaryLine, arenaEvalRoutes, buildParticipantArgs, readEvalMaps,
 } from '../../src/api/arenaEval.js';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -93,7 +93,10 @@ describe('AI 竞技场评估控制台 API', () => {
     // 四种模式全部接入跑批：歼灭与大逃杀各自带地图池。
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'annihilation')).toMatchObject({
       supported: true,
-      maps: [expect.objectContaining({ id: 'artillery-zone' })],
+      maps: [
+        expect.objectContaining({ id: 'artillery-zone' }),
+        expect.objectContaining({ id: 'trench-run' }),
+      ],
     });
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'royale')).toMatchObject({
       supported: true,
@@ -102,6 +105,23 @@ describe('AI 竞技场评估控制台 API', () => {
         expect.objectContaining({ id: 'narrow-road' }),
       ]),
     });
+  });
+
+  // 回归护栏：控制台地图目录必须覆盖 maps/ 下每张图（含新加的图），显示名与模式取自地图文件。
+  // 曾因手写清单漏掉歼灭图 trench-run，控制台只显示一张歼灭图。
+  it('lists every map file in the console catalog with its own mode and name', () => {
+    const catalog = readEvalMaps();
+    expect(catalog[0]).toMatchObject({ id: 'random', label: '随机图', mode: 'standard' });
+    const files = readdirSync('maps').filter(file => file.endsWith('.json'));
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      const id = file.replace(/\.json$/i, '');
+      const config = JSON.parse(readFileSync(join('maps', file), 'utf8'));
+      const entry = catalog.find(map => map.id === id);
+      expect(entry, `${id} 未进入控制台地图目录`).toBeDefined();
+      expect(entry!.label).toBe(config.name ?? id);
+      expect(entry!.mode).toBe(config.mode ?? 'standard');
+    }
   });
 
   it('rejects invalid maps, games and jobs on start', async () => {

@@ -1,16 +1,11 @@
 import './version.js';
 import './error-text.js';
+import { loadMapLabels, mapLabel } from './map-labels.js';
 
 /* 竞技场玩法统计 + 参与者档案 — reads /data/arena-stats.json only. */
 (() => {
   const DATA_URL = '/data/arena-stats.json';
 
-  const MAP_LABELS = {
-    random: '随机图', default: '六角前线', breach: '破障行动', 'danger-close': '危险距离',
-    'dual-lanes': '双线抉择', 'artillery-zone': '炮火禁区', standoff: '对峙之地',
-    'molten-throne': '熔池王座', snowflake: '雪花', 'narrow-road': '狭路相逢',
-    mistpine: '雾杉疏林',
-  };
   const MODE_LABELS = { standard: '标准模式', annihilation: '歼灭模式', simultaneous: '同时回合', royale: '大逃杀' };
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
   const END_REASON_LABELS = {
@@ -91,10 +86,6 @@ import './error-text.js';
 
   function escapeAttr(s) {
     return escapeHtml(s).replace(/'/g, '&#39;');
-  }
-
-  function mapLabel(map) {
-    return MAP_LABELS[map] || map;
   }
 
   function modeLabelById(id) {
@@ -310,6 +301,8 @@ import './error-text.js';
 
   async function loadData() {
     setStatus('加载中…');
+    // 地图中文名先就位，再渲染（否则新地图会先以英文 mapId 出现）。
+    await loadMapLabels();
     try {
       const res = await fetch(`${DATA_URL}?t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

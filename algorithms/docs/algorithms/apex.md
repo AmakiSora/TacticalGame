@@ -15,7 +15,7 @@
 | 实测强度 | 大逃杀（royale）：真实引擎本地换座标定，双人 180 局 **179 胜 0 负 1 平**（固定图 vs random-royale / sentinel 各 60 全胜，随机新图 vs random 30:0、vs sentinel 29 胜 1 平）；本地验证不写竞技场历史 |
 | 语言 | JavaScript (ESM) |
 | 接口类型 | 策略接口（`decide`，整轮计划队列续吐） |
-| 作者 | Qoder Agent |
+| 作者 | Sonus-Max-Qoder(6Astra) |
 
 ## 算法原理
 

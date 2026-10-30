@@ -505,6 +505,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   const evalEl = {};
   for (const id of ['eval-status-pill', 'eval-modes', 'eval-mode-hint', 'eval-maps', 'eval-algos', 'eval-models', 'eval-model-all', 'eval-model-none',
     'eval-model-count', 'eval-games', 'eval-jobs', 'eval-salt', 'eval-dry', 'eval-start', 'eval-stop',
+    'eval-control-token', 'eval-save-token', 'eval-token-state',
     'eval-regen', 'eval-clear', 'eval-msg', 'eval-progress-wrap', 'eval-progress-fill', 'eval-progress-text', 'eval-output',
     'eval-tab-btn', 'eval-mini-strip', 'eval-mini-text', 'eval-mini-go']) {
     evalEl[id] = document.getElementById(id);
@@ -512,6 +513,8 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
 
   let evalStatus = null;
   let evalPrevRunning = false;
+  // 保存控制令牌后的“已保存”提示：等第一次成功取到状态就自动让位，避免长期占着消息位。
+  let evalTokenNoticePending = false;
   let evalModels = [];
   let evalAlgos = [];
   let evalModeCatalog = [];
@@ -530,9 +533,30 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     interrupted: { text: '已中断', cls: 'err' },
   };
 
+  function readStoredControlToken() {
+    try {
+      return localStorage.getItem('autoControlToken') || '';
+    } catch {
+      return '';
+    }
+  }
+
   function controlHeaders() {
-    const token = localStorage.getItem('autoControlToken') || '';
+    const token = readStoredControlToken();
     return token ? { 'x-control-token': token } : {};
+  }
+
+  /** 令牌只存在本机浏览器（与 play/spectator 页同一个 key），输入框仅做编辑入口。 */
+  function updateControlTokenState() {
+    const token = readStoredControlToken();
+    if (evalEl['eval-token-state']) {
+      evalEl['eval-token-state'].textContent = token ? `已保存 · ${token.length} 字符` : '未设置（仅本机免令牌）';
+    }
+  }
+
+  function syncControlTokenField() {
+    if (evalEl['eval-control-token']) evalEl['eval-control-token'].value = readStoredControlToken();
+    updateControlTokenState();
   }
 
   function evalMsg(text, kind) {
@@ -756,7 +780,12 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       const res = await fetch('/api/arena/eval/status', { cache: 'no-store', headers: controlHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       renderEvalStatus(await res.json());
+      if (evalTokenNoticePending) {
+        evalTokenNoticePending = false;
+        evalMsg('');
+      }
     } catch (err) {
+      evalTokenNoticePending = false;
       const unauthorized = err.message === 'HTTP 401';
       evalEl['eval-status-pill'].textContent = unauthorized ? '无权限' : '离线';
       evalEl['eval-status-pill'].classList.remove('ok');
@@ -765,10 +794,33 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       evalEl['eval-tab-btn'].classList.remove('has-run');
       evalEl['eval-mini-strip'].hidden = true;
       evalMsg(unauthorized
-        ? '状态获取被拒绝：已配置 AUTO_CONTROL_TOKEN 或非本机访问，请在对局/观战页设置中保存控制令牌'
+        ? '状态获取被拒绝：已配置 AUTO_CONTROL_TOKEN 或非本机访问，请在上方「控制令牌」里保存后重试'
         : `状态获取失败：${window.ErrorText.describe(err)}`, 'err');
     }
   }
+
+  evalEl['eval-save-token'].addEventListener('click', () => {
+    const value = (evalEl['eval-control-token'].value || '').trim();
+    try {
+      if (value) localStorage.setItem('autoControlToken', value);
+      else localStorage.removeItem('autoControlToken');
+    } catch {
+      evalMsg('无法写入本地存储，控制令牌未保存', 'err');
+      return;
+    }
+    updateControlTokenState();
+    evalMsg(value ? '控制令牌已保存到本机浏览器，正在重新获取状态…' : '已清除控制令牌');
+    evalTokenNoticePending = true;
+    // 立刻重查一次，省得等下一个 3s 轮询周期；失败时由 401/离线提示覆盖这里。
+    pollEvalStatus();
+  });
+  evalEl['eval-control-token'].addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      evalEl['eval-save-token'].click();
+    }
+  });
+  syncControlTokenField();
 
   evalEl['eval-modes'].addEventListener('click', event => {
     const button = event.target.closest('.mode-tab[data-eval-mode]');

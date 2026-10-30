@@ -269,6 +269,13 @@ const defaultSpawner: Spawner = (cmd, args, cwd) => {
 
 const OUTPUT_TAIL_LIMIT = 120;
 
+/**
+ * 并发任务数上限。每个任务是一个独立的 evaluate_cross.py（外加它自己 spawn 的 node 引擎
+ * 与 torch 模型推理），不是线程；16 是产品层保护上限，实际可达并发受物理核数与内存约束
+ * （round_robin.py 的 `--jobs` 本身不设上限，建议 ≤ 物理核数-2）。
+ */
+export const MAX_EVAL_JOBS = 16;
+
 export class EvalRunner {
   private readonly spawner: Spawner;
   private readonly statsFile: string;
@@ -661,8 +668,8 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
       return reply.code(400).send({ error: 'games 必须是 2-500 的整数', code: 'invalid_games' });
     }
     const jobs = body.jobs ?? 1;
-    if (!Number.isInteger(jobs) || jobs < 1 || jobs > 8) {
-      return reply.code(400).send({ error: 'jobs 必须是 1-8 的整数', code: 'invalid_jobs' });
+    if (!Number.isInteger(jobs) || jobs < 1 || jobs > MAX_EVAL_JOBS) {
+      return reply.code(400).send({ error: `jobs 必须是 1-${MAX_EVAL_JOBS} 的整数`, code: 'invalid_jobs' });
     }
     let participants: string[] | null = null;
     if (Array.isArray(body.participants) && body.participants.length) {

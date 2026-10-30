@@ -340,7 +340,7 @@ def run_task(command: list[str], label: str, games: int, progress: Progress,
             errors="replace",
         )
         # stderr 由独立线程排空，避免管道写满阻塞子进程；stdout 逐行读，
-        # 每局完成的进度行即时透传（8 路并发下带 label 才能分清属于哪批），
+        # 每局完成的进度行即时透传（多路并发下带 label 才能分清属于哪批），
         # 其余输出留作失败回显，只保留尾部防长跑积内存。
         stderr_lines: list[str] = []
         stderr_thread = threading.Thread(

@@ -181,6 +181,27 @@
 
     <section id="rls-kpi-grid" class="kpi-grid" aria-label="玩法总览指标"></section>
 
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>打法风格雷达图</h2>
+          <span>裁决 7 分项（推HQ / 保HQ / 控点 / 控点持有 / 军队价值 / 补给 / 击杀价值）相对归一化 · 点击选择 0–4 个模型叠加对比（再点一次取消）· 重跑竞技场后采集</span>
+        </div>
+      </div>
+      <div id="rls-radar-pick" class="chip-pick" aria-label="选择参与雷达图对比的模型"></div>
+      <div id="rls-radar" class="chart-block empty-block">加载中…</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>地图先手胜率</h2>
+          <span>player_a 座（先手）胜率 · 偏离 50% 越远先手优势越明显（绿=先手占优，橙=后手占优）</span>
+        </div>
+      </div>
+      <div id="rls-firstseat" class="chart-block empty-block">加载中…</div>
+    </section>
+
     <section class="two-col">
       <section class="panel">
         <div class="panel-heading">
@@ -204,14 +225,31 @@
           <h2>回合数分布</h2>
           <span>30 回合上限，打满记最后一桶</span>
         </div>
-        <div id="rls-rounds-dist" class="empty-block">加载中…</div>
+        <div id="rls-rounds-dist" class="chart-block empty-block">加载中…</div>
       </section>
       <section class="panel">
         <div class="panel-heading">
           <h2>对局耗时分布</h2>
           <span>进程内模拟的墙钟时长</span>
         </div>
-        <div id="rls-duration-dist" class="empty-block">加载中…</div>
+        <div id="rls-duration-dist" class="chart-block empty-block">加载中…</div>
+      </section>
+    </section>
+
+    <section class="two-col">
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>决策耗时分布</h2>
+          <span>单局双方合并的每次决策平均墙钟 · 区分计算型（搜索类）与查表型（规则类）</span>
+        </div>
+        <div id="rls-decision-dist" class="chart-block empty-block">加载中…</div>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>动作类型分布</h2>
+          <span>全局 + 各模型动作构成（攻击/移动/部署/治疗/占领等）· 重跑竞技场后采集</span>
+        </div>
+        <div id="rls-action-mix" class="chart-block empty-block">加载中…</div>
       </section>
     </section>
 
@@ -268,8 +306,30 @@
 
     <section class="panel">
       <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>模型 × 地图交叉胜率</h2>
+          <span>每模型在该模式每张图的胜率热力（绿=高胜率）· 行按评分排序取前 12 名</span>
+        </div>
+      </div>
+      <div class="chart-scroll">
+        <div id="rls-heatmap" class="chart-block empty-block">加载中…</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>座位依赖检测</h2>
+          <span>横轴=先手胜率，纵轴=先手 − 后手胜率差（0 = 无座位差异）· 点越远离水平中线，该模型对先手/后手越敏感</span>
+        </div>
+      </div>
+      <div id="rls-seat-scatter" class="chart-block empty-block">加载中…</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
         <h2>分地图概览</h2>
-        <span>各地图的对局节奏与结局倾向</span>
+        <span>各地图的对局节奏、平衡与结局倾向</span>
       </div>
       <div class="table-wrap">
         <table id="rls-map-table" class="data-table">
@@ -279,9 +339,37 @@
               <th class="num">局数</th>
               <th class="num">平均回合</th>
               <th class="num">平均耗时</th>
+              <th class="num">先手胜率</th>
+              <th class="num">控制点易手</th>
               <th class="num">歼灭率</th>
               <th class="num">平局率</th>
               <th>最常见结局</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div class="panel-heading-copy">
+          <h2>地图静态指纹</h2>
+          <span>零对局成本的几何平衡指标：对称性 / HQ 间距 / 控制点偏置 / 地形阻塞（arena-map-fingerprint.json）</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="rls-fingerprint-table" class="data-table">
+          <thead>
+            <tr>
+              <th>地图</th>
+              <th>模式</th>
+              <th class="num">半径</th>
+              <th class="num">HQ 间距</th>
+              <th class="num">控制点</th>
+              <th class="num">控制点偏置</th>
+              <th>对称性</th>
+              <th>地形</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -321,6 +409,13 @@
         <strong id="eval-status-pill" class="status-pill">加载中…</strong>
       </div>
       <div class="eval-form">
+        <div class="eval-row eval-token-row">
+          <label>控制令牌（AUTO_CONTROL_TOKEN）
+            <input id="eval-control-token" type="password" placeholder="留空 = 仅本机免令牌" autocomplete="off" />
+          </label>
+          <button id="eval-save-token" type="button" class="ghost">保存 Token</button>
+          <span id="eval-token-state" class="eval-hint"></span>
+        </div>
         <div class="eval-field">
           <span class="eval-label">对局模式（不同模式独立跑批、独立榜单）</span>
           <div id="eval-modes" class="eval-chip-list eval-mode-list"></div>
@@ -348,7 +443,8 @@
             <input id="eval-games" type="number" value="24" min="2" max="500" step="2" />
           </label>
           <label>并发任务数
-            <input id="eval-jobs" type="number" value="1" min="1" max="8" />
+            <input id="eval-jobs" type="number" value="1" min="1" max="16"
+              title="每个任务 = 1 个 python 评估进程 + 1 个 node 引擎进程；算法批约 0.3 GB、模型批约 1.4 GB 内存，建议不超过物理核数" />
           </label>
           <label>种子盐（固定盐 + 同参数重跑 = 断点续跑）
             <input id="eval-salt" type="text" placeholder="留空 = 时间戳+随机" />

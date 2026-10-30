@@ -160,6 +160,24 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(mixedModes.json().code).toBe('mixed_modes');
   });
 
+  it('accepts the full 16-way concurrency and forwards it to round_robin', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'], jobs: 16 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({ jobs: 16 });
+    expect(spawner.calls[0].args.join(' ')).toContain('--jobs 16');
+  });
+
+  it('rejects concurrency above 16 and reports the current bound', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['random'], jobs: 17 },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('invalid_jobs');
+    expect(res.json().error).toContain('1-16');
+  });
+
   it('starts an annihilation run with the full registered participant pool', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/arena/eval/start', payload: { maps: ['artillery-zone'], games: 4 },

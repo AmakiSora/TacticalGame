@@ -159,12 +159,13 @@
 |---|---|
 | `maps` | 已知地图的非空子集；同一批只能属于同一模式 |
 | `games` | 2–500，默认 24 |
-| `jobs` | 1–8，默认 1 |
+| `jobs` | 1–16，默认 1 |
 | `participants` | 可选过滤，最多 32 项；算法用 `algo:<id>`，RL 模型仅支持标准模式 |
 | `salt` | 可选，最长 64 字符 |
 | `dryRun` | 试运行，不写入战报 |
 
 - 四种模式均已接入跑批：`standard` / `annihilation` 逐动作执行，`simultaneous` / `royale` 计划入队后统一结算。
+- `jobs` 每个任务是一个独立的 `evaluate_cross.py` 进程（再各自 spawn 一个 node 引擎，模型批还有 torch 推理），不是线程；上限 16 只是产品保护，实际吞吐受物理核数与内存约束，`round_robin.py` 自身建议 ≤ 物理核数−2。实测单任务峰值内存：纯算法批 ~0.3 GB、带模型批 ~1.4 GB（python 端 torch 约 1.1 GB + node 引擎约 0.3 GB），16 路全模型批会超过 16 GB 机器的物理内存。
 - 非标准模式没有 RL 模型参评，`participants` 至少需要 2 个该模式算法；不足时返回 400 `invalid_participants`。可用算法以 `GET /api/arena/participants` 返回条目的 `modes` 为准，名称与定位见 [算法 AI](AI_PLAYERS.md#3-算法-ai)。
 - 已有跑批进行中时 `start` / `clear-matches` 返回 409 `eval_already_running`。
 

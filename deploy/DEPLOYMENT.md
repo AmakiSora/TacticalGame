@@ -48,7 +48,7 @@ VPS：
 
 | 变量 | 默认 | 作用与建议 |
 | --- | --- | --- |
-| `AUTO_CONTROL_TOKEN` | 无（必填） | 控制接口凭证，来自 `deploy/.env.deploy` 的 `CONTROL_TOKEN`。设置后所有控制请求都要带 `X-Control-Token`（或 `?token=`，仅调试用，会进访问日志）。未设置时只放行「不带任何转发头的回环直连」，所以**开了反向代理却没设 token 时，代理转来的控制请求一律 401**。该接口能拉起竞技场训练子进程，建议用 32 字节随机串（短于 16 字符会在启动时告警）。 |
+| `AUTO_CONTROL_TOKEN` | 无（必填） | 控制接口凭证，来自 `deploy/.env.deploy` 的 `CONTROL_TOKEN`。设置后所有控制请求都要带 `X-Control-Token`（或 `?token=`，仅调试用，会进访问日志）；浏览器端可在 AI 竞技场「评估控制台」或对局/观战页设置里保存，写入 `localStorage.autoControlToken`。未设置时只放行「不带任何转发头的回环直连」，所以**开了反向代理却没设 token 时，代理转来的控制请求一律 401**。该接口能拉起竞技场训练子进程，建议用 32 字节随机串（短于 16 字符会在启动时告警）。 |
 | `TRUST_PROXY` | `compose.yml` 固定为 `false` | 设为 `true` 时 `req.ip` 取自 `X-Forwarded-For`。只适用于「应用端口仅由你信任的反向代理访问」的部署：代理必须自己写入转发头并覆盖客户端自带的同名头，应用端口不要直接暴露。限流分桶与 SSE 的每 IP 配额都按 `req.ip` 计算，转发头可被客户端伪造，接错反代等于把限流分桶交给客户端。 |
 | `METRICS_TOKEN` | 空 | 设置后 `/metrics` 必须带 `X-Metrics-Token` 或 `Authorization: Bearer`。留空时 `/metrics` 对能访问端口的人开放，请用防火墙或反代把该路径限制在内网。 |
 | `TACTICAL_GAME_MAX_LOBBIES` | `200` | 活跃大厅上限；达到上限后建房返回 503 `lobby_capacity`（容量保护，不是故障），请等空闲大厅过期。设为非正整数会让进程启动即失败。`compose.yml` 未透传该变量，要调整上限需在 `compose.yml` 的 `environment` 里显式设置。 |

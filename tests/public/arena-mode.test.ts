@@ -15,6 +15,19 @@ describe('AI 竞技场按玩法模式分榜', () => {
     expect(source).toContain('各模式独立评分');
   });
 
+  it('评估控制台在页面内提供控制令牌输入，不用再跑到对局页设置', () => {
+    expect(html).toContain('id="eval-control-token"');
+    expect(html).toContain('id="eval-save-token"');
+    expect(html).toContain('id="eval-token-state"');
+    expect(html).toContain('type="password"');
+    expect(source).toContain('function syncControlTokenField');
+    expect(source).toContain("localStorage.setItem('autoControlToken', value)");
+    expect(source).toContain("localStorage.removeItem('autoControlToken')");
+    expect(source).toContain("evalEl['eval-save-token'].addEventListener");
+    // 保存后立即重查一次状态，不必等下一个 3s 轮询周期。
+    expect(source).toMatch(/控制令牌已保存到本机浏览器[\s\S]{0,200}pollEvalStatus\(\);/);
+  });
+
   it('榜单数据按模式分组，不再提供跨模式 all 总榜', () => {
     expect(data.maps).toBeUndefined();
     expect(Array.isArray(data.modes)).toBe(true);
@@ -43,6 +56,49 @@ describe('AI 竞技场按玩法模式分榜', () => {
     expect(statsSource).toContain('function currentGameplay');
     expect(statsSource).toContain('return currentMode()?.gameplay');
     expect(statsSource).toContain('renderModeBar()');
+  });
+
+  it('座位依赖散点图的说明文案与纵轴口径一致（纵轴是先手−后手胜率差）', () => {
+    expect(html).toContain('纵轴=先手 − 后手胜率差');
+    expect(html).not.toContain('纵轴=后手胜率');
+    expect(statsSource).toContain("yLabel: '先手 − 后手胜率差'");
+  });
+
+  it('雷达图可清空选择、超上限有提示、配色不随勾选顺序漂移', () => {
+    // 用户主动取消后不再自动回填默认选中。
+    expect(statsSource).toContain('let radarTouched = false');
+    expect(statsSource).toContain('radarTouched = true');
+    expect(statsSource).toContain('if (!radarTouched && !radarPick.size)');
+    // 上限 4：超限给文案提示而不是静默忽略。
+    expect(statsSource).toContain('const RADAR_MAX = 4');
+    expect(statsSource).toContain('最多同时对比');
+    // 配色由候选顺序固定，而不是选中顺序。
+    expect(statsSource).toContain('function radarColorMap');
+    // 可点 chip 带 aria-pressed，读屏能感知选中状态。
+    expect(statsSource).toContain('aria-pressed="');
+  });
+
+  it('地图静态指纹按新版 spawnSlots/layouts 生成，committed 产物不是旧脚本的 null 数据', () => {
+    const fp = JSON.parse(readFileSync('public/data/arena-map-fingerprint.json', 'utf8'));
+    expect(fp.maps.length).toBeGreaterThanOrEqual(10);
+    for (const m of fp.maps) {
+      if (m.error) continue;
+      // 旧版脚本只认 headquarters/startingUnits，9/13 张图的 HQ 会解析成 null。
+      expect(m.hq, `${m.id} 缺 HQ`).toEqual({ player_a: expect.any(Array), player_b: expect.any(Array) });
+      expect(m.hqDistance, `${m.id} 缺 HQ 间距`).toEqual(expect.any(Number));
+      expect(m.playableCellCount === null || Number.isInteger(m.playableCellCount)).toBe(true);
+    }
+  });
+
+  it('增强数据源各自兜底：任一请求失败只让对应面板降级', () => {
+    expect(statsSource).toContain(
+      "fetch(`${LEADERBOARD_URL}?t=${Date.now()}`, { cache: 'no-store' }).catch(() => null)",
+    );
+    expect(statsSource).toContain(
+      "fetch(`${FINGERPRINT_URL}?t=${Date.now()}`, { cache: 'no-store' }).catch(() => null)",
+    );
+    expect(statsSource).toContain('lbRes?.ok');
+    expect(statsSource).toContain('fpRes?.ok');
   });
 
   it('评分榜与玩法画像都带「平均决策耗时」列，数据行携带 avgDecisionMs 字段', () => {

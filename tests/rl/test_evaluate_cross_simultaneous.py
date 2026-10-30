@@ -208,3 +208,36 @@ def test_random_annihilation_plays_sequential_annihilation(worker):
     assert failed == [], f"歼灭随机基线不应产出被拒动作：{failed[:3]}"
     assert detail["summary"]["rounds"] >= 2
     assert seat_log(detail, "player_a") and seat_log(detail, "player_b")
+
+
+def test_random_simultaneous_map_uses_plan_loop(worker):
+    """随机同时回合图（mode 由生成器给出）同样走计划入队 → 全员提交 → 统一结算。"""
+    seat_map = {
+        side: evaluate_cross.AlgorithmController("random-sim", "random-sim", "v2", side, worker)
+        for side in ("player_a", "player_b")
+    }
+    detail = play(worker, seat_map, make_args(map_id="random-simultaneous", max_rounds=2))
+
+    assert detail["meta"]["map"] == "random-simultaneous"
+    # round_resolved 只由计划队列模式产出：有它才证明生成的图不是缺省标准模式。
+    resolved = [event["payload"]["roundNumber"]
+                for event in detail["events"] if event["type"] == "round_resolved"]
+    assert resolved == [1, 2]
+    for side in ("player_a", "player_b"):
+        assert len([entry for entry in seat_log(detail, side) if entry.get("commit")]) == 2
+
+
+def test_random_annihilation_map_plays_sequential(worker):
+    """随机歼灭图走逐动作路径（无 round_resolved），基线整局零被拒动作。"""
+    seat_map = {
+        side: evaluate_cross.AlgorithmController(
+            "random-annihilation", "random-annihilation", "v1", side, worker)
+        for side in ("player_a", "player_b")
+    }
+    detail = play(worker, seat_map, make_args(map_id="random-annihilation", max_rounds=2))
+
+    assert detail["meta"]["map"] == "random-annihilation"
+    assert not [event for event in detail["events"] if event["type"] == "round_resolved"]
+    failed = [entry for entry in detail["actions"] if entry.get("failed")]
+    assert failed == [], f"随机歼灭图不应产出被拒动作：{failed[:3]}"
+    assert seat_log(detail, "player_a") and seat_log(detail, "player_b")

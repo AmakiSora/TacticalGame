@@ -44,6 +44,27 @@ _ML: dict[str, Any] | None = None
 # 控制台，其余输出仍只在批次失败时回显尾部（多路并发下避免刷屏）。
 GAME_PROGRESS_PREFIX = "进度|"
 
+# 虚拟随机图 id：模式 → id（与 round_robin.RANDOM_MAP_MODES、
+# src/config/randomMap.ts 的 RANDOM_MAP_MODES 同方向同内容）。一张随机图只能属于
+# 一种规则，故四种模式各有一个 id；standard 沿用历史的 ``random``（存量对局与默认
+# 地图池都是它）。四份副本跨语言/跨进程各一份，表内容必须逐字一致——只改
+# round_robin 漏改这里时，批次仍能解析出模式，但 reset 不带种子，worker 会生成一张
+# 不可复现的图且 mapSeed 为 null（静默降级）。tests/rl 有交叉断言守这两份 Python 表。
+RANDOM_MAP_MODES = {
+    "standard": "random",
+    "annihilation": "random-annihilation",
+    "simultaneous": "random-simultaneous",
+    "royale": "random-royale",
+}
+
+
+def random_mode_for_map(map_id: str) -> str | None:
+    """虚拟随机图 id → 玩法模式；静态地图返回 None。"""
+    for mode, random_id in RANDOM_MAP_MODES.items():
+        if random_id == map_id:
+            return mode
+    return None
+
 
 def format_duration(seconds: float) -> str:
     """秒 → h/m/s 紧凑格式（进度行用，与 round_robin.format_eta 同风格）。"""
@@ -126,7 +147,9 @@ def parse_args():
                         help="player_a 参与者的显示名（默认：模型取文件名，算法取 algo_<name>[@<版本>]）")
     parser.add_argument("--name-b", default=None, help="player_b 参与者的显示名（默认同上）")
     parser.add_argument("--games", type=int, default=2, help="总对局数（--swap-sides 时按相同种子成对换座）")
-    parser.add_argument("--map", dest="map_id", default="default", help="地图 id（默认 default；random 为每局一张对称随机地图）")
+    parser.add_argument("--map", dest="map_id", default="default",
+                        help="地图 id（默认 default）。随机图为每局一张对称随机地图：random（标准）/ "
+                             "random-annihilation / random-simultaneous / random-royale")
     parser.add_argument("--max-rounds", type=int, default=100, help="单局回合数上限，超过记为 draw")
     parser.add_argument("--max-actions", type=int, default=5000, help="单局动作数上限，超过记为 draw")
     parser.add_argument("--stochastic", action="store_true", help="按策略采样而非确定性取最优动作")
@@ -393,10 +416,20 @@ def make_controller(label: str, spec: str, side: str, args, worker: "EngineWorke
 
 def reset_command(args, game_index: int) -> dict[str, Any]:
     command: dict[str, Any] = {"cmd": "reset", "mapId": args.map_id}
-    if args.map_id == "random":
+    random_mode = random_mode_for_map(args.map_id)
+    if random_mode:
         # 每局一张对称随机地图；种子由局序派生，同参数评估可复现。
         pair_index = (game_index + 1) // 2 if args.swap_sides else game_index
-        command["random"] = {"seed": f"{args.seed_prefix}-{pair_index}", "symmetric": True}
+        options: dict[str, Any] = {"seed": f"{args.seed_prefix}-{pair_index}", "symmetric": True}
+        # 标准模式的 random 不带 mode：与历史随机图评估逐位一致（同盐同图可复现）。
+        # 其余模式必须显式带 mode，否则 worker 会按缺省 standard 生成一张规则不同的图。
+        if random_mode != "standard":
+            options["mode"] = random_mode
+        # 两张静态大逃杀图都没有回合上限（只靠淘汰/缩圈收场），随机大逃杀图沿用
+        # 同一口径；否则 10-30 回合的军队价值裁决会混进大逃杀榜。
+        if random_mode == "royale":
+            options["noTurnLimit"] = True
+        command["random"] = options
     return command
 
 

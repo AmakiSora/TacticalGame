@@ -24,6 +24,17 @@ try:
 except ImportError:  # 脚本模式（``python rl/training/train.py``）：入口已把 rl/envs 挂上 sys.path。
     from env import HexGameEnv, OPPONENT, PLAYER
 
+# 虚拟随机图 id：``random``（标准）与 ``random-<mode>``（其余三种模式）。worker 见到这些
+# id 会现生成一张对应模式的图；只有带上种子生成，gym seed 才能复现整条训练序列。
+# 与 ``src/config/randomMap.ts`` 的 ``RANDOM_MAP_MODES`` 同表（跨语言副本）。
+# 注意 REST 建房不吃这几个 id（见 docs/API.md），所以 HTTP 版 env.py 不在这一列。
+RANDOM_MAP_IDS = frozenset({
+    "random",
+    "random-annihilation",
+    "random-simultaneous",
+    "random-royale",
+})
+
 
 class LocalHexGameEnv(HexGameEnv):
     # v3.2.0：算法对手需要进程内引擎，本环境正好持有一个 worker。
@@ -95,6 +106,18 @@ class LocalHexGameEnv(HexGameEnv):
     def _algorithm_decide(self) -> dict[str, Any]:
         return self.decide(self.opponent, self.active_algorithm)
 
+    def _random_options_for(self, map_id: str) -> dict[str, Any] | None:
+        """虚拟随机图（``random`` / ``random-<mode>``）才附随机参数，静态地图返回 None。
+
+        只对随机图调用 ``_build_random_options``：它会从 np_random 取种子，静态图也走
+        这条路会改变既有训练序列的随机数流。宽度上训练环境只覆盖标准模式，但 map_mix
+        若写了 ``random-annihilation`` 这类 id，也必须带种子——worker 会按 id 生成对应
+        模式的图，少了种子就会用未播种的默认随机源，gym seed 从此不可复现。
+        """
+        if map_id not in RANDOM_MAP_IDS:
+            return None
+        return self._build_random_options()
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super(HexGameEnv, self).reset(seed=seed)
         self.player_token = "agent"
@@ -106,9 +129,9 @@ class LocalHexGameEnv(HexGameEnv):
             active_map = str(self.np_random.choice(names, p=probabilities))
         # 当前观测不读事件日志，让 worker 不再序列化事件尾部。
         command: dict[str, Any] = {"cmd": "reset", "mapId": active_map, "eventTail": 0}
-        if active_map == "random":
-            # 每局一张新的对称随机地图；种子从 np_random 派生，gym seed 可复现。
-            command["random"] = self._build_random_options()
+        random_options = self._random_options_for(active_map)
+        if random_options is not None:
+            command["random"] = random_options
         self._cached_state = None
         self.state = self._rpc(command)
         self._cached_state = self.state

@@ -15,6 +15,40 @@ export type RandomParam = number | [number, number];
 /** 生成器算法版本；生成逻辑发生影响输出的变化时必须 +1，使旧缓存键失效。 */
 export const RANDOM_MAP_GENERATOR_VERSION = 1;
 
+/**
+ * 虚拟随机图 id：一个随机图必须绑定一种玩法模式，所以四种模式各有一个 id。
+ * `standard` 沿用历史的 `random`（存量 `arena/matches.jsonl` 与 REST 建局都是它），
+ * 其余模式带模式后缀，免得同一个 `random` 在四种规则下有不同的含义。
+ *
+ * **仅评估链路**：跑批批次要靠地图 id 推出模式（`round_robin.py`），`matches.jsonl`
+ * 的 `map` 字段也要靠它归入对应模式榜单，所以需要这四个 id。REST 建房
+ * （`POST /api/games`）不走这张表——它只认 `mapId: 'random'`，模式放在 `random.mode`
+ * 里（大厅随机图面板就是这么发的），传给建房的 `random-annihilation` 等 id 会返回
+ * 带指引的 400。要接进建房入口，得连同房间加入/观战页「是否随机图」的判定一起改。
+ *
+ * 这张表是跑批链路的单一口径：worker 用它把 id 翻成生成器的 `mode`。
+ * `rl/evaluation/round_robin.py`、`rl/evaluation/evaluate_cross.py`、
+ * `rl/training/local_env.py`、`script/generateArenaLeaderboard.mjs` 与
+ * `public/map-labels.js` 各有一份同规则副本（跨语言/跨进程），改这里要一起改。
+ */
+export const RANDOM_MAP_MODES = {
+  standard: 'random',
+  annihilation: 'random-annihilation',
+  simultaneous: 'random-simultaneous',
+  royale: 'random-royale',
+} as const satisfies Record<GameMode, string>;
+
+/** 虚拟随机图 id → 玩法模式；静态地图 id 返回 null。 */
+export function randomMapModeForId(mapId: string): GameMode | null {
+  const entry = Object.entries(RANDOM_MAP_MODES).find(([, id]) => id === mapId);
+  return entry ? (entry[0] as GameMode) : null;
+}
+
+/** 玩法模式 → 虚拟随机图 id（standard 为历史的 `random`）。 */
+export function randomMapIdForMode(mode: GameMode): string {
+  return RANDOM_MAP_MODES[mode];
+}
+
 export interface RandomMapOptions {
   /** 随机种子（数字或字符串）；同种子产出完全相同的地图。 */
   seed?: number | string;

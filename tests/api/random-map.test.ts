@@ -118,6 +118,21 @@ describe('random map game creation API', () => {
     expect(new Set(boundIds).size).toBe(config!.config.spawnSlots.length);
   });
 
+  // 评估批次的随机图 id 不是建房地图：必须给出可执行的替代写法，而不是笼统的「找不到地图」。
+  it('rejects evaluation-only random map ids with actionable guidance', async () => {
+    app = await startTestServer();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      payload: { mapId: 'random-annihilation', maxPlayers: 2 },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('invalid_move');
+    expect(res.json().error).toContain('random-annihilation');
+    expect(res.json().error).toContain('mapId=random');
+    expect(res.json().error).toContain('random.mode');
+  });
+
   it('rejects invalid player counts and malformed random options', async () => {
     app = await startTestServer();
     const badCount = await app.inject({

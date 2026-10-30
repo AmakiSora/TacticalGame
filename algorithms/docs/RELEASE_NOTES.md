@@ -6,6 +6,17 @@
 >
 > **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法（greedy / random / mcts / threat / field / verdict / parallax）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
 
+## 3.8.20（2026-10-30）— 评估跑批随机图按模式拆分
+
+### 评估口径
+
+- 评估控制台为四种模式各加一个虚拟随机图 id：`random`（标准，沿用历史口径）、`random-annihilation`、`random-simultaneous`、`random-royale`。选中后每局现生成一张该模式的对称随机图（种子由批次盐与局对派生，同参数可复现），随机图对局按地图 id 归入对应模式的榜单与玩法统计；此前只有标准模式能跑随机图，歼灭/同时回合/大逃杀的榜只反映静态地图。
+- `random` 的 reset 命令与历史逐字一致（不传 `mode`），既有标准模式随机图成绩仍可原样断点续跑；非标准模式随机图显式带 `mode`，大逃杀另带 `noTurnLimit`，与两张静态大逃杀图「只靠淘汰/缩圈收场」的口径对齐。地图 id 与同名算法属不同命名空间（`--maps` vs `--algorithms`），算法实现零改动。
+
+### 测试与验证
+
+- 真实引擎冒烟：三种模式共 24 局、0 批次失败（歼灭 4 个算法、同时回合 5 个、大逃杀 4 个的配对组合；大逃杀 8 局均以淘汰收场，歼灭/同时回合按各自静态图惯例可出现回合上限裁决）；`tests/rl/test_evaluate_cross_random_maps.py` 锁 reset 命令与生成配置的模式，`test_round_robin_modes.py` 覆盖四个 id 的模式解析与混批拒绝。全量 vitest 1688 例、pytest 102 例通过，详见根 `RELEASE_NOTES.md` 3.8.20。
+
 ## 3.8.19（2026-10-29）— ark 方舟算法 v1
 
 ### 新增功能

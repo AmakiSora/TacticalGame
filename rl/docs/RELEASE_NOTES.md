@@ -3,6 +3,12 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-10-30 · 评估跑批支持各模式随机图（开发分支，未定版）
+
+**一句话**：评估链路以前只有标准模式能跑随机图（`--map random`），歼灭/同时回合/大逃杀的榜只能跑静态图；现在按模式拆成四个虚拟地图 id——`random` / `random-annihilation` / `random-simultaneous` / `random-royale`，`round_robin.py` 把它们解析进对应模式批次，`evaluate_cross.py` 只在非标准模式的 reset 命令里带 `mode`（标准模式命令逐字不变，历史随机图成绩仍可断点续跑），大逃杀另带 `noTurnLimit` 对齐静态大逃杀图无回合上限的口径。`local-worker.ts` 按 id 反查模式生成配置，调用方另传的 `random.mode` 与 id 冲突时直接报错；地图 id 与同名算法是两个命名空间。榜单/玩法统计的地图模式表同步登记这些 id，随机图对局归入对应模式榜。`local_env.py` 的播种判断同步改为四个虚拟 id 的集合（此前只认 `random`，`map_mix` 若写非标准随机图 id 会生成无种子的图、破坏 gym seed 复现；静态图路径仍不取 `np_random`）。REST 建房不在这一列：仍只认 `mapId=random` + `random.mode`，评估批次 id 会返回带指引的 400。
+
+**测试与验证**：`tests/config/randomMap.test.ts` 锁 id↔模式双向映射；`tests/rl/local-worker.test.ts` 覆盖四种 id 生成的配置模式、模式冲突报错、标准图显式/隐式 `mode` 逐位一致与大逃杀 `noTurnLimit`；`tests/rl/test_round_robin_modes.py` 覆盖四个 id 的模式解析与混批拒绝，新增 `tests/rl/test_evaluate_cross_random_maps.py` 锁 reset 命令形态与 worker 生成的配置模式，并交叉断言 `round_robin` 与 `evaluate_cross` 两份 Python 表逐字一致（同方向「模式→id」；此前一份 mode→id、一份 id→mode，只改一处会出现「批次能解析模式、reset 却不带种子」的静默降级），`test_evaluate_cross_simultaneous.py` 补随机同时回合（计划循环 + `round_resolved`）与随机歼灭（逐动作、零被拒动作）真引擎对局；评估 API 回归覆盖目录、启动参数与「清空旧局」的虚拟 id 过滤；新增 `tests/rl/test_local_env_random_maps.py` 锁训练环境对四个 id 的播种（并与评估表对齐、静态图不取 `np_random`），`tests/api/random-map.test.ts` 锁建房接口对评估批次 id 的指引报错。真实引擎冒烟：三种非标准模式随机图共 24 局、0 批次失败（歼灭 4 个算法、同时回合 5 个、大逃杀 4 个的配对组合；大逃杀 8 局均以淘汰收场，歼灭/同时回合按各自静态图惯例可出现回合上限裁决），榜单与玩法统计生成器把三个 mapId 分别归入对应模式。
+
 ## 2026-10-30 · 竞技场玩法明细改从本地 detail 派生（开发分支，未定版）
 
 **一句话**：玩法统计所需的裁决 7 分项、动作类型分布、policy 信号、控制点易手等明细**不再写入 `matches.jsonl`**（该文件入 git，逐点归属序列曾让单行涨到 2.5–4.5 KB、全量逼近 100 MB）；改由 `script/generateArenaStats.mjs` 按 `(detailFile, gameIndex)` 从 `arena/details/`（gitignored 本地明细）一次性派生进 `arena-stats.json` 快照，`matches.jsonl` 只新增 12 B 的 `gameIndex` 定位键（静态图 `mapSeed` 为 null，需它做匹配）。`generateArenaLeaderboard.mjs` 补地图先手胜率与同对子换座胜率差；新增 `generateArenaMapFingerprint.mjs`（地图静态对称性/距离图/地形指纹）。detail 缺失时玩法统计降级为 null、榜单不受影响；`--no-details` 可跳过明细读取。训练环境、模型接口、跑批编排口径不变。

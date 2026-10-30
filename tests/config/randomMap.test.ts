@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { generateRandomMapConfig, sanitizeRandomOptions } from '../../src/config/randomMap.js';
+import {
+  RANDOM_MAP_MODES, generateRandomMapConfig, randomMapIdForMode, randomMapModeForId, sanitizeRandomOptions,
+} from '../../src/config/randomMap.js';
 import { loadMaps, resetConfig, validateGeneratedMap } from '../../src/config/loader.js';
 import { hexDistance } from '../../src/engine/hex.js';
 
@@ -89,6 +91,25 @@ describe('random map generator', () => {
     const config = generateRandomMapConfig({ seed: 'mode-default' }, 2);
     expect(config.mode).toBe('standard');
     expect('annihilation' in config).toBe(false);
+  });
+
+  // 一张随机图只能属于一种规则：四种模式各有一个虚拟 id，standard 沿用历史的 random。
+  // 跑批编排器（round_robin / evaluate_cross / 榜单）各有一份同规则副本，这里是源表。
+  it('maps virtual random map ids to their game mode and back', () => {
+    expect(RANDOM_MAP_MODES).toEqual({
+      standard: 'random',
+      annihilation: 'random-annihilation',
+      simultaneous: 'random-simultaneous',
+      royale: 'random-royale',
+    });
+    for (const [mode, id] of Object.entries(RANDOM_MAP_MODES)) {
+      expect(randomMapModeForId(id)).toBe(mode);
+      expect(randomMapIdForMode(mode as keyof typeof RANDOM_MAP_MODES)).toBe(id);
+    }
+    // 静态地图与未知 id 都不是随机图。
+    expect(randomMapModeForId('default')).toBeNull();
+    expect(randomMapModeForId('artillery-zone')).toBeNull();
+    expect(randomMapModeForId('random-unknown')).toBeNull();
   });
 
   it('supports all four game modes with mode-appropriate artillery blocks', () => {

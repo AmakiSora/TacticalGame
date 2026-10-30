@@ -22,7 +22,7 @@ import {
 } from '../../src/engine/planning.js';
 import { createInitialGame, createInitialGameWithConfig } from '../../src/state/store.js';
 import { loadMaps } from '../../src/config/loader.js';
-import { generateRandomMapConfig, sanitizeRandomOptions } from '../../src/config/randomMap.js';
+import { generateRandomMapConfig, randomMapModeForId, sanitizeRandomOptions } from '../../src/config/randomMap.js';
 import { isSimultaneousMode } from '../../src/types.js';
 import type { GameState, PlayerId, UnitType } from '../../src/types.js';
 
@@ -146,11 +146,18 @@ export async function handleCommand(command: Record<string, unknown>): Promise<u
   if (command.cmd === 'reset') {
     snapshotEventTail = parseEventTail(command.eventTail);
     const mapId = typeof command.mapId === 'string' ? command.mapId : 'default';
-    if (mapId === 'random') {
-      // 本地训练用随机地图：与 REST 创建走同一套生成与校验逻辑，固定双人。
+    const randomMode = randomMapModeForId(mapId);
+    if (randomMode) {
+      // 本地训练/评估用随机地图：与 REST 创建走同一套生成与校验逻辑，固定双人。
+      // 玩法模式由虚拟 id 决定（`random` = 标准、`random-annihilation` 等带后缀），
+      // 调用方若另传 random.mode 必须一致——两份跨语言 id 表漂移时宁可报错，
+      // 也不要静默生成一张标准图却记在歼灭/大逃杀模式下。
       const options = sanitizeRandomOptions(command.random);
-      const config = generateRandomMapConfig(options, 2);
-      game = createInitialGameWithConfig(randomUUID(), config, 'random');
+      if (options.mode && options.mode !== randomMode) {
+        throw new Error(`随机图 ${mapId} 对应模式 ${randomMode}，与 random.mode=${options.mode} 不一致`);
+      }
+      const config = generateRandomMapConfig({ ...options, mode: randomMode }, 2);
+      game = createInitialGameWithConfig(randomUUID(), config, mapId);
     } else {
       game = createInitialGame(randomUUID(), mapId);
     }

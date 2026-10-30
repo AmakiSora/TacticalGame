@@ -64,6 +64,7 @@
 - 两套版本线是**独立计数**，但别理解成「成员变动不影响 `stateVersion`」：`PUT` / `DELETE /host/seats` 自身同时推进 `seatVersion` 与 `stateVersion`；成员变动（加入 / 退出 / 被踢）使 `seatVersion` +1，其 `stateVersion` 由 `player_joined` / `player_left` 事件推进（写入事件本身就会推进 `stateVersion`）；开局降级只推进 `seatVersion`，`stateVersion` 随后由 `game_start` 事件推进。因此 join / leave 之后带旧 `If-None-Match` 请求 `GET /api/games/:id` **不会** 304，而是 200 返回含新玩家与最新座位表的状态。
 - 座位字段的**结构化形态**（`seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots`）只由 `GET /api/games/:id/lobby` 提供；状态接口里虽有 `seatPlan` 原始字段，但房间页的座位区一律读 `/lobby`，不要从状态接口自己拼座位列表。
 - `seatVersion` 的语义是「座位视图可能已变」：`PUT` 成功、`DELETE` 成功、成员进出（`seatPlan` 为空时也一样）都 `+1`。`DELETE` 在本来就未编排时也 `+1`——幂等只承诺最终状态不变，不承诺版本号不变。
+- 随机地图建房只有一种写法：`POST /api/games` 用 `mapId: "random"`，玩法模式放在 `random.mode`（`standard` / `annihilation` / `simultaneous` / `royale`）。评估控制台的 `random-annihilation` / `random-simultaneous` / `random-royale` 是**跑批批次 id**（批次要靠地图 id 推模式、`matches.jsonl` 靠它归模式），不是可建房地图；传给建房接口返回 `400 invalid_move` 并提示改用 `mapId: "random"` + `random.mode`。
 - `GET /api/games` 的每一项带 `gameId`、`mapId`、`mapName`（随机地图为「随机战场」）、`hostName`、`createdAt` 与 `phase` / `mode` / `maxPlayers` / `playerCount` / `players` 等字段。
 
 ## 操作
@@ -157,7 +158,7 @@
 
 | 字段 | 约束 |
 |---|---|
-| `maps` | 已知地图的非空子集；同一批只能属于同一模式 |
+| `maps` | 已知地图的非空子集；同一批只能属于同一模式。随机图按模式拆成四个虚拟 id：`random`（标准）、`random-annihilation`、`random-simultaneous`、`random-royale` |
 | `games` | 2–500，默认 24 |
 | `jobs` | 1–16，默认 1 |
 | `participants` | 可选过滤，最多 32 项；算法用 `algo:<id>`，RL 模型仅支持标准模式 |

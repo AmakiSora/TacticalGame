@@ -85,15 +85,17 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'simultaneous')).toMatchObject({
       supported: true,
       maps: expect.arrayContaining([
+        expect.objectContaining({ id: 'random-simultaneous', label: '随机图（同时回合）' }),
         expect.objectContaining({ id: 'standoff' }),
         expect.objectContaining({ id: 'molten-throne' }),
         expect.objectContaining({ id: 'mistpine', label: '雾杉疏林' }),
       ]),
     });
-    // 四种模式全部接入跑批：歼灭与大逃杀各自带地图池。
+    // 四种模式全部接入跑批：歼灭与大逃杀各自带地图池，且随机图排在各自模式最前。
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'annihilation')).toMatchObject({
       supported: true,
       maps: [
+        expect.objectContaining({ id: 'random-annihilation', label: '随机图（歼灭）' }),
         expect.objectContaining({ id: 'artillery-zone' }),
         expect.objectContaining({ id: 'trench-run' }),
       ],
@@ -101,6 +103,7 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'royale')).toMatchObject({
       supported: true,
       maps: expect.arrayContaining([
+        expect.objectContaining({ id: 'random-royale', label: '随机图（大逃杀）' }),
         expect.objectContaining({ id: 'snowflake' }),
         expect.objectContaining({ id: 'narrow-road' }),
       ]),
@@ -121,6 +124,29 @@ describe('AI 竞技场评估控制台 API', () => {
       expect(entry, `${id} 未进入控制台地图目录`).toBeDefined();
       expect(entry!.label).toBe(config.name ?? id);
       expect(entry!.mode).toBe(config.mode ?? 'standard');
+    }
+  });
+
+  // 一张随机图只能属于一种规则：四种模式各一个虚拟条目，谁也不许只落在标准模式。
+  it('offers one virtual random map per mode', () => {
+    const catalog = readEvalMaps();
+    const virtual = catalog.filter(map => map.id.startsWith('random'));
+    expect(virtual.map(map => [map.id, map.mode, map.label])).toEqual([
+      ['random', 'standard', '随机图'],
+      ['random-annihilation', 'annihilation', '随机图（歼灭）'],
+      ['random-simultaneous', 'simultaneous', '随机图（同时回合）'],
+      ['random-royale', 'royale', '随机图（大逃杀）'],
+    ]);
+  });
+
+  // 浏览器端另有一份内置标签（GET /api/maps 只列静态地图）：文案漂移会让榜单/玩法
+  // 统计的地图筛选露出英文 id，所以直接对目录里的 id+label 做文本对齐检查。
+  it('keeps the browser label table in sync with the console catalog', () => {
+    const source = readFileSync('public/map-labels.js', 'utf8');
+    const virtual = readEvalMaps().filter(map => map.id.startsWith('random'));
+    expect(virtual).toHaveLength(4);
+    for (const map of virtual) {
+      expect(source, `${map.id} 缺少内置标签`).toContain(`['${map.id}', '${map.label}']`);
     }
   });
 
@@ -190,6 +216,28 @@ describe('AI 竞技场评估控制台 API', () => {
     // 不传 participants = 无过滤（round_robin 默认取全部该模式算法），故两者都不出现
     expect(args).not.toContain('--algorithms');
     expect(args).not.toContain('--models');
+  });
+
+  it('starts an annihilation run on the annihilation random map', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['random-annihilation'], games: 4 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({ mode: 'annihilation', maps: ['random-annihilation'] });
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--mode annihilation');
+    expect(args).toContain('--maps random-annihilation');
+  });
+
+  // 随机图 id 自带模式：两种模式的随机图不能混在一批，否则 round_robin 会拒绝启动。
+  it('rejects mixing two modes of random maps', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { maps: ['random-annihilation', 'random-royale'] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('mixed_modes');
   });
 
   it('starts royale evaluation with apex and its mode-specific baseline', async () => {
@@ -447,6 +495,33 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(byMap.json()).toMatchObject({ removed: 1 });
     expect(readFileSync(statsFile, 'utf8')).toContain('breach');
     expect(readFileSync(statsFile, 'utf8')).not.toContain('"default"');
+  });
+
+  it('clears matches on virtual random maps by mode and map id', async () => {
+    writeFileSync(statsFile, [
+      { map: 'random', players: { player_a: 'algo_greedy@v1', player_b: 'algo_threat@v1' } },
+      { map: 'random-annihilation', players: { player_a: 'algo_shrinkroll@v1', player_b: 'algo_vortex@v1' } },
+      { map: 'random-royale', players: { player_a: 'algo_echelon@v1', player_b: 'algo_apex@v1' } },
+    ].map(line => JSON.stringify(line)).join('\n') + '\n');
+
+    // 虚拟 id 自带模式：按歼灭过滤只命中 random-annihilation，标准 random 不受牵连。
+    const byMode = await app.inject({
+      method: 'POST', url: '/api/arena/eval/clear-matches', payload: { mode: 'annihilation', dryRun: true },
+    });
+    expect(byMode.json()).toMatchObject({ ok: true, removed: 1, total: 3 });
+
+    const byMap = await app.inject({
+      method: 'POST', url: '/api/arena/eval/clear-matches', payload: { map: 'random-royale' },
+    });
+    expect(byMap.json()).toMatchObject({ ok: true, removed: 1 });
+    const left = readFileSync(statsFile, 'utf8').split('\n').filter(l => l.trim()).map(l => JSON.parse(l).map);
+    expect(left).toEqual(['random', 'random-annihilation']);
+
+    const mismatch = await app.inject({
+      method: 'POST', url: '/api/arena/eval/clear-matches', payload: { mode: 'standard', map: 'random-annihilation' },
+    });
+    expect(mismatch.statusCode).toBe(400);
+    expect(mismatch.json().code).toBe('invalid_filter');
   });
 
   it('clear-matches validates filter values and combinations', async () => {

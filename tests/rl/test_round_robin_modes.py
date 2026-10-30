@@ -29,6 +29,32 @@ def test_load_map_modes_reads_map_files_and_defaults_random_to_standard():
     assert modes["narrow-road"] == "royale"
 
 
+def test_virtual_random_map_ids_map_to_their_own_mode():
+    """四种模式各有一个虚拟随机图 id；标准模式沿用历史的 random。"""
+    assert round_robin.RANDOM_MAP_MODES == {
+        "standard": "random",
+        "annihilation": "random-annihilation",
+        "simultaneous": "random-simultaneous",
+        "royale": "random-royale",
+    }
+    modes = round_robin.load_map_modes(ROOT)
+    for mode, map_id in round_robin.RANDOM_MAP_MODES.items():
+        assert modes[map_id] == mode
+
+
+def test_resolve_mode_accepts_mode_specific_random_maps():
+    for mode, map_id in round_robin.RANDOM_MAP_MODES.items():
+        assert round_robin.resolve_mode(ROOT, [map_id], "auto") == mode
+        assert round_robin.resolve_mode(ROOT, [map_id], mode) == mode
+    # 随机图可与同模式的静态图混在同一批。
+    assert round_robin.resolve_mode(ROOT, ["random-annihilation", "artillery-zone"], "auto") == "annihilation"
+    assert round_robin.resolve_mode(ROOT, ["random-royale", "snowflake"], "royale") == "royale"
+    with pytest.raises(ValueError, match="不一致"):
+        round_robin.resolve_mode(ROOT, ["random-annihilation"], "standard")
+    with pytest.raises(ValueError, match="不能混合"):
+        round_robin.resolve_mode(ROOT, ["random-annihilation", "random-royale"], "auto")
+
+
 def test_supported_modes_cover_all_four_and_split_plan_modes():
     assert set(round_robin.SUPPORTED_EVAL_MODES) == {
         "standard", "simultaneous", "annihilation", "royale"}

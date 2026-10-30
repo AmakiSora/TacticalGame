@@ -13,12 +13,14 @@
 - 算法参与者的名字以 ``algo_`` 前缀 + 版本写入 matches.jsonl（如 algo_threat@v1），
   传参规格为 ``algo:<name>@<version>``（版本取 registry.mjs 的当前标注，保证
   算法升版后历史对局仍归属旧版本 id）；--algorithms none 可退回纯模型循环赛；
-- 地图模式从 maps/<id>.json 的 ``mode`` 字段推断（random 固定 standard）；同一批
-  只能跑同一模式，四种模式均已接入：standard / annihilation 逐动作执行（歼灭的炮火
-  缩圈与淘汰由引擎在轮界结算），simultaneous / royale 走计划入队与统一结算。模式内
+- 地图模式从 maps/<id>.json 的 ``mode`` 字段推断；四种模式的虚拟随机图 id 固定为标准
+  ``random``、歼灭 ``random-annihilation``、同时回合 ``random-simultaneous``、大逃杀
+  ``random-royale``（与 ``src/config/randomMap.ts`` 的 ``RANDOM_MAP_MODES`` 同表）。
+  同一批只能跑同一模式，四种模式均已接入：standard / annihilation 逐动作执行（歼灭的
+  炮火缩圈与淘汰由引擎在轮界结算），simultaneous / royale 走计划入队与统一结算。模式内
   只纳入注册表 ``ALGORITHM_META.modes`` 声明该模式的算法；RL 模型仅支持标准模式，
-  不参与其他模式跑批。歼灭已有 random-annihilation、shrinkroll 与 vortex 三个条目，大逃杀
-  已有 random-royale 与 apex 两个，均可组批。
+  不参与其他模式跑批。歼灭已有 random-annihilation、shrinkroll、vortex 等条目，大逃杀
+  已有 random-royale、apex 等条目，均可组批。
 
 用法示例：
 
@@ -63,6 +65,16 @@ DEFAULT_STATS_FILE = Path("arena/matches.jsonl")
 SUPPORTED_EVAL_MODES = ("standard", "simultaneous", "annihilation", "royale")
 # 计划队列模式：动作入队、全员提交后统一结算（耗时兜底与模式校验共用）。
 PLAN_MODES = ("simultaneous", "royale")
+# 虚拟随机图 id → 模式。一张随机图只能属于一种规则，故四种模式各有一个 id；
+# standard 沿用历史的 ``random``（存量 matches.jsonl 全是它）。
+# 与 src/config/randomMap.ts 的 RANDOM_MAP_MODES、evaluate_cross.RANDOM_MAP_MODES
+# 以及 generateArenaLeaderboard.loadMapModes 同表，四处必须一起改。
+RANDOM_MAP_MODES = {
+    "standard": "random",
+    "annihilation": "random-annihilation",
+    "simultaneous": "random-simultaneous",
+    "royale": "random-royale",
+}
 # 模型批次的固定开销（torch 导入 + tsx worker 启动 + 模型加载）与单局耗时；
 # 纯算法批次不加载模型，开销低一档。单局耗时优先用累积历史均速，缺历史时按
 # 模式兜底：计划队列模式单局远慢于逐动作模式且地图间差异大（实测对峙之地 ~6s/局、
@@ -125,8 +137,13 @@ def discover_models(models_dir: Path) -> tuple[list[Path], list[Path]]:
 
 
 def load_map_modes(root: Path) -> dict[str, str]:
-    """读取 maps/*.json 的 mode 字段；random 固定 standard，缺省字段按 standard。"""
-    modes = {"random": "standard"}
+    """读取 maps/*.json 的 mode 字段；缺省字段按 standard。
+
+    四种虚拟随机图固定映射到各自模式（``RANDOM_MAP_MODES``），这样
+    ``--maps random-annihilation`` 能被解析成歼灭批次，而 ``--maps random``
+    仍只表示标准模式。
+    """
+    modes = {map_id: mode for mode, map_id in RANDOM_MAP_MODES.items()}
     for path in sorted((root / "maps").glob("*.json")):
         try:
             config = json.loads(path.read_text(encoding="utf-8"))

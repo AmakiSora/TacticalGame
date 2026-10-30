@@ -20,7 +20,7 @@ import { actionBodyHash, findReplay, rememberAction, scopedIdempotencyKey } from
 import { logger } from '../utils/logger.js';
 import { inc } from '../utils/metrics.js';
 import { listMaps } from '../config/loader.js';
-import { generateRandomMapConfig, sanitizeRandomOptions } from '../config/randomMap.js';
+import { generateRandomMapConfig, randomMapModeForId, sanitizeRandomOptions } from '../config/randomMap.js';
 import type { RandomParamValues } from '../config/randomMap.js';
 import { getCachedRandomMap, setCachedRandomMap } from '../config/randomMapCache.js';
 import { isPlayerId, isSimultaneousMode, normalizePlayerName } from '../types.js';
@@ -179,7 +179,9 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       };
       let game;
       if (mapId === 'random') {
-        // 随机地图：服务端按参数现生成完整配置，不写入静态地图表。
+        // 随机地图：服务端按参数现生成完整配置，不写入静态地图表。玩法模式走
+        // `random.mode`（大厅随机图面板也是这么发的），地图 id 恒为 `random`；
+        // 评估批次的 `random-annihilation` 等虚拟 id 不属于建房入口，见下面 else 分支。
         try {
           const options = sanitizeRandomOptions(req.body?.random);
           const cached = options.seed === undefined ? null : getCachedRandomMap(options, maxPlayers);
@@ -197,7 +199,20 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         }
       } else {
         const map = listMaps().find(item => item.id === mapId);
-        if (!map) return reply.code(400).send({ error: `找不到地图「${mapId}」`, code: 'invalid_move' });
+        if (!map) {
+          // 评估跑批的地图 id（random-annihilation / random-simultaneous / random-royale）
+          // 不是可建房地图：批次要靠地图 id 推模式，而建房把模式放在 random.mode 里。
+          // 这里给出可执行的替代写法，免得只回一句「找不到地图」。
+          const evalMode = randomMapModeForId(mapId);
+          if (evalMode) {
+            return reply.code(400).send({
+              error: `${mapId} 是评估跑批的随机图 id（${evalMode} 模式），不能用于建房；`
+                + '请改用 mapId=random 并在 random.mode 指定玩法模式',
+              code: 'invalid_move',
+            });
+          }
+          return reply.code(400).send({ error: `找不到地图「${mapId}」`, code: 'invalid_move' });
+        }
         if (!map.preview.supportedPlayerCounts.includes(maxPlayers)) {
           return reply.code(400).send({ error: '不支持该玩家人数', code: 'unsupported_player_count' });
         }

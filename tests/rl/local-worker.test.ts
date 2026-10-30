@@ -106,6 +106,60 @@ describe('local engine worker random maps', () => {
   });
 });
 
+describe('local engine worker mode-specific random maps', () => {
+  // 虚拟随机图 id 自带玩法模式（一张随机图只能属于一种规则）。评估控制台把
+  // random-annihilation / random-simultaneous / random-royale 当成地图 id 发给
+  // round_robin → evaluate_cross → 本 worker，worker 必须据此生成对应模式的配置。
+  it('generates a random map in the mode named by the virtual map id', async () => {
+    const cases = [
+      ['random', 'standard'],
+      ['random-annihilation', 'annihilation'],
+      ['random-simultaneous', 'simultaneous'],
+      ['random-royale', 'royale'],
+    ] as const;
+    for (const [mapId, mode] of cases) {
+      const state = await handleCommand({
+        cmd: 'reset', mapId, random: { seed: `worker-${mode}` },
+      }) as WorkerState;
+      expect(state.mapId, mapId).toBe(mapId);
+      expect(state.config.mode, mapId).toBe(mode);
+      expect(state.phase, mapId).toBe('active');
+      expect(state.config.spawnSlots, mapId).toHaveLength(2);
+    }
+  });
+
+  it('rejects a random.mode that contradicts the virtual map id', async () => {
+    await expect(handleCommand({
+      cmd: 'reset', mapId: 'random-annihilation', random: { seed: 'clash', mode: 'royale' },
+    })).rejects.toThrow('不一致');
+  });
+
+  it('keeps standard random maps byte-identical with and without an explicit mode', async () => {
+    // 历史标准图评估不传 mode；显式 mode=standard 必须逐位等价，否则同盐重跑会换图、旧成绩不可复现。
+    const implicit = await reset({ seed: 'worker-mode-compat' });
+    const explicit = await handleCommand({
+      cmd: 'reset', mapId: 'random', random: { seed: 'worker-mode-compat', mode: 'standard' },
+    }) as WorkerState;
+    expect(explicit.config.mode).toBe('standard');
+    expect(mapFingerprint(explicit)).toBe(mapFingerprint(implicit));
+  });
+
+  it('honors noTurnLimit on a random royale map', async () => {
+    // 两张静态大逃杀图都没有回合上限；evaluate_cross 给随机大逃杀图同样传 noTurnLimit。
+    const state = await handleCommand({
+      cmd: 'reset', mapId: 'random-royale', random: { seed: 'worker-royale-endless', noTurnLimit: true },
+    }) as WorkerState;
+    expect(state.config.mode).toBe('royale');
+    expect(state.config.balance.maxTurns).toBeNull();
+  });
+
+  it('still rejects malformed random options on a mode-specific id', async () => {
+    await expect(handleCommand({
+      cmd: 'reset', mapId: 'random-royale', random: { seed: 'bad', noTurnLimit: 'yes' },
+    })).rejects.toThrow('noTurnLimit');
+  });
+});
+
 describe('local engine worker simultaneous mode', () => {
   interface PlanState {
     config: { mode: string };

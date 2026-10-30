@@ -49,12 +49,26 @@ export const GAME_MODES = [
 export const MODE_LABELS = Object.fromEntries(GAME_MODES.map(mode => [mode.id, mode.label]));
 
 /**
+ * 虚拟随机图 id → 模式。一张随机图只能属于一种规则，故四种模式各有一个 id；
+ * standard 沿用历史的 `random`（存量 matches.jsonl 全是它）。与
+ * src/config/randomMap.ts 的 RANDOM_MAP_MODES、round_robin.py / evaluate_cross.py
+ * 的同名表同规则，四处必须一起改——这里漏一个，随机图对局就会掉进「未知地图按
+ * standard」的兜底，把歼灭/大逃杀局算进标准榜。
+ */
+export const RANDOM_MAP_MODES = {
+  standard: 'random',
+  annihilation: 'random-annihilation',
+  simultaneous: 'random-simultaneous',
+  royale: 'random-royale',
+};
+
+/**
  * 读 maps/*.json 的 mode 字段。地图文件名即 mapId；未声明 mode 的地图按 standard
- * 处理（与 src/config/loader.ts 的归一化规则一致）。随机图固定为标准模式，不需要
- * 静态地图文件。
+ * 处理（与 src/config/loader.ts 的归一化规则一致）。四种虚拟随机图不需要静态地图
+ * 文件，按 `RANDOM_MAP_MODES` 直接登记。
  */
 export function loadMapModes(mapsDir = DEFAULT_MAPS_DIR) {
-  const modes = new Map([['random', 'standard']]);
+  const modes = new Map(Object.entries(RANDOM_MAP_MODES).map(([mode, id]) => [id, mode]));
   try {
     for (const file of readdirSync(mapsDir)) {
       if (!file.endsWith('.json')) continue;

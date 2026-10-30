@@ -14,6 +14,7 @@ import type { FastifyInstance } from 'fastify';
 import { authorizeControlRequest } from './controlAuth.js';
 import { ALGORITHM_BOTS, refreshRlModels } from './bots.js';
 import { algorithmParticipantId } from '../../algorithms/registry.mjs';
+import { RANDOM_MAP_MODES } from '../config/randomMap.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -31,10 +32,12 @@ const DEFAULT_STATE_FILE = join(PROJECT_ROOT, 'runtime', 'arena-eval-state.json'
 const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRIPT];
 
 // 评估链路已接入全部四种模式：跑批脚本缺省地图池（STANDARD_EVAL_MAPS）与
-// round_robin.py 的 DEFAULT_MAPS 保持一致；其余模式使用静态地图，且只纳入注册表
-// 声明该模式的算法（RL 模型目前只覆盖标准模式）。四种模式的算法条目：歼灭
-// random-annihilation / shrinkroll / vortex / crucible / sovereign，大逃杀 random-royale /
-// echelon / apex，各模式均 ≥ 2 个可组批；「少于 2 个参评算法」的启动请求仍会被拦下。
+// round_robin.py 的 DEFAULT_MAPS 保持一致；四种模式各有自己的静态地图与虚拟随机图
+// （`random` / `random-annihilation` / `random-simultaneous` / `random-royale`，见
+// `RANDOM_MAP_MODES`），且只纳入注册表声明该模式的算法（RL 模型目前只覆盖标准模式）。
+// 四种模式的算法条目：歼灭 random-annihilation / shrinkroll / vortex / crucible / sovereign，
+// 大逃杀 random-royale / echelon / apex / ark，各模式均 ≥ 2 个可组批；「少于 2 个参评
+// 算法」的启动请求仍会被拦下。
 export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
 export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne', 'mistpine'] as const;
 
@@ -51,9 +54,10 @@ export interface EvalMapInfo {
   mode: string;
 }
 
-/** 同一模式内的展示顺序：既有顺序在前，未列出的新地图按 id 追加在后。 */
+/** 同一模式内的展示顺序：虚拟随机图排在最前，其余既有顺序在前，未列出的新地图按 id 追加在后。 */
 const MAP_DISPLAY_ORDER = [
-  'random', 'default', 'breach', 'danger-close', 'dual-lanes',
+  'random', 'random-annihilation', 'random-simultaneous', 'random-royale',
+  'default', 'breach', 'danger-close', 'dual-lanes',
   'artillery-zone', 'trench-run',
   'standoff', 'molten-throne', 'mistpine',
   'snowflake', 'narrow-road',
@@ -61,12 +65,32 @@ const MAP_DISPLAY_ORDER = [
 ];
 
 /**
+ * 虚拟随机图的显示名。与 `public/map-labels.js` 的内置标签保持一致——榜单/玩法统计
+ * 直接按地图 id 显示中文名，两处文案不能分叉。
+ */
+const RANDOM_MAP_LABELS: Record<string, string> = {
+  random: '随机图',
+  'random-annihilation': '随机图（歼灭）',
+  'random-simultaneous': '随机图（同时回合）',
+  'random-royale': '随机图（大逃杀）',
+};
+
+/** 四种模式各自的虚拟随机图条目（id ↔ 模式的权威映射在 `RANDOM_MAP_MODES`）。 */
+function virtualRandomMaps(): EvalMapInfo[] {
+  return Object.entries(RANDOM_MAP_MODES).map(([mode, id]) => ({
+    id,
+    label: RANDOM_MAP_LABELS[id] ?? id,
+    mode,
+  }));
+}
+
+/**
  * 控制台展示用地图目录：直接读 maps/*.json，显示名取地图自身的 name、模式取
- * mode 字段（缺省 standard），另加虚拟「随机图」。地图文件是唯一事实源——新增或
- * 下线地图时控制台自动跟随，不再靠手改清单（歼灭图 trench-run 就曾因此漏列）。
+ * mode 字段（缺省 standard），另加四种模式的虚拟「随机图」。地图文件是唯一事实源——
+ * 新增或下线地图时控制台自动跟随，不再靠手改清单（歼灭图 trench-run 就曾因此漏列）。
  */
 export function readEvalMaps(mapsDir = join(PROJECT_ROOT, 'maps')): EvalMapInfo[] {
-  const maps: EvalMapInfo[] = [{ id: 'random', label: '随机图', mode: 'standard' }];
+  const maps: EvalMapInfo[] = virtualRandomMaps();
   try {
     for (const file of readdirSync(mapsDir)) {
       if (!/\.json$/i.test(file)) continue;
@@ -82,7 +106,7 @@ export function readEvalMaps(mapsDir = join(PROJECT_ROOT, 'maps')): EvalMapInfo[
       maps.push({ id, label: name || id, mode });
     }
   } catch {
-    // 地图目录不可读时只剩「随机图」兜底；与 readMapModes 同向（少列，不误判）。
+    // 地图目录不可读时只剩四种虚拟随机图兜底；与 readMapModes 同向（少列，不误判）。
   }
   const modeRank = (mode: string) => {
     const index = EVAL_MODES.findIndex(item => item.id === mode);
@@ -115,12 +139,13 @@ export function buildEvalModeCatalog() {
 }
 
 /**
- * maps/*.json 的 mode 字段（random 固定 standard，缺省/损坏按 standard），与
- * generateArenaLeaderboard.loadMapModes 同规则；「清空旧局」按模式过滤时用它把
- * 对局记录的 map 字段归到模式。目录不可读时只剩 random 兜底。
+ * maps/*.json 的 mode 字段（缺省/损坏按 standard）加四种虚拟随机图（`RANDOM_MAP_MODES`），
+ * 与 generateArenaLeaderboard.loadMapModes 同规则；「清空旧局」按模式过滤时用它把
+ * 对局记录的 map 字段归到模式。目录不可读时只剩虚拟随机图兜底。
  */
 export function readMapModes(mapsDir = join(PROJECT_ROOT, 'maps')): Map<string, string> {
-  const modes = new Map<string, string>([['random', 'standard']]);
+  const modes = new Map<string, string>(
+    Object.entries(RANDOM_MAP_MODES).map(([mode, id]) => [id, mode]));
   try {
     for (const file of readdirSync(mapsDir)) {
       if (!file.endsWith('.json')) continue;
@@ -132,7 +157,7 @@ export function readMapModes(mapsDir = join(PROJECT_ROOT, 'maps')): Map<string, 
       }
     }
   } catch {
-    // 地图目录不可读时仅 random 可用；模式过滤会匹配不到未知地图，属安全方向（少删）。
+    // 地图目录不可读时仅虚拟随机图可用；模式过滤会匹配不到未知地图，属安全方向（少删）。
   }
   return modes;
 }

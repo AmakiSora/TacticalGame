@@ -3,6 +3,12 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-10-30 · 竞技场玩法明细改从本地 detail 派生（开发分支，未定版）
+
+**一句话**：玩法统计所需的裁决 7 分项、动作类型分布、policy 信号、控制点易手等明细**不再写入 `matches.jsonl`**（该文件入 git，逐点归属序列曾让单行涨到 2.5–4.5 KB、全量逼近 100 MB）；改由 `script/generateArenaStats.mjs` 按 `(detailFile, gameIndex)` 从 `arena/details/`（gitignored 本地明细）一次性派生进 `arena-stats.json` 快照，`matches.jsonl` 只新增 12 B 的 `gameIndex` 定位键（静态图 `mapSeed` 为 null，需它做匹配）。`generateArenaLeaderboard.mjs` 补地图先手胜率与同对子换座胜率差；新增 `generateArenaMapFingerprint.mjs`（地图静态对称性/距离图/地形指纹）。detail 缺失时玩法统计降级为 null、榜单不受影响；`--no-details` 可跳过明细读取。训练环境、模型接口、跑批编排口径不变。
+
+**测试与验证**：真实引擎 2 局验证单行 1163–1197 B（改前 2.5 KB+）、detail 派生 2/2 命中；全量 38,785 局聚合 7 秒、detail 覆盖 7,200 局（18.6%，其余本地明细已清理属正常降级）；vitest 35 例通过。本轮补测：`deriveDetailStats` 的 fallback 口径 5 例、地图静态指纹的新旧地图写法/对称性/占比/CLI 入口 9 例、玩法统计页雷达与降级 4 例；pytest 新增「被拒动作的兜底 `end_turn` 必带 fallback 标记」契约 2 例（真引擎）。全量 `npm run build` + `npm test` 通过（146 文件 / 1676 用例）、`npm run test:rl` 78 例通过。
+
 ## 2026-10-29 · 3.8.14 大逃杀双算法参评说明
 
 **一句话**：`rl/README.md` 的大逃杀跑批示例与控制台说明同步 `apex` / `random-royale` 双算法池；训练代码、模型接口和非标准模式禁止 RL 模型参评的规则不变。

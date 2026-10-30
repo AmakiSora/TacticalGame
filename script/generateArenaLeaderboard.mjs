@@ -405,6 +405,8 @@ const EMPTY_TALLY = () => ({ games: 0, wins: 0, draws: 0 });
 export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory) {
   const n = ids.length;
   const pairAgg = new Map();
+  // 先手（player_a 座）胜率：地图平衡第一指标（2026-10-30 起输出）。
+  let firstSeatWins = 0, firstSeatGames = 0;
   const perModel = new Map(ids.map(id => [id, {
     games: 0, wins: 0, losses: 0, draws: 0,
     firstSeat: { games: 0, wins: 0 }, secondSeat: { games: 0, wins: 0 },
@@ -418,10 +420,21 @@ export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory)
     let agg = pairAgg.get(key);
     if (!agg) {
       const [x, y] = key.split('|');
-      agg = { x, y, aScore: 0, games: 0, aWins: 0, bWins: 0, draws: 0 };
+      agg = { x, y, aScore: 0, games: 0, aWins: 0, bWins: 0, draws: 0,
+              xFirstGames: 0, xFirstWins: 0, xSecondGames: 0, xSecondWins: 0 };
       pairAgg.set(key, agg);
     }
     agg.games += 1;
+    // 先手胜率 + 同对子换座（x 坐先手/后手）表现：检测先手依赖与地图对称性。
+    firstSeatGames += 1;
+    if (g.winner === g.playerA) firstSeatWins += 1;
+    if (g.playerA === agg.x) {
+      agg.xFirstGames += 1;
+      if (g.winner === agg.x) agg.xFirstWins += 1;
+    } else {
+      agg.xSecondGames += 1;
+      if (g.winner === agg.x) agg.xSecondWins += 1;
+    }
 
     const mA = perModel.get(g.playerA);
     const mB = perModel.get(g.playerB);
@@ -541,7 +554,14 @@ export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory)
   });
 
   const h2h = [...pairAgg.values()]
-    .map(p => ({ a: p.x, b: p.y, games: p.games, aWins: p.aWins, bWins: p.bWins, draws: p.draws }))
+    .map(p => ({
+      a: p.x, b: p.y, games: p.games, aWins: p.aWins, bWins: p.bWins, draws: p.draws,
+      // 换座表现：a 坐先手/后手的胜率 + 换座胜率差（正 = 先手强，负 = 后手强）。
+      aFirstWinRate: p.xFirstGames > 0 ? round4(p.xFirstWins / p.xFirstGames) : null,
+      aSecondWinRate: p.xSecondGames > 0 ? round4(p.xSecondWins / p.xSecondGames) : null,
+      aSeatSwing: p.xFirstGames > 0 && p.xSecondGames > 0
+        ? round4(p.xFirstWins / p.xFirstGames - p.xSecondWins / p.xSecondGames) : null,
+    }))
     .sort((x, y) => y.games - x.games || x.a.localeCompare(y.a));
 
   return {
@@ -551,6 +571,8 @@ export function buildLeague(games, ids, indexOf, strata, bootstrapN, rngFactory)
       draws,
       drawRate: games.length > 0 ? round4(draws / games.length) : null,
       avgRounds: roundsGames.length > 0 ? round2(totalRounds / roundsGames.length) : null,
+      // 该池（模式或单图）的先手胜率：偏离 0.5 越远先手优势越大。
+      firstSeatWinRate: firstSeatGames > 0 ? round4(firstSeatWins / firstSeatGames) : null,
     },
     models,
     h2h,

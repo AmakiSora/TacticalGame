@@ -74,7 +74,10 @@
     .eval-model-list .ver { color: #6a8496; flex: none; }
     .eval-row { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: flex-end; }
     .eval-row > label { display: grid; gap: 4px; font-size: 12px; color: #9ab; }
-    .eval-row input[type="number"], .eval-row input[type="text"] { background: #141c22; border: 1px solid #2a3a44; color: #dce8f0; border-radius: 4px; padding: 5px 8px; width: 100px; }
+    .eval-row input[type="number"], .eval-row input[type="text"], .eval-row input[type="password"] { background: #141c22; border: 1px solid #2a3a44; color: #dce8f0; border-radius: 4px; padding: 5px 8px; width: 100px; }
+    /* 控制令牌行：输入框放宽到能放下 32 字节 hex（窄屏自动换行），状态提示与按钮同排靠底 */
+    .eval-token-row input[type="password"] { width: 320px; max-width: 100%; }
+    #eval-token-state { padding-bottom: 7px; }
     /* 清空旧局弹窗表单（挂载在 ui-dialog 面板内，宽度跟随面板内容区，避免撑出滚动条） */
     .eval-clear-form { display: grid; gap: 10px; }
     .eval-clear-form > label { display: grid; gap: 4px; font-size: 12px; color: #9ab; }
@@ -109,3 +112,24 @@
     .econ-item .value { font-size: 16px; font-weight: 700; color: #dce8f0; font-variant-numeric: tabular-nums; margin-top: 2px; }
     .econ-item .sub { font-size: 10px; color: #6a8496; margin-top: 2px; }
     @media (max-width: 480px) { .model-card-grid { grid-template-columns: 1fr; } }
+    /* ---- 玩法统计 SVG 图表（2026-10-30） ---- */
+    .chart-block svg { display: block; width: 100%; height: auto; }
+    .chart-block.empty-block { min-height: 120px; }
+    /* 雷达图模型选择 chips（覆盖 stats.css 的 .chip 展示用标签为可点按钮） */
+    .chip-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .chip-pick .chip { cursor: pointer; user-select: none; padding: 4px 12px; font-size: 12px; background: #141c22; border: 1px solid #2a3a44; color: #9ab; }
+    .chip-pick .chip:hover { border-color: #3a6a7a; color: #dce8f0; }
+    .chip-pick .chip.on { border-color: #3f9b6c; color: #fff; background: #16301f; }
+    .chip-pick .hint { margin: 0; }
+    /* 雷达图布局：图 + 图例 */
+    .radar-grid { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+    .radar-wrap { flex: 0 1 380px; min-width: 260px; }
+    .radar-wrap svg { width: 100%; height: auto; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; flex: 1; align-content: center; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #b8c6d0; }
+    .legend-item i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+    /* 热力图横向滚动容器 */
+    .chart-scroll { overflow-x: auto; }
+    /* 热力图按自然尺寸渲染：矩阵宽高比偏竖，交给 width:100% 拉伸会把高度撑到上千像素。
+       窄屏靠 .chart-scroll 横向滚动，不压缩单元格。 */
+    .chart-block.heatmap-block svg { width: auto; height: auto; }

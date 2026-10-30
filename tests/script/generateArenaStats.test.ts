@@ -8,6 +8,7 @@ import { collectRegistry } from '../../script/generateArenaLeaderboard.mjs';
 import {
   aggregateGameplay,
   buildModelProfiles,
+  deriveDetailStats,
   loadMatchDetails,
   parseModelsNotes,
   stripMd,
@@ -209,6 +210,63 @@ describe('aggregateGameplay 聚合', () => {
     const mB = gp.perModel.find((m: { id: string }) => m.id === B);
     expect(mA.avgDecisionMs).toBe(20);
     expect(mB.avgDecisionMs).toBe(50);
+  });
+});
+
+describe('2026-10-30 新增维度：裁决分项/动作画像/先手/控制点易手/决策耗时分布', () => {
+  it('scoreBreakdown 均值、actionMix 占比、rejectedRate、firstSeatWinRate、控制点易手均正确', () => {
+    const dir = makeModelsDir([A, B]);
+    const file = join(dir, 'matches.jsonl');
+    const sb = (hqDmg: number, cps: number, total: number) => ({
+      headquartersDamage: hqDmg, ownHqHp: 100, controlPoints: cps, controlHold: 2,
+      armyValue: 300, supplies: 80, killValue: 50, total,
+    });
+    const ap = (attack: number, move: number, total: number, rejected: number) => ({
+      byType: { attack, move, end_turn: total - attack - move }, total, rejected, forcedEndTurn: 0, intents: { attack },
+    });
+    const line = (obj: unknown) => JSON.stringify(obj) + '\n';
+    writeFileSync(file,
+      // 局1：A 先手赢；局2：B 先手赢（两局均为先手胜）。
+      line({ map: 'default', players: { player_a: A, player_b: B }, winner: A,
+        scoreBreakdown: { player_a: sb(40, 3, 100), player_b: sb(10, 1, 50) },
+        actionProfile: { player_a: ap(10, 15, 30, 1), player_b: ap(0, 20, 30, 0) },
+        controlPoints: { totalFlips: 2, totalCaptures: 4 } }) +
+      line({ map: 'default', players: { player_a: B, player_b: A }, winner: B,
+        scoreBreakdown: { player_a: sb(20, 2, 80), player_b: sb(20, 2, 60) },
+        actionProfile: { player_a: ap(5, 10, 30, 0), player_b: ap(0, 20, 30, 2) },
+        controlPoints: { totalFlips: 0, totalCaptures: 2 } }));
+    const { registry } = collectRegistry(dir, []);
+    const { matches } = loadMatchDetails(file, registry);
+    const gp = aggregateGameplay(matches);
+
+    // A 两局得分分项均值：(40+20)/2、控制点 (3+2)/2。
+    const mA = gp.perModel.find((m: { id: string }) => m.id === A);
+    expect(mA.scoreBreakdown).toMatchObject({ headquartersDamage: 30, controlPoints: 2.5 });
+    // A 动作画像：attack 10/60、rejected (1+2)/60。
+    expect(mA.actionMix.byType.attack).toBe(0.1667);
+    expect(mA.actionMix.rejectedRate).toBe(0.05);
+    // 每图先手（player_a 座）胜率：两局均为先手胜 → 1.0。
+    expect(gp.perMap[0].firstSeatWinRate).toBe(1);
+    // 控制点易手均值：(2+0)/2。
+    expect(gp.perMap[0].avgControlPointFlips).toBe(1);
+    // 全局 7 分项均值与全局被拒率。
+    expect(gp.overview.scoreBreakdown.headquartersDamage).toBe(22.5); // (40+10+20+20)/4
+    expect(gp.overview.actionMix.rejectedRate).toBe(0.025); // (1+0+0+2)/120
+  });
+
+  it('decisionMsDist 把单局两座合并成每局一个毫秒值分桶', () => {
+    const dir = makeModelsDir([A, B]);
+    const file = join(dir, 'matches.jsonl');
+    const line = (obj: unknown) => JSON.stringify(obj) + '\n';
+    writeFileSync(file,
+      line({ map: 'default', players: { player_a: A, player_b: B }, winner: A,
+        decisionSec: { player_a: 0.9, player_b: 0.1 }, decisionCount: { player_a: 30, player_b: 10 } }));
+    const { registry } = collectRegistry(dir, []);
+    const { matches } = loadMatchDetails(file, registry);
+    const gp = aggregateGameplay(matches);
+    // 单局两座合并：1.0s / 40 次 = 25ms → '20–100ms'。
+    expect(gp.decisionMsDist.find((b: { bucket: string }) => b.bucket === '20–100ms').count).toBe(1);
+    expect(gp.decisionMsDist.find((b: { bucket: string }) => b.bucket === '5–20ms').count).toBe(0);
   });
 });
 
@@ -426,5 +484,76 @@ describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
     expect(payload.source.modeDist.simultaneous).toBe(1);
     const krieg = payload.models.find((m: { id: string }) => m.id === 'algo_kriegspiel@v2');
     expect(krieg.modes).toEqual(['simultaneous']);
+  });
+});
+
+describe('deriveDetailStats：从 detail 派生玩法明细（fallback 口径）', () => {
+  const detail = {
+    final: {
+      scores: {
+        player_a: { headquartersDamage: 12, ownHqHp: 80, total: 999 },
+        player_b: { headquartersDamage: 3, total: 100 },
+      },
+    },
+    actions: [
+      // 逐人模式被拒：尝试先记一条，runner 补偿的 end_turn 带 fallback 标记
+      { seat: 'player_a', round: 1, action: { type: 'move' } },
+      { seat: 'player_a', round: 1, action: { type: 'attack' } },
+      { seat: 'player_a', round: 1, action: { type: 'end_turn' }, fallback: true, failed: true, error: 'boom' },
+      // 同时回合：被拒尝试本身带 failed（没有 fallback 条目）
+      { seat: 'player_b', round: 1, action: { type: 'deploy' }, failed: true },
+      { seat: 'player_b', round: 1, action: { type: 'deploy' }, value: 0.5, entropy: 1 },
+      { seat: 'player_b', round: 1, action: { type: 'end_turn' }, forced: true, value: 1.5, entropy: 3 },
+      // 未知座位忽略
+      { seat: 'player_c', round: 1, action: { type: 'move' } },
+    ],
+    events: [
+      { type: 'control_point_captured', payload: { pointId: 'cp_1', owner: 'player_a', previousOwner: null } },
+      { type: 'control_point_captured', payload: { pointId: 'cp_1', owner: 'player_b', previousOwner: 'player_a' } },
+      { type: 'unit_moved', payload: { unitId: 'u1' } },
+    ],
+  };
+
+  it('scoreBreakdown 去掉 total（scores 已存总分）', () => {
+    const derived = deriveDetailStats(detail);
+    expect(derived.scoreBreakdown.player_a).toEqual({ headquartersDamage: 12, ownHqHp: 80 });
+    expect(derived.scoreBreakdown.player_b).toEqual({ headquartersDamage: 3 });
+  });
+
+  it('兜底 end_turn 不计入动作次数，只让 rejected 加一（被拒率分母不被稀释）', () => {
+    const a = deriveDetailStats(detail).actionProfile.player_a;
+    expect(a.total).toBe(2); // move + attack；fallback 的 end_turn 不算
+    expect(a.byType).toEqual({ move: 1, attack: 1 });
+    expect(a.rejected).toBe(1);
+    expect(a.forcedEndTurn).toBeUndefined();
+  });
+
+  it('同时回合的被拒尝试计入次数，强制结束与 policy 样本各自汇总', () => {
+    const derived = deriveDetailStats(detail);
+    const b = derived.actionProfile.player_b;
+    expect(b.total).toBe(3); // 被拒的 deploy + 成功的 deploy + 强制 end_turn
+    expect(b.byType).toEqual({ deploy: 2, end_turn: 1 });
+    expect(b.rejected).toBe(1);
+    expect(b.forcedEndTurn).toBe(1);
+    // player_a 全程没有 value/entropy → 该座为 null；player_b 两样本的均值/标准差。
+    expect(derived.policyStats.player_a).toBeNull();
+    expect(derived.policyStats.player_b).toEqual({
+      samples: 2, valueMean: 1, valueStd: 0.5, entropyMean: 2, entropyStd: 1,
+    });
+  });
+
+  it('控制点只统计占领总数与换手次数，逐点序列不进摘要', () => {
+    expect(deriveDetailStats(detail).controlPoints).toEqual({ totalFlips: 1, totalCaptures: 2 });
+  });
+
+  it('detail 缺字段时返回空结构而不是抛错', () => {
+    const derived = deriveDetailStats({});
+    expect(derived.scoreBreakdown).toEqual({ player_a: {}, player_b: {} });
+    expect(derived.actionProfile).toEqual({
+      player_a: { byType: {}, total: 0 },
+      player_b: { byType: {}, total: 0 },
+    });
+    expect(derived.controlPoints).toEqual({ totalFlips: 0, totalCaptures: 0 });
+    expect(derived.policyStats).toBeNull();
   });
 });

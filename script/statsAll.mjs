@@ -17,6 +17,7 @@ const steps = [
   ['script/generateFunStats.mjs', '--matches-file', matchesFile],
   ['script/generateArenaLeaderboard.mjs'],
   ['script/generateArenaStats.mjs'],
+  ['script/generateArenaMapFingerprint.mjs'],
 ];
 
 for (const [script, ...args] of steps) {

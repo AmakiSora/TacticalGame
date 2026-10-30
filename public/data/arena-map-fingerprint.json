@@ -1,0 +1,2201 @@
+{
+  "generatedAt": "2026-10-30T03:15:44.929Z",
+  "note": "random 图为每局一张对称随机地图，无静态文件；其先手胜率来自竞技场统计而非本文件。",
+  "maps": [
+    {
+      "id": "artillery-zone",
+      "name": "炮火禁区",
+      "mode": "annihilation",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 6,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          6,
+          0
+        ],
+        "player_b": [
+          -6,
+          0
+        ]
+      },
+      "hqDistance": 12,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        }
+      },
+      "controlPointCount": 12,
+      "controlPointKinds": {
+        "forward_base": 6,
+        "supply": 6
+      },
+      "controlPoints": [
+        {
+          "id": "cp_east",
+          "kind": "forward_base",
+          "q": 4,
+          "r": 0,
+          "distToA": 2,
+          "distToB": 10,
+          "bias": 8
+        },
+        {
+          "id": "cp_northeast",
+          "kind": "forward_base",
+          "q": 4,
+          "r": -4,
+          "distToA": 6,
+          "distToB": 10,
+          "bias": 4
+        },
+        {
+          "id": "cp_northwest",
+          "kind": "forward_base",
+          "q": 0,
+          "r": -4,
+          "distToA": 10,
+          "distToB": 6,
+          "bias": -4
+        },
+        {
+          "id": "cp_west",
+          "kind": "forward_base",
+          "q": -4,
+          "r": 0,
+          "distToA": 10,
+          "distToB": 2,
+          "bias": -8
+        },
+        {
+          "id": "cp_southwest",
+          "kind": "forward_base",
+          "q": -4,
+          "r": 4,
+          "distToA": 10,
+          "distToB": 6,
+          "bias": -4
+        },
+        {
+          "id": "cp_southeast",
+          "kind": "forward_base",
+          "q": 0,
+          "r": 4,
+          "distToA": 6,
+          "distToB": 10,
+          "bias": 4
+        },
+        {
+          "id": "supply_east",
+          "kind": "supply",
+          "q": 3,
+          "r": 0,
+          "distToA": 3,
+          "distToB": 9,
+          "bias": 6
+        },
+        {
+          "id": "supply_northeast",
+          "kind": "supply",
+          "q": 3,
+          "r": -3,
+          "distToA": 6,
+          "distToB": 9,
+          "bias": 3
+        },
+        {
+          "id": "supply_northwest",
+          "kind": "supply",
+          "q": 0,
+          "r": -3,
+          "distToA": 9,
+          "distToB": 6,
+          "bias": -3
+        },
+        {
+          "id": "supply_west",
+          "kind": "supply",
+          "q": -3,
+          "r": 0,
+          "distToA": 9,
+          "distToB": 3,
+          "bias": -6
+        },
+        {
+          "id": "supply_southwest",
+          "kind": "supply",
+          "q": -3,
+          "r": 3,
+          "distToA": 9,
+          "distToB": 6,
+          "bias": -3
+        },
+        {
+          "id": "supply_southeast",
+          "kind": "supply",
+          "q": 0,
+          "r": 3,
+          "distToA": 6,
+          "distToB": 9,
+          "bias": 3
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 2,
+          "controlPointsUnmatched": 4,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [],
+      "balance": {
+        "startingSupplies": 45,
+        "baseIncome": 8,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 4,
+        "maxTurns": 20,
+        "adjudicationWeights": {
+          "enemyHqDamage": 0,
+          "ownHqHp": 0,
+          "controlPoint": 0,
+          "armyValue": 2,
+          "supplies": 0,
+          "killValue": 0.5
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 4,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "trench-run",
+      "name": "战壕",
+      "mode": "annihilation",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 8,
+      "playableCellCount": 83,
+      "hq": {
+        "player_a": [
+          -7,
+          3
+        ],
+        "player_b": [
+          7,
+          -3
+        ]
+      },
+      "hqDistance": 14,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        }
+      },
+      "controlPointCount": 8,
+      "controlPointKinds": {
+        "forward_base": 2,
+        "supply": 4,
+        "repair": 2
+      },
+      "controlPoints": [
+        {
+          "id": "fb_w",
+          "kind": "forward_base",
+          "q": -7,
+          "r": 4,
+          "distToA": 1,
+          "distToB": 14,
+          "bias": 13
+        },
+        {
+          "id": "fb_e",
+          "kind": "forward_base",
+          "q": 7,
+          "r": -4,
+          "distToA": 14,
+          "distToB": 1,
+          "bias": -13
+        },
+        {
+          "id": "sup_a0",
+          "kind": "supply",
+          "q": -4,
+          "r": 3,
+          "distToA": 3,
+          "distToB": 11,
+          "bias": 8
+        },
+        {
+          "id": "sup_a1",
+          "kind": "supply",
+          "q": 4,
+          "r": -3,
+          "distToA": 11,
+          "distToB": 3,
+          "bias": -8
+        },
+        {
+          "id": "sup_c0",
+          "kind": "supply",
+          "q": -3,
+          "r": 2,
+          "distToA": 4,
+          "distToB": 10,
+          "bias": 6
+        },
+        {
+          "id": "sup_c1",
+          "kind": "supply",
+          "q": 3,
+          "r": -2,
+          "distToA": 10,
+          "distToB": 4,
+          "bias": -6
+        },
+        {
+          "id": "rep_w",
+          "kind": "repair",
+          "q": -6,
+          "r": 4,
+          "distToA": 2,
+          "distToB": 13,
+          "bias": 11
+        },
+        {
+          "id": "rep_e",
+          "kind": "repair",
+          "q": 6,
+          "r": -4,
+          "distToA": 13,
+          "distToB": 2,
+          "bias": -11
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": false,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 3,
+          "controlPointsUnmatched": 8,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 4,
+          "share": 0.05
+        },
+        {
+          "kind": "blocker",
+          "count": 4,
+          "share": 0.05
+        }
+      ],
+      "balance": {
+        "startingSupplies": 45,
+        "baseIncome": 8,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 4,
+        "attacksPerUnit": 1,
+        "maxTurns": 22,
+        "adjudicationWeights": {
+          "enemyHqDamage": 0,
+          "ownHqHp": 0,
+          "controlPoint": 0,
+          "armyValue": 2,
+          "supplies": 0,
+          "killValue": 0.5
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 4,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "narrow-road",
+      "name": "狭路相逢",
+      "mode": "royale",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 6,
+      "playableCellCount": 59,
+      "hq": {
+        "player_a": [
+          -6,
+          0
+        ],
+        "player_b": [
+          6,
+          0
+        ]
+      },
+      "hqDistance": 12,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": null,
+          "toNearestControlPoint": null
+        },
+        "player_b": {
+          "toHq": null,
+          "toNearestControlPoint": null
+        }
+      },
+      "controlPointCount": 2,
+      "controlPointKinds": {
+        "forward_base": 2
+      },
+      "controlPoints": [
+        {
+          "id": "cp_1",
+          "kind": "forward_base",
+          "q": -5,
+          "r": 0,
+          "distToA": 1,
+          "distToB": 11,
+          "bias": 10
+        },
+        {
+          "id": "cp_2",
+          "kind": "forward_base",
+          "q": 5,
+          "r": 0,
+          "distToA": 11,
+          "distToB": 1,
+          "bias": -10
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": null,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": null,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": null,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": null,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "blocker",
+          "count": 38,
+          "share": 0.64
+        }
+      ],
+      "balance": {
+        "startingSupplies": 20,
+        "baseIncome": 5,
+        "damageVarianceRange": 0,
+        "minimumDamage": 1,
+        "healVarianceRange": 0,
+        "actionsPerTurn": 5,
+        "maxTurns": null,
+        "adjudicationWeights": {
+          "enemyHqDamage": 4,
+          "ownHqHp": 2,
+          "controlPoint": 0,
+          "armyValue": 1,
+          "supplies": 0,
+          "killValue": 1
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "snowflake",
+      "name": "雪花",
+      "mode": "royale",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 9,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          9,
+          0
+        ],
+        "player_b": [
+          -9,
+          0
+        ]
+      },
+      "hqDistance": 18,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        }
+      },
+      "controlPointCount": 6,
+      "controlPointKinds": {
+        "forward_base": 6
+      },
+      "controlPoints": [
+        {
+          "id": "cp_1",
+          "kind": "forward_base",
+          "q": 0,
+          "r": 8,
+          "distToA": 9,
+          "distToB": 17,
+          "bias": 8
+        },
+        {
+          "id": "cp_2",
+          "kind": "forward_base",
+          "q": -8,
+          "r": 8,
+          "distToA": 17,
+          "distToB": 9,
+          "bias": -8
+        },
+        {
+          "id": "cp_3",
+          "kind": "forward_base",
+          "q": -8,
+          "r": 0,
+          "distToA": 17,
+          "distToB": 1,
+          "bias": -16
+        },
+        {
+          "id": "cp_4",
+          "kind": "forward_base",
+          "q": 0,
+          "r": -8,
+          "distToA": 17,
+          "distToB": 9,
+          "bias": -8
+        },
+        {
+          "id": "cp_5",
+          "kind": "forward_base",
+          "q": 8,
+          "r": -8,
+          "distToA": 9,
+          "distToB": 17,
+          "bias": 8
+        },
+        {
+          "id": "cp_6",
+          "kind": "forward_base",
+          "q": 8,
+          "r": 0,
+          "distToA": 1,
+          "distToB": 17,
+          "bias": 16
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 2,
+          "controlPointsUnmatched": 2,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 12,
+          "share": 0.04
+        },
+        {
+          "kind": "blocker",
+          "count": 103,
+          "share": 0.38
+        }
+      ],
+      "balance": {
+        "startingSupplies": 500,
+        "baseIncome": 20,
+        "damageVarianceRange": 2,
+        "minimumDamage": 1,
+        "healVarianceRange": 10,
+        "actionsPerTurn": 8,
+        "maxTurns": null,
+        "adjudicationWeights": {
+          "enemyHqDamage": 0,
+          "ownHqHp": 0,
+          "controlPoint": 0,
+          "armyValue": 5,
+          "supplies": 0,
+          "killValue": 1.5
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 12,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 20,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "mistpine",
+      "name": "雾杉疏林",
+      "mode": "simultaneous",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 9,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          -9,
+          0
+        ],
+        "player_b": [
+          9,
+          0
+        ]
+      },
+      "hqDistance": 18,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": null
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": null
+        }
+      },
+      "controlPointCount": 0,
+      "controlPointKinds": {},
+      "controlPoints": [],
+      "totalControlPointBias": null,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": null,
+          "spawnsUnmatched": 20,
+          "controlPointsUnmatched": null,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": null,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": null,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 5,
+          "share": 0.02
+        },
+        {
+          "kind": "blocker",
+          "count": 40,
+          "share": 0.15
+        }
+      ],
+      "balance": {
+        "startingSupplies": 0,
+        "baseIncome": 0,
+        "damageVarianceRange": 5,
+        "minimumDamage": 1,
+        "healVarianceRange": 3,
+        "actionsPerTurn": 12,
+        "attacksPerUnit": 1,
+        "maxTurns": 30,
+        "adjudicationWeights": {
+          "enemyHqDamage": 10,
+          "ownHqHp": 3,
+          "controlPoint": 0,
+          "armyValue": 3,
+          "supplies": 0,
+          "killValue": 2
+        },
+        "deployFromHq": false,
+        "controlPointTypes": {
+          "supply": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0,
+            "canDeploy": false
+          },
+          "forward_base": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0,
+            "canDeploy": false
+          },
+          "repair": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0,
+            "canDeploy": false
+          }
+        }
+      }
+    },
+    {
+      "id": "molten-throne",
+      "name": "熔池王座",
+      "mode": "simultaneous",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 6,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          -5,
+          5
+        ],
+        "player_b": [
+          5,
+          -5
+        ]
+      },
+      "hqDistance": 10,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 2
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 2
+        }
+      },
+      "controlPointCount": 24,
+      "controlPointKinds": {
+        "supply": 16,
+        "forward_base": 4,
+        "repair": 4
+      },
+      "controlPoints": [
+        {
+          "id": "cp_6",
+          "kind": "supply",
+          "q": 0,
+          "r": -1,
+          "distToA": 6,
+          "distToB": 5,
+          "bias": -1
+        },
+        {
+          "id": "cp_7",
+          "kind": "forward_base",
+          "q": 1,
+          "r": -1,
+          "distToA": 6,
+          "distToB": 4,
+          "bias": -2
+        },
+        {
+          "id": "cp_8",
+          "kind": "supply",
+          "q": 1,
+          "r": 0,
+          "distToA": 6,
+          "distToB": 5,
+          "bias": -1
+        },
+        {
+          "id": "cp_9",
+          "kind": "supply",
+          "q": 0,
+          "r": 1,
+          "distToA": 5,
+          "distToB": 6,
+          "bias": 1
+        },
+        {
+          "id": "cp_10",
+          "kind": "forward_base",
+          "q": -1,
+          "r": 1,
+          "distToA": 4,
+          "distToB": 6,
+          "bias": 2
+        },
+        {
+          "id": "cp_11",
+          "kind": "supply",
+          "q": -1,
+          "r": 0,
+          "distToA": 5,
+          "distToB": 6,
+          "bias": 1
+        },
+        {
+          "id": "cp_12",
+          "kind": "supply",
+          "q": -2,
+          "r": 1,
+          "distToA": 4,
+          "distToB": 7,
+          "bias": 3
+        },
+        {
+          "id": "cp_13",
+          "kind": "supply",
+          "q": -2,
+          "r": 0,
+          "distToA": 5,
+          "distToB": 7,
+          "bias": 2
+        },
+        {
+          "id": "cp_14",
+          "kind": "supply",
+          "q": -1,
+          "r": -1,
+          "distToA": 6,
+          "distToB": 6,
+          "bias": 0
+        },
+        {
+          "id": "cp_15",
+          "kind": "supply",
+          "q": 0,
+          "r": -2,
+          "distToA": 7,
+          "distToB": 5,
+          "bias": -2
+        },
+        {
+          "id": "cp_16",
+          "kind": "supply",
+          "q": 1,
+          "r": -2,
+          "distToA": 7,
+          "distToB": 4,
+          "bias": -3
+        },
+        {
+          "id": "cp_17",
+          "kind": "supply",
+          "q": 2,
+          "r": -2,
+          "distToA": 7,
+          "distToB": 3,
+          "bias": -4
+        },
+        {
+          "id": "cp_18",
+          "kind": "supply",
+          "q": 2,
+          "r": -1,
+          "distToA": 7,
+          "distToB": 4,
+          "bias": -3
+        },
+        {
+          "id": "cp_19",
+          "kind": "supply",
+          "q": 2,
+          "r": 0,
+          "distToA": 7,
+          "distToB": 5,
+          "bias": -2
+        },
+        {
+          "id": "cp_20",
+          "kind": "supply",
+          "q": 1,
+          "r": 1,
+          "distToA": 6,
+          "distToB": 6,
+          "bias": 0
+        },
+        {
+          "id": "cp_21",
+          "kind": "supply",
+          "q": 0,
+          "r": 2,
+          "distToA": 5,
+          "distToB": 7,
+          "bias": 2
+        },
+        {
+          "id": "cp_22",
+          "kind": "supply",
+          "q": -1,
+          "r": 2,
+          "distToA": 4,
+          "distToB": 7,
+          "bias": 3
+        },
+        {
+          "id": "cp_23",
+          "kind": "supply",
+          "q": -2,
+          "r": 2,
+          "distToA": 3,
+          "distToB": 7,
+          "bias": 4
+        },
+        {
+          "id": "cp_24",
+          "kind": "repair",
+          "q": -1,
+          "r": -2,
+          "distToA": 7,
+          "distToB": 6,
+          "bias": -1
+        },
+        {
+          "id": "cp_25",
+          "kind": "repair",
+          "q": -2,
+          "r": -1,
+          "distToA": 6,
+          "distToB": 7,
+          "bias": 1
+        },
+        {
+          "id": "cp_26",
+          "kind": "repair",
+          "q": 2,
+          "r": 1,
+          "distToA": 7,
+          "distToB": 6,
+          "bias": -1
+        },
+        {
+          "id": "cp_27",
+          "kind": "repair",
+          "q": 1,
+          "r": 2,
+          "distToA": 6,
+          "distToB": 7,
+          "bias": 1
+        },
+        {
+          "id": "cp_28",
+          "kind": "forward_base",
+          "q": -2,
+          "r": -2,
+          "distToA": 7,
+          "distToB": 7,
+          "bias": 0
+        },
+        {
+          "id": "cp_29",
+          "kind": "forward_base",
+          "q": 2,
+          "r": 2,
+          "distToA": 7,
+          "distToB": 7,
+          "bias": 0
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": false,
+          "spawnsMatched": false,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 6,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 3,
+          "share": 0.02
+        },
+        {
+          "kind": "blocker",
+          "count": 12,
+          "share": 0.09
+        }
+      ],
+      "balance": {
+        "startingSupplies": 30,
+        "baseIncome": 5,
+        "damageVarianceRange": 5,
+        "minimumDamage": 1,
+        "healVarianceRange": 10,
+        "actionsPerTurn": 4,
+        "maxTurns": 20,
+        "adjudicationWeights": {
+          "enemyHqDamage": 7,
+          "ownHqHp": 2,
+          "controlPoint": 75,
+          "armyValue": 2,
+          "supplies": 0,
+          "killValue": 0.5
+        },
+        "deployFromHq": false,
+        "comebackSupply": {
+          "startRound": 4,
+          "scoreGapPercent": 15,
+          "amountPerRound": 12
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 1,
+            "deployDiscount": 0,
+            "repairAmount": 0,
+            "canDeploy": false
+          },
+          "forward_base": {
+            "income": 4,
+            "deployDiscount": 9,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 1,
+            "deployDiscount": 0,
+            "repairAmount": 5,
+            "canDeploy": false
+          }
+        }
+      }
+    },
+    {
+      "id": "standoff",
+      "name": "对峙之地",
+      "mode": "simultaneous",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 5,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          5,
+          0
+        ],
+        "player_b": [
+          -5,
+          0
+        ]
+      },
+      "hqDistance": 10,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        }
+      },
+      "controlPointCount": 7,
+      "controlPointKinds": {
+        "supply": 6,
+        "repair": 1
+      },
+      "controlPoints": [
+        {
+          "id": "cp_1",
+          "kind": "supply",
+          "q": 3,
+          "r": 0,
+          "distToA": 2,
+          "distToB": 8,
+          "bias": 6
+        },
+        {
+          "id": "cp_2",
+          "kind": "supply",
+          "q": 0,
+          "r": 3,
+          "distToA": 5,
+          "distToB": 8,
+          "bias": 3
+        },
+        {
+          "id": "cp_3",
+          "kind": "supply",
+          "q": -3,
+          "r": 3,
+          "distToA": 8,
+          "distToB": 5,
+          "bias": -3
+        },
+        {
+          "id": "cp_4",
+          "kind": "supply",
+          "q": -3,
+          "r": 0,
+          "distToA": 8,
+          "distToB": 2,
+          "bias": -6
+        },
+        {
+          "id": "cp_5",
+          "kind": "supply",
+          "q": 0,
+          "r": -3,
+          "distToA": 8,
+          "distToB": 5,
+          "bias": -3
+        },
+        {
+          "id": "cp_6",
+          "kind": "supply",
+          "q": 3,
+          "r": -3,
+          "distToA": 5,
+          "distToB": 8,
+          "bias": 3
+        },
+        {
+          "id": "cp_center",
+          "kind": "repair",
+          "q": 0,
+          "r": 0,
+          "distToA": 5,
+          "distToB": 5,
+          "bias": 0
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 2,
+          "controlPointsUnmatched": 2,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "blocker",
+          "count": 12,
+          "share": 0.13
+        }
+      ],
+      "balance": {
+        "startingSupplies": 120,
+        "baseIncome": 8,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 5,
+        "maxTurns": 15,
+        "adjudicationWeights": {
+          "enemyHqDamage": 5,
+          "ownHqHp": 1,
+          "controlPoint": 60,
+          "armyValue": 0.35,
+          "supplies": 0,
+          "killValue": 0.15
+        },
+        "comebackSupply": {
+          "startRound": 4,
+          "scoreGapPercent": 40,
+          "amountPerRound": 12
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 6,
+            "deployDiscount": 8,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 6,
+            "deployDiscount": 0,
+            "repairAmount": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "breach",
+      "name": "破障行动",
+      "mode": "standard",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 8,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          -8,
+          0
+        ],
+        "player_b": [
+          8,
+          0
+        ]
+      },
+      "hqDistance": 16,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 2,
+          "toNearestControlPoint": 2
+        },
+        "player_b": {
+          "toHq": 2,
+          "toNearestControlPoint": 2
+        }
+      },
+      "controlPointCount": 6,
+      "controlPointKinds": {
+        "supply": 2,
+        "repair": 2,
+        "forward_base": 2
+      },
+      "controlPoints": [
+        {
+          "id": "cp_nw",
+          "kind": "supply",
+          "q": -4,
+          "r": -3,
+          "distToA": 4,
+          "distToB": 15,
+          "bias": 11
+        },
+        {
+          "id": "cp_se",
+          "kind": "supply",
+          "q": 4,
+          "r": 3,
+          "distToA": 15,
+          "distToB": 4,
+          "bias": -11
+        },
+        {
+          "id": "cp_w",
+          "kind": "repair",
+          "q": -3,
+          "r": 0,
+          "distToA": 5,
+          "distToB": 11,
+          "bias": 6
+        },
+        {
+          "id": "cp_e",
+          "kind": "repair",
+          "q": 3,
+          "r": 0,
+          "distToA": 11,
+          "distToB": 5,
+          "bias": -6
+        },
+        {
+          "id": "cp_sw",
+          "kind": "forward_base",
+          "q": -4,
+          "r": 3,
+          "distToA": 7,
+          "distToB": 12,
+          "bias": 5
+        },
+        {
+          "id": "cp_ne",
+          "kind": "forward_base",
+          "q": 4,
+          "r": -3,
+          "distToA": 12,
+          "distToB": 7,
+          "bias": -5
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 2,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 12,
+          "share": 0.06
+        },
+        {
+          "kind": "blocker",
+          "count": 27,
+          "share": 0.12
+        }
+      ],
+      "balance": {
+        "startingSupplies": 50,
+        "baseIncome": 10,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 5,
+        "maxTurns": 15,
+        "adjudicationWeights": {
+          "enemyHqDamage": 5,
+          "ownHqHp": 2,
+          "controlPoint": 90,
+          "armyValue": 2,
+          "supplies": 0,
+          "killValue": 0.5
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 20,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 8,
+            "deployDiscount": 8,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "danger-close",
+      "name": "危险距离",
+      "mode": "standard",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 5,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          -2,
+          0
+        ],
+        "player_b": [
+          2,
+          0
+        ]
+      },
+      "hqDistance": 4,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 4,
+          "toNearestControlPoint": 4
+        },
+        "player_b": {
+          "toHq": 4,
+          "toNearestControlPoint": 4
+        }
+      },
+      "controlPointCount": 2,
+      "controlPointKinds": {
+        "supply": 2
+      },
+      "controlPoints": [
+        {
+          "id": "cp_1",
+          "kind": "supply",
+          "q": -3,
+          "r": 0,
+          "distToA": 1,
+          "distToB": 5,
+          "bias": 4
+        },
+        {
+          "id": "cp_2",
+          "kind": "supply",
+          "q": 3,
+          "r": 0,
+          "distToA": 5,
+          "distToB": 1,
+          "bias": -4
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 2,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "blocker",
+          "count": 16,
+          "share": 0.18
+        }
+      ],
+      "balance": {
+        "startingSupplies": 20,
+        "baseIncome": 6,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 1,
+        "maxTurns": 30,
+        "adjudicationWeights": {
+          "enemyHqDamage": 20,
+          "ownHqHp": 1,
+          "controlPoint": 30,
+          "armyValue": 1,
+          "supplies": 0,
+          "killValue": 0.25
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "default",
+      "name": "六角前线",
+      "mode": "standard",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 8,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          -8,
+          0
+        ],
+        "player_b": [
+          8,
+          0
+        ]
+      },
+      "hqDistance": 16,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 3
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 3
+        }
+      },
+      "controlPointCount": 5,
+      "controlPointKinds": {
+        "supply": 5
+      },
+      "controlPoints": [
+        {
+          "id": "cp_a",
+          "kind": "supply",
+          "q": -4,
+          "r": 0,
+          "distToA": 4,
+          "distToB": 12,
+          "bias": 8
+        },
+        {
+          "id": "cp_n",
+          "kind": "supply",
+          "q": 0,
+          "r": -4,
+          "distToA": 8,
+          "distToB": 12,
+          "bias": 4
+        },
+        {
+          "id": "cp_c",
+          "kind": "supply",
+          "q": 0,
+          "r": 0,
+          "distToA": 8,
+          "distToB": 8,
+          "bias": 0
+        },
+        {
+          "id": "cp_s",
+          "kind": "supply",
+          "q": 0,
+          "r": 4,
+          "distToA": 12,
+          "distToB": 8,
+          "bias": -4
+        },
+        {
+          "id": "cp_b",
+          "kind": "supply",
+          "q": 4,
+          "r": 0,
+          "distToA": 12,
+          "distToB": 4,
+          "bias": -8
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 6,
+          "share": 0.03
+        },
+        {
+          "kind": "blocker",
+          "count": 4,
+          "share": 0.02
+        }
+      ],
+      "balance": {
+        "startingSupplies": 80,
+        "baseIncome": 10,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 5,
+        "maxTurns": 15,
+        "adjudicationWeights": {
+          "enemyHqDamage": 5,
+          "ownHqHp": 2,
+          "controlPoint": 90,
+          "armyValue": 2,
+          "supplies": 0,
+          "killValue": 0.5
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 12,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 8,
+            "deployDiscount": 8,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "dual-lanes",
+      "name": "双线抉择",
+      "mode": "standard",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 8,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          -7,
+          0
+        ],
+        "player_b": [
+          7,
+          0
+        ]
+      },
+      "hqDistance": 14,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": null,
+          "toNearestControlPoint": null
+        },
+        "player_b": {
+          "toHq": null,
+          "toNearestControlPoint": null
+        }
+      },
+      "controlPointCount": 6,
+      "controlPointKinds": {
+        "supply": 2,
+        "repair": 2,
+        "forward_base": 2
+      },
+      "controlPoints": [
+        {
+          "id": "cp_nw",
+          "kind": "supply",
+          "q": -2,
+          "r": -4,
+          "distToA": 5,
+          "distToB": 13,
+          "bias": 8
+        },
+        {
+          "id": "cp_nc",
+          "kind": "repair",
+          "q": 2,
+          "r": -4,
+          "distToA": 9,
+          "distToB": 9,
+          "bias": 0
+        },
+        {
+          "id": "cp_ne",
+          "kind": "supply",
+          "q": 6,
+          "r": -4,
+          "distToA": 13,
+          "distToB": 5,
+          "bias": -8
+        },
+        {
+          "id": "cp_sw",
+          "kind": "forward_base",
+          "q": -6,
+          "r": 4,
+          "distToA": 5,
+          "distToB": 13,
+          "bias": 8
+        },
+        {
+          "id": "cp_sc",
+          "kind": "repair",
+          "q": -2,
+          "r": 4,
+          "distToA": 9,
+          "distToB": 9,
+          "bias": 0
+        },
+        {
+          "id": "cp_se",
+          "kind": "forward_base",
+          "q": 2,
+          "r": 4,
+          "distToA": 13,
+          "distToB": 5,
+          "bias": -8
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": null,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": null,
+          "controlPointsUnmatched": 2,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": null,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": null,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 8,
+          "share": 0.04
+        },
+        {
+          "kind": "blocker",
+          "count": 5,
+          "share": 0.02
+        }
+      ],
+      "balance": {
+        "startingSupplies": 208,
+        "baseIncome": 10,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 5,
+        "maxTurns": 15,
+        "adjudicationWeights": {
+          "enemyHqDamage": 4,
+          "ownHqHp": 2,
+          "controlPoint": 90,
+          "armyValue": 2,
+          "supplies": 0,
+          "killValue": 0.5
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 12,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 8,
+            "deployDiscount": 8,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "multiplayer-ring",
+      "name": "六方环线",
+      "mode": "standard",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 8,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          8,
+          0
+        ],
+        "player_b": [
+          -8,
+          0
+        ]
+      },
+      "hqDistance": 16,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 4
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 4
+        }
+      },
+      "controlPointCount": 7,
+      "controlPointKinds": {
+        "repair": 1,
+        "supply": 3,
+        "forward_base": 3
+      },
+      "controlPoints": [
+        {
+          "id": "cp_center",
+          "kind": "repair",
+          "q": 0,
+          "r": 0,
+          "distToA": 8,
+          "distToB": 8,
+          "bias": 0
+        },
+        {
+          "id": "cp_e",
+          "kind": "supply",
+          "q": 3,
+          "r": 0,
+          "distToA": 5,
+          "distToB": 11,
+          "bias": 6
+        },
+        {
+          "id": "cp_ne",
+          "kind": "forward_base",
+          "q": 3,
+          "r": -3,
+          "distToA": 8,
+          "distToB": 11,
+          "bias": 3
+        },
+        {
+          "id": "cp_nw",
+          "kind": "supply",
+          "q": 0,
+          "r": -3,
+          "distToA": 11,
+          "distToB": 8,
+          "bias": -3
+        },
+        {
+          "id": "cp_w",
+          "kind": "forward_base",
+          "q": -3,
+          "r": 0,
+          "distToA": 11,
+          "distToB": 5,
+          "bias": -6
+        },
+        {
+          "id": "cp_sw",
+          "kind": "supply",
+          "q": -3,
+          "r": 3,
+          "distToA": 11,
+          "distToB": 8,
+          "bias": -3
+        },
+        {
+          "id": "cp_se",
+          "kind": "forward_base",
+          "q": 0,
+          "r": 3,
+          "distToA": 8,
+          "distToB": 11,
+          "bias": 3
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 1,
+          "controlPointsUnmatched": 2,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "blocker",
+          "count": 6,
+          "share": 0.03
+        }
+      ],
+      "balance": {
+        "startingSupplies": 70,
+        "baseIncome": 6,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 7,
+        "maxTurns": 15,
+        "adjudicationWeights": {
+          "enemyHqDamage": 5,
+          "ownHqHp": 1,
+          "controlPoint": 75,
+          "armyValue": 1,
+          "supplies": 0,
+          "killValue": 0.3
+        },
+        "comebackSupply": {
+          "startRound": 3,
+          "scoreGapPercent": 40,
+          "amountPerRound": 20
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 4,
+            "deployDiscount": 4,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 2,
+            "deployDiscount": 0,
+            "repairAmount": 8
+          }
+        }
+      }
+    },
+    {
+      "id": "whirlpool",
+      "name": "星海漩涡",
+      "mode": "standard",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 8,
+      "playableCellCount": 217,
+      "hq": {
+        "player_a": [
+          4,
+          -1
+        ],
+        "player_b": [
+          -4,
+          1
+        ]
+      },
+      "hqDistance": 8,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 2
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 2
+        }
+      },
+      "controlPointCount": 12,
+      "controlPointKinds": {
+        "forward_base": 6,
+        "supply": 6
+      },
+      "controlPoints": [
+        {
+          "id": "port_0",
+          "kind": "forward_base",
+          "q": 7,
+          "r": -4,
+          "distToA": 3,
+          "distToB": 11,
+          "bias": 8
+        },
+        {
+          "id": "port_1",
+          "kind": "forward_base",
+          "q": 4,
+          "r": 3,
+          "distToA": 4,
+          "distToB": 10,
+          "bias": 6
+        },
+        {
+          "id": "port_2",
+          "kind": "forward_base",
+          "q": -3,
+          "r": 7,
+          "distToA": 8,
+          "distToB": 7,
+          "bias": -1
+        },
+        {
+          "id": "port_3",
+          "kind": "forward_base",
+          "q": -7,
+          "r": 4,
+          "distToA": 11,
+          "distToB": 3,
+          "bias": -8
+        },
+        {
+          "id": "port_4",
+          "kind": "forward_base",
+          "q": -4,
+          "r": -3,
+          "distToA": 10,
+          "distToB": 4,
+          "bias": -6
+        },
+        {
+          "id": "port_5",
+          "kind": "forward_base",
+          "q": 3,
+          "r": -7,
+          "distToA": 7,
+          "distToB": 8,
+          "bias": 1
+        },
+        {
+          "id": "cp_18",
+          "kind": "supply",
+          "q": 8,
+          "r": -8,
+          "distToA": 7,
+          "distToB": 12,
+          "bias": 5
+        },
+        {
+          "id": "cp_19",
+          "kind": "supply",
+          "q": 8,
+          "r": 0,
+          "distToA": 5,
+          "distToB": 12,
+          "bias": 7
+        },
+        {
+          "id": "cp_20",
+          "kind": "supply",
+          "q": 0,
+          "r": 8,
+          "distToA": 9,
+          "distToB": 11,
+          "bias": 2
+        },
+        {
+          "id": "cp_21",
+          "kind": "supply",
+          "q": -8,
+          "r": 8,
+          "distToA": 12,
+          "distToB": 7,
+          "bias": -5
+        },
+        {
+          "id": "cp_22",
+          "kind": "supply",
+          "q": -8,
+          "r": 0,
+          "distToA": 12,
+          "distToB": 5,
+          "bias": -7
+        },
+        {
+          "id": "cp_23",
+          "kind": "supply",
+          "q": 0,
+          "r": -8,
+          "distToA": 11,
+          "distToB": 9,
+          "bias": -2
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": false,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 3,
+          "controlPointsUnmatched": 8,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 13,
+          "share": 0.06
+        },
+        {
+          "kind": "blocker",
+          "count": 96,
+          "share": 0.44
+        }
+      ],
+      "balance": {
+        "startingSupplies": 60,
+        "baseIncome": 7,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 4,
+        "maxTurns": null,
+        "adjudicationWeights": {
+          "enemyHqDamage": 5,
+          "ownHqHp": 0.6,
+          "controlPoint": 50,
+          "armyValue": 0.5,
+          "supplies": 0,
+          "killValue": 0.15
+        },
+        "deployFromHq": false,
+        "comebackSupply": {
+          "startRound": 3,
+          "scoreGapPercent": 30,
+          "amountPerRound": 14
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 5,
+            "deployDiscount": 8,
+            "repairAmount": 6
+          },
+          "repair": {
+            "income": 10,
+            "deployDiscount": 0,
+            "repairAmount": 12
+          }
+        }
+      }
+    }
+  ]
+}

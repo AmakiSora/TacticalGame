@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-10-29T06:24:28.491Z",
+  "generatedAt": "2026-10-30T03:24:31.803Z",
   "source": {
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
-    "matchCount": 38641,
+    "matchCount": 38785,
     "retiredMatchesDropped": 0,
     "oldFormatMatchesDropped": 0,
     "mapDist": {
@@ -16,17 +16,19 @@
       "mistpine": 672,
       "artillery-zone": 241,
       "trench-run": 240,
-      "narrow-road": 72,
-      "snowflake": 72
+      "narrow-road": 144,
+      "snowflake": 144
     },
     "modeDist": {
       "standard": 36000,
       "annihilation": 481,
       "simultaneous": 2016,
-      "royale": 144
+      "royale": 288
     },
     "dateMin": "2026-10-21 03:57:34",
-    "dateMax": "2026-10-29 14:24:22"
+    "dateMax": "2026-10-30 04:09:30",
+    "detailDerived": 7200,
+    "detailFilesRead": 300
   },
   "gameplay": {
     "overview": {
@@ -36,7 +38,29 @@
       "annihilationRate": 0.549,
       "avgRounds": 14.91,
       "avgDurationSec": 1.48,
-      "avgActions": 176
+      "avgActions": 176,
+      "scoreBreakdown": {
+        "headquartersDamage": 70.92,
+        "ownHqHp": 89.41,
+        "controlPoints": 1.96,
+        "controlHold": 1.7,
+        "armyValue": 267.74,
+        "supplies": 38.66,
+        "killValue": 185.2
+      },
+      "actionMix": {
+        "byType": {
+          "deploy": 0.1075,
+          "move": 0.3951,
+          "end_turn": 0.1566,
+          "attack": 0.3378,
+          "heal": 0.0023,
+          "demolish": 0.0007
+        },
+        "rejectedRate": 0,
+        "forcedEndTurnRate": 0
+      },
+      "avgControlPointFlips": 10.75
     },
     "endReasons": [
       {
@@ -114,6 +138,38 @@
         "pct": 0.0008
       }
     ],
+    "decisionMsDist": [
+      {
+        "bucket": "<1ms",
+        "count": 0,
+        "pct": null
+      },
+      {
+        "bucket": "1–5ms",
+        "count": 0,
+        "pct": null
+      },
+      {
+        "bucket": "5–20ms",
+        "count": 0,
+        "pct": null
+      },
+      {
+        "bucket": "20–100ms",
+        "count": 0,
+        "pct": null
+      },
+      {
+        "bucket": "100ms–1s",
+        "count": 0,
+        "pct": null
+      },
+      {
+        "bucket": "≥1s",
+        "count": 0,
+        "pct": null
+      }
+    ],
     "units": [
       {
         "type": "infantry",
@@ -179,6 +235,29 @@
         "avgIncome": 363,
         "avgFirstCaptureRound": 1.54,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 83.78,
+          "ownHqHp": 71.17,
+          "controlPoints": 1.93,
+          "controlHold": 1.68,
+          "armyValue": 290.49,
+          "supplies": 29.58,
+          "killValue": 140.66
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.116,
+            "move": 0.4153,
+            "end_turn": 0.1571,
+            "attack": 0.2975,
+            "heal": 0.0136,
+            "demolish": 0.0004
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "scout",
@@ -211,6 +290,29 @@
         "avgIncome": 337,
         "avgFirstCaptureRound": 1.55,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 97.16,
+          "ownHqHp": 63.59,
+          "controlPoints": 2.01,
+          "controlHold": 1.73,
+          "armyValue": 256.74,
+          "supplies": 50.68,
+          "killValue": 127.32
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1084,
+            "move": 0.3752,
+            "attack": 0.3607,
+            "end_turn": 0.1516,
+            "heal": 0.0034,
+            "demolish": 0.0007
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "scout",
@@ -243,6 +345,29 @@
         "avgIncome": 380,
         "avgFirstCaptureRound": 1.52,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 93.88,
+          "ownHqHp": 69.6,
+          "controlPoints": 1.92,
+          "controlHold": 1.69,
+          "armyValue": 297.39,
+          "supplies": 29.9,
+          "killValue": 121.33
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.12,
+            "move": 0.3803,
+            "end_turn": 0.1595,
+            "attack": 0.3363,
+            "heal": 0.0031,
+            "demolish": 0.0007
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "scout",
@@ -275,6 +400,29 @@
         "avgIncome": 144,
         "avgFirstCaptureRound": 6.28,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 74.62,
+          "ownHqHp": 85.78,
+          "controlPoints": 1.88,
+          "controlHold": 1.46,
+          "armyValue": 331.33,
+          "supplies": 38.35,
+          "killValue": 44.65
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1288,
+            "end_turn": 0.1799,
+            "move": 0.466,
+            "attack": 0.2225,
+            "heal": 0.0019,
+            "demolish": 0.001
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "scout",
@@ -307,6 +455,29 @@
         "avgIncome": 381,
         "avgFirstCaptureRound": 1.54,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 85.14,
+          "ownHqHp": 74.82,
+          "controlPoints": 2,
+          "controlHold": 1.74,
+          "armyValue": 300.51,
+          "supplies": 31.12,
+          "killValue": 133.08
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1186,
+            "end_turn": 0.1588,
+            "move": 0.3964,
+            "attack": 0.3129,
+            "heal": 0.0127,
+            "demolish": 0.0006
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "scout",
@@ -339,6 +510,29 @@
         "avgIncome": 157,
         "avgFirstCaptureRound": 2.78,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 98.02,
+          "ownHqHp": 59.38,
+          "controlPoints": 1.83,
+          "controlHold": 1.35,
+          "armyValue": 280.11,
+          "supplies": 39.6,
+          "killValue": 37.97
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1387,
+            "end_turn": 0.1767,
+            "move": 0.3964,
+            "attack": 0.2865,
+            "heal": 0.0013,
+            "demolish": 0.0005
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "scout",
@@ -371,6 +565,29 @@
         "avgIncome": 443,
         "avgFirstCaptureRound": 1.8,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 55.97,
+          "ownHqHp": 107.17,
+          "controlPoints": 2.02,
+          "controlHold": 1.77,
+          "armyValue": 293.41,
+          "supplies": 33.51,
+          "killValue": 212.76
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1187,
+            "move": 0.35,
+            "end_turn": 0.1663,
+            "attack": 0.3637,
+            "heal": 0.0008,
+            "demolish": 0.0006
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -399,6 +616,29 @@
         "avgIncome": 393,
         "avgFirstCaptureRound": 1.74,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 64.33,
+          "ownHqHp": 104.19,
+          "controlPoints": 1.98,
+          "controlHold": 1.77,
+          "armyValue": 271.23,
+          "supplies": 28.9,
+          "killValue": 213.87
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1078,
+            "move": 0.3838,
+            "end_turn": 0.1531,
+            "attack": 0.353,
+            "heal": 0.0011,
+            "demolish": 0.0011
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -427,6 +667,29 @@
         "avgIncome": 401,
         "avgFirstCaptureRound": 1.72,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 61.1,
+          "ownHqHp": 94.64,
+          "controlPoints": 1.89,
+          "controlHold": 1.65,
+          "armyValue": 279.06,
+          "supplies": 33.27,
+          "killValue": 210.56
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1095,
+            "end_turn": 0.1603,
+            "move": 0.3838,
+            "attack": 0.3446,
+            "heal": 0.001,
+            "demolish": 0.0008
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -459,6 +722,29 @@
         "avgIncome": 424,
         "avgFirstCaptureRound": 1.71,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 60.97,
+          "ownHqHp": 98.88,
+          "controlPoints": 1.92,
+          "controlHold": 1.7,
+          "armyValue": 273.39,
+          "supplies": 35.44,
+          "killValue": 216.31
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1057,
+            "end_turn": 0.1562,
+            "move": 0.3951,
+            "attack": 0.3407,
+            "heal": 0.0015,
+            "demolish": 0.0008
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -491,6 +777,29 @@
         "avgIncome": 360,
         "avgFirstCaptureRound": 1.77,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 59.83,
+          "ownHqHp": 101.44,
+          "controlPoints": 1.95,
+          "controlHold": 1.73,
+          "armyValue": 272.28,
+          "supplies": 35.86,
+          "killValue": 227.44
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1068,
+            "move": 0.3918,
+            "end_turn": 0.1562,
+            "attack": 0.3426,
+            "heal": 0.0017,
+            "demolish": 0.0009
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -523,6 +832,29 @@
         "avgIncome": 392,
         "avgFirstCaptureRound": 2,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 63.69,
+          "ownHqHp": 98.25,
+          "controlPoints": 1.99,
+          "controlHold": 1.74,
+          "armyValue": 267.4,
+          "supplies": 33.6,
+          "killValue": 213.93
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1067,
+            "move": 0.3894,
+            "end_turn": 0.1543,
+            "attack": 0.3473,
+            "heal": 0.0016,
+            "demolish": 0.0007
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -555,6 +887,29 @@
         "avgIncome": 417,
         "avgFirstCaptureRound": 1.72,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 60.5,
+          "ownHqHp": 97.92,
+          "controlPoints": 1.92,
+          "controlHold": 1.69,
+          "armyValue": 272.47,
+          "supplies": 38.95,
+          "killValue": 219.09
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.106,
+            "move": 0.3967,
+            "end_turn": 0.1548,
+            "attack": 0.3405,
+            "heal": 0.0013,
+            "demolish": 0.0007
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -587,6 +942,29 @@
         "avgIncome": 391,
         "avgFirstCaptureRound": 1.67,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 59.78,
+          "ownHqHp": 101.19,
+          "controlPoints": 2.01,
+          "controlHold": 1.8,
+          "armyValue": 285.97,
+          "supplies": 39.45,
+          "killValue": 216.51
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1078,
+            "end_turn": 0.1523,
+            "move": 0.3959,
+            "attack": 0.3416,
+            "heal": 0.0015,
+            "demolish": 0.0009
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -615,6 +993,29 @@
         "avgIncome": 391,
         "avgFirstCaptureRound": 1.71,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 60.01,
+          "ownHqHp": 102.8,
+          "controlPoints": 1.98,
+          "controlHold": 1.71,
+          "armyValue": 264.54,
+          "supplies": 56.94,
+          "killValue": 191.68
+        },
+        "actionMix": {
+          "byType": {
+            "move": 0.3919,
+            "deploy": 0.107,
+            "end_turn": 0.1622,
+            "heal": 0.0015,
+            "attack": 0.3368,
+            "demolish": 0.0006
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -647,6 +1048,29 @@
         "avgIncome": 438,
         "avgFirstCaptureRound": 1.6,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 59.18,
+          "ownHqHp": 98.83,
+          "controlPoints": 2.01,
+          "controlHold": 1.77,
+          "armyValue": 284.85,
+          "supplies": 32.63,
+          "killValue": 240.47
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1119,
+            "move": 0.3747,
+            "end_turn": 0.1557,
+            "attack": 0.3553,
+            "heal": 0.0015,
+            "demolish": 0.0009
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -675,6 +1099,29 @@
         "avgIncome": 434,
         "avgFirstCaptureRound": 1.62,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 56.44,
+          "ownHqHp": 104.68,
+          "controlPoints": 1.93,
+          "controlHold": 1.69,
+          "armyValue": 276.55,
+          "supplies": 37.14,
+          "killValue": 212.1
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1093,
+            "end_turn": 0.1595,
+            "move": 0.3818,
+            "attack": 0.3475,
+            "heal": 0.0012,
+            "demolish": 0.0007
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -707,6 +1154,29 @@
         "avgIncome": 420,
         "avgFirstCaptureRound": 1.73,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 57.78,
+          "ownHqHp": 103.28,
+          "controlPoints": 1.95,
+          "controlHold": 1.73,
+          "armyValue": 271.52,
+          "supplies": 34.22,
+          "killValue": 241.11
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.1063,
+            "move": 0.3839,
+            "end_turn": 0.1543,
+            "attack": 0.3539,
+            "heal": 0.0007,
+            "demolish": 0.001
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -735,6 +1205,29 @@
         "avgIncome": 420,
         "avgFirstCaptureRound": 1.71,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 56.43,
+          "ownHqHp": 103.84,
+          "controlPoints": 2.01,
+          "controlHold": 1.78,
+          "armyValue": 283.42,
+          "supplies": 49.17,
+          "killValue": 215.53
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.108,
+            "move": 0.3892,
+            "end_turn": 0.1612,
+            "attack": 0.3394,
+            "demolish": 0.0006,
+            "heal": 0.0016
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -763,6 +1256,29 @@
         "avgIncome": 372,
         "avgFirstCaptureRound": 1.93,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 75.47,
+          "ownHqHp": 83.59,
+          "controlPoints": 1.99,
+          "controlHold": 1.77,
+          "armyValue": 222.46,
+          "supplies": 44.46,
+          "killValue": 221.81
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.0935,
+            "end_turn": 0.1462,
+            "move": 0.4157,
+            "attack": 0.3429,
+            "heal": 0.0015,
+            "demolish": 0.0003
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -795,6 +1311,29 @@
         "avgIncome": 364,
         "avgFirstCaptureRound": 1.92,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 79.64,
+          "ownHqHp": 80.03,
+          "controlPoints": 1.96,
+          "controlHold": 1.72,
+          "armyValue": 223.16,
+          "supplies": 44.37,
+          "killValue": 193.34
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.0959,
+            "move": 0.4095,
+            "end_turn": 0.1552,
+            "attack": 0.3377,
+            "heal": 0.0013,
+            "demolish": 0.0004
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -827,6 +1366,29 @@
         "avgIncome": 395,
         "avgFirstCaptureRound": 2.02,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 70.89,
+          "ownHqHp": 90.65,
+          "controlPoints": 1.96,
+          "controlHold": 1.74,
+          "armyValue": 243.61,
+          "supplies": 48.02,
+          "killValue": 198.11
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.0981,
+            "move": 0.4082,
+            "attack": 0.3357,
+            "end_turn": 0.1564,
+            "heal": 0.0012,
+            "demolish": 0.0004
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -859,6 +1421,29 @@
         "avgIncome": 373,
         "avgFirstCaptureRound": 1.84,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 77.52,
+          "ownHqHp": 80.03,
+          "controlPoints": 1.97,
+          "controlHold": 1.73,
+          "armyValue": 214.85,
+          "supplies": 37.85,
+          "killValue": 192.41
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.0936,
+            "attack": 0.3416,
+            "move": 0.4138,
+            "end_turn": 0.1495,
+            "heal": 0.0009,
+            "demolish": 0.0005
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -891,6 +1476,29 @@
         "avgIncome": 356,
         "avgFirstCaptureRound": 1.87,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 79.62,
+          "ownHqHp": 81.11,
+          "controlPoints": 1.98,
+          "controlHold": 1.74,
+          "armyValue": 217.68,
+          "supplies": 35.87,
+          "killValue": 204.68
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.0952,
+            "move": 0.4145,
+            "attack": 0.3412,
+            "end_turn": 0.1481,
+            "heal": 0.0008,
+            "demolish": 0.0002
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -923,6 +1531,29 @@
         "avgIncome": 360,
         "avgFirstCaptureRound": 2.01,
         "avgDecisionMs": null,
+        "scoreBreakdown": {
+          "headquartersDamage": 81.24,
+          "ownHqHp": 78.34,
+          "controlPoints": 1.97,
+          "controlHold": 1.71,
+          "armyValue": 219.12,
+          "supplies": 47.66,
+          "killValue": 183.3
+        },
+        "actionMix": {
+          "byType": {
+            "deploy": 0.096,
+            "move": 0.4198,
+            "attack": 0.3339,
+            "end_turn": 0.1483,
+            "heal": 0.0014,
+            "demolish": 0.0007
+          },
+          "rejectedRate": 0,
+          "forcedEndTurnRate": 0
+        },
+        "policyValueMean": null,
+        "policyEntropyMean": null,
         "topDeploys": [
           {
             "type": "infantry",
@@ -947,6 +1578,8 @@
         "annihilationRate": 0.3868,
         "avgRounds": 13.14,
         "avgDurationSec": 1.71,
+        "firstSeatWinRate": 0.4871,
+        "avgControlPointFlips": null,
         "topEndReason": "turn_limit_score"
       },
       {
@@ -956,6 +1589,8 @@
         "annihilationRate": 0.6388,
         "avgRounds": 21.16,
         "avgDurationSec": 0.58,
+        "firstSeatWinRate": 0.4442,
+        "avgControlPointFlips": null,
         "topEndReason": "last_player_standing"
       },
       {
@@ -965,6 +1600,8 @@
         "annihilationRate": 0.4999,
         "avgRounds": 13.41,
         "avgDurationSec": 1.71,
+        "firstSeatWinRate": 0.4611,
+        "avgControlPointFlips": null,
         "topEndReason": "turn_limit_score"
       },
       {
@@ -974,6 +1611,8 @@
         "annihilationRate": 0.5463,
         "avgRounds": 13.36,
         "avgDurationSec": 1.93,
+        "firstSeatWinRate": 0.4356,
+        "avgControlPointFlips": null,
         "topEndReason": "last_player_standing"
       },
       {
@@ -983,6 +1622,8 @@
         "annihilationRate": 0.6733,
         "avgRounds": 13.48,
         "avgDurationSec": 1.46,
+        "firstSeatWinRate": 0.5417,
+        "avgControlPointFlips": 10.75,
         "topEndReason": "last_player_standing"
       }
     ]
@@ -1000,7 +1641,29 @@
           "annihilationRate": 0.549,
           "avgRounds": 14.91,
           "avgDurationSec": 1.48,
-          "avgActions": 176
+          "avgActions": 176,
+          "scoreBreakdown": {
+            "headquartersDamage": 70.92,
+            "ownHqHp": 89.41,
+            "controlPoints": 1.96,
+            "controlHold": 1.7,
+            "armyValue": 267.74,
+            "supplies": 38.66,
+            "killValue": 185.2
+          },
+          "actionMix": {
+            "byType": {
+              "deploy": 0.1075,
+              "move": 0.3951,
+              "end_turn": 0.1566,
+              "attack": 0.3378,
+              "heal": 0.0023,
+              "demolish": 0.0007
+            },
+            "rejectedRate": 0,
+            "forcedEndTurnRate": 0
+          },
+          "avgControlPointFlips": 10.75
         },
         "endReasons": [
           {
@@ -1078,6 +1741,38 @@
             "pct": 0.0008
           }
         ],
+        "decisionMsDist": [
+          {
+            "bucket": "<1ms",
+            "count": 0,
+            "pct": null
+          },
+          {
+            "bucket": "1–5ms",
+            "count": 0,
+            "pct": null
+          },
+          {
+            "bucket": "5–20ms",
+            "count": 0,
+            "pct": null
+          },
+          {
+            "bucket": "20–100ms",
+            "count": 0,
+            "pct": null
+          },
+          {
+            "bucket": "100ms–1s",
+            "count": 0,
+            "pct": null
+          },
+          {
+            "bucket": "≥1s",
+            "count": 0,
+            "pct": null
+          }
+        ],
         "units": [
           {
             "type": "infantry",
@@ -1143,6 +1838,29 @@
             "avgIncome": 363,
             "avgFirstCaptureRound": 1.54,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 83.78,
+              "ownHqHp": 71.17,
+              "controlPoints": 1.93,
+              "controlHold": 1.68,
+              "armyValue": 290.49,
+              "supplies": 29.58,
+              "killValue": 140.66
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.116,
+                "move": 0.4153,
+                "end_turn": 0.1571,
+                "attack": 0.2975,
+                "heal": 0.0136,
+                "demolish": 0.0004
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -1175,6 +1893,29 @@
             "avgIncome": 337,
             "avgFirstCaptureRound": 1.55,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 97.16,
+              "ownHqHp": 63.59,
+              "controlPoints": 2.01,
+              "controlHold": 1.73,
+              "armyValue": 256.74,
+              "supplies": 50.68,
+              "killValue": 127.32
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1084,
+                "move": 0.3752,
+                "attack": 0.3607,
+                "end_turn": 0.1516,
+                "heal": 0.0034,
+                "demolish": 0.0007
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -1207,6 +1948,29 @@
             "avgIncome": 380,
             "avgFirstCaptureRound": 1.52,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 93.88,
+              "ownHqHp": 69.6,
+              "controlPoints": 1.92,
+              "controlHold": 1.69,
+              "armyValue": 297.39,
+              "supplies": 29.9,
+              "killValue": 121.33
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.12,
+                "move": 0.3803,
+                "end_turn": 0.1595,
+                "attack": 0.3363,
+                "heal": 0.0031,
+                "demolish": 0.0007
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -1239,6 +2003,29 @@
             "avgIncome": 144,
             "avgFirstCaptureRound": 6.28,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 74.62,
+              "ownHqHp": 85.78,
+              "controlPoints": 1.88,
+              "controlHold": 1.46,
+              "armyValue": 331.33,
+              "supplies": 38.35,
+              "killValue": 44.65
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1288,
+                "end_turn": 0.1799,
+                "move": 0.466,
+                "attack": 0.2225,
+                "heal": 0.0019,
+                "demolish": 0.001
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -1271,6 +2058,29 @@
             "avgIncome": 381,
             "avgFirstCaptureRound": 1.54,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 85.14,
+              "ownHqHp": 74.82,
+              "controlPoints": 2,
+              "controlHold": 1.74,
+              "armyValue": 300.51,
+              "supplies": 31.12,
+              "killValue": 133.08
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1186,
+                "end_turn": 0.1588,
+                "move": 0.3964,
+                "attack": 0.3129,
+                "heal": 0.0127,
+                "demolish": 0.0006
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -1303,6 +2113,29 @@
             "avgIncome": 157,
             "avgFirstCaptureRound": 2.78,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 98.02,
+              "ownHqHp": 59.38,
+              "controlPoints": 1.83,
+              "controlHold": 1.35,
+              "armyValue": 280.11,
+              "supplies": 39.6,
+              "killValue": 37.97
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1387,
+                "end_turn": 0.1767,
+                "move": 0.3964,
+                "attack": 0.2865,
+                "heal": 0.0013,
+                "demolish": 0.0005
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -1335,6 +2168,29 @@
             "avgIncome": 443,
             "avgFirstCaptureRound": 1.8,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 55.97,
+              "ownHqHp": 107.17,
+              "controlPoints": 2.02,
+              "controlHold": 1.77,
+              "armyValue": 293.41,
+              "supplies": 33.51,
+              "killValue": 212.76
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1187,
+                "move": 0.35,
+                "end_turn": 0.1663,
+                "attack": 0.3637,
+                "heal": 0.0008,
+                "demolish": 0.0006
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1363,6 +2219,29 @@
             "avgIncome": 393,
             "avgFirstCaptureRound": 1.74,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 64.33,
+              "ownHqHp": 104.19,
+              "controlPoints": 1.98,
+              "controlHold": 1.77,
+              "armyValue": 271.23,
+              "supplies": 28.9,
+              "killValue": 213.87
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1078,
+                "move": 0.3838,
+                "end_turn": 0.1531,
+                "attack": 0.353,
+                "heal": 0.0011,
+                "demolish": 0.0011
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1391,6 +2270,29 @@
             "avgIncome": 401,
             "avgFirstCaptureRound": 1.72,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 61.1,
+              "ownHqHp": 94.64,
+              "controlPoints": 1.89,
+              "controlHold": 1.65,
+              "armyValue": 279.06,
+              "supplies": 33.27,
+              "killValue": 210.56
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1095,
+                "end_turn": 0.1603,
+                "move": 0.3838,
+                "attack": 0.3446,
+                "heal": 0.001,
+                "demolish": 0.0008
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1423,6 +2325,29 @@
             "avgIncome": 424,
             "avgFirstCaptureRound": 1.71,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 60.97,
+              "ownHqHp": 98.88,
+              "controlPoints": 1.92,
+              "controlHold": 1.7,
+              "armyValue": 273.39,
+              "supplies": 35.44,
+              "killValue": 216.31
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1057,
+                "end_turn": 0.1562,
+                "move": 0.3951,
+                "attack": 0.3407,
+                "heal": 0.0015,
+                "demolish": 0.0008
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1455,6 +2380,29 @@
             "avgIncome": 360,
             "avgFirstCaptureRound": 1.77,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 59.83,
+              "ownHqHp": 101.44,
+              "controlPoints": 1.95,
+              "controlHold": 1.73,
+              "armyValue": 272.28,
+              "supplies": 35.86,
+              "killValue": 227.44
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1068,
+                "move": 0.3918,
+                "end_turn": 0.1562,
+                "attack": 0.3426,
+                "heal": 0.0017,
+                "demolish": 0.0009
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1487,6 +2435,29 @@
             "avgIncome": 392,
             "avgFirstCaptureRound": 2,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 63.69,
+              "ownHqHp": 98.25,
+              "controlPoints": 1.99,
+              "controlHold": 1.74,
+              "armyValue": 267.4,
+              "supplies": 33.6,
+              "killValue": 213.93
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1067,
+                "move": 0.3894,
+                "end_turn": 0.1543,
+                "attack": 0.3473,
+                "heal": 0.0016,
+                "demolish": 0.0007
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1519,6 +2490,29 @@
             "avgIncome": 417,
             "avgFirstCaptureRound": 1.72,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 60.5,
+              "ownHqHp": 97.92,
+              "controlPoints": 1.92,
+              "controlHold": 1.69,
+              "armyValue": 272.47,
+              "supplies": 38.95,
+              "killValue": 219.09
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.106,
+                "move": 0.3967,
+                "end_turn": 0.1548,
+                "attack": 0.3405,
+                "heal": 0.0013,
+                "demolish": 0.0007
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1551,6 +2545,29 @@
             "avgIncome": 391,
             "avgFirstCaptureRound": 1.67,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 59.78,
+              "ownHqHp": 101.19,
+              "controlPoints": 2.01,
+              "controlHold": 1.8,
+              "armyValue": 285.97,
+              "supplies": 39.45,
+              "killValue": 216.51
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1078,
+                "end_turn": 0.1523,
+                "move": 0.3959,
+                "attack": 0.3416,
+                "heal": 0.0015,
+                "demolish": 0.0009
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1579,6 +2596,29 @@
             "avgIncome": 391,
             "avgFirstCaptureRound": 1.71,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 60.01,
+              "ownHqHp": 102.8,
+              "controlPoints": 1.98,
+              "controlHold": 1.71,
+              "armyValue": 264.54,
+              "supplies": 56.94,
+              "killValue": 191.68
+            },
+            "actionMix": {
+              "byType": {
+                "move": 0.3919,
+                "deploy": 0.107,
+                "end_turn": 0.1622,
+                "heal": 0.0015,
+                "attack": 0.3368,
+                "demolish": 0.0006
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1611,6 +2651,29 @@
             "avgIncome": 438,
             "avgFirstCaptureRound": 1.6,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 59.18,
+              "ownHqHp": 98.83,
+              "controlPoints": 2.01,
+              "controlHold": 1.77,
+              "armyValue": 284.85,
+              "supplies": 32.63,
+              "killValue": 240.47
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1119,
+                "move": 0.3747,
+                "end_turn": 0.1557,
+                "attack": 0.3553,
+                "heal": 0.0015,
+                "demolish": 0.0009
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1639,6 +2702,29 @@
             "avgIncome": 434,
             "avgFirstCaptureRound": 1.62,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 56.44,
+              "ownHqHp": 104.68,
+              "controlPoints": 1.93,
+              "controlHold": 1.69,
+              "armyValue": 276.55,
+              "supplies": 37.14,
+              "killValue": 212.1
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1093,
+                "end_turn": 0.1595,
+                "move": 0.3818,
+                "attack": 0.3475,
+                "heal": 0.0012,
+                "demolish": 0.0007
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1671,6 +2757,29 @@
             "avgIncome": 420,
             "avgFirstCaptureRound": 1.73,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 57.78,
+              "ownHqHp": 103.28,
+              "controlPoints": 1.95,
+              "controlHold": 1.73,
+              "armyValue": 271.52,
+              "supplies": 34.22,
+              "killValue": 241.11
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.1063,
+                "move": 0.3839,
+                "end_turn": 0.1543,
+                "attack": 0.3539,
+                "heal": 0.0007,
+                "demolish": 0.001
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1699,6 +2808,29 @@
             "avgIncome": 420,
             "avgFirstCaptureRound": 1.71,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 56.43,
+              "ownHqHp": 103.84,
+              "controlPoints": 2.01,
+              "controlHold": 1.78,
+              "armyValue": 283.42,
+              "supplies": 49.17,
+              "killValue": 215.53
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.108,
+                "move": 0.3892,
+                "end_turn": 0.1612,
+                "attack": 0.3394,
+                "demolish": 0.0006,
+                "heal": 0.0016
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1727,6 +2859,29 @@
             "avgIncome": 372,
             "avgFirstCaptureRound": 1.93,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 75.47,
+              "ownHqHp": 83.59,
+              "controlPoints": 1.99,
+              "controlHold": 1.77,
+              "armyValue": 222.46,
+              "supplies": 44.46,
+              "killValue": 221.81
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.0935,
+                "end_turn": 0.1462,
+                "move": 0.4157,
+                "attack": 0.3429,
+                "heal": 0.0015,
+                "demolish": 0.0003
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1759,6 +2914,29 @@
             "avgIncome": 364,
             "avgFirstCaptureRound": 1.92,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 79.64,
+              "ownHqHp": 80.03,
+              "controlPoints": 1.96,
+              "controlHold": 1.72,
+              "armyValue": 223.16,
+              "supplies": 44.37,
+              "killValue": 193.34
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.0959,
+                "move": 0.4095,
+                "end_turn": 0.1552,
+                "attack": 0.3377,
+                "heal": 0.0013,
+                "demolish": 0.0004
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1791,6 +2969,29 @@
             "avgIncome": 395,
             "avgFirstCaptureRound": 2.02,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 70.89,
+              "ownHqHp": 90.65,
+              "controlPoints": 1.96,
+              "controlHold": 1.74,
+              "armyValue": 243.61,
+              "supplies": 48.02,
+              "killValue": 198.11
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.0981,
+                "move": 0.4082,
+                "attack": 0.3357,
+                "end_turn": 0.1564,
+                "heal": 0.0012,
+                "demolish": 0.0004
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1823,6 +3024,29 @@
             "avgIncome": 373,
             "avgFirstCaptureRound": 1.84,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 77.52,
+              "ownHqHp": 80.03,
+              "controlPoints": 1.97,
+              "controlHold": 1.73,
+              "armyValue": 214.85,
+              "supplies": 37.85,
+              "killValue": 192.41
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.0936,
+                "attack": 0.3416,
+                "move": 0.4138,
+                "end_turn": 0.1495,
+                "heal": 0.0009,
+                "demolish": 0.0005
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1855,6 +3079,29 @@
             "avgIncome": 356,
             "avgFirstCaptureRound": 1.87,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 79.62,
+              "ownHqHp": 81.11,
+              "controlPoints": 1.98,
+              "controlHold": 1.74,
+              "armyValue": 217.68,
+              "supplies": 35.87,
+              "killValue": 204.68
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.0952,
+                "move": 0.4145,
+                "attack": 0.3412,
+                "end_turn": 0.1481,
+                "heal": 0.0008,
+                "demolish": 0.0002
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1887,6 +3134,29 @@
             "avgIncome": 360,
             "avgFirstCaptureRound": 2.01,
             "avgDecisionMs": null,
+            "scoreBreakdown": {
+              "headquartersDamage": 81.24,
+              "ownHqHp": 78.34,
+              "controlPoints": 1.97,
+              "controlHold": 1.71,
+              "armyValue": 219.12,
+              "supplies": 47.66,
+              "killValue": 183.3
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.096,
+                "move": 0.4198,
+                "attack": 0.3339,
+                "end_turn": 0.1483,
+                "heal": 0.0014,
+                "demolish": 0.0007
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -1911,6 +3181,8 @@
             "annihilationRate": 0.3868,
             "avgRounds": 13.14,
             "avgDurationSec": 1.71,
+            "firstSeatWinRate": 0.4871,
+            "avgControlPointFlips": null,
             "topEndReason": "turn_limit_score"
           },
           {
@@ -1920,6 +3192,8 @@
             "annihilationRate": 0.6388,
             "avgRounds": 21.16,
             "avgDurationSec": 0.58,
+            "firstSeatWinRate": 0.4442,
+            "avgControlPointFlips": null,
             "topEndReason": "last_player_standing"
           },
           {
@@ -1929,6 +3203,8 @@
             "annihilationRate": 0.4999,
             "avgRounds": 13.41,
             "avgDurationSec": 1.71,
+            "firstSeatWinRate": 0.4611,
+            "avgControlPointFlips": null,
             "topEndReason": "turn_limit_score"
           },
           {
@@ -1938,6 +3214,8 @@
             "annihilationRate": 0.5463,
             "avgRounds": 13.36,
             "avgDurationSec": 1.93,
+            "firstSeatWinRate": 0.4356,
+            "avgControlPointFlips": null,
             "topEndReason": "last_player_standing"
           },
           {
@@ -1947,6 +3225,8 @@
             "annihilationRate": 0.6733,
             "avgRounds": 13.48,
             "avgDurationSec": 1.46,
+            "firstSeatWinRate": 0.5417,
+            "avgControlPointFlips": 10.75,
             "topEndReason": "last_player_standing"
           }
         ]
@@ -1964,7 +3244,10 @@
           "annihilationRate": 1,
           "avgRounds": 12.33,
           "avgDurationSec": 1.3,
-          "avgActions": 152
+          "avgActions": 152,
+          "scoreBreakdown": null,
+          "actionMix": null,
+          "avgControlPointFlips": null
         },
         "endReasons": [
           {
@@ -2037,6 +3320,38 @@
             "pct": 0
           }
         ],
+        "decisionMsDist": [
+          {
+            "bucket": "<1ms",
+            "count": 4,
+            "pct": 0.0083
+          },
+          {
+            "bucket": "1–5ms",
+            "count": 203,
+            "pct": 0.422
+          },
+          {
+            "bucket": "5–20ms",
+            "count": 274,
+            "pct": 0.5696
+          },
+          {
+            "bucket": "20–100ms",
+            "count": 0,
+            "pct": 0
+          },
+          {
+            "bucket": "100ms–1s",
+            "count": 0,
+            "pct": 0
+          },
+          {
+            "bucket": "≥1s",
+            "count": 0,
+            "pct": 0
+          }
+        ],
         "units": [
           {
             "type": "infantry",
@@ -2102,6 +3417,10 @@
             "avgIncome": 413,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 8.39,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2134,6 +3453,10 @@
             "avgIncome": 124,
             "avgFirstCaptureRound": 2.56,
             "avgDecisionMs": 0.96,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -2166,6 +3489,10 @@
             "avgIncome": 277,
             "avgFirstCaptureRound": 1.8,
             "avgDecisionMs": 11.35,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2198,6 +3525,10 @@
             "avgIncome": 428,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 3.98,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2230,6 +3561,10 @@
             "avgIncome": 407,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 1.58,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -2254,6 +3589,8 @@
             "annihilationRate": 1,
             "avgRounds": 11.18,
             "avgDurationSec": 1.46,
+            "firstSeatWinRate": 0.5021,
+            "avgControlPointFlips": null,
             "topEndReason": "last_player_standing"
           },
           {
@@ -2263,6 +3600,8 @@
             "annihilationRate": 1,
             "avgRounds": 13.48,
             "avgDurationSec": 1.14,
+            "firstSeatWinRate": 0.55,
+            "avgControlPointFlips": null,
             "topEndReason": "last_player_standing"
           }
         ]
@@ -2280,7 +3619,10 @@
           "annihilationRate": 0.5347,
           "avgRounds": 17.73,
           "avgDurationSec": 71.16,
-          "avgActions": 296
+          "avgActions": 296,
+          "scoreBreakdown": null,
+          "actionMix": null,
+          "avgControlPointFlips": null
         },
         "endReasons": [
           {
@@ -2363,6 +3705,38 @@
             "pct": 0.501
           }
         ],
+        "decisionMsDist": [
+          {
+            "bucket": "<1ms",
+            "count": 0,
+            "pct": 0
+          },
+          {
+            "bucket": "1–5ms",
+            "count": 172,
+            "pct": 0.0853
+          },
+          {
+            "bucket": "5–20ms",
+            "count": 368,
+            "pct": 0.1825
+          },
+          {
+            "bucket": "20–100ms",
+            "count": 855,
+            "pct": 0.4241
+          },
+          {
+            "bucket": "100ms–1s",
+            "count": 591,
+            "pct": 0.2932
+          },
+          {
+            "bucket": "≥1s",
+            "count": 30,
+            "pct": 0.0149
+          }
+        ],
         "units": [
           {
             "type": "infantry",
@@ -2428,6 +3802,10 @@
             "avgIncome": 277,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 22.42,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2460,6 +3838,10 @@
             "avgIncome": 215,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 92.16,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2492,6 +3874,10 @@
             "avgIncome": 278,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 332.81,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2524,6 +3910,10 @@
             "avgIncome": 207,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 10.06,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2556,6 +3946,10 @@
             "avgIncome": 200,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 1174.71,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2588,6 +3982,10 @@
             "avgIncome": 76,
             "avgFirstCaptureRound": 2.49,
             "avgDecisionMs": 2.57,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "scout",
@@ -2620,6 +4018,10 @@
             "avgIncome": 105,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 109,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
@@ -2652,6 +4054,10 @@
             "avgIncome": 192,
             "avgFirstCaptureRound": 1,
             "avgDecisionMs": 5.43,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "heavy",
@@ -2676,6 +4082,8 @@
             "annihilationRate": 0.1622,
             "avgRounds": 28.92,
             "avgDurationSec": 198.69,
+            "firstSeatWinRate": 0.5119,
+            "avgControlPointFlips": null,
             "topEndReason": "turn_limit_score"
           },
           {
@@ -2685,6 +4093,8 @@
             "annihilationRate": 0.8065,
             "avgRounds": 12.29,
             "avgDurationSec": 8.63,
+            "firstSeatWinRate": 0.4688,
+            "avgControlPointFlips": null,
             "topEndReason": "last_player_standing"
           },
           {
@@ -2694,6 +4104,8 @@
             "annihilationRate": 0.6354,
             "avgRounds": 11.97,
             "avgDurationSec": 6.17,
+            "firstSeatWinRate": 0.4777,
+            "avgControlPointFlips": null,
             "topEndReason": "last_player_standing"
           }
         ]
@@ -2702,27 +4114,30 @@
     {
       "id": "royale",
       "label": "大逃杀",
-      "games": 144,
+      "games": 288,
       "gameplay": {
         "overview": {
-          "games": 144,
-          "draws": 1,
-          "drawRate": 0.0069,
-          "annihilationRate": 0.9931,
-          "avgRounds": 13.1,
-          "avgDurationSec": 1.66,
-          "avgActions": 143
+          "games": 288,
+          "draws": 13,
+          "drawRate": 0.0451,
+          "annihilationRate": 0.9549,
+          "avgRounds": 13.6,
+          "avgDurationSec": 1.75,
+          "avgActions": 149,
+          "scoreBreakdown": null,
+          "actionMix": null,
+          "avgControlPointFlips": null
         },
         "endReasons": [
           {
             "reason": "last_player_standing",
-            "count": 143,
-            "pct": 0.9931
+            "count": 275,
+            "pct": 0.9549
           },
           {
             "reason": "mutual_annihilation",
-            "count": 1,
-            "pct": 0.0069
+            "count": 13,
+            "pct": 0.0451
           }
         ],
         "roundsDist": [
@@ -2733,13 +4148,13 @@
           },
           {
             "bucket": "10–14",
-            "count": 97,
-            "pct": 0.822
+            "count": 161,
+            "pct": 0.7594
           },
           {
             "bucket": "15–19",
-            "count": 21,
-            "pct": 0.178
+            "count": 51,
+            "pct": 0.2406
           },
           {
             "bucket": "20–24",
@@ -2760,31 +4175,63 @@
         "durationDist": [
           {
             "bucket": "<1s",
-            "count": 86,
-            "pct": 0.5972
+            "count": 155,
+            "pct": 0.5382
           },
           {
             "bucket": "1–2s",
-            "count": 7,
-            "pct": 0.0486
+            "count": 55,
+            "pct": 0.191
           },
           {
             "bucket": "2–3s",
-            "count": 22,
-            "pct": 0.1528
+            "count": 25,
+            "pct": 0.0868
           },
           {
             "bucket": "3–5s",
             "count": 26,
-            "pct": 0.1806
+            "pct": 0.0903
           },
           {
             "bucket": "5–10s",
-            "count": 3,
-            "pct": 0.0208
+            "count": 26,
+            "pct": 0.0903
           },
           {
             "bucket": "≥10s",
+            "count": 1,
+            "pct": 0.0035
+          }
+        ],
+        "decisionMsDist": [
+          {
+            "bucket": "<1ms",
+            "count": 5,
+            "pct": 0.0174
+          },
+          {
+            "bucket": "1–5ms",
+            "count": 157,
+            "pct": 0.5451
+          },
+          {
+            "bucket": "5–20ms",
+            "count": 99,
+            "pct": 0.3438
+          },
+          {
+            "bucket": "20–100ms",
+            "count": 27,
+            "pct": 0.0938
+          },
+          {
+            "bucket": "100ms–1s",
+            "count": 0,
+            "pct": 0
+          },
+          {
+            "bucket": "≥1s",
             "count": 0,
             "pct": 0
           }
@@ -2792,144 +4239,192 @@
         "units": [
           {
             "type": "ranger",
-            "deploys": 678,
-            "deployShare": 0.326,
-            "losses": 272,
-            "lossShare": 0.1637
-          },
-          {
-            "type": "support",
-            "deploys": 527,
-            "deployShare": 0.2534,
-            "losses": 397,
-            "lossShare": 0.2389
+            "deploys": 1765,
+            "deployShare": 0.3925,
+            "losses": 959,
+            "lossShare": 0.2557
           },
           {
             "type": "scout",
-            "deploys": 475,
-            "deployShare": 0.2284,
-            "losses": 475,
-            "lossShare": 0.2858
+            "deploys": 1229,
+            "deployShare": 0.2733,
+            "losses": 1166,
+            "lossShare": 0.3109
+          },
+          {
+            "type": "support",
+            "deploys": 797,
+            "deployShare": 0.1772,
+            "losses": 667,
+            "lossShare": 0.1779
           },
           {
             "type": "infantry",
-            "deploys": 272,
-            "deployShare": 0.1308,
-            "losses": 254,
-            "lossShare": 0.1528
+            "deploys": 479,
+            "deployShare": 0.1065,
+            "losses": 439,
+            "lossShare": 0.1171
           },
           {
             "type": "heavy",
-            "deploys": 128,
-            "deployShare": 0.0615,
-            "losses": 264,
-            "lossShare": 0.1588
+            "deploys": 227,
+            "deployShare": 0.0505,
+            "losses": 519,
+            "lossShare": 0.1384
           }
         ],
         "economy": {
-          "seatCount": 288,
-          "avgIncomeTotal": 250,
-          "controlShare": 0.4442,
-          "avgDeployCost": 270,
-          "avgCaptures": 0.08,
-          "avgSteals": 0.08,
-          "avgFirstCaptureRound": 8.04,
+          "seatCount": 576,
+          "avgIncomeTotal": 265,
+          "controlShare": 0.4457,
+          "avgDeployCost": 293,
+          "avgCaptures": 0.14,
+          "avgSteals": 0.14,
+          "avgFirstCaptureRound": 5.85,
           "comebackRate": 0
         },
         "perModel": [
           {
             "id": "algo_apex@v1",
-            "games": 96,
-            "wins": 96,
-            "losses": 0,
-            "draws": 0,
-            "winRate": 1,
-            "avgScore": 1566,
-            "avgDamageDealt": 31,
-            "avgDamageTaken": 73,
-            "avgKills": 9.21,
-            "avgLosses": 2.13,
+            "games": 144,
+            "wins": 120,
+            "losses": 12,
+            "draws": 12,
+            "winRate": 0.8333,
+            "avgScore": 1280,
+            "avgDamageDealt": 105,
+            "avgDamageTaken": 157,
+            "avgKills": 9.39,
+            "avgLosses": 3.92,
             "avgCaptures": 0.01,
             "avgSteals": 0.01,
-            "avgIncome": 255,
+            "avgIncome": 279,
             "avgFirstCaptureRound": 9,
-            "avgDecisionMs": 23.23,
+            "avgDecisionMs": 25.82,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "ranger",
-                "count": 469
+                "count": 709
               },
               {
                 "type": "scout",
-                "count": 101
+                "count": 149
               },
               {
                 "type": "support",
-                "count": 65
+                "count": 89
+              }
+            ]
+          },
+          {
+            "id": "algo_ark@v1",
+            "games": 144,
+            "wins": 108,
+            "losses": 24,
+            "draws": 12,
+            "winRate": 0.75,
+            "avgScore": 1375,
+            "avgDamageDealt": 94,
+            "avgDamageTaken": 215,
+            "avgKills": 9.37,
+            "avgLosses": 5.13,
+            "avgCaptures": 0.19,
+            "avgSteals": 0.19,
+            "avgIncome": 281,
+            "avgFirstCaptureRound": 6.36,
+            "avgDecisionMs": 3.75,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
+            "topDeploys": [
+              {
+                "type": "ranger",
+                "count": 741
+              },
+              {
+                "type": "scout",
+                "count": 473
+              },
+              {
+                "type": "infantry",
+                "count": 22
               }
             ]
           },
           {
             "id": "algo_echelon@v1",
-            "games": 96,
+            "games": 144,
             "wins": 47,
-            "losses": 48,
+            "losses": 96,
             "draws": 1,
-            "winRate": 0.4896,
-            "avgScore": 314,
+            "winRate": 0.3264,
+            "avgScore": 210,
             "avgDamageDealt": 2,
-            "avgDamageTaken": 342,
-            "avgKills": 5.81,
-            "avgLosses": 5.14,
-            "avgCaptures": 0.21,
-            "avgSteals": 0.21,
-            "avgIncome": 258,
-            "avgFirstCaptureRound": 8.11,
-            "avgDecisionMs": 2.68,
+            "avgDamageTaken": 373,
+            "avgKills": 5.13,
+            "avgLosses": 6.59,
+            "avgCaptures": 0.31,
+            "avgSteals": 0.31,
+            "avgIncome": 267,
+            "avgFirstCaptureRound": 5.53,
+            "avgDecisionMs": 2.99,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "support",
-                "count": 300
+                "count": 462
               },
               {
                 "type": "scout",
-                "count": 162
+                "count": 270
               },
               {
                 "type": "ranger",
-                "count": 96
+                "count": 144
               }
             ]
           },
           {
             "id": "algo_random-royale@v1",
-            "games": 96,
+            "games": 144,
             "wins": 0,
-            "losses": 95,
+            "losses": 143,
             "draws": 1,
             "winRate": 0,
             "avgScore": 2,
-            "avgDamageDealt": 5,
-            "avgDamageTaken": 588,
-            "avgKills": 2.29,
-            "avgLosses": 10.05,
-            "avgCaptures": 0.03,
-            "avgSteals": 0.03,
-            "avgIncome": 236,
-            "avgFirstCaptureRound": 7.33,
-            "avgDecisionMs": 1.12,
+            "avgDamageDealt": 4,
+            "avgDamageTaken": 598,
+            "avgKills": 2.16,
+            "avgLosses": 10.4,
+            "avgCaptures": 0.04,
+            "avgSteals": 0.04,
+            "avgIncome": 234,
+            "avgFirstCaptureRound": 5.17,
+            "avgDecisionMs": 1.26,
+            "scoreBreakdown": null,
+            "actionMix": null,
+            "policyValueMean": null,
+            "policyEntropyMean": null,
             "topDeploys": [
               {
                 "type": "infantry",
-                "count": 216
+                "count": 341
               },
               {
                 "type": "scout",
-                "count": 212
+                "count": 337
               },
               {
                 "type": "support",
-                "count": 162
+                "count": 246
               }
             ]
           }
@@ -2937,20 +4432,24 @@
         "perMap": [
           {
             "map": "narrow-road",
-            "games": 72,
-            "drawRate": 0.0139,
-            "annihilationRate": 0.9861,
-            "avgRounds": 13.13,
-            "avgDurationSec": 0.69,
+            "games": 144,
+            "drawRate": 0.0903,
+            "annihilationRate": 0.9097,
+            "avgRounds": 13.47,
+            "avgDurationSec": 0.68,
+            "firstSeatWinRate": 0.5,
+            "avgControlPointFlips": null,
             "topEndReason": "last_player_standing"
           },
           {
             "map": "snowflake",
-            "games": 72,
+            "games": 144,
             "drawRate": 0,
             "annihilationRate": 1,
-            "avgRounds": 13.08,
-            "avgDurationSec": 2.63,
+            "avgRounds": 13.74,
+            "avgDurationSec": 2.83,
+            "firstSeatWinRate": 0.5,
+            "avgControlPointFlips": null,
             "topEndReason": "last_player_standing"
           }
         ]
@@ -2958,48 +4457,6 @@
     }
   ],
   "models": [
-    {
-      "id": "algo_apex@v1",
-      "kind": "algorithm",
-      "short": "绝境算法",
-      "version": "v1",
-      "trainDate": null,
-      "trainMap": null,
-      "opponentType": null,
-      "steps": null,
-      "algorithm": "apex",
-      "modes": [
-        "royale"
-      ],
-      "status": "builtin",
-      "statusNote": null,
-      "rated": true,
-      "sizeMB": null,
-      "rating": 2153,
-      "ratingLo": 2029,
-      "ratingHi": 2059,
-      "winRate": 1,
-      "games": 96,
-      "ratings": [
-        {
-          "mode": "royale",
-          "modeLabel": "大逃杀",
-          "rating": 2153,
-          "ratingLo": 2029,
-          "ratingHi": 2059,
-          "winRate": 1,
-          "games": 96,
-          "wins": 96,
-          "losses": 0,
-          "draws": 0
-        }
-      ],
-      "ratingMode": "royale",
-      "ratingModeLabel": "大逃杀",
-      "docRef": "algorithms/docs/algorithms/apex.md",
-      "docStatus": "内置算法",
-      "notes": "大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验"
-    },
     {
       "id": "algo_sovereign@v1",
       "kind": "algorithm",
@@ -3083,6 +4540,90 @@
       "docRef": "algorithms/docs/algorithms/tempo-weave.md",
       "docStatus": "内置算法",
       "notes": "同时回合：任务竞价、变长行动排程与总部生存期限约束"
+    },
+    {
+      "id": "algo_apex@v1",
+      "kind": "algorithm",
+      "short": "绝境算法",
+      "version": "v1",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "apex",
+      "modes": [
+        "royale"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 2023,
+      "ratingLo": 1918,
+      "ratingHi": 1961,
+      "winRate": 0.8333,
+      "games": 144,
+      "ratings": [
+        {
+          "mode": "royale",
+          "modeLabel": "大逃杀",
+          "rating": 2023,
+          "ratingLo": 1918,
+          "ratingHi": 1961,
+          "winRate": 0.8333,
+          "games": 144,
+          "wins": 120,
+          "losses": 12,
+          "draws": 12
+        }
+      ],
+      "ratingMode": "royale",
+      "ratingModeLabel": "大逃杀",
+      "docRef": "algorithms/docs/algorithms/apex.md",
+      "docStatus": "内置算法",
+      "notes": "大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验"
+    },
+    {
+      "id": "algo_ark@v1",
+      "kind": "algorithm",
+      "short": "方舟算法",
+      "version": "v1",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "ark",
+      "modes": [
+        "royale"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 1940,
+      "ratingLo": 1843,
+      "ratingHi": 1879,
+      "winRate": 0.75,
+      "games": 144,
+      "ratings": [
+        {
+          "mode": "royale",
+          "modeLabel": "大逃杀",
+          "rating": 1940,
+          "ratingLo": 1843,
+          "ratingHi": 1879,
+          "winRate": 0.75,
+          "games": 144,
+          "wins": 108,
+          "losses": 24,
+          "draws": 12
+        }
+      ],
+      "ratingMode": "royale",
+      "ratingModeLabel": "大逃杀",
+      "docRef": "algorithms/docs/algorithms/ark.md",
+      "docStatus": "内置算法",
+      "notes": "大逃杀：独立安全格容量分配、行动组合调度与缩圈增援负担评估"
     },
     {
       "id": "algo_verdict@v1",
@@ -3925,48 +5466,6 @@
       "notes": "6205 维可观测性修复 + 混合地图 + 配对评估；随机图 96 局胜 v2.4.0 66:30，default 24:0，forge 19:5，dual-lanes 14:10"
     },
     {
-      "id": "algo_echelon@v1",
-      "kind": "algorithm",
-      "short": "雁阵算法",
-      "version": "v1",
-      "trainDate": null,
-      "trainMap": null,
-      "opponentType": null,
-      "steps": null,
-      "algorithm": "echelon",
-      "modes": [
-        "royale"
-      ],
-      "status": "builtin",
-      "statusNote": null,
-      "rated": true,
-      "sizeMB": null,
-      "rating": 1475,
-      "ratingLo": 1464,
-      "ratingHi": 1500,
-      "winRate": 0.4896,
-      "games": 96,
-      "ratings": [
-        {
-          "mode": "royale",
-          "modeLabel": "大逃杀",
-          "rating": 1475,
-          "ratingLo": 1464,
-          "ratingHi": 1500,
-          "winRate": 0.4896,
-          "games": 96,
-          "wins": 47,
-          "losses": 48,
-          "draws": 1
-        }
-      ],
-      "ratingMode": "royale",
-      "ratingModeLabel": "大逃杀",
-      "docRef": "algorithms/docs/algorithms/echelon.md",
-      "docStatus": "内置算法",
-      "notes": "大逃杀：落点扩散预报 + 精确击杀概率 + 炮火圈生存调度的逐拍效用决策"
-    },
-    {
       "id": "algo_matrix-eq@v2",
       "kind": "algorithm",
       "short": "矩阵均衡算法",
@@ -4345,6 +5844,48 @@
       "notes": "续训+学习率衰减+锚点；小样本对 v2.4.0 3:5，竞技场大样本 73:95 仍处下风"
     },
     {
+      "id": "algo_echelon@v1",
+      "kind": "algorithm",
+      "short": "雁阵算法",
+      "version": "v1",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "echelon",
+      "modes": [
+        "royale"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 1297,
+      "ratingLo": 1317,
+      "ratingHi": 1341,
+      "winRate": 0.3264,
+      "games": 144,
+      "ratings": [
+        {
+          "mode": "royale",
+          "modeLabel": "大逃杀",
+          "rating": 1297,
+          "ratingLo": 1317,
+          "ratingHi": 1341,
+          "winRate": 0.3264,
+          "games": 144,
+          "wins": 47,
+          "losses": 96,
+          "draws": 1
+        }
+      ],
+      "ratingMode": "royale",
+      "ratingModeLabel": "大逃杀",
+      "docRef": "algorithms/docs/algorithms/echelon.md",
+      "docStatus": "内置算法",
+      "notes": "大逃杀：落点扩散预报 + 精确击杀概率 + 炮火圈生存调度的逐拍效用决策"
+    },
+    {
       "id": "hex_ppo_v2.6.0_20260831_3.6M.zip",
       "kind": "model",
       "short": "v2.6.0@3.6M",
@@ -4513,48 +6054,6 @@
       "notes": "歼灭：炮火收缩圈预判疏散、稳杀集火、走位风筝与激进补员"
     },
     {
-      "id": "algo_random-royale@v1",
-      "kind": "algorithm",
-      "short": "大逃杀随机算法",
-      "version": "v1",
-      "trainDate": null,
-      "trainMap": null,
-      "opponentType": null,
-      "steps": null,
-      "algorithm": "random-royale",
-      "modes": [
-        "royale"
-      ],
-      "status": "builtin",
-      "statusNote": null,
-      "rated": true,
-      "sizeMB": null,
-      "rating": 872,
-      "ratingLo": 941,
-      "ratingHi": 1007,
-      "winRate": 0,
-      "games": 96,
-      "ratings": [
-        {
-          "mode": "royale",
-          "modeLabel": "大逃杀",
-          "rating": 872,
-          "ratingLo": 941,
-          "ratingHi": 1007,
-          "winRate": 0,
-          "games": 96,
-          "wins": 0,
-          "losses": 95,
-          "draws": 1
-        }
-      ],
-      "ratingMode": "royale",
-      "ratingModeLabel": "大逃杀",
-      "docRef": "algorithms/docs/algorithms/random-royale.md",
-      "docStatus": "内置算法",
-      "notes": "大逃杀：从所有合法计划动作中随机入队，随后提交"
-    },
-    {
       "id": "algo_random@v1",
       "kind": "algorithm",
       "short": "随机算法",
@@ -4595,6 +6094,48 @@
       "docRef": "algorithms/docs/algorithms/random.md",
       "docStatus": "内置算法",
       "notes": "从所有合法动作中随机选择"
+    },
+    {
+      "id": "algo_random-royale@v1",
+      "kind": "algorithm",
+      "short": "大逃杀随机算法",
+      "version": "v1",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "random-royale",
+      "modes": [
+        "royale"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 741,
+      "ratingLo": 845,
+      "ratingHi": 902,
+      "winRate": 0,
+      "games": 144,
+      "ratings": [
+        {
+          "mode": "royale",
+          "modeLabel": "大逃杀",
+          "rating": 741,
+          "ratingLo": 845,
+          "ratingHi": 902,
+          "winRate": 0,
+          "games": 144,
+          "wins": 0,
+          "losses": 143,
+          "draws": 1
+        }
+      ],
+      "ratingMode": "royale",
+      "ratingModeLabel": "大逃杀",
+      "docRef": "algorithms/docs/algorithms/random-royale.md",
+      "docStatus": "内置算法",
+      "notes": "大逃杀：从所有合法计划动作中随机入队，随后提交"
     },
     {
       "id": "algo_random-sim@v2",
@@ -4681,6 +6222,35 @@
       "notes": "歼灭：从所有合法动作中随机选择，跳过炮火危险区内的部署与治疗"
     },
     {
+      "id": "algo_parallax@v1",
+      "kind": "algorithm",
+      "short": "视差算法",
+      "version": "v1",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "parallax",
+      "modes": [
+        "standard"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": null,
+      "ratingLo": null,
+      "ratingHi": null,
+      "winRate": null,
+      "games": 0,
+      "ratings": [],
+      "ratingMode": null,
+      "ratingModeLabel": null,
+      "docRef": "algorithms/docs/algorithms/parallax.md",
+      "docStatus": "内置算法",
+      "notes": "标准：独立整回合行动组合搜索、反击情景检验与配置驱动的地图路径规划"
+    },
+    {
       "id": "hex_ppo_v1.0.0_20260824_120K.zip",
       "kind": "model",
       "short": "v1.0.0@120K",
@@ -4742,5 +6312,7 @@
       "reason": "在回合交替损坏的环境下训练（从 v2.1.7 崩溃的 12 万步断点续训），自评 100% 胜率为虚假数据"
     }
   ],
-  "warnings": []
+  "warnings": [
+    "detail 明细缺失：31585/38785 局无玩法明细（换机器或已清理本地明细时玩法统计会降级）"
+  ]
 }

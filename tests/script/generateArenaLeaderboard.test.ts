@@ -204,6 +204,38 @@ describe('决策耗时字段（matches.jsonl decisionSec/decisionCount）', () =
   });
 });
 
+describe('先手胜率与换座胜率差（2026-10-30）', () => {
+  it('overview 带先手胜率，h2h 带换座胜率差', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-seat-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    const line = (a: string, b: string, winner: string) =>
+      JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
+    // algo_threat 先手赢、后手输（强先手依赖）；两局均为先手（player_a 座）胜。
+    writeFileSync(statsFile,
+      line('algo_threat@v1', VALID, 'algo_threat@v1') +
+      line(VALID, 'algo_threat@v1', VALID));
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    const all = payload.modes.find((m: { id: string }) => m.id === 'standard').maps.all;
+    expect(all.overview.firstSeatWinRate).toBe(1); // 两局均为先手胜
+    const h = all.h2h.find((x: { a: string }) => x.a === 'algo_threat@v1');
+    // algo_threat 先手 1/1 赢、后手 0/1 赢 → 换座胜率差 1.0。
+    expect(h.aFirstWinRate).toBe(1);
+    expect(h.aSecondWinRate).toBe(0);
+    expect(h.aSeatSwing).toBe(1);
+  });
+});
+
 describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
   const line = (a: string, b: string, winner: string) =>
     JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';

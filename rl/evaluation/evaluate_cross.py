@@ -41,7 +41,7 @@ from typing import Any
 _ML: dict[str, Any] | None = None
 
 # 每局完成后的进度行前缀：round_robin.py 按此前缀把逐局进度实时透传到评估
-# 控制台，其余输出仍只在批次失败时回显尾部（8 路并发下避免刷屏）。
+# 控制台，其余输出仍只在批次失败时回显尾部（多路并发下避免刷屏）。
 GAME_PROGRESS_PREFIX = "进度|"
 
 
@@ -770,10 +770,11 @@ def _play_sequential(worker: EngineWorker, seat_map: dict[str, SideController], 
                 raise
             # 线上 runner 对算法动作失败的处理是结束整个回合（algorithms/lib/interfaces.mjs），
             # 进程内评估对齐该语义：记录失败动作并改走 end_turn，不中断整批跑测。
+            # fallback 标记供动作画像区分「控制器决策」与 runner 补偿动作（不计入动作次数）。
             print(f"  警告：{controller.short} 动作被引擎拒绝（{exc}），按线上语义结束该回合")
             action_log.append({"seat": side, "round": round_number,
                                "action": {"type": "end_turn"}, "kind": "algorithm",
-                               "failed": True, "error": str(exc)})
+                               "fallback": True, "failed": True, "error": str(exc)})
             state = worker.apply(side, "end_turn", {})
         collector.absorb(state)
         acted += 1
@@ -1014,6 +1015,10 @@ def main():
                 "endReason": end_reason,
                 "scores": final_scores,
                 "actions": detail["summary"]["actions"],
+                # 摘要行只保留榜单与统计必需的紧凑字段。裁决 7 分项、动作类型分布、
+                # 控制点易手、policy 信号等玩法明细，由 generateArenaStats 从 detail
+                # 一次性派生进 arena-stats.json 快照，不在入 git 的 matches.jsonl 重复存
+                # （2026-10-30 体积治理：这些字段曾让单行涨到 2.5–4.5 KB）。
                 # 摘要行自带双方 derived 统计（部署/伤害/占点等），弱点分析不必打开原始明细；
                 # 明细文件本身 gitignored，仅本地留存（2026-09-08）。
                 "derived": detail["derived"],
@@ -1022,6 +1027,9 @@ def main():
                 "decisionCount": detail["summary"]["decisionCount"],
                 "seed": detail["meta"]["mapSeed"],
                 "detailFile": detail_path,
+                # 批内局号：静态图 mapSeed 为 null，聚合端靠 (detailFile, gameIndex)
+                # 定位本地明细、派生玩法统计（2026-10-30）。
+                "gameIndex": detail["meta"]["gameIndex"],
             }
             records.append(record)
             print(f"  结果：{result}（{rounds} 回合 / {acted} 动作 / {end_reason}）")

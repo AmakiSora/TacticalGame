@@ -169,6 +169,7 @@
 - `jobs` 每个任务是一个独立的 `evaluate_cross.py` 进程（再各自 spawn 一个 node 引擎，模型批还有 torch 推理），不是线程；上限 16 只是产品保护，实际吞吐受物理核数与内存约束，`round_robin.py` 自身建议 ≤ 物理核数−2。实测单任务峰值内存：纯算法批 ~0.3 GB、带模型批 ~1.4 GB（python 端 torch 约 1.1 GB + node 引擎约 0.3 GB），16 路全模型批会超过 16 GB 机器的物理内存。
 - 非标准模式没有 RL 模型参评，`participants` 至少需要 2 个该模式算法；不足时返回 400 `invalid_participants`。可用算法以 `GET /api/arena/participants` 返回条目的 `modes` 为准，名称与定位见 [算法 AI](AI_PLAYERS.md#3-算法-ai)。
 - 已有跑批进行中时 `start` / `clear-matches` 返回 409 `eval_already_running`。
+- 清空旧局的 `participant` 按对局记录里的参与者 id 匹配任一座位：模型为 zip 文件名（精确），算法为 `algo_<name>@<version>`；只传不带版本的 `algo_<name>`（控制台算法下拉即此形式）时匹配该算法的全部版本，升版后旧版本 id 上的历史对局也能一并清理。带版本的 id 仍精确匹配。
 - **维护任务 `auxTask`**：`status` 快照新增 `auxTask`（跑批之外的重算榜单 / 清空旧局），字段为 `{ kind: 'regen'|'clear', label, status: 'running'|'finished'|'failed', step, steps, stepLabel, startedAt, finishedAt, outputTail, detail, error }`；`step/steps` 是步骤进度（重算 2 步：榜单 → 玩法统计；清空 3 步：扫描 → 重写 → 完成），`outputTail` 是子脚本 stdout/stderr 的最近 40 行，`detail` 在清空完成时带 `{ removed, total }`。任务只存进程内，重启后丢失。
 - 维护任务之间互斥：已有任务运行时再调 `clear-matches`（非 dryRun）或 `leaderboard/regenerate` 返回 409 `aux_task_running` 并附当前 `auxTask`；重算失败不再返回 500，而是任务收尾为 `status: 'failed'` 并带 `error`（控制台展示在日志区）。
 - 控制台轮询策略：跑批或维护任务运行时 1s 一次，空闲 3s 一次（前端实现，接口无差别）。

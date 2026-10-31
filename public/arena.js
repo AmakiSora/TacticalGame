@@ -994,7 +994,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       <label>地图
         <select data-clear="map"></select>
       </label>
-      <label>参与者（精确匹配任一座位）
+      <label title="模型按 zip 文件名精确匹配；算法按名称匹配全部版本（含升版前的历史对局）">参与者（算法匹配全部版本）
         <select data-clear="participant"></select>
       </label>
       <p class="eval-clear-preview" data-clear="preview">正在统计命中局数…</p>`;

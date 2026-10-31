@@ -25,7 +25,7 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { wilsonLower, round2, round4 } from './generateStats.mjs';
-import { listAlgorithmInfo, algorithmVersionedId } from '../algorithms/registry.mjs';
+import { listAlgorithmInfo, listHistoricalAlgorithmInfo, algorithmVersionedId } from '../algorithms/registry.mjs';
 import { MODEL_STATUS_BY_VERSION, RETIRED_VERSIONS } from './modelStatus.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -223,15 +223,20 @@ export function shortName(meta) {
  * （kind=algorithm，来自 algorithms/registry.mjs）。作废版本（RETIRED_VERSIONS）
  * 直接跳过：不注册、不进"未参评"区（排行榜任何区域都不展示），其历史对局由 loadMatches 单独过滤。
  */
-export function collectRegistry(modelsDir, algorithms = listAlgorithmInfo()) {
+export function collectRegistry(modelsDir, algorithms = null, historical = null) {
   const registry = new Map();
   const excluded = [];
+  // 默认：当前算法 + 历史算法版本。显式传 `algorithms`（测试里的纯模型/空清单）
+  // 时不再自动加历史版本，避免把算法混进只测模型的 registry。
+  const current = algorithms ?? listAlgorithmInfo();
+  const history = historical ?? (algorithms === null ? listHistoricalAlgorithmInfo() : []);
   let files = [];
   try {
     files = readdirSync(modelsDir);
   } catch {
     // 模型目录不可读只是少了模型参与者，算法照常注册（如纯算法环境的开发机）。
-    registryAlgorithms(registry, algorithms);
+    registryAlgorithms(registry, current);
+    registryAlgorithms(registry, history);
     return { registry, excluded, warning: `cannot read ${modelsDir}` };
   }
   for (const f of files) {
@@ -244,7 +249,8 @@ export function collectRegistry(modelsDir, algorithms = listAlgorithmInfo()) {
       excluded.push({ id: meta.id, version: meta.version, reason: '512 动作旧格式，评估脚本不支持进程内互打' });
     }
   }
-  registryAlgorithms(registry, algorithms);
+  registryAlgorithms(registry, current);
+  registryAlgorithms(registry, history);
   excluded.sort((a, b) => a.id.localeCompare(b.id));
   return { registry, excluded, warning: null };
 }
@@ -252,10 +258,11 @@ export function collectRegistry(modelsDir, algorithms = listAlgorithmInfo()) {
 function registryAlgorithms(registry, algorithms) {
   for (const info of algorithms) {
     // 参与者 id 带版本（algo_<name>@<v1>），算法升版后历史对局仍归属旧版本 id。
-    const id = algorithmVersionedId(info.name);
+    const id = algorithmVersionedId(info.name, info.version);
     registry.set(id, {
       id, kind: 'algorithm', name: info.name, displayName: info.displayName,
       description: info.description, version: info.version,
+      historical: Boolean(info.historical),
       modes: Array.isArray(info.modes) && info.modes.length ? info.modes : ['standard'],
     });
   }
@@ -601,8 +608,14 @@ function main() {
   const { matches, warnings: loadWarnings, retiredDropped } = loadMatches(opts.statsFile, registry, mapModes);
   warnings.push(...loadWarnings);
 
+  const playedIds = new Set(matches.flatMap(m => [m.playerA, m.playerB]));
   const allIds = [...registry.keys()]
     .filter(id => !EXCLUDED_VERSIONS.has(registry.get(id).version))
+    // 历史版本只在确有对局时进榜：清空某算法的数据后，旧版本不应残留一行 0 局。
+    .filter(id => {
+      const meta = registry.get(id);
+      return !(meta?.historical && !playedIds.has(id));
+    })
     .sort();
   const strata = buildStrata(matches);
 
@@ -637,7 +650,9 @@ function main() {
   // （如刚接入歼灭/大逃杀、尚未跑批的 random）不应在页面上开一个 0 局的空榜。
   }).filter(mode => mode.games > 0);
 
-  const registryMeta = Object.fromEntries([...registry.entries()].map(([id, meta]) => [id, meta.kind === 'algorithm' ? {
+  const registryMeta = Object.fromEntries([...registry.entries()]
+    .filter(([id]) => allIds.includes(id))
+    .map(([id, meta]) => [id, meta.kind === 'algorithm' ? {
     kind: 'algorithm',
     short: meta.displayName,
     algorithm: meta.name,

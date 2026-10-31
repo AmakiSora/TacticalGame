@@ -28,14 +28,22 @@ export interface AlgorithmMeta {
 
 export declare const ALGORITHMS: Record<string, string>;
 export declare const ALGORITHM_META: Record<string, AlgorithmDisplayMeta>;
+/** 历史算法版本：只用于榜单/统计解析旧对局，不加载模块、不进大厅。 */
+export declare const ALGORITHM_HISTORY: Record<string, Array<{
+  version: string;
+  displayName?: string;
+  description?: string;
+  modes?: string[];
+}>>;
 
 export declare function loadAlgorithm(name: string): Promise<AlgorithmModule>;
 export declare function listAlgorithms(): string[];
 export declare function listAlgorithmInfo(): Array<{ name: string; displayName: string; description: string; version: string; modes: string[] }>;
+export declare function listHistoricalAlgorithmInfo(): Array<{ name: string; displayName: string; description: string; version: string; modes: string[]; historical: true }>;
 export declare function algorithmVersion(name: string): string;
 export declare function algorithmModes(name: string): string[];
 export declare function algorithmSupportsMode(name: string, mode: string): boolean;
 export declare function algorithmParticipantId(name: string): string;
-export declare function algorithmVersionedId(name: string): string;
+export declare function algorithmVersionedId(name: string, version?: string): string;
 export declare function getAlgorithmMeta(name: string): AlgorithmMeta | null;
 export declare function registerAlgorithm(name: string, path: string): void;

@@ -293,13 +293,15 @@ describe('verdict 算法 decide()', () => {
 
   it('拆墙：只拆比脚下更接近任务目标的墙', async () => {
     const heavy = makeUnit('player_a', 'heavy', 0, 0);
-    // 朝向目标方向的墙（更近）与背离目标方向的墙（更远）各一堵，都贴在重装身边
+    // 目标在 q=3 一侧；q=1 整列是墙，唯一通路必须拆墙。
+    // 直线距离上 (1,0) 与 (-1,0) 都贴在重装身边，但只有朝目标那侧是唯一通路。
+    const blockers: BlockerSpec[] = [];
+    for (let r = -5; r <= 5; r++) blockers.push({ q: 1, r, terrain: 'blocker' });
+    blockers.push({ q: -1, r: 0, terrain: 'blocker' });
     const game = makeGame([heavy], {
-      enemyHqAt: { q: 3, r: 3 },
-      blockers: [
-        { q: 1, r: 0, terrain: 'blocker' },
-        { q: -1, r: 0, terrain: 'blocker' },
-      ],
+      radius: 5,
+      enemyHqAt: { q: 3, r: 0 },
+      blockers,
       turnNumber: 5,
     });
 

@@ -166,8 +166,25 @@ export function readMapModes(mapsDir = join(PROJECT_ROOT, 'maps')): Map<string, 
 export interface ClearFilter {
   mode?: string | null;
   map?: string | null;
-  /** 参与者 id（模型 zip 文件名或 algo_<name>@<version>），精确匹配任一座位。 */
+  /**
+   * 参与者 id（模型 zip 文件名或 algo_<name>@<version>），匹配任一座位。
+   * 模型文件名与带版本的算法 id 精确匹配；不带版本的 algo_<name>（控制台算法下拉的
+   * 形式）匹配该算法的全部版本，算法升版后也能清掉留在旧版本 id 上的历史旧局。
+   */
   participant?: string | null;
+}
+
+/**
+ * 清空旧局的参与者匹配：控制台算法下拉给的是当前命名空间的 `algo_<name>`（不带版本），
+ * 而 matches.jsonl 里的算法参与者是 `algo_<name>@<version>`（算法升版后历史对局仍留在
+ * 旧版本 id 上）。不带版本的算法过滤项按算法名匹配全部版本，避免下拉选中的算法永远
+ * 命中 0 局；带版本的算法 id 与模型文件名仍按原样精确匹配。
+ */
+function participantMatchesFilter(playerId: unknown, filterId: string): boolean {
+  if (typeof playerId !== 'string' || !playerId) return false;
+  if (playerId === filterId) return true;
+  return filterId.startsWith('algo_') && !filterId.includes('@')
+    && playerId.startsWith(`${filterId}@`);
 }
 
 /** 清空旧局任务日志里的范围描述（用原始 id，控制台另有带中文名的版本）。 */
@@ -528,7 +545,8 @@ export class EvalRunner {
       const hitMap = !filter.map || mapId === filter.map;
       const hitParticipant = !filter.participant || (
         players && typeof players === 'object'
-        && (players.player_a === filter.participant || players.player_b === filter.participant));
+        && (participantMatchesFilter(players.player_a, filter.participant)
+          || participantMatchesFilter(players.player_b, filter.participant)));
       (hitMode && hitMap && hitParticipant ? removed : staying).push(line);
     }
     return { removed, staying, total };

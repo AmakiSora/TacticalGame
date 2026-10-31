@@ -780,9 +780,11 @@ function leaderboardRatings(leaderboardJson) {
  * 组装参与者档案列表：registry 元数据（模型 zip + 内置算法）+ 文件大小 + 榜单评分（可选）
  * + MODELS_NOTES/注册表说明。leaderboardJson 为 null 时评分字段留空（榜单未生成也能出档案）。
  */
-export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notesProfiles }) {
+export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notesProfiles, playedIds = null }) {
   const ratingsById = leaderboardRatings(leaderboardJson);
   const profiles = [...registry.entries()].map(([id, meta]) => {
+    // 历史算法版本只在确有对局时出档案：清空数据后不残留一行 0 局的旧版本。
+    if (meta.kind === 'algorithm' && meta.historical && playedIds && !playedIds.has(id)) return null;
     const ratings = ratingsById.get(id) ?? [];
     const lb = ratings[0] ?? null;
     if (meta.kind === 'algorithm') {
@@ -846,7 +848,7 @@ export function buildModelProfiles({ registry, modelsDir, leaderboardJson, notes
       docStatus: notes?.docStatus ?? null,
       notes: notes?.notes ?? null,
     };
-  });
+  }).filter(Boolean);
   // 评分降序（无评分/未参评排后），同分按文件名。
   profiles.sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity) || a.id.localeCompare(b.id));
   return profiles;
@@ -901,7 +903,10 @@ function main() {
     warnings.push(`leaderboard file not found: ${opts.leaderboardFile}（档案评分字段留空）`);
   }
 
-  const models = buildModelProfiles({ registry, modelsDir, leaderboardJson, notesProfiles: notesData.profiles });
+  const playedIds = new Set(matches.flatMap(m => [m.playerA, m.playerB]));
+  const models = buildModelProfiles({
+    registry, modelsDir, leaderboardJson, notesProfiles: notesData.profiles, playedIds,
+  });
 
   const tsList = matches.map(m => m.ts).filter(Boolean).sort();
   const payload = {

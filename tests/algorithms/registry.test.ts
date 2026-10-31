@@ -5,11 +5,13 @@ import { describe, expect, it } from 'vitest';
 // @ts-expect-error 注册表为 ESM .mjs，类型声明见 registry.d.mts
 import {
   ALGORITHMS,
+  ALGORITHM_HISTORY,
   ALGORITHM_META,
   algorithmModes,
   algorithmSupportsMode,
   getAlgorithmMeta,
   listAlgorithmInfo,
+  listHistoricalAlgorithmInfo,
 } from '../../algorithms/registry.mjs';
 
 const KNOWN_MODES = ['standard', 'simultaneous', 'annihilation', 'royale'];
@@ -123,5 +125,15 @@ describe('algorithm registry modes', () => {
     const doc = readFileSync('algorithms/docs/algorithms/shrinkroll.md', 'utf8');
     expect(doc).toContain('## 身份与文件');
     expect(doc).toContain('algo_shrinkroll@v1');
+  });
+
+  it('默认不登记历史算法版本', async () => {
+    const { algorithmVersionedId } = await import('../../algorithms/registry.mjs');
+    expect(Object.keys(ALGORITHM_HISTORY)).toEqual([]);
+    expect(listHistoricalAlgorithmInfo()).toEqual([]);
+    expect(listAlgorithmInfo().find(i => i.name === 'verdict')?.version).toBe('v2');
+    expect(algorithmVersionedId('verdict')).toBe('algo_verdict@v2');
+    // 显式版本仍能拼出旧 id（供解析历史数据用），但注册表不再登记 v1
+    expect(algorithmVersionedId('verdict', 'v1')).toBe('algo_verdict@v1');
   });
 });

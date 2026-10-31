@@ -402,7 +402,7 @@ export const ALGORITHM_META = {
 - `version` 是算法的“当前版本”标注。算法行为被改进后应升版（如 `v1` → `v2`）；竞技场参与者 id 是 `algo_<name>@<version>`，历史对局仍归属旧版本 id。
 - 升版时必须按下面的“版本升级的文档要求”更新单算法档案，不能只改代码和 `version`。
 - 线上 bot type 是 `algo_<name>`，永远指向当前实现；`src/api/bots.ts` 的 `ALGORITHM_BOTS` 由注册表自动生成，前端下拉从 `/api/algorithms` 动态拉取。**不要再手工维护第二份算法清单。**
-- 若旧版本实现不再保留，需要像模型退役一样显式处理旧版本 id，否则历史对局会因“未知参与者”被榜单过滤。
+- 旧版本实现不再保留时，把该版本登记到 `algorithms/registry.mjs` 的 `ALGORITHM_HISTORY`，榜单/统计才能继续解析旧对局（未登记的旧 id 会被当作“未知参与者”过滤）；登记了但没有对局的历史版本不会出现在榜单/统计里。
 
 ### 版本升级的文档要求（强制）
 
@@ -470,7 +470,7 @@ export const ALGORITHM_META = {
 
 | 算法 | 模式 | 版本 | 类型 | 复杂度 | 强度 / 状态 | 用途 |
 |---|---|---|---|---|---|---|
-| **random** | standard | v1 | 随机 | O(n) | arena 756 / 1.3%（2026-10-21 UTC） | 基准对照、测试 |
+| **random** | standard | v1 | 随机 | O(n) | arena 713 / 0.9%（2026-10-31） | 基准对照、测试 |
 | **random-annihilation** | annihilation | v1 | 随机 | O(n) | 暂无对局与标定（3.8.10 新条目） | 歼灭模式基线、炮火合法性冒烟 |
 | **shrinkroll** | annihilation | v1 | 束搜索 + 缩圈时间线投影 | O(束宽×候选×深度×结算投影) | 3.8.12 开发期真实引擎标定（`temp/arena/bench.ts`，两图各 240 局）：对 random-annihilation **480/480**；对评测贪婪基线 100%（artillery-zone，160/160）/ 98.75%（trench-run，158/160）；自我镜像 50.0% / 49.7%；3 人局第一名 90.0%（108/120）；随机歼灭图 97.9%（47/48）、6 人混战 32/32；单次 decide 4.91–10.85ms、零非法 | 歼灭模式强基线、多席位领先者压制 |
 | **random-royale** | royale | v1 | 随机 | O(n) | 独立随机基线，对战见 [ark 评估](#ark方舟算法)、[apex 评估](#apex绝境算法) 与 [echelon 评估](#echelon雁阵算法) | 大逃杀模式基线、计划队列冒烟 |
@@ -480,12 +480,12 @@ export const ALGORITHM_META = {
 | **vortex** | annihilation | v1 | 效用 AI / 威胁图 + 炮火收缩圈预判 | O(单位×格子) | 真实引擎 headless strict 对拍 `random-annihilation` 40:0（两图各 20 局，2026-10-29，零非法），详见 [设计与评估](#vortex旋涡算法)；当前榜单 rating **1155**（192 局 48W/144L），3.8.13 发布时为 1882（40W/0L） | 歼灭模式强度条目、炮火圈疏散与稳杀集火参考 |
 | **crucible** | annihilation | v1 | 整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演 | O(束宽×候选×深度×(单位×格子)) | 3.8.15 真实引擎本地换座标定，详见 [设计与评估](#crucible熔炉算法)；本地标定不入榜，另由竞技场跑批入榜（crucible 193 局，2026-10-29） | 歼灭模式整回合规划、跨图/跨权重泛化 |
 | **sovereign** | annihilation | v1 | 概率齐射竞价 + 多轮炮火逃逸 + 协同让行/爆破距离场 | O(单位×格子 + 齐射组合×目标 + 部署候选×(单位×格子)) | 3.8.17 真实引擎黑盒跑批（`scripts/sovereign-arena.mts`，2026-10-29）：双人 256 局 225:31、三人 18:6、六人 11:13，合计 **304 局 254:50**、零非法；静态双人对 crucible 30:10，随机新图 8:12、六人对 shrinkroll/crucible 各 0:6，详见 [设计与评估](#sovereign统御算法) | 歼灭模式概率集火与多人风险建模参考 |
-| **parallax** | standard | v1 | 整回合束搜索 + 完整激活宏动作 + 对抗回应检验 | O(束宽×候选×深度×单次激活镜像) | 3.8.18 真实引擎本地换座（`scripts/parallax-arena.mts`，2026-10-29）：双人四图 **45:3**、随机挑战 **8:0**、环形/漩涡 4:2（另 2 截断），3/6/8 人 **1:5**；合计 **70 局 58:10**、零非法；决策 p50 19–1008ms，详见 [设计与评估](#parallax视差算法)；本地标定不入榜 | 标准模式整回合规划、终局裁决与换家压力建模参考 |
-| **greedy** | standard | v1 | 启发式 | O(n²) | arena 1761 / 77.5%；历史 vs random 100% | 快速决策、基准线 |
-| **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1631 / 64.1%；历史 vs greedy 25% | 战术推演、对比实验 |
-| **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1778 / 79.1%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
-| **field** | standard | v1 | 势场/梯度下降 | O(单位×格子) | arena 1753 / 76.8%；历史 vs greedy 64.3%；danger-close 强项、multiplayer-ring 短板 | 涌现式走位、慢节奏消耗战 |
-| **verdict** | standard | v1 | 反向规划/期限排程 | O(单位×格子 + 排程回合) | arena 1933 / 90.1%（该快照 standard 第一）；历史 vs greedy 95.7% | 裁决分统一计价、预算内斩首、守成与回防 |
+| **parallax** | standard | v1 | 整回合束搜索 + 完整激活宏动作 + 对抗回应检验 | O(束宽×候选×深度×单次激活镜像) | 3.8.18 真实引擎本地换座（`scripts/parallax-arena.mts`，2026-10-29）：双人四图 **45:3**、随机挑战 **8:0**、环形/漩涡 4:2（另 2 截断），3/6/8 人 **1:5**；合计 **70 局 58:10**、零非法；决策 p50 19–1008ms，详见 [设计与评估](#parallax视差算法)；本地标定不入榜，竞技场当前 2224 / 97.5%（3,745 局，2026-10-31） | 标准模式整回合规划、终局裁决与换家压力建模参考 |
+| **greedy** | standard | v1 | 启发式 | O(n²) | arena 1748 / 74.6%；历史 vs random 100% | 快速决策、基准线 |
+| **mcts** | standard | v1 | 搜索 | O(b^d · k) | arena 1630 / 63.1%；历史 vs greedy 25% | 战术推演、对比实验 |
+| **threat** | standard | v1 | 效用/影响图 | O(单位×格子) | arena 1780 / 77.2%；历史 vs greedy 70.6%（3.5.x 7 图） | 走位稳健的对战、教学 |
+| **field** | standard | v1 | 势场/梯度下降 | O(单位×格子) | arena 1706 / 70.5%；历史 vs greedy 64.3%；danger-close 强项、multiplayer-ring 短板 | 涌现式走位、慢节奏消耗战 |
+| **verdict** | standard | v2 | 反向规划/期限排程 + 破墙路径场 | O(单位×格子 + 排程回合 + 路径场) | 2026-10-31 竞技场 3,745 局 **1929 / 87.4%**（standard 第二），`whirlpool` **144 局 108:36（75%）**；headless 7 图 ×30 局：vs greedy **191/210（91.0%）**、vs threat 148/210（70.5%）、vs field 178/210（84.8%） | 裁决分统一计价、预算内斩首、守成回防、破墙地图开路 |
 | **random-sim** | simultaneous | v2 | 随机 | O(n) | v2 已适配分步引擎；同时回合基线（3.8.5 竞技场 288 局 0W/288L、评分 678） | 基线对照、模式隔离冒烟 |
 | **dest-prob** | simultaneous | v2 | 对手建模/预测评估 | O(敌军×可达格×覆盖格 + 己方单位×瞄准格) | 3.8.1 真实引擎同 harness（30 局/图，2026-10-23）：对 v1 **50/60（83.3%）**、对 random-sim **60/60**；对 kriegspiel v2 21/60、对 matrix-eq v2 23/60（抽样）；3.8.5 竞技场 288 局 114W/174L、评分 1379 | 预测射击、冲突规避、分步队列投影样例 |
 | **kriegspiel** | simultaneous | v2 | 分步结算 rollout + 有序计划联合搜索 | O(行动点×候选×种子计划×rollouts×分步结算) | 3.8.1 真实引擎标定（standoff / molten-throne 各 30 局 ×3 对手，2026-10-23）：60:0 vs random-sim、52:8（86.7%，p<0.0001）vs dest-prob v1、29:31 vs matrix-eq v2（standoff 27:3 / molten-throne **2:28**，斩首短板；合计 p=0.90 不可用，必须按图拆）；与引擎逐点对拍 40 局面零偏差；180 局零非法；`decide` 45–169ms（v1 的 15–40 倍）。**同 harness 同种子的 v1 基线**：vs dest-prob 43.3%、vs matrix-eq 31.7%，即适配带来 +43.4pp / +16.6pp；但 v1↔v2 直接对打 35:25（p=0.245）**未达显著**，且 v2 结算期失败 17.1–23.1/局远高于 v1 的 1.3/局（`destination_occupied` 未修）；3.8.5 竞技场 288 局 114W/173L/1D、评分 1380 | 同时回合搜索型内置、分步结算语义参考镜像 |
@@ -495,7 +495,7 @@ export const ALGORITHM_META = {
 | **tempo-weave** | simultaneous | v1 | 任务排程/期限约束 | O(单位×任务×束宽×行动点×镜像步) | 3.8.2 真实引擎（两图 ×4 对手 ×30 局，2026-10-24）：对 random-sim / dest-prob / kriegspiel / matrix-eq **全部 30:0（240/240）**；多席位 standoff 3 人 15/15、6 人 24/6；3.8.5 集成抽样复验 8:0；竞技场 288 局 **288:0**、评分 **2355** 第一 | 任务级行动点预算、多席位回防 |
 | **horizon** | simultaneous | v1 | 分步结算镜像 + 终局投影胜率评估 + 同构对手场景 + 束搜索 + 对抗探针 | O(行动点×束宽×候选×场景×单轮结算) | 3.8.2 真实引擎（`scripts/horizon-arena.mts`，standoff / molten-throne 各 30 局 ×4 对手，种子基 20261026，2026-10-26）：random-sim 30:0 / 30:0、dest-prob 30:0 / 30:0、kriegspiel 30:0 / 30:0、matrix-eq 29:1 / 27:3，合计 **236:4（98.3%）**、零非法；molten-throne 据点流量低于 dest-prob / kriegspiel（7 vs 12），胜利来自斩首；多席位只做抽样（6 人局对 matrix-eq 两次复测 1:5 / 9:3 互相矛盾）；单轮规划（单进程）standoff p50 154ms、molten-throne p50 233ms、6 人 p50 529ms | 同时回合多轮视界规划、强基线 |
 
-> 表中 standard 行的 arena 数字来自 `public/data/arena-leaderboard.json`（2026-10-21 UTC 生成，standard，36,000 局，300 对，每人 2,880 局）；simultaneous 行来自 2026-10-24 生成的 1,008 局分区（7 名参与者，tempo / tempo-weave 已入榜）；其中 prism 的 192 局 / 1977 是 3.8.3 首战快照，当前为 288 局 / 1,839。评分是 Bradley-Terry 混合池，胜率包含不同对手，不能与单图对拍数字直接比较；模式之间也不可混比。
+> 表中 standard 行的 arena 数字来自 `public/data/arena-leaderboard.json`（2026-10-31 UTC 生成，standard，7 图，算法每人约 3,745 局、模型 3,600 局）；simultaneous 行来自 2026-10-24 生成的 1,008 局分区（7 名参与者，tempo / tempo-weave 已入榜）；其中 prism 的 192 局 / 1977 是 3.8.3 首战快照，当前为 288 局 / 1,839。评分是 Bradley-Terry 混合池，胜率包含不同对手，不能与单图对拍数字直接比较；模式之间也不可混比。
 >
 > 历史数字采集于 3.5.x 地图池与 3.6.0 之前的裁决分口径；`forge`、`desert` 已不在当前池，详见“历史标定”。
 
@@ -513,19 +513,20 @@ export const ALGORITHM_META = {
 > 战绩不会混名；标准模式的实现与历史不受影响。
 > 歼灭模式强度算法 `shrinkroll`（3.8.12）、`vortex`（3.8.13）、`crucible`（3.8.15）与 `sovereign`（3.8.17）；大逃杀强度算法 `echelon`（3.8.16）、`apex`（3.8.14）与 `ark`（3.8.19）；标准模式强度算法 `parallax`（3.8.18）。跨模式战绩不可用于证明算法强度。
 
-## 当前强度快照（standard，2026-10-21 UTC）
+## 当前强度快照（standard，2026-10-31 UTC）
 
 | 参与者 | 类型 | 评分 | 胜率 | 局数 |
 |---|---|---:|---:|---:|
-| `algo_verdict@v1` | 算法 | **1933** | **90.1%** | 2,880 |
-| `algo_threat@v1` | 算法 | 1778 | 79.1% | 2,880 |
-| `algo_greedy@v1` | 算法 | 1761 | 77.5% | 2,880 |
-| `algo_field@v1` | 算法 | 1753 | 76.8% | 2,880 |
-| `hex_ppo_v3.1.1_20260911_8.8M.zip` | 模型 | 1660 | 67.3% | 2,880 |
-| `algo_mcts@v1` | 算法 | 1631 | 64.1% | 2,880 |
-| `algo_random@v1` | 算法 | 756 | 1.3% | 2,880 |
+| `algo_parallax@v1` | 算法 | **2224** | **97.5%** | 3,745 |
+| `algo_verdict@v2` | 算法 | **1929** | **87.4%** | 3,745 |
+| `algo_threat@v1` | 算法 | 1780 | 77.2% | 3,748 |
+| `algo_greedy@v1` | 算法 | 1748 | 74.6% | 3,744 |
+| `algo_field@v1` | 算法 | 1706 | 70.5% | 3,747 |
+| `hex_ppo_v3.1.1_20260911_8.8M.zip` | 模型 | 1653 | 66.8% | 3,600 |
+| `algo_mcts@v1` | 算法 | 1630 | 63.1% | 3,745 |
+| `algo_random@v1` | 算法 | 713 | 0.9% | 3,746 |
 
-> 口径：Arena 标准模式混合池（`default` / `breach` / `danger-close` / `dual-lanes` / `random`），不含 `multiplayer-ring` 与 `whirlpool`；胜率是对混合对手的总体胜率，不是对固定基线的单挑。该快照生成于 3.8.0 之前（`generatedAt` 为 2026-10-21T22:02Z），standard 规则不受同时回合分步结算影响。该快照只能说明“在这个池子里”的强弱，不能外推到全图池、同时回合、大逃杀或歼灭。`parallax` 于 3.8.18 加入，尚未进入该快照；其本地黑盒结果见 [设计与评估](#parallax视差算法)，本地标定不写竞技场历史。
+> 口径：Arena 标准模式 7 图池（`default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `random` / `whirlpool`）；`whirlpool` 声明 `modelEval: false`，只有算法对算法 144 局，模型每图 600 局、合计 3,600 局。评分是 Bradley-Terry 混合池，胜率是对混合对手的总体胜率，不是对固定基线的单挑，也不能外推到同时回合、大逃杀或歼灭。该快照由 `public/data/arena-leaderboard.json`（`generatedAt` 2026-10-31T18:01Z）导出；`algo_verdict@v2` 为当前版本，v1 已下线并移除登记，榜单只有 v2 一行。
 
 ## 历史标定（3.5.x 标准模式）
 
@@ -607,7 +608,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 
 ## 算法 vs RL 模型
 
-当前可比较的数据是上面的 Arena 标准模式快照：`algo_verdict@v1` 评分 1933、胜率 90.1%，高于最强模型 `hex_ppo_v3.1.1` 的 1660 / 67.3%。因此不能再概括为“算法 AI 与训练良好的 RL 模型仍有显著差距”；更准确的说法是：**在当前 Arena 标准图池与模型池里，规则算法第一梯队不弱于最强模型**，但这不能外推到同时回合、大逃杀、歼灭或训练分布外的地图。
+当前可比较的数据是上面的 Arena 标准模式快照：`algo_verdict@v2` 评分 1929、胜率 87.4%（`algo_parallax@v1` 2224 / 97.5%），高于最强模型 `hex_ppo_v3.1.1` 的 1653 / 66.8%。因此不能再概括为“算法 AI 与训练良好的 RL 模型仍有显著差距”；更准确的说法是：**在当前 Arena 标准图池与模型池里，规则算法第一梯队不弱于最强模型**，但这不能外推到同时回合、大逃杀、歼灭或训练分布外的地图。verdict 自 3.8.21 起为 v2（破墙路径场），见 [verdict.md](algorithms/verdict.md)。
 
 历史上只有一组 48 局配对换座的旧数据：
 
@@ -615,7 +616,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 |---|---|---|---|
 | greedy vs v2.7.0 | 18.8% (9:39) | 6:18 / 3:21 | 历史；random 地图，48 局；数据源 `rl/test-output/stats/algo_vs_rl_random.jsonl` 已不在仓库 |
 
-> 旧数据只用于解释 3.5.x 时代的差距；模型池、随机地图域与竞技场口径都已变化，不能作为当前结论。MCTS 的 RL 同口径数据现在可从 Arena 的 2,880 局记录中读取，不再标注“尚未进行”。
+> 旧数据只用于解释 3.5.x 时代的差距；模型池、随机地图域与竞技场口径都已变化，不能作为当前结论。MCTS 的 RL 同口径数据现在可从 Arena 的 3,745 局记录中读取，不再标注“尚未进行”。
 
 ## 规则与地图变更对算法的影响
 
@@ -663,6 +664,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 2026-10-29 | 3.8.17 | 新增 sovereign 统御算法 v1（歼灭）：概率齐射竞价（精确离散伤害分布卷积、2–4 单位联合击杀概率）、多轮炮火逃逸动态规划、最终安全区让行与移动后爆破、按本局配置的部署/据点经济；单文件零导入、独立设计，不参考其他算法。真实引擎黑盒跑批（`scripts/sovereign-arena.mts`，换座）：双人 256 局 225:31、三人 18:6、六人 11:13，合计 **304 局 254:50**、零非法/零未完成；随机新图对 crucible 8:12、六人对 shrinkroll/crucible 各 0:6。详见 [设计与评估](#sovereign统御算法) |
 | 2026-10-29 | 3.8.18 | 新增 parallax 视差算法 v1（standard）：单位完整激活宏动作 + 整回合束搜索 + 对抗回应检验 + 终局边界实裁模拟；零导入独立设计，不读地图/对手身份。真实引擎换座（`scripts/parallax-arena.mts`）：常规四图 45:3、随机挑战 8:0、环形/漩涡 4:2（另 2 截断）、3/6/8 人混战 1:5，合计 **70 局 58 胜 10 负、零非法**。详见 [设计与评估](#parallax视差算法) |
 | 2026-10-29 | 3.8.19 | 新增 ark 方舟算法 v1（royale）：Hungarian 安全格容量匹配、逐行动点单/两动作竞价、队列前缀投影、闭式伤害分布、缩圈增援与疏散负担评估；零导入独立设计，不读地图/对手身份/对手队列。真实引擎黑盒换座（`scripts/horizon-arena.mts`）：对 random-royale 25:0:0、echelon 25:0:0、apex 7:9:5，合计 **71 局 57 胜 9 负 5 平**，零非法/零截断；雪花双人 2:6、三人 0:3 对 apex 仍是短板。详见 [设计与评估](#ark方舟算法) |
+| 2026-10-31 | 3.8.21 | verdict v2（standard）：`travelField` 改 Dijkstra，需破墙时 blocker 记 3 步；`siegeTimeline` 先走平地场、不可达才切可爆破场，并移除"直线 + 0.3"兜底；`demolishOptions` 用同一路径场比较"墙 vs 脚下"，重装另用占位场。仅在原始地图双方总部不在同一平地连通块时启用（`plainPathExists`），普通 6 图逐图统计与上一版一致。`whirlpool` 竞技场 144 局从 0-96-48 变为 **108:36（75%）**；headless 对 greedy / mcts / random 30:0、field 25:5、threat 9:21、parallax 8:22，7 图 ×30 局 vs greedy 161→191、vs threat 139→148、vs field 153→178（/210）。详见 [verdict.md](algorithms/verdict.md) |
 
 ## 未来方向
 
@@ -712,7 +714,7 @@ field 的口径与 threat 一致（`scripts/algorithm-arena.mjs`，headless 自�
 | 大逃杀换座评估 | `scripts/apex-arena.mts` | 真实引擎、公开快照，支持随机基线 / 独立启发式 / 多人自博弈，输出未结束局与动作失败统计，不写竞技场历史 |
 | 熔炉标定与复现 | `scripts/crucible-arena.mts` | 真实引擎进程内、成对换座、随机新图，审计零拒绝；不写竞技场历史 |
 | 统御黑盒评估 | `scripts/sovereign-arena.mts` | 真实引擎黑盒对战、成对共享战斗种子并换座，支持 2–8 人与额外随机图；报告只写 `temp/`，不写竞技场历史 |
-| Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 标准 36,000 局、歼灭 481 局、同时回合 2,016 局、大逃杀 144 局（`generatedAt` 2026-10-29T06:24:28Z）；按模式分榜，不同模式不混榜 |
+| Arena 榜单 | `arena/matches.jsonl`、`public/data/arena-leaderboard.json` | 标准 47,323 局、歼灭 720 局、同时回合 2,688 局、大逃杀 432 局（`generatedAt` 2026-10-31T18:01Z）；按模式分榜，不同模式不混榜 |
 | 合法性回归 | `tests/algorithms/*-selfplay.test.ts` | 整局零非法动作、正常完赛 |
 | 单算法档案 | `algorithms/docs/algorithms/*.md` | 设计细节与逐图数据；本文只保留总览与当前快照 |
 | 版本历史 | 根 `RELEASE_NOTES.md`（权威） / `algorithms/docs/RELEASE_NOTES.md`（算法专题记录，已补录 3.5.0–3.8.5） | 算法侧细节看专题记录；与根文档冲突时以根文档为准 |

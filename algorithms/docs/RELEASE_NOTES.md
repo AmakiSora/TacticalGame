@@ -4,7 +4,22 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法（greedy / random / mcts / threat / field / verdict / parallax）与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
+
+## 3.8.21（2026-10-31）— verdict v2 破墙路径场
+
+### 算法实现
+
+- **verdict v2（裁决线算法）**：`whirlpool` 的六条旋臂被墙隔断，上一版用六边形直线距离判断走位与拆墙；重装出生点相邻墙的直线距离与脚下相等（9 vs 9/10），拆墙候选恒为 0。排程在目标不可达时又退回"直线 + 0.3 抵达率"，误判 13 回合可斩首，竞技场 144 局因此是 **0 胜 96 负 48 平**（48 平是 101 回合上限，真实规则下无限僵持）。
+- v2 只替换"赶路距离"：`travelField` 改为 Dijkstra，需破墙时 blocker 记 `WALL_TRAVEL_STEPS=3`；`siegeTimeline` 先走平地场、不可达才切可爆破场，不可达且不在射程内的单位退出排程、不再直线兜底；`demolishOptions` 用同一路径场比较"墙 vs 脚下"；重装专用占位场；仅在原始地图双方总部不在同一平地连通块时启用（`plainPathExists`）。裁决账本、三条线、任务分派、动作计价与部署逻辑均未改。
+- 当前 7 图 ×30 局（真实引擎，种子基 1000）：vs greedy 161→191、vs threat 139→148、vs field 153→178（均 /210）；`whirlpool` 对 greedy / mcts / random 30:0、field 25:5、threat 9:21、parallax 8:22；第二套种子基 3000 的 whirlpool 为 greedy 30:0、threat 8:22、field 27:3；其余 6 图两版每图统计逐项一致。
+- 竞技场标准模式（2026-10-31，7 图）：verdict v2 跑批 3,745 局后重算榜单，`algo_verdict@v2` 评分 **1929**、胜率 **87.4%**（standard 第二，榜上每参与者约 3,745 局）；`whirlpool` **144 局 108:36（75%）**，上一版同图为 0:96:48；其余 6 图逐图持平（default 92.0%、breach 98.0%、danger-close 82.0%、dual-lanes 87.7%、multiplayer-ring 90.0%，random 78.7%→77.5% 属随机图波动）。
+- 榜单注册表新增历史版本登记位（`ALGORITHM_HISTORY`）与 `listHistoricalAlgorithmInfo()`：历史版本只用于解析升级前遗留的对局，不加载模块、不进大厅；登记了但没有对局的历史版本不会出现在榜单/统计里，`collectRegistry(dir, [])` 的纯模型/空清单调用也不混入历史。当前未登记任何历史版本（verdict v1 已下线并移除）。详细档案见 [verdict.md](algorithms/verdict.md)。
+- 榜单/统计生成器：历史版本只在确有对局时进榜/出档案；当前版本即使无对局也保留一行未参评占位。
+
+### 测试与验证
+
+- `npm run build` 通过；全量 vitest **146 文件 / 1699 例**通过；`npm run check-version` 通过；headless 标定批次零非法动作。版本 `algo_verdict@v2`，榜单/统计只有 v2 一行。
 
 ## 3.8.20（2026-10-30）— 评估跑批随机图按模式拆分
 

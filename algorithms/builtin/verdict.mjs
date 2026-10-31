@@ -127,8 +127,10 @@ const DAMAGE_EXPECTATION = 1.0;
 const STEP_SURVIVAL = 0.55;
 /** 抵达概率下限：再糟的路线也留一点念想，免得排程永远判"打不了"。 */
 const MIN_ARRIVAL = 0.1;
-/** 陆路不通（只能直线摸过去）时的抵达概率。 */
-const FALLBACK_ARRIVAL = 0.3;
+/** 爆破一堵墙在路径距离场里的代价（步）。重装拆墙要 1 行动点，再花移动动作
+ *  进入墙格，按 2~3 格折算；`whirlpool` 的六旋臂只有重装能开路，v1 的直线
+ *  距离在这里会把"拆墙"判成"没更近"，v2 改用可爆破路径场。 */
+const WALL_TRAVEL_STEPS = 3;
 
 // ═══ 占点与守成 ═══
 /** 守成姿态下，己方据点遭威胁的摆动系数（被夺 = 我 −90 + 敌 +90）。 */
@@ -162,9 +164,52 @@ function ringKeys(range, c) {
   return out;
 }
 
-/** 只走平地（与 utils.isEmptyPlain 的可通行口径一致：水与墙都不可通行）。 */
-function isPlain(game, utils, pos) {
-  return utils.isPlayable(game, pos) && utils.terrainAt(game, pos) === 'plain';
+/**
+ * 重装走位场的占位快照：除自己外的所有存活单位 + 所有总部格。
+ * 单位会移动，所以这张场只用于"重装现在能从哪条路出去"，
+ * 不参与排程上界；每回合重算。
+ */
+function heavyBlockedCells(game, heavy) {
+  const blocked = new Set();
+  for (const u of game.units) {
+    if (u.alive && u.id !== heavy.id) blocked.add(key(u));
+  }
+  for (const hq of Object.values(game.headquarters || {})) {
+    if (hq?.alive !== false) blocked.add(key(hq));
+  }
+  return blocked;
+}
+
+/**
+ * 静态地图上两个格子是否在同一块可通行平地里（墙/水都不可通行）。
+ * 用 `config` 的原始地形而不是当前 `game.map.terrainCells`：拆掉的墙会让
+ * 当前地形连通，但"这张图是否需要破墙"是地图属性，不能中途翻转。
+ */
+function plainPathExists(game, utils, from, to) {
+  const source = Array.isArray(game.config?.playableCells) && game.config.playableCells.length
+    ? game.config.playableCells
+    : game.cells;
+  const playable = new Set(source.map(key));
+  const terrain = new Map(game.cells.map(cell => [key(cell), cell.terrain ?? 'plain']));
+  const overrides = Array.isArray(game.config?.terrainCells)
+    ? game.config.terrainCells
+    : game.map.terrainCells;
+  for (const cell of overrides) terrain.set(key(cell), cell.terrain);
+
+  const seen = new Set([key(from)]);
+  const queue = [{ q: from.q, r: from.r }];
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i];
+    if (cur.q === to.q && cur.r === to.r) return true;
+    for (const n of utils.neighbors(cur)) {
+      const k = key(n);
+      if (seen.has(k) || !playable.has(k)) continue;
+      if ((terrain.get(k) ?? 'plain') !== 'plain') continue;
+      seen.add(k);
+      queue.push(n);
+    }
+  }
+  return false;
 }
 
 // ─── 裁决账本 ───
@@ -241,23 +286,45 @@ function scoreOf(game, utils, owner, w) {
 // ─── 攻城排程（逆向归纳的核心）───
 
 /**
- * 从总部格出发的波前距离场（BFS 步数）。只走平地、忽略单位阻挡 ——
- * 单位会移动，把友军当墙会让排程把整支军队算成"过不去"；
- * 用波前而不是直线距离，是因为 breach 这类有隔墙的图上直线会严重低估到达时间。
+ * 从总部格出发的路径距离场（Dijkstra，单位：步）。
+ *
+ * `wallCost > 0` 时把 blocker 当作"可爆破通道"：进入该格记 `wallCost` 步
+ * （1 行动点拆墙 + 进入墙格的移动动作，按 2~3 格折算）；`wallCost = 0` 退化为
+ * 只走平地的版本。水永远不可通行。
+ *
+ * 为什么不能再用直线距离：`whirlpool` 的六条旋臂互不连通，唯一通路是重装拆墙；
+ * 拆墙那一步在直线距离上可能"不更近"（甚至更远），基于直线的走位/拆墙判据会
+ * 停在山谷里。只走平地的波前同样到不了对面，排程会退回直线乐观估计。
+ *
+ * 忽略单位阻挡：单位会移动，把友军当墙会让排程把整支军队算成"过不去"。
+ * 重装的走位场例外：它可能被自己的前排堵在口袋里，`blocked` 传入当前占位，
+ * 用"重装实际能走的路"判断拆哪堵墙（排程本身仍用不挡单位的场，保持上界口径）。
+ * @param {number} wallCost - 穿过一堵墙的步数代价；0 表示墙不可通行
+ * @param {Set<string>|null} blocked - 额外视为不可通行的格子键（起点除外）
  * @returns {Map<string, number>} 格子键 → 步数
  */
-function travelField(game, utils, origin) {
+function travelField(game, utils, origin, wallCost = 0, blocked = null) {
   const dist = new Map([[key(origin), 0]]);
-  const queue = [{ q: origin.q, r: origin.r }];
-  for (let i = 0; i < queue.length; i++) {
-    const cur = queue[i];
+  const queue = [{ q: origin.q, r: origin.r, d: 0 }];
+  while (queue.length > 0) {
+    queue.sort((a, b) => a.d - b.d);
+    const cur = queue.shift();
     const d = dist.get(key(cur));
+    if (d !== cur.d) continue;
     for (const n of utils.neighbors(cur)) {
+      if (!utils.isPlayable(game, n)) continue;
+      if (blocked?.has(key(n))) continue;
+      const terrain = utils.terrainAt(game, n);
+      let step;
+      if (terrain === 'plain') step = 1;
+      else if (terrain === 'blocker' && wallCost > 0) step = wallCost;
+      else continue;
       const k = key(n);
-      if (dist.has(k)) continue;
-      if (!isPlain(game, utils, n)) continue;
-      dist.set(k, d + 1);
-      queue.push(n);
+      const nd = d + step;
+      if (nd < (dist.get(k) ?? Infinity)) {
+        dist.set(k, nd);
+        queue.push({ q: n.q, r: n.r, d: nd });
+      }
     }
   }
   return dist;
@@ -282,34 +349,45 @@ function travelField(game, utils, origin) {
  * @returns {{killRound: number|null, dealt: number, need: number, apPerRound: number,
  *            travelActions: number, curve: number[]}}
  */
-function siegeTimeline(game, utils, seats, hq, rounds, zones = null) {
+function siegeTimeline(game, utils, seats, hq, rounds, zones = null, field = null) {
   const balance = game.config?.balance ?? {};
   const minDamage = balance.minimumDamage ?? 1;
   const perTurn = balance.actionsPerTurn ?? 5;
   const units = seats.flatMap(seat => utils.livingUnits(game, seat));
   // 每回合能投入攻城的行动点：受该方行动点预算与攻城部队规模双重限制
   const apPerRound = Math.max(1, Math.min(perTurn * seats.length, units.length));
-  const field = travelField(game, utils, hq);
-  const risk = zones ? riskyShares(game, utils, zones, hq) : null;
+  // 先用只走平地的场判断"重装能不能不拆墙就走到目标"；只有走不到时才切
+  // 可爆破路径场。这样普通图（default/breach/dual-lanes...）保持 v1 的平地
+  // 波前口径，不会因为"绕墙可能更短"而改变原有节奏。
+  const plainField = travelField(game, utils, hq, 0);
+  const heavy = units.find(u => u.type === 'heavy');
+  const needBreach = Boolean(heavy && !plainField.has(key(heavy)));
+  const travel = field ?? (needBreach
+    ? travelField(game, utils, hq, WALL_TRAVEL_STEPS)
+    : plainField);
+  const risk = zones ? riskyShares(game, utils, zones, hq, travel) : null;
 
   const shooters = units
     .filter(u => (u.attack ?? 0) > 0)
     .map(u => {
-      const steps = field.get(key(u));
+      const steps = travel.get(key(u));
       const standoff = Math.max(0, (u.attackRange ?? 1) - 1);
-      const gap = steps === undefined
-        ? Math.max(0, utils.hexDistance(u, hq) - standoff)   // 陆地不通：退回直线
-        : Math.max(0, steps - standoff);
-      // 抵达概率：只在赶路段折算，到位开火之后的风险交给走位层（cta 的 risk）处理
+      const inRange = utils.hexDistance(u, hq) <= (u.attackRange ?? 1);
+      // 连"拆墙后"都到不了的部队不参与排程；已经站在射程内的除外。
+      if (steps === undefined && !inRange) return null;
+      const gap = steps === undefined ? 0 : Math.max(0, steps - standoff);
+      // 抵达概率：只在赶路段折算，到位开火之后的风险交给走位层（cta 的 risk）处理。
+      // 不再用"直线摸过去"的固定 0.3：地形不通就是不通，排程宁可判打不了。
       const arrival = steps === undefined
-        ? Math.pow(FALLBACK_ARRIVAL, 1)
+        ? 1
         : Math.max(MIN_ARRIVAL, Math.pow(STEP_SURVIVAL, riskySteps(risk, gap)));
       return {
         id: u.id,
         travelLeft: Math.max(0, Math.ceil(gap / Math.max(1, u.moveRange ?? 1))),
         dmg: Math.max(minDamage, (u.attack ?? 0) - (hq.defense || 0)) * arrival,
       };
-    });
+    })
+    .filter(Boolean);
 
   const need = Math.max(0, hq.hp);
   let dealt = 0;
@@ -341,24 +419,14 @@ function siegeTimeline(game, utils, seats, hq, rounds, zones = null) {
 }
 
 /**
- * 从总部出发的波前距离场，按环距统计"有多少比例的格子落在敌方打击区内"。
- * 这是抵达概率的原料：一条被火力全覆盖的走廊，其所在环距的 dangerous 比例接近 1。
+ * 按路径距离统计"有多少比例的格子落在敌方打击区内"。
+ * 这是抵达概率的原料：一条被火力全覆盖的走廊，其所在距离的 dangerous 比例接近 1。
+ * `field` 传入 siegeTimeline 已经算好的同口径路径场（含拆墙代价），
+ * 距离与赶路步数保持一致；不传时退回只走平地的场。
  * @returns {{total: number[], risky: number[]}|null}
  */
-function riskyShares(game, utils, zones, hq) {
-  const dist = new Map([[key(hq), 0]]);
-  const queue = [{ q: hq.q, r: hq.r }];
-  for (let i = 0; i < queue.length; i++) {
-    const cur = queue[i];
-    const d = dist.get(key(cur));
-    for (const n of utils.neighbors(cur)) {
-      const k = key(n);
-      if (dist.has(k)) continue;
-      if (!isPlain(game, utils, n)) continue;
-      dist.set(k, d + 1);
-      queue.push(n);
-    }
-  }
+function riskyShares(game, utils, zones, hq, field = null) {
+  const dist = field ?? travelField(game, utils, hq);
   const total = [];
   const risky = [];
   for (const [k, d] of dist) {
@@ -477,7 +545,27 @@ function chooseVerdict(game, utils, owner, w, zones) {
     .sort((a, b) => a.hp - b.hp);
   const primaryHq = enemyHqs[0] ?? null;
 
-  const siege = primaryHq ? siegeTimeline(game, utils, [owner], primaryHq, rounds, zones) : null;
+  // 攻城/走位/拆墙共用的路径场：默认保持 v1 的平地口径（goalField=null，
+  // 走位与拆墙仍用直线距离）；只有"地图上双方总部本来就不在同一块平地里"
+  // 时才切到墙可爆破的路径场。星海旋涡的六条旋臂就是这种情况。
+  // 判据用原始地图（config）而不是当前地形：拆掉墙后当前地形会连通，
+  // 但"这张图需要破墙"是地图属性，不能中途翻转，否则后续部队会失去通路指引。
+  const myHeavy = utils.livingUnits(game, owner).find(u => u.type === 'heavy') ?? null;
+  const myHq = game.headquarters?.[owner];
+  const breachNeeded = Boolean(
+    primaryHq && myHq && myHeavy && !plainPathExists(game, utils, primaryHq, myHq)
+  );
+  const goalField = breachNeeded
+    ? travelField(game, utils, primaryHq, WALL_TRAVEL_STEPS)
+    : null;
+  // 重装专用：把当前占位算进去，避免"计划从自己人身上穿过去"而原地打转。
+  const heavyField = breachNeeded
+    ? travelField(game, utils, primaryHq, WALL_TRAVEL_STEPS, heavyBlockedCells(game, myHeavy))
+    : null;
+
+  const siege = primaryHq
+    ? siegeTimeline(game, utils, [owner], primaryHq, rounds, zones, goalField)
+    : null;
   const killRound = siege?.killRound ?? null;
   const slack = killRound === null ? null : rounds - killRound;
   // 磨平线：到期末还能打出的总部伤害值多少分（比"现在停手"多拿的）
@@ -485,7 +573,6 @@ function chooseVerdict(game, utils, owner, w, zones) {
   const holdMargin = margin - accessibleSwing(game, utils, w, zones, owner);
 
   // 敌方斩首线：对面比我更快拿下总部 → 什么都别管，回防
-  const myHq = game.headquarters?.[owner];
   let enemyKillRound = null;
   if (myHq && myHq.alive !== false) {
     const enemySeats = utils.enemySeats(game, owner);
@@ -522,7 +609,7 @@ function chooseVerdict(game, utils, owner, w, zones) {
 
   return {
     rounds, line, posture, primaryHq, siege, killRound, slack,
-    wearGain, margin, holdMargin, enemyKillRound, emergency,
+    wearGain, margin, holdMargin, enemyKillRound, emergency, goalField, heavyField, breachNeeded,
     risk: POSTURE_RISK[posture],
     capture: POSTURE_CAPTURE[posture],
     urgency: POSTURE_URGENCY[posture],
@@ -649,10 +736,25 @@ function missionPayoff(game, utils, w, ctx, unit) {
   return PACE_POINTS;
 }
 
+/**
+ * 任务目标到 pos 的路径距离；只有"攻城线的主总部目标"才有可爆破路径场。
+ * 重装用带占位快照的 heavyField（它可能被自己人堵住）；其他单位用不挡单位的
+ * goalField。其他目标（自家总部/据点）仍用直线距离——它们通常在同一片可通行
+ * 区域，且 v1 的拆墙/守成行为就是按直线算的，不在这次修复范围内。
+ */
+function goalDistance(ctx, goal, pos, unit = null) {
+  if (!goal || !ctx?.goalField || !ctx.primaryHq || goal.id !== ctx.primaryHq.id) {
+    return undefined;
+  }
+  const field = unit?.type === 'heavy' && ctx.heavyField ? ctx.heavyField : ctx.goalField;
+  return field.get(key(pos));
+}
+
 /** 该单位到任务目标的剩余步数（远程兵停在射程边缘，不贴脸）。 */
-function stepsToGoal(utils, unit, goal) {
+function stepsToGoal(ctx, utils, unit, goal) {
   const standoff = unit.canCapture ? 0 : Math.max(0, (unit.attackRange ?? 1) - 1);
-  return Math.max(0, utils.hexDistance(unit, goal) - standoff);
+  const dist = goalDistance(ctx, goal, unit, unit) ?? utils.hexDistance(unit, goal);
+  return Math.max(0, dist - standoff);
 }
 
 /** 每步梯度：到位收益的边际增量，下限 PACE_POINTS。 */
@@ -660,7 +762,7 @@ function paceGradient(game, utils, w, ctx, unit) {
   const goal = ctx.goals.get(unit.id);
   if (!goal) return PACE_POINTS;
   const payoff = missionPayoff(game, utils, w, ctx, unit);
-  const steps = stepsToGoal(utils, unit, goal);
+  const steps = stepsToGoal(ctx, utils, unit, goal);
   if (steps <= 0) return 0;
   return Math.max(PACE_POINTS, payoff / steps);
 }
@@ -780,7 +882,8 @@ function positionPoints(game, utils, w, ctx, unit, pos, ownCells) {
   //    期限越紧（urgency 越高）扣得越狠 —— 这是"排程"落到"走位"的那一环，不是单纯的引力。
   const goal = ctx.goals.get(unit.id);
   if (goal) {
-    pts -= utils.hexDistance(pos, goal) * ctx.pace.get(unit.id) * ctx.urgency;
+    const dist = goalDistance(ctx, goal, pos, unit) ?? utils.hexDistance(pos, goal);
+    pts -= dist * ctx.pace.get(unit.id) * ctx.urgency;
   }
 
   // 5) 轻微疏散
@@ -819,7 +922,7 @@ function moveOptions(game, utils, w, ctx) {
   return options;
 }
 
-/** 爆破候选：只炸"拆了确实更接近任务目标"的墙（否则是白丢行动点）。 */
+/** 爆破候选：只炸"拆了之后路径距离确实变短"的墙（否则是白丢行动点）。 */
 function demolishOptions(game, utils, ctx) {
   const options = [];
   if ((game.turn?.turnNumber ?? 0) < 4) return options;
@@ -827,14 +930,21 @@ function demolishOptions(game, utils, ctx) {
     if (h.type !== 'heavy' || h.hasActed || !canAct(h, ctx)) continue;
     const goal = ctx.goals.get(h.id);
     if (!goal) continue;
-    const distToGoal = utils.hexDistance(h, goal);
+    // 攻城线（主总部目标）用重装的占位路径场；其他目标沿用直线距离（v1 行为）。
+    const field = ctx.goalField && ctx.primaryHq && goal.id === ctx.primaryHq.id
+      ? (ctx.heavyField ?? ctx.goalField)
+      : null;
+    const heavyDist = field ? field.get(key(h)) : utils.hexDistance(h, goal);
+    if (heavyDist === undefined) continue;
     for (const pos of utils.neighbors(h)) {
       if (!utils.isPlayable(game, pos)) continue;
       if (utils.terrainAt(game, pos) !== 'blocker') continue;
       if (utils.occupantAt(game, pos)) continue;
-      // 只要求墙比脚下更接近目标：连续障碍带里墙后往往还是墙，
+      // 只要求墙比脚下更接近目标：路径场里"墙后是唯一通路"的墙天然比脚下小
+      // WALL_TRAVEL_STEPS，不会被 v1 的直线等距误杀。连续障碍带里墙后往往还是墙，
       // 要求"墙后必是空地"会让重装在有城墙的图上永不拆墙。
-      if (utils.hexDistance(pos, goal) >= distToGoal) continue;
+      const wallDist = field ? (field.get(key(pos)) ?? Infinity) : utils.hexDistance(pos, goal);
+      if (wallDist >= heavyDist) continue;
       options.push({
         type: 'demolish',
         payload: { unitId: h.id, q: pos.q, r: pos.r },

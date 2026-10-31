@@ -557,3 +557,19 @@ describe('deriveDetailStats：从 detail 派生玩法明细（fallback 口径）
     expect(derived.policyStats).toBeNull();
   });
 });
+
+describe('算法档案版本', () => {
+  it('只出当前版本档案，已下线的 verdict v1 不再出现', () => {
+    const dir = makeModelsDir([A]);
+    const { registry } = collectRegistry(dir);
+    const profiles = buildModelProfiles({
+      registry,
+      modelsDir: dir,
+      leaderboardJson: null,
+      notesProfiles: new Map(),
+      playedIds: new Set(),
+    });
+    expect(profiles.some(p => p.id === 'algo_verdict@v1')).toBe(false);
+    expect(profiles.some(p => p.id === 'algo_verdict@v2')).toBe(true);
+  });
+});

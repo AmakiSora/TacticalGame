@@ -526,6 +526,29 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(readFileSync(statsFile, 'utf8')).not.toContain('"default"');
   });
 
+  it('matches every algorithm version when the participant filter omits the version', async () => {
+    writeFileSync(statsFile, [
+      { map: 'random', players: { player_a: 'algo_random@v1', player_b: 'algo_greedy@v1' } },
+      { map: 'random', players: { player_a: 'algo_random@v2', player_b: 'algo_greedy@v2' } },
+      { map: 'random', players: { player_a: 'algo_random-sim@v2', player_b: 'algo_greedy@v1' } },
+      { map: 'random', players: { player_a: 'algo_random-heavy@v1', player_b: 'algo_greedy@v1' } },
+      { map: 'random', players: { player_a: 'hex_ppo_v3.0.4_20260909_8.4M.zip', player_b: 'algo_greedy@v1' } },
+    ].map(line => JSON.stringify(line)).join('\n') + '\n');
+
+    const dryRun = async (participant: string) => (await app.inject({
+      method: 'POST', url: '/api/arena/eval/clear-matches',
+      payload: { participant, dryRun: true },
+    })).json();
+
+    // 控制台算法下拉给的是不带版本的 algo_<name>：按算法名匹配全部版本，
+    // 但不能跨到同前缀的其他算法（algo_random-sim / algo_random-heavy）。
+    expect(await dryRun('algo_random')).toMatchObject({ ok: true, removed: 2, total: 5 });
+    // 带版本的过滤项仍按记录里的 id 精确匹配。
+    expect(await dryRun('algo_random@v2')).toMatchObject({ ok: true, removed: 1, total: 5 });
+    // 模型参与者继续按 zip 文件名精确匹配。
+    expect(await dryRun('hex_ppo_v3.0.4_20260909_8.4M.zip')).toMatchObject({ ok: true, removed: 1, total: 5 });
+  });
+
   it('clears matches on virtual random maps by mode and map id', async () => {
     writeFileSync(statsFile, [
       { map: 'random', players: { player_a: 'algo_greedy@v1', player_b: 'algo_threat@v1' } },

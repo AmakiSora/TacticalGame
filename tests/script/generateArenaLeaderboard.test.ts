@@ -159,6 +159,32 @@ describe('collectRegistry 内置算法混池注册', () => {
     const { registry } = collectRegistry(makeModelsDir([VALID]));
     expect(registry.has('algo_threat')).toBe(false);
   });
+
+  it('只注册当前算法版本，不再登记 verdict v1', () => {
+    const { registry } = collectRegistry(makeModelsDir([VALID]));
+    expect(registry.has('algo_verdict@v2')).toBe(true);
+    expect(registry.has('algo_verdict@v1')).toBe(false);
+  });
+
+  it('清空某算法数据后只出现当前版本行', () => {
+    const dir = makeModelsDir([VALID]);
+    const stats = join(dir, 'matches.jsonl');
+    const out = join(dir, 'lb.json');
+    const line = (a: string, b: string, winner: string) =>
+      JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';
+    writeFileSync(stats, line('algo_threat@v1', VALID, 'algo_threat@v1'));
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', stats, '--out', out,
+        '--models-dir', dir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(out, 'utf8'));
+    const rows = payload.modes.find((m: { id: string }) => m.id === 'standard').maps.all.models;
+    expect(rows.some((r: { id: string }) => r.id === 'algo_verdict@v1')).toBe(false);
+    expect(rows.some((r: { id: string }) => r.id === 'algo_verdict@v2')).toBe(true);
+  });
 });
 
 describe('决策耗时字段（matches.jsonl decisionSec/decisionCount）', () => {

@@ -9,11 +9,11 @@
 | 文件 | `algorithms/builtin/verdict.mjs` |
 | 算法名 | `verdict` |
 | 注册键 | `algo_verdict` |
-| 竞技场参与者 id | `algo_verdict@v1`（带版本；实现改进升版后，历史战绩仍归属旧版本 id，见 `registry.mjs` 的 version 约定） |
+| 竞技场参与者 id | `algo_verdict@v2`（带版本；v1 已下线，其竞技场数据已清空重跑，榜单只有 v2 一行） |
 | 显示名称 | 裁决线算法（Verdict） |
 | 定位 | 反向规划（backward induction）：先从终局倒推"我用哪条线赢、还差几个回合"，再让全军向那条线的期限收束 |
-| 实现日期 | 2026-09-18（v3.5.4） |
-| 实测强度 | vs greedy 7 图 ×30 局 **201:9（95.7%）**，两套种子基完全一致；vs threat 161:49（76.7%）；vs field 186:24（88.6%）；vs random 24:0 |
+| 实现日期 | 2026-09-18（v1，3.5.4）；2026-10-31（v2，3.8.21） |
+| 实测强度 | 竞技场 3,745 局 **1929 分 / 87.4%**（standard 第二），`whirlpool` 144 局 **108:36（75%）**；headless 7 图 ×30 局：vs greedy **191/210（91.0%）**、vs threat **148/210（70.5%）**、vs field **178/210（84.8%）** |
 | 语言 | JavaScript (ESM) |
 | 接口类型 | 策略接口（`decide`） |
 
@@ -84,6 +84,37 @@ slack = 剩余回合 − killRound
 排程是上界，但**不是无条件上界**：每单位按"路上要穿过几格敌方打击区"折算一个抵达概率
 （`STEP_SURVIVAL^危险步数`）。不折损就会对着永远打不到的终点无限乐观。
 
+### 第三步的 v2 修正：可爆破路径距离场（2026-10-31）
+
+v1 的 `stepsToGoal` / `positionPoints` / `demolishOptions` 用六边形直线距离，
+`siegeTimeline` 只走平地、目标不可达时退回"直线 + 固定 0.3 抵达率"。
+在 `whirlpool`（六条旋臂被墙隔断、唯一通路是重装拆墙）上：
+
+- 重装出生点 `(5,-2)` 到敌方总部 `(-4,1)` 直线距离 9；相邻两堵墙 `(5,-1)` / `(6,-2)`
+  的直线距离是 **9 / 10**，`>=` 判据返回 **0 个拆墙候选**；
+- 排程误以为 13 回合能斩首，实际重装整局不动；v1 在 whirlpool 的 144 局是
+  **0 胜 96 负 48 平**（48 平是竞技场 101 回合上限，真实规则下会无限僵持）。
+
+v2 不改裁决账本、三条线、任务分派和动作计价，只把"赶路距离"换成路径距离：
+
+1. `travelField` 改为 Dijkstra：`wallCost=0` 时与 v1 的平地波前一致；
+   `wallCost=WALL_TRAVEL_STEPS` 时把 blocker 当作"可爆破通道"——进入墙格记 3 步
+   （1 AP 拆墙 + 进入墙格的移动动作），水永远不可通行。
+2. `siegeTimeline` 先用平地场判断重装能否不拆墙到达；能到达就保持 v1 的平地口径，
+   不能到达才切可爆破场。不可达且不在射程内的单位不再用"直线 + 0.3"兜底，
+   而是退出排程——地形不通就是不通，排程宁可判打不了。
+3. `demolishOptions` 用同一路径场比较"墙 vs 脚下"：墙后是唯一通路时，墙的场值
+   天然比脚下小 `WALL_TRAVEL_STEPS`，不会被直线等距误杀；仍然只拆"拆了之后
+   路径距离确实变短"的墙，判据的语义没变，只是距离从直线换成了真实路径。
+4. 重装专用 `heavyField` 把当前单位/总部占位算进去（其余单位会移动，只用于重装的
+   走位/拆墙；排程本身仍用不挡单位的场，保持上界口径）。
+5. **只在"双方总部原本不在同一块平地里"的地图上启用**（用 `config` 原始地形做
+   `plainPathExists`）；普通图继续走上一版的直线/平地口径。因此
+   `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `random`
+   的逐图统计与上一版一致（随机图 1pp 量级波动），只有 `whirlpool` 发生变化。
+   榜单侧保留历史版本登记位（`ALGORITHM_HISTORY`）用于解析升级前遗留的对局；
+   当前未登记任何历史版本，榜单只有 `algo_verdict@v2` 一行。
+
 ### 第四步：tempo 量纲（`ALGORITHMS_NOTES` 点名的共同短板）
 
 笔记里的结论是：threat 输 `danger-close`（1 行动点/回合，避险换不来 tempo，18%）、
@@ -131,6 +162,7 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
 | `OPPORTUNITY_DISCOUNT` | 0.75 | 走位后本回合可兑现火力的折扣 |
 | `DEPLOY_PRIORITY` | 1.5 | 部署门槛 = 部署净收益 × 该系数 |
 | `DEMOLISH_POINTS` | 60 | 拆一堵墙换来的推进 |
+| `WALL_TRAVEL_STEPS` | 3 | 爆破一堵墙的路径代价（1 AP 拆墙 + 进入墙格的移动）；只在需破墙的地图启用 |
 | 姿态风险 / 占点 / 急迫 / 接战 | 见源码表 | 依次为 `POSTURE_RISK` / `_CAPTURE` / `_URGENCY` / `_OFFENSE` |
 | 单位价值 | `w.army × 造价` | 击杀/阵亡/封顶共用（与引擎 `armyValue` 同式） |
 
@@ -146,7 +178,7 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
 
 再往下排程会过度悲观、斩首线永不触发，全落到磨平线上硬换。
 
-### 十个必须守住的约束（都踩过，别再改回去）
+### 十一个必须守住的约束（都踩过，别再改回去）
 
 1. **结束回合门槛必须极小**。`decide` 返回 `null` 的语义是"结束整个回合"，门槛一旦接近
    `PACE_POINTS`，只能再走一格时会被直接掐掉回合（与 threat/field 同源的陷阱）。
@@ -173,8 +205,16 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
    （实测：紧急回防时单位反而退了 3 格）。
 10. **守成/回防姿态下必须压低接战倾向**（`POSTURE_OFFENSE`）。否则单位为了挪到"好火力位"
     会放弃任务：实测紧急回防的步兵为了挪到敌方总部隔壁（机会火力 90 分）而不回家。
+11. **双方总部不在同一块平地时，赶路/拆墙距离必须用可爆破路径场**。`whirlpool` 的六旋臂：
+    重装到敌方总部直线 9，相邻墙也是 9/10，`>=` 判据 0 候选，v1 整局 0 胜；v2 用 Dijkstra
+    （墙记 `WALL_TRAVEL_STEPS`）后对 greedy/mcts/random 30:0。反例：如果普通图也全局切
+    路径场，`default` 29→13、`dual-lanes` 28→16（v2 开发中实测），所以必须用"原始地图
+    上双方总部是否连通"来限定启用范围——这也是为什么默认图 v1/v2 每图统计一致。
 
 ### 已知限制
+
+> 1–4 是 v1 时代（3.5.x 旧图池，`forge` / `four-corners` 已下线）的标定，保留作历史参考；
+> 5–8 与 v2 现状对应，v2 的逐图数据见[性能表现](#性能表现)。
 
 1. **对上 threat 时 forge 只有 33%**（同一张图 verdict 打 greedy 是 100%、threat 打 greedy 是 80%）。
    `forge` 是半径 6、10 回合的短图，双方都必须抢 tempo；threat 的单步效用在这种
@@ -187,7 +227,7 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
    "用哪条线赢"的判定会摇摆（threat 同口径 53%、field 40%）。
 4. **相对最弱的一图是 `danger-close`**：45/60（75%）。它同时也是唯一对两个对手都赢的图
    （threat 30:0、field 30:0），但打 greedy 时波动明显比别的图大。
-5. **排程仍是乐观模型**：抵达概率是按环距比例估的，不建模"敌人会主动拦截这条路线"；
+5. **排程仍是乐观模型**：抵达概率是按沿途危险格比例估的（v2 按路径距离分桶），不建模"敌人会主动拦截这条路线"；
    每个回合重算一次，靠逐回合重规划自我修正。
 6. **客户端视角看不到 `stats.headquartersDamage`**（`sanitizeGameForResponse` 只给快照，
    不含 `players[].stats`）。算法用"敌方总部掉了多少血"替代：2 人局两者完全相等；
@@ -195,13 +235,52 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
    只影响选线的激进程度，是限制 2 的一个成因。
 7. **单步执行**：排程是"整回合交付"级的推演，但实际动作仍由 `decide` 逐个返回；
    本回合的走位只按当前姿态的梯度走，不会为了两条线之间的切换做提前量。
+8. **破墙地图的路径场仍是上界**：`WALL_TRAVEL_STEPS=3` 只是"1 AP 拆墙 + 进入移动"的
+   近似，不建模重装被击杀后的破墙空窗，也不保证重装一定活着走到墙边；`whirlpool`
+   对 threat 仍只有 9:21、对 parallax 8:22。v2 解决的是"结构 0 胜"，不是"碾压所有对手"。
 
 ## 性能表现
 
 实测工具：`scripts/algorithm-arena.mjs`（headless 自博弈，直接驱动 `src/engine/`，不经 HTTP），
-每图 30 局、逐局交替席位，并审计每个动作是否被引擎接受（**全部 ✅，8 张图零非法动作**）。
+每图 30 局、逐局交替席位，并审计每个动作是否被引擎接受（**全部 ✅，各图标定零非法动作**）。
 
-### vs greedy（各图 30 局，两套种子基）
+### v2 标定（当前 7 图池，2026-10-31）
+
+同一 harness（`scripts/algorithm-arena.mjs`，真实引擎、逐局换座、种子基 1000、每图 30 局）下
+v1/v2 的逐图胜场（verdict 视角，胜/30）：
+
+| 地图 | vs greedy v1 → v2 | vs threat v1 → v2 | vs field v1 → v2 |
+|---|---:|---:|---:|
+| default | 29 → 29 | 20 → 20 | 29 → 29 |
+| breach | 30 → 30 | 30 → 30 | 30 → 30 |
+| danger-close | 24 → 24 | 30 → 30 | 30 → 30 |
+| dual-lanes | 28 → 28 | 18 → 18 | 16 → 16 |
+| multiplayer-ring | 28 → 28 | 22 → 22 | 29 → 29 |
+| **whirlpool** | **0 → 30** | **0 → 9** | **0 → 25** |
+| random | 22 → 22 | 19 → 19 | 19 → 19 |
+| **合计** | **161 → 191 / 210** | **139 → 148 / 210** | **153 → 178 / 210** |
+
+> 除 whirlpool 外六张图 v1/v2 的每图统计逐项一致：v2 的路径场只在"双方总部
+> 原本不在同一块平地"的地图上启用，普通图继续走 v1 的直线/平地口径。
+> whirlpool 上 v2 对 mcts / random / greedy 均 **30:0**、对 field **25:5**、
+> 对 threat **9:21**、对 parallax **8:22**；第二套种子基 3000 的 whirlpool 复测
+> 为 greedy 30:0、threat 8:22、field 27:3，结论方向一致。对 threat/parallax
+> 仍是被压制方，但已从"结构 0 胜"变成能破墙、能赢下部分对局。所有批次动作
+> 均被真实引擎接受（0 非法）；headless 决策 p50 0.2–1.7 ms，p95 < 7 ms。
+
+### 竞技场（standard，2026-10-31 跑批）
+
+榜单 [arena-leaderboard.json](../../../public/data/arena-leaderboard.json)（`generatedAt` 2026-10-31T18:01Z，
+7 图、每参与者约 3,745 局）：`algo_verdict@v2` 跑批 3,745 局后评分 **1929**、胜率 **87.4%**，standard 第二；
+`whirlpool` **144 局 108:36（75%）**，上一版同图是 0 胜 96 负 48 平。逐图胜率：`default` 92.0%、
+`breach` 98.0%、`danger-close` 82.0%、`dual-lanes` 87.7%、`multiplayer-ring` 90.0%、`random` 77.5%，
+除随机图 1pp 量级波动外与上一版逐图一致。
+
+### v1 历史标定（已下线；旧 7 图池，2026-09，含已下线 desert / forge）
+
+> v1 实现与竞技场数据均已下线，以下是 2026-09 旧图池上的历史数据，仅作开发史参考，不能与上面的 v2 表直接相加或比较。
+
+**v1 vs greedy（旧图池，两套种子基）**
 
 | 地图 | 种子基 1000 | 种子基 3000 | threat 同口径 | field 同口径 |
 |---|---:|---:|---:|---:|
@@ -218,7 +297,7 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
 > 两套种子基给出完全相同的合计（201:9），逐图差异只有 `default`/`dual-lanes`/`danger-close`
 > 各 ±1~3 局，属于 30 局量级的正常波动。
 
-### vs 其他算法（各 7 图 ×30 局）
+### v1 vs 其他算法（旧图池，各 7 图 ×30 局）
 
 | 对手 | 战绩 | 逐图（verdict 胜） |
 |---|---:|---|
@@ -226,7 +305,7 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
 | field | **186:24（88.6%）** | default 28、breach 30、desert 28、dual-lanes 16、forge 30、danger-close 30、ring 24 |
 | random | 24:0（100%） | default，24 局 |
 
-### 三方相克（同口径、各 30 局）
+### v1 三方相克（旧图池，同口径、各 30 局）
 
 四个算法在各图上的胜率互不相同，不存在"强弱全序"。已标定的关系：
 
@@ -240,7 +319,7 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
 > **单图胜率不可外推**：verdict 在 `danger-close` 上是三个算法里唯一同时碾压 threat 与 field 的，
 > 但在 `forge` 上被 threat 反过来拿下 67%。相克关系比"谁更强"更值得记。
 
-### 4 人局（未标定）
+### v1 4 人局（未标定）
 
 | 对局 | 战绩 | 备注 |
 |---|---:|---|
@@ -254,10 +333,11 @@ field 输 `multiplayer-ring`（7 行动点，井外不存在，7%）—— **两
 | dual-lanes | 0.61–1.13 ms | 3.3–3.5 ms | 5.4–5.9 ms | 12.5–30.6 ms |
 | breach | 0.49–0.94 ms | 2.8–3.0 ms | 6.6–7.2 ms | 11.3–30.4 ms |
 | danger-close（小图） | 0.27–0.33 ms | 1.3 ms | 2.1 ms | 6.1–23.7 ms |
+| whirlpool（v2，需破墙） | 0.69–1.73 ms | 2.2–6.1 ms | 6.0–8.1 ms | 9.9–10.5 ms |
 
 与 threat / field 同量级（无搜索无模拟）。单次决策的主要成本是两张排程
-（`siegeTimeline` 我方 + 敌方，各一次波前 BFS）与逐格查表；p99 略高于 field 是因为
-排程要各跑一次绕行距离场。
+（`siegeTimeline` 我方 + 敌方，各一次路径场）与逐格查表；v2 在需破墙的图上
+多跑一张重装占位 Dijkstra，p50 仍在 2 ms 内。
 
 ## 优化方向
 
@@ -331,8 +411,10 @@ armyValue()            // 军队价值（与引擎 scorePlayer 同式：造价 �
 hqDamageDealt()        // 客户端视角下"对敌总部的累计伤害"（用总部掉血近似）
 
 // 反向排程
-travelField()          // 从目标点出发的波前距离场（真实绕行步距）
-riskyShares()          // 按环距统计"多少比例的格子落在敌方打击区内"
+plainPathExists()      // 原始地图上双方总部是否在同一块平地（决定是否启用破墙场）
+travelField()          // Dijkstra 路径场：平地 1；需破墙时 blocker 记 WALL_TRAVEL_STEPS
+heavyBlockedCells()    // 重装占位快照：除自己外的单位 + 总部格
+riskyShares()          // 按路径距离统计"多少比例的格子落在敌方打击区内"
 siegeTimeline()        // 攻城排程：行动点先赶路后开火 → killRound（按抵达概率折损）
 riskySteps()           // 一段路程预计穿过几个危险格 → 抵达概率
 
@@ -347,12 +429,13 @@ incomingAt()           // 落点期望承伤（按敌方出手上限截断，可
 strikePoints()         // 一次打击的裁决分：打单位 = 血 × 军队价值/最大血；打总部 = 血 × w.hqDamage
 bestStrikeFrom()       // 某落点本回合能兑现的最高打击分
 missionPayoff() / paceGradient()   // 任务推进的到位收益与每步梯度
+goalDistance()          // 攻城目标用路径场（重装用占位场）；其他目标回退直线
 defensePayoff()        // 回防到位收益 = 敌方每回合压在我方总部上的伤害值多少分
 positionPoints()       // 落点评分：占点 + 机会火力 − 风险 − 推进 − 扎堆 − 驻军
 strikeOptions()        // 打击：打击分 − 原地承伤×姿态 + 暴露下降差分
 healOptions()          // 治疗：回复量 × 军队价值/血
 moveOptions()          // 移动：逐格"落点评分"取最优，与原地比较取增量
-demolishOptions()      // 爆破：只拆比脚下更接近任务目标的墙
+demolishOptions()      // 爆破：只拆"拆了之后路径距离确实变短"的墙
 buildContext()         // 整回合共用：权重、敌情区、排程结果、任务目标、梯度
 
 // 导出接口
@@ -363,21 +446,25 @@ export default {
 }
 ```
 
-完整源码见 `algorithms/builtin/verdict.mjs`（约 880 行）。
+完整源码见 `algorithms/builtin/verdict.mjs`（约 1010 行）。
 
 测试两份：
 
-- `tests/algorithms/verdict.test.ts`（12 场景）：裁决账本（射程内同时有敌方总部和敌军时优先打总部）、
+- `tests/algorithms/verdict.test.ts`（13 场景）：裁决账本（射程内同时有敌方总部和敌军时优先打总部）、
   稳杀集火、斩首收束、**排程单位一步只推进一格也不提前交回合**、磨平线的交换裁决、紧急回防、
-  治疗、补员、被全歼仍补员、行动点耗尽不得返回耗点动作、已移动单位不得再移动、拆墙正反例。
+  治疗、补员、被全歼仍补员、行动点耗尽不得返回耗点动作、已移动单位不得再移动、
+  **墙后是唯一通路时拆墙（路径场，不再依赖直线距离）**。
 - `tests/algorithms/verdict-selfplay.test.ts`：直接驱动引擎跑完整对局
-  （default/breach/desert/dual-lanes/danger-close/multiplayer-ring/随机地图），
-  断言 verdict 席位**零非法动作**、对局正常结束、开局无兵时也会补员。
+  （default/breach/dual-lanes/danger-close/multiplayer-ring/**whirlpool**/随机地图），
+  断言 verdict 席位**零非法动作**、对局正常结束、开局无兵时也会补员；
+  whirlpool 用例额外断言**至少一次 demolish 且 verdict 获胜**。
 
 ## 一句话总结
 
 `verdict` 不评估"这一步好不好"，而是先用引擎的裁决权重当账本选出"这局我用哪条线赢"，
-再从"敌方总部归零"这个终局逐回合倒推出一条带期限的攻城排程，用 `slack` 决定全军的风险姿态；
-7 图 30 局对 greedy **201:9（95.7%）**、两套种子一致，对 threat 76.7%、对 field 88.6%、对 random 24:0，
-在 `danger-close`（threat 18%）与 `multiplayer-ring`（field 7%）两个老短板上都是三者中最强的；
-代价是对上 threat 时 `forge` 只有 33%，以及 4 人局仍然未标定（10%）。
+再从"敌方总部归零"这个终局逐回合倒推出一条带期限的攻城排程，用 `slack` 决定全军的风险姿态。
+v2 把赶路/拆墙距离从直线换成"墙可爆破"的路径场，并只在双方总部原本不连通的地图上启用：
+竞技场 3,745 局 **1929 分 / 87.4%**、`whirlpool` 144 局 **108:36（75%）**（上一版同图 0 胜）；
+headless 7 图 ×30 局对 greedy **191:19（91.0%）**、对 threat **148:62（70.5%）**、对 field
+**178:32（84.8%）**。除 `whirlpool` 外各图逐图统计与上一版一致，说明这次只补了破墙模型，
+没有改动"选线—排程—计价"的核心。

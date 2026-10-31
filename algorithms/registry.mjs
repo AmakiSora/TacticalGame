@@ -66,7 +66,7 @@ export const ALGORITHM_META = {
   mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1', modes: ['standard'] },
   threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1', modes: ['standard'] },
   field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'] },
-  verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v1', modes: ['standard'] },
+  verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v2', modes: ['standard'] },
   'random-sim': { displayName: '同时随机算法', description: '同时回合：从所有合法计划动作中随机选择入队，随后提交', version: 'v2', modes: ['simultaneous'] },
   'dest-prob': { displayName: '落点概率算法', description: '同时回合分步：建模敌军落点概率，预测射击并规避目的格冲突', version: 'v2', modes: ['simultaneous'] },
   kriegspiel: { displayName: '兵棋推演算法', description: '同时回合：分步结算 rollout + 整份计划联合搜索 + 风险规避', version: 'v2', modes: ['simultaneous'] },
@@ -83,6 +83,15 @@ export const ALGORITHM_META = {
   sovereign: { displayName: '统御算法', description: '歼灭：概率齐射竞价、多轮炮火逃逸与协同让行开路，动态权衡兵力和部署窗口', version: 'v1', modes: ['annihilation'] },
   ark: { displayName: '方舟算法', description: '大逃杀：独立安全格容量分配、行动组合调度与缩圈增援负担评估', version: 'v1', modes: ['royale'] },
 };
+
+/**
+ * 历史算法版本：只用于榜单/统计解析旧对局，不参与大厅、不加载模块。
+ * 升版时把旧版本登记在这里；否则 `collectRegistry` 只注册当前版本，
+ * 旧 id 的对局会被 `loadMatches` 当作「未知参与者」丢掉。
+ * 条目字段与 `ALGORITHM_META` 对齐（displayName/description 可省略）。
+ * 当前为空：verdict v1 已下线，登记与对局一并移除。
+ */
+export const ALGORITHM_HISTORY = {};
 
 /**
  * 加载指定的算法模块
@@ -136,6 +145,22 @@ export function listAlgorithmInfo() {
 }
 
 /**
+ * 列出历史算法版本（只用于榜单/统计解析旧对局；不加载模块、不进大厅）。
+ * @returns {Array<{name: string, displayName: string, description: string, version: string, modes: string[]}>}
+ */
+export function listHistoricalAlgorithmInfo() {
+  return Object.entries(ALGORITHM_HISTORY).flatMap(([name, versions]) =>
+    (versions ?? []).map(entry => ({
+      name,
+      displayName: entry.displayName ?? ALGORITHM_META[name]?.displayName ?? name,
+      description: entry.description ?? ALGORITHM_META[name]?.description ?? '',
+      version: entry.version,
+      modes: Array.isArray(entry.modes) && entry.modes.length ? entry.modes : algorithmModes(name),
+      historical: true,
+    })));
+}
+
+/**
  * 算法当前版本（未显式标注 meta 的算法视为 v1）。
  * @param {string} name - 算法名称
  * @returns {string}
@@ -180,10 +205,11 @@ export function algorithmParticipantId(name) {
  * 与模型"每个 zip 一个版本一个参与者"的口径对齐。
  * 由 rl/evaluation/round_robin.py 经 discover_algorithms 读取并写入对局记录。
  * @param {string} name - 算法名称
+ * @param {string} [version] - 指定版本（历史版本注册用）；缺省取当前版本
  * @returns {string}
  */
-export function algorithmVersionedId(name) {
-  return `algo_${name}@${algorithmVersion(name)}`;
+export function algorithmVersionedId(name, version = algorithmVersion(name)) {
+  return `algo_${name}@${version}`;
 }
 
 /**

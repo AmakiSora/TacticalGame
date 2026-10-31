@@ -107,7 +107,7 @@ async function playGame(mapId: string, seed: number, verdictSeat: string) {
       endTurn(game, globalEventBus, owner);
     }
   }
-  return { finished: game.phase === 'game_over', rounds: game.turn.roundNumber, illegal, types };
+  return { finished: game.phase === 'game_over', winner: game.winner, rounds: game.turn.roundNumber, illegal, types };
 }
 
 describe('verdict 自博弈合法性（decide 不得返回引擎拒绝的动作）', () => {
@@ -130,6 +130,15 @@ describe('verdict 自博弈合法性（decide 不得返回引擎拒绝的动作�
     const r = await playGame('random', 77, 'player_a');
     expect(r.illegal).toEqual([]);
     expect(r.finished).toBe(true);
+  }, 120000);
+
+  it('whirlpool：六旋臂被墙隔断，必须靠重装拆墙推进并获胜', async () => {
+    const r = await playGame('whirlpool', 4242, 'player_a');
+    expect(r.illegal).toEqual([]);
+    expect(r.finished).toBe(true);
+    expect(r.types.has('demolish')).toBe(true);
+    expect(r.winner).toBe('player_a');
+    expect(r.rounds).toBeGreaterThan(3);
   }, 120000);
 
   it('兵力清零时仍会补员，而不是交空回合', async () => {

@@ -15,7 +15,7 @@
 
 ### 测试与验证
 
-- 真实引擎冒烟：三种模式共 24 局、0 批次失败（歼灭 4 个算法、同时回合 5 个、大逃杀 4 个的配对组合；大逃杀 8 局均以淘汰收场，歼灭/同时回合按各自静态图惯例可出现回合上限裁决）；`tests/rl/test_evaluate_cross_random_maps.py` 锁 reset 命令与生成配置的模式，`test_round_robin_modes.py` 覆盖四个 id 的模式解析与混批拒绝。全量 vitest 1688 例、pytest 102 例通过，详见根 `RELEASE_NOTES.md` 3.8.20。
+- 真实引擎冒烟：三种模式共 24 局、0 批次失败（歼灭 4 个算法、同时回合 5 个、大逃杀 4 个的配对组合；大逃杀 8 局均以淘汰收场，歼灭/同时回合按各自静态图惯例可出现回合上限裁决）；`tests/rl/test_evaluate_cross_random_maps.py` 锁 reset 命令与生成配置的模式，`test_round_robin_modes.py` 覆盖四个 id 的模式解析与混批拒绝。全量 vitest 1691 例、pytest 102 例通过，详见根 `RELEASE_NOTES.md` 3.8.20。
 
 ## 3.8.19（2026-10-29）— ark 方舟算法 v1
 

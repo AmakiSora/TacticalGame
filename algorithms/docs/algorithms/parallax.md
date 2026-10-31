@@ -17,6 +17,7 @@
 | 测试 | [tests/algorithms/parallax.test.ts](../../../tests/algorithms/parallax.test.ts)（67 例） |
 | 评估工具 | [scripts/parallax-arena.mts](../../../scripts/parallax-arena.mts) |
 | 实现日期 | 2026-10-29 |
+| 作者 | Sonus-Max-Qoder(6Astra) |
 
 ## 设计原则
 

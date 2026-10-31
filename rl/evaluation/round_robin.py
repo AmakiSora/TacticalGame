@@ -105,7 +105,8 @@ def parse_args():
                         help="并行任务数（默认 1；每个任务独立 python+引擎进程，建议 ≤ 物理核数-2）")
     parser.add_argument("--device", default="auto", help="torch 设备：auto / cuda / cpu")
     parser.add_argument("--models", default=None,
-                        help="逗号分隔的文件名子串过滤，只评测匹配的模型（冒烟测试用）")
+                        help="逗号分隔的文件名子串过滤，只评测匹配的模型（冒烟测试用）；"
+                             "none=不带模型，只跑算法对算法")
     parser.add_argument("--algorithms", default=None,
                         help="逗号分隔算法名（缺省=当前模式全部注册算法；none=不带算法，纯模型循环赛）")
     parser.add_argument("--policy-stats", action="store_true",
@@ -219,6 +220,87 @@ def resolve_algorithms(root: Path, raw: str | None, mode: str = "standard") -> t
     if unknown:
         raise ValueError(f"未注册的算法：{', '.join(unknown)}（可选：{', '.join(names)}）")
     return [pair for pair in registered if pair[0] in needles], None
+
+
+def apply_model_filter(included: list[Path], excluded: list[Path],
+                       raw: str | None) -> tuple[list[Path], list[Path]]:
+    """解析 ``--models``：缺省 = 全部模型，``none``/``off`` = 不带模型，其余按文件名子串过滤。
+
+    ``none`` 是控制台「只勾算法」时显式传下来的哨兵值：不这样区分的话，空列表会被当成
+    「未指定」而把全部模型拉进纯算法跑批。
+    """
+    if raw is None:
+        return included, excluded
+    text = raw.strip()
+    if not text:
+        return included, excluded
+    if text.lower() in ("none", "off"):
+        return [], []
+    needles = [n.strip() for n in text.split(",") if n.strip()]
+    return ([model for model in included if any(n in model.name for n in needles)],
+            [model for model in excluded if any(n in model.name for n in needles)])
+
+
+def load_model_eval_policy(root: Path, maps: list[str]) -> dict[str, str]:
+    """读取地图里的 ``modelEval: false`` 声明，返回「不跑含模型批次」的地图 → 说明。
+
+    只在图层面拦：这些图纸跑算法对算法。随机图 id（``random`` / ``random-*``）没有静态配置，
+    视为开放；地图文件缺失或损坏时不在此处报错，交给写批阶段的地图校验兜底。
+    """
+    disabled: dict[str, str] = {}
+    for map_id in maps:
+        try:
+            config = json.loads((root / "maps" / f"{map_id}.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(config, dict) and config.get("modelEval") is False:
+            note = str(config.get("modelEvalNote") or "").strip()
+            disabled[map_id] = note or "该地图未开放模型评估"
+    return disabled
+
+
+def describe_model_skips(model_skipped: dict[str, int], disabled_maps: dict[str, str]) -> str:
+    """把「跳过图 → 批数」写成一行可读说明（图名 + 原因；批数由调用方的总数承担）。"""
+    return "、".join(
+        f"{map_id}（{disabled_maps.get(map_id, '未开放模型评估')}）"
+        for map_id in sorted(model_skipped)
+    )
+
+
+def plan_tasks(ordered: list[tuple[str, str]], maps: list[str], salt: str,
+               counts: dict[tuple[str, str, str], int], games_per_pair: int,
+               disabled_maps: dict[str, str]) -> tuple[list[dict], int, dict[str, int]]:
+    """按「地图 × 参与者对」生成待跑批次。
+
+    返回 ``(批次, 已满足且不补跑的局数, 因地图不评估模型而跳过的批次)``。
+    跳过只发生在「该图声明 modelEval: false 且对局至少一方是模型」；算法对算法照跑。
+    种子前缀仍按地图下标与参与者下标生成，跳过不会移动其它批次的种子（断点续跑兼容）。
+    """
+    tasks: list[dict] = []
+    skipped_games = 0
+    model_skipped: dict[str, int] = {}
+    for map_idx, map_id in enumerate(maps):
+        skip_note = disabled_maps.get(map_id)
+        for i, j in itertools.combinations(range(len(ordered)), 2):
+            spec_a, name_a = ordered[i]
+            spec_b, name_b = ordered[j]
+            have = counts.get((map_id, name_a, name_b), 0)
+            need = max(0, games_per_pair - have)
+            if need % 2 == 1:
+                need += 1
+            if need <= 0:
+                skipped_games += have
+                continue
+            if skip_note and (not spec_a.startswith("algo:") or not spec_b.startswith("algo:")):
+                model_skipped[map_id] = model_skipped.get(map_id, 0) + 1
+                continue
+            tasks.append({
+                "spec_a": spec_a, "spec_b": spec_b,
+                "name_a": name_a, "name_b": name_b,
+                "map": map_id, "games": need,
+                "seed_prefix": f"rr-{salt}-{map_idx}-{i}-{j}",
+            })
+    return tasks, skipped_games, model_skipped
 
 
 def _pair_key(map_id: str, name_a: str, name_b: str) -> tuple[str, str, str]:
@@ -404,12 +486,10 @@ def main():
 
     if mode == "standard":
         included, excluded = discover_models(models_dir)
-        if args.models:
-            needles = [n.strip() for n in args.models.split(",") if n.strip()]
-            included = [m for m in included if any(n in m.name for n in needles)]
-            excluded = [m for m in excluded if any(n in m.name for n in needles)]
+        included, excluded = apply_model_filter(included, excluded, args.models)
     else:
-        if args.models:
+        # none/off 与「未指定」同义：非标准模式本来就不带模型。
+        if args.models and args.models.strip().lower() not in ("none", "off"):
             print(f"错误：{mode} 模式暂不支持 RL 模型参评（现有模型仅覆盖 standard）。",
                   file=sys.stderr)
             return 1
@@ -466,30 +546,22 @@ def main():
         map_seconds[map_key] = map_seconds.get(map_key, 0.0) + total_sec
     map_avgs = {mid: map_seconds[mid] / n for mid, n in map_games.items() if n > 0}
     ordered = sorted(participants, key=lambda part: part[1])
-    tasks: list[dict] = []
-    skipped_games = 0
-    for map_idx, map_id in enumerate(maps):
-        for i, j in itertools.combinations(range(len(ordered)), 2):
-            name_a, name_b = ordered[i][1], ordered[j][1]
-            have = counts.get((map_id, name_a, name_b), 0)
-            need = max(0, args.games - have)
-            if need % 2 == 1:
-                need += 1
-            if need <= 0:
-                skipped_games += have
-                continue
-            seed_prefix = f"rr-{salt}-{map_idx}-{i}-{j}"
-            tasks.append({
-                "spec_a": ordered[i][0], "spec_b": ordered[j][0],
-                "name_a": name_a, "name_b": name_b,
-                "map": map_id, "games": need, "seed_prefix": seed_prefix,
-            })
+    disabled_maps = load_model_eval_policy(root, maps)
+    tasks, skipped_games, model_skipped = plan_tasks(
+        ordered, maps, salt, counts, args.games, disabled_maps)
 
     total_games = sum(task["games"] for task in tasks)
+    skipped_batches = sum(model_skipped.values())
+    if skipped_batches:
+        print(f"\n跳过 {skipped_batches} 个含模型的对战批次："
+              f"{describe_model_skips(model_skipped, disabled_maps)}；这些图只跑算法对算法。")
     print(f"\n任务：{len(tasks)} 个对战批次，待跑 {total_games} 局"
-          f"（已完成 {skipped_games} 局直接跳过）。")
+          f"（已完成 {skipped_games} 局直接跳过）")
     if not tasks:
-        print("所有目标局数已达成，无需补跑。")
+        if skipped_batches and not skipped_games:
+            print("所选地图均未开放模型评估，本次没有可跑批次：换图，或只选算法再跑。")
+        else:
+            print("所有目标局数已达成，无需补跑。")
         return 0
     estimates = [estimate_batch_seconds(task, counts, durations, map_avgs, mode)
                  for task in tasks]
@@ -534,6 +606,9 @@ def main():
           f"失败 {progress.failed} 批，总用时 {format_eta(elapsed)}（{rate:.1f} 局/s）。")
     if progress.failed:
         print("存在失败批次：可原样重跑（断点续跑会只补差额），失败原因见上方输出。")
+    if skipped_batches:
+        print(f"另跳过 {skipped_batches} 个含模型的对战批次："
+              f"{describe_model_skips(model_skipped, disabled_maps)}；这些图只跑算法对算法。")
     print(f"刷新排行榜数据：npm run arena-leaderboard")
     return 1 if progress.failed else 0
 

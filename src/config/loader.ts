@@ -117,6 +117,13 @@ export interface MapConfig {
   units: Record<UnitType, UnitSpec>;
   headquartersSpec: HeadquartersSpec;
   annihilation?: AnnihilationConfig;
+  /**
+   * false = 该图不参与 RL 模型评估（竞技场只跑算法对算法）；缺省视为参与。
+   * 仅评估链路读取（`rl/evaluation/round_robin.py`），引擎行为不受影响。
+   */
+  modelEval?: boolean;
+  /** 不参与模型评估的原因，写进跑批日志，便于事后解释被跳过的批次。 */
+  modelEvalNote?: string;
   balance: {
     startingSupplies: number;
     baseIncome: number;
@@ -413,6 +420,14 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     if ((comeback.scoreGapPercent as number) > 100) {
       throw new Error(`Map "${id}".balance.comebackSupply.scoreGapPercent must be <= 100`);
     }
+  }
+
+  // 竞技场模型评估开关：只影响 rl/evaluation/round_robin.py 的组批，不参与引擎判定。
+  if ('modelEval' in c && typeof c.modelEval !== 'boolean') {
+    throw new Error(`Map "${id}".modelEval must be boolean`);
+  }
+  if ('modelEvalNote' in c && typeof c.modelEvalNote !== 'string') {
+    throw new Error(`Map "${id}".modelEvalNote must be a string`);
   }
 
   if (isAnnihilationMode(c.mode)) {

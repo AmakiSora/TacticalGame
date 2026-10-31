@@ -372,10 +372,18 @@ class HexGameEnv(gym.Env):
         if not spec or resources < int(spec.get("cost", 10)):
             return None
         origins = []
+        # 与引擎 deployOriginFor 同口径：deployFromHq=false 的图禁止总部出兵，
+        # 据点类型 canDeploy=false 也不能出兵；否则 helper 会发出引擎必拒的 deploy。
+        balance = state.get("config", {}).get("balance") or {}
         hq = state.get("headquarters", {}).get(owner)
-        if hq and hq.get("alive"):
+        if hq and hq.get("alive") and balance.get("deployFromHq") is not False:
             origins.append(hq)
-        origins.extend(p for p in state.get("controlPoints", []) if p.get("owner") == owner)
+        point_types = balance.get("controlPointTypes") or {}
+        origins.extend(
+            p for p in state.get("controlPoints", [])
+            if p.get("owner") == owner
+            and (point_types.get(p.get("kind") or "", {}) or {}).get("canDeploy") is not False
+        )
         cells = {key(int(c["q"]), int(c["r"])): c for c in state.get("cells", [])}
         occupied = {(int(u["q"]), int(u["r"])) for u in state.get("units", []) if u.get("alive")}
         occupied.update((int(h["q"]), int(h["r"])) for h in state.get("headquarters", {}).values() if h.get("alive"))

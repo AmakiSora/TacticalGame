@@ -44,6 +44,12 @@
 
 `balance.maxTurns` 接受 `>= 1` 的有限数字，或写成 `null` 表示**无回合上限**：引擎不会在回合边界做轮数裁决，对局仅由一方全灭、总部/军力被毁或房主 `POST /api/games/:id/force-adjudicate` 结束。前端回合角标此时显示 `当前轮/∞`，地图卡片显示 `⏱∞`，地图编辑器可用「无回合上限」开关切换。
 
+## 模型评估开关
+
+竞技场跑批（`rl/evaluation/round_robin.py`）默认让全部模型参与每张标准图。地图可以用顶层 `"modelEval": false` 退出模型评估：含模型的批次在组批阶段被跳过并在日志里注明原因，不计成失败批次，算法对算法照跑；`"modelEvalNote": "..."` 是可选的说明文本，原样写进跑批日志。字段只影响竞技场评估链路，引擎、建房与对局规则不受影响；缺省视为参与。
+
+`whirlpool`（星海漩涡）是首例：无回合上限 + 只能从港口出兵 + 六条旋臂被 blocker 隔断（纯陆地连通分量 7 块，两个总部之间至少砸穿 4 面墙），当前模型的策略不会先破墙再进攻，模型对局跑满回合全是平局。背景见 [rl/docs/RELEASE_NOTES.md](../rl/docs/RELEASE_NOTES.md) 2026-10-31 两条记录。
+
 ## 歼灭与大逃杀字段
 
 歼灭模式地图另外声明 `mode: "annihilation"`、`annihilation.artillery`，并让每个 `spawnSlots[]` 通过 `controlPointId` 关联一个唯一出生据点；大逃杀模式地图声明 `mode: "royale"` 时同样**必须**携带 `annihilation.artillery` 与据点绑定的出生槽（`minimumSafeRadius` 允许为 0，即最终只剩中心一格安全）。

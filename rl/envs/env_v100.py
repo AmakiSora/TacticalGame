@@ -278,10 +278,18 @@ class HexGameEnv(gym.Env):
         if actions_used < ap_limit:
             resources = state.get("resources", {}).get(owner, {}).get("supplies", 0)
             origins = []
+            # 与引擎 deployOriginFor 同口径：deployFromHq=false 的图禁止总部出兵，
+            # 据点类型 canDeploy=false 也不能出兵；否则会发出引擎必拒的 deploy。
+            balance = state.get("config", {}).get("balance") or {}
             hq = state.get("headquarters", {}).get(owner)
-            if hq and hq.get("alive"):
+            if hq and hq.get("alive") and balance.get("deployFromHq") is not False:
                 origins.append(hq)
-            origins.extend(p for p in state.get("controlPoints", []) if p.get("owner") == owner)
+            point_types = balance.get("controlPointTypes") or {}
+            origins.extend(
+                p for p in state.get("controlPoints", [])
+                if p.get("owner") == owner
+                and (point_types.get(p.get("kind") or "", {}) or {}).get("canDeploy") is not False
+            )
             specs = state.get("config", {}).get("units", {})
             for origin in origins:
                 origin_pos = key(int(origin["q"]), int(origin["r"]))

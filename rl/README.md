@@ -489,6 +489,14 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default,breach,d
 # 纯模型循环赛（不带算法，如复现旧口径）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --algorithms none
 
+# 只跑算法对算法（标准图；等价于控制台只勾算法，缺省 --models 仍是「全部模型」）
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models none --algorithms greedy,threat
+```
+
+地图可以用顶层 `"modelEval": false` 退出模型评估（见 [docs/MAP_FORMAT.md](../docs/MAP_FORMAT.md)）：含模型的批次在组批阶段直接跳过，
+日志按图列出跳过原因与批数，**不计成失败批次**，算法对算法照跑。`whirlpool` 目前就是这种情况——无回合上限 + 只能从港口出兵 +
+旋臂被墙隔断，当前模型打不出胜负（详见 [RELEASE_NOTES](docs/RELEASE_NOTES.md) 2026-10-31）。
+
 # 同时回合（仅内置算法；地图池 standoff / molten-throne / mistpine）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps standoff,molten-throne --games 2 \
     --algorithms random-sim,dest-prob,kriegspiel,matrix-eq
@@ -518,6 +526,9 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random-royale --
   从 JSONL 生成 `public/data/arena-leaderboard.json`，页面 `/arena.html` 展示。
   也可以直接在 `/arena.html` 的「评估控制台」页签（`#console` 直达）里网页启动/监控/停止跑批，
   结束后自动重算榜单（需要本机 `rl/.venv`；Docker 容器内不可用）。
+- **维护任务进度**：「重算榜单」（榜单脚本 → 玩法统计脚本）与「清空旧局」（扫描 → 重写 → 完成）
+  以独立进度条与实时日志区展示，与跑批输出分开；状态来自 `/api/arena/eval/status` 的
+  `auxTask`，任务运行中页面轮询 1s、空闲 3s，并发发起会返回 409。
 - **评分协议**：Bradley-Terry MLE（MM 迭代，平局记 0.5，已交手对附加 1 局虚拟平局先验防发散），
   Elo 映射 `1500 + 400/ln10 × ln p`；95% CI 为按（对,图）分层 bootstrap（固定种子可复现）；
   小样本另附 Wilson 下界参考列。先手/后手只做展示统计，不进评分。

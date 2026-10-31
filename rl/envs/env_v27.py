@@ -555,10 +555,18 @@ class HexGameEnv(gym.Env):
         if not spec or resources < int(spec.get("cost", 10)):
             return None
         origins = []
+        # 与引擎 deployOriginFor 同口径：deployFromHq=false 的图禁止总部出兵，
+        # 据点类型 canDeploy=false 也不能出兵；否则 helper 会发出引擎必拒的 deploy。
+        balance = state.get("config", {}).get("balance") or {}
         hq = state.get("headquarters", {}).get(owner)
-        if hq and hq.get("alive"):
+        if hq and hq.get("alive") and balance.get("deployFromHq") is not False:
             origins.append(hq)
-        origins.extend(p for p in state.get("controlPoints", []) if p.get("owner") == owner)
+        point_types = balance.get("controlPointTypes") or {}
+        origins.extend(
+            p for p in state.get("controlPoints", [])
+            if p.get("owner") == owner
+            and (point_types.get(p.get("kind") or "", {}) or {}).get("canDeploy") is not False
+        )
         cells = {key(int(c["q"]), int(c["r"])): c for c in state.get("cells", [])}
         occupied = {(int(u["q"]), int(u["r"])) for u in state.get("units", []) if u.get("alive")}
         occupied.update((int(h["q"]), int(h["r"])) for h in state.get("headquarters", {}).values() if h.get("alive"))
@@ -794,7 +802,8 @@ class HexGameEnv(gym.Env):
         balance = config.get("balance", {})
         # 随机地图的回合/行动点/经济参数逐局变化，归一化除数改读本局配置。
         ap_limit = max(1.0, float(balance.get("actionsPerTurn", 5)))
-        max_turns = max(1.0, float(balance.get("maxTurns", 20)))
+        # 无回合上限的地图（balance.maxTurns = null）按缺省 20 归一化，避免 float(None)。
+        max_turns = max(1.0, float(balance.get("maxTurns") or 20))
         supply_scale = max(300.0, 2.5 * float(balance.get("startingSupplies", 80)))
         hq_hp_scale = max(1.0, float(config.get("headquartersSpec", {}).get("hp", 180)))
         own = state.get("resources", {}).get(self.owner, {}).get("supplies", 0)

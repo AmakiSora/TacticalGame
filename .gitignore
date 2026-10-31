@@ -29,6 +29,8 @@ rl/distill/
 rl/tb/
 rl/test-output/
 arena/details/
+# 评估累积文件的跨进程写锁（append_jsonl 用完即留，不参与版本管理）
+arena/*.lock
 
 # Temporary debug state snapshots
 /*.json

@@ -147,6 +147,27 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('validates the arena model-eval flag and keeps it on the config', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as Record<string, any>;
+    map.modelEval = 'no';
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+    expect(() => loadMaps(dir)).toThrow('modelEval must be boolean');
+    resetConfig();
+
+    const okDir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const okMap = validMap() as Record<string, any>;
+    okMap.modelEval = false;
+    okMap.modelEvalNote = '无回合上限';
+    writeFileSync(join(okDir, 'default.json'), JSON.stringify(okMap));
+
+    loadMaps(okDir);
+
+    expect(getMapConfig('default').modelEval).toBe(false);
+    expect(getMapConfig('default').modelEvalNote).toBe('无回合上限');
+    resetConfig();
+  });
+
   it('accepts null maxTurns as an unlimited-round map', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as Record<string, any>;

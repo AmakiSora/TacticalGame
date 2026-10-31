@@ -665,6 +665,59 @@ def _derive_event_stats(collector: EventCollector) -> dict[str, Any]:
     return stats
 
 
+def _lock_handle(handle) -> None:
+    """阻塞式独占锁：Windows 用 msvcrt 逐字节锁，其它平台用 flock。"""
+    if os.name == "nt":
+        import msvcrt
+        handle.seek(0)
+        while True:
+            try:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                return
+            except OSError:
+                time.sleep(0.01)
+    else:
+        import fcntl
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+
+
+def _unlock_handle(handle) -> None:
+    if os.name == "nt":
+        import msvcrt
+        handle.seek(0)
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+    else:
+        import fcntl
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def append_jsonl(path: Path, record: dict[str, Any]) -> None:
+    """把一条记录整行追加进 JSONL，跨进程互斥。
+
+    round_robin --jobs N 会同时跑 N 个 evaluate_cross 写同一个累积文件；本机实测（8 进程
+    各 300 行）裸 append 会丢 600+ 行、写坏 70+ 行——Windows 上并发 append 不是原子的。
+    这里用同目录 ``*.lock`` 文件做互斥，保证每次落盘是一整行合法 JSON。
+    """
+    payload = (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8")
+    lock_path = path.with_name(path.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as lock:
+        if lock.tell() == 0:
+            lock.write(b"\0")
+            lock.flush()
+        _lock_handle(lock)
+        try:
+            with path.open("ab") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+        finally:
+            _unlock_handle(lock)
+
+
 class DetailWriter:
     """每批次一个明细 JSONL；每局结束立即落盘，跑批中断时已完成对局不丢。"""
 
@@ -676,8 +729,7 @@ class DetailWriter:
     def append(self, record: dict[str, Any]) -> None:
         if not self.path:
             return
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        append_jsonl(self.path, record)
 
     def display_path(self) -> str | None:
         """供 matches.jsonl 摘要引用：项目根内用相对路径，否则绝对路径（posix 风格）。"""
@@ -966,6 +1018,25 @@ def play_one_game(worker: EngineWorker, seat_map: dict[str, SideController], arg
     return state.get("winner"), acted, detail["summary"]["rounds"], detail
 
 
+def warn_if_model_eval_disabled(map_id: str, specs: dict[str, str]) -> None:
+    """地图声明 ``modelEval: false`` 且本局含模型座位时给出提示。
+
+    竞技场跑批（round_robin.py）会直接跳过这些「图 × 模型」批次；单局 CLI 仍允许跑，
+    但结果只作研究参考——这类图按当前模型的能力打不出胜负。
+    """
+    if all(spec.startswith("algo:") for spec in specs.values()):
+        return
+    try:
+        config = json.loads((_PROJECT_ROOT / "maps" / f"{map_id}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if not isinstance(config, dict) or config.get("modelEval") is not False:
+        return
+    note = str(config.get("modelEvalNote") or "").strip() or "该地图未开放模型评估"
+    print(f"[警告] 地图 {map_id} 未开放模型评估（{note}）；"
+          f"本局仅作研究参考，竞技场跑批会跳过含模型的批次。")
+
+
 def main():
     # Windows 控制台默认 GBK，统一改用 UTF-8 输出避免乱码。
     for stream in (sys.stdout, sys.stderr):
@@ -986,6 +1057,7 @@ def main():
         return 2
     names = {"player_a": name_a, "player_b": name_b}
     specs = {"player_a": spec_a, "player_b": spec_b}
+    warn_if_model_eval_disabled(args.map_id, specs)
 
     details_dir = None if args.no_details else Path(args.details_dir)
     batch_id = f"{args.seed_prefix}-{time.strftime('%Y%m%d_%H%M%S')}-{os.getpid()}"
@@ -1069,8 +1141,7 @@ def main():
             # 每局完成立即入库（原为整批结束后一次性追加）：跑批中断时已完成对局
             # 仍在累积文件里、断点续跑只补差额；编排器也能按行透传逐局进度。
             if stats_file is not None:
-                with stats_file.open("a", encoding="utf-8") as handle:
-                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+                append_jsonl(stats_file, record)
             print(f"{GAME_PROGRESS_PREFIX}第 {game_index}/{args.games} 局完成"
                   f"（{detail['meta']['durationSec']:.0f}s，"
                   f"累计 {format_duration(time.monotonic() - run_started)}）", flush=True)

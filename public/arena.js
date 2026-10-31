@@ -507,12 +507,17 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     'eval-model-count', 'eval-games', 'eval-jobs', 'eval-salt', 'eval-dry', 'eval-start', 'eval-stop',
     'eval-control-token', 'eval-save-token', 'eval-token-state',
     'eval-regen', 'eval-clear', 'eval-msg', 'eval-progress-wrap', 'eval-progress-fill', 'eval-progress-text', 'eval-output',
+    'eval-task-panel', 'eval-task-title', 'eval-task-state', 'eval-task-elapsed', 'eval-task-fill', 'eval-task-text', 'eval-task-output',
     'eval-tab-btn', 'eval-mini-strip', 'eval-mini-text', 'eval-mini-go']) {
     evalEl[id] = document.getElementById(id);
   }
 
   let evalStatus = null;
   let evalPrevRunning = false;
+  // 维护任务（重算榜单 / 清空旧局）的上一次状态：用于在 running → 结束的瞬间刷新数据/提示。
+  let auxPrevStatus = null;
+  // 本次清空旧局的范围描述：任务完成提示里带上它（与确认弹窗同口径）。
+  let pendingClearScope = '';
   // 保存控制令牌后的“已保存”提示：等第一次成功取到状态就自动让位，避免长期占着消息位。
   let evalTokenNoticePending = false;
   let evalModels = [];
@@ -708,10 +713,12 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     updateEvalStartState();
   }
 
-  function formatDuration(iso) {
+  function formatDuration(iso, endIso) {
     const start = new Date(iso).getTime();
     if (Number.isNaN(start)) return '';
-    let secs = Math.max(0, Math.floor((Date.now() - start) / 1000));
+    // 已结束的任务用结束时间，避免「用时」随着页面停留一直涨。
+    const end = endIso ? new Date(endIso).getTime() : Date.now();
+    let secs = Math.max(0, Math.floor(((Number.isNaN(end) ? Date.now() : end) - start) / 1000));
     const h = Math.floor(secs / 3600);
     secs %= 3600;
     const m = Math.floor(secs / 60);
@@ -734,7 +741,8 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     evalEl['eval-status-pill'].classList.toggle('err', pill.cls === 'err');
     updateEvalStartState();
     evalEl['eval-stop'].disabled = st.status !== 'running';
-    evalEl['eval-clear'].disabled = st.status === 'running';
+    const auxRunning = st.auxTask?.status === 'running';
+    evalEl['eval-clear'].disabled = st.status === 'running' || auxRunning;
 
     const running = st.status === 'running';
     const hasHistory = Boolean(st.params);
@@ -742,12 +750,24 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     evalEl['eval-output'].hidden = !running && !hasHistory;
 
     if (running) {
-      const pctValue = st.batchesTotal ? Math.min(100, Math.round(st.batchesDone / st.batchesTotal * 100)) : 0;
-      evalEl['eval-progress-fill'].style.width = `${pctValue}%`;
+      // 进度以「局」为主、批为辅：一个模型批次可能几分钟，按批走会长时间停在 0%。
+      const gamesKnown = Number(st.plannedGames) > 0;
+      const batchesKnown = Number(st.batchesTotal) > 0;
+      const gamePct = gamesKnown ? Math.min(100, (st.gamesNew / st.plannedGames) * 100) : null;
+      const batchPct = batchesKnown ? Math.min(100, (st.batchesDone / st.batchesTotal) * 100) : null;
+      const pct = gamePct !== null ? gamePct : batchPct;
+      // 还没有任何进度（启动/加载模型阶段）时用流动条纹，避免进度条看着像没动。
+      const indeterminate = pct === null || pct <= 0;
+      const fill = evalEl['eval-progress-fill'];
+      fill.classList.toggle('is-indeterminate', indeterminate);
+      // 至少给 1%，否则 500 局目标的头几局会四舍五入成 0%、进度条又看不见。
+      const pctLabel = indeterminate ? 0 : Math.max(1, Math.round(pct));
+      fill.style.width = indeterminate ? '' : `${pctLabel}%`;
       const bits = [];
-      if (st.batchesTotal) bits.push(`${st.batchesDone}/${st.batchesTotal} 批（${pctValue}%）`);
-      if (st.plannedGames) bits.push(`新增 ${st.gamesNew}/${st.plannedGames} 局`);
+      if (batchesKnown) bits.push(`${st.batchesDone}/${st.batchesTotal} 批`);
+      if (gamesKnown) bits.push(`新增 ${st.gamesNew}/${st.plannedGames} 局`);
       else bits.push(`新增 ${st.gamesNew} 局`);
+      if (!indeterminate) bits.push(`${pctLabel}%`);
       if (st.startedAt) bits.push(`已运行 ${formatDuration(st.startedAt)}`);
       evalEl['eval-progress-text'].textContent = bits.join(' · ');
     }
@@ -766,12 +786,77 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     const tail = (st.outputTail || []).slice(-14).join('\n');
     evalEl['eval-output'].textContent = tail || '（暂无输出）';
 
+    renderEvalAuxTask(st.auxTask);
+
     if (evalPrevRunning && !running) {
       // 跑批结束：服务端已自动重算榜单，稍等一下再刷新页面数据。
       evalMsg(`跑批${EVAL_PILL[st.status]?.text || st.status}，正在刷新榜单…`);
       setTimeout(loadData, 2500);
     }
     evalPrevRunning = running;
+  }
+
+  /**
+   * 维护任务面板：重算榜单 / 清空旧局的进度条与日志，数据来自 /status 的 auxTask。
+   * 任务结束后保留日志，直到下一次任务覆盖；完成瞬间按任务类型刷新榜单或提示结果。
+   */
+  function renderEvalAuxTask(task) {
+    const panel = evalEl['eval-task-panel'];
+    if (!panel) return;
+    if (!task) {
+      panel.hidden = true;
+      auxPrevStatus = null;
+      return;
+    }
+    panel.hidden = false;
+    const running = task.status === 'running';
+    const finished = task.status === 'finished';
+    evalEl['eval-task-title'].textContent = task.label || '维护任务';
+    const stateEl = evalEl['eval-task-state'];
+    stateEl.textContent = running ? `运行中 · ${task.step}/${task.steps}` : finished ? '已完成' : '失败';
+    stateEl.classList.toggle('ok', finished);
+    stateEl.classList.toggle('err', task.status === 'failed');
+    evalEl['eval-task-elapsed'].textContent = task.startedAt
+      ? `${running ? '已运行' : '用时'} ${formatDuration(task.startedAt, running ? null : task.finishedAt)}`
+      : '';
+    const pct = task.steps ? Math.min(100, Math.round((task.step / task.steps) * 100)) : 0;
+    evalEl['eval-task-fill'].style.width = `${pct}%`;
+
+    const bits = [];
+    if (task.stepLabel) bits.push(task.stepLabel);
+    if (task.kind === 'clear' && task.detail && typeof task.detail.removed === 'number') {
+      bits.push(`命中 ${task.detail.removed}/${task.detail.total} 局`);
+    }
+    if (task.error) bits.push(task.error);
+    evalEl['eval-task-text'].textContent = bits.join(' · ');
+    evalEl['eval-task-output'].textContent = (task.outputTail || []).join('\n') || '（暂无输出）';
+
+    // 维护任务运行中不许再点重算/清空（后端同样 409），避免并发写同一批数据。
+    if (running) {
+      evalEl['eval-regen'].disabled = true;
+      evalEl['eval-clear'].disabled = true;
+    } else {
+      evalEl['eval-regen'].disabled = false;
+      evalEl['eval-clear'].disabled = evalStatus?.status === 'running';
+    }
+
+    if (auxPrevStatus === 'running' && !running) {
+      if (finished) {
+        if (task.kind === 'regen') {
+          evalMsg('榜单数据已重算');
+          loadData();
+        } else if (task.detail && typeof task.detail.removed === 'number') {
+          const scope = pendingClearScope ? `（${pendingClearScope}）` : '';
+          evalMsg(task.detail.removed > 0
+            ? `已删除 ${task.detail.removed} / 共 ${task.detail.total} 局${scope}，现在可重新跑批累积计时数据`
+            : '没有命中范围可清空的旧对局');
+        }
+      } else {
+        evalMsg(`${task.label || '维护任务'}失败：${task.error || '见任务日志'}`, 'err');
+      }
+      pollEvalStatus();
+    }
+    auxPrevStatus = task.status;
   }
 
   async function pollEvalStatus() {
@@ -991,6 +1076,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     });
     if (!ok) return;
     const filter = readFilter();
+    pendingClearScope = describeClearScope(filter);
     evalEl['eval-clear'].disabled = true;
     try {
       const res = await fetch('/api/arena/eval/clear-matches', {
@@ -1001,34 +1087,34 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         evalMsg(`清空失败：${data.error || res.status}`, 'err');
-      } else if (data.removed > 0) {
-        evalMsg(`已删除 ${data.removed} / 共 ${data.total} 局（${describeClearScope(filter)}），现在可重新跑批累积计时数据`);
+        evalEl['eval-clear'].disabled = evalStatus?.status === 'running';
       } else {
-        evalMsg('没有命中范围可清空的旧对局');
+        if (data.auxTask) renderEvalAuxTask(data.auxTask);
+        evalMsg('清空旧局已启动，进度与日志见下方任务区');
+        pollEvalStatus();
       }
-      pollEvalStatus();
     } catch (err) {
       evalMsg(`清空失败：${window.ErrorText.describe(err)}`, 'err');
-    } finally {
       evalEl['eval-clear'].disabled = evalStatus?.status === 'running';
     }
   });
 
   evalEl['eval-regen'].addEventListener('click', async () => {
     evalEl['eval-regen'].disabled = true;
-    evalMsg('正在重算榜单数据…');
+    evalMsg('正在启动榜单重算…');
     try {
       const res = await fetch('/api/arena/leaderboard/regenerate', { method: 'POST', headers: controlHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         evalMsg(`重算失败：${data.error || res.status}`, 'err');
-      } else {
-        evalMsg('榜单数据已重算');
-        loadData();
+        evalEl['eval-regen'].disabled = false;
+        return;
       }
+      if (data.auxTask) renderEvalAuxTask(data.auxTask);
+      evalMsg('榜单重算已启动，进度与日志见下方任务区');
+      pollEvalStatus();
     } catch (err) {
       evalMsg(`重算失败：${window.ErrorText.describe(err)}`, 'err');
-    } finally {
       evalEl['eval-regen'].disabled = false;
     }
   });
@@ -1050,6 +1136,12 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   });
   loadEvalParticipants();
   evalEl['eval-mini-strip'].addEventListener('click', () => switchTab('console'));
-  pollEvalStatus();
-  setInterval(pollEvalStatus, 3000);
+
+  // 自适应轮询：跑批或维护任务运行时 1s（进度条与日志更跟手），空闲时 3s。
+  async function pollLoop() {
+    await pollEvalStatus();
+    const busy = evalStatus?.status === 'running' || evalStatus?.auxTask?.status === 'running';
+    setTimeout(pollLoop, busy ? 1000 : 3000);
+  }
+  pollLoop();
 })();

@@ -41,6 +41,17 @@ function fakeSpawner() {
   return { spawner, calls, children };
 }
 
+/** 等维护任务（重算榜单/清空旧局）跑完：轮询 /status 直到任务不再是 running。 */
+async function waitForAuxTask(app: FastifyInstance, timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const status = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
+    if (status.auxTask && status.auxTask.status !== 'running') return { status, task: status.auxTask };
+    await delay(10);
+  }
+  throw new Error('维护任务在超时内没有结束');
+}
+
 describe('AI 竞技场评估控制台 API', () => {
   let app: FastifyInstance;
   let dir: string;
@@ -79,6 +90,8 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(data.knownMaps).toContain('mistpine');
     expect(data.defaults.games).toBe(24);
     expect(data.gamesTotal).toBe(2);
+    // 维护任务（重算榜单/清空旧局）默认没有：前端据此隐藏任务进度面板。
+    expect(data.auxTask).toBeNull();
     const modeIds = data.modeCatalog.map((mode: { id: string }) => mode.id);
     expect(modeIds).toEqual(['standard', 'annihilation', 'simultaneous', 'royale']);
     expect(data.modeCatalog.find((mode: { id: string }) => mode.id === 'standard').supported).toBe(true);
@@ -362,6 +375,19 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(buildParticipantArgs({ mode: 'standard', maps: ['random'], participants: null, games: 24, jobs: 1, salt: null, dryRun: false })).toEqual([]);
   });
 
+  it('buildParticipantArgs sends an explicit none when only algorithms are picked', () => {
+    // 标准模式不传 --models = 全部模型；只勾算法时必须显式 none，否则模型会被一起拉进跑批。
+    expect(buildParticipantArgs({
+      mode: 'standard', maps: ['whirlpool'], participants: ['algo:greedy', 'algo:random'],
+      games: 24, jobs: 1, salt: null, dryRun: false,
+    })).toEqual(['--models', 'none', '--algorithms', 'greedy,random']);
+    // 非标准模式本来就不允许模型，仍不传 --models（round_robin 见到就报错）。
+    expect(buildParticipantArgs({
+      mode: 'royale', maps: ['snowflake'], participants: ['algo:random-royale', 'algo:apex'],
+      games: 24, jobs: 1, salt: null, dryRun: false,
+    })).toEqual(['--algorithms', 'random-royale,apex']);
+  });
+
   it('serves the merged participant catalog', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/arena/participants' });
     expect(res.statusCode).toBe(200);
@@ -446,13 +472,16 @@ describe('AI 竞技场评估控制台 API', () => {
   it('clears the accumulated matches file so a fresh batch can accumulate', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches' });
     expect(res.statusCode).toBe(200);
-    const data = res.json();
-    expect(data.ok).toBe(true);
-    expect(data.removed).toBe(2);
-    expect(data.total).toBe(2);
+    // 真删是后台维护任务：接口先回任务快照，进度与日志随后由 /status 轮询。
+    const started = res.json();
+    expect(started.ok).toBe(true);
+    expect(started.auxTask).toMatchObject({ kind: 'clear', label: '清空旧局', status: 'running', steps: 3 });
+
+    const { status, task } = await waitForAuxTask(app);
+    expect(task).toMatchObject({ kind: 'clear', status: 'finished', detail: { removed: 2, total: 2 } });
+    expect(task.outputTail.join('\n')).toContain('命中 2 局');
     // 全部行命中时重写为空文件（保留文件本身，局数归零）。
     expect(readFileSync(statsFile, 'utf8').trim()).toBe('');
-    const status = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
     expect(status.gamesTotal).toBe(0);
     expect(status.notes.join()).toContain('已删除 2/2 局');
   });
@@ -476,14 +505,14 @@ describe('AI 竞技场评估控制台 API', () => {
     ].map(line => JSON.stringify(line)).join('\n') + '\n');
 
     // 模式过滤：standoff 属 simultaneous（读真实 maps/*.json 的 mode 字段）。
-    const byMode = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { mode: 'simultaneous' } });
-    expect(byMode.json()).toMatchObject({ ok: true, removed: 2, total: 4 });
+    await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { mode: 'simultaneous' } });
+    expect((await waitForAuxTask(app)).task.detail).toMatchObject({ removed: 2, total: 4 });
     const leftMaps = readFileSync(statsFile, 'utf8').split('\n').filter(l => l.trim()).map(l => JSON.parse(l).map);
     expect(leftMaps).toEqual(['default', 'random']);
 
     // 参与者过滤：精确匹配任一座位（剩余两行都含 algo_greedy@v1，全部命中）。
-    const byParticipant = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { participant: 'algo_greedy@v1' } });
-    expect(byParticipant.json()).toMatchObject({ removed: 2 });
+    await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { participant: 'algo_greedy@v1' } });
+    expect((await waitForAuxTask(app)).task.detail).toMatchObject({ removed: 2 });
     expect(readFileSync(statsFile, 'utf8').split('\n').filter(l => l.trim())).toHaveLength(0);
 
     // 地图过滤。
@@ -491,8 +520,8 @@ describe('AI 竞技场评估控制台 API', () => {
       { map: 'default', players: { player_a: 'a', player_b: 'b' } },
       { map: 'breach', players: { player_a: 'a', player_b: 'b' } },
     ].map(line => JSON.stringify(line)).join('\n') + '\n');
-    const byMap = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { map: 'default' } });
-    expect(byMap.json()).toMatchObject({ removed: 1 });
+    await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { map: 'default' } });
+    expect((await waitForAuxTask(app)).task.detail).toMatchObject({ removed: 1 });
     expect(readFileSync(statsFile, 'utf8')).toContain('breach');
     expect(readFileSync(statsFile, 'utf8')).not.toContain('"default"');
   });
@@ -513,7 +542,8 @@ describe('AI 竞技场评估控制台 API', () => {
     const byMap = await app.inject({
       method: 'POST', url: '/api/arena/eval/clear-matches', payload: { map: 'random-royale' },
     });
-    expect(byMap.json()).toMatchObject({ ok: true, removed: 1 });
+    expect(byMap.statusCode).toBe(200);
+    expect((await waitForAuxTask(app)).task.detail).toMatchObject({ removed: 1 });
     const left = readFileSync(statsFile, 'utf8').split('\n').filter(l => l.trim()).map(l => JSON.parse(l).map);
     expect(left).toEqual(['random', 'random-annihilation']);
 
@@ -540,7 +570,8 @@ describe('AI 竞技场评估控制台 API', () => {
   it('reports zero removed without touching the file when nothing matches', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches', payload: { participant: 'nobody@v1' } });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ ok: true, removed: 0, total: 2 });
+    expect(res.json().auxTask).toMatchObject({ kind: 'clear', status: 'running' });
+    expect((await waitForAuxTask(app)).task.detail).toMatchObject({ removed: 0, total: 2 });
     expect(readFileSync(statsFile, 'utf8').split('\n').filter(l => l.trim())).toHaveLength(2);
   });
 
@@ -548,7 +579,7 @@ describe('AI 竞技场评估控制台 API', () => {
     rmSync(statsFile, { force: true });
     const res = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ ok: true, removed: 0, total: 0 });
+    expect((await waitForAuxTask(app)).task.detail).toMatchObject({ removed: 0, total: 0 });
   });
 
   it('rejects clear-matches while a run is in progress', async () => {
@@ -630,17 +661,51 @@ describe('AI 竞技场评估控制台 API', () => {
     }
   });
 
-  it('regenerates leaderboard data on demand', async () => {
-    const pending = app.inject({ method: 'POST', url: '/api/arena/leaderboard/regenerate' });
-    await delay(10);
-    // 重算串行跑两个脚本：先榜单（gen.mjs），后玩法统计（generateArenaStats.mjs）。
-    spawner.children[0].emit('exit', 0, null);
-    await delay(10);
-    spawner.children[1].emit('exit', 0, null);
-    const res = await pending;
-    expect(res.statusCode).toBe(200);
+  it('regenerates leaderboard data on demand and streams progress', async () => {
+    const start = await app.inject({ method: 'POST', url: '/api/arena/leaderboard/regenerate' });
+    expect(start.statusCode).toBe(200);
+    expect(start.json().auxTask).toMatchObject({ kind: 'regen', label: '重算榜单', status: 'running', step: 0, steps: 2 });
     expect(spawner.calls[0].args.join(' ')).toContain('gen.mjs');
+
+    // 进度条按脚本推进：第一个脚本退出后进入第二步（统计）。
+    spawner.children[0].emit('exit', 0, null);
+    await delay(20);
+    const mid = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
+    expect(mid.auxTask).toMatchObject({ status: 'running', step: 1, steps: 2 });
     expect(spawner.calls[1].args.join(' ')).toContain('generateArenaStats.mjs');
+
+    spawner.children[1].emit('exit', 0, null);
+    const { task } = await waitForAuxTask(app);
+    expect(task).toMatchObject({ kind: 'regen', status: 'finished', step: 2, steps: 2 });
+    expect(task.outputTail.join('\n')).toContain('$ node gen.mjs');
+    expect(task.outputTail.join('\n')).toContain('榜单数据已生成');
+    expect(task.outputTail.join('\n')).toContain('玩法统计数据已生成');
+  });
+
+  it('reports a failed regeneration in the maintenance task log', async () => {
+    const start = await app.inject({ method: 'POST', url: '/api/arena/leaderboard/regenerate' });
+    expect(start.statusCode).toBe(200);
+    spawner.children[0].emit('exit', 1, null);
+    const { task } = await waitForAuxTask(app);
+    expect(task.status).toBe('failed');
+    expect(task.error).toContain('榜单');
+    // 第一步失败后不再跑统计脚本。
+    expect(spawner.calls).toHaveLength(1);
+  });
+
+  it('rejects a second maintenance task while one is running', async () => {
+    await app.inject({ method: 'POST', url: '/api/arena/leaderboard/regenerate' });
+    const regen = await app.inject({ method: 'POST', url: '/api/arena/leaderboard/regenerate' });
+    expect(regen.statusCode).toBe(409);
+    expect(regen.json().code).toBe('aux_task_running');
+    expect(regen.json().auxTask).toMatchObject({ kind: 'regen', status: 'running' });
+
+    const clear = await app.inject({ method: 'POST', url: '/api/arena/eval/clear-matches' });
+    expect(clear.statusCode).toBe(409);
+    expect(clear.json().code).toBe('aux_task_running');
+    // 放掉挂起的重算脚本，避免影响 afterEach 关闭。
+    spawner.children[0].emit('exit', 1, null);
+    await waitForAuxTask(app);
   });
 
   it('rejects eval writes with 501 when the batch toolchain is not shipped', async () => {

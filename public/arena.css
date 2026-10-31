@@ -91,8 +91,27 @@
     .eval-hint { color: #66788a; font-size: 11px; }
     .eval-progress { height: 10px; background: #141c22; border: 1px solid #2a3a44; border-radius: 5px; overflow: hidden; }
     .eval-progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, #2f7d54, #3f9b6c); transition: width .5s; }
+    /* 尚无确定进度（启动/加载模型阶段）：流动条纹，表示任务在跑而不是卡住 */
+    .eval-progress-fill.is-indeterminate {
+      width: 38%;
+      transition: none;
+      background: linear-gradient(90deg, #2f7d54, #6ad39a, #2f7d54);
+      background-size: 200% 100%;
+      animation: eval-progress-sweep 1.1s linear infinite;
+    }
+    @keyframes eval-progress-sweep {
+      from { background-position: 0% 0; }
+      to { background-position: -200% 0; }
+    }
     .eval-progress-text { margin-top: 6px; font-size: 12px; color: #9ab; }
     #eval-output { max-height: 200px; overflow: auto; background: #0d1216; border: 1px solid #22303a; border-radius: 6px; padding: 8px 10px; font-size: 11px; line-height: 1.55; color: #9ab; white-space: pre-wrap; word-break: break-all; margin: 0; }
+    /* 维护任务（重算榜单 / 清空旧局）：独立进度条 + 日志区，与跑批面板并列 */
+    .eval-task-panel { margin-top: 12px; padding: 10px 12px; background: #0f171d; border: 1px solid #22303a; border-radius: 8px; }
+    .eval-task-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; color: #cfe3d8; }
+    .eval-task-state { font-size: 11px; color: #66788a; }
+    .eval-task-state.ok { color: #6ad39a; }
+    .eval-task-state.err { color: #f0a0a0; }
+    .eval-task-output { max-height: 200px; overflow: auto; background: #0d1216; border: 1px solid #22303a; border-radius: 6px; padding: 8px 10px; font-size: 11px; line-height: 1.55; color: #9ab; white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; }
     @media (max-width: 700px) { #eval-salt { width: 100%; } }
     /* 模型档案卡片 */
     .model-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }

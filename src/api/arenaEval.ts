@@ -8,7 +8,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { authorizeControlRequest } from './controlAuth.js';
@@ -170,7 +170,47 @@ export interface ClearFilter {
   participant?: string | null;
 }
 
+/** 清空旧局任务日志里的范围描述（用原始 id，控制台另有带中文名的版本）。 */
+function describeClearFilter(filter: ClearFilter): string {
+  const parts: string[] = [];
+  if (filter.mode) parts.push(`模式=${filter.mode}`);
+  if (filter.map) parts.push(`地图=${filter.map}`);
+  if (filter.participant) parts.push(`参与者=${filter.participant}`);
+  return parts.length ? parts.join(' 且 ') : '全部对局';
+}
+
 export type EvalRunStatus = 'idle' | 'running' | 'finished' | 'failed' | 'stopped' | 'interrupted';
+
+/**
+ * 控制台的「维护任务」：跑批之外的写操作（重算榜单、清空旧局）也走同一条状态通道，
+ * 前端用同一个进度条 + 日志区展示。跑批本身仍由 `EvalRunState` 表示（它有批次进度）。
+ */
+export type AuxTaskKind = 'regen' | 'clear';
+export type AuxTaskStatus = 'running' | 'finished' | 'failed';
+export interface AuxTaskState {
+  kind: AuxTaskKind;
+  /** 面向界面的任务名：重算榜单 / 清空旧局。 */
+  label: string;
+  status: AuxTaskStatus;
+  /** 已完成步骤数与总步骤数（进度条的分子/分母，不是百分比）。 */
+  step: number;
+  steps: number;
+  /** 当前步骤说明，直接显示在进度条下方。 */
+  stepLabel: string;
+  startedAt: string;
+  finishedAt: string | null;
+  /** 最近输出行（子脚本 stdout/stderr 原样），供控制台日志区滚动展示。 */
+  outputTail: string[];
+  /** 任务结果摘要：clear → { removed, total }；regen → { scripts }。 */
+  detail: Record<string, unknown> | null;
+  error: string | null;
+}
+
+const AUX_LABELS: Record<AuxTaskKind, string> = { regen: '重算榜单', clear: '清空旧局' };
+const AUX_OUTPUT_LIMIT = 200;
+
+/** 让出事件循环：清空旧局是同步文件操作，分步 yield 才能让状态接口报出中间进度。 */
+const yieldTick = () => new Promise<void>(resolve => setImmediate(resolve));
 
 export interface EvalRunParams {
   /** 本批对局模式（由地图池推断，同一批不允许混模式）；缺省按 standard 兼容旧调用。 */
@@ -198,7 +238,13 @@ export function buildParticipantArgs(params: EvalRunParams): string[] {
     else modelFilters.push(item);
   }
   const args: string[] = [];
-  if (modelFilters.length) args.push('--models', modelFilters.join(','));
+  if (modelFilters.length) {
+    args.push('--models', modelFilters.join(','));
+  } else if ((params.mode ?? 'standard') === 'standard') {
+    // 标准模式下「不传 --models」的语义是「全部模型」：只勾算法时必须显式传 none，
+    // 否则 19 个模型会被一起拉进跑批（whirlpool 这种只跑算法对算法的图尤其要避免）。
+    args.push('--models', 'none');
+  }
   args.push('--algorithms', algoNames.length ? algoNames.join(',') : 'none');
   return args;
 }
@@ -317,6 +363,12 @@ export class EvalRunner {
   private stopping = false;
   private disposing = false;
   private gamesCache: { mtimeMs: number; size: number; count: number } | null = null;
+  /** 维护任务（重算榜单 / 清空旧局）的最近一次状态；只留内存，重启后自然清空。 */
+  private aux: AuxTaskState | null = null;
+  /** 维护任务当前子进程（重算脚本），服务器关闭时一并终止。 */
+  private auxChild: ChildProcess | null = null;
+  /** 同一时刻只跑一个重算；重复点按钮的请求加入同一个 Promise，不重复 spawn。 */
+  private regenPromise: Promise<{ ok: boolean; code: number | null; output: string[] }> | null = null;
 
   constructor(deps: ArenaEvalDeps = {}) {
     this.spawner = deps.spawner ?? defaultSpawner;
@@ -356,6 +408,54 @@ export class EvalRunner {
   private pushOutput(line: string): void {
     this.state.outputTail.push(line);
     if (this.state.outputTail.length > OUTPUT_TAIL_LIMIT) this.state.outputTail.shift();
+  }
+
+  /** 维护任务是否有子进程在跑（路由用它拒绝并发写操作）。 */
+  get isAuxRunning(): boolean {
+    return this.aux?.status === 'running';
+  }
+
+  /** 维护任务快照：输出尾只回最近 40 行，避免状态响应随日志无限增长。 */
+  auxTaskSnapshot(): AuxTaskState | null {
+    return this.aux ? { ...this.aux, outputTail: this.aux.outputTail.slice(-40) } : null;
+  }
+
+  private beginAux(kind: AuxTaskKind, steps: number, stepLabel: string): AuxTaskState {
+    this.aux = {
+      kind,
+      label: AUX_LABELS[kind],
+      status: 'running',
+      step: 0,
+      steps,
+      stepLabel,
+      startedAt: this.now().toISOString(),
+      finishedAt: null,
+      outputTail: [],
+      detail: null,
+      error: null,
+    };
+    return this.aux;
+  }
+
+  private auxLog(line: string): void {
+    if (!this.aux || !line) return;
+    this.aux.outputTail.push(line);
+    if (this.aux.outputTail.length > AUX_OUTPUT_LIMIT) this.aux.outputTail.shift();
+  }
+
+  private auxStep(step: number, stepLabel: string): void {
+    if (!this.aux) return;
+    this.aux.step = Math.max(0, Math.min(step, this.aux.steps));
+    this.aux.stepLabel = stepLabel;
+  }
+
+  private finishAux(status: 'finished' | 'failed', detail: Record<string, unknown> | null, error: string | null = null): void {
+    if (!this.aux) return;
+    this.aux.status = status;
+    this.aux.finishedAt = this.now().toISOString();
+    this.aux.detail = detail;
+    this.aux.error = error;
+    if (status === 'finished') this.aux.step = this.aux.steps;
   }
 
   private persist(): void {
@@ -549,42 +649,127 @@ export class EvalRunner {
     return true;
   }
 
-  /** 依次重算榜单与玩法统计数据（先榜单后统计：统计脚本会合并榜单评分）；返回退出码与输出尾。 */
-  async regenLeaderboard(): Promise<{ ok: boolean; code: number | null; output: string[] }> {
+  /**
+   * 依次重算榜单与玩法统计数据（先榜单后统计：统计脚本会合并榜单评分）。
+   * 同时只跑一份：重复调用返回同一个 Promise，不重复 spawn；进度与日志写进维护任务状态。
+   */
+  regenLeaderboard(): Promise<{ ok: boolean; code: number | null; output: string[] }> {
+    if (this.regenPromise) return this.regenPromise;
+    const promise = this.runRegenTask();
+    this.regenPromise = promise;
+    void promise.finally(() => { this.regenPromise = null; }).catch(() => { /* 只为清理引用，失败已落在任务状态里 */ });
+    return promise;
+  }
+
+  private async runRegenTask(): Promise<{ ok: boolean; code: number | null; output: string[] }> {
     const output: string[] = [];
-    for (const script of [this.leaderboardScript, this.statsScript]) {
-      const result = await this.runRegenScript(script, output);
-      if (!result.ok) return { ok: false, code: result.code, output: output.slice(-10) };
+    this.beginAux('regen', 2, '生成榜单数据（generateArenaLeaderboard）');
+    this.auxLog('$ npm run arena-leaderboard（script/generateArenaLeaderboard.mjs）');
+    const scripts: Array<{ script: string; label: string }> = [
+      { script: this.leaderboardScript, label: '榜单' },
+      { script: this.statsScript, label: '玩法统计' },
+    ];
+    for (const [index, item] of scripts.entries()) {
+      this.auxStep(index, `生成${item.label}数据（${basename(item.script)}）`);
+      this.auxLog(`$ node ${item.script}`);
+      const result = await this.runRegenScript(item.script, output, line => this.auxLog(line));
+      if (!result.ok) {
+        this.auxLog(`${item.label}脚本失败（退出码 ${result.code ?? '未知'}）`);
+        this.finishAux('failed', { script: item.script }, `${item.label}脚本失败（退出码 ${result.code ?? '未知'}）`);
+        return { ok: false, code: result.code, output: output.slice(-10) };
+      }
+      this.auxStep(index + 1, `${item.label}数据已生成`);
+      this.auxLog(`${item.label}数据已生成`);
     }
+    this.finishAux('finished', { scripts: scripts.length });
     return { ok: true, code: 0, output: output.slice(-10) };
   }
 
-  private runRegenScript(script: string, output: string[]): Promise<{ ok: boolean; code: number | null }> {
+  private runRegenScript(
+    script: string,
+    output: string[],
+    onLine?: (line: string) => void,
+  ): Promise<{ ok: boolean; code: number | null }> {
     return new Promise(resolve => {
       const child = this.spawner(process.execPath, [script], PROJECT_ROOT);
       if (!child) {
-        output.push('无法启动 node 进程重算数据');
+        const message = '无法启动 node 进程重算数据';
+        output.push(message);
+        onLine?.(message);
         resolve({ ok: false, code: null });
         return;
       }
-      createInterface({ input: child.stdout! }).on('line', line => output.push(line));
-      createInterface({ input: child.stderr! }).on('line', line => output.push(`[stderr] ${line}`));
+      this.auxChild = child;
+      const done = (result: { ok: boolean; code: number | null }) => {
+        if (this.auxChild === child) this.auxChild = null;
+        resolve(result);
+      };
+      createInterface({ input: child.stdout! }).on('line', line => { output.push(line); onLine?.(line); });
+      createInterface({ input: child.stderr! }).on('line', line => {
+        const text = `[stderr] ${line}`;
+        output.push(text);
+        onLine?.(text);
+      });
       const timeout = setTimeout(() => {
         child.kill();
-        output.push('[超时] 数据重算超过 60s，已终止');
-        resolve({ ok: false, code: null });
+        const text = '[超时] 数据重算超过 60s，已终止';
+        output.push(text);
+        onLine?.(text);
+        done({ ok: false, code: null });
       }, 60_000);
       timeout.unref();
       child.on('error', err => {
         clearTimeout(timeout);
-        output.push(`[错误] ${err.message}`);
-        resolve({ ok: false, code: null });
+        const text = `[错误] ${err.message}`;
+        output.push(text);
+        onLine?.(text);
+        done({ ok: false, code: null });
       });
       child.on('exit', code => {
         clearTimeout(timeout);
-        resolve({ ok: code === 0, code });
+        done({ ok: code === 0, code });
       });
     });
+  }
+
+  /**
+   * 清空旧局的后台任务版：分「扫描 → 重写 → 刷新」三步 yield，每次写进度与日志。
+   * 文件操作本身是同步的（38k 行约几十毫秒），分步是为了让控制台能看到进度条与日志。
+   * 失败只落到任务状态里，不向调用方抛错（请求早已返回）。
+   */
+  async clearMatchesTracked(filter: ClearFilter): Promise<{ removed: number; total: number }> {
+    this.beginAux('clear', 3, '扫描 matches.jsonl');
+    this.auxLog(`筛选范围：${describeClearFilter(filter)}`);
+    try {
+      await yieldTick();
+      const { removed, staying, total } = this.partitionMatches(filter);
+      this.auxStep(1, `扫描 ${total} 局，命中 ${removed.length} 局`);
+      this.auxLog(`扫描 ${this.statsFile}：共 ${total} 局，命中 ${removed.length} 局`);
+      await yieldTick();
+      if (removed.length) {
+        // 先写临时文件再原子改名，避免写一半时被读侧（状态局数统计/重算脚本）看到残缺。
+        const tmpFile = `${this.statsFile}.tmp`;
+        writeFileSync(tmpFile, staying.join('\n'), 'utf8');
+        renameSync(tmpFile, this.statsFile);
+        this.gamesCache = null;
+        this.auxStep(2, `已重写 matches.jsonl，删除 ${removed.length} 局`);
+        this.auxLog(`已删除 ${removed.length}/${total} 局，保留 ${total - removed.length} 局`);
+        this.pushNote(`已删除 ${removed.length}/${total} 局旧对局；新跑批将从零累积（带决策计时）。`);
+        this.persist();
+      } else {
+        this.auxStep(2, '没有命中的对局，文件未改动');
+        this.auxLog('没有命中的对局，文件未改动');
+      }
+      await yieldTick();
+      this.auxStep(3, '完成');
+      this.finishAux('finished', { removed: removed.length, total });
+      return { removed: removed.length, total };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.auxLog(`[错误] ${message}`);
+      this.finishAux('failed', null, `清空旧局失败：${message}`);
+      throw err;
+    }
   }
 
   statusSnapshot(): Record<string, unknown> {
@@ -603,6 +788,7 @@ export class EvalRunner {
       gamesTotal,
       gamesNew: this.state.params ? Math.max(0, gamesTotal - this.state.baselineGames) : 0,
       outputTail: this.state.outputTail.slice(-30),
+      auxTask: this.auxTaskSnapshot(),
       notes: this.state.notes,
       knownMaps: KNOWN_MAPS,
       modeCatalog: buildEvalModeCatalog(),
@@ -614,6 +800,11 @@ export class EvalRunner {
 
   /** 服务器关闭时：登记中断并终止进程树，避免留下无人管理的跑批。 */
   dispose(): void {
+    // 维护任务（榜单/统计脚本）是短命进程，但关闭时也不该留孤儿。
+    if (this.auxChild) {
+      try { this.auxChild.kill(); } catch { /* 进程可能已退出 */ }
+      this.auxChild = null;
+    }
     if (!this.isRunning) return;
     this.disposing = true;
     // 必须先杀进程再改状态：stop() 以 status==='running' 为前提。
@@ -767,6 +958,7 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
 
   // 清空旧局（直接删除命中行，matches.jsonl 已提交历史可在 git 找回；dryRun 只预览
   // 数量）：跑批中拒绝，避免重写 matches.jsonl 与 evaluate_cross 的追加写竞争。
+  // 真删改走后台维护任务：先返回任务快照，进度与日志由 /status 轮询驱动（dryRun 仍同步返数）。
   app.post('/api/arena/eval/clear-matches', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     if (!toolchainAvailable) return reply.code(501).send(evalUnavailable);
@@ -789,20 +981,41 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
     if (filter.mode && filter.map && mapModes.get(filter.map!) !== filter.mode) {
       return reply.code(400).send({ error: `地图 ${filter.map} 不属于模式 ${filter.mode}`, code: 'invalid_filter' });
     }
-    try {
-      return { ok: true, ...runner.clearMatches(filter, Boolean(body.dryRun)) };
-    } catch (err) {
-      return reply.code(500).send({ error: `清空旧局失败：${(err as Error).message}`, code: 'clear_failed' });
+    if (body.dryRun) {
+      try {
+        return { ok: true, ...runner.clearMatches(filter, true), dryRun: true };
+      } catch (err) {
+        return reply.code(500).send({ error: `清空旧局失败：${(err as Error).message}`, code: 'clear_failed' });
+      }
     }
+    if (runner.isAuxRunning) {
+      return reply.code(409).send({
+        error: '已有维护任务在进行中（重算榜单或清空旧局），请等它结束',
+        code: 'aux_task_running',
+        auxTask: runner.auxTaskSnapshot(),
+      });
+    }
+    void runner.clearMatchesTracked(filter).catch(() => {
+      // 失败已写进维护任务状态（用于控制台日志），这里只吞掉 Promise 拒绝。
+    });
+    return { ok: true, auxTask: runner.auxTaskSnapshot() };
   });
 
+  // 重算榜单同样是后台维护任务：立即返回任务快照，前端轮询 /status 看进度与日志；
+  // 结束后由前端刷新排行榜数据。重复点击不会重复 spawn（EvalRunner 内部合并 Promise）。
   app.post('/api/arena/leaderboard/regenerate', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     if (!toolchainAvailable) return reply.code(501).send(evalUnavailable);
-    const result = await runner.regenLeaderboard();
-    if (!result.ok) {
-      return reply.code(500).send({ error: '榜单重算失败', code: 'regenerate_failed', detail: result });
+    if (runner.isAuxRunning) {
+      return reply.code(409).send({
+        error: '已有维护任务在进行中（重算榜单或清空旧局），请等它结束',
+        code: 'aux_task_running',
+        auxTask: runner.auxTaskSnapshot(),
+      });
     }
-    return { ok: true, output: result.output };
+    void runner.regenLeaderboard().catch(() => {
+      // runRegenTask 内部已把失败写进维护任务状态，这里只避免未处理的 Promise 拒绝。
+    });
+    return { ok: true, auxTask: runner.auxTaskSnapshot() };
   });
 }

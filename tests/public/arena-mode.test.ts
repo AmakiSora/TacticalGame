@@ -28,6 +28,28 @@ describe('AI 竞技场按玩法模式分榜', () => {
     expect(source).toMatch(/控制令牌已保存到本机浏览器[\s\S]{0,200}pollEvalStatus\(\);/);
   });
 
+  it('评估控制台的维护任务（重算榜单/清空旧局）有独立进度条与日志区', () => {
+    // 面板与跑批进度分开：维护任务的进度/日志不会覆盖跑批输出。
+    for (const id of ['eval-task-panel', 'eval-task-title', 'eval-task-state', 'eval-task-fill', 'eval-task-text', 'eval-task-output']) {
+      expect(html, `${id} 缺失`).toContain(`id="${id}"`);
+    }
+    expect(source).toContain('function renderEvalAuxTask');
+    expect(source).toContain('renderEvalAuxTask(st.auxTask)');
+    expect(source).toContain('task.outputTail');
+    // 跑批进度条的填充元素必须带样式类：3.5.2 起它只有 id、没有 class，
+    // 结果进度条一直是一条空轨道（维护任务面板另建的 fill 带了 class 才正常）。
+    expect(html).toContain('<div id="eval-progress-fill" class="eval-progress-fill"></div>');
+    // 没有确定进度时用流动条纹，避免启动/加载模型阶段看起来像卡住。
+    expect(source).toContain("fill.classList.toggle('is-indeterminate', indeterminate)");
+    expect(readFileSync('public/arena.css', 'utf8')).toContain('.eval-progress-fill.is-indeterminate');
+    // 轮询自适应：跑批/维护任务运行时 1s，空闲 3s。
+    expect(source).toContain('setTimeout(pollLoop, busy ? 1000 : 3000)');
+    // 两个写操作都改走后台任务，完成前先给“已启动”，结果由状态轮询驱动。
+    expect(source).toContain('榜单重算已启动，进度与日志见下方任务区');
+    expect(source).toContain('清空旧局已启动，进度与日志见下方任务区');
+    expect(source).toContain('维护任务运行中不许再点重算/清空');
+  });
+
   it('榜单数据按模式分组，不再提供跨模式 all 总榜', () => {
     expect(data.maps).toBeUndefined();
     expect(Array.isArray(data.modes)).toBe(true);

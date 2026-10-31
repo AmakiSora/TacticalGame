@@ -3,6 +3,28 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-10-31 · 评估累积文件改为跨进程加锁追加（开发分支，未定版）
+
+**一句话**：`--jobs 8` 的跑批结束后 `arena/matches.jsonl` 里有 5 行只剩尾部，榜单页因此显示「已加载（5 条警告）」。本机压测复现了根因——Windows 上多进程并发 append 同一文件会丢行/坏行（8 进程各 300 行：裸写只剩 1781 行、76 行非法；单进程 300 行完好，4 进程就已丢 165 行）。`evaluate_cross.py` 新增 `append_jsonl()`：用同目录 `*.lock`（Windows `msvcrt.locking`、其他平台 `flock`）串行化整行写入并 `fsync`，累积文件与批次明细都改走它；同样 8 进程压测变成 2400 行、0 非法。锁文件由 `.gitignore` 的 `arena/*.lock` 忽略。
+
+**清理**：删掉现存 5 行非法片段（文件仍保留 51,125 条有效记录），`npm run arena-leaderboard` / `npm run arena-stats` 重算后两者 `warnings` 均为空；被吞掉的 5 局会在下次断点续跑时按差额自动补回（此前统计到的 19 批 / 38 局零头同源）。
+
+**测试与验证**：新增 `tests/rl/test_append_jsonl_lock.py`（8 进程 × 40 行断言不丢行、行行可解析）；`npm run test:rl` 331 passed / 13 skipped。
+
+## 2026-10-31 · whirlpool 退出模型评估，只跑算法对算法（开发分支，未定版）
+
+**一句话**：`whirlpool` 在地图里声明顶层 `"modelEval": false`（附 `modelEvalNote` 说明）；`round_robin.py` 新增 `load_model_eval_policy()`，并把组批循环抽成 `plan_tasks()`——「至少一方是模型」的批次在这些图上于组批阶段直接跳过，计划与总结各打印一行「跳过 N 个含模型的对战批次：whirlpool（原因）」，不计成失败批次，算法对算法照跑；`evaluate_cross.py` 对同一组合的单局 CLI 打印同口径提示（仅作研究参考）。顺带修正「只勾算法」的旧口径：标准模式控制台只勾算法时显式传 `--models none`，`round_robin.py` 的 `--models` 支持 `none`/`off` 表示不带模型（缺省仍是全部模型；非标准模式遇到 `none` 视为未指定而非报错）。`maps/*.json` 的 `modelEval` / `modelEvalNote` 由加载器校验布尔/字符串类型，字段只影响评估链路。
+
+**为什么**：同日上一条修完崩溃后，模型在漩涡图上仍打不出胜负——217 格里 96 个 blocker + 13 水，只走空地分成 7 块，两个总部各在一个 17 格旋臂，最短通路要精准砸穿 4 面墙（(3,-1)/(2,-1)/(-2,1)/(-3,1)）；模型砸墙数量不输算法但落点全在自家门口，4 局抽样里 3 局双方最近距离 5–8 格、0 次攻击，跑满 101 回合判平；唯一砸通的一局把对面总部打到 34/200 仍未收尾。算法对算法 396 局有胜负（平均每边 3.5 次 demolish、24.6 回合）。这不是评估侧能修的问题，先把模型批次从该图摘掉。
+
+**测试与验证**：新增 `tests/rl/test_round_robin_model_eval.py`（跳过计数、算法对保留、已完成局与跳过批区分、`--models none` 语义）；`tests/config/loader.test.ts` 校验 `modelEval` 类型并保留字段；`tests/api/arena-eval.test.ts` 锁「标准模式只勾算法 → `--models none`」与「非标准模式不传 `--models`」。dry-run 实测：whirlpool + v3.3.0 + greedy 跳过 1 批、default 照排 1 批；`--models none --algorithms greedy,random` 在 whirlpool 正常组 1 个算法对、无跳过。`npm run build` + `npm test`（146 文件 / 1693 例）通过；`npm run test:rl` 329 passed / 13 skipped，其中 `test_random_annihilation_map_plays_sequential` 在整包运行偶发红、单跑 10/10 通过（随机歼灭图的既有抖动，与本次改动无关）。
+
+## 2026-10-31 · 冻结环境快照补齐无回合上限与总部禁止出兵（开发分支，未定版）
+
+**一句话**：标准模式图池加入 `whirlpool`（星海漩涡）后，一次跑批 2275 个批次里有 304 个含模型的批次全数失败——16 个模型在 `_encode_state` 撞 `float(None)`（该图 `balance.maxTurns: null` 表示无回合上限，`dict.get(key, 20)` 对显式 null 不生效），v2.0.0 / v2.1.3 / v2.2.0 三个不读该字段的旧模型则在第一次出兵就撞引擎 `invalid_deploy`（该图 `balance.deployFromHq: false`，helper 仍把总部当出兵起点）。修复分两处：`env.py` 与三个冻结快照 `env_v24/v25/v27` 的回合进度归一化改为 `float(balance.get("maxTurns") or 20)`（null 与键缺失同口径，有限值路径逐位不变）；`env.py`、`env_v22/v24/v25/v27/v200/v100` 的出兵起点改为与引擎 `validation.deployOriginFor` 同口径——`deployFromHq: false` 时不再把总部列入起点，据点类型 `canDeploy: false` 同样跳过。评估编排、模型接口与榜单口径不变；非标准模式仍然禁止模型座位，因此该缺陷只影响标准模式图池。
+
+**测试与验证**：新增 `tests/rl/test_map_config_compat.py`，对 `maps/*.json` 全部 16 张图 × 7 个 env 世代做纯计算校验（`_encode_state` 形状与有限值、`deployFromHq: false` 时不得给出总部起点、null 与键缺失编码逐位一致），221 passed / 13 skipped；全量 `npm run test:rl` 322 passed / 13 skipped（`test_random_annihilation_map_plays_sequential` 首轮因随机歼灭图偶发缺 player_b 动作而红，单跑 3/3 通过，与本改动无关）。真引擎冒烟：`hex_ppo` v2.0.0 / v2.1.3 / v2.3.1 / v2.5.0 / v2.7.0 / v3.3.0 对 `algo:random` 在 whirlpool 各 1 局，全部正常收局（改前 6 个世代均在第一局异常退出）。分布外提示：修完崩溃不等于模型在该图有竞争力——v3.3.0 对 `algo:random` 6 局全平（101 回合，0 次攻击），对 `algo:greedy` 0/6 负，同一模型在 default 对 `algo:greedy` 3/3 胜；该图随后退出模型批次（只跑算法对算法）。
+
 ## 2026-10-30 · 评估跑批支持各模式随机图（开发分支，未定版）
 
 **一句话**：评估链路以前只有标准模式能跑随机图（`--map random`），歼灭/同时回合/大逃杀的榜只能跑静态图；现在按模式拆成四个虚拟地图 id——`random` / `random-annihilation` / `random-simultaneous` / `random-royale`，`round_robin.py` 把它们解析进对应模式批次，`evaluate_cross.py` 只在非标准模式的 reset 命令里带 `mode`（标准模式命令逐字不变，历史随机图成绩仍可断点续跑），大逃杀另带 `noTurnLimit` 对齐静态大逃杀图无回合上限的口径。`local-worker.ts` 按 id 反查模式生成配置，调用方另传的 `random.mode` 与 id 冲突时直接报错；地图 id 与同名算法是两个命名空间。榜单/玩法统计的地图模式表同步登记这些 id，随机图对局归入对应模式榜。`local_env.py` 的播种判断同步改为四个虚拟 id 的集合（此前只认 `random`，`map_mix` 若写非标准随机图 id 会生成无种子的图、破坏 gym seed 复现；静态图路径仍不取 `np_random`）。REST 建房不在这一列：仍只认 `mapId=random` + `random.mode`，评估批次 id 会返回带指引的 400。

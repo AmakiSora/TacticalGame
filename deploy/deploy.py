@@ -104,6 +104,9 @@ EXCLUDE_PATTERNS = [
     r'^rl/models/deprecated', r'^rl/test-output', r'^rl/selfplay', r'__pycache__',
     # 竞技场每局明细约 2GB/轮，仅本地弱点分析用（原 rl/leaderboard/details；不上服务器）
     r'^arena/details',
+    # 对局原始累积数据 60MB+，容器内用不到（榜单读 public/data/*.json 构建产物），
+    # 传上去只会拖慢每次部署
+    r'^arena/matches\.jsonl',
     # 编辑器 / agent 工具目录与本地状态，与 .gitignore 对齐，不上服务器
     r'\.pi/', r'\.pi$', r'\.zcode/', r'\.zcode$', r'\.qoder/', r'\.qoder$',
     r'\.pytest_cache/', r'\.pytest_cache$', r'\.superpowers/', r'\.superpowers$',

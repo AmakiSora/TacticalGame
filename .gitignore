@@ -29,6 +29,9 @@ rl/distill/
 rl/tb/
 rl/test-output/
 arena/details/
+# 对局原始累积数据只留在跑批机器：线上榜单读 public/data/*.json 构建产物，
+# 镜像也已排除 arena/，提交这份 60MB+ 的 JSONL 只会撑大仓库与部署上传。
+arena/matches.jsonl
 # 评估累积文件的跨进程写锁（append_jsonl 用完即留，不参与版本管理）
 arena/*.lock
 

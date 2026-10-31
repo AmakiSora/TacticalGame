@@ -484,7 +484,7 @@ export class EvalRunner {
 
   /**
    * 清空累积对局：按（模式 ∧ 地图 ∧ 参与者）命中的行直接删除，其余行原样保留
-   * （matches.jsonl 在 git 里，已提交的历史对局仍可从 git 恢复）。round_robin 的
+   * （matches.jsonl 只留在跑批机器、不入 git，删掉的行需自行备份才能找回）。round_robin 的
    * 补跑计划按「(地图, 参与者对) 已累积局数」算差额且与盐无关——旧局把目标局数
    * 占满后新批次会提示「无需补跑」，清空（全部或定向）即可让带决策计时的新对局
    * 重新累积。dryRun 只统计不动文件。
@@ -956,8 +956,8 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
     return { ok: true };
   });
 
-  // 清空旧局（直接删除命中行，matches.jsonl 已提交历史可在 git 找回；dryRun 只预览
-  // 数量）：跑批中拒绝，避免重写 matches.jsonl 与 evaluate_cross 的追加写竞争。
+  // 清空旧局（直接删除命中行，matches.jsonl 只在跑批机器上、删了不可从 git 找回；
+  // dryRun 只预览数量）：跑批中拒绝，避免重写 matches.jsonl 与 evaluate_cross 的追加写竞争。
   // 真删改走后台维护任务：先返回任务快照，进度与日志由 /status 轮询驱动（dryRun 仍同步返数）。
   app.post('/api/arena/eval/clear-matches', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;

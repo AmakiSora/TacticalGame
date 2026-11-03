@@ -147,6 +147,16 @@ describe('AI 竞技场按玩法模式分榜', () => {
     expect(source).toContain('等第二个算法落地后才能组批');
   });
 
+  it('双人/三人是标准模式下的二级分类，不占一级模式页签', () => {
+    expect(html).toContain('id="board-player-bar"');
+    expect(source).toContain('function playerScopes');
+    expect(source).toContain('function populatePlayerBar');
+    expect(source).toContain('data-player-count');
+    expect(source).not.toContain('return [...doubles, ...divisions]');
+    // 一级页签只来自 raw.modes；人数切换单独写入二级条。
+    expect(source).toMatch(/function modes\(\)[\s\S]{0,120}return Array\.isArray\(raw\?\.modes\) \? raw\.modes : \[\]/);
+  });
+
   it('评估控制台参赛人数用 chip 按钮，与对局模式行同款而不是下拉框', () => {
     expect(html).toContain('id="eval-players" class="eval-chip-list eval-mode-list eval-player-list"');
     expect(html).toContain('id="eval-player-hint"');

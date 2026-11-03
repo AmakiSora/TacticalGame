@@ -40,6 +40,9 @@
     #kpi-grid { gap: 12px; }
     /* 玩法模式切换条：榜单与玩法统计各自独立，先选模式再看该模式内的地图/排名。 */
     .mode-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mode-subbar { margin-top: -8px; }
+    .mode-subbar[hidden] { display: none; }
+    .mode-subbar .mode-tab { padding: 5px 11px; font-size: 12px; border-radius: 999px; }
     .mode-tab { display: inline-flex; align-items: center; gap: 8px; background: #141c22; border: 1px solid #2a3a44; color: #9ab; border-radius: 10px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
     .mode-tab:hover { border-color: #3a6a7a; color: #dce8f0; }
     .mode-tab.active { border-color: #3f9b6c; color: #fff; background: #16301f; }

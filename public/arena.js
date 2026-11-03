@@ -25,6 +25,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     btnReload: document.getElementById('btn-reload'),
     kpiGrid: document.getElementById('kpi-grid'),
     modeBar: document.getElementById('mode-bar'),
+    playerBar: document.getElementById('board-player-bar'),
     boardModeHint: document.getElementById('board-mode-hint'),
     filterLeague: document.getElementById('filter-league'),
     filterKind: document.getElementById('filter-kind'),
@@ -42,26 +43,42 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   /** @type {any} */
   let raw = null;
   let mode = null;
+  let playerCount = 2;
   let league = 'all';
   let kindFilter = 'all';
   let selectedModel = null;
   let sort = { key: 'rating', dir: 'desc' };
 
   function modes() {
-    const doubles = Array.isArray(raw?.modes) ? raw.modes.map(item => ({ ...item, playerCount: 2 })) : [];
-    const divisions = Array.isArray(raw?.divisions)
-      ? raw.divisions.map(item => ({
-        ...item,
-        id: `three:${item.id}`,
-        label: item.label || `${item.mode} · 三人`,
-        division: true,
-      }))
-      : [];
-    return [...doubles, ...divisions];
+    return Array.isArray(raw?.modes) ? raw.modes : [];
+  }
+
+  function divisionForMode(modeId) {
+    return (Array.isArray(raw?.divisions) ? raw.divisions : [])
+      .find(item => item.mode === modeId) ?? null;
+  }
+
+  /** 一级页签只切换玩法模式；标准模式内部再按双人/三人选择评分池。 */
+  function playerScopes(modeId = mode) {
+    const base = modes().find(item => item.id === modeId);
+    if (!base) return [];
+    const scopes = [{ ...base, playerCount: 2, scopeLabel: '双人' }];
+    const division = divisionForMode(modeId);
+    if (division) {
+      scopes.push({
+        ...division,
+        id: `three:${division.id}`,
+        label: division.label || `${modeId} · 三人`,
+        playerCount: 3,
+        scopeLabel: '三人',
+      });
+    }
+    return scopes;
   }
 
   function currentMode() {
-    return modes().find(m => m.id === mode) || modes()[0] || null;
+    const scopes = playerScopes();
+    return scopes.find(scope => scope.playerCount === playerCount) || scopes[0] || null;
   }
 
   function setStatus(text, kind) {
@@ -162,45 +179,61 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     const rows = buildRows(ld);
     const rated = rows.filter(m => m.games > 0);
     const current = currentMode();
+    const three = current?.playerCount === 3;
     const mapCount = Object.keys(current?.maps || {}).filter(key => key !== 'all').length;
-    let cards;
-    if (current?.playerCount === 3) {
-      cards = [
-        { label: '当前赛制', value: current?.label ?? '三人', sub: `${current?.rulesVersion || '—'} · 独立 PL 榜` },
-        { label: '计分局数', value: ld.overview.games, sub: `全并列平局 ${ld.overview.draws}（${pct(ld.overview.drawRate)}）` },
-        { label: '完整 superblock', value: ld.overview.superblockCount, sub: `隔离残块 ${ld.overview.quarantinedSuperblocks}` },
-        { label: '参评算法', value: rated.length, sub: `暂定 ${rated.filter(row => row.provisional).length} 个（完赛块 <20 或 CI 过宽）` },
+    const modelCount = rated.filter(m => m.kind === 'model').length;
+    const algoCount = rated.filter(m => m.kind === 'algorithm').length;
+    const pairs = rated.length * (rated.length - 1) / 2;
+    const target = pairs * mapCount * (raw.source.targetGamesPerPair || 24);
+    const coverage = target > 0 ? Math.min(100, Math.round(ld.overview.games / target * 100)) : 0;
+    const baseLabel = modes().find(item => item.id === mode)?.label ?? '—';
+    // 双人（Bradley-Terry）与三人（Plackett-Luce）共用同名同序的 6 张卡，模式专属指标一律排在末尾。
+    const cards = [
+      {
+        label: '当前模式',
+        value: baseLabel,
+        sub: three ? '三人局 · 独立评分池' : '双人局 · 独立评分池',
+      },
+      {
+        label: '总局数',
+        value: ld.overview.games,
+        sub: three ? '计分：完整块' : '计分：全部对局',
+      },
+      {
+        label: '参评者',
+        value: rated.length,
+        sub: three
+          ? `内置算法 ${algoCount}`
+          : [modelCount ? `RL 模型 ${modelCount}` : null, algoCount ? `算法 ${algoCount}` : null]
+            .filter(Boolean).join(' · '),
+      },
+      { label: '平局率', value: pct(ld.overview.drawRate), sub: three ? '三座全并列' : '达到回合/动作上限' },
+      {
+        label: '平均回合',
+        value: ld.overview.avgRounds ?? '—',
+        sub: '单局 rounds 均值',
+      },
+      {
+        label: '当前地图池',
+        value: league === 'all' ? '全部' : mapLabel(league),
+        sub: league === 'all' ? `${mapCount} 张图池化` : `${ld.overview.games} 局`,
+      },
+    ];
+    if (three) {
+      cards.push(
+        {
+          label: '完整 superblock',
+          value: ld.overview.superblockCount ?? '—',
+          sub: `残块 ${ld.overview.quarantinedSuperblocks ?? 0} · 20 块/人`,
+        },
         { label: '唯一胜率', value: pct(ld.overview.uniqueWinRate), sub: '非并列头名的局占比' },
-        { label: '平均回合', value: ld.overview.avgRounds ?? '—', sub: '计分完整块内单局均值' },
-        {
-          label: '当前地图池',
-          value: league === 'all' ? '全部' : mapLabel(league),
-          sub: league === 'all' ? `${mapCount} 张图池化` : `${ld.overview.games} 局`,
-        },
-      ];
+      );
     } else {
-      const modelCount = rated.filter(m => m.kind === 'model').length;
-      const algoCount = rated.filter(m => m.kind === 'algorithm').length;
-      const pairs = rated.length * (rated.length - 1) / 2;
-      const target = pairs * mapCount * (raw.source.targetGamesPerPair || 24);
-      const coverage = target > 0 ? Math.min(100, Math.round(ld.overview.games / target * 100)) : 0;
-      cards = [
-        { label: '当前模式', value: current?.label ?? '—', sub: '不同模式独立评分，不跨模式比较' },
-        { label: '总局数', value: ld.overview.games, sub: `平局 ${ld.overview.draws}（${pct(ld.overview.drawRate)}）` },
-        {
-          label: '参评者',
-          value: rated.length,
-          sub: `RL 模型 ${modelCount} · 算法 ${algoCount} · 对局对数 ${ld.overview.pairCount}`,
-        },
-        { label: '平局率', value: pct(ld.overview.drawRate), sub: '达到回合/动作上限' },
-        { label: '平均回合', value: ld.overview.avgRounds ?? '—', sub: '单局 rounds 均值' },
-        { label: '局数覆盖度', value: target > 0 ? `${coverage}%` : '—', sub: target > 0 ? `${ld.overview.games} / 目标 ${target}` : '该模式暂无地图池' },
-        {
-          label: '当前地图池',
-          value: league === 'all' ? '全部' : mapLabel(league),
-          sub: league === 'all' ? `${mapCount} 张图池化` : `${ld.overview.games} 局`,
-        },
-      ];
+      cards.push({
+        label: '局数覆盖度',
+        value: target > 0 ? `${coverage}%` : '—',
+        sub: target > 0 ? `${ld.overview.games} / 目标 ${target}` : '该模式暂无地图池',
+      });
     }
     el.kpiGrid.innerHTML = cards
       .map(c => `<article class="kpi-card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub || ''}</div></article>`)
@@ -472,10 +505,12 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   function renderMethod() {
     const m = raw.ratingMethod || {};
     const s = raw.source || {};
-    const three = currentMode()?.playerCount === 3;
+    const current = currentMode();
+    const three = current?.playerCount === 3;
+    const rulesNote = current?.rulesVersion ? ` · 赛制 ${escapeHtml(current.rulesVersion)}` : '';
     const lines = three
       ? [
-        `<div><strong>评分模型</strong>：${escapeHtml(m.multiplayer || '并列感知 Plackett-Luce + L2 先验')}</div>`,
+        `<div><strong>评分模型</strong>：${escapeHtml(m.multiplayer || '并列感知 Plackett-Luce + L2 先验')}${rulesNote}</div>`,
         `<div><strong>计分单元</strong>：仅完整六局 superblock 进入评分；正反方向各三局座位轮换，每人每出生座位两次、先手两次，任意两者相对行动先后各三次。</div>`,
         `<div><strong>名次口径</strong>：同存活状态且同裁决分记为并列，枚举全部合法严格排列求似然；不使用伤害、座位或种子破平。</div>`,
         `<div><strong>置信区间</strong>：按地图 × 阵容分层的完整 superblock cluster bootstrap；残块只隔离展示，不进入评分。</div>`,
@@ -515,16 +550,36 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   function populateModeBar() {
     el.modeBar.innerHTML = modes().map(item => {
       const active = item.id === mode;
+      const division = divisionForMode(item.id);
+      const games = (item.maps?.all?.overview?.games ?? 0)
+        + (division?.maps?.all?.overview?.games ?? 0);
       return `<button type="button" class="mode-tab${active ? ' active' : ''}" data-mode="${escapeAttr(item.id)}" role="tab" aria-selected="${active}">
-        <span>${escapeHtml(item.label)}</span><span class="mode-count">${item.maps?.all?.overview?.games ?? 0}</span>
+        <span>${escapeHtml(item.label)}</span><span class="mode-count">${games}</span>
       </button>`;
     }).join('');
+    populatePlayerBar();
     const current = currentMode();
     el.boardModeHint.textContent = current?.playerCount === 3
-      ? '三人 · 并列感知 Plackett-Luce · 仅完整六局双向 superblock 计分 · 独立于双人 BT 池'
+      ? '标准模式 · 三人 · 并列感知 Plackett-Luce · 仅完整六局双向 superblock 计分'
       : current
         ? `${current.label} · Bradley-Terry MLE · 平局记 0.5 · 排名列固定为模式内排名`
         : 'Bradley-Terry MLE · 平局记 0.5 · 各模式独立评分';
+  }
+
+  function populatePlayerBar() {
+    const scopes = playerScopes();
+    el.playerBar.hidden = scopes.length < 2;
+    if (scopes.length < 2) {
+      el.playerBar.innerHTML = '';
+      return;
+    }
+    el.playerBar.innerHTML = scopes.map(scope => {
+      const active = scope.playerCount === playerCount;
+      const games = scope.maps?.all?.overview?.games ?? 0;
+      return `<button type="button" class="mode-tab${active ? ' active' : ''}" data-player-count="${scope.playerCount}" role="tab" aria-selected="${active}">
+        <span>${escapeHtml(scope.scopeLabel)}</span><span class="mode-count">${games}</span>
+      </button>`;
+    }).join('');
   }
 
   function populateLeagueSelect() {
@@ -537,6 +592,8 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   }
 
   function renderAll() {
+    // 方法论随模式/人数切换重绘：它按当前评分池取文案，放在最前面保证空榜单也不留旧文案。
+    renderMethod();
     const ld = currentLeague();
     if (!ld) return;
     if (currentMode()?.playerCount === 3) {
@@ -568,12 +625,12 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       if (!mode || !modes().some(item => item.id === mode)) {
         mode = modes().find(item => item.maps?.all?.overview?.games > 0)?.id || modes()[0]?.id || null;
       }
+      if (!playerScopes().some(scope => scope.playerCount === playerCount)) playerCount = 2;
       league = 'all';
       selectedModel = null;
       populateModeBar();
       populateLeagueSelect();
       renderAll();
-      renderMethod();
       renderExcluded();
       const warnings = raw.warnings || [];
       if (!raw.source?.matchCount && !raw.source?.multiplayerMatchCount) {
@@ -591,9 +648,27 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   el.btnReload.addEventListener('click', loadData);
   el.modeBar.addEventListener('click', event => {
     const button = event.target.closest('.mode-tab[data-mode]');
-    if (!button || button.dataset.mode === mode) return;
+    if (!button) return;
+    if (button.dataset.mode === mode && playerCount === 2) return;
     mode = button.dataset.mode;
+    playerCount = 2;
     league = 'all';
+    kindFilter = 'all';
+    el.filterKind.value = 'all';
+    selectedModel = null;
+    populateModeBar();
+    populateLeagueSelect();
+    renderAll();
+  });
+  el.playerBar.addEventListener('click', event => {
+    const button = event.target.closest('.mode-tab[data-player-count]');
+    if (!button) return;
+    const next = Number(button.dataset.playerCount) === 3 ? 3 : 2;
+    if (next === playerCount) return;
+    playerCount = next;
+    league = 'all';
+    kindFilter = next === 3 ? 'algorithm' : 'all';
+    el.filterKind.value = kindFilter;
     selectedModel = null;
     populateModeBar();
     populateLeagueSelect();

@@ -9,7 +9,9 @@
 
 **名次与公平性**：`rankGroups` 由引擎终局或超时裁决快照的存活状态 + 裁决总分重建，同分不破平；每个 superblock 内每人每个出生座位两次、先手两次，任意两者相对行动先后各三次。残缺块只计入隔离数，不进入评分或 bootstrap；全并列局不提供强弱信息。
 
-**测试与验证**：`local-worker.test.ts` 覆盖三座位开局、C 座合法整回合、同种子复现、非法 seatOrder，并逐个验证全部 7 个标准算法的第三座位整回合；`test_three_player_evaluation.py` 锁定六局均衡、manifest 前缀续跑、三人 reset 与并列名次；`multiplayerRating.test.ts` 11 例覆盖并列、有限评分、残块隔离、bootstrap 复现、座位轮换不变量及执行器真实 `blockId` 形状；榜单/API 测试覆盖三人记录与双人池分离、残块不评分、地图/算法人数能力与启动校验。真实引擎静态图与随机图各 6 局均 0 失败、completeSuperblocks=1、quarantined=0；`mcts` / `field` / `verdict@v2` / `parallax` 另各在三个出生座位实战一局，共 12 局全部正常终局且零非法动作；`mcts / verdict / parallax` 六局完整 superblock 互打也零失败。浏览器验证三人榜单列集、控制台人数联动、模型禁用、三人地图过滤、至少 3 算法和 6 局步长。
+**榜单重算性能**：正式数据 2,520 局三人赛叠加 35 个离一阵容拟合与 1,000 次 bootstrap 后超过控制台维护任务旧 60 秒上限。PL 求解改为带 Hessian 的 Newton 法、warm start 与浮点停滞即停，单次 2,520 局拟合从约 16 秒降到约 0.11 秒；三人榜 bootstrap 上限设为 300 次/图 100 次，维护脚本超时放宽到 300 秒。API 真跑重算成功，榜单约 36 秒、榜单加玩法统计约 106 秒，三人榜 420 个完整 superblock、0 残块。
+
+**测试与验证**：`test_three_player_evaluation.py` 锁定六局均衡、manifest 前缀续跑、三人 reset 与并列名次；`multiplayerRating.test.ts` 13 例覆盖并列、有限评分、残块隔离、bootstrap 复现、座位轮换不变量、执行器真实 `blockId` 形状、2,520 局性能回归与 warm start 一致性；榜单/API 测试覆盖三人记录与双人池分离、残块不评分、地图/算法人数能力与启动校验。真实引擎静态图与随机图各 6 局均 0 失败、completeSuperblocks=1、quarantined=0；`mcts` / `field` / `verdict@v2` / `parallax` 另各在三个出生座位实战一局，共 12 局全部正常终局且零非法动作；`mcts / verdict / parallax` 六局完整 superblock 互打也零失败。浏览器验证三人榜单列集、控制台人数联动、模型禁用、三人地图过滤、至少 3 算法和 6 局步长。
 
 ## 2026-10-31 · 评估累积文件改为跨进程加锁追加（开发分支，未定版）
 

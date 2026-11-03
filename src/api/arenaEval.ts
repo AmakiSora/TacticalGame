@@ -258,6 +258,10 @@ export interface EvalRunParams {
   dryRun: boolean;
 }
 
+/** 榜单/统计脚本的重算上限。三人 PL 的大样本 superblock bootstrap 是本机 CPU 重活，
+ *  1000 次抽样在正式数据上已超过旧 60s 上限；给足时间，避免维护任务被误判失败。 */
+const REGEN_SCRIPT_TIMEOUT_MS = 300_000;
+
 /** 把 participants 过滤列表翻译成 round_robin 的 --models / --algorithms 参数。 */
 export function buildParticipantArgs(params: EvalRunParams): string[] {
   if (!params.participants) return [];
@@ -743,11 +747,11 @@ export class EvalRunner {
       });
       const timeout = setTimeout(() => {
         child.kill();
-        const text = '[超时] 数据重算超过 60s，已终止';
+        const text = '[超时] 数据重算超过 300s，已终止';
         output.push(text);
         onLine?.(text);
         done({ ok: false, code: null });
-      }, 60_000);
+      }, REGEN_SCRIPT_TIMEOUT_MS);
       timeout.unref();
       child.on('error', err => {
         clearTimeout(timeout);

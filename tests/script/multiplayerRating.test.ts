@@ -110,6 +110,26 @@ describe('solveTieAwarePL', () => {
     expect(beta[2]).toBeLessThan(0);
     expect(Math.abs(beta[2])).toBeLessThan(100);
   });
+
+  it('正式规模的 2520 局不会在浮点平台上空转到 maxIter', () => {
+    const games = Array.from({ length: 2520 }, (_, index) => plGame([
+      [A], index % 3 === 0 ? [B] : [C], index % 3 === 0 ? [C] : [B],
+    ]));
+    const started = performance.now();
+    const beta = solveTieAwarePL(games, IDS);
+    expect(performance.now() - started).toBeLessThan(5000);
+    expect(beta.every(Number.isFinite)).toBe(true);
+    expect(beta[0]).toBeGreaterThan(beta[1]);
+    expect(beta[0]).toBeGreaterThan(beta[2]);
+  });
+
+  it('warm start 与冷启动收敛到同一最优解', () => {
+    const games = Array.from({ length: 36 }, (_, index) => plGame(index % 4 === 0
+      ? [[A, B], [C]] : [[A], [B], [C]]));
+    const cold = solveTieAwarePL(games, IDS);
+    const warm = solveTieAwarePL(games, IDS, { initial: cold });
+    for (let i = 0; i < IDS.length; i++) expect(warm[i]).toBeCloseTo(cold[i], 6);
+  });
 });
 
 describe('completeSuperblocks', () => {

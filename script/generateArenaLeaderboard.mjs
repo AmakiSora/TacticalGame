@@ -280,6 +280,13 @@ function numericSeatMap(value, seats = ['player_a', 'player_b']) {
 }
 
 const MULTIPLAYER_SEATS = ['player_a', 'player_b', 'player_c'];
+/**
+ * 三人 PL 每次 bootstrap 都要重拟合 7 人 + 全部 superblock，单次成本远高于双人 BT。
+ * 默认 1000/300 次会让正式 2,520 局数据的重算超过维护任务时限；300/100 次的
+ * percentile CI 已足够稳定，同时保持整份榜单可在控制台一次完成。
+ */
+const MULTIPLAYER_BOOTSTRAP_CAP = 300;
+const MULTIPLAYER_BOOTSTRAP_PER_MAP_CAP = 100;
 
 function normalizeMultiplayerMatch(record, registry, mapModes, line) {
   const players = record.players;
@@ -719,13 +726,13 @@ function main() {
     const mapsForDivision = [...new Set(divisionMatches.map(match => match.map))].sort();
     const leagues = {
       all: buildMultiplayerLeague(divisionMatches, ids, {
-        bootstrapN: opts.bootstrap,
+        bootstrapN: Math.min(opts.bootstrap, MULTIPLAYER_BOOTSTRAP_CAP),
         rngFactory: () => mulberry32(opts.bootstrapSeed),
       }),
     };
     for (const map of mapsForDivision) {
       leagues[map] = buildMultiplayerLeague(divisionMatches.filter(match => match.map === map), ids, {
-        bootstrapN: opts.bootstrapPerMap,
+        bootstrapN: Math.min(opts.bootstrapPerMap, MULTIPLAYER_BOOTSTRAP_PER_MAP_CAP),
         rngFactory: () => mulberry32(opts.bootstrapSeed),
       });
     }

@@ -54,11 +54,51 @@ function center(values) {
   return values;
 }
 
-function plEvaluation(beta, observations, prior) {
-  const gradient = new Float64Array(beta.length);
+function solveLinear(matrix, rhs, n) {
+  const a = Float64Array.from(matrix);
+  const x = Float64Array.from(rhs);
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(a[row * n + col]) > Math.abs(a[pivot * n + col])) pivot = row;
+    }
+    if (Math.abs(a[pivot * n + col]) < 1e-12) return null;
+    if (pivot !== col) {
+      for (let k = 0; k < n; k++) {
+        const tmp = a[col * n + k];
+        a[col * n + k] = a[pivot * n + k];
+        a[pivot * n + k] = tmp;
+      }
+      const tmp = x[col];
+      x[col] = x[pivot];
+      x[pivot] = tmp;
+    }
+    const divisor = a[col * n + col];
+    for (let row = col + 1; row < n; row++) {
+      const factor = a[row * n + col] / divisor;
+      if (factor === 0) continue;
+      for (let k = col; k < n; k++) a[row * n + k] -= factor * a[col * n + k];
+      x[row] -= factor * x[col];
+    }
+  }
+  for (let row = n - 1; row >= 0; row--) {
+    let value = x[row];
+    for (let col = row + 1; col < n; col++) value -= a[row * n + col] * x[col];
+    x[row] = value / a[row * n + row];
+  }
+  return x;
+}
+
+/**
+ * 负对数后验、梯度与 Hessian。
+ * 并列组先展开为全部合法严格排列，再对排列取混合；因此同分不被人为破平。
+ */
+function plEvaluation(beta, observations, prior, withHessian = true) {
+  const n = beta.length;
+  const gradient = new Float64Array(n);
+  const hessian = withHessian ? new Float64Array(n * n) : null;
   let loss = 0;
   for (const value of beta) loss += 0.5 * prior * value * value;
-  for (let i = 0; i < beta.length; i++) gradient[i] = prior * beta[i];
 
   for (const orders of observations) {
     const logProbabilities = [];
@@ -66,27 +106,65 @@ function plEvaluation(beta, observations, prior) {
       let logProbability = 0;
       for (let position = 0; position < order.length; position++) {
         const remaining = order.slice(position);
-        const terms = remaining.map(index => beta[index]);
-        logProbability += beta[order[position]] - logSumExp(terms);
+        logProbability += beta[order[position]] - logSumExp(remaining.map(index => beta[index]));
       }
       logProbabilities.push(logProbability);
     }
     const logZ = logSumExp(logProbabilities);
     loss -= logZ;
+
+    const mixtureGradient = new Float64Array(n);
+    const weightedHessian = withHessian ? new Float64Array(n * n) : null;
     for (let o = 0; o < orders.length; o++) {
       const order = orders[o];
       const weight = Math.exp(logProbabilities[o] - logZ);
+      const orderGradient = new Float64Array(n);
+      const orderHessian = withHessian ? new Float64Array(n * n) : null;
       for (let position = 0; position < order.length; position++) {
-        gradient[order[position]] -= weight;
         const remaining = order.slice(position);
         const normalizer = logSumExp(remaining.map(index => beta[index]));
+        const probabilities = new Map(remaining.map(index => [index, Math.exp(beta[index] - normalizer)]));
+        const chosen = order[position];
         for (const index of remaining) {
-          gradient[index] += weight * Math.exp(beta[index] - normalizer);
+          orderGradient[index] += (index === chosen ? 1 : 0) - probabilities.get(index);
+        }
+        if (orderHessian) {
+          for (const left of remaining) {
+            for (const right of remaining) {
+              orderHessian[left * n + right] -= (left === right ? probabilities.get(left) : 0)
+                - probabilities.get(left) * probabilities.get(right);
+            }
+          }
+        }
+      }
+      for (let i = 0; i < n; i++) mixtureGradient[i] += weight * orderGradient[i];
+      if (weightedHessian) {
+        for (let i = 0; i < n; i++) {
+          for (let j = 0; j < n; j++) {
+            weightedHessian[i * n + j] += weight * (
+              orderHessian[i * n + j] + orderGradient[i] * orderGradient[j]);
+          }
+        }
+      }
+    }
+    for (let i = 0; i < n; i++) gradient[i] += mixtureGradient[i];
+    if (hessian) {
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          hessian[i * n + j] += weightedHessian[i * n + j] - mixtureGradient[i] * mixtureGradient[j];
         }
       }
     }
   }
-  return { loss, gradient };
+
+  for (let i = 0; i < n; i++) {
+    gradient[i] = prior * beta[i] - gradient[i];
+    if (hessian) {
+      for (let j = 0; j < n; j++) hessian[i * n + j] = -hessian[i * n + j];
+      hessian[i * n + i] += prior;
+    }
+  }
+  return { loss, gradient, hessian };
 }
 
 export function solveTieAwarePL(games, ids, options = {}) {
@@ -97,50 +175,28 @@ export function solveTieAwarePL(games, ids, options = {}) {
   const tol = Number.isFinite(options.tol) && options.tol > 0 ? options.tol : 1e-8;
   const indexOf = new Map(ids.map((id, index) => [id, index]));
   const observations = games.map(game => plOrders(game, indexOf)).filter(orders => orders.length > 0);
-  let beta = new Float64Array(n);
+  let beta = Array.isArray(options.initial) && options.initial.length === n
+    ? Float64Array.from(options.initial)
+    : new Float64Array(n);
+  center(beta);
   let evaluation = plEvaluation(beta, observations, prior);
-  const history = [];
 
   for (let iter = 0; iter < maxIter; iter++) {
     let maxGradient = 0;
     for (const value of evaluation.gradient) maxGradient = Math.max(maxGradient, Math.abs(value));
     if (maxGradient < tol) break;
 
-    const q = Float64Array.from(evaluation.gradient);
-    const alphas = [];
-    for (let i = 0; i < history.length; i++) {
-      const alpha = history[i].rho * dot(history[i].s, q);
-      alphas[i] = alpha;
-      for (let j = 0; j < n; j++) q[j] -= alpha * history[i].y[j];
-    }
-    let scale = 1;
-    if (history.length > 0) {
-      const latest = history[0];
-      scale = dot(latest.s, latest.y) / Math.max(dot(latest.y, latest.y), 1e-30);
-    }
-    const r = new Float64Array(n);
-    for (let i = 0; i < n; i++) r[i] = scale * q[i];
-    for (let i = history.length - 1; i >= 0; i--) {
-      const correction = history[i].rho * dot(history[i].y, r);
-      for (let j = 0; j < n; j++) {
-        r[j] += history[i].s[j] * (alphas[i] - correction);
-      }
-    }
-    const direction = new Float64Array(n);
-    for (let i = 0; i < n; i++) direction[i] = -r[i];
+    const direction = solveLinear(
+      evaluation.hessian, evaluation.gradient.map(value => -value), n);
+    if (!direction) break;
     center(direction);
     let slope = dot(evaluation.gradient, direction);
-    if (!(slope < 0)) {
-      for (let i = 0; i < n; i++) direction[i] = -evaluation.gradient[i];
-      center(direction);
-      slope = dot(evaluation.gradient, direction);
-    }
     if (!(slope < 0)) break;
 
     let step = 1;
     let next = null;
     let nextEvaluation = null;
-    for (let attempt = 0; attempt < 40; attempt++) {
+    for (let attempt = 0; attempt < 30; attempt++) {
       const candidate = new Float64Array(n);
       for (let i = 0; i < n; i++) candidate[i] = beta[i] + step * direction[i];
       center(candidate);
@@ -154,20 +210,11 @@ export function solveTieAwarePL(games, ids, options = {}) {
       step *= 0.5;
     }
     if (!next) break;
-
-    const s = new Float64Array(n);
-    const y = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      s[i] = next[i] - beta[i];
-      y[i] = nextEvaluation.gradient[i] - evaluation.gradient[i];
-    }
-    const ys = dot(y, s);
-    if (ys > 1e-12) {
-      history.unshift({ s, y, rho: 1 / ys });
-      if (history.length > 8) history.pop();
-    }
+    const improvement = evaluation.loss - nextEvaluation.loss;
     beta = next;
     evaluation = nextEvaluation;
+    // 双精度下梯度降到 1e-6 量级后继续切步只会损失全为浮点噪声，不能空转到 maxIter。
+    if (improvement <= 1e-10 * Math.max(1, Math.abs(evaluation.loss))) break;
   }
   center(beta);
   return Array.from(beta);
@@ -325,8 +372,8 @@ function tallyOutput(tally) {
   };
 }
 
-function solveRatings(games, ids, prior, maxIter, tol) {
-  const beta = solveTieAwarePL(games, ids, { prior, maxIter, tol });
+function solveRatings(games, ids, prior, maxIter, tol, initial = null) {
+  const beta = solveTieAwarePL(games, ids, { prior, maxIter, tol, initial });
   return beta.map(value => 1500 + RATING_SCALE * value);
 }
 
@@ -402,7 +449,8 @@ export function buildMultiplayerLeague(games, ids, options = {}) {
     }
   }
 
-  const rawRatings = solveRatings(validGames, ids, prior, maxIter, tol);
+  const fullBeta = solveTieAwarePL(validGames, ids, { prior, maxIter, tol });
+  const rawRatings = fullBeta.map(value => 1500 + RATING_SCALE * value);
   const bootstrap = ids.map(() => []);
   if (bootstrapN > 0 && blocks.complete.size > 0) {
     if (typeof rngFactory !== 'function') throw new TypeError('rngFactory is required when bootstrapN > 0');
@@ -423,7 +471,7 @@ export function buildMultiplayerLeague(games, ids, options = {}) {
           sample.push(...stratum[Math.floor(rng() * stratum.length)]);
         }
       }
-      const ratings = solveRatings(sample, ids, prior, maxIter, tol);
+      const ratings = solveRatings(sample, ids, prior, maxIter, tol, fullBeta);
       for (let i = 0; i < ids.length; i++) bootstrap[i].push(ratings[i]);
     }
     for (const samples of bootstrap) samples.sort((a, b) => a - b);
@@ -435,7 +483,7 @@ export function buildMultiplayerLeague(games, ids, options = {}) {
   const hasShift = ids.map(() => false);
   for (const lineupId of lineupIds) {
     const remaining = validGames.filter(game => game.schedule.lineupId !== lineupId);
-    const ratings = solveRatings(remaining, ids, prior, maxIter, tol);
+    const ratings = solveRatings(remaining, ids, prior, maxIter, tol, fullBeta);
     for (let i = 0; i < ids.length; i++) {
       const stats = perModel.get(ids[i]);
       const remainingGames = stats.games - (stats.gamesByLineup.get(lineupId) ?? 0);

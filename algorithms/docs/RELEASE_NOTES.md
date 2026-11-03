@@ -18,7 +18,7 @@
 
 - 三人静态图 `multiplayer-ring` 与随机图各跑完整六局：均 6/6 完赛、1 个完整 superblock、0 残块、0 批次失败；随机图六局共享同一地图种子。排名与完整块指标由 `script/multiplayerRating.mjs` 从真实记录生成，详见 [RL 日志](../../rl/docs/RELEASE_NOTES.md)。
 - 新增 `mcts` / `field` / `verdict@v2` / `parallax` 各在 A/B/C 三个出生座位实战一局（共 12 局）：全部正常终局、0 暴露动作拒绝、0 回合提交兜底；另跑 `mcts / verdict / parallax` 六局完整 superblock 互打，同样 0 失败。连同原三人六局，7 个标准算法均有真实三人整局记录。
-- `npm run build`、`npm run check-version` 通过；全量 Vitest **147 文件 / 1729 例**、RL pytest **336 passed / 13 skipped**。新增回归会逐个运行 7 个标准算法的第三座位整回合。
+- `npm run build`、`npm run check-version` 通过；全量 Vitest **147 文件 / 1732 例**、RL pytest **336 passed / 13 skipped**。新增回归会逐个运行 7 个标准算法的第三座位整回合，并用 2,520 局合成样本锁定 PL 求解不会因浮点噪声空转到 `maxIter`。
 
 ## 3.8.21（2026-10-31）— verdict v2 破墙路径场
 

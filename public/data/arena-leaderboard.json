@@ -1,15 +1,17 @@
 {
-  "generatedAt": "2026-10-31T18:01:40.366Z",
+  "generatedAt": "2026-11-03T13:44:03.487Z",
   "ratingMethod": {
     "model": "Bradley-Terry MLE (MM iteration), draw = 0.5 win",
     "scope": "per game mode; modes are never pooled together",
     "prior": "1 virtual draw per played pair",
     "scale": "Elo: 1500 + 400/ln(10) * ln p",
-    "ci": "stratified bootstrap by (pair,map) within each mode: 1000 draws for mode / 300 per map, seed 20260901"
+    "ci": "stratified bootstrap by (pair,map) within each mode: 1000 draws for mode / 300 per map, seed 20260901",
+    "multiplayer": "three-player tie-aware Plackett-Luce with L2 prior; complete six-game superblocks only; cluster bootstrap by superblock"
   },
   "source": {
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
     "matchCount": 51163,
+    "multiplayerMatchCount": 2520,
     "retiredMatchesDropped": 0,
     "mapDist": {
       "artillery-zone": 240,
@@ -51,6 +53,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 500000,
       "deliveredSteps": 500000,
       "status": "legacy",
@@ -65,6 +70,9 @@
       "opponentType": "rule_defensive",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 800000,
       "deliveredSteps": 800000,
@@ -81,6 +89,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 120000,
       "deliveredSteps": 120000,
       "status": "legacy",
@@ -95,6 +106,9 @@
       "opponentType": "modelmix",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 70000,
       "deliveredSteps": 70000,
@@ -111,6 +125,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 340000,
       "deliveredSteps": 340000,
       "status": "legacy",
@@ -125,6 +142,9 @@
       "opponentType": "selfplay",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 770000,
       "deliveredSteps": 770000,
@@ -141,6 +161,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 2000000,
       "deliveredSteps": 2000000,
       "status": "legacy",
@@ -155,6 +178,9 @@
       "opponentType": "selfplay",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 2000000,
       "deliveredSteps": 2000000,
@@ -171,6 +197,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 3600000,
       "deliveredSteps": 3600000,
       "status": "legacy",
@@ -185,6 +214,9 @@
       "opponentType": "selfplay",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 4000000,
       "deliveredSteps": 4000000,
@@ -201,6 +233,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 4700000,
       "deliveredSteps": 4700000,
       "status": "legacy",
@@ -215,6 +250,9 @@
       "opponentType": "selfplay",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 50000,
       "deliveredSteps": 50000,
@@ -231,6 +269,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 1400000,
       "deliveredSteps": 1400000,
       "status": "legacy",
@@ -245,6 +286,9 @@
       "opponentType": "selfplay",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 5000000,
       "deliveredSteps": 5000000,
@@ -261,6 +305,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 8400000,
       "deliveredSteps": 8400000,
       "status": "legacy",
@@ -275,6 +322,9 @@
       "opponentType": "selfplay",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 100000,
       "deliveredSteps": 100000,
@@ -291,6 +341,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 8800000,
       "deliveredSteps": 8800000,
       "status": "legacy",
@@ -305,6 +358,9 @@
       "opponentType": "selfplay",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2
       ],
       "steps": 9800000,
       "deliveredSteps": 9800000,
@@ -321,6 +377,9 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2
+      ],
       "steps": 11400000,
       "deliveredSteps": 11400000,
       "status": "legacy",
@@ -335,6 +394,10 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2,
+        3
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -346,6 +409,10 @@
       "description": "从所有合法动作中随机选择",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2,
+        3
       ],
       "status": "builtin",
       "statusNote": null
@@ -359,6 +426,9 @@
       "modes": [
         "annihilation"
       ],
+      "playerCounts": [
+        2
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -370,6 +440,9 @@
       "description": "大逃杀：从所有合法计划动作中随机入队，随后提交",
       "modes": [
         "royale"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -383,6 +456,10 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2,
+        3
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -394,6 +471,10 @@
       "description": "威胁图统一效用评估：集火斩杀、避险走位",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2,
+        3
       ],
       "status": "builtin",
       "statusNote": null
@@ -407,6 +488,10 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2,
+        3
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -418,6 +503,10 @@
       "description": "从终局倒推攻城排程与期限，全动作按裁决分计价",
       "modes": [
         "standard"
+      ],
+      "playerCounts": [
+        2,
+        3
       ],
       "status": "builtin",
       "statusNote": null
@@ -431,6 +520,9 @@
       "modes": [
         "simultaneous"
       ],
+      "playerCounts": [
+        2
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -442,6 +534,9 @@
       "description": "同时回合分步：建模敌军落点概率，预测射击并规避目的格冲突",
       "modes": [
         "simultaneous"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -455,6 +550,9 @@
       "modes": [
         "simultaneous"
       ],
+      "playerCounts": [
+        2
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -466,6 +564,9 @@
       "description": "同时回合：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正",
       "modes": [
         "simultaneous"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -479,6 +580,9 @@
       "modes": [
         "simultaneous"
       ],
+      "playerCounts": [
+        2
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -490,6 +594,9 @@
       "description": "同时回合：敌方剧本逐拍投影 + 威胁时间线避险 + 裁决地平线姿态调节",
       "modes": [
         "simultaneous"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -503,6 +610,9 @@
       "modes": [
         "simultaneous"
       ],
+      "playerCounts": [
+        2
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -514,6 +624,9 @@
       "description": "同时回合：分步结算镜像 + 多轮视界投影胜率评估 + 同构对手场景 + 束搜索 + 对抗探针",
       "modes": [
         "simultaneous"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -527,6 +640,9 @@
       "modes": [
         "annihilation"
       ],
+      "playerCounts": [
+        2
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -538,6 +654,9 @@
       "description": "歼灭：炮火收缩圈预判疏散、稳杀集火、走位风筝与激进补员",
       "modes": [
         "annihilation"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -551,6 +670,9 @@
       "modes": [
         "royale"
       ],
+      "playerCounts": [
+        2
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -562,6 +684,9 @@
       "description": "大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验",
       "modes": [
         "royale"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -575,6 +700,9 @@
       "modes": [
         "annihilation"
       ],
+      "playerCounts": [
+        2
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -586,6 +714,9 @@
       "description": "歼灭：概率齐射竞价、多轮炮火逃逸与协同让行开路，动态权衡兵力和部署窗口",
       "modes": [
         "annihilation"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -599,6 +730,10 @@
       "modes": [
         "standard"
       ],
+      "playerCounts": [
+        2,
+        3
+      ],
       "status": "builtin",
       "statusNote": null
     },
@@ -610,6 +745,9 @@
       "description": "大逃杀：独立安全格容量分配、行动组合调度与缩圈增援负担评估",
       "modes": [
         "royale"
+      ],
+      "playerCounts": [
+        2
       ],
       "status": "builtin",
       "statusNote": null
@@ -68445,6 +68583,2116 @@
               "aSeatSwing": 0
             }
           ]
+        }
+      }
+    }
+  ],
+  "divisions": [
+    {
+      "id": "standard-3p-standard-3p-v1",
+      "mode": "standard",
+      "playerCount": 3,
+      "rulesVersion": "standard-3p-v1",
+      "label": "标准模式 · 三人",
+      "games": 2520,
+      "maps": {
+        "all": {
+          "overview": {
+            "games": 2520,
+            "superblockCount": 420,
+            "quarantinedSuperblocks": 0,
+            "draws": 0,
+            "drawRate": 0,
+            "avgRounds": 29.86,
+            "uniqueWinRate": 1
+          },
+          "models": [
+            {
+              "id": "algo_field@v1",
+              "rating": 1389,
+              "ratingLo": 1377,
+              "ratingHi": 1400,
+              "games": 1080,
+              "uniqueWins": 206,
+              "topGroupCount": 206,
+              "uniqueWinRate": 0.1907,
+              "topGroupRate": 0.1907,
+              "averageRank": 2.2954,
+              "placementScore": 0.3523,
+              "wilson": 0.3244,
+              "avgRounds": 31.8,
+              "avgDecisionMs": 3.53,
+              "perSeat": {
+                "player_a": {
+                  "games": 360,
+                  "uniqueWins": 17,
+                  "topGroupCount": 17,
+                  "uniqueWinRate": 0.0472,
+                  "topGroupRate": 0.0472,
+                  "averageRank": 2.6139,
+                  "placementScore": 0.1931
+                },
+                "player_b": {
+                  "games": 360,
+                  "uniqueWins": 59,
+                  "topGroupCount": 59,
+                  "uniqueWinRate": 0.1639,
+                  "topGroupRate": 0.1639,
+                  "averageRank": 2.3167,
+                  "placementScore": 0.3417
+                },
+                "player_c": {
+                  "games": 360,
+                  "uniqueWins": 130,
+                  "topGroupCount": 130,
+                  "uniqueWinRate": 0.3611,
+                  "topGroupRate": 0.3611,
+                  "averageRank": 1.9556,
+                  "placementScore": 0.5222
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 89,
+                  "topGroupCount": 89,
+                  "uniqueWinRate": 0.2472,
+                  "topGroupRate": 0.2472,
+                  "averageRank": 2.3,
+                  "placementScore": 0.35
+                },
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 77,
+                  "topGroupCount": 77,
+                  "uniqueWinRate": 0.2139,
+                  "topGroupRate": 0.2139,
+                  "averageRank": 2.2333,
+                  "placementScore": 0.3833
+                },
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 40,
+                  "topGroupCount": 40,
+                  "uniqueWinRate": 0.1111,
+                  "topGroupRate": 0.1111,
+                  "averageRank": 2.3528,
+                  "placementScore": 0.3236
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_greedy@v1",
+              "rating": 1535,
+              "ratingLo": 1524,
+              "ratingHi": 1548,
+              "games": 1080,
+              "uniqueWins": 449,
+              "topGroupCount": 449,
+              "uniqueWinRate": 0.4157,
+              "topGroupRate": 0.4157,
+              "averageRank": 1.8648,
+              "placementScore": 0.5676,
+              "wilson": 0.5379,
+              "avgRounds": 28.93,
+              "avgDecisionMs": 1.22,
+              "perSeat": {
+                "player_a": {
+                  "games": 360,
+                  "uniqueWins": 106,
+                  "topGroupCount": 106,
+                  "uniqueWinRate": 0.2944,
+                  "topGroupRate": 0.2944,
+                  "averageRank": 2.0889,
+                  "placementScore": 0.4556
+                },
+                "player_b": {
+                  "games": 360,
+                  "uniqueWins": 147,
+                  "topGroupCount": 147,
+                  "uniqueWinRate": 0.4083,
+                  "topGroupRate": 0.4083,
+                  "averageRank": 1.8694,
+                  "placementScore": 0.5653
+                },
+                "player_c": {
+                  "games": 360,
+                  "uniqueWins": 196,
+                  "topGroupCount": 196,
+                  "uniqueWinRate": 0.5444,
+                  "topGroupRate": 0.5444,
+                  "averageRank": 1.6361,
+                  "placementScore": 0.6819
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 154,
+                  "topGroupCount": 154,
+                  "uniqueWinRate": 0.4278,
+                  "topGroupRate": 0.4278,
+                  "averageRank": 1.8417,
+                  "placementScore": 0.5792
+                },
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 109,
+                  "topGroupCount": 109,
+                  "uniqueWinRate": 0.3028,
+                  "topGroupRate": 0.3028,
+                  "averageRank": 2.0417,
+                  "placementScore": 0.4792
+                },
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 186,
+                  "topGroupCount": 186,
+                  "uniqueWinRate": 0.5167,
+                  "topGroupRate": 0.5167,
+                  "averageRank": 1.7111,
+                  "placementScore": 0.6444
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_mcts@v1",
+              "rating": 1441,
+              "ratingLo": 1433,
+              "ratingHi": 1451,
+              "games": 1080,
+              "uniqueWins": 263,
+              "topGroupCount": 263,
+              "uniqueWinRate": 0.2435,
+              "topGroupRate": 0.2435,
+              "averageRank": 2.1565,
+              "placementScore": 0.4218,
+              "wilson": 0.3926,
+              "avgRounds": 32.33,
+              "avgDecisionMs": 14.5,
+              "perSeat": {
+                "player_a": {
+                  "games": 360,
+                  "uniqueWins": 45,
+                  "topGroupCount": 45,
+                  "uniqueWinRate": 0.125,
+                  "topGroupRate": 0.125,
+                  "averageRank": 2.3944,
+                  "placementScore": 0.3028
+                },
+                "player_b": {
+                  "games": 360,
+                  "uniqueWins": 79,
+                  "topGroupCount": 79,
+                  "uniqueWinRate": 0.2194,
+                  "topGroupRate": 0.2194,
+                  "averageRank": 2.15,
+                  "placementScore": 0.425
+                },
+                "player_c": {
+                  "games": 360,
+                  "uniqueWins": 139,
+                  "topGroupCount": 139,
+                  "uniqueWinRate": 0.3861,
+                  "topGroupRate": 0.3861,
+                  "averageRank": 1.925,
+                  "placementScore": 0.5375
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 150,
+                  "topGroupCount": 150,
+                  "uniqueWinRate": 0.4167,
+                  "topGroupRate": 0.4167,
+                  "averageRank": 1.7889,
+                  "placementScore": 0.6056
+                },
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 111,
+                  "topGroupCount": 111,
+                  "uniqueWinRate": 0.3083,
+                  "topGroupRate": 0.3083,
+                  "averageRank": 1.9333,
+                  "placementScore": 0.5333
+                },
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 2,
+                  "topGroupCount": 2,
+                  "uniqueWinRate": 0.0056,
+                  "topGroupRate": 0.0056,
+                  "averageRank": 2.7472,
+                  "placementScore": 0.1264
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_parallax@v1",
+              "rating": 1748,
+              "ratingLo": 1735,
+              "ratingHi": 1761,
+              "games": 1080,
+              "uniqueWins": 795,
+              "topGroupCount": 795,
+              "uniqueWinRate": 0.7361,
+              "topGroupRate": 0.7361,
+              "averageRank": 1.3426,
+              "placementScore": 0.8287,
+              "wilson": 0.8051,
+              "avgRounds": 27.89,
+              "avgDecisionMs": 539.1,
+              "perSeat": {
+                "player_a": {
+                  "games": 360,
+                  "uniqueWins": 216,
+                  "topGroupCount": 216,
+                  "uniqueWinRate": 0.6,
+                  "topGroupRate": 0.6,
+                  "averageRank": 1.5111,
+                  "placementScore": 0.7444
+                },
+                "player_b": {
+                  "games": 360,
+                  "uniqueWins": 269,
+                  "topGroupCount": 269,
+                  "uniqueWinRate": 0.7472,
+                  "topGroupRate": 0.7472,
+                  "averageRank": 1.35,
+                  "placementScore": 0.825
+                },
+                "player_c": {
+                  "games": 360,
+                  "uniqueWins": 310,
+                  "topGroupCount": 310,
+                  "uniqueWinRate": 0.8611,
+                  "topGroupRate": 0.8611,
+                  "averageRank": 1.1667,
+                  "placementScore": 0.9167
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 220,
+                  "topGroupCount": 220,
+                  "uniqueWinRate": 0.6111,
+                  "topGroupRate": 0.6111,
+                  "averageRank": 1.5417,
+                  "placementScore": 0.7292
+                },
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 303,
+                  "topGroupCount": 303,
+                  "uniqueWinRate": 0.8417,
+                  "topGroupRate": 0.8417,
+                  "averageRank": 1.1861,
+                  "placementScore": 0.9069
+                },
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 272,
+                  "topGroupCount": 272,
+                  "uniqueWinRate": 0.7556,
+                  "topGroupRate": 0.7556,
+                  "averageRank": 1.3,
+                  "placementScore": 0.85
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_random@v1",
+              "rating": 1277,
+              "ratingLo": 1264,
+              "ratingHi": 1289,
+              "games": 1080,
+              "uniqueWins": 31,
+              "topGroupCount": 31,
+              "uniqueWinRate": 0.0287,
+              "topGroupRate": 0.0287,
+              "averageRank": 2.6509,
+              "placementScore": 0.1745,
+              "wilson": 0.1531,
+              "avgRounds": 31.8,
+              "avgDecisionMs": 1.14,
+              "perSeat": {
+                "player_a": {
+                  "games": 360,
+                  "uniqueWins": 8,
+                  "topGroupCount": 8,
+                  "uniqueWinRate": 0.0222,
+                  "topGroupRate": 0.0222,
+                  "averageRank": 2.8083,
+                  "placementScore": 0.0958
+                },
+                "player_b": {
+                  "games": 360,
+                  "uniqueWins": 9,
+                  "topGroupCount": 9,
+                  "uniqueWinRate": 0.025,
+                  "topGroupRate": 0.025,
+                  "averageRank": 2.6444,
+                  "placementScore": 0.1778
+                },
+                "player_c": {
+                  "games": 360,
+                  "uniqueWins": 14,
+                  "topGroupCount": 14,
+                  "uniqueWinRate": 0.0389,
+                  "topGroupRate": 0.0389,
+                  "averageRank": 2.5,
+                  "placementScore": 0.25
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 3,
+                  "topGroupCount": 3,
+                  "uniqueWinRate": 0.0083,
+                  "topGroupRate": 0.0083,
+                  "averageRank": 2.6417,
+                  "placementScore": 0.1792
+                },
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 3,
+                  "topGroupCount": 3,
+                  "uniqueWinRate": 0.0083,
+                  "topGroupRate": 0.0083,
+                  "averageRank": 2.8639,
+                  "placementScore": 0.0681
+                },
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 25,
+                  "topGroupCount": 25,
+                  "uniqueWinRate": 0.0694,
+                  "topGroupRate": 0.0694,
+                  "averageRank": 2.4472,
+                  "placementScore": 0.2764
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_threat@v1",
+              "rating": 1537,
+              "ratingLo": 1527,
+              "ratingHi": 1546,
+              "games": 1080,
+              "uniqueWins": 435,
+              "topGroupCount": 435,
+              "uniqueWinRate": 0.4028,
+              "topGroupRate": 0.4028,
+              "averageRank": 1.8611,
+              "placementScore": 0.5694,
+              "wilson": 0.5397,
+              "avgRounds": 34.07,
+              "avgDecisionMs": 1.97,
+              "perSeat": {
+                "player_a": {
+                  "games": 360,
+                  "uniqueWins": 92,
+                  "topGroupCount": 92,
+                  "uniqueWinRate": 0.2556,
+                  "topGroupRate": 0.2556,
+                  "averageRank": 2.1361,
+                  "placementScore": 0.4319
+                },
+                "player_b": {
+                  "games": 360,
+                  "uniqueWins": 138,
+                  "topGroupCount": 138,
+                  "uniqueWinRate": 0.3833,
+                  "topGroupRate": 0.3833,
+                  "averageRank": 1.8528,
+                  "placementScore": 0.5736
+                },
+                "player_c": {
+                  "games": 360,
+                  "uniqueWins": 205,
+                  "topGroupCount": 205,
+                  "uniqueWinRate": 0.5694,
+                  "topGroupRate": 0.5694,
+                  "averageRank": 1.5944,
+                  "placementScore": 0.7028
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 157,
+                  "topGroupCount": 157,
+                  "uniqueWinRate": 0.4361,
+                  "topGroupRate": 0.4361,
+                  "averageRank": 1.8528,
+                  "placementScore": 0.5736
+                },
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 113,
+                  "topGroupCount": 113,
+                  "uniqueWinRate": 0.3139,
+                  "topGroupRate": 0.3139,
+                  "averageRank": 1.9667,
+                  "placementScore": 0.5167
+                },
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 165,
+                  "topGroupCount": 165,
+                  "uniqueWinRate": 0.4583,
+                  "topGroupRate": 0.4583,
+                  "averageRank": 1.7639,
+                  "placementScore": 0.6181
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_verdict@v2",
+              "rating": 1572,
+              "ratingLo": 1563,
+              "ratingHi": 1583,
+              "games": 1080,
+              "uniqueWins": 341,
+              "topGroupCount": 341,
+              "uniqueWinRate": 0.3157,
+              "topGroupRate": 0.3157,
+              "averageRank": 1.8287,
+              "placementScore": 0.5856,
+              "wilson": 0.556,
+              "avgRounds": 22.23,
+              "avgDecisionMs": 4.02,
+              "perSeat": {
+                "player_a": {
+                  "games": 360,
+                  "uniqueWins": 85,
+                  "topGroupCount": 85,
+                  "uniqueWinRate": 0.2361,
+                  "topGroupRate": 0.2361,
+                  "averageRank": 1.9222,
+                  "placementScore": 0.5389
+                },
+                "player_b": {
+                  "games": 360,
+                  "uniqueWins": 117,
+                  "topGroupCount": 117,
+                  "uniqueWinRate": 0.325,
+                  "topGroupRate": 0.325,
+                  "averageRank": 1.7944,
+                  "placementScore": 0.6028
+                },
+                "player_c": {
+                  "games": 360,
+                  "uniqueWins": 139,
+                  "topGroupCount": 139,
+                  "uniqueWinRate": 0.3861,
+                  "topGroupRate": 0.3861,
+                  "averageRank": 1.7694,
+                  "placementScore": 0.6153
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 67,
+                  "topGroupCount": 67,
+                  "uniqueWinRate": 0.1861,
+                  "topGroupRate": 0.1861,
+                  "averageRank": 2.0333,
+                  "placementScore": 0.4833
+                },
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 124,
+                  "topGroupCount": 124,
+                  "uniqueWinRate": 0.3444,
+                  "topGroupRate": 0.3444,
+                  "averageRank": 1.775,
+                  "placementScore": 0.6125
+                },
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 150,
+                  "topGroupCount": 150,
+                  "uniqueWinRate": 0.4167,
+                  "topGroupRate": 0.4167,
+                  "averageRank": 1.6778,
+                  "placementScore": 0.6611
+                }
+              },
+              "provisional": false
+            }
+          ],
+          "audit": {
+            "encounterMatrix": {
+              "algo_field@v1": {
+                "algo_field@v1": 0,
+                "algo_greedy@v1": 360,
+                "algo_mcts@v1": 360,
+                "algo_parallax@v1": 360,
+                "algo_random@v1": 360,
+                "algo_threat@v1": 360,
+                "algo_verdict@v2": 360
+              },
+              "algo_greedy@v1": {
+                "algo_field@v1": 360,
+                "algo_greedy@v1": 0,
+                "algo_mcts@v1": 360,
+                "algo_parallax@v1": 360,
+                "algo_random@v1": 360,
+                "algo_threat@v1": 360,
+                "algo_verdict@v2": 360
+              },
+              "algo_mcts@v1": {
+                "algo_field@v1": 360,
+                "algo_greedy@v1": 360,
+                "algo_mcts@v1": 0,
+                "algo_parallax@v1": 360,
+                "algo_random@v1": 360,
+                "algo_threat@v1": 360,
+                "algo_verdict@v2": 360
+              },
+              "algo_parallax@v1": {
+                "algo_field@v1": 360,
+                "algo_greedy@v1": 360,
+                "algo_mcts@v1": 360,
+                "algo_parallax@v1": 0,
+                "algo_random@v1": 360,
+                "algo_threat@v1": 360,
+                "algo_verdict@v2": 360
+              },
+              "algo_random@v1": {
+                "algo_field@v1": 360,
+                "algo_greedy@v1": 360,
+                "algo_mcts@v1": 360,
+                "algo_parallax@v1": 360,
+                "algo_random@v1": 0,
+                "algo_threat@v1": 360,
+                "algo_verdict@v2": 360
+              },
+              "algo_threat@v1": {
+                "algo_field@v1": 360,
+                "algo_greedy@v1": 360,
+                "algo_mcts@v1": 360,
+                "algo_parallax@v1": 360,
+                "algo_random@v1": 360,
+                "algo_threat@v1": 0,
+                "algo_verdict@v2": 360
+              },
+              "algo_verdict@v2": {
+                "algo_field@v1": 360,
+                "algo_greedy@v1": 360,
+                "algo_mcts@v1": 360,
+                "algo_parallax@v1": 360,
+                "algo_random@v1": 360,
+                "algo_threat@v1": 360,
+                "algo_verdict@v2": 0
+              }
+            },
+            "seatPlacementScore": {
+              "player_a": 0.3946,
+              "player_b": 0.5016,
+              "player_c": 0.6038
+            },
+            "leaveOneLineupOut": {
+              "algo_field@v1": 13,
+              "algo_greedy@v1": 7,
+              "algo_mcts@v1": 8,
+              "algo_parallax@v1": 7,
+              "algo_random@v1": 8,
+              "algo_threat@v1": 10,
+              "algo_verdict@v2": 5
+            }
+          }
+        },
+        "multiplayer-ring": {
+          "overview": {
+            "games": 840,
+            "superblockCount": 140,
+            "quarantinedSuperblocks": 0,
+            "draws": 0,
+            "drawRate": 0,
+            "avgRounds": 13.16,
+            "uniqueWinRate": 1
+          },
+          "models": [
+            {
+              "id": "algo_field@v1",
+              "rating": 1379,
+              "ratingLo": 1360,
+              "ratingHi": 1397,
+              "games": 360,
+              "uniqueWins": 89,
+              "topGroupCount": 89,
+              "uniqueWinRate": 0.2472,
+              "topGroupRate": 0.2472,
+              "averageRank": 2.3,
+              "placementScore": 0.35,
+              "wilson": 0.3025,
+              "avgRounds": 13.53,
+              "avgDecisionMs": 3.92,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 5,
+                  "topGroupCount": 5,
+                  "uniqueWinRate": 0.0417,
+                  "topGroupRate": 0.0417,
+                  "averageRank": 2.775,
+                  "placementScore": 0.1125
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 21,
+                  "topGroupCount": 21,
+                  "uniqueWinRate": 0.175,
+                  "topGroupRate": 0.175,
+                  "averageRank": 2.4083,
+                  "placementScore": 0.2958
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 63,
+                  "topGroupCount": 63,
+                  "uniqueWinRate": 0.525,
+                  "topGroupRate": 0.525,
+                  "averageRank": 1.7167,
+                  "placementScore": 0.6417
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 89,
+                  "topGroupCount": 89,
+                  "uniqueWinRate": 0.2472,
+                  "topGroupRate": 0.2472,
+                  "averageRank": 2.3,
+                  "placementScore": 0.35
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_greedy@v1",
+              "rating": 1544,
+              "ratingLo": 1532,
+              "ratingHi": 1556,
+              "games": 360,
+              "uniqueWins": 154,
+              "topGroupCount": 154,
+              "uniqueWinRate": 0.4278,
+              "topGroupRate": 0.4278,
+              "averageRank": 1.8417,
+              "placementScore": 0.5792,
+              "wilson": 0.5276,
+              "avgRounds": 13.29,
+              "avgDecisionMs": 1,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 22,
+                  "topGroupCount": 22,
+                  "uniqueWinRate": 0.1833,
+                  "topGroupRate": 0.1833,
+                  "averageRank": 2.275,
+                  "placementScore": 0.3625
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 41,
+                  "topGroupCount": 41,
+                  "uniqueWinRate": 0.3417,
+                  "topGroupRate": 0.3417,
+                  "averageRank": 1.9833,
+                  "placementScore": 0.5083
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 91,
+                  "topGroupCount": 91,
+                  "uniqueWinRate": 0.7583,
+                  "topGroupRate": 0.7583,
+                  "averageRank": 1.2667,
+                  "placementScore": 0.8667
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 154,
+                  "topGroupCount": 154,
+                  "uniqueWinRate": 0.4278,
+                  "topGroupRate": 0.4278,
+                  "averageRank": 1.8417,
+                  "placementScore": 0.5792
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_mcts@v1",
+              "rating": 1570,
+              "ratingLo": 1558,
+              "ratingHi": 1585,
+              "games": 360,
+              "uniqueWins": 150,
+              "topGroupCount": 150,
+              "uniqueWinRate": 0.4167,
+              "topGroupRate": 0.4167,
+              "averageRank": 1.7889,
+              "placementScore": 0.6056,
+              "wilson": 0.5542,
+              "avgRounds": 13.19,
+              "avgDecisionMs": 11.5,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 24,
+                  "topGroupCount": 24,
+                  "uniqueWinRate": 0.2,
+                  "topGroupRate": 0.2,
+                  "averageRank": 2.15,
+                  "placementScore": 0.425
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 44,
+                  "topGroupCount": 44,
+                  "uniqueWinRate": 0.3667,
+                  "topGroupRate": 0.3667,
+                  "averageRank": 1.8333,
+                  "placementScore": 0.5833
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 82,
+                  "topGroupCount": 82,
+                  "uniqueWinRate": 0.6833,
+                  "topGroupRate": 0.6833,
+                  "averageRank": 1.3833,
+                  "placementScore": 0.8083
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 150,
+                  "topGroupCount": 150,
+                  "uniqueWinRate": 0.4167,
+                  "topGroupRate": 0.4167,
+                  "averageRank": 1.7889,
+                  "placementScore": 0.6056
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_parallax@v1",
+              "rating": 1652,
+              "ratingLo": 1634,
+              "ratingHi": 1671,
+              "games": 360,
+              "uniqueWins": 220,
+              "topGroupCount": 220,
+              "uniqueWinRate": 0.6111,
+              "topGroupRate": 0.6111,
+              "averageRank": 1.5417,
+              "placementScore": 0.7292,
+              "wilson": 0.681,
+              "avgRounds": 12.62,
+              "avgDecisionMs": 438.61,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 40,
+                  "topGroupCount": 40,
+                  "uniqueWinRate": 0.3333,
+                  "topGroupRate": 0.3333,
+                  "averageRank": 1.8833,
+                  "placementScore": 0.5583
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 67,
+                  "topGroupCount": 67,
+                  "uniqueWinRate": 0.5583,
+                  "topGroupRate": 0.5583,
+                  "averageRank": 1.675,
+                  "placementScore": 0.6625
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 113,
+                  "topGroupCount": 113,
+                  "uniqueWinRate": 0.9417,
+                  "topGroupRate": 0.9417,
+                  "averageRank": 1.0667,
+                  "placementScore": 0.9667
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 220,
+                  "topGroupCount": 220,
+                  "uniqueWinRate": 0.6111,
+                  "topGroupRate": 0.6111,
+                  "averageRank": 1.5417,
+                  "placementScore": 0.7292
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_random@v1",
+              "rating": 1302,
+              "ratingLo": 1283,
+              "ratingHi": 1320,
+              "games": 360,
+              "uniqueWins": 3,
+              "topGroupCount": 3,
+              "uniqueWinRate": 0.0083,
+              "topGroupRate": 0.0083,
+              "averageRank": 2.6417,
+              "placementScore": 0.1792,
+              "wilson": 0.143,
+              "avgRounds": 13.73,
+              "avgDecisionMs": 1.04,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.9167,
+                  "placementScore": 0.0417
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 1,
+                  "topGroupCount": 1,
+                  "uniqueWinRate": 0.0083,
+                  "topGroupRate": 0.0083,
+                  "averageRank": 2.675,
+                  "placementScore": 0.1625
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 2,
+                  "topGroupCount": 2,
+                  "uniqueWinRate": 0.0167,
+                  "topGroupRate": 0.0167,
+                  "averageRank": 2.3333,
+                  "placementScore": 0.3333
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 3,
+                  "topGroupCount": 3,
+                  "uniqueWinRate": 0.0083,
+                  "topGroupRate": 0.0083,
+                  "averageRank": 2.6417,
+                  "placementScore": 0.1792
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_threat@v1",
+              "rating": 1538,
+              "ratingLo": 1520,
+              "ratingHi": 1557,
+              "games": 360,
+              "uniqueWins": 157,
+              "topGroupCount": 157,
+              "uniqueWinRate": 0.4361,
+              "topGroupRate": 0.4361,
+              "averageRank": 1.8528,
+              "placementScore": 0.5736,
+              "wilson": 0.522,
+              "avgRounds": 13.49,
+              "avgDecisionMs": 1.9,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 22,
+                  "topGroupCount": 22,
+                  "uniqueWinRate": 0.1833,
+                  "topGroupRate": 0.1833,
+                  "averageRank": 2.2917,
+                  "placementScore": 0.3542
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 45,
+                  "topGroupCount": 45,
+                  "uniqueWinRate": 0.375,
+                  "topGroupRate": 0.375,
+                  "averageRank": 1.9333,
+                  "placementScore": 0.5333
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 90,
+                  "topGroupCount": 90,
+                  "uniqueWinRate": 0.75,
+                  "topGroupRate": 0.75,
+                  "averageRank": 1.3333,
+                  "placementScore": 0.8333
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 157,
+                  "topGroupCount": 157,
+                  "uniqueWinRate": 0.4361,
+                  "topGroupRate": 0.4361,
+                  "averageRank": 1.8528,
+                  "placementScore": 0.5736
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_verdict@v2",
+              "rating": 1514,
+              "ratingLo": 1498,
+              "ratingHi": 1524,
+              "games": 360,
+              "uniqueWins": 67,
+              "topGroupCount": 67,
+              "uniqueWinRate": 0.1861,
+              "topGroupRate": 0.1861,
+              "averageRank": 2.0333,
+              "placementScore": 0.4833,
+              "wilson": 0.4322,
+              "avgRounds": 12.26,
+              "avgDecisionMs": 3.96,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 9,
+                  "topGroupCount": 9,
+                  "uniqueWinRate": 0.075,
+                  "topGroupRate": 0.075,
+                  "averageRank": 2.15,
+                  "placementScore": 0.425
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 10,
+                  "topGroupCount": 10,
+                  "uniqueWinRate": 0.0833,
+                  "topGroupRate": 0.0833,
+                  "averageRank": 2.1583,
+                  "placementScore": 0.4208
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 48,
+                  "topGroupCount": 48,
+                  "uniqueWinRate": 0.4,
+                  "topGroupRate": 0.4,
+                  "averageRank": 1.7917,
+                  "placementScore": 0.6042
+                }
+              },
+              "perMap": {
+                "multiplayer-ring": {
+                  "games": 360,
+                  "uniqueWins": 67,
+                  "topGroupCount": 67,
+                  "uniqueWinRate": 0.1861,
+                  "topGroupRate": 0.1861,
+                  "averageRank": 2.0333,
+                  "placementScore": 0.4833
+                }
+              },
+              "provisional": false
+            }
+          ],
+          "audit": {
+            "encounterMatrix": {
+              "algo_field@v1": {
+                "algo_field@v1": 0,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_greedy@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 0,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_mcts@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 0,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_parallax@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 0,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_random@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 0,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_threat@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 0,
+                "algo_verdict@v2": 120
+              },
+              "algo_verdict@v2": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 0
+              }
+            },
+            "seatPlacementScore": {
+              "player_a": 0.3256,
+              "player_b": 0.4524,
+              "player_c": 0.722
+            },
+            "leaveOneLineupOut": {
+              "algo_field@v1": 12,
+              "algo_greedy@v1": 14,
+              "algo_mcts@v1": 11,
+              "algo_parallax@v1": 13,
+              "algo_random@v1": 10,
+              "algo_threat@v1": 10,
+              "algo_verdict@v2": 9
+            }
+          }
+        },
+        "random": {
+          "overview": {
+            "games": 840,
+            "superblockCount": 140,
+            "quarantinedSuperblocks": 0,
+            "draws": 0,
+            "drawRate": 0,
+            "avgRounds": 9.59,
+            "uniqueWinRate": 1
+          },
+          "models": [
+            {
+              "id": "algo_field@v1",
+              "rating": 1400,
+              "ratingLo": 1370,
+              "ratingHi": 1432,
+              "games": 360,
+              "uniqueWins": 77,
+              "topGroupCount": 77,
+              "uniqueWinRate": 0.2139,
+              "topGroupRate": 0.2139,
+              "averageRank": 2.2333,
+              "placementScore": 0.3833,
+              "wilson": 0.3346,
+              "avgRounds": 10.47,
+              "avgDecisionMs": 4.73,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 11,
+                  "topGroupCount": 11,
+                  "uniqueWinRate": 0.0917,
+                  "topGroupRate": 0.0917,
+                  "averageRank": 2.475,
+                  "placementScore": 0.2625
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 23,
+                  "topGroupCount": 23,
+                  "uniqueWinRate": 0.1917,
+                  "topGroupRate": 0.1917,
+                  "averageRank": 2.3,
+                  "placementScore": 0.35
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 43,
+                  "topGroupCount": 43,
+                  "uniqueWinRate": 0.3583,
+                  "topGroupRate": 0.3583,
+                  "averageRank": 1.925,
+                  "placementScore": 0.5375
+                }
+              },
+              "perMap": {
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 77,
+                  "topGroupCount": 77,
+                  "uniqueWinRate": 0.2139,
+                  "topGroupRate": 0.2139,
+                  "averageRank": 2.2333,
+                  "placementScore": 0.3833
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_greedy@v1",
+              "rating": 1476,
+              "ratingLo": 1444,
+              "ratingHi": 1507,
+              "games": 360,
+              "uniqueWins": 109,
+              "topGroupCount": 109,
+              "uniqueWinRate": 0.3028,
+              "topGroupRate": 0.3028,
+              "averageRank": 2.0417,
+              "placementScore": 0.4792,
+              "wilson": 0.4281,
+              "avgRounds": 10.6,
+              "avgDecisionMs": 1.15,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 20,
+                  "topGroupCount": 20,
+                  "uniqueWinRate": 0.1667,
+                  "topGroupRate": 0.1667,
+                  "averageRank": 2.3,
+                  "placementScore": 0.35
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 32,
+                  "topGroupCount": 32,
+                  "uniqueWinRate": 0.2667,
+                  "topGroupRate": 0.2667,
+                  "averageRank": 2.0583,
+                  "placementScore": 0.4708
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 57,
+                  "topGroupCount": 57,
+                  "uniqueWinRate": 0.475,
+                  "topGroupRate": 0.475,
+                  "averageRank": 1.7667,
+                  "placementScore": 0.6167
+                }
+              },
+              "perMap": {
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 109,
+                  "topGroupCount": 109,
+                  "uniqueWinRate": 0.3028,
+                  "topGroupRate": 0.3028,
+                  "averageRank": 2.0417,
+                  "placementScore": 0.4792
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_mcts@v1",
+              "rating": 1529,
+              "ratingLo": 1510,
+              "ratingHi": 1553,
+              "games": 360,
+              "uniqueWins": 111,
+              "topGroupCount": 111,
+              "uniqueWinRate": 0.3083,
+              "topGroupRate": 0.3083,
+              "averageRank": 1.9333,
+              "placementScore": 0.5333,
+              "wilson": 0.4817,
+              "avgRounds": 9.74,
+              "avgDecisionMs": 32.18,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 21,
+                  "topGroupCount": 21,
+                  "uniqueWinRate": 0.175,
+                  "topGroupRate": 0.175,
+                  "averageRank": 2.1583,
+                  "placementScore": 0.4208
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 35,
+                  "topGroupCount": 35,
+                  "uniqueWinRate": 0.2917,
+                  "topGroupRate": 0.2917,
+                  "averageRank": 1.9417,
+                  "placementScore": 0.5292
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 55,
+                  "topGroupCount": 55,
+                  "uniqueWinRate": 0.4583,
+                  "topGroupRate": 0.4583,
+                  "averageRank": 1.7,
+                  "placementScore": 0.65
+                }
+              },
+              "perMap": {
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 111,
+                  "topGroupCount": 111,
+                  "uniqueWinRate": 0.3083,
+                  "topGroupRate": 0.3083,
+                  "averageRank": 1.9333,
+                  "placementScore": 0.5333
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_parallax@v1",
+              "rating": 1873,
+              "ratingLo": 1832,
+              "ratingHi": 1924,
+              "games": 360,
+              "uniqueWins": 303,
+              "topGroupCount": 303,
+              "uniqueWinRate": 0.8417,
+              "topGroupRate": 0.8417,
+              "averageRank": 1.1861,
+              "placementScore": 0.9069,
+              "wilson": 0.8725,
+              "avgRounds": 7.09,
+              "avgDecisionMs": 443.71,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 93,
+                  "topGroupCount": 93,
+                  "uniqueWinRate": 0.775,
+                  "topGroupRate": 0.775,
+                  "averageRank": 1.2667,
+                  "placementScore": 0.8667
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 96,
+                  "topGroupCount": 96,
+                  "uniqueWinRate": 0.8,
+                  "topGroupRate": 0.8,
+                  "averageRank": 1.2417,
+                  "placementScore": 0.8792
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 114,
+                  "topGroupCount": 114,
+                  "uniqueWinRate": 0.95,
+                  "topGroupRate": 0.95,
+                  "averageRank": 1.05,
+                  "placementScore": 0.975
+                }
+              },
+              "perMap": {
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 303,
+                  "topGroupCount": 303,
+                  "uniqueWinRate": 0.8417,
+                  "topGroupRate": 0.8417,
+                  "averageRank": 1.1861,
+                  "placementScore": 0.9069
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_random@v1",
+              "rating": 1109,
+              "ratingLo": 1062,
+              "ratingHi": 1148,
+              "games": 360,
+              "uniqueWins": 3,
+              "topGroupCount": 3,
+              "uniqueWinRate": 0.0083,
+              "topGroupRate": 0.0083,
+              "averageRank": 2.8639,
+              "placementScore": 0.0681,
+              "wilson": 0.0463,
+              "avgRounds": 10.14,
+              "avgDecisionMs": 1.11,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.9417,
+                  "placementScore": 0.0292
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.8667,
+                  "placementScore": 0.0667
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 3,
+                  "topGroupCount": 3,
+                  "uniqueWinRate": 0.025,
+                  "topGroupRate": 0.025,
+                  "averageRank": 2.7833,
+                  "placementScore": 0.1083
+                }
+              },
+              "perMap": {
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 3,
+                  "topGroupCount": 3,
+                  "uniqueWinRate": 0.0083,
+                  "topGroupRate": 0.0083,
+                  "averageRank": 2.8639,
+                  "placementScore": 0.0681
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_threat@v1",
+              "rating": 1508,
+              "ratingLo": 1486,
+              "ratingHi": 1528,
+              "games": 360,
+              "uniqueWins": 113,
+              "topGroupCount": 113,
+              "uniqueWinRate": 0.3139,
+              "topGroupRate": 0.3139,
+              "averageRank": 1.9667,
+              "placementScore": 0.5167,
+              "wilson": 0.4651,
+              "avgRounds": 10.31,
+              "avgDecisionMs": 2.39,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 26,
+                  "topGroupCount": 26,
+                  "uniqueWinRate": 0.2167,
+                  "topGroupRate": 0.2167,
+                  "averageRank": 2.15,
+                  "placementScore": 0.425
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 31,
+                  "topGroupCount": 31,
+                  "uniqueWinRate": 0.2583,
+                  "topGroupRate": 0.2583,
+                  "averageRank": 2,
+                  "placementScore": 0.5
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 56,
+                  "topGroupCount": 56,
+                  "uniqueWinRate": 0.4667,
+                  "topGroupRate": 0.4667,
+                  "averageRank": 1.75,
+                  "placementScore": 0.625
+                }
+              },
+              "perMap": {
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 113,
+                  "topGroupCount": 113,
+                  "uniqueWinRate": 0.3139,
+                  "topGroupRate": 0.3139,
+                  "averageRank": 1.9667,
+                  "placementScore": 0.5167
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_verdict@v2",
+              "rating": 1604,
+              "ratingLo": 1583,
+              "ratingHi": 1628,
+              "games": 360,
+              "uniqueWins": 124,
+              "topGroupCount": 124,
+              "uniqueWinRate": 0.3444,
+              "topGroupRate": 0.3444,
+              "averageRank": 1.775,
+              "placementScore": 0.6125,
+              "wilson": 0.5612,
+              "avgRounds": 8.81,
+              "avgDecisionMs": 4.88,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 34,
+                  "topGroupCount": 34,
+                  "uniqueWinRate": 0.2833,
+                  "topGroupRate": 0.2833,
+                  "averageRank": 1.8833,
+                  "placementScore": 0.5583
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 40,
+                  "topGroupCount": 40,
+                  "uniqueWinRate": 0.3333,
+                  "topGroupRate": 0.3333,
+                  "averageRank": 1.7667,
+                  "placementScore": 0.6167
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 50,
+                  "topGroupCount": 50,
+                  "uniqueWinRate": 0.4167,
+                  "topGroupRate": 0.4167,
+                  "averageRank": 1.675,
+                  "placementScore": 0.6625
+                }
+              },
+              "perMap": {
+                "random": {
+                  "games": 360,
+                  "uniqueWins": 124,
+                  "topGroupCount": 124,
+                  "uniqueWinRate": 0.3444,
+                  "topGroupRate": 0.3444,
+                  "averageRank": 1.775,
+                  "placementScore": 0.6125
+                }
+              },
+              "provisional": false
+            }
+          ],
+          "audit": {
+            "encounterMatrix": {
+              "algo_field@v1": {
+                "algo_field@v1": 0,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_greedy@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 0,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_mcts@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 0,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_parallax@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 0,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_random@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 0,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_threat@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 0,
+                "algo_verdict@v2": 120
+              },
+              "algo_verdict@v2": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 0
+              }
+            },
+            "seatPlacementScore": {
+              "player_a": 0.4161,
+              "player_b": 0.4875,
+              "player_c": 0.5964
+            },
+            "leaveOneLineupOut": {
+              "algo_field@v1": 11,
+              "algo_greedy@v1": 9,
+              "algo_mcts@v1": 10,
+              "algo_parallax@v1": 16,
+              "algo_random@v1": 10,
+              "algo_threat@v1": 8,
+              "algo_verdict@v2": 8
+            }
+          }
+        },
+        "whirlpool": {
+          "overview": {
+            "games": 840,
+            "superblockCount": 140,
+            "quarantinedSuperblocks": 0,
+            "draws": 0,
+            "drawRate": 0,
+            "avgRounds": 66.83,
+            "uniqueWinRate": 1
+          },
+          "models": [
+            {
+              "id": "algo_field@v1",
+              "rating": 1355,
+              "ratingLo": 1337,
+              "ratingHi": 1370,
+              "games": 360,
+              "uniqueWins": 40,
+              "topGroupCount": 40,
+              "uniqueWinRate": 0.1111,
+              "topGroupRate": 0.1111,
+              "averageRank": 2.3528,
+              "placementScore": 0.3236,
+              "wilson": 0.2774,
+              "avgRounds": 71.41,
+              "avgDecisionMs": 2.78,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 1,
+                  "topGroupCount": 1,
+                  "uniqueWinRate": 0.0083,
+                  "topGroupRate": 0.0083,
+                  "averageRank": 2.5917,
+                  "placementScore": 0.2042
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 15,
+                  "topGroupCount": 15,
+                  "uniqueWinRate": 0.125,
+                  "topGroupRate": 0.125,
+                  "averageRank": 2.2417,
+                  "placementScore": 0.3792
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 24,
+                  "topGroupCount": 24,
+                  "uniqueWinRate": 0.2,
+                  "topGroupRate": 0.2,
+                  "averageRank": 2.225,
+                  "placementScore": 0.3875
+                }
+              },
+              "perMap": {
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 40,
+                  "topGroupCount": 40,
+                  "uniqueWinRate": 0.1111,
+                  "topGroupRate": 0.1111,
+                  "averageRank": 2.3528,
+                  "placementScore": 0.3236
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_greedy@v1",
+              "rating": 1609,
+              "ratingLo": 1601,
+              "ratingHi": 1617,
+              "games": 360,
+              "uniqueWins": 186,
+              "topGroupCount": 186,
+              "uniqueWinRate": 0.5167,
+              "topGroupRate": 0.5167,
+              "averageRank": 1.7111,
+              "placementScore": 0.6444,
+              "wilson": 0.5937,
+              "avgRounds": 62.88,
+              "avgDecisionMs": 1.36,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 64,
+                  "topGroupCount": 64,
+                  "uniqueWinRate": 0.5333,
+                  "topGroupRate": 0.5333,
+                  "averageRank": 1.6917,
+                  "placementScore": 0.6542
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 74,
+                  "topGroupCount": 74,
+                  "uniqueWinRate": 0.6167,
+                  "topGroupRate": 0.6167,
+                  "averageRank": 1.5667,
+                  "placementScore": 0.7167
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 48,
+                  "topGroupCount": 48,
+                  "uniqueWinRate": 0.4,
+                  "topGroupRate": 0.4,
+                  "averageRank": 1.875,
+                  "placementScore": 0.5625
+                }
+              },
+              "perMap": {
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 186,
+                  "topGroupCount": 186,
+                  "uniqueWinRate": 0.5167,
+                  "topGroupRate": 0.5167,
+                  "averageRank": 1.7111,
+                  "placementScore": 0.6444
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_mcts@v1",
+              "rating": 1191,
+              "ratingLo": 1176,
+              "ratingHi": 1212,
+              "games": 360,
+              "uniqueWins": 2,
+              "topGroupCount": 2,
+              "uniqueWinRate": 0.0056,
+              "topGroupRate": 0.0056,
+              "averageRank": 2.7472,
+              "placementScore": 0.1264,
+              "wilson": 0.096,
+              "avgRounds": 74.05,
+              "avgDecisionMs": 10.88,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.875,
+                  "placementScore": 0.0625
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.675,
+                  "placementScore": 0.1625
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 2,
+                  "topGroupCount": 2,
+                  "uniqueWinRate": 0.0167,
+                  "topGroupRate": 0.0167,
+                  "averageRank": 2.6917,
+                  "placementScore": 0.1542
+                }
+              },
+              "perMap": {
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 2,
+                  "topGroupCount": 2,
+                  "uniqueWinRate": 0.0056,
+                  "topGroupRate": 0.0056,
+                  "averageRank": 2.7472,
+                  "placementScore": 0.1264
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_parallax@v1",
+              "rating": 1795,
+              "ratingLo": 1777,
+              "ratingHi": 1816,
+              "games": 360,
+              "uniqueWins": 272,
+              "topGroupCount": 272,
+              "uniqueWinRate": 0.7556,
+              "topGroupRate": 0.7556,
+              "averageRank": 1.3,
+              "placementScore": 0.85,
+              "wilson": 0.8094,
+              "avgRounds": 63.95,
+              "avgDecisionMs": 608.45,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 83,
+                  "topGroupCount": 83,
+                  "uniqueWinRate": 0.6917,
+                  "topGroupRate": 0.6917,
+                  "averageRank": 1.3833,
+                  "placementScore": 0.8083
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 106,
+                  "topGroupCount": 106,
+                  "uniqueWinRate": 0.8833,
+                  "topGroupRate": 0.8833,
+                  "averageRank": 1.1333,
+                  "placementScore": 0.9333
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 83,
+                  "topGroupCount": 83,
+                  "uniqueWinRate": 0.6917,
+                  "topGroupRate": 0.6917,
+                  "averageRank": 1.3833,
+                  "placementScore": 0.8083
+                }
+              },
+              "perMap": {
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 272,
+                  "topGroupCount": 272,
+                  "uniqueWinRate": 0.7556,
+                  "topGroupRate": 0.7556,
+                  "averageRank": 1.3,
+                  "placementScore": 0.85
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_random@v1",
+              "rating": 1332,
+              "ratingLo": 1319,
+              "ratingHi": 1343,
+              "games": 360,
+              "uniqueWins": 25,
+              "topGroupCount": 25,
+              "uniqueWinRate": 0.0694,
+              "topGroupRate": 0.0694,
+              "averageRank": 2.4472,
+              "placementScore": 0.2764,
+              "wilson": 0.2327,
+              "avgRounds": 71.53,
+              "avgDecisionMs": 1.22,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 8,
+                  "topGroupCount": 8,
+                  "uniqueWinRate": 0.0667,
+                  "topGroupRate": 0.0667,
+                  "averageRank": 2.5667,
+                  "placementScore": 0.2167
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 8,
+                  "topGroupCount": 8,
+                  "uniqueWinRate": 0.0667,
+                  "topGroupRate": 0.0667,
+                  "averageRank": 2.3917,
+                  "placementScore": 0.3042
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 9,
+                  "topGroupCount": 9,
+                  "uniqueWinRate": 0.075,
+                  "topGroupRate": 0.075,
+                  "averageRank": 2.3833,
+                  "placementScore": 0.3083
+                }
+              },
+              "perMap": {
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 25,
+                  "topGroupCount": 25,
+                  "uniqueWinRate": 0.0694,
+                  "topGroupRate": 0.0694,
+                  "averageRank": 2.4472,
+                  "placementScore": 0.2764
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_threat@v1",
+              "rating": 1585,
+              "ratingLo": 1571,
+              "ratingHi": 1598,
+              "games": 360,
+              "uniqueWins": 165,
+              "topGroupCount": 165,
+              "uniqueWinRate": 0.4583,
+              "topGroupRate": 0.4583,
+              "averageRank": 1.7639,
+              "placementScore": 0.6181,
+              "wilson": 0.5669,
+              "avgRounds": 78.41,
+              "avgDecisionMs": 1.89,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 44,
+                  "topGroupCount": 44,
+                  "uniqueWinRate": 0.3667,
+                  "topGroupRate": 0.3667,
+                  "averageRank": 1.9667,
+                  "placementScore": 0.5167
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 62,
+                  "topGroupCount": 62,
+                  "uniqueWinRate": 0.5167,
+                  "topGroupRate": 0.5167,
+                  "averageRank": 1.625,
+                  "placementScore": 0.6875
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 59,
+                  "topGroupCount": 59,
+                  "uniqueWinRate": 0.4917,
+                  "topGroupRate": 0.4917,
+                  "averageRank": 1.7,
+                  "placementScore": 0.65
+                }
+              },
+              "perMap": {
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 165,
+                  "topGroupCount": 165,
+                  "uniqueWinRate": 0.4583,
+                  "topGroupRate": 0.4583,
+                  "averageRank": 1.7639,
+                  "placementScore": 0.6181
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_verdict@v2",
+              "rating": 1633,
+              "ratingLo": 1624,
+              "ratingHi": 1646,
+              "games": 360,
+              "uniqueWins": 150,
+              "topGroupCount": 150,
+              "uniqueWinRate": 0.4167,
+              "topGroupRate": 0.4167,
+              "averageRank": 1.6778,
+              "placementScore": 0.6611,
+              "wilson": 0.6107,
+              "avgRounds": 45.61,
+              "avgDecisionMs": 3.84,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 42,
+                  "topGroupCount": 42,
+                  "uniqueWinRate": 0.35,
+                  "topGroupRate": 0.35,
+                  "averageRank": 1.7333,
+                  "placementScore": 0.6333
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 67,
+                  "topGroupCount": 67,
+                  "uniqueWinRate": 0.5583,
+                  "topGroupRate": 0.5583,
+                  "averageRank": 1.4583,
+                  "placementScore": 0.7708
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 41,
+                  "topGroupCount": 41,
+                  "uniqueWinRate": 0.3417,
+                  "topGroupRate": 0.3417,
+                  "averageRank": 1.8417,
+                  "placementScore": 0.5792
+                }
+              },
+              "perMap": {
+                "whirlpool": {
+                  "games": 360,
+                  "uniqueWins": 150,
+                  "topGroupCount": 150,
+                  "uniqueWinRate": 0.4167,
+                  "topGroupRate": 0.4167,
+                  "averageRank": 1.6778,
+                  "placementScore": 0.6611
+                }
+              },
+              "provisional": false
+            }
+          ],
+          "audit": {
+            "encounterMatrix": {
+              "algo_field@v1": {
+                "algo_field@v1": 0,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_greedy@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 0,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_mcts@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 0,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_parallax@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 0,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_random@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 0,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 120
+              },
+              "algo_threat@v1": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 0,
+                "algo_verdict@v2": 120
+              },
+              "algo_verdict@v2": {
+                "algo_field@v1": 120,
+                "algo_greedy@v1": 120,
+                "algo_mcts@v1": 120,
+                "algo_parallax@v1": 120,
+                "algo_random@v1": 120,
+                "algo_threat@v1": 120,
+                "algo_verdict@v2": 0
+              }
+            },
+            "seatPlacementScore": {
+              "player_a": 0.4423,
+              "player_b": 0.5649,
+              "player_c": 0.4929
+            },
+            "leaveOneLineupOut": {
+              "algo_field@v1": 27,
+              "algo_greedy@v1": 15,
+              "algo_mcts@v1": 23,
+              "algo_parallax@v1": 18,
+              "algo_random@v1": 22,
+              "algo_threat@v1": 22,
+              "algo_verdict@v2": 16
+            }
+          }
         }
       }
     }

@@ -17,7 +17,7 @@ npm run stats-all
 
 ## 竞技场数据
 
-竞技场数据独立成链：对战记录在 `arena/matches.jsonl`（由 `rl/evaluation/round_robin.py` 累积，页面内评估控制台可网页发起跑批——标准模式跑模型与算法混合循环赛，其余三种模式跑该模式注册的算法，大逃杀可用 random-royale / echelon / apex / ark、歼灭可用 random-annihilation / shrinkroll / vortex / crucible / sovereign 组批）。四种模式都可选各自模式的虚拟随机图（`random` / `random-annihilation` / `random-simultaneous` / `random-royale`，与算法同名者属不同命名空间），随机图对局按地图 id 归入对应模式榜单。跑批依赖仓库里的 `round_robin.py`、`script/generateArena*.mjs` 与本地模型，属本地开发功能，Docker 镜像不携带，线上相关写接口返回 `501 arena_eval_unavailable`。榜单与统计由 `npm run arena-leaderboard` / `npm run arena-stats` 生成，详见 [rl/README.md](../rl/README.md)「AI 竞技场」节。
+竞技场数据独立成链：对战记录在 `arena/matches.jsonl`（由 `rl/evaluation/round_robin.py` 累积，页面内评估控制台可网页发起跑批——标准模式跑模型与算法混合循环赛，人数可切三人（CLI 为 `--player-count 3`），其余三种模式跑该模式注册的算法，大逃杀可用 random-royale / echelon / apex / ark、歼灭可用 random-annihilation / shrinkroll / vortex / crucible / sovereign 组批）。四种模式都可选各自模式的虚拟随机图（`random` / `random-annihilation` / `random-simultaneous` / `random-royale`，与算法同名者属不同命名空间），随机图对局按地图 id 归入对应模式榜单。三人对局与双人分池：榜单 JSON 把 `playerCount: 3` 的记录按 `mode × rulesVersion` 落到 `divisions`，双人仍按 `mode` 分池，页面在标准模式下用「双人 / 三人」二级页签切换。两池评分互相独立——双人沿用 Bradley-Terry（平局记 0.5），三人用并列感知 Plackett-Luce（`rankGroups` 保留并列名次，叠加 L2 先验），以六局双向 superblock 为计分单元，残块只计数不记分。跑批依赖仓库里的 `round_robin.py`、`script/generateArena*.mjs` 与本地模型，属本地开发功能，Docker 镜像不携带，线上相关写接口返回 `501 arena_eval_unavailable`。榜单与统计由 `npm run arena-leaderboard` / `npm run arena-stats` 生成，详见 [rl/README.md](../rl/README.md)「AI 竞技场」节。
 
 ## 性能基线
 

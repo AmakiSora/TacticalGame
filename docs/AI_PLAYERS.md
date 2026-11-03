@@ -51,6 +51,8 @@ python rl/evaluate.py --model rl/models/model.zip
 
 **算法按对局模式注册，不同模式不能混用**：每个算法在注册表（`algorithms/registry.mjs` 的 `ALGORITHM_META.modes`）声明支持的模式，大厅添加、命令行运行器与竞技场评估都会按此校验；前端「算法类型」下拉只列出当前对局模式可用的算法。
 
+**参赛人数也是注册表能力**：`ALGORITHM_META.playerCounts` 决定算法能否进入三人竞技场。标准模式的 7 个算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）声明 `[2, 3]`，可跑三人批；其余模式的算法均为 `[2]`。三人批只收标准模式算法，RL 模型是单对手观测编码，不参评。
+
 当前内置算法（未标注者为标准模式）。每条只写定位，实测战绩与评分以 `/arena.html` 榜单为准，实现细节见各自档案：
 
 - **贪心算法（Greedy）**：按固定优先级选择动作——可击杀目标 > 治疗受伤友军 > 爆破障碍 > 战略部署 > 向目标移动。[档案](../algorithms/docs/algorithms/greedy.md)

@@ -15,7 +15,7 @@
   <header>
     <div class="brand-block">
       <h1>AI 竞技场 <span class="version-badge"></span></h1>
-      <div class="page-subtitle">按玩法模式分榜 · RL 模型 × 内置算法循环赛 · Bradley-Terry 评分</div>
+      <div class="page-subtitle">按玩法模式分榜 · 标准模式双人 Bradley-Terry / 三人 Plackett-Luce · RL 模型与内置算法循环赛</div>
     </div>
     <nav class="page-nav" aria-label="站点导航">
       <a href="/">首页</a>
@@ -112,7 +112,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="hint">评分基于当前模式内全部参评对局的 Bradley-Terry 最大似然估计（每对附加 1 局虚拟平局先验），映射到 Elo 刻度（均值 1500）；±值为分层 bootstrap 95% 置信区间半径。Wilson 下界 = (胜 + 0.5·平) 的 95% 置信下限，供小样本参考。平均决策耗时 = 每次决策（含被拒重选与计划提交）的平均墙钟时长，不含引擎结算，仅 2026-10-25 起的新对局携带计时，旧对局显示 —。RL 模型与规则算法在同一模式内互打评分，可直接跨类型比较；不同模式规则不同，评分互不混算。点击参与者行查看对位明细。</p>
+      <p class="hint">双人榜评分基于当前模式内全部参评对局的 Bradley-Terry 最大似然估计（每对附加 1 局虚拟平局先验），映射到 Elo 刻度（均值 1500）；三人榜按每局并列名次做并列感知 Plackett-Luce（L2 先验），只计完整六局双向 superblock，与双人榜分池。±值为分层 bootstrap 95% 置信区间半径（三人按 superblock 聚类重采样）。Wilson 下界 = (胜 + 0.5·平) 的 95% 置信下限，供小样本参考。平均决策耗时 = 每次决策（含被拒重选与计划提交）的平均墙钟时长，不含引擎结算，仅 2026-10-25 起的新对局携带计时，旧对局显示 —。RL 模型与规则算法在同一模式内互打评分，可直接跨类型比较；不同模式规则不同，评分互不混算。点击参与者行查看对位明细。</p>
     </section>
 
     <section class="board-stack">

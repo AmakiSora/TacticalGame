@@ -6,6 +6,20 @@
 >
 > **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
 
+## 3.9.0（2026-11-03）— 标准模式三人竞技场
+
+### 评估口径
+
+- 算法注册表新增 `playerCounts` 能力声明。全部 7 个标准模式算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）均声明 `[2, 3]`；非标准模式算法不参与三人标准局。进程内 decide 通道仍按声明校验，不能只靠界面过滤把未声明人数的算法送进三人局。
+- 三人评分与双人 Bradley-Terry 完全分池：每个完整 superblock 为同一阵容、地图与种子下的正反方向各三局座位轮换，每人每个出生座位两次、先手两次，任意两者相对行动先后各三次。只有完整六局块进入并列感知 Plackett-Luce（含 L2 先验），残块隔离；同存活状态且同裁决分保持并列，不以伤害、座位或种子破平。
+- 三人榜使用完整 superblock cluster bootstrap；7 个标准算法的实现本身未改，本版只新增可参评人数与实际三人跑批能力。
+
+### 测试与验证
+
+- 三人静态图 `multiplayer-ring` 与随机图各跑完整六局：均 6/6 完赛、1 个完整 superblock、0 残块、0 批次失败；随机图六局共享同一地图种子。排名与完整块指标由 `script/multiplayerRating.mjs` 从真实记录生成，详见 [RL 日志](../../rl/docs/RELEASE_NOTES.md)。
+- 新增 `mcts` / `field` / `verdict@v2` / `parallax` 各在 A/B/C 三个出生座位实战一局（共 12 局）：全部正常终局、0 暴露动作拒绝、0 回合提交兜底；另跑 `mcts / verdict / parallax` 六局完整 superblock 互打，同样 0 失败。连同原三人六局，7 个标准算法均有真实三人整局记录。
+- `npm run build`、`npm run check-version` 通过；全量 Vitest **147 文件 / 1729 例**、RL pytest **336 passed / 13 skipped**。新增回归会逐个运行 7 个标准算法的第三座位整回合。
+
 ## 3.8.21（2026-10-31）— verdict v2 破墙路径场
 
 ### 算法实现

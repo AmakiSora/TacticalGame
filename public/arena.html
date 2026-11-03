@@ -93,7 +93,7 @@
       <div class="table-wrap">
         <table id="model-table" class="data-table">
           <thead>
-            <tr>
+            <tr id="model-head-row">
               <th data-sort="rank">#</th>
               <th data-sort="short">参与者</th>
               <th data-sort="version">版本</th>
@@ -122,7 +122,7 @@
         </div>
         <div id="detail-body" class="empty-block">未选择参与者</div>
       </section>
-      <section class="panel">
+      <section class="panel" id="matrix-panel">
         <div class="panel-heading">
           <h2>对位矩阵</h2>
           <span>行参与者对列参与者的胜率（平局计 0.5）· 悬停查看比分</span>
@@ -415,6 +415,11 @@
           </label>
           <button id="eval-save-token" type="button" class="ghost">保存 Token</button>
           <span id="eval-token-state" class="eval-hint"></span>
+        </div>
+        <div class="eval-field">
+          <span class="eval-label">参赛人数（双人 Bradley-Terry 榜 / 三人独立 Plackett-Luce 榜）</span>
+          <div id="eval-players" class="eval-chip-list eval-mode-list eval-player-list"></div>
+          <div id="eval-player-hint" class="eval-hint"></div>
         </div>
         <div class="eval-field">
           <span class="eval-label">对局模式（不同模式独立跑批、独立榜单）</span>

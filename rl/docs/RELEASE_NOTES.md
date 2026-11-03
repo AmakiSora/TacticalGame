@@ -3,6 +3,14 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-11-03 · 标准模式三人评估跑批（3.9.0）
+
+**一句话**：评估链路新增 `--player-count 3` 的完整标准模式三人分支。`local-worker.ts` 接受 `player_a/b/c`，按 `seatOrder`、`firstSeat` 与 `gameSeed` 通过大厅座位表确定性开局；`evaluate_cross.py` 动态驱动三座位并为每局写入 `rankGroups`、`manifestHash` 和轮换 `schedule`；`round_robin.py` 对每个阵容 × 地图生成正反各三局的六局 superblock，冻结 manifest 并根据已跑前缀续跑；`script/multiplayerRating.mjs` 只接收完整块，并列感知 PL 评分并按 superblock 分层 bootstrap。三人榜作为 `divisions` 与双人 BT 的 `modes` 完全隔离，控制台按人数过滤算法、地图和模型，局数强制为 6 的倍数。现有 RL 模型是单对手观测编码，明确不参加三人局；全部 7 个标准模式算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）均声明并验证支持 3 人。
+
+**名次与公平性**：`rankGroups` 由引擎终局或超时裁决快照的存活状态 + 裁决总分重建，同分不破平；每个 superblock 内每人每个出生座位两次、先手两次，任意两者相对行动先后各三次。残缺块只计入隔离数，不进入评分或 bootstrap；全并列局不提供强弱信息。
+
+**测试与验证**：`local-worker.test.ts` 覆盖三座位开局、C 座合法整回合、同种子复现、非法 seatOrder，并逐个验证全部 7 个标准算法的第三座位整回合；`test_three_player_evaluation.py` 锁定六局均衡、manifest 前缀续跑、三人 reset 与并列名次；`multiplayerRating.test.ts` 11 例覆盖并列、有限评分、残块隔离、bootstrap 复现、座位轮换不变量及执行器真实 `blockId` 形状；榜单/API 测试覆盖三人记录与双人池分离、残块不评分、地图/算法人数能力与启动校验。真实引擎静态图与随机图各 6 局均 0 失败、completeSuperblocks=1、quarantined=0；`mcts` / `field` / `verdict@v2` / `parallax` 另各在三个出生座位实战一局，共 12 局全部正常终局且零非法动作；`mcts / verdict / parallax` 六局完整 superblock 互打也零失败。浏览器验证三人榜单列集、控制台人数联动、模型禁用、三人地图过滤、至少 3 算法和 6 局步长。
+
 ## 2026-10-31 · 评估累积文件改为跨进程加锁追加（开发分支，未定版）
 
 **一句话**：`--jobs 8` 的跑批结束后 `arena/matches.jsonl` 里有 5 行只剩尾部，榜单页因此显示「已加载（5 条警告）」。本机压测复现了根因——Windows 上多进程并发 append 同一文件会丢行/坏行（8 进程各 300 行：裸写只剩 1781 行、76 行非法；单进程 300 行完好，4 进程就已丢 165 行）。`evaluate_cross.py` 新增 `append_jsonl()`：用同目录 `*.lock`（Windows `msvcrt.locking`、其他平台 `flock`）串行化整行写入并 `fsync`，累积文件与批次明细都改走它；同样 8 进程压测变成 2400 行、0 非法。锁文件由 `.gitignore` 的 `arena/*.lock` 忽略。

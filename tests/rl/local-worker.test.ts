@@ -12,7 +12,7 @@ interface WorkerState {
     balance: { maxTurns: number | null; actionsPerTurn: number };
     units: Record<string, unknown>;
   };
-  units: Array<{ owner: string }>;
+  units: Array<{ id: string; owner: string }>;
   headquarters: Record<string, { owner: string; q: number; r: number }>;
   rngState?: unknown;
 }
@@ -157,6 +157,92 @@ describe('local engine worker mode-specific random maps', () => {
     await expect(handleCommand({
       cmd: 'reset', mapId: 'random-royale', random: { seed: 'bad', noTurnLimit: 'yes' },
     })).rejects.toThrow('noTurnLimit');
+  });
+});
+
+describe('local engine worker three-player standard games', () => {
+  it('initializes three seats with an explicit spawn order and first player', async () => {
+    const state = await handleCommand({
+      cmd: 'reset', mapId: 'multiplayer-ring', playerCount: 3,
+      seatOrder: ['player_c', 'player_a', 'player_b'], firstSeat: 1, gameSeed: 'three-seat',
+    }) as WorkerState & { turn: { currentPlayerId: string; turnOrder: string[] } };
+    expect(state.phase).toBe('active');
+    expect(state.config.mode).toBe('standard');
+    expect(Object.keys(state.headquarters).sort()).toEqual(['player_a', 'player_b', 'player_c']);
+    expect(state.turn.turnOrder).toEqual(['player_a', 'player_b', 'player_c']);
+    expect(state.turn.currentPlayerId).toBe('player_a');
+    expect(state.headquarters.player_c).toMatchObject({ q: 8, r: 0 });
+  });
+
+  it('lets the third seat decide and apply a legal turn', async () => {
+    await handleCommand({
+      cmd: 'reset', mapId: 'multiplayer-ring', playerCount: 3,
+      seatOrder: ['player_a', 'player_b', 'player_c'], firstSeat: 0, gameSeed: 7,
+    });
+    await handleCommand({ cmd: 'apply', owner: 'player_a', action: { type: 'end_turn' } });
+    await handleCommand({ cmd: 'apply', owner: 'player_b', action: { type: 'end_turn' } });
+    for (let step = 0; step < 100; step++) {
+      const result = await handleCommand({ cmd: 'decide', owner: 'player_c', algorithm: 'greedy' }) as DecideResult;
+      if (result.endTurn) break;
+      expect(step).toBeLessThan(99);
+      await handleCommand({
+        cmd: 'apply', owner: 'player_c',
+        action: { type: result.action!.type, ...result.action!.payload },
+      });
+    }
+    const state = await handleCommand({ cmd: 'apply', owner: 'player_c', action: { type: 'end_turn' } }) as {
+      turn: { currentPlayerId: string };
+    };
+    expect(state.turn.currentPlayerId).toBe('player_a');
+  });
+
+  for (const algorithm of ['threat', 'greedy', 'random', 'field', 'mcts', 'verdict', 'parallax']) {
+    it(`${algorithm} plays a legal third-seat turn`, async () => {
+      await handleCommand({
+        cmd: 'reset', mapId: 'multiplayer-ring', playerCount: 3,
+        seatOrder: ['player_a', 'player_b', 'player_c'], firstSeat: 0, gameSeed: 11,
+      });
+      await handleCommand({ cmd: 'apply', owner: 'player_a', action: { type: 'end_turn' } });
+      await handleCommand({ cmd: 'apply', owner: 'player_b', action: { type: 'end_turn' } });
+      for (let step = 0; step < 100; step++) {
+        const result = await handleCommand({ cmd: 'decide', owner: 'player_c', algorithm }) as DecideResult;
+        if (result.endTurn) return;
+        await handleCommand({
+          cmd: 'apply', owner: 'player_c',
+          action: { type: result.action!.type, ...result.action!.payload },
+        });
+      }
+      throw new Error(`${algorithm} did not end its third-seat turn`);
+    });
+  }
+
+  it('reproduces the same three-player opening for the same game seed', async () => {
+    const command = {
+      cmd: 'reset', mapId: 'random', playerCount: 3,
+      random: { seed: 'three-random', startingUnitCount: 2 },
+      seatOrder: ['player_b', 'player_c', 'player_a'], firstSeat: 2, gameSeed: 'repeatable',
+    };
+    const first = await handleCommand(command) as WorkerState & { turn: unknown };
+    const second = await handleCommand(command) as WorkerState & { turn: unknown };
+    expect(mapFingerprint(second)).toBe(mapFingerprint(first));
+    expect(second.turn).toEqual(first.turn);
+    expect(second.units.map(({ id: _id, ...unit }) => unit)).toEqual(
+      first.units.map(({ id: _id, ...unit }) => unit),
+    );
+    const headquarters = (state: WorkerState) => Object.fromEntries(
+      Object.entries(state.headquarters).map(([seat, hq]) => [seat, { ...hq, id: undefined }]),
+    );
+    expect(headquarters(second)).toEqual(headquarters(first));
+    expect(first.config.spawnSlots).toHaveLength(3);
+  });
+
+  it('rejects unsupported three-player maps and malformed seat plans', async () => {
+    await expect(handleCommand({ cmd: 'reset', mapId: 'default', playerCount: 3 })).rejects.toThrow('不支持');
+    await expect(handleCommand({
+      cmd: 'reset', mapId: 'multiplayer-ring', playerCount: 3,
+      seatOrder: ['player_a', 'player_b', 'player_b'],
+    })).rejects.toThrow('seatOrder');
+    await expect(handleCommand({ cmd: 'reset', mapId: 'default', playerCount: 4 })).rejects.toThrow('playerCount');
   });
 });
 

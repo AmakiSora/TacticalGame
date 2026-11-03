@@ -44,6 +44,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import itertools
 import json
 import re
@@ -87,6 +88,7 @@ SEC_PER_GAME_ALGO_PLAN = 20.0
 # evaluate_cross.py 每局完成的进度行前缀：实时透传到评估控制台，其余输出仅在
 # 批次失败时回显尾部。字面量与前者保持一致（脚本间不经 import 共享）。
 GAME_PROGRESS_PREFIX = "进度|"
+THREE_PLAYER_RULES_VERSION = "standard-3p-v1"
 
 
 def parse_args():
@@ -97,6 +99,8 @@ def parse_args():
                         help="对局模式（默认 auto：按所选地图的 mode 字段推断；同一批不能混模式）")
     parser.add_argument("--games", type=int, default=24,
                         help="每对参与者 × 地图的目标总局数（含已跑局数，默认 24）")
+    parser.add_argument("--player-count", type=int, choices=(2, 3), default=2,
+                        help="参赛人数；三人仅标准模式内置算法，每阵容局数必须为 6 的倍数")
     parser.add_argument("--stats-file", default=None,
                         help=f"累积 JSONL 路径（默认 {DEFAULT_STATS_FILE}）")
     parser.add_argument("--salt", default=None,
@@ -175,7 +179,7 @@ def resolve_mode(root: Path, maps: list[str], requested: str) -> str:
     return mode
 
 
-def discover_algorithms(root: Path, mode: str = "standard") -> list[tuple[str, str]]:
+def discover_algorithms(root: Path, mode: str = "standard", player_count: int = 2) -> list[tuple[str, str]]:
     """读取 algorithms/registry.mjs 的注册算法及当前版本（经 node，避免手工维护第二份名单）。
 
     返回 (注册名, 版本) 对，两者拼成竞技场参与者 id ``algo_<注册名>@<版本>``。
@@ -184,8 +188,10 @@ def discover_algorithms(root: Path, mode: str = "standard") -> list[tuple[str, s
     """
     registry_url = (root / "algorithms" / "registry.mjs").as_posix()
     mode_literal = json.dumps(mode)
+    count_literal = json.dumps(player_count)
     script = (f"import('file:///{registry_url}').then(r => console.log("
-              f"r.listAlgorithmInfo().filter(i => i.modes.includes({mode_literal}))"
+              f"r.listAlgorithmInfo().filter(i => i.modes.includes({mode_literal})"
+              f" && (i.playerCounts || [2]).includes({count_literal}))"
               ".map(i => i.name + '@' + i.version).join(',')))")
     result = subprocess.run(
         ["node", "--input-type=module", "-e", script],
@@ -204,12 +210,13 @@ def discover_algorithms(root: Path, mode: str = "standard") -> list[tuple[str, s
     return pairs
 
 
-def resolve_algorithms(root: Path, raw: str | None, mode: str = "standard") -> tuple[list[tuple[str, str]], str | None]:
+def resolve_algorithms(root: Path, raw: str | None, mode: str = "standard",
+                       player_count: int = 2) -> tuple[list[tuple[str, str]], str | None]:
     """把 --algorithms 参数解析成 (注册名, 版本) 清单；node 不可用时降级为空清单并给出警告。"""
     if raw is not None and raw.strip().lower() in ("none", "off", ""):
         return [], None
     try:
-        registered = discover_algorithms(root, mode)
+        registered = discover_algorithms(root, mode, player_count)
     except (OSError, RuntimeError) as exc:
         return [], f"无法读取算法注册表（node 不可用？）：{exc}；本轮不带算法参与者。"
     if raw is None:
@@ -358,6 +365,153 @@ def build_command(python: str, script: Path, spec_a: str, spec_b: str,
     return command
 
 
+def map_supports_player_count(root: Path, map_id: str, player_count: int) -> bool:
+    if map_id in RANDOM_MAP_MODES.values():
+        return True
+    try:
+        config = json.loads((root / "maps" / f"{map_id}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return str(player_count) in (config.get("layouts") or {})
+
+
+def _manifest_hash(document: dict) -> str:
+    payload = json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def build_three_player_manifest(ordered: list[tuple[str, str]], map_id: str,
+                                seed_prefix: str, target_games: int) -> dict:
+    """冻结一个阵容 × 地图的全部六局双向轮换 superblock。"""
+    if len(ordered) != 3 or target_games <= 0 or target_games % 6:
+        raise ValueError("三人 manifest 需要三个不同参与者，且局数为 6 的倍数")
+    names = [name for _spec, name in ordered]
+    if len(set(names)) != 3:
+        raise ValueError("三人正式阵容不允许同一参与者重复占座")
+    lineup_id = "lineup-" + hashlib.sha256("\0".join(names).encode("utf-8")).hexdigest()[:12]
+    document = {
+        "schema": 1,
+        "mode": "standard",
+        "playerCount": 3,
+        "rulesVersion": THREE_PLAYER_RULES_VERSION,
+        "map": map_id,
+        "lineup": names,
+        "lineupId": lineup_id,
+        "seedPrefix": seed_prefix,
+        "targetGames": target_games,
+        "games": [],
+    }
+    rotations = ((0, 1, 2), (1, 2, 0), (2, 0, 1))
+    for block_index in range(target_games // 6):
+        block_seed = f"{seed_prefix}-sb{block_index + 1}"
+        superblock_id = f"{lineup_id}:{map_id}:{block_seed}"
+        for direction, order in (("forward", (0, 1, 2)), ("reverse", (0, 2, 1))):
+            for rotation in rotations:
+                seat_order = [names[order[index]] for index in rotation]
+                document["games"].append({
+                    "gameIndex": len(document["games"]) + 1,
+                    "lineupId": lineup_id,
+                    "superblockId": superblock_id,
+                    "blockId": f"{superblock_id}:{direction}",
+                    "direction": direction,
+                    "rotation": rotations.index(rotation),
+                    "seatOrder": seat_order,
+                    "firstSeat": 0,
+                    "mapSeed": block_seed if map_id in RANDOM_MAP_MODES.values() else None,
+                    "gameSeed": block_seed,
+                })
+    document["manifestHash"] = _manifest_hash(document)
+    for game in document["games"]:
+        game["manifestHash"] = document["manifestHash"]
+    return document
+
+
+def count_three_player_existing(stats_file: Path) -> dict[tuple, list[dict]]:
+    records: dict[tuple, list[dict]] = {}
+    if not stats_file.exists():
+        return records
+    for line in stats_file.read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        players = record.get("players")
+        if record.get("playerCount") != 3 or not isinstance(players, dict) or len(players) != 3:
+            continue
+        names = tuple(sorted(str(name) for name in players.values()))
+        key = (str(record.get("map", "")),) + names
+        records.setdefault(key, []).append(record)
+    return records
+
+
+def plan_three_player_tasks(ordered: list[tuple[str, str]], maps: list[str], salt: str,
+                            existing: dict[tuple, list[dict]], target_games: int,
+                            stats_file: Path) -> tuple[list[dict], int]:
+    if target_games <= 0 or target_games % 6:
+        raise ValueError("三人每阵容 × 地图的目标局数必须为 6 的倍数")
+    tasks: list[dict] = []
+    skipped_games = 0
+    manifest_dir = stats_file.parent / "details" / "manifests"
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    for map_index, map_id in enumerate(maps):
+        for indices in itertools.combinations(range(len(ordered)), 3):
+            trio = [ordered[index] for index in indices]
+            names = [name for _spec, name in trio]
+            key = (map_id, *sorted(names))
+            previous = existing.get(key, [])
+            need = max(0, target_games - len(previous))
+            if need <= 0:
+                skipped_games += len(previous)
+                continue
+            seed_prefix = f"rr-{salt}-{map_index}-{'-'.join(map(str, indices))}"
+            manifest = build_three_player_manifest(trio, map_id, seed_prefix, target_games)
+            current = [r for r in previous if r.get("manifestHash") == manifest["manifestHash"]]
+            current_indexes = sorted((r.get("schedule") or {}).get("gameIndex") for r in current)
+            if current_indexes != list(range(1, len(current) + 1)):
+                raise ValueError(f"{map_id} / {', '.join(names)} 的 manifest 续跑记录不是连续前缀")
+            if not current and need % 6:
+                need += 6 - need % 6
+            pending = manifest["games"][len(current):len(current) + need]
+            if not pending:
+                skipped_games += len(previous)
+                continue
+            manifest_path = manifest_dir / f"{manifest['manifestHash']}.json"
+            serialized = json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
+            if manifest_path.exists() and manifest_path.read_text(encoding="utf-8") != serialized:
+                raise ValueError(f"manifest 文件与待跑计划不一致：{manifest_path}")
+            manifest_path.write_text(serialized, encoding="utf-8")
+            schedule = {key: value for key, value in manifest.items() if key != "games"}
+            schedule["games"] = pending
+            schedule_path = manifest_dir / (
+                f"{manifest['manifestHash']}.{pending[0]['gameIndex']}-{pending[-1]['gameIndex']}.pending.json")
+            schedule_path.write_text(json.dumps(schedule, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            tasks.append({
+                "specs": [spec for spec, _name in trio],
+                "names": names,
+                "map": map_id,
+                "games": len(pending),
+                "schedule_file": schedule_path,
+                "manifestHash": manifest["manifestHash"],
+                "seed_prefix": seed_prefix,
+            })
+    return tasks, skipped_games
+
+
+def build_three_player_command(python: str, script: Path, task: dict, stats_file: Path,
+                               device: str) -> list[str]:
+    command = [python, str(script)]
+    for seat, spec, name in zip(("a", "b", "c"), task["specs"], task["names"]):
+        command += [f"--player-{seat}", spec, f"--name-{seat}", name]
+    command += [
+        "--games", str(task["games"]), "--map", task["map"],
+        "--schedule-file", str(task["schedule_file"]),
+        "--stats-file", str(stats_file), "--seed-prefix", task["seed_prefix"],
+        "--device", device,
+    ]
+    return command
+
+
+
 def estimate_batch_seconds(task: dict, counts: dict, durations: dict,
                            map_avgs: dict[str, float], mode: str) -> float:
     """逐批次预估耗时（秒）：模型批保持常量；纯算法批单局耗时按
@@ -466,6 +620,76 @@ def run_task(command: list[str], label: str, games: int, progress: Progress,
     progress.report(task_index, label, ok, games if ok else 0, duration, tail if not ok else "")
 
 
+def run_three_player(args, root: Path, maps: list[str], mode: str, stats_file: Path) -> int:
+    if mode != "standard":
+        print("错误：三人竞技场当前仅支持 standard 模式。", file=sys.stderr)
+        return 1
+    if args.models and args.models.strip().lower() not in ("none", "off"):
+        print("错误：三人竞技场不支持现有 RL 模型，请使用 --models none。", file=sys.stderr)
+        return 1
+    unsupported = [map_id for map_id in maps if not map_supports_player_count(root, map_id, 3)]
+    if unsupported:
+        print(f"错误：以下地图没有三人布局：{', '.join(unsupported)}", file=sys.stderr)
+        return 1
+    try:
+        algorithm_infos, warning = resolve_algorithms(root, args.algorithms, mode, 3)
+        if warning:
+            print(f"警告：{warning}")
+        participants = [
+            (f"algo:{name}@{version}", f"algo_{name}@{version}")
+            for name, version in algorithm_infos
+        ]
+        existing = count_three_player_existing(stats_file)
+        salt = args.salt or f"{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
+        tasks, skipped = plan_three_player_tasks(
+            sorted(participants, key=lambda part: part[1]), maps, salt, existing,
+            args.games, stats_file)
+    except (ValueError, RuntimeError) as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        return 1
+    if len(participants) < 3:
+        print(f"错误：三人参评算法不足 3 个（当前 {len(participants)} 个）。", file=sys.stderr)
+        return 1
+    print(f"对局模式：standard / 三人；规则版本：{THREE_PLAYER_RULES_VERSION}")
+    print(f"参评算法：{', '.join(name for _spec, name in participants)}")
+    print(f"地图池：{', '.join(maps)}；每阵容 × 每图 {args.games} 局（六局双向 superblock）")
+    print(f"seed 盐：{salt}；manifest：{stats_file.parent / 'details' / 'manifests'}")
+    total_games = sum(task["games"] for task in tasks)
+    print(f"任务：{len(tasks)} 个阵容批次，待跑 {total_games} 局（已完成 {skipped} 局）")
+    estimates = [TASK_OVERHEAD_SEC_ALGO + task["games"] * SEC_PER_GAME_ALGO_SEQUENTIAL * 1.5
+                 for task in tasks]
+    if not tasks:
+        print("所有目标局数已达成，无需补跑。")
+        return 0
+    if args.dry_run:
+        for task, estimate in zip(tasks, estimates):
+            print(f"  {' vs '.join(task['names'])} @ {task['map']}：补 {task['games']} 局，"
+                  f"manifest={task['manifestHash'][:12]}，预估约 {format_eta(estimate)}")
+        return 0
+    python = resolve_python(root)
+    script = root / "rl" / "evaluation" / "evaluate_cross.py"
+    progress = Progress(len(tasks), estimates, args.jobs)
+    commands = [
+        (build_three_player_command(python, script, task, stats_file, args.device),
+         f"{' vs '.join(task['names'])} @ {task['map']}", task["games"])
+        for task in tasks
+    ]
+    started = time.monotonic()
+    if args.jobs <= 1:
+        for index, (command, label, games) in enumerate(commands):
+            run_task(command, label, games, progress, index)
+    else:
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            futures = [pool.submit(run_task, command, label, games, progress, index)
+                       for index, (command, label, games) in enumerate(commands)]
+            for future in as_completed(futures):
+                future.result()
+    print(f"\n===== 总结 =====\n完成批次 {progress.done}/{progress.total}，新增 {progress.games} 局，"
+          f"失败 {progress.failed} 批，总用时 {format_eta(time.monotonic() - started)}。")
+    print("刷新排行榜数据：npm run arena-leaderboard")
+    return 1 if progress.failed else 0
+
+
 def main():
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -483,6 +707,9 @@ def main():
     except ValueError as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 1
+
+    if args.player_count == 3:
+        return run_three_player(args, root, maps, mode, stats_file)
 
     if mode == "standard":
         included, excluded = discover_models(models_dir)

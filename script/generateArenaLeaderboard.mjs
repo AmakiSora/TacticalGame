@@ -27,6 +27,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { wilsonLower, round2, round4 } from './generateStats.mjs';
 import { listAlgorithmInfo, listHistoricalAlgorithmInfo, algorithmVersionedId } from '../algorithms/registry.mjs';
 import { MODEL_STATUS_BY_VERSION, RETIRED_VERSIONS } from './modelStatus.mjs';
+import { buildMultiplayerLeague } from './multiplayerRating.mjs';
 
 export const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_DIR = dirname(SCRIPT_DIR);
@@ -264,17 +265,67 @@ function registryAlgorithms(registry, algorithms) {
       description: info.description, version: info.version,
       historical: Boolean(info.historical),
       modes: Array.isArray(info.modes) && info.modes.length ? info.modes : ['standard'],
+      playerCounts: Array.isArray(info.playerCounts) && info.playerCounts.length ? info.playerCounts : [2],
     });
   }
 }
 
 /** matches.jsonl 行的 per-seat 数值字段（decisionSec/decisionCount 等）→ 数值表；缺失记 null。 */
-function numericSeatMap(value) {
-  return ['player_a', 'player_b'].reduce((o, seat) => {
+function numericSeatMap(value, seats = ['player_a', 'player_b']) {
+  return seats.reduce((o, seat) => {
     const v = value?.[seat];
     o[seat] = Number.isFinite(v) ? v : null;
     return o;
   }, {});
+}
+
+const MULTIPLAYER_SEATS = ['player_a', 'player_b', 'player_c'];
+
+function normalizeMultiplayerMatch(record, registry, mapModes, line) {
+  const players = record.players;
+  if (record.playerCount !== 3 || Object.keys(players).sort().join('|') !== [...MULTIPLAYER_SEATS].sort().join('|')) {
+    return { warning: `line ${line}: three-player match requires player_a/player_b/player_c` };
+  }
+  const names = MULTIPLAYER_SEATS.map(seat => players[seat]);
+  if (names.some(id => typeof id !== 'string' || !registry.has(id))) {
+    return { warning: `line ${line}: unknown three-player participant` };
+  }
+  if (new Set(names).size !== 3 || names.some(id => {
+    const meta = registry.get(id);
+    return meta.kind !== 'algorithm' || !meta.playerCounts?.includes(3);
+  })) {
+    return { warning: `line ${line}: three-player lineup must contain three distinct eligible algorithms` };
+  }
+  const flat = Array.isArray(record.rankGroups) ? record.rankGroups.flat() : [];
+  if (!Array.isArray(record.rankGroups) || record.rankGroups.some(group => !Array.isArray(group) || group.length === 0)
+    || flat.length !== 3 || new Set(flat).size !== 3 || flat.some(id => !names.includes(id))) {
+    return { warning: `line ${line}: rankGroups must partition the three participants` };
+  }
+  const schedule = record.schedule;
+  if (!schedule || typeof schedule.manifestHash !== 'string' || schedule.manifestHash !== record.manifestHash
+    || typeof schedule.superblockId !== 'string' || typeof schedule.lineupId !== 'string') {
+    return { warning: `line ${line}: missing or inconsistent three-player schedule` };
+  }
+  const map = typeof record.map === 'string' ? record.map : 'unknown';
+  const mode = mapModes.get(map) ?? 'standard';
+  if (mode !== 'standard') return { warning: `line ${line}: three-player rating currently supports standard mode only` };
+  return {
+    match: {
+      ts: record.ts ?? null,
+      map,
+      mode,
+      players: { ...players },
+      playerCount: 3,
+      rulesVersion: typeof record.rulesVersion === 'string' ? record.rulesVersion : 'standard-3p-v1',
+      rankGroups: record.rankGroups.map(group => [...group]),
+      schedule: structuredClone(schedule),
+      manifestHash: record.manifestHash,
+      rounds: Number.isFinite(record.rounds) ? record.rounds : null,
+      seed: typeof record.seed === 'string' ? record.seed : null,
+      decisionSec: numericSeatMap(record.decisionSec, MULTIPLAYER_SEATS),
+      decisionCount: numericSeatMap(record.decisionCount, MULTIPLAYER_SEATS),
+    },
+  };
 }
 
 /**
@@ -283,11 +334,12 @@ function numericSeatMap(value) {
  */
 export function loadMatches(statsFile, registry, mapModes = new Map()) {
   const matches = [];
+  const multiplayerMatches = [];
   const warnings = [];
   let retiredDropped = 0;
   if (!existsSync(statsFile)) {
     warnings.push(`stats file not found: ${statsFile}`);
-    return { matches, warnings, retiredDropped };
+    return { matches, multiplayerMatches, warnings, retiredDropped };
   }
   const lines = readFileSync(statsFile, 'utf8').split('\n');
   for (let idx = 0; idx < lines.length; idx++) {
@@ -301,6 +353,12 @@ export function loadMatches(statsFile, registry, mapModes = new Map()) {
       continue;
     }
     const players = record?.players;
+    if (record?.playerCount === 3 || (players && typeof players === 'object' && Object.keys(players).length === 3)) {
+      const normalized = normalizeMultiplayerMatch(record, registry, mapModes, idx + 1);
+      if (normalized.warning) warnings.push(normalized.warning);
+      else multiplayerMatches.push(normalized.match);
+      continue;
+    }
     if (!players || typeof players !== 'object' || Object.keys(players).length !== 2) {
       warnings.push(`line ${idx + 1}: players must have exactly 2 entries`);
       continue;
@@ -340,7 +398,7 @@ export function loadMatches(statsFile, registry, mapModes = new Map()) {
       decisionCount: numericSeatMap(record.decisionCount),
     });
   }
-  return { matches, warnings, retiredDropped };
+  return { matches, multiplayerMatches, warnings, retiredDropped };
 }
 
 /**
@@ -605,7 +663,7 @@ function main() {
   const { registry, excluded, warning } = collectRegistry(opts.modelsDir ?? join(PROJECT_DIR, 'rl', 'models'));
   const warnings = warning ? [warning] : [];
   const mapModes = loadMapModes(opts.mapsDir);
-  const { matches, warnings: loadWarnings, retiredDropped } = loadMatches(opts.statsFile, registry, mapModes);
+  const { matches, multiplayerMatches, warnings: loadWarnings, retiredDropped } = loadMatches(opts.statsFile, registry, mapModes);
   warnings.push(...loadWarnings);
 
   const playedIds = new Set(matches.flatMap(m => [m.playerA, m.playerB]));
@@ -650,6 +708,38 @@ function main() {
   // （如刚接入歼灭/大逃杀、尚未跑批的 random）不应在页面上开一个 0 局的空榜。
   }).filter(mode => mode.games > 0);
 
+  const divisionKeys = [...new Set(multiplayerMatches.map(match => `${match.mode}|${match.rulesVersion}`))].sort();
+  const divisions = divisionKeys.map(key => {
+    const separator = key.indexOf('|');
+    const mode = key.slice(0, separator);
+    const rulesVersion = key.slice(separator + 1);
+    const divisionMatches = multiplayerMatches.filter(match => match.mode === mode && match.rulesVersion === rulesVersion);
+    const actualIds = new Set(divisionMatches.flatMap(match => Object.values(match.players)));
+    const ids = allIds.filter(id => registry.get(id)?.playerCounts?.includes(3) || actualIds.has(id));
+    const mapsForDivision = [...new Set(divisionMatches.map(match => match.map))].sort();
+    const leagues = {
+      all: buildMultiplayerLeague(divisionMatches, ids, {
+        bootstrapN: opts.bootstrap,
+        rngFactory: () => mulberry32(opts.bootstrapSeed),
+      }),
+    };
+    for (const map of mapsForDivision) {
+      leagues[map] = buildMultiplayerLeague(divisionMatches.filter(match => match.map === map), ids, {
+        bootstrapN: opts.bootstrapPerMap,
+        rngFactory: () => mulberry32(opts.bootstrapSeed),
+      });
+    }
+    return {
+      id: `${mode}-3p-${rulesVersion}`,
+      mode,
+      playerCount: 3,
+      rulesVersion,
+      label: `${MODE_LABELS[mode] ?? mode} · 三人`,
+      games: divisionMatches.length,
+      maps: leagues,
+    };
+  });
+
   const registryMeta = Object.fromEntries([...registry.entries()]
     .filter(([id]) => allIds.includes(id))
     .map(([id, meta]) => [id, meta.kind === 'algorithm' ? {
@@ -659,6 +749,7 @@ function main() {
     version: meta.version,
     description: meta.description,
     modes: meta.modes,
+    playerCounts: meta.playerCounts,
     status: 'builtin',
     statusNote: null,
   } : {
@@ -669,6 +760,7 @@ function main() {
     trainMap: meta.trainMap,
     opponentType: meta.opponentType,
     modes: meta.modes,
+    playerCounts: [2],
     steps: meta.steps,
     deliveredSteps: meta.deliveredSteps ?? null,
     status: MODEL_STATUS_BY_VERSION[meta.version] ?? 'legacy',
@@ -684,10 +776,12 @@ function main() {
       prior: '1 virtual draw per played pair',
       scale: 'Elo: 1500 + 400/ln(10) * ln p',
       ci: `stratified bootstrap by (pair,map) within each mode: ${opts.bootstrap} draws for mode / ${opts.bootstrapPerMap} per map, seed ${opts.bootstrapSeed}`,
+      multiplayer: 'three-player tie-aware Plackett-Luce with L2 prior; complete six-game superblocks only; cluster bootstrap by superblock',
     },
     source: {
       file: opts.statsFile,
       matchCount: matches.length,
+      multiplayerMatchCount: multiplayerMatches.length,
       retiredMatchesDropped: retiredDropped,
       mapDist: Object.fromEntries(maps.map(map => [map, matches.filter(m => m.map === map).length])),
       modeDist: Object.fromEntries(GAME_MODES.map(meta => [meta.id, matches.filter(m => m.mode === meta.id).length])),
@@ -697,6 +791,7 @@ function main() {
     },
     registry: registryMeta,
     modes,
+    divisions,
     excluded,
     warnings,
   };

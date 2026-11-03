@@ -58,15 +58,15 @@ export const ALGORITHMS = {
  * 因"未知参与者"被 loadMatches 过滤掉。
  */
 export const ALGORITHM_META = {
-  parallax: { displayName: '视差算法', description: '标准：独立整回合行动组合搜索、反击情景检验与配置驱动的地图路径规划', version: 'v1', modes: ['standard'] },
-  greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动', version: 'v1', modes: ['standard'] },
-  random: { displayName: '随机算法', description: '从所有合法动作中随机选择', version: 'v1', modes: ['standard'] },
+  parallax: { displayName: '视差算法', description: '标准：独立整回合行动组合搜索、反击情景检验与配置驱动的地图路径规划', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
+  greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
+  random: { displayName: '随机算法', description: '从所有合法动作中随机选择', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
   'random-annihilation': { displayName: '歼灭随机算法', description: '歼灭：从所有合法动作中随机选择，跳过炮火危险区内的部署与治疗', version: 'v1', modes: ['annihilation'] },
   'random-royale': { displayName: '大逃杀随机算法', description: '大逃杀：从所有合法计划动作中随机入队，随后提交', version: 'v1', modes: ['royale'] },
-  mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1', modes: ['standard'] },
-  threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1', modes: ['standard'] },
-  field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'] },
-  verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v2', modes: ['standard'] },
+  mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
+  threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
+  field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
+  verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v2', modes: ['standard'], playerCounts: [2, 3] },
   'random-sim': { displayName: '同时随机算法', description: '同时回合：从所有合法计划动作中随机选择入队，随后提交', version: 'v2', modes: ['simultaneous'] },
   'dest-prob': { displayName: '落点概率算法', description: '同时回合分步：建模敌军落点概率，预测射击并规避目的格冲突', version: 'v2', modes: ['simultaneous'] },
   kriegspiel: { displayName: '兵棋推演算法', description: '同时回合：分步结算 rollout + 整份计划联合搜索 + 风险规避', version: 'v2', modes: ['simultaneous'] },
@@ -141,6 +141,7 @@ export function listAlgorithmInfo() {
     description: ALGORITHM_META[name]?.description ?? '',
     version: algorithmVersion(name),
     modes: algorithmModes(name),
+    playerCounts: algorithmPlayerCounts(name),
   }));
 }
 
@@ -156,6 +157,8 @@ export function listHistoricalAlgorithmInfo() {
       description: entry.description ?? ALGORITHM_META[name]?.description ?? '',
       version: entry.version,
       modes: Array.isArray(entry.modes) && entry.modes.length ? entry.modes : algorithmModes(name),
+      playerCounts: Array.isArray(entry.playerCounts) && entry.playerCounts.length
+        ? entry.playerCounts : algorithmPlayerCounts(name),
       historical: true,
     })));
 }
@@ -187,6 +190,12 @@ export function algorithmModes(name) {
  */
 export function algorithmSupportsMode(name, mode) {
   return algorithmModes(name).includes(mode);
+}
+
+/** 已验证可参赛的人数；未声明的存量算法仍仅限双人。 */
+export function algorithmPlayerCounts(name) {
+  const counts = ALGORITHM_META[name]?.playerCounts;
+  return Array.isArray(counts) && counts.length ? counts : [2];
 }
 
 /**
@@ -227,6 +236,7 @@ export function getAlgorithmMeta(name) {
     description: ALGORITHM_META[name]?.description ?? '',
     version: algorithmVersion(name),
     modes: algorithmModes(name),
+    playerCounts: algorithmPlayerCounts(name),
   };
 }
 

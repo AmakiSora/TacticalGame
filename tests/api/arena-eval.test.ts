@@ -244,6 +244,86 @@ describe('AI 竞技场评估控制台 API', () => {
   });
 
   // 随机图 id 自带模式：两种模式的随机图不能混在一批，否则 round_robin 会拒绝启动。
+  it('starts a three-player standard superblock run with only eligible algorithms', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: {
+        playerCount: 3, maps: ['multiplayer-ring'], games: 6,
+        participants: ['algo:greedy', 'algo:random', 'algo:threat'],
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({ mode: 'standard', playerCount: 3, games: 6 });
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--player-count 3');
+    expect(args).toContain('--maps multiplayer-ring');
+    expect(args).toContain('--models none');
+    expect(args).toContain('--algorithms greedy,random,threat');
+  });
+
+  it('accepts every registered standard algorithm for three-player games', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: {
+        playerCount: 3, maps: ['multiplayer-ring'], games: 6,
+        participants: ['field', 'greedy', 'mcts', 'parallax', 'random', 'threat', 'verdict']
+          .map(name => `algo:${name}`),
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(spawner.calls[0].args.join(' ')).toContain('--algorithms field,greedy,mcts,parallax,random,threat,verdict');
+  });
+
+  it('rejects invalid three-player maps, game counts, algorithms and models', async () => {
+    const base = {
+      playerCount: 3, maps: ['multiplayer-ring'], games: 6,
+      participants: ['algo:greedy', 'algo:random', 'algo:threat'],
+    };
+    const noLayout = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start', payload: { ...base, maps: ['default'] },
+    });
+    expect(noLayout.statusCode).toBe(400);
+    expect(noLayout.json().code).toBe('invalid_maps');
+
+    const badGames = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start', payload: { ...base, games: 8 },
+    });
+    expect(badGames.statusCode).toBe(400);
+    expect(badGames.json().error).toContain('6 的倍数');
+
+    const fewAlgos = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { ...base, participants: ['algo:greedy', 'algo:random'] },
+    });
+    expect(fewAlgos.statusCode).toBe(400);
+    expect(fewAlgos.json().error).toContain('至少需要 3 个');
+
+    const withModel = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { ...base, participants: [...base.participants, 'hex_ppo_v3.0.4_20260909_8.4M.zip'] },
+    });
+    expect(withModel.statusCode).toBe(400);
+    expect(withModel.json().error).toContain('不能参加三人竞技场');
+
+    const nonStandard = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: { ...base, maps: ['standoff'] },
+    });
+    expect(nonStandard.statusCode).toBe(400);
+    expect(nonStandard.json().code).toBe('mode_not_supported');
+  });
+
+  it('exposes player counts on maps and participants', async () => {
+    const status = (await app.inject({ method: 'GET', url: '/api/arena/eval/status' })).json();
+    const standard = status.modeCatalog.find((mode: { id: string }) => mode.id === 'standard');
+    expect(standard.maps.find((map: { id: string }) => map.id === 'multiplayer-ring').playerCounts).toEqual([2, 3, 6]);
+    expect(standard.maps.find((map: { id: string }) => map.id === 'default').playerCounts).toEqual([2]);
+    const participants = (await app.inject({ method: 'GET', url: '/api/arena/participants' })).json();
+    expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_threat').playerCounts).toEqual([2, 3]);
+    expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_mcts').playerCounts).toEqual([2, 3]);
+    expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_verdict').playerCounts).toEqual([2, 3]);
+  });
+
   it('rejects mixing two modes of random maps', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',

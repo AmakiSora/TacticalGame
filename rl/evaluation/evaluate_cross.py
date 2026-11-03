@@ -141,11 +141,16 @@ def parse_args():
                         help="player_a 座位参与者规格：模型 zip 路径或 algo:<算法名>[@<版本>]")
     parser.add_argument("--player-b", default=None,
                         help="player_b 座位参与者规格：模型 zip 路径或 algo:<算法名>[@<版本>]")
+    parser.add_argument("--player-c", default=None,
+                        help="player_c 座位算法规格；提供后启用三人标准模式（仅内置算法）")
+    parser.add_argument("--schedule-file", default=None,
+                        help="三人轮换 manifest/待跑片段 JSON；座位、种子和 superblock 元数据以其为准")
     parser.add_argument("--model-a", default=None, help="等价 --player-a（仅模型规格），兼容保留")
     parser.add_argument("--model-b", default=None, help="等价 --player-b（仅模型规格），兼容保留")
     parser.add_argument("--name-a", default=None,
                         help="player_a 参与者的显示名（默认：模型取文件名，算法取 algo_<name>[@<版本>]）")
     parser.add_argument("--name-b", default=None, help="player_b 参与者的显示名（默认同上）")
+    parser.add_argument("--name-c", default=None, help="player_c 参与者的显示名（默认同上）")
     parser.add_argument("--games", type=int, default=2, help="总对局数（--swap-sides 时按相同种子成对换座）")
     parser.add_argument("--map", dest="map_id", default="default",
                         help="地图 id（默认 default）。随机图为每局一张对称随机地图：random（标准）/ "
@@ -180,7 +185,7 @@ def seat_breakdown(records: list[dict[str, Any]]) -> list[str]:
     lines = []
     for name, by_seat in games.items():
         parts, total_w, total_g, draws = [], 0, 0, 0
-        for seat in ("player_a", "player_b"):
+        for seat in _SEATS:
             g = by_seat.get(seat, 0)
             if not g:
                 continue
@@ -416,11 +421,20 @@ def make_controller(label: str, spec: str, side: str, args, worker: "EngineWorke
 
 def reset_command(args, game_index: int) -> dict[str, Any]:
     command: dict[str, Any] = {"cmd": "reset", "mapId": args.map_id}
+    schedule = getattr(args, "schedule_by_index", {}).get(game_index)
+    if schedule:
+        command.update({
+            "playerCount": 3,
+            "seatOrder": ["player_a", "player_b", "player_c"][:len(schedule["seatOrder"])],
+            "firstSeat": 0,
+            "gameSeed": schedule["gameSeed"],
+        })
     random_mode = random_mode_for_map(args.map_id)
     if random_mode:
         # 每局一张对称随机地图；种子由局序派生，同参数评估可复现。
         pair_index = (game_index + 1) // 2 if args.swap_sides else game_index
-        options: dict[str, Any] = {"seed": f"{args.seed_prefix}-{pair_index}", "symmetric": True}
+        map_seed = schedule.get("mapSeed") if schedule else f"{args.seed_prefix}-{pair_index}"
+        options: dict[str, Any] = {"seed": map_seed, "symmetric": True}
         # 标准模式的 random 不带 mode：与历史随机图评估逐位一致（同盐同图可复现）。
         # 其余模式必须显式带 mode，否则 worker 会按缺省 standard 生成一张规则不同的图。
         if random_mode != "standard":
@@ -577,6 +591,24 @@ def _final_summary(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def rank_groups(state: dict[str, Any], seats: dict[str, str]) -> list[list[str]]:
+    """按存活状态与裁决分重建并列组；引擎数组下标不代表严格名次。"""
+    result = state.get("result") or {}
+    rankings = result.get("rankings") or (state.get("adjudication") or {}).get("rankings") or []
+    groups: list[list[str]] = []
+    previous: tuple[Any, Any] | None = None
+    for ranking in rankings:
+        seat = ranking.get("playerId")
+        key = (ranking.get("status"), (ranking.get("score") or {}).get("total"))
+        if key != previous:
+            groups.append([])
+            previous = key
+        groups[-1].append(seats.get(seat, seat))
+    if len(groups) == 1:
+        return groups
+    return [group for group in groups if group]
+
+
 def _empty_side_stats() -> dict[str, Any]:
     return {
         "deploysByType": {}, "deployCost": 0,
@@ -659,9 +691,10 @@ def _derive_event_stats(collector: EventCollector) -> dict[str, Any]:
             owner = payload.get("owner")
             if owner in stats:
                 stats[owner]["comebackSupplies"] += payload.get("amount") or 0
-    other = {"player_a": "player_b", "player_b": "player_a"}
-    for seat, seat_stats in stats.items():
-        seat_stats["killsByType"] = dict(stats[other[seat]]["lossesByType"])
+    if set(stats) == {"player_a", "player_b"}:
+        other = {"player_a": "player_b", "player_b": "player_a"}
+        for seat, seat_stats in stats.items():
+            seat_stats["killsByType"] = dict(stats[other[seat]]["lossesByType"])
     return stats
 
 
@@ -769,12 +802,18 @@ def _build_detail(args, seat_map: dict[str, SideController], state: dict[str, An
         print(f"  警告：事件流缺失 {missing} 条（seq {ranges}），该局明细 events/derived 不完整"
               f"（timeline/final 不受影响）")
 
+    final = _final_summary(state)
+    final["rankGroups"] = rank_groups(
+        state, {seat: controller.label for seat, controller in seat_map.items()})
     detail = {
         "schema": 1,
         "meta": {
             "gameIndex": game_index,
             "map": args.map_id,
             "mapSeed": map_seed,
+            "playerCount": len(seat_map),
+            "rulesVersion": getattr(args, "rules_version", None),
+            "schedule": getattr(args, "schedule_by_index", {}).get(game_index),
             "models": {seat: {"name": controller.label, "kind": getattr(controller, "kind", "model"),
                               "version": controller.version,
                               "path": getattr(controller, "model_path", None),
@@ -805,7 +844,7 @@ def _build_detail(args, seat_map: dict[str, SideController], state: dict[str, An
             "decisionTimeSec": {seat: round(decision_time.get(seat, 0.0), 3) for seat in _SEATS},
             "decisionCount": {seat: int(decision_count.get(seat, 0)) for seat in _SEATS},
         },
-        "final": _final_summary(state),
+        "final": final,
         "derived": _derive_event_stats(collector),
         "timeline": [timeline_by_round[round_number] for round_number in sorted(timeline_by_round)],
         "actions": action_log,
@@ -1038,25 +1077,46 @@ def warn_if_model_eval_disabled(map_id: str, specs: dict[str, str]) -> None:
 
 
 def main():
+    global _SEATS
     # Windows 控制台默认 GBK，统一改用 UTF-8 输出避免乱码。
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
     args = parse_args()
+    schedule_doc: dict[str, Any] = {}
+    if args.schedule_file:
+        schedule_doc = json.loads(Path(args.schedule_file).read_text(encoding="utf-8"))
+        if schedule_doc.get("playerCount") != 3 or not isinstance(schedule_doc.get("games"), list):
+            raise ValueError("三人 schedule-file 必须包含 playerCount=3 与 games 数组")
+    args.schedule_by_index = {
+        int(game["gameIndex"]): game for game in schedule_doc.get("games", [])
+    }
+    args.rules_version = schedule_doc.get("rulesVersion")
+    if args.schedule_file or args.player_c:
+        _SEATS = ("player_a", "player_b", "player_c")
     spec_a = args.player_a or args.model_a
     spec_b = args.player_b or args.model_b
-    if not spec_a or not spec_b:
-        print("错误：需为两个座位提供参与者："
-              "--player-a/--player-b（zip 路径或 algo:<name>），兼容 --model-a/--model-b。",
+    spec_c = args.player_c
+    if not spec_a or not spec_b or (len(_SEATS) == 3 and not spec_c):
+        print("错误：需为每个座位提供参与者："
+              "--player-a/--player-b（三人另需 --player-c；规格为 zip 或 algo:<name>）。",
               file=sys.stderr)
+        return 2
+    if len(_SEATS) == 3 and any(not spec.startswith("algo:") for spec in (spec_a, spec_b, spec_c)):
+        print("错误：三人标准模式当前仅支持内置算法，现有 RL 模型不能参评。", file=sys.stderr)
         return 2
     name_a = args.name_a or default_display_name(spec_a)
     name_b = args.name_b or default_display_name(spec_b)
-    if name_a == name_b:
-        print(f"错误：两个座位是同一参与者（{name_a}）。", file=sys.stderr)
+    name_c = args.name_c or default_display_name(spec_c) if spec_c else None
+    participant_names = [name for name in (name_a, name_b, name_c) if name]
+    if len(set(participant_names)) != len(participant_names):
+        print("错误：同一阵容不能由同一参与者重复占座。", file=sys.stderr)
         return 2
     names = {"player_a": name_a, "player_b": name_b}
     specs = {"player_a": spec_a, "player_b": spec_b}
+    if len(_SEATS) == 3:
+        names["player_c"] = name_c
+        specs["player_c"] = spec_c
     warn_if_model_eval_disabled(args.map_id, specs)
 
     details_dir = None if args.no_details else Path(args.details_dir)
@@ -1070,7 +1130,8 @@ def main():
     try:
         controllers = {side: make_controller(names[side], specs[side], side, args, workers[0])
                        for side in _SEATS}
-        tally: dict[str, int] = {name_a: 0, name_b: 0, "draw": 0}
+        tally: dict[str, int] = {name: 0 for name in participant_names}
+        tally["draw"] = 0
         records: list[dict[str, Any]] = []
         if args.stats_file:
             stats_file = Path(args.stats_file)
@@ -1078,9 +1139,24 @@ def main():
         else:
             stats_file = None
         run_started = time.monotonic()
+        spec_by_name = {names[seat]: specs[seat] for seat in _SEATS}
+        game_indexes = (list(args.schedule_by_index) if args.schedule_file
+                        else list(range(1, args.games + 1)))
+        if args.schedule_file:
+            args.games = len(game_indexes)
 
-        for game_index in range(1, args.games + 1):
-            if args.swap_sides and game_index > 1:
+        for game_position, game_index in enumerate(game_indexes, start=1):
+            schedule = args.schedule_by_index.get(game_index)
+            if schedule:
+                seat_names = schedule.get("seatOrder")
+                if not isinstance(seat_names, list) or set(seat_names) != set(participant_names):
+                    raise ValueError(f"第 {game_index} 局 seatOrder 不是当前阵容的排列")
+                names = dict(zip(_SEATS, seat_names))
+                controllers = {
+                    seat: make_controller(names[seat], spec_by_name[names[seat]], seat, args, workers[0])
+                    for seat in _SEATS
+                }
+            elif args.swap_sides and game_index > 1:
                 # 交换座位：重建控制器以匹配新的 owner 视角。
                 # 注意：必须按当前座位映射取显示名/参与者规格——上一次重建后控制器
                 # 的 label 已与初始 names 字典相反，直接取 names[side] 会导致
@@ -1094,8 +1170,8 @@ def main():
             for controller in controllers.values():
                 controller.reset_for_game()
 
-            print(f"— 第 {game_index}/{args.games} 局（{controllers['player_a'].short}"
-                  f" vs {controllers['player_b'].short}）")
+            print(f"— 第 {game_position}/{args.games} 局（"
+                  + " vs ".join(controllers[seat].short for seat in _SEATS) + "）")
             winner, acted, rounds, detail = play_one_game(workers[0], controllers, args, game_index)
             seats = {seat: controller.label for seat, controller in controllers.items()}
             writer.append(detail)
@@ -1116,6 +1192,11 @@ def main():
                 "map": args.map_id,
                 "players": seats,
                 "winner": winner_label,
+                "playerCount": len(seats),
+                "rulesVersion": args.rules_version,
+                "rankGroups": detail["final"]["rankGroups"],
+                "manifestHash": schedule.get("manifestHash") if schedule else None,
+                "schedule": schedule,
                 "rounds": rounds,
                 "endReason": end_reason,
                 "scores": final_scores,
@@ -1142,19 +1223,19 @@ def main():
             # 仍在累积文件里、断点续跑只补差额；编排器也能按行透传逐局进度。
             if stats_file is not None:
                 append_jsonl(stats_file, record)
-            print(f"{GAME_PROGRESS_PREFIX}第 {game_index}/{args.games} 局完成"
+            print(f"{GAME_PROGRESS_PREFIX}第 {game_position}/{args.games} 局完成"
                   f"（{detail['meta']['durationSec']:.0f}s，"
                   f"累计 {format_duration(time.monotonic() - run_started)}）", flush=True)
 
         print("\n===== 总结（本次运行）=====")
-        for name in (name_a, name_b, "draw"):
+        for name in (*participant_names, "draw"):
             print(f"{name}: {tally.get(name, 0)}")
         print("分座位（本次运行）：")
         for line in seat_breakdown(records):
             print(line)
 
         if stats_file is not None:
-            cumulative = load_stats(stats_file, {name_a, name_b}, args.map_id)
+            cumulative = load_stats(stats_file, set(participant_names), args.map_id)
             print(f"\n===== 累计统计（{stats_file.name}，{len(cumulative)} 局）=====")
             for line in seat_breakdown(cumulative):
                 print(line)

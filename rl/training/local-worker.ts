@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { globalEventBus } from '../../src/events/bus.js';
 // 算法模块为 ESM .mjs，无类型声明（与 tests/algorithms 的引用方式一致）。
 // @ts-expect-error untyped .mjs module
-import { loadAlgorithm, ALGORITHM_META } from '../../algorithms/registry.mjs';
+import { loadAlgorithm, ALGORITHM_META, algorithmPlayerCounts } from '../../algorithms/registry.mjs';
 // @ts-expect-error untyped .mjs module
 import * as algorithmUtils from '../../algorithms/lib/game-utils.mjs';
 // @ts-expect-error untyped .mjs module
@@ -20,10 +20,13 @@ import {
   queueAttackAction, queueDeployAction, queueDemolishAction, queueHealAction,
   queueMoveAction, queueWaitAction,
 } from '../../src/engine/planning.js';
-import { createInitialGame, createInitialGameWithConfig } from '../../src/state/store.js';
-import { loadMaps } from '../../src/config/loader.js';
+import {
+  addLobbyPlayer, createInitialGame, createInitialGameWithConfig, createLobbyWithConfig,
+  initializeLobbyGame, setSeatPlan,
+} from '../../src/state/store.js';
+import { getMapConfig, loadMaps } from '../../src/config/loader.js';
 import { generateRandomMapConfig, randomMapModeForId, sanitizeRandomOptions } from '../../src/config/randomMap.js';
-import { isSimultaneousMode } from '../../src/types.js';
+import { isSimultaneousMode, PLAYER_IDS } from '../../src/types.js';
 import type { GameState, PlayerId, UnitType } from '../../src/types.js';
 
 let game: GameState | null = null;
@@ -68,8 +71,56 @@ function parseEventTail(value: unknown): number {
 }
 
 function owner(value: unknown): PlayerId {
-  if (value === 'player_a' || value === 'player_b') return value;
-  throw new Error('owner must be player_a or player_b');
+  if (typeof value === 'string' && (PLAYER_IDS as readonly string[]).includes(value)) return value as PlayerId;
+  throw new Error(`owner must be one of ${PLAYER_IDS.join(', ')}`);
+}
+
+function parsePlayerCount(value: unknown): number {
+  if (value === undefined) return 2;
+  if (value !== 2 && value !== 3) throw new Error('playerCount must be 2 or 3');
+  return value;
+}
+
+function seededRandom(seed: unknown): () => number {
+  const text = String(seed ?? '0');
+  let hash = 1779033703 ^ text.length;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = Math.imul(hash ^ text.charCodeAt(i), 3432918353);
+    hash = (hash << 13) | (hash >>> 19);
+  }
+  hash = Math.imul(hash ^ (hash >>> 16), 2246822507);
+  hash = Math.imul(hash ^ (hash >>> 13), 3266489909);
+  let state = (hash ^ (hash >>> 16)) >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createMultiplayerGame(mapId: string, config: ReturnType<typeof generateRandomMapConfig>, command: Record<string, unknown>) {
+  const playerCount = parsePlayerCount(command.playerCount);
+  const players = PLAYER_IDS.slice(0, playerCount);
+  const seatOrder = command.seatOrder ?? players;
+  if (!Array.isArray(seatOrder) || seatOrder.length !== playerCount
+    || new Set(seatOrder).size !== playerCount
+    || seatOrder.some(id => !players.includes(id as PlayerId))) {
+    throw new Error(`seatOrder must be a permutation of ${players.join(', ')}`);
+  }
+  const firstSeat = command.firstSeat ?? 0;
+  if (!Number.isInteger(firstSeat) || (firstSeat as number) < 0 || (firstSeat as number) >= playerCount) {
+    throw new Error(`firstSeat must be an integer in [0, ${playerCount - 1}]`);
+  }
+  const lobby = createLobbyWithConfig(randomUUID(), mapId, config, {
+    maxPlayers: playerCount,
+    participate: false,
+  });
+  for (let i = 0; i < playerCount; i += 1) addLobbyPlayer(lobby);
+  setSeatPlan(lobby, seatOrder as PlayerId[], firstSeat as number);
+  initializeLobbyGame(lobby, seededRandom(command.gameSeed));
+  return lobby;
 }
 
 /** 同时模式：动作只入队，不立即执行；end_turn 表示提交本回合计划。 */
@@ -147,19 +198,21 @@ export async function handleCommand(command: Record<string, unknown>): Promise<u
     snapshotEventTail = parseEventTail(command.eventTail);
     const mapId = typeof command.mapId === 'string' ? command.mapId : 'default';
     const randomMode = randomMapModeForId(mapId);
+    const playerCount = parsePlayerCount(command.playerCount);
     if (randomMode) {
-      // 本地训练/评估用随机地图：与 REST 创建走同一套生成与校验逻辑，固定双人。
-      // 玩法模式由虚拟 id 决定（`random` = 标准、`random-annihilation` 等带后缀），
-      // 调用方若另传 random.mode 必须一致——两份跨语言 id 表漂移时宁可报错，
-      // 也不要静默生成一张标准图却记在歼灭/大逃杀模式下。
+      // 玩法模式由虚拟 id 决定，调用方若另传 random.mode 必须一致。
       const options = sanitizeRandomOptions(command.random);
       if (options.mode && options.mode !== randomMode) {
         throw new Error(`随机图 ${mapId} 对应模式 ${randomMode}，与 random.mode=${options.mode} 不一致`);
       }
-      const config = generateRandomMapConfig({ ...options, mode: randomMode }, 2);
-      game = createInitialGameWithConfig(randomUUID(), config, mapId);
+      const config = generateRandomMapConfig({ ...options, mode: randomMode }, playerCount);
+      game = playerCount === 2
+        ? createInitialGameWithConfig(randomUUID(), config, mapId)
+        : createMultiplayerGame(mapId, config, command);
     } else {
-      game = createInitialGame(randomUUID(), mapId);
+      game = playerCount === 2
+        ? createInitialGame(randomUUID(), mapId)
+        : createMultiplayerGame(mapId, getMapConfig(mapId), command);
     }
     // apply 通道覆盖四种模式：standard / annihilation 逐动作立即执行（轮界由引擎
     // 结算炮火伤害与淘汰）；simultaneous / royale 动作入队、end_turn 提交并统一结算。
@@ -197,6 +250,7 @@ async function loadDecideAlgorithm(name: string) {
 async function decideAlgorithmAction(command: Record<string, unknown>): Promise<unknown> {
   if (!game) throw new Error('game is not initialized');
   const who = owner(command.owner);
+  if (!game.players[who]) throw new Error(`owner is not seated in this game: ${who}`);
   const name = typeof command.algorithm === 'string' ? command.algorithm : '';
   if (!name) throw new Error('decide requires an algorithm name');
   // 不同模式不能混用算法：注册表 ALGORITHM_META.modes 是唯一口径（缺省仅 standard）。
@@ -208,6 +262,10 @@ async function decideAlgorithmAction(command: Record<string, unknown>): Promise<
     throw new Error(
       `algorithm "${name}" supports mode(s) [${modes.join(', ')}]; current game mode is "${game.config.mode}"`,
     );
+  }
+  const playerCount = PLAYER_IDS.filter(id => game!.players[id]).length;
+  if (!algorithmPlayerCounts(name).includes(playerCount)) {
+    throw new Error(`algorithm "${name}" does not support ${playerCount}-player games`);
   }
   const algorithm = await loadDecideAlgorithm(name);
   // 同时模式没有 currentPlayerId，算法只能从 ctx.owner 得知自己的座位；

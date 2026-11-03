@@ -262,6 +262,100 @@ describe('先手胜率与换座胜率差（2026-10-30）', () => {
   });
 });
 
+describe('三人标准模式独立 PL 分榜', () => {
+  const lineup = ['algo_greedy@v1', 'algo_random@v1', 'algo_threat@v1'];
+
+  function threePlayerLines() {
+    const rotations = [[0, 1, 2], [1, 2, 0], [2, 0, 1]];
+    const lines = [];
+    let gameIndex = 1;
+    for (const [direction, base] of [
+      ['forward', [0, 1, 2]],
+      ['reverse', [0, 2, 1]],
+    ] as const) {
+      for (const [rotation, order] of rotations.entries()) {
+        const seatOrder = order.map(index => lineup[base[index]]);
+        const schedule = {
+          gameIndex, lineupId: 'lineup-1', superblockId: 'sb-1',
+          blockId: `sb-1-${direction}`, direction, rotation,
+          seatOrder, firstSeat: 0, mapSeed: null, gameSeed: 'seed-1', manifestHash: 'manifest-1',
+        };
+        lines.push(JSON.stringify({
+          map: 'multiplayer-ring',
+          players: { player_a: seatOrder[0], player_b: seatOrder[1], player_c: seatOrder[2] },
+          winner: seatOrder[0], playerCount: 3, rulesVersion: 'standard-3p-v1',
+          rankGroups: [[seatOrder[0]], [seatOrder[1]], [seatOrder[2]]],
+          manifestHash: 'manifest-1', schedule, rounds: 12, seed: null,
+        }));
+        gameIndex += 1;
+      }
+    }
+    return lines;
+  }
+
+  it('三人记录与双人 BT 池分离，并生成完整 superblock 的独立分榜', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-three-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    writeFileSync(statsFile, threePlayerLines().join('\n') + '\n');
+
+    const registry = collectRegistry(modelsDir).registry;
+    const loaded = loadMatches(statsFile, registry, loadMapModes());
+    expect(loaded.matches).toHaveLength(0);
+    expect(loaded.multiplayerMatches).toHaveLength(6);
+    expect(loaded.warnings).toEqual([]);
+    expect(loaded.multiplayerMatches[0].rankGroups).toHaveLength(3);
+
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    expect(payload.modes).toEqual([]);
+    expect(payload.divisions).toHaveLength(1);
+    const division = payload.divisions[0];
+    expect(division).toMatchObject({
+      mode: 'standard', playerCount: 3, rulesVersion: 'standard-3p-v1', games: 6,
+    });
+    expect(division.maps.all.overview).toMatchObject({
+      games: 6, superblockCount: 1, quarantinedSuperblocks: 0,
+    });
+    const played = division.maps.all.models.filter((model: { games: number }) => model.games > 0);
+    expect(played).toHaveLength(3);
+    expect(played.every((model: { games: number }) => model.games === 6)).toBe(true);
+    expect(division.maps.all.models.filter((model: { games: number }) => model.games === 0)).toHaveLength(4);
+    expect(payload.registry['algo_threat@v1'].playerCounts).toEqual([2, 3]);
+    expect(payload.registry['algo_verdict@v2'].playerCounts).toEqual([2, 3]);
+  });
+
+  it('残缺三人块不进入评分但保留隔离计数', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-three-partial-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    writeFileSync(statsFile, threePlayerLines().slice(0, 5).join('\n') + '\n');
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    expect(payload.divisions[0].maps.all.overview).toMatchObject({
+      games: 0, superblockCount: 0, quarantinedSuperblocks: 1,
+    });
+  });
+});
+
 describe('端到端冒烟：spawn 真脚本覆盖 main() 独有路径', () => {
   const line = (a: string, b: string, winner: string) =>
     JSON.stringify({ map: 'default', players: { player_a: a, player_b: b }, winner }) + '\n';

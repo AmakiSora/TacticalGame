@@ -52,6 +52,8 @@ export interface EvalMapInfo {
   id: string;
   label: string;
   mode: string;
+  /** 该地图可玩人数；随机图支持 2–8 人。 */
+  playerCounts: number[];
 }
 
 /** 同一模式内的展示顺序：虚拟随机图排在最前，其余既有顺序在前，未列出的新地图按 id 追加在后。 */
@@ -81,6 +83,7 @@ function virtualRandomMaps(): EvalMapInfo[] {
     id,
     label: RANDOM_MAP_LABELS[id] ?? id,
     mode,
+    playerCounts: [2, 3, 4, 5, 6, 7, 8],
   }));
 }
 
@@ -103,7 +106,15 @@ export function readEvalMaps(mapsDir = join(PROJECT_ROOT, 'maps')): EvalMapInfo[
       }
       const name = typeof config?.name === 'string' ? config.name.trim() : '';
       const mode = typeof config?.mode === 'string' && config.mode ? config.mode : 'standard';
-      maps.push({ id, label: name || id, mode });
+      const layouts = (config?.layouts ?? {}) as Record<string, unknown>;
+      const declaredCounts = Array.isArray(config?.supportedPlayerCounts)
+        ? (config!.supportedPlayerCounts as unknown[]).map(Number).filter(Number.isInteger)
+        : [];
+      const playerCounts = Object.keys(layouts).map(Number).filter(count => Number.isInteger(count)).sort((a, b) => a - b);
+      maps.push({
+        id, label: name || id, mode,
+        playerCounts: playerCounts.length ? playerCounts : (declaredCounts.length ? declaredCounts : [2]),
+      });
     }
   } catch {
     // 地图目录不可读时只剩四种虚拟随机图兜底；与 readMapModes 同向（少列，不误判）。
@@ -232,6 +243,8 @@ const yieldTick = () => new Promise<void>(resolve => setImmediate(resolve));
 export interface EvalRunParams {
   /** 本批对局模式（由地图池推断，同一批不允许混模式）；缺省按 standard 兼容旧调用。 */
   mode?: string;
+  /** 参赛人数；缺省 2。三人走独立 PL 分榜，只支持标准模式内置算法。 */
+  playerCount?: 2 | 3;
   maps: string[];
   /**
    * 参评者过滤：null = 全部可对战模型 + 全部注册算法（round_robin 缺省行为）。
@@ -545,8 +558,7 @@ export class EvalRunner {
       const hitMap = !filter.map || mapId === filter.map;
       const hitParticipant = !filter.participant || (
         players && typeof players === 'object'
-        && (participantMatchesFilter(players.player_a, filter.participant)
-          || participantMatchesFilter(players.player_b, filter.participant)));
+        && Object.values(players).some(playerId => participantMatchesFilter(playerId, filter.participant!)));
       (hitMode && hitMap && hitParticipant ? removed : staying).push(line);
     }
     return { removed, staying, total };
@@ -561,6 +573,7 @@ export class EvalRunner {
     const args = [
       this.roundRobinScript,
       '--mode', params.mode ?? 'standard',
+      '--player-count', String(params.playerCount ?? 2),
       '--maps', params.maps.join(','),
       '--games', String(params.games),
       '--jobs', String(params.jobs),
@@ -810,7 +823,7 @@ export class EvalRunner {
       notes: this.state.notes,
       knownMaps: KNOWN_MAPS,
       modeCatalog: buildEvalModeCatalog(),
-      defaults: { games: 24, jobs: 1, maps: ['random'] },
+      defaults: { games: 24, jobs: 1, maps: ['random'], playerCounts: [2, 3] },
       statsFile: this.statsFile,
       python: this.pythonPath,
     };
@@ -848,13 +861,14 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
   // 当前模式展示对应的算法；真正启动时仍由 start 接口做模式兼容校验。
   app.get('/api/arena/participants', async () => ({
     // 现有 RL 训练环境只覆盖标准模式；模型支持模式写在响应里，前端按模式过滤。
-    models: refreshRlModels().map(model => ({ ...model, modes: ['standard'] })),
+    models: refreshRlModels().map(model => ({ ...model, modes: ['standard'], playerCounts: [2] })),
     algorithms: Object.entries(ALGORITHM_BOTS).map(([id, config]) => ({
       id,
       name: config.name,
       algorithm: config.algorithm,
       description: config.description,
       modes: config.modes,
+      playerCounts: config.playerCounts,
     })),
   }));
 
@@ -897,9 +911,33 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
         code: 'mode_not_supported',
       });
     }
+    const playerCount = body.playerCount ?? 2;
+    if (playerCount !== 2 && playerCount !== 3) {
+      return reply.code(400).send({ error: 'playerCount 必须是 2 或 3', code: 'invalid_player_count' });
+    }
+    if (playerCount === 3 && mode !== 'standard') {
+      return reply.code(400).send({
+        error: '三人竞技场当前仅支持标准模式', code: 'mode_not_supported',
+      });
+    }
+    if (playerCount === 3) {
+      const unsupportedMaps = mapInfos.filter(info => !info!.playerCounts.includes(3));
+      if (unsupportedMaps.length) {
+        return reply.code(400).send({
+          error: `以下地图没有三人布局：${unsupportedMaps.map(info => `「${info!.label}」`).join('、')}`,
+          code: 'invalid_maps',
+        });
+      }
+    }
     const games = body.games ?? 24;
     if (!Number.isInteger(games) || games < 2 || games > 500) {
       return reply.code(400).send({ error: 'games 必须是 2-500 的整数', code: 'invalid_games' });
+    }
+    if (playerCount === 3 && games % 6 !== 0) {
+      return reply.code(400).send({
+        error: '三人跑批按六局双向 superblock 计分，games 必须是 6 的倍数',
+        code: 'invalid_games',
+      });
     }
     const jobs = body.jobs ?? 1;
     if (!Number.isInteger(jobs) || jobs < 1 || jobs > MAX_EVAL_JOBS) {
@@ -940,6 +978,37 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
           code: 'mode_not_supported',
         });
       }
+      if (playerCount === 3 && modelFilters.length) {
+        return reply.code(400).send({
+          error: '现有 RL 模型是单对手观测编码，不能参加三人竞技场；请只选择三人准入算法。',
+          code: 'mode_not_supported',
+        });
+      }
+      if (playerCount === 3) {
+        const ineligible = participants
+          .filter(m => m.startsWith('algo:'))
+          .filter(m => !ALGORITHM_BOTS[algorithmParticipantId(m.slice('algo:'.length))]?.playerCounts.includes(3));
+        if (ineligible.length) {
+          return reply.code(400).send({
+            error: `${ineligible.join(', ')} 尚未通过三人端到端验证；请只选择声明支持 3 人的算法。`,
+            code: 'invalid_participants',
+          });
+        }
+      }
+    }
+    if (playerCount === 3) {
+      const eligibleCount = Object.values(ALGORITHM_BOTS)
+        .filter(config => config.modes.includes(mode) && config.playerCounts.includes(3)).length;
+      const selectedAlgos = participants?.filter(m => m.startsWith('algo:')) ?? [];
+      const algos = selectedAlgos.length ? selectedAlgos : Object.entries(ALGORITHM_BOTS)
+        .filter(([, config]) => config.modes.includes(mode) && config.playerCounts.includes(3))
+        .map(([id]) => id.replace(/^algo_/, 'algo:'));
+      if (new Set(algos).size < 3) {
+        return reply.code(400).send({
+          error: `三人跑批至少需要 3 个不同算法（当前可选 ${eligibleCount} 个），且同一算法不能重复占座。`,
+          code: 'invalid_participants',
+        });
+      }
     }
     // 非标准模式没有 RL 模型可参评，至少需要两个该模式算法才能组成对阵批次；
     // 歼灭（random-annihilation + shrinkroll + vortex）3 个、大逃杀（random-royale + apex）2 个。
@@ -957,7 +1026,9 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
       }
     }
     const salt = body.salt ? String(body.salt).slice(0, 64) : null;
-    const params: EvalRunParams = { mode, maps, participants, games, jobs, salt, dryRun: Boolean(body.dryRun) };
+    const params: EvalRunParams = {
+      mode, playerCount, maps, participants, games, jobs, salt, dryRun: Boolean(body.dryRun),
+    };
     try {
       runner.start(params);
     } catch (err) {

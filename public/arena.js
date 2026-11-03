@@ -29,6 +29,8 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     filterLeague: document.getElementById('filter-league'),
     filterKind: document.getElementById('filter-kind'),
     modelTable: document.getElementById('model-table'),
+    modelHead: document.getElementById('model-head-row'),
+    matrixPanel: document.getElementById('matrix-panel'),
     h2hHead: document.getElementById('h2h-head'),
     h2hBody: document.getElementById('h2h-body'),
     detailTitle: document.getElementById('detail-title'),
@@ -46,7 +48,16 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   let sort = { key: 'rating', dir: 'desc' };
 
   function modes() {
-    return Array.isArray(raw?.modes) ? raw.modes : [];
+    const doubles = Array.isArray(raw?.modes) ? raw.modes.map(item => ({ ...item, playerCount: 2 })) : [];
+    const divisions = Array.isArray(raw?.divisions)
+      ? raw.divisions.map(item => ({
+        ...item,
+        id: `three:${item.id}`,
+        label: item.label || `${item.mode} · 三人`,
+        division: true,
+      }))
+      : [];
+    return [...doubles, ...divisions];
   }
 
   function currentMode() {
@@ -101,6 +112,8 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
         deliveredSteps: meta.deliveredSteps ?? null,
         status: meta.status || 'legacy',
         statusNote: meta.statusNote || null,
+        playerCount: currentMode()?.playerCount ?? 2,
+        provisional: m.provisional === true,
         firstSeatRate: m.firstSeat?.winRate ?? null,
         secondSeatRate: m.secondSeat?.winRate ?? null,
       };
@@ -133,6 +146,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
 
   function ratingCell(row) {
     if (row.rating == null) return '—';
+    if (row.ratingLo == null || row.ratingHi == null) return String(row.rating);
     const lo = row.rating - row.ratingLo;
     const hi = row.ratingHi - row.rating;
     const ci = Math.round(Math.max(lo, hi));
@@ -147,30 +161,47 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   function renderKpis(ld) {
     const rows = buildRows(ld);
     const rated = rows.filter(m => m.games > 0);
-    const modelCount = rated.filter(m => m.kind === 'model').length;
-    const algoCount = rated.filter(m => m.kind === 'algorithm').length;
-    const pairs = rated.length * (rated.length - 1) / 2;
     const current = currentMode();
     const mapCount = Object.keys(current?.maps || {}).filter(key => key !== 'all').length;
-    const target = pairs * mapCount * (raw.source.targetGamesPerPair || 24);
-    const coverage = target > 0 ? Math.min(100, Math.round(ld.overview.games / target * 100)) : 0;
-    const cards = [
-      { label: '当前模式', value: current?.label ?? '—', sub: '不同模式独立评分，不跨模式比较' },
-      { label: '总局数', value: ld.overview.games, sub: `平局 ${ld.overview.draws}（${pct(ld.overview.drawRate)}）` },
-      {
-        label: '参评者',
-        value: rated.length,
-        sub: `RL 模型 ${modelCount} · 算法 ${algoCount} · 对局对数 ${ld.overview.pairCount}`,
-      },
-      { label: '平局率', value: pct(ld.overview.drawRate), sub: '达到回合/动作上限' },
-      { label: '平均回合', value: ld.overview.avgRounds ?? '—', sub: '单局 rounds 均值' },
-      { label: '局数覆盖度', value: target > 0 ? `${coverage}%` : '—', sub: target > 0 ? `${ld.overview.games} / 目标 ${target}` : '该模式暂无地图池' },
-      {
-        label: '当前地图池',
-        value: league === 'all' ? '全部' : mapLabel(league),
-        sub: league === 'all' ? `${mapCount} 张图池化` : `${ld.overview.games} 局`,
-      },
-    ];
+    let cards;
+    if (current?.playerCount === 3) {
+      cards = [
+        { label: '当前赛制', value: current?.label ?? '三人', sub: `${current?.rulesVersion || '—'} · 独立 PL 榜` },
+        { label: '计分局数', value: ld.overview.games, sub: `全并列平局 ${ld.overview.draws}（${pct(ld.overview.drawRate)}）` },
+        { label: '完整 superblock', value: ld.overview.superblockCount, sub: `隔离残块 ${ld.overview.quarantinedSuperblocks}` },
+        { label: '参评算法', value: rated.length, sub: `暂定 ${rated.filter(row => row.provisional).length} 个（完赛块 <20 或 CI 过宽）` },
+        { label: '唯一胜率', value: pct(ld.overview.uniqueWinRate), sub: '非并列头名的局占比' },
+        { label: '平均回合', value: ld.overview.avgRounds ?? '—', sub: '计分完整块内单局均值' },
+        {
+          label: '当前地图池',
+          value: league === 'all' ? '全部' : mapLabel(league),
+          sub: league === 'all' ? `${mapCount} 张图池化` : `${ld.overview.games} 局`,
+        },
+      ];
+    } else {
+      const modelCount = rated.filter(m => m.kind === 'model').length;
+      const algoCount = rated.filter(m => m.kind === 'algorithm').length;
+      const pairs = rated.length * (rated.length - 1) / 2;
+      const target = pairs * mapCount * (raw.source.targetGamesPerPair || 24);
+      const coverage = target > 0 ? Math.min(100, Math.round(ld.overview.games / target * 100)) : 0;
+      cards = [
+        { label: '当前模式', value: current?.label ?? '—', sub: '不同模式独立评分，不跨模式比较' },
+        { label: '总局数', value: ld.overview.games, sub: `平局 ${ld.overview.draws}（${pct(ld.overview.drawRate)}）` },
+        {
+          label: '参评者',
+          value: rated.length,
+          sub: `RL 模型 ${modelCount} · 算法 ${algoCount} · 对局对数 ${ld.overview.pairCount}`,
+        },
+        { label: '平局率', value: pct(ld.overview.drawRate), sub: '达到回合/动作上限' },
+        { label: '平均回合', value: ld.overview.avgRounds ?? '—', sub: '单局 rounds 均值' },
+        { label: '局数覆盖度', value: target > 0 ? `${coverage}%` : '—', sub: target > 0 ? `${ld.overview.games} / 目标 ${target}` : '该模式暂无地图池' },
+        {
+          label: '当前地图池',
+          value: league === 'all' ? '全部' : mapLabel(league),
+          sub: league === 'all' ? `${mapCount} 张图池化` : `${ld.overview.games} 局`,
+        },
+      ];
+    }
     el.kpiGrid.innerHTML = cards
       .map(c => `<article class="kpi-card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub || ''}</div></article>`)
       .join('');
@@ -179,13 +210,59 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   function renderTable(rows) {
     const sorted = sortRows(rows, sort);
     const body = el.modelTable.querySelector('tbody');
+    const current = currentMode();
+    const three = current?.playerCount === 3;
+    el.modelHead.innerHTML = three
+      ? `<th data-sort="rank">#</th>
+        <th data-sort="short">参与者</th>
+        <th data-sort="version">版本</th>
+        <th data-sort="rating" class="num">PL 评分</th>
+        <th data-sort="games" class="num">计分局数</th>
+        <th data-sort="uniqueWinRate" class="num">独胜率</th>
+        <th data-sort="topGroupRate" class="num">头名率</th>
+        <th data-sort="averageRank" class="num">平均名次</th>
+        <th data-sort="placementScore" class="num">Placement</th>
+        <th data-sort="wilson" class="num">Wilson 下界</th>
+        <th data-sort="avgRounds" class="num">平均回合</th>
+        <th data-sort="avgDecisionMs" class="num">平均决策耗时</th>`
+      : `<th data-sort="rank">#</th>
+        <th data-sort="short">参与者</th>
+        <th data-sort="version">版本</th>
+        <th data-sort="rating" class="num">评分</th>
+        <th class="num">胜-负-平</th>
+        <th data-sort="games" class="num">局数</th>
+        <th data-sort="winRate" class="num">胜率</th>
+        <th data-sort="wilson" class="num">Wilson 下界</th>
+        <th data-sort="firstSeatRate" class="num">先手胜率</th>
+        <th data-sort="secondSeatRate" class="num">后手胜率</th>
+        <th data-sort="avgRounds" class="num">平均回合</th>
+        <th data-sort="avgDecisionMs" class="num">平均决策耗时</th>`;
     if (!currentLeague()?.overview?.games) {
-      body.innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（可在评估控制台选择该模式启动跑批）</td></tr>';
+      body.innerHTML = `<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">${three
+        ? '该三人赛制暂无完整六局 superblock（残块不计分，可在评估控制台选择三人继续跑批）'
+        : '该模式暂无对局数据（可在评估控制台选择该模式启动跑批）'}</td></tr>`;
+      bindSortHeaders();
       return;
     }
     body.innerHTML = sorted
       .map(r => {
         const selected = selectedModel === r.id ? 'selected' : '';
+        if (three) {
+          return `<tr data-model="${escapeAttr(r.id)}" class="${selected}">
+          <td class="num" data-label="排名">${r.rank ?? '—'}</td>
+          <td class="model-name" data-label="参与者" title="${escapeAttr(r.id)}">${kindBadge(r.kind)}${escapeHtml(r.short)}${r.provisional ? ' <span class="tag st-muted">暂定</span>' : ''}</td>
+          <td data-label="版本">${escapeHtml(r.version) || '—'}</td>
+          <td class="num" data-label="PL 评分">${ratingCell(r)}</td>
+          <td class="num" data-label="计分局数">${r.games || '—'}</td>
+          <td class="num" data-label="独胜率">${pct(r.uniqueWinRate)}</td>
+          <td class="num" data-label="头名率">${pct(r.topGroupRate)}</td>
+          <td class="num" data-label="平均名次">${r.averageRank ?? '—'}</td>
+          <td class="num" data-label="Placement">${r.placementScore == null ? '—' : r.placementScore.toFixed(3)}</td>
+          <td class="num" data-label="Wilson 下界">${r.wilson == null ? '—' : pct(r.wilson)}</td>
+          <td class="num" data-label="平均回合">${r.avgRounds ?? '—'}</td>
+          <td class="num" data-label="平均决策耗时">${r.avgDecisionMs != null ? `${r.avgDecisionMs}ms` : '—'}</td>
+        </tr>`;
+        }
         return `<tr data-model="${escapeAttr(r.id)}" class="${selected}"${r.statusNote ? ` title="${escapeAttr(r.statusNote)}"` : ''}>
           <td class="num" data-label="排名">${r.rank ?? '—'}</td>
           <td class="model-name" data-label="参与者" title="${escapeAttr(r.id)}">${kindBadge(r.kind)}${escapeHtml(r.short)}</td>
@@ -202,8 +279,21 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
         </tr>`;
       })
       .join('');
+    bindSortHeaders();
+  }
+
+  function bindSortHeaders() {
     el.modelTable.querySelectorAll('th[data-sort]').forEach(th => {
       th.classList.toggle('sorted', th.dataset.sort === sort.key);
+      th.onclick = () => {
+        const key = th.dataset.sort;
+        if (sort.key === key) {
+          sort.dir = sort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sort = { key, dir: key === 'short' || key === 'version' ? 'asc' : 'desc' };
+        }
+        renderTable(viewRows(currentLeague()));
+      };
     });
   }
 
@@ -219,6 +309,9 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   }
 
   function renderMatrix(ld) {
+    const three = currentMode()?.playerCount === 3;
+    if (el.matrixPanel) el.matrixPanel.hidden = three;
+    if (three) return;
     if (!ld.overview?.games) {
       el.h2hHead.innerHTML = '<th class="model-col">参与者 \\ 对手</th>';
       el.h2hBody.innerHTML = '<tr><td class="muted" style="text-align:center;padding:24px">该模式暂无对局数据（可在评估控制台选择该模式启动跑批）</td></tr>';
@@ -265,6 +358,52 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     }
     el.detailTitle.textContent = `${row.short}（${row.id}）`;
     el.detailBody.className = '';
+    if (row.playerCount === 3) {
+      const seatRows = Object.entries(row.perSeat || {}).map(([seat, value]) => `<tr>
+        <td data-label="座位">${escapeHtml(seat.replace('player_', '').toUpperCase())}</td>
+        <td class="num" data-label="局数">${value.games}</td>
+        <td class="num" data-label="独胜">${value.uniqueWins}</td>
+        <td class="num" data-label="头名">${value.topGroupCount}</td>
+        <td class="num" data-label="平均名次">${value.averageRank ?? '—'}</td>
+        <td class="num" data-label="Placement">${value.placementScore == null ? '—' : value.placementScore.toFixed(3)}</td>
+      </tr>`).join('');
+      const mapRows = Object.entries(row.perMap || {}).sort((a, b) => b[1].games - a[1].games)
+        .map(([map, value]) => `<tr>
+          <td data-label="地图">${escapeHtml(mapLabel(map))}</td>
+          <td class="num" data-label="局数">${value.games}</td>
+          <td class="num" data-label="独胜">${value.uniqueWins}</td>
+          <td class="num" data-label="头名">${value.topGroupCount}</td>
+          <td class="num" data-label="平均名次">${value.averageRank ?? '—'}</td>
+          <td class="num" data-label="Placement">${value.placementScore == null ? '—' : value.placementScore.toFixed(3)}</td>
+        </tr>`).join('');
+      el.detailBody.innerHTML = `
+        <div class="detail-meta">
+          <span>类型 <strong>内置规则算法</strong></span>
+          <span>注册名 <strong>${escapeHtml(row.algorithm || row.id.replace(/^algo_/, '').replace(/@.*$/, ''))}</strong></span>
+          <span>版本 <strong>${escapeHtml(row.version || '—')}</strong></span>
+          <span>PL 评分 <strong>${ratingCell(row)}</strong></span>
+          <span>完整 superblock <strong>${row.games ? Math.floor(row.games / 6) : 0}</strong></span>
+          <span>状态 <strong>${row.provisional ? '暂定' : '已稳定'}</strong></span>
+          <span style="flex-basis:100%">策略 <strong>${escapeHtml(row.description || '—')}</strong></span>
+        </div>
+        <div class="detail-cols">
+          <div>
+            <h3 style="margin: 6px 0;">分座位表现</h3>
+            <div class="table-wrap"><table class="data-table compact">
+              <thead><tr><th>座位</th><th class="num">局数</th><th class="num">独胜</th><th class="num">头名</th><th class="num">平均名次</th><th class="num">Placement</th></tr></thead>
+              <tbody>${seatRows || '<tr><td colspan="6" class="muted">无计分局</td></tr>'}</tbody>
+            </table></div>
+          </div>
+          <div>
+            <h3 style="margin: 6px 0;">分地图表现</h3>
+            <div class="table-wrap"><table class="data-table compact">
+              <thead><tr><th>地图</th><th class="num">局数</th><th class="num">独胜</th><th class="num">头名</th><th class="num">平均名次</th><th class="num">Placement</th></tr></thead>
+              <tbody>${mapRows || '<tr><td colspan="6" class="muted">无计分局</td></tr>'}</tbody>
+            </table></div>
+          </div>
+        </div>`;
+      return;
+    }
     const stepText = row.steps == null
       ? 'best'
       : row.deliveredSteps != null && row.deliveredSteps !== row.steps
@@ -333,15 +472,25 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   function renderMethod() {
     const m = raw.ratingMethod || {};
     const s = raw.source || {};
-    const lines = [
-      `<div><strong>评分模型</strong>：${escapeHtml(m.model || '—')}</div>`,
-      `<div><strong>模式隔离</strong>：不同玩法模式使用独立评分池，榜单只在当前模式内比较；模式之间不共享评分。</div>`,
-      `<div><strong>先验</strong>：${escapeHtml(m.prior || '—')}</div>`,
-      `<div><strong>Elo 映射</strong>：${escapeHtml(m.scale || '—')}</div>`,
-      `<div><strong>置信区间</strong>：${escapeHtml(m.ci || '—')}</div>`,
-      `<div><strong>对战协议</strong>：确定性策略，每两局共享同一随机图种子并交换座位（配对换座），消除先手与地图偏差。</div>`,
-      `<div><strong>数据范围</strong>：${s.matchCount ?? 0} 局 · ${s.dateMin ?? '—'} → ${s.dateMax ?? '—'} · 每对目标 ${s.targetGamesPerPair ?? '—'} 局/图。</div>`,
-    ];
+    const three = currentMode()?.playerCount === 3;
+    const lines = three
+      ? [
+        `<div><strong>评分模型</strong>：${escapeHtml(m.multiplayer || '并列感知 Plackett-Luce + L2 先验')}</div>`,
+        `<div><strong>计分单元</strong>：仅完整六局 superblock 进入评分；正反方向各三局座位轮换，每人每出生座位两次、先手两次，任意两者相对行动先后各三次。</div>`,
+        `<div><strong>名次口径</strong>：同存活状态且同裁决分记为并列，枚举全部合法严格排列求似然；不使用伤害、座位或种子破平。</div>`,
+        `<div><strong>置信区间</strong>：按地图 × 阵容分层的完整 superblock cluster bootstrap；残块只隔离展示，不进入评分。</div>`,
+        `<div><strong>参评边界</strong>：三人榜与双人 Bradley-Terry 分池；现有单对手观测 RL 模型不参加三人局。</div>`,
+        `<div><strong>数据范围</strong>：三人原始记录 ${s.multiplayerMatchCount ?? 0} 局 · ${s.dateMin ?? '—'} → ${s.dateMax ?? '—'}。</div>`,
+      ]
+      : [
+        `<div><strong>评分模型</strong>：${escapeHtml(m.model || '—')}</div>`,
+        `<div><strong>模式隔离</strong>：不同玩法模式使用独立评分池，榜单只在当前模式内比较；模式之间不共享评分。</div>`,
+        `<div><strong>先验</strong>：${escapeHtml(m.prior || '—')}</div>`,
+        `<div><strong>Elo 映射</strong>：${escapeHtml(m.scale || '—')}</div>`,
+        `<div><strong>置信区间</strong>：${escapeHtml(m.ci || '—')}</div>`,
+        `<div><strong>对战协议</strong>：确定性策略，每两局共享同一随机图种子并交换座位（配对换座），消除先手与地图偏差。</div>`,
+        `<div><strong>数据范围</strong>：${s.matchCount ?? 0} 局 · ${s.dateMin ?? '—'} → ${s.dateMax ?? '—'} · 每对目标 ${s.targetGamesPerPair ?? '—'} 局/图。</div>`,
+      ];
     el.methodBody.className = '';
     el.methodBody.innerHTML = lines.map(l => `<p style="margin:6px 0">${l}</p>`).join('');
   }
@@ -371,9 +520,11 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       </button>`;
     }).join('');
     const current = currentMode();
-    el.boardModeHint.textContent = current
-      ? `${current.label} · Bradley-Terry MLE · 平局记 0.5 · 排名列固定为模式内排名`
-      : 'Bradley-Terry MLE · 平局记 0.5 · 各模式独立评分';
+    el.boardModeHint.textContent = current?.playerCount === 3
+      ? '三人 · 并列感知 Plackett-Luce · 仅完整六局双向 superblock 计分 · 独立于双人 BT 池'
+      : current
+        ? `${current.label} · Bradley-Terry MLE · 平局记 0.5 · 排名列固定为模式内排名`
+        : 'Bradley-Terry MLE · 平局记 0.5 · 各模式独立评分';
   }
 
   function populateLeagueSelect() {
@@ -388,6 +539,13 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   function renderAll() {
     const ld = currentLeague();
     if (!ld) return;
+    if (currentMode()?.playerCount === 3) {
+      kindFilter = 'algorithm';
+      el.filterKind.value = 'algorithm';
+      el.filterKind.disabled = true;
+    } else {
+      el.filterKind.disabled = false;
+    }
     renderKpis(ld);
     renderTable(viewRows(ld));
     renderMatrix(ld);
@@ -403,7 +561,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       raw = await res.json();
       el.generatedAt.textContent = raw.generatedAt ? new Date(raw.generatedAt).toLocaleString() : '—';
-      el.sourceCount.textContent = raw.source?.matchCount ?? 0;
+      el.sourceCount.textContent = (raw.source?.matchCount ?? 0) + (raw.source?.multiplayerMatchCount ?? 0);
       el.dateRange.textContent = raw.source?.dateMin
         ? `${raw.source.dateMin} → ${raw.source.dateMax ?? ''}`
         : '—';
@@ -418,7 +576,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       renderMethod();
       renderExcluded();
       const warnings = raw.warnings || [];
-      if (!raw.source?.matchCount) {
+      if (!raw.source?.matchCount && !raw.source?.multiplayerMatchCount) {
         setStatus('暂无对局数据', 'err');
       } else if (warnings.length) {
         setStatus(`已加载（${warnings.length} 条警告）`, 'err');
@@ -504,7 +662,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   /* ===== 评估控制台：网页启动 round_robin.py 跑批（模型 × 算法混合循环赛） ===== */
   const evalEl = {};
   for (const id of ['eval-status-pill', 'eval-modes', 'eval-mode-hint', 'eval-maps', 'eval-algos', 'eval-models', 'eval-model-all', 'eval-model-none',
-    'eval-model-count', 'eval-games', 'eval-jobs', 'eval-salt', 'eval-dry', 'eval-start', 'eval-stop',
+    'eval-model-count', 'eval-players', 'eval-player-hint', 'eval-games', 'eval-jobs', 'eval-salt', 'eval-dry', 'eval-start', 'eval-stop',
     'eval-control-token', 'eval-save-token', 'eval-token-state',
     'eval-regen', 'eval-clear', 'eval-msg', 'eval-progress-wrap', 'eval-progress-fill', 'eval-progress-text', 'eval-output',
     'eval-task-panel', 'eval-task-title', 'eval-task-state', 'eval-task-elapsed', 'eval-task-fill', 'eval-task-text', 'eval-task-output',
@@ -524,6 +682,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   let evalAlgos = [];
   let evalModeCatalog = [];
   let evalMode = 'standard';
+  let evalPlayerCount = 2;
   let renderedParticipantsMode = null;
   // status 接口会返回 modeCatalog；这里的列表只是首屏兜底，收到 status 后以服务端为准。
   const EVAL_FALLBACK_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'];
@@ -589,14 +748,20 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
 
   function currentEvalMaps() {
     // 服务端目录项自带 label（maps/*.json 的 name）；首屏兜底只有 id，交给 mapLabel 补名。
-    return currentEvalMode()?.maps || EVAL_FALLBACK_MAPS.map(id => ({ id }));
+    const maps = currentEvalMode()?.maps || EVAL_FALLBACK_MAPS.map(id => ({ id }));
+    return maps.filter(item => {
+      const counts = typeof item === 'string' ? [2] : item.playerCounts;
+      return !Array.isArray(counts) || counts.includes(evalPlayerCount);
+    });
   }
 
   function evalAlgosForMode() {
-    return evalAlgos.filter(a => (Array.isArray(a.modes) ? a.modes : ['standard']).includes(evalMode));
+    return evalAlgos.filter(a => (Array.isArray(a.modes) ? a.modes : ['standard']).includes(evalMode)
+      && (Array.isArray(a.playerCounts) ? a.playerCounts : [2]).includes(evalPlayerCount));
   }
 
   function evalModelsForMode() {
+    if (evalPlayerCount !== 2) return [];
     return evalModels.filter(m => (Array.isArray(m.modes) ? m.modes : ['standard']).includes(evalMode));
   }
 
@@ -604,37 +769,57 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     const current = currentEvalMode();
     const unsupported = Boolean(current && !current.supported);
     const { algos, models } = checkedParticipants();
-    // 非标准模式没有 RL 模型可参评，至少需要两个该模式算法才能组成对阵；只剩一个
-    // 算法（如歼灭/大逃杀目前的随机基线）时提前禁用并给出说明，不必等 400 回来。
-    // 未勾选任何参与者 = 全部参评，按该模式全部算法计数。
     const selectedAlgoCount = algos.length || models.length ? algos.length : evalAlgosForMode().length;
     const needsMoreAlgorithms = Boolean(
-      current && current.id !== 'standard' && !unsupported && selectedAlgoCount < 2,
+      current && !unsupported && (
+        evalPlayerCount === 3 ? selectedAlgoCount < 3
+          : current.id !== 'standard' && selectedAlgoCount < 2),
     );
     evalEl['eval-start'].disabled = evalStatus?.status === 'running' || unsupported || needsMoreAlgorithms;
     evalEl['eval-start'].title = unsupported
       ? (current.reason || '该模式暂不支持跑批')
       : needsMoreAlgorithms
-        ? '该模式至少需要选择 2 个参评算法（暂无 RL 模型）'
+        ? (evalPlayerCount === 3
+          ? '三人跑批至少需要选择 3 个不同算法，且同一算法不能重复占座'
+          : '该模式至少需要选择 2 个参评算法（暂无 RL 模型）')
         : '';
   }
 
+  const EVAL_PLAYER_OPTIONS = [
+    { value: 2, label: '双人（Bradley-Terry）', hint: '双人局 · Bradley-Terry 两两比较排名 · 模型与内置算法按当前模式参评' },
+    { value: 3, label: '三人（标准模式内置算法）', hint: '三人局 · 独立 Plackett-Luce 榜与六局双向轮换 · 仅标准模式内置算法，至少 3 个' },
+  ];
+
+  function renderEvalPlayerBar() {
+    evalEl['eval-players'].innerHTML = EVAL_PLAYER_OPTIONS.map(option => {
+      const active = option.value === evalPlayerCount;
+      return `<button type="button" class="mode-tab${active ? ' active' : ''}" data-eval-players="${option.value}" role="tab" aria-selected="${active}">${escapeHtml(option.label)}</button>`;
+    }).join('');
+    evalEl['eval-player-hint'].textContent = EVAL_PLAYER_OPTIONS.find(option => option.value === evalPlayerCount)?.hint || '';
+  }
+
   function renderEvalModeBar() {
-    evalEl['eval-modes'].innerHTML = evalModeCatalog.map(item => {
+    const visible = evalPlayerCount === 3
+      ? evalModeCatalog.filter(item => item.id === 'standard')
+      : evalModeCatalog;
+    evalEl['eval-modes'].innerHTML = visible.map(item => {
       const active = item.id === currentEvalMode()?.id;
       const label = item.supported ? item.label : `${item.label}（暂不支持）`;
       return `<button type="button" class="mode-tab${active ? ' active' : ''}${item.supported ? '' : ' unsupported'}" data-eval-mode="${escapeAttr(item.id)}" role="tab" aria-selected="${active}">${escapeHtml(label)}</button>`;
     }).join('');
     const current = currentEvalMode();
-    evalEl['eval-mode-hint'].textContent = current
-      ? current.supported
-        ? `${current.maps?.length ?? 0} 张地图 · 该模式独立榜单与评分`
-          + (current.id !== 'standard' ? ' · 仅内置算法（RL 模型暂只支持标准模式）' : '')
-          + (current.id !== 'standard' && evalAlgos.length > 0 && evalAlgosForMode().length < 2
-            ? ' · 该模式目前只有 1 个算法，等第二个算法落地后才能组批'
-            : '')
-        : (current.reason || '该模式暂不支持跑批')
-      : '';
+    evalEl['eval-mode-hint'].textContent = evalPlayerCount === 3
+      ? `三人标准模式 · 独立 PL 榜 · 仅 ${evalAlgosForMode().length} 个算法已通过三人准入`
+        + (evalAlgosForMode().length < 3 ? ' · 不足 3 个，无法组批' : '')
+      : current
+        ? current.supported
+          ? `${current.maps?.length ?? 0} 张地图 · 该模式独立榜单与评分`
+            + (current.id !== 'standard' ? ' · 仅内置算法（RL 模型暂只支持标准模式）' : '')
+            + (current.id !== 'standard' && evalAlgos.length > 0 && evalAlgosForMode().length < 2
+              ? ' · 该模式目前只有 1 个算法，等第二个算法落地后才能组批'
+              : '')
+          : (current.reason || '该模式暂不支持跑批')
+        : '';
     updateEvalStartState();
   }
 
@@ -653,7 +838,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
   function syncMapChips(maps) {
     if (!Array.isArray(maps) || !maps.length) return;
     const ids = maps.map(item => (typeof item === 'string' ? item : item.id));
-    const sig = `${evalMode}\u0001${ids.join('\u0001')}`;
+    const sig = `${evalMode}\u0001${evalPlayerCount}\u0001${ids.join('\u0001')}`;
     if (sig === renderedMapSig) return;
     renderedMapSig = sig;
     const checked = checkedMaps().filter(map => ids.includes(map));
@@ -676,12 +861,16 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       .map(a => `<label title="${escapeAttr(a.description)}"><input type="checkbox" value="algo:${escapeAttr(a.algorithm)}" checked/><span class="tag st-algo">算法</span> ${escapeHtml(a.name)}（${escapeHtml(a.algorithm)}）</label>`)
       .join('');
     const modeModels = evalModelsForMode();
-    evalEl['eval-models'].innerHTML = modeModels.length
-      ? modeModels
-        .map(m => `<label title="${escapeAttr(m.file)}"><input type="checkbox" value="${escapeAttr(m.file)}"/><span class="ver">${escapeHtml(m.label || '?')}</span> ${escapeHtml(m.file)}</label>`)
-        .join('')
-      : '<span class="eval-hint">当前模式暂无 RL 模型（现有模型仅覆盖标准模式）</span>';
-    renderedParticipantsMode = evalMode;
+    evalEl['eval-models'].innerHTML = evalPlayerCount === 3
+      ? '<span class="eval-hint">三人局不使用模型：现有 RL 模型是单对手观测编码，不能参加三人竞技场</span>'
+      : modeModels.length
+        ? modeModels
+          .map(m => `<label title="${escapeAttr(m.file)}"><input type="checkbox" value="${escapeAttr(m.file)}"/><span class="ver">${escapeHtml(m.label || '?')}</span> ${escapeHtml(m.file)}</label>`)
+          .join('')
+        : '<span class="eval-hint">当前模式暂无 RL 模型（现有模型仅覆盖标准模式）</span>';
+    evalEl['eval-model-all'].disabled = evalPlayerCount === 3;
+    evalEl['eval-model-none'].disabled = evalPlayerCount === 3;
+    renderedParticipantsMode = `${evalMode}:${evalPlayerCount}`;
     updateModelCount();
   }
 
@@ -706,9 +895,11 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     const total = modeModels.length + modeAlgos.length;
     const selected = algos.length + models.length;
     const modeLabel = currentEvalMode()?.label || evalMode;
-    evalEl['eval-model-count'].textContent = selected
-      ? `已选 ${selected} / ${total} 个（模型 ${models.length} / ${modeModels.length}，算法 ${algos.length} / ${modeAlgos.length}，${modeLabel}）`
-      : `共 ${modeModels.length} 个可对战模型 + ${modeAlgos.length} 个算法（${modeLabel}；不选 = 全部参评）`;
+    evalEl['eval-model-count'].textContent = evalPlayerCount === 3
+      ? `三人准入算法 ${modeAlgos.length} 个${selected ? `，已选 ${algos.length} 个` : '（默认全选；至少 3 个）'}`
+      : selected
+        ? `已选 ${selected} / ${total} 个（模型 ${models.length} / ${modeModels.length}，算法 ${algos.length} / ${modeAlgos.length}，${modeLabel}）`
+        : `共 ${modeModels.length} 个可对战模型 + ${modeAlgos.length} 个算法（${modeLabel}；不选 = 全部参评）`;
     // 参评算法数直接影响「非标准模式至少 2 个算法」的启动资格。
     updateEvalStartState();
   }
@@ -734,7 +925,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       renderEvalModeBar();
     }
     syncMapChips(currentEvalMaps());
-    if (renderedParticipantsMode !== evalMode) renderEvalParticipants();
+    if (renderedParticipantsMode !== `${evalMode}:${evalPlayerCount}`) renderEvalParticipants();
     const pill = EVAL_PILL[st.status] || { text: st.status, cls: '' };
     evalEl['eval-status-pill'].textContent = pill.text;
     evalEl['eval-status-pill'].classList.toggle('ok', pill.cls === 'ok');
@@ -906,6 +1097,36 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     }
   });
   syncControlTokenField();
+  renderEvalPlayerBar();
+
+  function setEvalPlayerCount(next) {
+    const value = Number(next) === 3 ? 3 : 2;
+    if (value === evalPlayerCount) return;
+    evalPlayerCount = value;
+    if (evalPlayerCount === 3) evalMode = 'standard';
+    const games = evalEl['eval-games'];
+    if (evalPlayerCount === 3) {
+      games.min = '6';
+      games.step = '6';
+      if (!Number(games.value) || Number(games.value) % 6) games.value = '24';
+    } else {
+      games.min = '2';
+      games.step = '2';
+    }
+    renderedMapSig = '';
+    renderEvalPlayerBar();
+    renderEvalModeBar();
+    syncMapChips(currentEvalMaps());
+    renderEvalParticipants();
+    evalMsg(evalPlayerCount === 3
+      ? '三人模式：仅标准模式、仅通过三人准入的算法、局数按六局 superblock 计。'
+      : '', undefined);
+  }
+
+  evalEl['eval-players'].addEventListener('click', event => {
+    const button = event.target.closest('.mode-tab[data-eval-players]');
+    if (button) setEvalPlayerCount(button.dataset.evalPlayers);
+  });
 
   evalEl['eval-modes'].addEventListener('click', event => {
     const button = event.target.closest('.mode-tab[data-eval-mode]');
@@ -933,8 +1154,20 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
       return;
     }
     const { algos, models } = checkedParticipants();
+    if (evalPlayerCount === 3) {
+      if ((algos.length || 0) < 3) {
+        evalMsg('三人跑批至少需要勾选 3 个不同算法（同一算法不能重复占座）', 'err');
+        return;
+      }
+      const games = Number(evalEl['eval-games'].value) || 24;
+      if (games % 6 !== 0) {
+        evalMsg('三人跑批局数必须是 6 的倍数（六局双向 superblock）', 'err');
+        return;
+      }
+    }
     const payload = {
       maps,
+      playerCount: evalPlayerCount,
       participants: algos.length || models.length ? [...models, ...algos] : null,
       games: Number(evalEl['eval-games'].value) || 24,
       jobs: Number(evalEl['eval-jobs'].value) || 1,

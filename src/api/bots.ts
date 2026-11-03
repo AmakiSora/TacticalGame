@@ -163,6 +163,8 @@ export interface AlgorithmBotConfig {
   description: string;
   /** 算法声明支持的对局模式（注册表 ALGORITHM_META.modes），跨模式混用一律拒绝。 */
   modes: string[];
+  /** 已通过端到端验证的参赛人数；大厅不按人数拦截，评估控制台按它过滤参评算法。 */
+  playerCounts: number[];
 }
 export const ALGORITHM_BOTS: Record<string, AlgorithmBotConfig> = Object.fromEntries(
   listAlgorithmInfo().map(info => [algorithmParticipantId(info.name), {
@@ -170,6 +172,7 @@ export const ALGORITHM_BOTS: Record<string, AlgorithmBotConfig> = Object.fromEnt
     algorithm: info.name,
     description: info.description,
     modes: info.modes,
+    playerCounts: info.playerCounts,
   }]),
 );
 
@@ -567,6 +570,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       algorithm: config.algorithm,
       description: config.description,
       modes: config.modes,
+      playerCounts: config.playerCounts,
     })),
   }));
 

@@ -8,6 +8,8 @@ export interface AlgorithmDisplayMeta {
   version: string;
   /** 算法可参与的对局模式（standard / simultaneous / royale / annihilation），缺省视为 ['standard']。 */
   modes?: string[];
+  /** 已通过端到端验证的参赛人数，缺省视为 [2]。 */
+  playerCounts?: number[];
 }
 
 export interface AlgorithmModule {
@@ -24,6 +26,7 @@ export interface AlgorithmMeta {
   description: string;
   version: string;
   modes: string[];
+  playerCounts: number[];
 }
 
 export declare const ALGORITHMS: Record<string, string>;
@@ -34,14 +37,16 @@ export declare const ALGORITHM_HISTORY: Record<string, Array<{
   displayName?: string;
   description?: string;
   modes?: string[];
+  playerCounts?: number[];
 }>>;
 
 export declare function loadAlgorithm(name: string): Promise<AlgorithmModule>;
 export declare function listAlgorithms(): string[];
-export declare function listAlgorithmInfo(): Array<{ name: string; displayName: string; description: string; version: string; modes: string[] }>;
-export declare function listHistoricalAlgorithmInfo(): Array<{ name: string; displayName: string; description: string; version: string; modes: string[]; historical: true }>;
+export declare function listAlgorithmInfo(): Array<{ name: string; displayName: string; description: string; version: string; modes: string[]; playerCounts: number[] }>;
+export declare function listHistoricalAlgorithmInfo(): Array<{ name: string; displayName: string; description: string; version: string; modes: string[]; playerCounts: number[]; historical: true }>;
 export declare function algorithmVersion(name: string): string;
 export declare function algorithmModes(name: string): string[];
+export declare function algorithmPlayerCounts(name: string): number[];
 export declare function algorithmSupportsMode(name: string, mode: string): boolean;
 export declare function algorithmParticipantId(name: string): string;
 export declare function algorithmVersionedId(name: string, version?: string): string;

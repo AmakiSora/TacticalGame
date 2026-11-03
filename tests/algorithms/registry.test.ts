@@ -8,6 +8,7 @@ import {
   ALGORITHM_HISTORY,
   ALGORITHM_META,
   algorithmModes,
+  algorithmPlayerCounts,
   algorithmSupportsMode,
   getAlgorithmMeta,
   listAlgorithmInfo,
@@ -42,8 +43,20 @@ describe('algorithm registry modes', () => {
     }
   });
 
-  it('exposes modes through listAlgorithmInfo and getAlgorithmMeta', () => {
-    const info = listAlgorithmInfo().find(i => i.name === 'random-sim');
+  it('declares three-player support for every standard algorithm only', () => {
+    const standard = Object.keys(ALGORITHMS).filter(name => algorithmModes(name).includes('standard'));
+    expect(standard.sort()).toEqual([
+      'field', 'greedy', 'mcts', 'parallax', 'random', 'threat', 'verdict',
+    ]);
+    for (const name of standard) {
+      expect(algorithmPlayerCounts(name), name).toEqual([2, 3]);
+    }
+    for (const name of Object.keys(ALGORITHMS).filter(name => !standard.includes(name))) {
+      expect(algorithmPlayerCounts(name), name).toEqual([2]);
+    }
+  });
+
+  it('exposes modes through listAlgorithmInfo and getAlgorithmMeta', () => {    const info = listAlgorithmInfo().find(i => i.name === 'random-sim');
     expect(info?.modes).toEqual(['simultaneous']);
     expect(getAlgorithmMeta('random-sim')?.modes).toEqual(['simultaneous']);
     const destProb = listAlgorithmInfo().find(i => i.name === 'dest-prob');

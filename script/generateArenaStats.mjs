@@ -78,9 +78,10 @@ export function loadMatchDetails(statsFile, registry, mapModes = new Map()) {
   const warnings = [];
   let retiredDropped = 0;
   let formatDropped = 0;
+  let multiplayerDropped = 0;
   if (!existsSync(statsFile)) {
     warnings.push(`stats file not found: ${statsFile}`);
-    return { matches, warnings, retiredDropped, formatDropped };
+    return { matches, warnings, retiredDropped, formatDropped, multiplayerDropped };
   }
   const lines = readFileSync(statsFile, 'utf8').split('\n');
   for (let idx = 0; idx < lines.length; idx++) {
@@ -94,6 +95,10 @@ export function loadMatchDetails(statsFile, registry, mapModes = new Map()) {
       continue;
     }
     const players = record?.players;
+    if (record?.playerCount === 3 || (players && typeof players === 'object' && Object.keys(players).length === 3)) {
+      multiplayerDropped += 1;
+      continue;
+    }
     if (!players || typeof players !== 'object' || Object.keys(players).length !== 2) {
       warnings.push(`line ${idx + 1}: players must have exactly 2 entries`);
       continue;
@@ -164,7 +169,7 @@ export function loadMatchDetails(statsFile, registry, mapModes = new Map()) {
       controlPoints: cps && typeof cps === 'object' ? cps : null,
     });
   }
-  return { matches, warnings, retiredDropped, formatDropped };
+  return { matches, warnings, retiredDropped, formatDropped, multiplayerDropped };
 }
 
 /**
@@ -860,7 +865,7 @@ function main() {
   const { registry, warning } = collectRegistry(modelsDir);
   const warnings = warning ? [warning] : [];
   const mapModes = loadMapModes(opts.mapsDir);
-  const { matches, warnings: loadWarnings, retiredDropped, formatDropped } = loadMatchDetails(opts.statsFile, registry, mapModes);
+  const { matches, warnings: loadWarnings, retiredDropped, formatDropped, multiplayerDropped } = loadMatchDetails(opts.statsFile, registry, mapModes);
   warnings.push(...loadWarnings);
   // 玩法明细（裁决分项 / 动作分布 / 控制点易手）不在 matches.jsonl 里，从本地 detail 补。
   const detailInfo = opts.details
@@ -916,6 +921,7 @@ function main() {
       matchCount: matches.length,
       retiredMatchesDropped: retiredDropped,
       oldFormatMatchesDropped: formatDropped,
+      multiplayerMatchesDropped: multiplayerDropped,
       mapDist: matches.map(m => m.map).reduce((o, map) => ({ ...o, [map]: (o[map] ?? 0) + 1 }), {}),
       modeDist: Object.fromEntries(GAME_MODES.map(meta => [meta.id, matches.filter(m => m.mode === meta.id).length])),
       dateMin: tsList[0] ?? null,
@@ -936,7 +942,8 @@ function main() {
   writeFileSync(opts.out, JSON.stringify(payload, null, 2), 'utf8');
   console.log(`Wrote ${opts.out} — ${matches.length} matches, ${models.length} participant profiles, ${notesData.deprecated.length} deprecated` +
     (retiredDropped > 0 ? `（跳过作废对局 ${retiredDropped}）` : '') +
-    (formatDropped > 0 ? `（跳过旧格式对局 ${formatDropped}）` : ''));
+    (formatDropped > 0 ? `（跳过旧格式对局 ${formatDropped}）` : '') +
+    (multiplayerDropped > 0 ? `（三人对局 ${multiplayerDropped} 局由独立榜处理）` : ''));
   for (const mode of modes) {
     const gp = mode.gameplay;
     console.log(`${mode.label}（${mode.games} 局）Units: ${gp.units.map(u => `${u.type} ${(u.deployShare * 100).toFixed(0)}%`).join(' / ') || '—'}`);

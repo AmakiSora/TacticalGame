@@ -147,6 +147,16 @@ describe('AI 竞技场按玩法模式分榜', () => {
     expect(source).toContain('等第二个算法落地后才能组批');
   });
 
+  it('评估控制台参赛人数用 chip 按钮，与对局模式行同款而不是下拉框', () => {
+    expect(html).toContain('id="eval-players" class="eval-chip-list eval-mode-list eval-player-list"');
+    expect(html).toContain('id="eval-player-hint"');
+    expect(html).not.toContain('<select id="eval-players"');
+    expect(source).toContain('const EVAL_PLAYER_OPTIONS');
+    expect(source).toContain('function renderEvalPlayerBar');
+    expect(source).toContain("closest('.mode-tab[data-eval-players]')");
+    expect(source).toContain('function setEvalPlayerCount');
+  });
+
   it('评估控制台提供「清空旧局」弹窗：范围筛选 + 试跑预览 + 确认后直接删除', () => {
     expect(html).toContain('id="eval-clear"');
     expect(source).toContain('window.UIDialog.open({');

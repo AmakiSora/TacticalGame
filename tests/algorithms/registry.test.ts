@@ -43,14 +43,14 @@ describe('algorithm registry modes', () => {
     }
   });
 
-  it('declares three-player support for the standard, annihilation and simultaneous algorithms', () => {
-    const threePlayerModes = ['standard', 'annihilation', 'simultaneous'];
+  it('declares three-player support for the standard, annihilation, simultaneous and royale algorithms', () => {
+    const threePlayerModes = ['standard', 'annihilation', 'simultaneous', 'royale'];
     const threePlayer = Object.keys(ALGORITHMS)
       .filter(name => algorithmModes(name).some(mode => threePlayerModes.includes(mode)));
     expect(threePlayer.sort()).toEqual([
-      'crucible', 'dest-prob', 'field', 'greedy', 'horizon', 'kriegspiel', 'matrix-eq', 'mcts',
-      'parallax', 'prism', 'random', 'random-annihilation', 'random-sim', 'shrinkroll',
-      'sovereign', 'tempo', 'tempo-weave', 'threat', 'verdict', 'vortex',
+      'apex', 'ark', 'crucible', 'dest-prob', 'echelon', 'field', 'greedy', 'horizon', 'kriegspiel',
+      'matrix-eq', 'mcts', 'parallax', 'prism', 'random', 'random-annihilation', 'random-royale',
+      'random-sim', 'shrinkroll', 'sovereign', 'tempo', 'tempo-weave', 'threat', 'verdict', 'vortex',
     ]);
     for (const name of threePlayer) {
       expect(algorithmPlayerCounts(name), name).toEqual([2, 3]);
@@ -58,9 +58,9 @@ describe('algorithm registry modes', () => {
     for (const name of Object.keys(ALGORITHMS).filter(name => !threePlayer.includes(name))) {
       expect(algorithmPlayerCounts(name), name).toEqual([2]);
     }
-    // 大逃杀暂无三人分榜：四个大逃杀条目保持双人。
+    // 四个大逃杀条目都在 3.9.3 接入三人：模式仍独占 royale。
     for (const name of ['random-royale', 'echelon', 'apex', 'ark']) {
-      expect(algorithmPlayerCounts(name), name).toEqual([2]);
+      expect(algorithmPlayerCounts(name), name).toEqual([2, 3]);
       expect(algorithmModes(name), name).toEqual(['royale']);
     }
   });

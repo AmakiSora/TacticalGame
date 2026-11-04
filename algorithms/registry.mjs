@@ -51,6 +51,9 @@ export const ALGORITHMS = {
  * 与竞技场跑批发现（rl/evaluation/round_robin.py）都按它校验/过滤。缺省视为
  * ['standard']。
  *
+ * playerCounts 声明算法可参与的参赛人数（目前为 2 / 3），缺省视为 [2]；
+ * 三人榜与三人跑批只纳入声明含 3 的算法。
+ *
  * version 是算法的"当前版本"标注，进入竞技场参与者 id（algo_<name>@<version>）：
  * 算法实现被改进后升版时改这里（如 'v1' → 'v2'），此后新对局记在新版本 id 下，
  * 历史战绩仍归属旧版本 id。注意旧版本 id 必须继续在榜单注册表里可解析——若旧版
@@ -62,7 +65,7 @@ export const ALGORITHM_META = {
   greedy: { displayName: '贪心算法', description: '攻击 > 治疗 > 爆破 > 部署 > 移动', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
   random: { displayName: '随机算法', description: '从所有合法动作中随机选择', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
   'random-annihilation': { displayName: '歼灭随机算法', description: '歼灭：从所有合法动作中随机选择，跳过炮火危险区内的部署与治疗', version: 'v1', modes: ['annihilation'], playerCounts: [2, 3] },
-  'random-royale': { displayName: '大逃杀随机算法', description: '大逃杀：从所有合法计划动作中随机入队，随后提交', version: 'v1', modes: ['royale'] },
+  'random-royale': { displayName: '大逃杀随机算法', description: '大逃杀：从所有合法计划动作中随机入队，随后提交', version: 'v1', modes: ['royale'], playerCounts: [2, 3] },
   mcts: { displayName: '蒙特卡洛树搜索', description: '蒙特卡洛树搜索：模拟推演选择最优动作', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
   threat: { displayName: '威胁感知算法', description: '威胁图统一效用评估：集火斩杀、避险走位', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
   field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
@@ -77,11 +80,11 @@ export const ALGORITHM_META = {
   horizon: { displayName: '视界算法', description: '同时回合：分步结算镜像 + 多轮视界投影胜率评估 + 同构对手场景 + 束搜索 + 对抗探针', version: 'v1', modes: ['simultaneous'], playerCounts: [2, 3] },
   shrinkroll: { displayName: '缩圈推演算法', description: '歼灭：回合内束搜索 + 缩圈时间线推演 + 轮界裁决投影', version: 'v1', modes: ['annihilation'], playerCounts: [2, 3] },
   vortex: { displayName: '旋涡算法', description: '歼灭：炮火收缩圈预判疏散、稳杀集火、走位风筝与激进补员', version: 'v1', modes: ['annihilation'], playerCounts: [2, 3] },
-  echelon: { displayName: '雁阵算法', description: '大逃杀：落点扩散预报 + 精确击杀概率 + 炮火圈生存调度的逐拍效用决策', version: 'v1', modes: ['royale'] },
-  apex: { displayName: '绝境算法', description: '大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验', version: 'v1', modes: ['royale'] },
+  echelon: { displayName: '雁阵算法', description: '大逃杀：落点扩散预报 + 精确击杀概率 + 炮火圈生存调度的逐拍效用决策', version: 'v1', modes: ['royale'], playerCounts: [2, 3] },
+  apex: { displayName: '绝境算法', description: '大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验', version: 'v1', modes: ['royale'], playerCounts: [2, 3] },
   crucible: { displayName: '熔炉算法', description: '歼灭：整回合束搜索、对抗集火回推与缩圈时间线逃逸推演', version: 'v1', modes: ['annihilation'], playerCounts: [2, 3] },
   sovereign: { displayName: '统御算法', description: '歼灭：概率齐射竞价、多轮炮火逃逸与协同让行开路，动态权衡兵力和部署窗口', version: 'v1', modes: ['annihilation'], playerCounts: [2, 3] },
-  ark: { displayName: '方舟算法', description: '大逃杀：独立安全格容量分配、行动组合调度与缩圈增援负担评估', version: 'v1', modes: ['royale'] },
+  ark: { displayName: '方舟算法', description: '大逃杀：独立安全格容量分配、行动组合调度与缩圈增援负担评估', version: 'v1', modes: ['royale'], playerCounts: [2, 3] },
 };
 
 /**

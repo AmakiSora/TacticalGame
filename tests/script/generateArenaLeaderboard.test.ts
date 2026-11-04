@@ -426,6 +426,48 @@ describe('三人标准模式独立 PL 分榜', () => {
     expect(payload.registry['algo_tempo@v1'].modes).toEqual(['simultaneous']);
   });
 
+  it('大逃杀三人记录自成一份分榜，规则版本用 royale-3p-v1', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-three-royale-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    writeFileSync(statsFile, threePlayerLines({
+      map: 'snowflake',
+      rulesVersion: 'royale-3p-v1',
+      lineup: ['algo_random-royale@v1', 'algo_echelon@v1', 'algo_apex@v1'],
+    }).join('\n') + '\n');
+
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    expect(payload.modes).toEqual([]);
+    expect(payload.divisions).toHaveLength(1);
+    const division = payload.divisions[0];
+    expect(division).toMatchObject({
+      id: 'royale-3p-royale-3p-v1',
+      label: '大逃杀 · 三人',
+      mode: 'royale',
+      playerCount: 3,
+      rulesVersion: 'royale-3p-v1',
+      games: 6,
+    });
+    expect(division.maps.all.overview).toMatchObject({
+      games: 6, superblockCount: 1, quarantinedSuperblocks: 0,
+    });
+    // 大逃杀三人榜列全部 4 个大逃杀算法（3 个上场 + 1 个零局），不混入其它模式算法。
+    expect(division.maps.all.models).toHaveLength(4);
+    expect(division.maps.all.models.filter((model: { games: number }) => model.games > 0)).toHaveLength(3);
+    expect(payload.registry['algo_apex@v1'].playerCounts).toEqual([2, 3]);
+    expect(payload.registry['algo_apex@v1'].modes).toEqual(['royale']);
+  });
+
   it('残缺三人块不进入评分但保留隔离计数', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-three-partial-'));
     const statsFile = join(tempDir, 'matches.jsonl');

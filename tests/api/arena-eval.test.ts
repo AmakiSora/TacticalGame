@@ -332,6 +332,27 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(args).toContain(`--algorithms ${algorithms.join(',')}`);
   });
 
+  it('accepts every registered royale algorithm for three-player games', async () => {
+    const algorithms = ['apex', 'ark', 'echelon', 'random-royale'];
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: {
+        playerCount: 3, maps: ['snowflake'], games: 6,
+        participants: algorithms.map(name => `algo:${name}`),
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({
+      mode: 'royale', playerCount: 3, maps: ['snowflake'], games: 6,
+    });
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--mode royale');
+    expect(args).toContain('--player-count 3');
+    expect(args).toContain('--maps snowflake');
+    expect(args).toContain('--models none');
+    expect(args).toContain(`--algorithms ${algorithms.join(',')}`);
+  });
+
   it('rejects an annihilation map that has no three-player layout', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',
@@ -376,17 +397,17 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(withModel.statusCode).toBe(400);
     expect(withModel.json().error).toContain('不能参加三人竞技场');
 
-    // 大逃杀有三人布局（snowflake），但暂无三人分榜：按模式拒绝，与布局无关。
-    const royale = await app.inject({
+    // 大逃杀只有 snowflake 有三人布局，narrow-road 仍是纯双人图。
+    const royaleNoLayout = await app.inject({
       method: 'POST', url: '/api/arena/eval/start',
       payload: {
-        ...base, maps: ['snowflake'],
+        ...base, maps: ['narrow-road'],
         participants: ['algo:apex', 'algo:ark', 'algo:random-royale'],
       },
     });
-    expect(royale.statusCode).toBe(400);
-    expect(royale.json().code).toBe('mode_not_supported');
-    expect(royale.json().error).toContain('三人竞技场当前仅支持标准模式、歼灭模式与同时回合模式');
+    expect(royaleNoLayout.statusCode).toBe(400);
+    expect(royaleNoLayout.json().code).toBe('invalid_maps');
+    expect(royaleNoLayout.json().error).toContain('没有三人布局');
   });
 
   it('exposes player counts on maps and participants', async () => {
@@ -405,7 +426,8 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_verdict').playerCounts).toEqual([2, 3]);
     expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_dest-prob').playerCounts).toEqual([2, 3]);
     expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_matrix-eq').playerCounts).toEqual([2, 3]);
-    expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_ark').playerCounts).toEqual([2]);
+    expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_ark').playerCounts).toEqual([2, 3]);
+    expect(participants.algorithms.find((algo: { id: string }) => algo.id === 'algo_apex').playerCounts).toEqual([2, 3]);
   });
 
   it('rejects mixing two modes of random maps', async () => {

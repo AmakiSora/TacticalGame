@@ -6,6 +6,18 @@
 >
 > **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
 
+## 3.9.3（2026-11-04）— 大逃杀模式三人竞技场
+
+### 评估口径
+
+- 4 个大逃杀算法（`random-royale` / `echelon` / `apex` / `ark`）的 `playerCounts` 由 `[2]` 放宽到 `[2, 3]`，进入三人跑批。算法实现本身未改：雁阵、绝境、方舟都按缩圈时空与计划队列逐拍评估，不读对手人数；本版只放开准入并提供跑批能力。
+- 大逃杀三人局冻结 `royale-3p-v1` 规则版本，与标准、歼灭、同时回合三份三人榜各自独立成并列感知 Plackett-Luce 分榜。三人地图池只有 `snowflake` 与虚拟随机图 `random-royale`——`narrow-road` 的 `layouts` 只有双人布局，不能进三人批；RL 模型仍是单对手观测编码，任何模式的三人局都不参评。
+
+### 测试与验证
+
+- 真实引擎跑完 8 个阵容×地图批次（`snowflake` 4 组、`random-royale` 4 组，共 **288 局**），48 个完整 superblock、0 残块、0 批次失败、用时 18m21s；分榜 4 个算法全部非 provisional（`apex` 1874 / `ark` 1818 / `echelon` 1407 / `random-royale` 901），每人 216 局、每座位 72 局。
+- pytest 更新大逃杀 manifest 的规则版本、任务模式透传与未知模式拒绝；注册表、API、分榜与控制台回归覆盖 4 个算法的三人准入、`snowflake` 启动与「大逃杀 · 三人」分榜隔离。详见 [RL 日志](../../rl/docs/RELEASE_NOTES.md)。
+
 ## 3.9.2（2026-11-04）— 同时回合模式三人竞技场
 
 ### 评估口径

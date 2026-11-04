@@ -50,9 +50,9 @@ export const EVAL_MODES = [
 
 /**
  * 已接入三人跑批的模式；与 `rl/evaluation/round_robin.py` 的 `THREE_PLAYER_MODES`
- * 同口径（大逃杀暂无三人分榜）。三人局一律不参评 RL 模型。
+ * 同口径（四种模式均已有三人分榜）。三人局一律不参评 RL 模型。
  */
-export const THREE_PLAYER_EVAL_MODES = new Set(['standard', 'annihilation', 'simultaneous']);
+export const THREE_PLAYER_EVAL_MODES = new Set(['standard', 'annihilation', 'simultaneous', 'royale']);
 
 export interface EvalMapInfo {
   id: string;
@@ -249,7 +249,7 @@ const yieldTick = () => new Promise<void>(resolve => setImmediate(resolve));
 export interface EvalRunParams {
   /** 本批对局模式（由地图池推断，同一批不允许混模式）；缺省按 standard 兼容旧调用。 */
   mode?: string;
-  /** 参赛人数；缺省 2。三人走独立 PL 分榜（标准/歼灭/同时回合各一份），只收注册表声明 3 人的内置算法。 */
+  /** 参赛人数；缺省 2。三人走独立 PL 分榜（标准/歼灭/同时回合/大逃杀各一份），只收注册表声明 3 人的内置算法。 */
   playerCount?: 2 | 3;
   maps: string[];
   /**
@@ -928,7 +928,7 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
     }
     if (playerCount === 3 && !THREE_PLAYER_EVAL_MODES.has(mode)) {
       return reply.code(400).send({
-        error: '三人竞技场当前仅支持标准模式、歼灭模式与同时回合模式', code: 'mode_not_supported',
+        error: '三人竞技场当前仅支持标准模式、歼灭模式、同时回合模式与大逃杀模式', code: 'mode_not_supported',
       });
     }
     if (playerCount === 3) {
@@ -1024,7 +1024,7 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
     // 非标准模式没有 RL 模型可参评，至少需要两个该模式算法才能组成对阵批次；
     // 歼灭（random-annihilation + shrinkroll + vortex + crucible + sovereign）5 个、
     // 同时回合（random-sim + dest-prob + kriegspiel + matrix-eq + prism + tempo + tempo-weave + horizon）8 个、
-    // 大逃杀（random-royale + apex）2 个。
+    // 大逃杀（random-royale + echelon + apex + ark）4 个。
     if (mode !== 'standard') {
       const modeAlgoCount = Object.values(ALGORITHM_BOTS)
         .filter(config => config.modes.includes(mode)).length;

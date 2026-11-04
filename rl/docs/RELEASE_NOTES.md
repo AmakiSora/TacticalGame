@@ -3,6 +3,14 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-11-04 · 大逃杀模式三人评估跑批（3.9.3）
+
+**一句话**：三人评估补上大逃杀。`round_robin.py --player-count 3 --mode royale` 冻结 `royale-3p-v1` 的六局双向 manifest，4 个 royale 算法（`random-royale` / `echelon` / `apex` / `ark`）声明 `[2, 3]` 准入；`evaluate_cross.py` 的 `_is_plan_mode` 纳入 `royale`，三人路径按计划队列结算，reset 快照带 `playerCount: 3`；榜单按 `mode × rulesVersion` 生成独立的「大逃杀 · 三人」分榜，名册只取本模式通过三人准入的算法。
+
+**地图池**：大逃杀静态图只有 `snowflake` 带三人布局（`narrow-road` 的 `layouts` 只有 `2`），三人批写 `--maps snowflake,random-royale` 即可同时跑真实图与虚拟随机图；控制台按地图 `playerCounts` 过滤并用服务端布局校验兜底，`--mode royale` 必须显式给出（`--player-count 3` 默认仍按标准模式解释）。
+
+**测试与验证**：真实引擎跑 8 个阵容×地图批次共 **288 局**（4 阵容 × 2 图 × 36 局），48 个完整 superblock、0 残块、0 批次失败、用时 18m21s；分榜 4 个算法全部非 provisional（`apex` 1874 / `ark` 1818 / `echelon` 1407 / `random-royale` 901），每算法 216 局、三座位各 72 局。`test_three_player_evaluation.py` 改为大逃杀 manifest 规则版本、任务模式透传与未知模式拒绝三例；`tests/api/arena-eval.test.ts` 覆盖 royale 三人启动、4 算法准入与 `narrow-road` 无三人布局拒绝，`generateArenaLeaderboard` 覆盖「大逃杀 · 三人」分榜隔离与 4 条名册。
+
 ## 2026-11-04 · 同时回合模式三人评估跑批（3.9.2）
 
 **一句话**：三人评估从标准、歼灭扩到同时回合。`round_robin.py --player-count 3 --mode simultaneous` 冻结 `simultaneous-3p-v1` 的六局双向 manifest，8 个同时回合算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）声明 `[2, 3]` 准入；`evaluate_cross.py` 的三人路径本就不读模式参数（`_is_plan_mode` 从对局状态取模式），本版只把 `--player-c` 帮助文案改成模式中立；榜单按 `mode × rulesVersion` 生成独立的「同时回合 · 三人」分榜，名册只取本模式通过三人准入的算法。

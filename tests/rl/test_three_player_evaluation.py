@@ -1,4 +1,4 @@
-"""三人评估（标准 / 歼灭 / 同时回合）：六局双向轮换、manifest 续跑与并列名次（pytest）。"""
+"""三人评估（标准 / 歼灭 / 同时回合 / 大逃杀）：六局双向轮换、manifest 续跑与并列名次（pytest）。"""
 
 from __future__ import annotations
 
@@ -29,6 +29,11 @@ SIMULTANEOUS_PARTICIPANTS = [
     ("algo:dest-prob@v2", "algo_dest-prob@v2"),
     ("algo:random-sim@v2", "algo_random-sim@v2"),
     ("algo:tempo@v1", "algo_tempo@v1"),
+]
+ROYALE_PARTICIPANTS = [
+    ("algo:random-royale@v1", "algo_random-royale@v1"),
+    ("algo:echelon@v1", "algo_echelon@v1"),
+    ("algo:apex@v1", "algo_apex@v1"),
 ]
 
 
@@ -87,17 +92,43 @@ def test_three_player_plan_carries_the_annihilation_mode_into_every_task(tmp_pat
         assert len(schedule["games"]) == 6
 
 
-def test_three_player_manifest_rejects_modes_without_a_three_player_arena():
-    # 同时回合已接入三人分榜；大逃杀虽有 snowflake 的三人布局，但暂无三人分榜。
+def test_three_player_manifest_rejects_unknown_modes():
+    # 四种内置模式全部有三人分榜；未知模式仍在冻结 manifest 前就被挡住。
     round_robin.build_three_player_manifest(
         SIMULTANEOUS_PARTICIPANTS, "standoff", "rr-simultaneous", 6, mode="simultaneous")
     try:
         round_robin.build_three_player_manifest(
-            ANNIHILATION_PARTICIPANTS, "snowflake", "rr-unsupported", 6, mode="royale")
+            ROYALE_PARTICIPANTS, "snowflake", "rr-unsupported", 6, mode="team-deathmatch")
     except ValueError as exc:
-        assert "royale" in str(exc)
+        assert "team-deathmatch" in str(exc)
     else:
-        raise AssertionError("royale three-player manifest must be rejected")
+        raise AssertionError("unknown three-player mode must be rejected")
+
+
+def test_royale_manifest_freezes_its_own_rules_version():
+    manifest = round_robin.build_three_player_manifest(
+        ROYALE_PARTICIPANTS, "snowflake", "rr-royale", 6, mode="royale")
+    assert manifest["mode"] == "royale"
+    assert manifest["rulesVersion"] == "royale-3p-v1"
+    assert manifest["rulesVersion"] == round_robin.THREE_PLAYER_RULES_VERSIONS["royale"]
+    assert len(manifest["games"]) == 6
+    # 计划大逃杀局的 ETA 需要该模式的单局成本（缩圈 + 淘汰比同时回合更久）。
+    assert round_robin.THREE_PLAYER_COST_PER_GAME["royale"] > 0
+    assert round_robin.THREE_PLAYER_COST_PER_GAME["royale"] > round_robin.THREE_PLAYER_COST_PER_GAME["standard"]
+
+
+def test_three_player_plan_carries_the_royale_mode_into_every_task(tmp_path):
+    stats = tmp_path / "matches.jsonl"
+    tasks, skipped = round_robin.plan_three_player_tasks(
+        ROYALE_PARTICIPANTS, ["snowflake", "random-royale"],
+        "rr-royale-plan", {}, 6, stats, mode="royale")
+    assert skipped == 0
+    assert [task["map"] for task in tasks] == ["snowflake", "random-royale"]
+    for task in tasks:
+        schedule = json.loads(Path(task["schedule_file"]).read_text(encoding="utf-8"))
+        assert schedule["mode"] == "royale"
+        assert schedule["rulesVersion"] == "royale-3p-v1"
+        assert len(schedule["games"]) == 6
 
 
 def test_simultaneous_manifest_freezes_its_own_rules_version():
@@ -156,6 +187,9 @@ def test_plan_rejects_non_six_multiple_and_unsupported_maps():
     assert round_robin.map_supports_player_count(ROOT, "whirlpool", 3)
     assert round_robin.map_supports_player_count(ROOT, "standoff", 3)
     assert round_robin.map_supports_player_count(ROOT, "random-simultaneous", 3)
+    assert round_robin.map_supports_player_count(ROOT, "snowflake", 3)
+    assert round_robin.map_supports_player_count(ROOT, "random-royale", 3)
+    assert not round_robin.map_supports_player_count(ROOT, "narrow-road", 3)
     assert not round_robin.map_supports_player_count(ROOT, "mistpine", 3)
     assert not round_robin.map_supports_player_count(ROOT, "default", 3)
     try:

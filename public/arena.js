@@ -862,11 +862,11 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
 
   /** 已接入三人跑批的模式；与后端 `THREE_PLAYER_EVAL_MODES`、
    *  `rl/evaluation/round_robin.py` 的 `THREE_PLAYER_MODES` 同口径。 */
-  const EVAL_THREE_PLAYER_MODES = ['standard', 'annihilation', 'simultaneous'];
+  const EVAL_THREE_PLAYER_MODES = ['standard', 'annihilation', 'simultaneous', 'royale'];
 
   const EVAL_PLAYER_OPTIONS = [
     { value: 2, label: '双人（Bradley-Terry）', hint: '双人局 · Bradley-Terry 两两比较排名 · 模型与内置算法按当前模式参评' },
-    { value: 3, label: '三人（独立 PL 分榜）', hint: '三人局 · 独立 Plackett-Luce 榜与六局双向轮换 · 标准/歼灭/同时回合模式的内置算法参评，至少 3 个' },
+    { value: 3, label: '三人（独立 PL 分榜）', hint: '三人局 · 独立 Plackett-Luce 榜与六局双向轮换 · 标准/歼灭/同时回合/大逃杀模式的内置算法参评，至少 3 个' },
   ];
 
   function renderEvalPlayerBar() {
@@ -1198,7 +1198,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     syncMapChips(currentEvalMaps());
     renderEvalParticipants();
     evalMsg(evalPlayerCount === 3
-      ? '三人模式：标准/歼灭/同时回合模式、仅通过三人准入的内置算法、局数按六局 superblock 计。'
+      ? '三人模式：标准/歼灭/同时回合/大逃杀模式、仅通过三人准入的内置算法、局数按六局 superblock 计。'
       : '', undefined);
   }
 

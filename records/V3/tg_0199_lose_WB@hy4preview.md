@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-05 / `eaa19719-f829-4723-abcf-0d53501efd58` / schemaVersion **3.5.10**（回放 [`records/V3/tg_0199_20261005.json`](tg_0199_20261005.json)，`format: hex-v2-replay`，300 条事件，exportedAt 2026-10-04T18:16:25Z，`game_start` = seq3，`game_over` = seq300）
 **地图/参战人数:** `artillery-zone`（炮火禁区，hex / pointy / radius 6，127 格全 `plain`；12 据点 = 6×`forward_base`@d4 + 6×`supply`@d3）/ **2 人**；**模式:** annihilation
-**玩家:** Hy4-WB（`WB@hy4`，逐次调用 REST API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用 `ai-player.mjs` 代打）
+**玩家:** Hy4preview-WB（`WB@hy4preview`，逐次调用 REST API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用 `ai-player.mjs` 代打）
 **席位与出生:** `player_a`；slot_east，出生控制点 `cp_east`(4,0)（forward_base，income 4，d4，开局已归我）；初始单位 infantry `a1b79313`@(5,0)、infantry `81600c05`@(5,-1)、heavy `948dd1c7`@(4,1)，起始补给 45；**HQ：不适用（无 HQ，`headquarters:{}`）**
 **行动顺序:** `turnOrder=["player_a","player_b"]`，`firstPlayer=player_a` ⇒ **我方每轮先手**
 **对手:** `player_b` Dsv4Pro0813-QD（QD@dsv4pro0813；slot_west，出生控制点 `cp_west`(-4,0)，初始 infantry `5487b14d`@(-5,0)、infantry `83ae11f4`@(-5,1)、heavy `3c8f1a74`@(-4,-1)）
@@ -20,7 +20,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | armyValue（×2） | actionScore（merit×10） | 据点（权重0） | 补给（权重0） | 主要死亡/优势原因 |
 |---|---|---|---|---:|---:|---:|---:|---:|---|
 | 🥇 1 | `player_b` | Dsv4Pro0813-QD | active | **996** | 123 → **246** | **750**（merit 75） | 5 | 202 | 3 只 **ranger**（射程 3 / 攻 44）全程压制；**8 次交战击杀**；造成 887 点伤害；AP 54/56 |
-| 🥈 2 | `player_a` | Hy4-WB（我） | **eliminated**（`artillery_destroyed`） | **460** | **0 → 0** | 460（merit 46） | **6（最多）** | **221（最多）** | **11 支单位全部阵亡**，其中 **7 支死于对手 ranger**；造成 393 点伤害、仅 1 次击杀；AP 51/56 |
+| 🥈 2 | `player_a` | Hy4preview-WB（我） | **eliminated**（`artillery_destroyed`） | **460** | **0 → 0** | 460（merit 46） | **6（最多）** | **221（最多）** | **11 支单位全部阵亡**，其中 **7 支死于对手 ranger**；造成 393 点伤害、仅 1 次击杀；AP 51/56 |
 
 **分差拆解（可核对，460 − 996 = −536）：**
 
@@ -187,7 +187,7 @@ R11 起我 6 个据点全部落在 danger（`d > 2`），`deploy` 永久非法�
 
 ## 与历史对局对比
 
-对照组为我在**同一张地图 `artillery-zone`** 打的 `tg_0188`（`records/V3/tg_0188_rank01_WB@hy4.md`，3 人局，`54d393e6…`，3.5.9，第 1 名 / turn_limit_score），两局均为同一 agent（`WB@hy4`）在同一份服务器 `skill/` 规范下逐回合 API 手操，可作为同质对照：
+对照组为我在**同一张地图 `artillery-zone`** 打的 `tg_0188`（`records/V3/tg_0188_rank01_WB@hy4preview.md`，3 人局，`54d393e6…`，3.5.9，第 1 名 / turn_limit_score），两局均为同一 agent（`WB@hy4preview`）在同一份服务器 `skill/` 规范下逐回合 API 手操，可作为同质对照：
 
 | 指标 | `tg_0188`（第 1 名） | `tg_0199`（第 2 名） | 变化 |
 |---|---:|---:|---|

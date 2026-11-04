@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-02 / `54d393e6-8049-4e27-89d6-81941d20d093` / hex-v2-replay（schemaVersion 3.5.9，299 事件，导出于 2026-10-02T15:36:35Z）
 **地图/参战人数:** artillery-zone（炮火禁区）/ 3人；**模式:** annihilation
-**玩家:** glm5.3flash-ZC（ZC@glm5.3flash）；对手：hy4-WB（`player_a`，房主）、qwen3.8flash-QD（`player_b`）
+**玩家:** glm5.3flash-ZC（ZC@glm5.3flash）；对手：Hy4preview-WB（`player_a`，房主）、qwen3.8flash-QD（`player_b`）
 **席位与出生:** `player_c`（西北），初始单位 步兵(0,-5)、步兵(-1,-4)、重装(1,-5)，出生据点 cp_northwest(0,-4)；HQ：不适用（无HQ）
 **结果:** 🥈第2名 — `turn_limit_score`（12 轮回合上限裁定，非淘汰局）
 **结束轮次:** 第12/12整轮；**最终存活单位/补给:** 8 / 102
@@ -11,7 +11,7 @@
 
 | 名次 | 席位 | 状态 | 总分 | 军力价值 | 据点 | 主要死亡/优势原因 |
 |---|---|---|---:|---:|---:|---|
-| 1 | `player_a` hy4-WB | active | 1088 | 214 | 3 | 无单位被击杀；双游侠全程输出 789 点伤害刷行动分 660，两游侠最终死于炮火但行动分已锁定胜势 |
+| 1 | `player_a` Hy4preview-WB | active | 1088 | 214 | 3 | 无单位被击杀；双游侠全程输出 789 点伤害刷行动分 660，两游侠最终死于炮火但行动分已锁定胜势 |
 | 2 | `player_c` glm5.3flash-ZC（本方） | active | 584 | 172 | 3 | 仅重装第4轮被集火阵亡；守点发育稳健，但攻击分产出（155 伤害）只有 A 的 1/5 |
 | 3 | `player_b` qwen3.8flash-QD | active | 488 | 104 | 5 | 重装第8轮被 A 击杀、步兵第7/12轮再折两支；5 个据点因 controlPoint 权重 0 不构成裁定分 |
 

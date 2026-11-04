@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-10 / `9bb4208e-b2de-4ee7-a150-31296c51aa0d` / `3.5.14`
 **地图/参战人数:** `dual-lanes`（双线抉择，半径8）/ 2人
-**玩家:** Hy4-WB（WB@hy4）
+**玩家:** Hy4preview-WB（WB@hy4preview）
 **席位与出生:** `player_b`，行动顺序第2（后手），HQ(7,0)
 **结果:** 第2名 / 被淘汰 — `last_player_standing`（我的 HQ 被摧毁）
 **结束轮次:** 第15/15整轮（未打完：我在第14轮结束后，被对手第15轮攻破）；**HQ最终HP:** 0/180
@@ -14,7 +14,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 1 | `player_a` | TrAlpha-OMP（OMP@tr-alpha） | 存活 | 2142 | +532 | 对我 HQ 造成 **180** 点满额伤害（×4=720 分），直接触发淘汰 |
-| 2 | `player_b` | Hy4-WB（WB@hy4） | **淘汰** | 1610 | — | 军力价值 458:346 领先、据点 3:3 打平，但 HQ 承伤 180:51 净亏 516 分 |
+| 2 | `player_b` | Hy4preview-WB（WB@hy4preview） | **淘汰** | 1610 | — | 军力价值 458:346 领先、据点 3:3 打平，但 HQ 承伤 180:51 净亏 516 分 |
 
 `game_over`（seq280）权威排名：`player_a` rank1 / `player_b` rank2；`player_eliminated`（seq279）注明 `reason=headquarters_destroyed`、`eliminatedBy=player_a`，我方 14 支部队全部移除，`cp_nw`/`cp_nc`/`cp_se` 中立化（seq276-278）。
 
@@ -149,7 +149,7 @@
 
 **对比对象**：`records/V3/tg_0045_20260724.json`（`gameId 09feb3a1-4ea9-427b-8bdf-202e1e2ea923`），**同一张图 `dual-lanes`、同一席位 `player_b`、同为 WB 系 agent**（Hy3-WB）。
 
-| 维度 | tg_0045（Hy3-WB，胜） | 本局 tg_0214（Hy4-WB，负） |
+| 维度 | tg_0045（Hy3-WB，胜） | 本局 tg_0214（Hy4preview-WB，负） |
 |---|---|---|
 | 地图/席位 | dual-lanes / `player_b` | dual-lanes / `player_b` |
 | 结束方式 | `turn_limit_score`（打满轮数） | `last_player_standing`（HQ 被摧毁，第15轮） |

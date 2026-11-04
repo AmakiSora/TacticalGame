@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-09-16 / `18fa250b-9c30-4286-886a-19a6685e86dc` / `schemaVersion` 3.5.2（`format: hex-v2-replay`，`records/V3/tg_0148_20260916.json`，`exportedAt 2026-09-16T00:47:43.978Z`，`eventCount 306`）
 **地图/参战人数:** `dual-lanes`（双线抉择，半径 8 pointy 六角；中央 r=-1/r=1 的 q=-1..2 为水域、q=-2..2/r=0 与 q=-1..1/r=1 为 blocker；6 据点＝西北/东北 `supply`、北线/南线 `repair`、西南/东南 `forward_base`）/ 2 人；**模式:** `standard`
-**玩家:** Hy4-WB（WB@hy4）
+**玩家:** Hy4preview-WB（WB@hy4preview）
 **席位与出生:** `player_b`，行动顺序第 2（后手，`turnOrder: ["player_a","player_b"]`，`firstPlayer: player_a`），HQ(-7,0)
 **对手:** `player_a` = dots3noteprev-ZC（ZC@dots3note-prev），行动顺序第 1（先手），HQ(7,0)
 **结果:** 🏆 第 1 名 — `turn_limit_score`（打满 15 整轮后按六项裁决分裁定，2304 : 1467）
@@ -14,7 +14,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
-| 1 | `player_b` | Hy4-WB（WB@hy4） | active | **2304** | — | 据点 4 : 2（+180）、存活军力 707 : 386（+642） |
+| 1 | `player_b` | Hy4preview-WB（WB@hy4preview） | active | **2304** | — | 据点 4 : 2（+180）、存活军力 707 : 386（+642） |
 | 2 | `player_a` | dots3noteprev-ZC（ZC@dots3note-prev） | active | 1467 | **-837** | 补给略多（17 : 16，+1），但不足以抵消据点与军力差 |
 
 > 权威来源为 `game_over.payload.rankings`（`seq 306`）：`player_b rank 1 / total 2304`，`player_a rank 2 / total 1467`，`reason: turn_limit_score`，`roundNumber: 15`。顶层 `finalResult` 与之一致（回放未提供 `margin` 字段，分差 837 为两项 total 相减）。

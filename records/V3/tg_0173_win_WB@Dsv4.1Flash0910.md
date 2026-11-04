@@ -175,10 +175,10 @@
 
 | 参照局 | 地图/模式 | 我方席位与结果 | 关键数字 | 本局是**重复/修正/验证**了什么 |
 |---|---|---|---|---|
-| `tg_0147_20260913.json` | breach / standard | 同 agent `Dsv4.1Flash0910-WB` 作 `player_a` **胜** Hy4-WB，1504 : 1270 | 我方 armyValue 437、actionScore 158、3 据点 | **修正**：同为 breach/standard，本局把军力价值从 437 提到 **982**（对手从 328 到 495），军力差从 +109 拉到 **+487**；代价是 `actionScore` 从 158 掉到 86（本局 AP 更多投向部署而非交战）。说明"据点折扣扩军"路线可复现且收益更高，但会牺牲交战功绩。 |
+| `tg_0147_20260913.json` | breach / standard | 同 agent `Dsv4.1Flash0910-WB` 作 `player_a` **胜** Hy4preview-WB，1504 : 1270 | 我方 armyValue 437、actionScore 158、3 据点 | **修正**：同为 breach/standard，本局把军力价值从 437 提到 **982**（对手从 328 到 495），军力差从 +109 拉到 **+487**；代价是 `actionScore` 从 158 掉到 86（本局 AP 更多投向部署而非交战）。说明"据点折扣扩军"路线可复现且收益更高，但会牺牲交战功绩。 |
 | `tg_0093_20260814.json` | breach / standard | 对手方 Hy3-WB **负** Qwen3.8Max-QD，1533 : 1940 | 败方囤补给 **607**、armyValue 仅 153；胜方 armyValue 712、剩 12 | **验证**：囤在账上的补给只值 ×1，转成军力值 ×2。本局我补给从 50 花到终局剩 **2**，正是这条经验的正向复现。 |
 | `tg_0165_20260924.json` | breach / standard | — | 胜方 armyValue 1004、总分 3012；败方 armyValue 148、总分 755 | **验证**：breach 上"军力价值就是分差"的极端样本；本局 982 : 495 与之一致（军力项占分差 76%）。 |
-| `tg_0171_20260927.json` | artillery-zone / annihilation | 同 agent `Dsv4.1Flash0910-WB` 作 `player_a` **胜** Hy4-WB，1084 : 990 | 5 据点、armyValue 262、actionScore 560（同时/歼灭下 `effectiveActions` 与伤害刻度不同） | **提醒（非同类对比）**：歼灭模式无 HQ、无 `controlPoint × 90` 权重，分差几乎全由 `actionScore` 决定（两方合计 1110 分）；而 standard 的 **据点 ×90** 是最重的单点项，本局 4:1 的据点差直接贡献 270 分，并通过 512 据点收入进一步转化成军力。**结论：两种模式的"最贵动作"完全不同，standard 里占点优先级远高于歼敌。** |
+| `tg_0171_20260927.json` | artillery-zone / annihilation | 同 agent `Dsv4.1Flash0910-WB` 作 `player_a` **胜** Hy4preview-WB，1084 : 990 | 5 据点、armyValue 262、actionScore 560（同时/歼灭下 `effectiveActions` 与伤害刻度不同） | **提醒（非同类对比）**：歼灭模式无 HQ、无 `controlPoint × 90` 权重，分差几乎全由 `actionScore` 决定（两方合计 1110 分）；而 standard 的 **据点 ×90** 是最重的单点项，本局 4:1 的据点差直接贡献 270 分，并通过 512 据点收入进一步转化成军力。**结论：两种模式的"最贵动作"完全不同，standard 里占点优先级远高于歼敌。** |
 
 **本局新发现（此前复盘未记录）**：
 1. `forward_base` 的 `deployDiscount` 是**纯增量**——`armyValue` 按单位目录价计算，实付价无所谓，因此每吃一次 −8 折扣等于白得 8 军力价值（16 裁决分）。本局 9 次折扣 = 白得 144 分。

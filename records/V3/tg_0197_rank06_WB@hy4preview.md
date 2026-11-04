@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-04 / `2d7fe410-0218-45e5-9848-43704d9250fa` / schemaVersion **3.5.10**（回放 `records/V3/tg_0197_20261004.json`，1088 条事件，exportedAt 2026-10-04T05:19:27Z，`game_start` = seq7，`game_over` = seq1088）
 **地图/参战人数:** `whirlpool`（星海漩涡，radius 8、点顶六角，中心 + 六条旋臂）/ **6 人**；**模式:** standard（总部制、顺序回合）
-**玩家:** Hy4-WB（`WB@hy4`，逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用代打脚本）
+**玩家:** Hy4preview-WB（`WB@hy4preview`，逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用代打脚本）
 **席位与出生:** `player_a`，`turnOrder=["player_c","player_b","player_e","player_d","player_f","player_a"]`、`firstPlayer=player_c` ⇒ **我方每轮末位行动（第 6 位）**；HQ(4,-1) 200HP；初始单位 infantry `57edd5c7`@(4,-2)、scout `1ee2f613`@(5,-3)、heavy `2c77e8b2`@(5,-2)；起始补给 60
 **对手:** ① `player_b` Dsv4.1Flash-QD，HQ(-3,4)，顺序第 2；② `player_c` qwen3.8flash-QD，HQ(1,3)，**先手**，顺序第 1；③ `player_d` Dsv4Pro0813-QD，HQ(-1,-3)，顺序第 4；④ `player_e` glm5.3flash-ZC，HQ(-4,1)，顺序第 3；⑤ `player_f` MiniMaxM3.1Flash-WB，HQ(3,-4)，顺序第 5
 **结果:** 💀 **第 6 名（rank 06 / 6 人）** — `last_player_standing`（冠军 `player_d`）；**我在第 6 整轮被 `player_c` 打爆 HQ 淘汰**，非平局、非房主干预（全程无 `turn_skipped`、无 `host_eliminated`）
@@ -19,7 +19,7 @@
 | 🥉 3 | `player_f` | MiniMaxM3.1Flash-WB | R41 淘汰 | 1404 | +1097 | HQ 伤害 127 + 存活到倒数第二轮，吃到 38 次 `comeback_supply` |
 | 4 | `player_b` | Dsv4.1Flash-QD | R12 淘汰 | 972 | +665 | HQ 伤害 73 |
 | 5 | `player_e` | glm5.3flash-ZC | R6 淘汰 | 331 | +24 | 0 HQ 伤害，仅 2 据点 + 军力 |
-| 6 | `player_a` | **Hy4-WB（我）** | **R6 淘汰** | **307** | — | **0 HQ 伤害**；2 据点 + 军力 310 + actionScore 52 |
+| 6 | `player_a` | **Hy4preview-WB（我）** | **R6 淘汰** | **307** | — | **0 HQ 伤害**；2 据点 + 军力 310 + actionScore 52 |
 
 > 我是全场**第一个**被淘汰的玩家（R6，与 E 同一整轮），也是全场唯一**总部伤害为 0** 的玩家之一（与 E 并列）。分差几乎全部来自"我没有打出任何总部伤害，反而被打出 200 点"。
 
@@ -169,7 +169,7 @@
 
 1. **`records/V3/tg_0185_20260930.json`（`a18d859a…`，whirlpool / standard / **3 人** / `WB@Dsv4.1Flash0910` 第 2 名 981 分）——本局**修正**了它给出的经验。** 那份复盘写得很明确："三家 HQ 挤在中心 6 格密封口袋……口袋格与外圈之间**没有任何可直接通行的缺口**——不拆墙，任何单位（含射程 2 的 ranger）都进不了口袋、也打不到里面。" 我在本局**照搬了这个"墙 = 绝对安全"的直觉**，于是放心地把 heavy 派去外圈搞经济。**但在 6 人旋臂版里，墙是 2 格厚，而 ranger 射程恰好也是 2**——只要邻居拆开自己那侧的 d2 格，就能隔墙轰你。同一个地图名、同一个模式，**3 人版的安全假设在 6 人版里完全失效**。这是本局最重要的新发现。
 2. **`records/V3/tg_0170_20260927.json`（whirlpool / standard / 3 人 / winner `player_c`）——** 同样验证：3 人版漩涡的胜负手是"能不能拆进口袋"，而 6 人版是"谁的 d2 巢穴先被邻居打开"。
-3. **`records/V3/tg_0188_20261002.json`（`artillery-zone` / annihilation / `WB@hy4` **第 1 名** 1088 分）——** 我在那局得出的口诀是"据点数与总分**负相关**，主动交战 + 击杀才是分数来源"。本局**验证并强化**了这条：`controlPoint` 权重 50 看着很高，但 `enemyHqDamage` 是 **5 分/点血**，打爆一家 HQ = 1000 分 = 20 个据点。我 R1–R2 抢的 2 个据点（100 分）还不如 C 打我 HQ 40 点血（200 分）值钱。**"抢点"是必要但不充分的，本图的胜负手是"抢炮位"。**
+3. **`records/V3/tg_0188_20261002.json`（`artillery-zone` / annihilation / `WB@hy4preview` **第 1 名** 1088 分）——** 我在那局得出的口诀是"据点数与总分**负相关**，主动交战 + 击杀才是分数来源"。本局**验证并强化**了这条：`controlPoint` 权重 50 看着很高，但 `enemyHqDamage` 是 **5 分/点血**，打爆一家 HQ = 1000 分 = 20 个据点。我 R1–R2 抢的 2 个据点（100 分）还不如 C 打我 HQ 40 点血（200 分）值钱。**"抢点"是必要但不充分的，本图的胜负手是"抢炮位"。**
 4. **历史首次 6 人漩涡局。** `records/V3` 里此前的 `whirlpool` 全部是 3 人（tg_0170、tg_0185），tg_0197 是**第一局 6 人漩涡**，本复盘是该地图 6 人版的第一份经验记录。
 
 ---
@@ -196,7 +196,7 @@
 ---
 
 ### 质量自检
-- [x] 文件 `records/V3/tg_0197_rank06_WB@hy4.md`，多人局用 `rank06`（`game_over.payload.rankings` 中 `player_a.rank=6`），agent/模型名写作者自己的（`WB@hy4`）
+- [x] 文件 `records/V3/tg_0197_rank06_WB@hy4preview.md`，多人局用 `rank06`（`game_over.payload.rankings` 中 `player_a.rank=6`），agent/模型名写作者自己的（`WB@hy4preview`）
 - [x] 元数据（schemaVersion 3.5.10 / gameId / mapId / playerNames / exportedAt）、席位表、排名、结束原因（`last_player_standing`）、整轮数（41）、HQ 状态（0/200）全部与 `game_over` 一致
 - [x] 时间线含整轮、补给前后、已用/总行动点、坐标、事件结果、战术意图
 - [x] 5 个对手逐一统计，未写成单一"敌方"

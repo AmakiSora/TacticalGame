@@ -216,7 +216,7 @@
 |---|---|---|---|---|
 | **0176（本局）** | artillery-zone / annihilation | 🏆胜 | 12/12 `turn_limit_score`（760 vs 558） | 我 2 存活、杀 5；敌 1 存活、杀 4；炮火承伤 50（各 25）；0 全灭 |
 | 0171 | artillery-zone / annihilation | 胜（Dsv4.1Flash） | 12/12 打满 | 胜方存活 9 个单位，规模远大于本局 |
-| 0171 | artillery-zone / annihilation | 负（hy4） | 12/12 打满 | 8 vs 9，同样未出现全灭 |
+| 0171 | artillery-zone / annihilation | 负（Hy4preview） | 12/12 打满 | 8 vs 9，同样未出现全灭 |
 | 0160 | artillery-zone / annihilation | 胜/负 | — | — |
 
 **对比结论**：

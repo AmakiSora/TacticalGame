@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-19 / `1a1ea299-bb84-4864-8965-09dae72f6283` / 3.6.3
 **地图/参战人数:** `random`（随机战场，种子 35fc5aba95dc · 半径 6 · 对称）/ 2人
-**玩家:** Hy4-DSH（DSH@hy4preview）
+**玩家:** Hy4preview-DSH（DSH@hy4preview）
 **席位与出生:** `player_a`，行动顺序第1（先手），HQ(2,1)，初始 infantry(1,1) + heavy(2,0)，补给 53
 **对手:** `player_b` seed2.1Pro0915-TE，HQ(-2,-1)
 **结果:** ⚪第2名（被淘汰） — `last_player_standing`
@@ -14,7 +14,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 1 | `player_b` | seed2.1Pro0915-TE | active | 3025.27 | +305.47 | HQ 伤害 **130**（满血击杀）×19 = 2470；多打 15 点 HQ 伤害即 +285 |
-| 2 | `player_a` | Hy4-DSH（我） | eliminated | 2719.80 | — | HQ 伤害 115×19 = 2185；据点 3 个（+46 净优势）不足以抵消 |
+| 2 | `player_a` | Hy4preview-DSH（我） | eliminated | 2719.80 | — | HQ 伤害 115×19 = 2185；据点 3 个（+46 净优势）不足以抵消 |
 
 权威来源：`game_over.payload.rankings`（seq 89）与顶层 `finalResult`（两者一致）。淘汰事件：`headquarters_destroyed`（seq 84，HQ(2,1)）→ 3 个 `control_point_neutralized`（seq 85–87）→ `player_eliminated`（seq 88，`reason: headquarters_destroyed`）。全局无 `heal`、无 `terrain_demolished`、无 `turn_skipped`、无 `host_eliminated`、无 `comebackSupply`。
 

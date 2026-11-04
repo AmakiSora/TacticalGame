@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-09-18 / `c25a435e-2b94-495a-bc09-a6df4a634071` / `schemaVersion` **3.5.2**（`format: hex-v2-replay`，`eventCount 297`；落盘 `records/V3/tg_0154_20260918.json`，`exportedAt 2026-09-18T00:50:07.483Z`）
 **地图/参战人数:** `breach`（破障行动，半径 8 pointy 六角；中央 q=0 整列石墙 + 两侧水域，三对类型据点原点反射对称）/ 2 人；**模式:** `standard`
-**玩家:** Hy4-WB（WB@hy4，WorkBuddy 客户端）
+**玩家:** Hy4preview-WB（WB@hy4preview，WorkBuddy 客户端）
 **席位与出生:** `player_a`，出生槽 `slot_b`，行动顺序第 **2**（**后手**，`turnOrder: ["player_b","player_a"]`，`firstPlayer: player_b`），HQ **(8,0)**（`5fc8379c`），HP 100/100
 **对手:** `player_b` = seed2.1pro0915-TC（TC@seed2.1pro0915），出生槽 `slot_a`，行动顺序第 1（先手），HQ (-8,0)（`51940e6e`），HP 100/100
 **结果:** 🏆 第 1 名 — `turn_limit_score`（打满 15 整轮，双方均存活，按六项裁决分裁定 **1874 : 1702**）
@@ -43,7 +43,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
-| 🏆 1 | `player_a`（我） | Hy4-WB（WB@hy4） | active | **1874** | — | 存活军力 **618 : 527**（×2 = **+182**）+ 行动分 164 : 160（+4） |
+| 🏆 1 | `player_a`（我） | Hy4preview-WB（WB@hy4preview） | active | **1874** | — | 存活军力 **618 : 527**（×2 = **+182**）+ 行动分 164 : 160（+4） |
 | 2 | `player_b` | seed2.1pro0915-TC | active | **1702** | **−172** | 击杀 **6 : 3** 领先、剩余补给 18 : 4（+14），不足以抵消军力差 |
 
 > 权威来源 `game_over.payload.rankings`（seq297）：`player_a rank 1 / total 1874`，`player_b rank 2 / total 1702`，`reason: turn_limit_score`，`roundNumber: 15`；顶层 `finalResult` 与之一致。
@@ -226,9 +226,9 @@
 
 ## 与历史对局对比
 
-### 对照一：`tg_0147_lose_WB@hy4`（`2a38fc84`，2026-09-13）—— 同图、同 agent、同模型、同权重的**败局**，本局是它的正面修正
+### 对照一：`tg_0147_lose_WB@hy4preview`（`2a38fc84`，2026-09-13）—— 同图、同 agent、同模型、同权重的**败局**，本局是它的正面修正
 
-| 指标 | **tg_0154 本局**<br>WB@hy4 · `player_a` | tg_0147<br>WB@hy4 · `player_b` |
+| 指标 | **tg_0154 本局**<br>WB@hy4preview · `player_a` | tg_0147<br>WB@hy4preview · `player_b` |
 |---|---|---|
 | 地图 / 模式 / 人数 | `breach` / standard / 2人 | `breach` / standard / 2人 |
 | 席位 / HQ | `player_a` 后手，HQ(8,0) | `player_b` **先手**，HQ(-8,0) |

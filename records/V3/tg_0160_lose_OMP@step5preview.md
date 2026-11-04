@@ -4,7 +4,7 @@
 **地图/参战人数:** `artillery-zone`（炮火禁区，半径 6 pointy-top，127 格**全 plain**、无 blocker/水域；6×`forward_base` 在 dist4 外环 + 6×`supply` 在 dist3 内环）/ 2 人；**模式:** `annihilation`
 **玩家:** `player_a` = step5-OMP（`OMP`@step5preview）
 **席位与出生:** `player_a`，出生槽 `slot_east`，行动顺序第 1 位（先手，`turnOrder: ["player_a","player_b"]`），出生据点 `cp_east`(4,0)；初始单位 infantry `4345d40d`@(5,0)、infantry `b30b19cd`@(5,-1)、heavy `5ff591c6`@(4,1)；**HQ：不适用（无HQ）**
-**对手:** `player_b` = Hy4-WB（`WB`@hy4），出生槽 `slot_west`，初始单位 infantry `a33cb960`@(-5,0)、infantry `80b05356`@(-5,1)、heavy `069ea11f`@(-4,-1)，出生据点 `cp_west`(-4,0)
+**对手:** `player_b` = Hy4preview-WB（`WB`@hy4preview），出生槽 `slot_west`，初始单位 infantry `a33cb960`@(-5,0)、infantry `80b05356`@(-5,1)、heavy `069ea11f`@(-4,-1)，出生据点 `cp_west`(-4,0)
 **结果:** ❌ 第 2 名 — `turn_limit_score`（打满 `maxTurns=12` 整轮，按 `armyValue×2 + actionScore` 裁决，winner=`player_b`；全程无 `player_eliminated`、无 `mutual_annihilation`、无 `turn_skipped`/`host_eliminated`，房主未干预）
 **结束轮次:** 第 12/12 整轮；**最终存活单位/补给:** 2 / 145
 
@@ -12,7 +12,7 @@
 
 | 名次 | 席位 | 状态 | 总分 | 军力价值×2 | 据点 | 主要死亡/优势原因 |
 |---|---|---|---:|---:|---:|---|
-| 1 | `player_b`（Hy4-WB） | active | **1226** | 586（293×2） | 6 | 第 4 轮起 6 据点满经济（44 收入/轮 vs 我 28），滚出 9 单位、418 补给军备，炮火承伤 175 仍靠数量压死 |
+| 1 | `player_b`（Hy4preview-WB） | active | **1226** | 586（293×2） | 6 | 第 4 轮起 6 据点满经济（44 收入/轮 vs 我 28），滚出 9 单位、418 补给军备，炮火承伤 175 仍靠数量压死 |
 | 2 | `player_a`（step5-OMP） | active | **370** | 50（25×2） | 3 | 军力被逐轮消耗（6 死 vs 敌 3 死），零炮火承伤也救不回经济差 |
 
 终局军力明细（无双删）：我军仅剩 `b30b19cd` infantry 55HP@(1,-2)（价值 25）；敌军 7 单位存活（价值 293）。**全程无人被歼灭淘汰，9 次 `unit_death` 全部为战斗致死，炮火 0 击杀。**
@@ -120,7 +120,7 @@
 | 最终死亡原因 | 全战斗致死，`turn_limit_score` | 同左 | 同左 |
 | 排名 | 第 2（370:1226） | 第 2（640:1184） | 第 1（1184:640） |
 
-**跨局结论：同一张 `artillery-zone` 上，OMP 已两次以“第 2 名 + `turn_limit_score`”收场，胜负手完全一致——R3 前能否把东侧两个 d3 supply 环拿到手并守住**。0156 我峰值曾到 6 据点仍输在中期被连偷 2 个；本局从 R3 起就 3:6 再未翻身。0156 的胜者（WB）与本局胜者（Hy4-WB）都握住了 `supply_west`+`supply_northwest`+`supply_southwest` 三件套并持续用 d3 据点出到 R10；0152（同图）胜者同样走了这条路。**"先手方拿 d3 环"应写进开局 checklist：R1 两步兵去最近两个 supply 点，比 R1 部署一个 45 兵力更接近胜利。**
+**跨局结论：同一张 `artillery-zone` 上，OMP 已两次以“第 2 名 + `turn_limit_score`”收场，胜负手完全一致——R3 前能否把东侧两个 d3 supply 环拿到手并守住**。0156 我峰值曾到 6 据点仍输在中期被连偷 2 个；本局从 R3 起就 3:6 再未翻身。0156 的胜者（WB）与本局胜者（Hy4preview-WB）都握住了 `supply_west`+`supply_northwest`+`supply_southwest` 三件套并持续用 d3 据点出到 R10；0152（同图）胜者同样走了这条路。**"先手方拿 d3 环"应写进开局 checklist：R1 两步兵去最近两个 supply 点，比 R1 部署一个 45 兵力更接近胜利。**
 
 ## 总结
 

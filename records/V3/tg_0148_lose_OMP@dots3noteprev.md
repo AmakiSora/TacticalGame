@@ -4,7 +4,7 @@
 **地图/参战人数:** `dual-lanes`（双线抉择，六角 pointy radius 8；中央 q=−2..2 整列 blocker（r=0）将地图分为南北两线，q=−1..2 {r=−1} 与 q=−2..1 {r=1} 两片 water 形成护城河；6 据点＝西北/东北 `supply`、北线/南线 `repair`、西南/东南 `forward_base`；双方 HQ 分别位于 (7,0) 与 (−7,0)，被中央 blocker 隔开）/ 2 人；**模式:** `standard`
 **玩家:** dots3noteprev-ZC（`OMP`@dots3noteprev）
 **席位与出生:** `player_a`，行动顺序第 1（`turnOrder: ["player_a","player_b"]`，`firstPlayer: player_a`），HQ(7,0)，HP 180/180，defense 6
-**对手:** `player_b` = Hy4-WB（`WB`@hy4），行动顺序第 2（后手），HQ(−7,0)，HP 180/180，defense 6
+**对手:** `player_b` = Hy4preview-WB（`WB`@hy4preview），行动顺序第 2（后手），HQ(−7,0)，HP 180/180，defense 6
 **结果:** 🥈 第 2 名 — `turn_limit_score`
 **结束轮次:** 第 15/15 整轮；**HQ 最终 HP:** 我方 180/180，敌方 180/180（**双方 HQ 全程零承伤**）
 
@@ -20,10 +20,10 @@
 
 | 名次 | 席位 | 玩家（Agent@模型） | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---:|---:|---:|---|
-| 🥇 1 | `player_b` | Hy4-WB（WB@hy4） | active | **2304** | +837 | **零单位损失（0 vs 我方 5）**；军力价值 707 vs 386（×2＝+642）；据点 4 vs 2（×90＝+180）；维修总量 315 vs 20 |
+| 🥇 1 | `player_b` | Hy4preview-WB（WB@hy4preview） | active | **2304** | +837 | **零单位损失（0 vs 我方 5）**；军力价值 707 vs 386（×2＝+642）；据点 4 vs 2（×90＝+180）；维修总量 315 vs 20 |
 | 🥈 2 | `player_a`（我） | dots3noteprev-ZC（OMP@dots3noteprev） | active | **1467** | — | 行动分 138 vs 154（−16）；补给 17 vs 16（≈平）；HQ 伤害与 HQ HP 双零 |
 
-> 单局 2 人，唯一对手 `player_b`（Hy4-WB / agent `WB` / 模型 `hy4`），无第三人，下文不再分列多对手。
+> 单局 2 人，唯一对手 `player_b`（Hy4preview-WB / agent `WB` / 模型 `Hy4preview`），无第三人，下文不再分列多对手。
 > 双方均存活至第 15 整轮，无淘汰、无房主干预 —— 纯 `turn_limit_score` 裁决。
 
 ---

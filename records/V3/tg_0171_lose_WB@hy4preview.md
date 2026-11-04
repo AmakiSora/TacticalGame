@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-09-27 / `14370499-4a4e-4af7-a218-e0f1c7210cbe` / schemaVersion 3.5.6（回放 `records/V3/tg_0171_20260927.json`，237 条事件，exportedAt 2026-09-27T06:19:43Z）
 **地图/参战人数:** `artillery-zone`（炮火禁区，半径 6 全平地 127 格，12 据点 = 6×`forward_base`@d4 + 6×`supply`@d3）/ 2 人；**模式:** annihilation
-**玩家:** Hy4-WB（`WB@hy4`，逐 API 手操，wait-turn.mjs 前台阻塞轮询）
+**玩家:** Hy4preview-WB（`WB@hy4preview`，逐 API 手操，wait-turn.mjs 前台阻塞轮询）
 **席位与出生:** `player_b`，行动顺序第 2（`turnOrder=["player_a","player_b"]`，firstPlayer=player_a），slot_east，出生 `cp_east`(4,0)；初始 infantry `f924401e`@(5,0) + infantry `837e51fd`@(5,-1) + heavy `2d523510`@(4,1)，补给 45；**HQ：不适用（无 HQ，`headquarters:{}`）**
 **对手:** `player_a` Dsv4.1flash0910-WB（房主，slot_west，出生 `cp_west`(-4,0)，初始 infantry×2 + heavy，先手）
 **结果:** ⚠️ **第 2 名** — `turn_limit_score`（打满 12/12 整轮后按权重裁定，全程无 `player_eliminated`、无 `control_point_neutralized`）
@@ -15,7 +15,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 军力价值(×2) | 据点(权重0) | actionScore | 主要死亡/优势原因 |
 |---|---|---|---|---:|---:|---:|---:|---|
 | 🥇 1 | `player_a` | Dsv4.1flash0910-WB | 存活 | **1084** | 262 → 524 | 5 | 560（merit 56） | 阵亡 2（scout `1e964fcf` R4 seq73、ranger `3913a771` R11 seq208）；**炮火承伤仅 25**；AP 满勤 48/48 |
-| 🥈 2 | `player_b` | Hy4-WB（我） | 存活 | **990** | 220 → 440 | 6 | 550（merit 55） | 阵亡 3（infantry `b53161d1` R6 seq102、infantry `f7fe2ffe` R8 seq140、heavy `2d523510` R11 seq199）；**炮火承伤 150（对手的 6 倍）**；AP 42/48 |
+| 🥈 2 | `player_b` | Hy4preview-WB（我） | 存活 | **990** | 220 → 440 | 6 | 550（merit 55） | 阵亡 3（infantry `b53161d1` R6 seq102、infantry `f7fe2ffe` R8 seq140、heavy `2d523510` R11 seq199）；**炮火承伤 150（对手的 6 倍）**；AP 42/48 |
 
 **分差 −94 拆解:** armyValue 差 (220−262)×2 = **−84**；actionScore 差 (55−56)×10 = **−10**；合计 **−94** ✓。
 据点我 6 : 5 领先、补给我 105 : 102 领先，但这两项**权重均为 0**，一分不值 —— 我把优势堆在了不计费的地方。
@@ -142,7 +142,7 @@ R12 我让 954105b4 长途奔袭到 (-3,3) 夺 supply_southwest，拿到 capture
 | tg_0126（同图） | 🏆 1438:? | 0 ✅ | 4 | 175 / 50 | — | 129 | — | 384 / — | — |
 | tg_0130（vs OMP@Dsv4） | 🏆 948:598 | 0 ✅ | 3 | 125 / 150 ✅ | 6 | — | — | — / 5 单位 | +350 |
 
-**定位：** 本局是 WB@hy4 在 `artillery-zone` 上 **第一次输掉的对局**，也是**炮火账与对手比值最差的一局**（150 : 25 = 6:1，此前最差是 tg_0137 的 425 : 50，但那局靠军力优势勉强赢了）。两个新的失败维度同时出现：**AP 从 47/48 掉回 42/48**（R8/R9 连续空转）、**质量交换比 0.60 : 1**（此前 tg_0169 是 2.5 : 1）。
+**定位：** 本局是 WB@hy4preview 在 `artillery-zone` 上 **第一次输掉的对局**，也是**炮火账与对手比值最差的一局**（150 : 25 = 6:1，此前最差是 tg_0137 的 425 : 50，但那局靠军力优势勉强赢了）。两个新的失败维度同时出现：**AP 从 47/48 掉回 42/48**（R8/R9 连续空转）、**质量交换比 0.60 : 1**（此前 tg_0169 是 2.5 : 1）。
 
 **已固化的旧教训（本局执行到位）：**
 - 首次预警外圈 0 单位 —— 连续第六局保持，出生 d5 → 开局内压已成习惯。

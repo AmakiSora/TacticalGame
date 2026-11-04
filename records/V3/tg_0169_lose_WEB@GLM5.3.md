@@ -4,9 +4,9 @@
 - **gameId:** `faaad72d-ebbe-438a-9829-d3a2dc30bf12`（回放：`tg_0169_20260926.json`，事件 seq 1–220）
 - **地图:** artillery-zone（炮火禁区，半径 6 六边形圆盘，127 格全平原，无任何阻挡地形）
 - **模式:** `annihilation`（无 HQ、炮火收缩、军队歼灭制）
-- **玩家:** GLM5.3-WEB（GLM5.3-WEB@GLM，`player_a`，slot_west，第 2 行动）vs Hy4-WB（`player_b`，slot_east，第 1 行动）
+- **玩家:** GLM5.3-WEB（GLM5.3-WEB@GLM，`player_a`，slot_west，第 2 行动）vs Hy4preview-WB（`player_b`，slot_east，第 1 行动）
 - **结果:** **第 2 名（负）**，结束原因 `turn_limit_score`（12 轮上限裁决），分差 498
-- **最终比分（game_over.rankings）:** GLM5.3-WEB 总分 608（军队价值 114×权重2=228 + 战功 380）｜Hy4-WB 总分 1106（军队价值 333×权重2=666 + 战功 440）
+- **最终比分（game_over.rankings）:** GLM5.3-WEB 总分 608（军队价值 114×权重2=228 + 战功 380）｜Hy4preview-WB 总分 1106（军队价值 333×权重2=666 + 战功 440）
 - **基础配置（game_start.payload.config）:** 起始补给 45、基础收入 8、AP 4/回合、maxTurns 12；炮火 startRound 5 / intervalRounds 2 / damage 25 / minimumSafeRadius 2；裁决权重：armyValue×2、effectiveActions×10，controlPoint/supplies/HQ 三类全部 0 权重
 
 ---
@@ -14,7 +14,7 @@
 ## 一、结束判定（与 game_over 一致）
 
 - 双方 12 轮打满，无人被歼灭：我方存活 4 单位（重坦 125hp、步兵 75/5/3hp），对方存活 9 单位。
-- 结束原因 `turn_limit_score`：按存活玩家裁决分排名，Hy4-WB 第 1、GLM5.3-WEB 第 2。无 `player_eliminated` / `army_destroyed` / `last_player_standing` / `mutual_annihilation` 事件；无 `turn_skipped` / `host_eliminated`（房主管理干预零次）。
+- 结束原因 `turn_limit_score`：按存活玩家裁决分排名，Hy4preview-WB 第 1、GLM5.3-WEB 第 2。无 `player_eliminated` / `army_destroyed` / `last_player_standing` / `mutual_annihilation` 事件；无 `turn_skipped` / `host_eliminated`（房主管理干预零次）。
 - 全局 6 次单位死亡均为战斗与炮火所致：我方 4 次（2 游骑、1 步兵、1 侦察），对方 2 次（均为步兵）。
 
 ## 二、单位、据点和补给时间线（全部引自事件 seq）

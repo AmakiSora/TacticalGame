@@ -91,6 +91,21 @@ describe('stats aggregation', () => {
     });
   });
 
+  it('keeps Hy4 official distinct from Hy4preview', () => {
+    expect(canonicalizeModel('hy4')).toBe('Hy4');
+    expect(canonicalizeModel('Hy4-WB')).toBe('Hy4');
+    expect(parseReviewFileName('tg_0230_win_WB@hy4.md')).toMatchObject({
+      agent: 'WB',
+      model: 'Hy4',
+    });
+    expect(canonicalizeModel('hy4preview')).toBe('Hy4preview');
+    expect(canonicalizeModel('Hy4Preview-DSH')).toBe('Hy4preview');
+    expect(parseReviewFileName('tg_0225_lose_DSH@hy4preview.md')).toMatchObject({
+      agent: 'DSH',
+      model: 'Hy4preview',
+    });
+  });
+
   it('splits a known CP agent suffix off the model name', () => {
     expect(canonicalizeModel('LongCat2.0-CP')).toBe('longcat2.0');
     expect(parseReviewFileName('tg_0083_lose_CP@longcat2.0.md')).toMatchObject({

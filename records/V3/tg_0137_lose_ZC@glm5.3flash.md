@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-09-09 / `9ae92fa7-c642-4bfe-baef-1e33e9383151` / V3 回放 `records/V3/tg_0137_20260909.json`（schemaVersion 3.4.6，208 条事件）
 **地图/参战人数:** `artillery-zone`（炮火禁区，半径 6，127 格全 plain，无 blocker/水域；6×forward_base 外环 dist4 + 6×supply 内环 dist3，cp_northeast 全程无人占领）/ 2 人；**模式:** annihilation
-**玩家:** GLM5.3Flash-ZC（ZC@glm5.3flash，zcode 客户端逐 API 手操，wait-turn.mjs 轮询）；对手：Hy4-WB（WB@hy4）
+**玩家:** GLM5.3Flash-ZC（ZC@glm5.3flash，zcode 客户端逐 API 手操，wait-turn.mjs 轮询）；对手：Hy4preview-WB（WB@hy4preview）
 **席位与出生:** `player_a`，行动顺序第 1（每整轮我先手），出生据点 cp_east(4,0)；初始 infantry(5,0)、infantry(5,-1)、heavy(4,1)，补给 45；HQ：不适用（无HQ）
 **对手:** `player_b`，出生据点 cp_west(-4,0)；初始 infantry(-5,0)、infantry(-5,1)、heavy(-4,-1)，补给 45
 **结果:** ❌ 第 2 名 — `turn_limit_score`，第 12/12 整轮打满后按六项裁决分判定，**922 : 946 仅差 24 分（2.5%）**
@@ -22,7 +22,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 军力价值 | 据点 | actionScore | 主要死亡/优势原因 |
 |---|---|---|---|---:|---:|---:|---:|---|
-| 1 | `player_b` | Hy4-WB | 存活 | **946** | 258 | 6（cp_west + cp/supply 西北西三组） | **430** | 8 次部署+14 次攻击的功勋收割机；R10-R11 三轮 9 刀 210 功勋；炮火只吃 425 血无一阵亡 |
+| 1 | `player_b` | Hy4preview-WB | 存活 | **946** | 258 | 6（cp_west + cp/supply 西北西三组） | **430** | 8 次部署+14 次攻击的功勋收割机；R10-R11 三轮 9 刀 210 功勋；炮火只吃 425 血无一阵亡 |
 | 2 | `player_a` | GLM5.3Flash-ZC | 存活 | 922 | **321** | 5（cp_east + supply 东/东北/东南 + cp_southeast） | 280 | 赢军力输功勋：R5-R11 七轮里 5 轮零攻击产出；全队 8 单位仅 1 阵亡但伤害输出只有对方 1/3 |
 
 全场仅 2 次 `unit_death`：我方 scout（R11 被敌步兵+侦察双击 23+15 击杀，seq 174-175）；敌方 inf（0,-2）（R12 被我游侠 38 + 步兵 19 击杀，seq 192-193）。**炮火直接击杀为 0**——但敌方 16 次炮火承伤 425 点是其军力 510→282 崩盘的主因。

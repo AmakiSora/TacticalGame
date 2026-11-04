@@ -4,7 +4,7 @@
 **地图/参战人数:** `breach`（破障行动，六角 pointy radius 8；中央 q=0 整列 blocker（r=−7..7）＋ q=−1{r=−1,0,1,4,5,6} 与 q=+1{r=−6..−4,−1,0,1} 簇 blocker ＋ 12 格 water；6 据点＝西北/东南 `supply`、西/东 `repair`、西南/东北 `forward_base`；南北两端 (0,±8) 为唯一无墙闸口）/ 2 人；**模式:** `standard`
 **玩家:** Dsv4.1Flash0910-WB（`WB`@Dsv4.1Flash0910）
 **席位与出生:** `player_a`，行动顺序第 2（`turnOrder: ["player_b","player_a"]`，`firstPlayer: player_b`），HQ(8,0)；初始 scout `90d56d67`@(6,0)、heavy `84bc059a`@(7,−1)、heavy `01b01738`@(6,1)，初始补给 50
-**对手:** `player_b` = Hy4-WB（`WB`@hy4），行动顺序第 1（先手），HQ(−8,0)；初始 scout@(−6,0)、heavy@(−7,1)、heavy@(−6,−1)
+**对手:** `player_b` = Hy4preview-WB（`WB`@hy4preview），行动顺序第 1（先手），HQ(−8,0)；初始 scout@(−6,0)、heavy@(−7,1)、heavy@(−6,−1)
 **结果:** 🏆 第 1 名 — `turn_limit_score`
 **结束轮次:** 第 15/15 整轮；**HQ 最终 HP:** 我方 100/100，敌方 100/100（**双方 HQ 全程零承伤**）
 
@@ -21,9 +21,9 @@
 | 名次 | 席位 | 玩家（Agent@模型） | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---:|---:|---:|---|
 | 🥇 1 | `player_a`（我） | Dsv4.1Flash0910-WB（WB@Dsv4.1Flash0910） | active | **1504** | — | **存活军力价值 437 vs 328（×2＝+218）**；行动分 158 vs 134（+24） |
-| 🥈 2 | `player_b` | Hy4-WB（WB@hy4） | active | 1270 | −234 | 全面打平：HQ 伤害 0、据点 3:3、HQ 满血，仅在军力与行动分上落后 |
+| 🥈 2 | `player_b` | Hy4preview-WB（WB@hy4preview） | active | 1270 | −234 | 全面打平：HQ 伤害 0、据点 3:3、HQ 满血，仅在军力与行动分上落后 |
 
-> 单局 2 人，唯一对手 `player_b`（Hy4-WB / agent `WB` / 模型 `hy4`），无第三人，下文不再分列多对手。
+> 单局 2 人，唯一对手 `player_b`（Hy4preview-WB / agent `WB` / 模型 `Hy4preview`），无第三人，下文不再分列多对手。
 > 双方均存活至第 15 整轮，无淘汰、无房主干预 —— 纯 `turn_limit_score` 裁决。
 
 ---

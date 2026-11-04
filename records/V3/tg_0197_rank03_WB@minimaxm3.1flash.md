@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-04 / `2d7fe410-0218-45e5-9848-43704d9250fa` / hex-v2-replay（schemaVersion 3.5.10，1088 事件，导出于 2026-10-04T05:19:27Z）
 **地图/参战人数:** whirlpool（星海漩涡，hex / pointy / radius 8）/ 6人；**模式:** standard
-**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）；对手：Hy4-WB（`player_a`）、Dsv4.1Flash-QD（`player_b`）、qwen3.8flash-QD（`player_c`）、Dsv4Pro0813-QD（`player_d`）、glm5.3flash-ZC（`player_e`）
+**玩家:** MiniMaxM3.1Flash-WB（WB@minimaxm3.1flash）；对手：Hy4preview-WB（`player_a`）、Dsv4.1Flash-QD（`player_b`）、qwen3.8flash-QD（`player_c`）、Dsv4Pro0813-QD（`player_d`）、glm5.3flash-ZC（`player_e`）
 **席位与出生:** `player_f`（slot_ne，行动顺序第 **5**/6，firstPlayer=`player_c`），HQ(**3,-4**)，初始 3 单位、60 补给
 **结果:** 🥉第 3 名 — `last_player_standing`
 **结束轮次:** 第 41 整轮（`maxTurns: null`，无回合上限）；**HQ 最终 HP:** 0/200
@@ -16,7 +16,7 @@
 | 3 | `player_f` | MiniMaxM3.1Flash-WB（本方） | eliminated | 1404 | — | 唯一淘汰过玩家的席位（c）；HQ 伤害 127；但 40 回合仅 9 回合用满 4 AP |
 | 4 | `player_b` | Dsv4.1Flash-QD | eliminated | 972 | −432 | 第 12 轮被 d 打穿 HQ（223 伤害）；3 据点 |
 | 5 | `player_e` | glm5.3flash-ZC | eliminated | 331 | −1073 | 第 6 轮被 d 打穿 HQ（209 伤害），全场最早阵亡 |
-| 6 | `player_a` | Hy4-WB | eliminated | 307 | −1097 | 第 6 轮被 c 打穿 HQ（215 伤害）；2 据点 |
+| 6 | `player_a` | Hy4preview-WB | eliminated | 307 | −1097 | 第 6 轮被 c 打穿 HQ（215 伤害）；2 据点 |
 
 `artillery: null`（本图无炮火收缩）。全场 5 次 `headquarters_destroyed`，无 `turn_skipped` / `host_eliminated`。
 
@@ -84,7 +84,7 @@ seq 逐条可查：R37 d 部署重装到 `(-4,-4)`（我方西线的正后方）
 |---|---:|---:|---|---|
 | `player_c` qwen3.8flash-QD | **131**（R10 18 / R25 35 / R26 41 / R27 37） | 4 个单位（R16 scout / R20 infantry / R21 ranger / R24 scout） | R27 夺其 `port_1`+`cp_20` | **我淘汰（第27轮）** |
 | `player_d` Dsv4Pro0813-QD | **0** | 0 | 无接触 | **d 淘汰我（第41轮）** |
-| `player_a` Hy4-WB | 0 | 0 | R6 接管其 `port_0`+`cp_19` | 第6轮被 c 淘汰 |
+| `player_a` Hy4preview-WB | 0 | 0 | R6 接管其 `port_0`+`cp_19` | 第6轮被 c 淘汰 |
 | `player_b` Dsv4.1Flash-QD | 0 | 0 | 无接触 | 第12轮被 d 淘汰 |
 | `player_e` glm5.3flash-ZC | 0 | 0 | 无接触 | 第6轮被 d 淘汰 |
 

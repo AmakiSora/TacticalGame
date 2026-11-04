@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-08-31（对局 03:19–04:26 GMT+8） / `ec6df5ae-47fb-43ce-b5f7-f8374c22526b` / `3.3.4`
 **地图/参战人数:** `artillery-zone`（炮火禁区，半径 6 六边形，127 格**全平地、无 blocker/水域**，12 据点 = 6 `forward_base` + 6 `supply`） / 2 人；**模式:** annihilation
-**玩家:** Hy4-WB（WB@hy4）
+**玩家:** Hy4preview-WB（WB@hy4preview）
 **席位与出生:** `player_a`，行动顺序第 2（**后手**，`turnOrder: ["player_b","player_a"]`，`firstPlayer=player_b`），`slot_east`；初始单位 infantry `c7f2fd1b`(5,0)、infantry `e01d0e36`(5,-1)、heavy `a6d5fa28`(4,1)，初始控制点 `cp_east`@(4,0)；**HQ：不适用（无 HQ）**
 **对手:** Hy3-WB（`player_b`，先手，`slot_west`，初始 inf(-5,0)、inf(-5,1)、heavy(-4,-1)，初始控制点 `cp_west`）
 **结果:** 🏆 第 1 名 — `turn_limit_score`（打满 12 整轮，按裁决分取胜）
@@ -34,7 +34,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 军力价值 | 据点 | 补给 | 主要优势/劣势原因 |
 |---|---|---|---|---:|---:|---:|---:|---|
-| 1 | `player_a` | Hy4-WB（WB@hy4） | active | **1438** | 384 | 7 | 129 | 收入 536 换 9 个增援（部署花费 452，占收入 84%）；集火换掉对方 5 个单位（299 cost），自身仅失 3 个（175 cost） |
+| 1 | `player_a` | Hy4preview-WB（WB@hy4preview） | active | **1438** | 384 | 7 | 129 | 收入 536 换 9 个增援（部署花费 452，占收入 84%）；集火换掉对方 5 个单位（299 cost），自身仅失 3 个（175 cost） |
 | 2 | `player_b` | Hy3-WB（WB@hy3） | active | 474 | 57 | 3 | 93 | 收入 300 只换 5 个增援（252）；R8 后仅剩 3 个据点，20–28/轮；R10–R11 集火我 heavy 得手但被双游侠点掉 4 个步兵 |
 
 **无任何玩家被淘汰** —— 双方均以 `active` 状态打到第 12 整轮结束，判定为 `turn_limit_score`，不是 `army_destroyed` / `last_player_standing` / `mutual_annihilation`。本局也不存在 `turn_skipped`、`host_eliminated` 等房主管理干预事件。
@@ -275,7 +275,7 @@ R11 `artillery_shrunk` 把 `safeRadius` 从 3 压到 2 之后：
 
 ## 与历史对局对比
 
-| 指标 | **tg_0126 本局**<br>WB@hy4 · 2人 | tg_0118<br>KimiK3-CP · 2人<br>`1353ed39` | tg_0089<br>WB@hy3 · 6人<br>`43eca9d3` |
+| 指标 | **tg_0126 本局**<br>WB@hy4preview · 2人 | tg_0118<br>KimiK3-CP · 2人<br>`1353ed39` | tg_0089<br>WB@hy3 · 6人<br>`43eca9d3` |
 |---|---:|---:|---:|
 | 地图 / 模式 | artillery-zone / annihilation | artillery-zone / annihilation | artillery-zone / annihilation |
 | 结果 | 🏆 1st `turn_limit_score` | 🏆 1st `turn_limit_score` | 🏆 1st `turn_limit_score` |

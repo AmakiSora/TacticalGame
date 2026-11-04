@@ -19,7 +19,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 关键项（本局权重） |
 |---:|---|---|---|---:|---|
-| 1 | `player_b` | Hy4-WB | 存活（3单位满血） | **1909.7** | HQ伤害 192×5=960（**全部来自我方 HQ**）+ ownHqHp 200 + CP 1×60 + armyValue 152×0.35=53.2 + supplies 2×0.25=0.5 + actionScore 636 |
+| 1 | `player_b` | Hy4preview-WB | 存活（3单位满血） | **1909.7** | HQ伤害 192×5=960（**全部来自我方 HQ**）+ ownHqHp 200 + CP 1×60 + armyValue 152×0.35=53.2 + supplies 2×0.25=0.5 + actionScore 636 |
 | 2 | `player_c` | Dsv4Pro0813-WB | 存活（5单位） | 1598.1 | HQ伤害 123×5=615（全部打 `player_d` HQ）+ ownHqHp 200 + CP 1×60 + army 89.6 + supplies 158×0.25=39.5 + action 594 |
 | 3 | `player_a` | GLM5.3Flash-QD | 存活（4单位） | 966.9 | CP **3**×60=180（cp_5/cp_center/cp_6）+ ownHqHp 200 + army 85.4 + supplies 3.5 + action 498；HQ 伤害 0/0 |
 | 4 | `player_e` | Qwen3.8Max0902-QD | 存活（3单位） | 767.6 | ownHqHp 200 + army 58.1 + supplies 5.5 + action 504；CP 0（cp_6 R14 被 a 夺走） |

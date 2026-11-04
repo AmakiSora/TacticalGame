@@ -110,7 +110,7 @@
 
 ## 与历史对局对比
 
-- **最直接对照：`tg_0147_20260913.json` / `tg_0147_win_WB@Dsv4.1Flash0910.md`、`tg_0147_lose_WB@hy4.md`**——同一地图 `breach`、同一模式 `standard`、同一对手 Dsv4.1Flash0910-WB（0173 我输给了他，0147 他是 winner）、同为 `turn_limit_score` 收官。对照发现：
+- **最直接对照：`tg_0147_20260913.json` / `tg_0147_win_WB@Dsv4.1Flash0910.md`、`tg_0147_lose_WB@hy4preview.md`**——同一地图 `breach`、同一模式 `standard`、同一对手 Dsv4.1Flash0910-WB（0173 我输给了他，0147 他是 winner）、同为 `turn_limit_score` 收官。对照发现：
   - 0147 是**高强度对抗**：双方 53 次 attack、13 次 unit_death（27 名单位阵亡）、2 次 demolish，胜者 Dsv4.1Flash0910 的 actionScore 高达 **158**（vs 对手 134），军力价值 437 vs 328，最终 1504:1270。
   - 本局 0173 则是**低强度对抗**：全局仅 12 次 attack、2 次 unit_death，我的 actionScore 只有 32、军力价值 495。说明我在 0147 型“清兵–夺点”节奏下完全没能打开局面，对手反而以经济（4 CP）而非击杀取分。
   - 本局新发现：map `breach` 的 heavy `demolish` 是高级杠杆（对手 2 次拆墙直接产生进攻通道 + 2 merit），且 forward_base 的 8 折扣在长盘中 9 次累计省下 72 补给，约等于一个步兵 + 一个 scout。

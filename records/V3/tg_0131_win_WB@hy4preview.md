@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-09-03 / `c5aa325e-fcfc-4c18-8f82-ae0017dacb2e` / `records/V3/tg_0131_20260903.json`
 **地图/参战人数:** `standoff`（对峙之地）/ 2人；**模式:** simultaneous
-**玩家:** Hy4-WB（WB@hy4）
+**玩家:** Hy4preview-WB（WB@hy4preview）
 **席位与出生:** `player_a`，HQ(5,0)；对手 `player_b` Dsv4Flash0731-QD，HQ(-5,0)。`turn.currentPlayerId` 与 `turn.currentOwner` 全程为 `null`；行动顺序仅用于同阶段确定性处理
 **结果:** 🏆 第1名 — `turn_limit_score`（双方存活至 maxTurns，无 HQ 归零、无人被淘汰）
 **结束轮次:** 第15/15整轮；**HQ最终HP:** 我方 200/200，敌方 200/200（全局 0 HQ 伤害）
@@ -13,7 +13,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 关键项（本局权重） |
 |---:|---|---|---|---:|---|
-| **1** | **`player_a`** | **Hy4-WB（我）** | 存活 | **985.85** | CP 3×60=180、armyValue 456×0.35=159.6、actionScore 444、ownHqHp 200×1=200、supplies 9×0.25=2.25、enemyHqDamage 0 |
+| **1** | **`player_a`** | **Hy4preview-WB（我）** | 存活 | **985.85** | CP 3×60=180、armyValue 456×0.35=159.6、actionScore 444、ownHqHp 200×1=200、supplies 9×0.25=2.25、enemyHqDamage 0 |
 | 2 | `player_b` | Dsv4Flash0731-QD | 存活 | 916.45 | CP 3×60=180、armyValue 297×0.35=103.95、actionScore 396、ownHqHp 200、supplies 146×0.25=36.5、enemyHqDamage 0 |
 
 **分差 +69.4。** 双方 CP 数与 HQ 完全持平，胜负由**军力价值（+55.65）**与**行动功勋（+48）**决定，被敌方补给结余（−34.25）部分抵消。

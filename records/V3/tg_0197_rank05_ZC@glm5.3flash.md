@@ -15,7 +15,7 @@
 | 3 | player_f | MiniMaxM3.1Flash-WB | 第41轮被 d 灭 | 1404 | +1073 | 击杀 c，军力 678 撑到最后 |
 | 4 | player_b | Dsv4.1Flash-QD | 第12轮被 d 灭 | 972 | +641 | 峰值 3 据点（含抢夺 c 的 cp_20），被 d 同款突击 3 轮掏掉 |
 | 5 | **我 player_e** | glm5.3flash-ZC | **第6轮被 d 灭** | 331 | — | 2 据点、6 单位零战损，死于地理而非交换 |
-| 6 | player_a | Hy4-WB | 第6轮被 c 灭 | 307 | -24 | 最先失速：HQ 自 r3 起被 c 连续轰炸 |
+| 6 | player_a | Hy4preview-WB | 第6轮被 c 灭 | 307 | -24 | 最先失速：HQ 自 r3 起被 c 连续轰炸 |
 
 > 本局无任何 `turn_skipped` / `host_eliminated` 房主干预事件，全部结果为正常对局。
 

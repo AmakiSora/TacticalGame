@@ -16,7 +16,7 @@
 | 🥇 1 | **player_b（我）** | active | **2043.70** | 104 | 1 | **累计 HQ 伤害 251（=1255 分）**：C 总部 177、E 总部 74，全场最高 |
 | 🥈 2 | player_f（Dsv4Pro0813-TC） | active | 1862.25 | **200** | **4** | 经济滚雪球：4 据点(240)+军力 225(78.75)+剩补给 218(54.5)，且对我 HQ 输出 145 |
 | 🥉 3 | player_e（Dsv4.1Flash0910-OMP） | active | 1093.05 | 27 | 2 | 行动分 750（全场第1）、10 次击杀、抢下 cp_center 并"摘走"C 的淘汰判定 |
-| 4 | player_d（Hy4-WB） | active | 1022.50 | 147 | 0 | 全靠 108 HQ 伤害 + 追赶补给；军队第15轮被打空（军力 0） |
+| 4 | player_d（Hy4preview-WB） | active | 1022.50 | 147 | 0 | 全靠 108 HQ 伤害 + 追赶补给；军队第15轮被打空（军力 0） |
 | 5 | player_a（seed2.1pro0915-TC） | active | 672.40 | 69 | 0 | 无单项优势；房主席位（按 `player_joined` 最早推断，回放未标记 host） |
 | 6 | player_c（GLM5.3Flash-ZC） | **eliminated** | 808.25 | 0 | 0 | 第10轮 HQ 被毁（我 177 + E 23，判定归 E）；**冻结分 808.25 高于第5名，但淘汰者一律排在存活者之后** |
 
@@ -145,7 +145,7 @@
 
 ## 与历史对局对比
 
-| 项目 | **本局 tg_0155（6人 standoff，QD@qwen3.8Flash）** | tg_0132（6人 standoff，WB@hy4，🏆1909.70） | tg_0150（3人，ZC@Dsv4.1Flash0910，🏆1231.40） | tg_0153（2人，TC@seed2.1pro0915，🏆984.85） |
+| 项目 | **本局 tg_0155（6人 standoff，QD@qwen3.8Flash）** | tg_0132（6人 standoff，WB@hy4preview，🏆1909.70） | tg_0150（3人，ZC@Dsv4.1Flash0910，🏆1231.40） | tg_0153（2人，TC@seed2.1pro0915，🏆984.85） |
 |---|---|---|---|---|
 | 制胜杠杆 | HQ 伤害 251（1255 分）+ 锁定射击 + 挡点 | HQ 伤害 192（960 分）+ 唯一淘汰 | 3 据点(180)+军力 | **4 据点(240)**，HQ 伤害 0 |
 | 据点数（第1名） | 1/7 | 1/7 | 3 | 4 |
@@ -186,6 +186,6 @@
 **几何备忘（本局验证）：** `line` 形状的覆盖格由**射线**决定、与瞄准距离无关——长度 2 时恒为"相邻格 + 次格"，所以瞄准 2 格外的格并不能多扫一格，而目标在 3 格外则**完全不可打**（第 15 轮够不到 (-3,-1) 的 17HP 残游骑兵即为此因）。
 
 *回放证据：`records/V3/tg_0155_20260918.json`（629 事件，含 `game_start.config`、每轮 `round_resolved.results`、`control_point_captured`、`player_eliminated`、`game_over.scores/rankings`）*
-*交叉校验：同局另有四份对手视角复盘——`tg_0155_rank03_OMP@Dsv4.1Flash0910.md`(player_e)、`tg_0155_rank04_WB@hy4.md`(player_d)、`tg_0155_rank05_TC@seed2.1pro0915.md`(player_a)、`tg_0155_rank06_ZC@GLM5.3Flash.md`(player_c)，其自报名次与本文采用的 `game_over.rankings` 完全一致（player_c 自认第6、player_a 自认第5，均与"存活优先"规则吻合）。*
+*交叉校验：同局另有四份对手视角复盘——`tg_0155_rank03_OMP@Dsv4.1Flash0910.md`(player_e)、`tg_0155_rank04_WB@hy4preview.md`(player_d)、`tg_0155_rank05_TC@seed2.1pro0915.md`(player_a)、`tg_0155_rank06_ZC@GLM5.3Flash.md`(player_c)，其自报名次与本文采用的 `game_over.rankings` 完全一致（player_c 自认第6、player_a 自认第5，均与"存活优先"规则吻合）。*
 *游戏版本：schema 3.5.2 / standoff / simultaneous，maxTurns 15，actionsPerTurn 5，startingSupplies 120，damageVarianceRange 3，minimumDamage 1*
 *AI 模型：Qwen3.8Flash-QD（`QD@qwen3.8Flash`）*

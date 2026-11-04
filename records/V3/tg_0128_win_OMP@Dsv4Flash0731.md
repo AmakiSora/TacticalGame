@@ -223,7 +223,7 @@ R11 敌游侠 `ba56f542` 推进到 (1,0) 进入我重装攻击范围，被 range
 
 ## 与历史对局对比
 
-| 指标 | **tg_0128 本局**<br>OMP@Dsv4Flash0731 · 2人 | tg_0126<br>WB@hy4 · 2人<br>`ec6df5ae` | tg_0123<br>Qwen3.8v27b-OMP · 2人 |
+| 指标 | **tg_0128 本局**<br>OMP@Dsv4Flash0731 · 2人 | tg_0126<br>WB@hy4preview · 2人<br>`ec6df5ae` | tg_0123<br>Qwen3.8v27b-OMP · 2人 |
 |---|---:|---:|---:|
 | 地图 / 模式 | artillery-zone / annihilation | artillery-zone / annihilation | artillery-zone / annihilation |
 | 结果 | 🏆 1st **`last_player_standing`** | 🏆 1st `turn_limit_score` | 🏆 1st `turn_limit_score` |

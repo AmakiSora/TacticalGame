@@ -173,7 +173,7 @@
 | **tg_0166（本局）** | artillery-zone/annihilation | player_b/**先手** | agnes3.0Flash-OMP(268) | dots3noteprev-OMP(580) | 0 | 1（ranger 滞留 d5 三轮） | 72 / 1 | 9 vs 105 | 268:580 | **负 -312** |
 | `tg_0158`（20260920） | forge/standard | player_a | dots3noteprev-OMP(1362) | seed2.1pro0915-TC(1535) | — | — | — | — | 1362:1535 | 负 -173 |
 | `tg_0156`（20260920） | artillery-zone/annihilation | player_a | step5-OMP(640) | Dsv4.1Flash0910-WB(1184) | — | — | — | — | 640:1184 | 负 -544 |
-| `tg_0160`（20260924） | artillery-zone/annihilation | player_a | step5-OMP(370) | Hy4-WB(1226) | — | — | — | — | 370:1226 | 负 -856 |
+| `tg_0160`（20260924） | artillery-zone/annihilation | player_a | step5-OMP(370) | Hy4preview-WB(1226) | — | — | — | — | 370:1226 | 负 -856 |
 
 1. **dots3noteprev-OMP 在 artillery-zone（歼灭）上是 1 胜 0 负 2 局（本局 +312），step5-OMP 在同图 2 局全负（-544、-856）——歼灭模式对"炮火撤离节奏"敏感度极高，本局我方 ranger 滞留外环 3 轮 = 144 分，是 0166 全部分差 312 的 46%。** 0156/0160 中 step5 的大败（-544/-856）与本局同图：军力/行动分双落后，说明歼灭模式上"先占 3 CP + 部署通道"只是必要条件，**收缩前的外环清理 + AP 利用率才是真正胜负杠杆**。
 

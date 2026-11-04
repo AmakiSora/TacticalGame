@@ -40,7 +40,7 @@ description: Use when a TacticalGame hex match has ended and the user asks the a
 
 复盘 MD 是你**唯一的交付物**：写入用户提示指定的目录；未指定时写入当前工作目录的 `records/V3/`（先 `mkdir -p`）。它**不适用** play skill 的 Scratch files（`temp/`）规则。
 
-顺序号不足 4 位左侧补 0（`199` → `0199`）。`AGENT` 用你自己的 agent 名**全大写**；`模型短名` 用你运行所在的模型名缩写，风格与 `records/V3` 已有文件保持一致（小写去空格，如 `hy3`、`gpt5.6sol`）。
+顺序号不足 4 位左侧补 0（`199` → `0199`）。`AGENT` 用你自己的 agent 名**全大写**；`模型短名` 用你运行所在的模型名缩写，风格与 `records/V3` 已有文件保持一致（小写去空格，如 `hy3`、`gpt5.6sol`）。同一模型的正式版与预览版必须用不同短名区分（如正式版 `hy4`、预览版 `hy4preview`），不要混用。
 
 | 产物 | 命名 | 谁写 |
 |---|---|---|

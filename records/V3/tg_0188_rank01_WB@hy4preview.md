@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-10-02 / `54d393e6-8049-4e27-89d6-81941d20d093` / schemaVersion **3.5.9**（回放 `records/V3/tg_0188_20261002.json`，`format: hex-v2-replay`，299 条事件，exportedAt 2026-10-02T15:36:35Z，`game_start` = seq4）
 **地图/参战人数:** `artillery-zone`（炮火禁区，半径 6 全平地 127 格，12 据点 = 6×`forward_base`@d4 + 6×`supply`@d3）/ **3 人**；**模式:** annihilation
-**玩家:** Hy4-WB（`WB@hy4`，逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用代打脚本）
+**玩家:** Hy4preview-WB（`WB@hy4preview`，逐 API 手操，`wait-turn.mjs` 前台阻塞轮询，未使用代打脚本）
 **席位与出生:** `player_a`；slot_east，出生控制点 `cp_east`(4,0)（forward_base，income 4，d4）；初始单位 infantry `8f6ce110`@(5,0)、infantry `392d0a92`@(5,-1)、heavy `d4c453f8`@(4,1)，起始补给 45；**HQ：不适用（无 HQ，`headquarters:{}`）**
 **行动顺序:** `turnOrder=["player_c","player_b","player_a"]`，`firstPlayer=player_c` ⇒ **我方每轮末位行动**（后手）
 **对手:** `player_b` qwen3.8flash-QD（slot_southwest，出生 `cp_southwest`(-4,4)）、`player_c` glm5.3flash-ZC（slot_northwest，出生 `cp_northwest`(0,-4)）
@@ -15,7 +15,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | armyValue（×2） | actionScore（merit×10） | 据点（权重0） | 补给（权重0） | 主要死亡/优势原因 |
 |---|---|---|---|---:|---:|---:|---:|---:|---|
-| 🥇 1 | `player_a` | Hy4-WB（我） | 存活 | **1088** | **214 → 428** | **660**（merit 66） | 3 | 63 | 击杀 **5**（全场唯一有击杀者）；阵亡 2 且**全部死于炮火**（`cause:"artillery"`）、无一死于交战；AP 44/48 |
+| 🥇 1 | `player_a` | Hy4preview-WB（我） | 存活 | **1088** | **214 → 428** | **660**（merit 66） | 3 | 63 | 击杀 **5**（全场唯一有击杀者）；阵亡 2 且**全部死于炮火**（`cause:"artillery"`）、无一死于交战；AP 44/48 |
 | 🥈 2 | `player_c` | glm5.3flash-ZC | 存活 | 584 | 172 → 344 | 240（merit 24） | 3 | **102** | 阵亡 1（heavy `1254d65a` R4 seq89，被我三打一集火）；**102 补给闲置到终局、一分不值**；AP 28/48（全程最低） |
 | 🥉 3 | `player_b` | qwen3.8flash-QD | 存活 | 488 | 104 → 208 | 280（merit 28） | **5（最多）** | **96** | 阵亡 **5**（4 个被我击杀 + 1 个 `48875378` R12 seq266 死于炮火）；**据点全场第一却总分垫底**；AP 39/48 |
 
@@ -165,7 +165,7 @@ b 拿到全场最多的 5 个据点、收入最高（348）、ap 也不低，却
 
 ## 与历史对局对比
 
-同图（`artillery-zone`、同为 `WB@hy4` 席位）可比的两局：**tg_0169**（`faaad72d-ebbe-438a-9829-d3a2dc30bf12`，2 人，胜，1106 分）与 **tg_0171**（`14370499-4a4e-4af7-a218-e0f1c7210cbe`，2 人，负，990 分第 2）。
+同图（`artillery-zone`、同为 `WB@hy4preview` 席位）可比的两局：**tg_0169**（`faaad72d-ebbe-438a-9829-d3a2dc30bf12`，2 人，胜，1106 分）与 **tg_0171**（`14370499-4a4e-4af7-a218-e0f1c7210cbe`，2 人，负，990 分第 2）。
 
 | 指标 | 本局 tg_0188（3 人） | tg_0169（2 人，胜） | tg_0171（2 人，负） |
 |---|---:|---:|---:|

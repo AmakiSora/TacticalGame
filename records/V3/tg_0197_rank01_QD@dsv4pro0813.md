@@ -16,7 +16,7 @@
 | 3 | `player_f` | MiniMaxM3.1Flash-WB | R41 被我淘汰 | 1404 | -2891.5 | 捡尸 A 领土 + 击杀 C，但远征军与家宅分离 |
 | 4 | `player_b` | Dsv4.1Flash-QD | R12 被我淘汰 | 972 | -3323.5 | 与 C 全面战争拖垮国力，老家被我闪击 |
 | 5 | `player_e` | glm5.3flash-ZC | R6 被我淘汰 | 331 | -3964.5 | 全军西扩占点导致 HQ 空虚 |
-| 6 | `player_a` | Hy4-WB（房主） | R6 被 C 淘汰 | 307 | -3988.5 | 单位尽出东侧抢点，HQ 被 C 游侠+重型夹击 |
+| 6 | `player_a` | Hy4preview-WB（房主） | R6 被 C 淘汰 | 307 | -3988.5 | 单位尽出东侧抢点，HQ 被 C 游侠+重型夹击 |
 
 > 席位出生（`game_start` seq7）：A `slot_e` HQ(4,-1)、B `slot_sw` HQ(-3,4)、C `slot_se` HQ(1,3)、D（我）`slot_nw` HQ(-1,-3)、E `slot_w` HQ(-4,1)、F `slot_ne` HQ(3,-4)。行动顺序 `turnOrder: [C, B, E, D, F, A]`，C 为先手，我第 4 手。
 

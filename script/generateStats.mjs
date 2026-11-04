@@ -76,6 +76,9 @@ export const MODEL_ALIASES = new Map([
   ['gpt5.6sol', 'gpt5.6sol'],
   ['gpt5.6luna', 'gpt5.6luna'],
   ['hy3', 'hy3'],
+  // Hy4 正式版与预览版并存：正式版用 hy4，预览版用 hy4preview，勿混用。
+  ['hy4', 'Hy4'],
+  ['hy4preview', 'Hy4preview'],
   ['kimik3', 'kimik3'],
   ['grok4.5', 'grok4.5'],
   ['fable5', 'fable5'],
@@ -1100,7 +1103,8 @@ export function collectReviews(versionDir) {
   return byRecord;
 }
 
-const STATS_CACHE_VERSION = 2;
+// 模型别名变化会改变缓存里已归一化的身份，升版本强制重建。
+const STATS_CACHE_VERSION = 4;
 
 /** 磁盘缓存只存 JSON：把 match.unitOwner（Map）编码成普通对象，读回时还原。 */
 export function encodeMatchForCache(match) {

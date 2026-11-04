@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-09-04 / `e1c2844c-157f-4e97-97a1-71f6ca5a0ef8` / 规范 V3（3.0）；本局 payload 未返回 `schemaVersion` 字段
 **地图/参战人数:** `standoff`（对峙之地）/ 6人；**模式:** simultaneous（秘密计划、全员确认、严格同时结算）
-**玩家:** Hy4-WB（`WB@hy4`）
+**玩家:** Hy4preview-WB（`WB@hy4preview`）
 **席位与出生:** `player_b`，HQ(5,0)（东角哨点 slot_1）；`turn.currentPlayerId`/`turn.currentOwner` 始终为 `null`，行动顺序仅用于同阶段确定性平局处理
 **结果:** 🏆 **第1名** — `turn_limit_score`（满 15 轮评分决胜，无剩余存活 HQ 淘汰局）
 **结束轮次:** 第 15 / 15 整轮；**HQ最终HP:** 200 / 200（全程未受损伤）
@@ -117,7 +117,7 @@
 
 ## 与历史对局对比
 
-| 项目 | V3 第34局（tg_0034，6人环线，QD@Qwen3.8Max） | **本局 V3 第132局（standoff，WB@hy4）** |
+| 项目 | V3 第34局（tg_0034，6人环线，QD@Qwen3.8Max） | **本局 V3 第132局（standoff，WB@hy4preview）** |
 |---|---|---|
 | 结果 | 🏆第1（险胜 15 分） | **🏆第1（领先 311.6 分）** |
 | 制胜杠杆 | 双控制点(200)+部署得分 | **单点 HQ 拆除(960 分)** |
@@ -152,4 +152,4 @@
 
 *回放证据：`records/V3/tg_0132_20260904.json`（完整 events 与 adjudication）*
 *游戏版本：standoff / simultaneous，maxTurns 15，actionsPerTurn 5*
-*AI 模型：Hy4-WB（WB@hy4）*
+*AI 模型：Hy4preview-WB（WB@hy4preview）*

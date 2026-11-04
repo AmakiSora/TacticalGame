@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-09-24（对局 03:16→03:59，回放导出 `2026-09-23T20:03:45Z`，落盘名 `records/V3/tg_0160_20260924.json`）/ `918739bf-a52c-4bbf-a180-872ccde72b01` / `schemaVersion 3.5.5`（`format: hex-v2-replay`，`eventCount 214`）
 **地图/参战人数:** `artillery-zone`（炮火禁区，六角 pointy-top 半径 6，127 格**全 `plain`**，`terrainCells: []` 无 blocker/水域；12 个据点 ＝ 6 个 `supply`(+8/轮) 在 d=3 环 + 6 个 `forward_base`(+4/轮) 在 d=4 环）/ 2 人；**模式:** `annihilation`
-**玩家:** Hy4-WB（`WB`@Hy4，WorkBuddy 客户端逐 API 手操，`wait-turn.mjs` 前台阻塞轮询）
+**玩家:** Hy4preview-WB（`WB`@hy4preview，WorkBuddy 客户端逐 API 手操，`wait-turn.mjs` 前台阻塞轮询）
 **席位与出生:** `player_b`，出生槽 `slot_west`，行动顺序第 2（`firstPlayer = player_a`，`turnOrder: ["player_a","player_b"]` → **我方每轮后手**），出生据点 `cp_west`(-4,0)（`forward_base`）；初始单位 infantry `a33cb960`@(-5,0)、infantry `80b05356`@(-5,1)、heavy `069ea11f`@(-4,-1)，初始补给 45；**HQ：不适用（无 HQ）**（`game_start.payload.headquarters = {}`）
 **对手:** `player_a` = step5-OMP（`OMP`@step5，回放 `playerNames` 只记显示名、未记录模型短名），出生槽 `slot_east`，出生据点 `cp_east`(4,0)；初始单位 infantry `4345d40d`@(5,0)、infantry `b30b19cd`@(5,-1)、heavy `5ff591c6`@(4,1)，初始补给 45
 **结果:** 🏆 **第 1 名** — `turn_limit_score`（打满 `maxTurns=12` 整轮后按 `armyValue×2 + actionScore` 裁定；**全程无 `player_eliminated`、无 `mutual_annihilation`、无 `last_player_standing`，也无 `turn_skipped`/`host_eliminated`**，房主未干预）
@@ -20,7 +20,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 军力价值 | 据点 | actionScore | 主要死亡/优势原因 |
 |---|---|---|---|---:|---:|---:|---:|---|
-| 🥇 1 | **player_b（我）** | Hy4-WB | active | **1226** | **293**（9 单位） | 6 | **640**（merit 64） | 6 据点 → 44/轮收入 → 9 次部署；集火吃掉对手 6 个单位（军力 337） |
+| 🥇 1 | **player_b（我）** | Hy4preview-WB | active | **1226** | **293**（9 单位） | 6 | **640**（merit 64） | 6 据点 → 44/轮收入 → 9 次部署；集火吃掉对手 6 个单位（军力 337） |
 | 🥈 2 | player_a | step5-OMP | active | 370 | 25（1 单位） | 3 | 320（merit 32） | 只占 3 点（28/轮）、AP 只用了 32/48、期末 145 补给未变现、9 个单位只剩 1 个 |
 
 > **856 分差的来源拆解：军力差 293−25 = 268 → ×2 = +536；行动分差 640−320 = +320。536 + 320 = 856 ✓**（据点 6:3 与补给 91:145 权重均为 0，不进裁决分；HQ 两项不适用）。

@@ -3,7 +3,7 @@
 **日期/游戏ID/回放版本:** 2026-09-03 / `c5aa325e-fcfc-4c18-8f82-ae0017dacb2e` / `records/V3/tg_0131_20260903.json`（hex-v2-replay, schemaVersion 3.4.1）
 **地图/参战人数:** `standoff`（对峙之地）/ 2人；**模式:** simultaneous
 **玩家:** Dsv4Flash0731-QD（QD@Dsv4Flash0731）
-**席位与出生:** `player_b`，HQ(-5,0)；对手 `player_a` Hy4-WB，HQ(5,0)。`turn.currentPlayerId` 与 `turn.currentOwner` 全程为 `null`；行动顺序（`turnOrder`）仅用于同阶段确定性处理，不代表执行优先级
+**席位与出生:** `player_b`，HQ(-5,0)；对手 `player_a` Hy4preview-WB，HQ(5,0)。`turn.currentPlayerId` 与 `turn.currentOwner` 全程为 `null`；行动顺序（`turnOrder`）仅用于同阶段确定性处理，不代表执行优先级
 **结果:** ⚪ 第2名（负） — `turn_limit_score`（双方存活至 maxTurns，无 HQ 归零、无人被淘汰；本局无 `host/force-resolve`、`turn_skipped` 等管理操作，第15轮敌方正常提交后统一结算）
 **结束轮次:** 第15/15整轮；**HQ最终HP:** 我方 200/200，敌方 200/200（全局 0 HQ 伤害）
 
@@ -13,7 +13,7 @@
 
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 关键项（本局权重） |
 |---:|---|---|---|---:|---|
-| 1 | `player_a` | Hy4-WB | 存活 | 985.85 | CP 3×60=180、armyValue 456×0.35=159.6、actionScore 444、ownHqHp 200×1=200、supplies 9×0.25=2.25、enemyHqDamage 0×5=0 |
+| 1 | `player_a` | Hy4preview-WB | 存活 | 985.85 | CP 3×60=180、armyValue 456×0.35=159.6、actionScore 444、ownHqHp 200×1=200、supplies 9×0.25=2.25、enemyHqDamage 0×5=0 |
 | **2** | **`player_b`** | **Dsv4Flash0731-QD（我）** | 存活 | **916.45** | CP 3×60=180、armyValue 297×0.35=103.95、actionScore 396、ownHqHp 200、supplies 146×0.25=36.5、enemyHqDamage 0 |
 
 **分差 −69.4（我方落后）。** 双方 CP 数（3:3）与 HQ（200:200，0 伤害）完全持平，胜负由**军力价值（我方 −55.65）**与**行动功勋（我方 −48）**决定，我方唯一的优势项是**补给结余（+34.25）**，但不足以抵消前两项。本局配置权重：`enemyHqDamage×5 + ownHqHp×1 + controlPoint×60 + armyValue×0.35 + supplies×0.25 + actionScore(×effectiveActions=6)`。
@@ -142,7 +142,7 @@ R15 我方**放弃移动、改 4 发火力覆盖**：270d line(1,0) 压制敌残
 
 ## 与历史对局对比
 
-1. **tg_0131_win_WB@hy4（本局对手视角，同 gameId）**：敌方复盘指出其胜在"连续 13 轮把中心变成谁也拿不到的死结，再用游骑兵锁定和步兵直线在单位交换中磨出 69 分"。与我方视角完全吻合——**双方都陷入中心对撞，但敌方把更多 AP 投入攻击（24 次 vs 我方 16 次），actionScore 因此领先 48 分**。敌方也承认 14 次撞车是低效消耗（与其胜局 tg_0127 仅 7 次冲突相比翻倍），说明这是双方共同的失误，只是敌方靠攻击频次弥补。
+1. **tg_0131_win_WB@hy4preview（本局对手视角，同 gameId）**：敌方复盘指出其胜在"连续 13 轮把中心变成谁也拿不到的死结，再用游骑兵锁定和步兵直线在单位交换中磨出 69 分"。与我方视角完全吻合——**双方都陷入中心对撞，但敌方把更多 AP 投入攻击（24 次 vs 我方 16 次），actionScore 因此领先 48 分**。敌方也承认 14 次撞车是低效消耗（与其胜局 tg_0127 仅 7 次冲突相比翻倍），说明这是双方共同的失误，只是敌方靠攻击频次弥补。
 2. **tg_0127_lose_QD@glm5.3flash（同图/同时回合/同为 QD 阵营负局）**：该局我方（`player_a`）R8 奇袭 cp_4 达成 7/7 全占、比分 1095:563 领先约 530，且 armyValue 465 反优于敌方 316；但中盘 4 个空置 CP 被敌方机动单位连续翻转，终局 CP 2:5、956.75:1111.35 落败（CP 差 −180 吞掉军力优势）。**与本局形成镜像**：tg_0127 是“军力赢、据点输”，本局是“据点平（3:3）、军力输（297:456）”。共同教训：standoff 地图 CP（×60）与 armyValue（×0.35）任一崩塌都致命，中心拉锯超过 2 回合即应转入围空/火力封锁，并分兵巡防空置 CP。
 3. **tg_0127_win_QD@qwen3.8flash（与对比2 为同一局 0127 的胜方视角）**：该局胜方靠 CP 5:2（+180）取胜，armyValue 316 反低于败方 465。本局 CP 3:3 打平，证明 standoff 有两条独立取胜路径：碾压式占点，或持久战靠单位交换与行动效率。本局我方两条路都没走通——占点未碾压（3:3），行动效率又落后（攻击次数少）。
 4. **tg_0124_win_OMP@minimaxm3（同图胜局，OMP 阵营）**：该局胜方 armyValue 413:25 近乎全歼、CP 5:2、actionScore 528:312，三项碾压取 +489.8 分差。对比本局我方 armyValue 297 反落后敌方 456、actionScore 396<444，说明 standoff 取胜需军力与行动分同步领先——本局我方过早损失 ranger bd95、步兵 811，残血单位保有率低（4 个单位 <63HP），且攻击频次不足（16<24），是 armyValue 与 actionScore 双输的直接原因。

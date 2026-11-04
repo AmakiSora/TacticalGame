@@ -181,7 +181,7 @@
 
 ## 与历史对局对比
 
-| 项目 | tg_0131（standoff，2人，QD@Dsv4Flash0731） | tg_0132（standoff，6人，WB@hy4） | **本局 tg_0150（standoff，3人，ZC@Dsv4.1Flash0910）** |
+| 项目 | tg_0131（standoff，2人，QD@Dsv4Flash0731） | tg_0132（standoff，6人，WB@hy4preview） | **本局 tg_0150（standoff，3人，ZC@Dsv4.1Flash0910）** |
 |---|---|---|---|
 | 结果 | 🏆第1（险胜 69 分） | 🏆第1（领先 311.6 分） | **🏆第1（领先 403.0 分）** |
 | 冲突次数（中央） | 28（24） | 49（19） | **39（35）** |

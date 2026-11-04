@@ -2,7 +2,7 @@
 
 **日期/游戏ID/回放版本:** 2026-08-31 23:43 – 2026-09-01 01:22 GMT+8（回放导出 2026-09-01 01:55） / `a5f80afa-27dc-4f29-b42d-b0c0cdfd76a2` / `3.4.1`
 **地图/参战人数:** `forge`（熔炉重铸，半径 6，127 格，中央十字 blocker 阻断直通） / 2 人
-**玩家:** Hy4-WB（WB@hy4）
+**玩家:** Hy4preview-WB（WB@hy4preview）
 **席位与出生:** `player_a`，行动顺序第 **2**（**后手**，`turnOrder: ["player_b","player_a"]`，`firstPlayer=player_b`），出生槽 `slot_b`，HQ **(5,-5)**，HP 100/100
 **对手:** Qwen3.8Flash-QD（`player_b`，先手，`slot_a`，HQ (-5,5)，HP 100/100）
 **结果:** 第 2 名 — `turn_limit_score`（打满 10 整轮，按裁决分落败）
@@ -61,7 +61,7 @@
 | 名次 | 席位 | 玩家 | 状态 | 总分 | 与我方分差 | 决定性优势 |
 |---|---|---|---|---:|---:|---|
 | 1 | `player_b` | Qwen3.8Flash-QD | active | **1588** | +413 | 据点 4 比 2（+150）；唯一一次 HQ 伤害 28（+196）；HQ 满血（+56） |
-| 2 | `player_a` | Hy4-WB（WB@hy4） | active | **1175** | — | 军力价值 389 比 370（+38）是唯一领先项 |
+| 2 | `player_a` | Hy4preview-WB（WB@hy4preview） | active | **1175** | — | 军力价值 389 比 370（+38）是唯一领先项 |
 
 **分差 −413 的六项拆解：**
 
@@ -346,7 +346,7 @@ R10 时 cp_fb_b @(2,2) 属敌方但**无单位驻守**（`e01e` 已在 R9 seq172
 
 ## 与历史对局对比
 
-| 指标 | **tg_0128 本局**<br>WB@hy4 · 2人 | tg_0126<br>WB@hy4 · 2人<br>`ec6df5ae` | tg_0123<br>Qwen3.8v27b-OMP vs **Qwen3.8Flash-QD** |
+| 指标 | **tg_0128 本局**<br>WB@hy4preview · 2人 | tg_0126<br>WB@hy4preview · 2人<br>`ec6df5ae` | tg_0123<br>Qwen3.8v27b-OMP vs **Qwen3.8Flash-QD** |
 |---|---:|---:|---:|
 | 地图 / 模式 | **forge / standard** | artillery-zone / annihilation | artillery-zone / standard |
 | 结果 | **第 2 名** `turn_limit_score` | 🏆 第 1 名 `turn_limit_score` | 🏆 player_a 胜（本局对手为 player_b，落败） |

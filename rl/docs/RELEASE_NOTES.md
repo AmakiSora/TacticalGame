@@ -3,6 +3,14 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-11-04 · 歼灭模式三人评估跑批（3.9.1）
+
+**一句话**：三人评估从标准模式扩到歼灭模式。`round_robin.py` 的 `--player-count 3` 按地图推断模式，歼灭批冻结 `annihilation-3p-v1` 的六局双向 manifest，5 个歼灭算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）声明 `[2, 3]` 准入；`evaluate_cross.py` 的三人路径本身与模式无关，错误文案改为模式中立；榜单按 `mode × rulesVersion` 生成独立的「歼灭模式 · 三人」分榜，名册只取本模式通过三人准入的算法。
+
+**地图池**：歼灭静态图只有 `artillery-zone` 带三人布局（`trench-run` 是双人图，`standoff` 等属同时回合），真实图三人批必须显式写 `--maps artillery-zone`，也可直接用虚拟随机图 `random-annihilation`；控制台按地图的 `playerCounts` 过滤，服务端另校验一次布局。
+
+**测试与验证**：真实引擎跑三组三人歼灭阵容（`artillery-zone` 两组、`random-annihilation` 一组），全部正常终局、三个座位均实际出手；`test_three_player_evaluation.py` 新增歼灭 manifest 规则版本、任务模式透传与不支持模式拒绝三例；`tests/api/arena-eval.test.ts` 覆盖歼灭地图启动、全部歼灭算法准入与无三人布局地图拒绝，`generateArenaLeaderboard` 覆盖两份三人分榜互不串名册。
+
 ## 2026-11-03 · 标准模式三人评估跑批（3.9.0）
 
 **一句话**：评估链路新增 `--player-count 3` 的完整标准模式三人分支。`local-worker.ts` 接受 `player_a/b/c`，按 `seatOrder`、`firstSeat` 与 `gameSeed` 通过大厅座位表确定性开局；`evaluate_cross.py` 动态驱动三座位并为每局写入 `rankGroups`、`manifestHash` 和轮换 `schedule`；`round_robin.py` 对每个阵容 × 地图生成正反各三局的六局 superblock，冻结 manifest 并根据已跑前缀续跑；`script/multiplayerRating.mjs` 只接收完整块，并列感知 PL 评分并按 superblock 分层 bootstrap。三人榜作为 `divisions` 与双人 BT 的 `modes` 完全隔离，控制台按人数过滤算法、地图和模型，局数强制为 6 的倍数。现有 RL 模型是单对手观测编码，明确不参加三人局；全部 7 个标准模式算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）均声明并验证支持 3 人。

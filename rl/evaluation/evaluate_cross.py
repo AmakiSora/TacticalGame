@@ -142,7 +142,7 @@ def parse_args():
     parser.add_argument("--player-b", default=None,
                         help="player_b 座位参与者规格：模型 zip 路径或 algo:<算法名>[@<版本>]")
     parser.add_argument("--player-c", default=None,
-                        help="player_c 座位算法规格；提供后启用三人标准模式（仅内置算法）")
+                        help="player_c 座位算法规格；提供后启用三人模式（标准/歼灭，仅内置算法）")
     parser.add_argument("--schedule-file", default=None,
                         help="三人轮换 manifest/待跑片段 JSON；座位、种子和 superblock 元数据以其为准")
     parser.add_argument("--model-a", default=None, help="等价 --player-a（仅模型规格），兼容保留")
@@ -1103,7 +1103,7 @@ def main():
               file=sys.stderr)
         return 2
     if len(_SEATS) == 3 and any(not spec.startswith("algo:") for spec in (spec_a, spec_b, spec_c)):
-        print("错误：三人标准模式当前仅支持内置算法，现有 RL 模型不能参评。", file=sys.stderr)
+        print("错误：三人竞技场当前仅支持内置算法，现有 RL 模型不能参评。", file=sys.stderr)
         return 2
     name_a = args.name_a or default_display_name(spec_a)
     name_b = args.name_b or default_display_name(spec_b)

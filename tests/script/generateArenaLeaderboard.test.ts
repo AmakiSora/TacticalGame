@@ -265,7 +265,16 @@ describe('先手胜率与换座胜率差（2026-10-30）', () => {
 describe('三人标准模式独立 PL 分榜', () => {
   const lineup = ['algo_greedy@v1', 'algo_random@v1', 'algo_threat@v1'];
 
-  function threePlayerLines() {
+  function threePlayerLines(options: {
+    map?: string;
+    rulesVersion?: string;
+    lineup?: string[];
+  } = {}) {
+    const {
+      map = 'multiplayer-ring',
+      rulesVersion = 'standard-3p-v1',
+      lineup: seats = lineup,
+    } = options;
     const rotations = [[0, 1, 2], [1, 2, 0], [2, 0, 1]];
     const lines = [];
     let gameIndex = 1;
@@ -274,16 +283,16 @@ describe('三人标准模式独立 PL 分榜', () => {
       ['reverse', [0, 2, 1]],
     ] as const) {
       for (const [rotation, order] of rotations.entries()) {
-        const seatOrder = order.map(index => lineup[base[index]]);
+        const seatOrder = order.map(index => seats[base[index]]);
         const schedule = {
           gameIndex, lineupId: 'lineup-1', superblockId: 'sb-1',
           blockId: `sb-1-${direction}`, direction, rotation,
           seatOrder, firstSeat: 0, mapSeed: null, gameSeed: 'seed-1', manifestHash: 'manifest-1',
         };
         lines.push(JSON.stringify({
-          map: 'multiplayer-ring',
+          map,
           players: { player_a: seatOrder[0], player_b: seatOrder[1], player_c: seatOrder[2] },
-          winner: seatOrder[0], playerCount: 3, rulesVersion: 'standard-3p-v1',
+          winner: seatOrder[0], playerCount: 3, rulesVersion,
           rankGroups: [[seatOrder[0]], [seatOrder[1]], [seatOrder[2]]],
           manifestHash: 'manifest-1', schedule, rounds: 12, seed: null,
         }));
@@ -332,6 +341,47 @@ describe('三人标准模式独立 PL 分榜', () => {
     expect(division.maps.all.models.filter((model: { games: number }) => model.games === 0)).toHaveLength(4);
     expect(payload.registry['algo_threat@v1'].playerCounts).toEqual([2, 3]);
     expect(payload.registry['algo_verdict@v2'].playerCounts).toEqual([2, 3]);
+  });
+
+  it('歼灭模式三人记录自成一份分榜，不与标准三人榜合并', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-three-annihilation-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    writeFileSync(statsFile, threePlayerLines({
+      map: 'artillery-zone',
+      rulesVersion: 'annihilation-3p-v1',
+      lineup: ['algo_random-annihilation@v1', 'algo_shrinkroll@v1', 'algo_vortex@v1'],
+    }).join('\n') + '\n');
+
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    expect(payload.modes).toEqual([]);
+    expect(payload.divisions).toHaveLength(1);
+    expect(payload.divisions[0]).toMatchObject({
+      id: 'annihilation-3p-annihilation-3p-v1',
+      label: '歼灭模式 · 三人',
+      mode: 'annihilation',
+      playerCount: 3,
+      rulesVersion: 'annihilation-3p-v1',
+      games: 6,
+    });
+    expect(payload.divisions[0].maps.all.overview).toMatchObject({
+      games: 6, superblockCount: 1, quarantinedSuperblocks: 0,
+    });
+    // 歼灭三人榜只列歼灭算法（3 个上场 + 2 个零局），不把标准算法拉进名册。
+    expect(payload.divisions[0].maps.all.models).toHaveLength(5);
+    expect(payload.divisions[0].maps.all.models.filter((model: { games: number }) => model.games > 0))
+      .toHaveLength(3);
+    expect(payload.registry['algo_shrinkroll@v1'].playerCounts).toEqual([2, 3]);
   });
 
   it('残缺三人块不进入评分但保留隔离计数', () => {

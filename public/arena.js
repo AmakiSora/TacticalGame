@@ -560,7 +560,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     populatePlayerBar();
     const current = currentMode();
     el.boardModeHint.textContent = current?.playerCount === 3
-      ? '标准模式 · 三人 · 并列感知 Plackett-Luce · 仅完整六局双向 superblock 计分'
+      ? `${current.label} · 并列感知 Plackett-Luce · 仅完整六局双向 superblock 计分`
       : current
         ? `${current.label} · Bradley-Terry MLE · 平局记 0.5 · 排名列固定为模式内排名`
         : 'Bradley-Terry MLE · 平局记 0.5 · 各模式独立评分';
@@ -860,9 +860,13 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
         : '';
   }
 
+  /** 已接入三人跑批的模式；与后端 `THREE_PLAYER_EVAL_MODES`、
+   *  `rl/evaluation/round_robin.py` 的 `THREE_PLAYER_MODES` 同口径。 */
+  const EVAL_THREE_PLAYER_MODES = ['standard', 'annihilation'];
+
   const EVAL_PLAYER_OPTIONS = [
     { value: 2, label: '双人（Bradley-Terry）', hint: '双人局 · Bradley-Terry 两两比较排名 · 模型与内置算法按当前模式参评' },
-    { value: 3, label: '三人（标准模式内置算法）', hint: '三人局 · 独立 Plackett-Luce 榜与六局双向轮换 · 仅标准模式内置算法，至少 3 个' },
+    { value: 3, label: '三人（独立 PL 分榜）', hint: '三人局 · 独立 Plackett-Luce 榜与六局双向轮换 · 标准模式与歼灭模式的内置算法参评，至少 3 个' },
   ];
 
   function renderEvalPlayerBar() {
@@ -875,7 +879,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
 
   function renderEvalModeBar() {
     const visible = evalPlayerCount === 3
-      ? evalModeCatalog.filter(item => item.id === 'standard')
+      ? evalModeCatalog.filter(item => EVAL_THREE_PLAYER_MODES.includes(item.id))
       : evalModeCatalog;
     evalEl['eval-modes'].innerHTML = visible.map(item => {
       const active = item.id === currentEvalMode()?.id;
@@ -884,7 +888,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     }).join('');
     const current = currentEvalMode();
     evalEl['eval-mode-hint'].textContent = evalPlayerCount === 3
-      ? `三人标准模式 · 独立 PL 榜 · 仅 ${evalAlgosForMode().length} 个算法已通过三人准入`
+      ? `${current?.label || '三人'} · 独立 PL 榜 · 仅 ${evalAlgosForMode().length} 个算法已通过三人准入`
         + (evalAlgosForMode().length < 3 ? ' · 不足 3 个，无法组批' : '')
       : current
         ? current.supported
@@ -1178,7 +1182,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     const value = Number(next) === 3 ? 3 : 2;
     if (value === evalPlayerCount) return;
     evalPlayerCount = value;
-    if (evalPlayerCount === 3) evalMode = 'standard';
+    if (evalPlayerCount === 3 && !EVAL_THREE_PLAYER_MODES.includes(evalMode)) evalMode = 'standard';
     const games = evalEl['eval-games'];
     if (evalPlayerCount === 3) {
       games.min = '6';
@@ -1194,7 +1198,7 @@ import { loadMapLabels, mapLabel } from './map-labels.js';
     syncMapChips(currentEvalMaps());
     renderEvalParticipants();
     evalMsg(evalPlayerCount === 3
-      ? '三人模式：仅标准模式、仅通过三人准入的算法、局数按六局 superblock 计。'
+      ? '三人模式：仅标准/歼灭模式、仅通过三人准入的内置算法、局数按六局 superblock 计。'
       : '', undefined);
   }
 

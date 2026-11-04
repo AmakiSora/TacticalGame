@@ -19,8 +19,12 @@
   同一批只能跑同一模式，四种模式均已接入：standard / annihilation 逐动作执行（歼灭的
   炮火缩圈与淘汰由引擎在轮界结算），simultaneous / royale 走计划入队与统一结算。模式内
   只纳入注册表 ``ALGORITHM_META.modes`` 声明该模式的算法；RL 模型仅支持标准模式，
-  不参与其他模式跑批。歼灭已有 random-annihilation、shrinkroll、vortex 等条目，大逃杀
-  已有 random-royale、apex 等条目，均可组批。
+  不参与其他模式跑批。歼灭已有 random-annihilation、shrinkroll、vortex、crucible、
+  sovereign 五个条目，大逃杀已有 random-royale、apex 等条目，均可组批。
+- 三人（``--player-count 3``）：每阵容 × 每图固定 3 座位轮换 × 2 先手 = 6 局一个
+  superblock，按模式分规则版本（standard-3p-v1 / annihilation-3p-v1）各成独立分榜；
+  不参评 RL 模型，只跑注册表声明 ``playerCounts`` 含 3 的算法。三人局需要每张图都有
+  三人布局，缺省地图池是标准模式双人图，须显式给图（如歼灭的 artillery-zone）。
 
 用法示例：
 
@@ -33,6 +37,10 @@
     # 同时回合（仅内置算法；两张同时模式地图）
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py \
         --maps standoff,molten-throne --games 24
+
+    # 三人歼灭（六局一个 superblock；仅 artillery-zone 与随机歼灭图有三人布局）
+    rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 \
+        --maps artillery-zone,random-annihilation --games 12
 
     # 冒烟测试
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default \
@@ -88,7 +96,16 @@ SEC_PER_GAME_ALGO_PLAN = 20.0
 # evaluate_cross.py 每局完成的进度行前缀：实时透传到评估控制台，其余输出仅在
 # 批次失败时回显尾部。字面量与前者保持一致（脚本间不经 import 共享）。
 GAME_PROGRESS_PREFIX = "进度|"
-THREE_PLAYER_RULES_VERSION = "standard-3p-v1"
+# 三人竞技场按模式分规则版本：轮换/先手口径相同，但玩法规则不同即不可同池评分，
+# 榜单再按 rulesVersion 拆 division。新增三人模式时在此登记。
+THREE_PLAYER_RULES_VERSIONS = {
+    "standard": "standard-3p-v1",
+    "annihilation": "annihilation-3p-v1",
+}
+# 已接入三人跑批的模式。RL 模型是单对手观测编码，三人一律不含模型。
+THREE_PLAYER_MODES = tuple(THREE_PLAYER_RULES_VERSIONS)
+# 缺省（standard）规则版本；既有引用与历史 manifest 都指向它。
+THREE_PLAYER_RULES_VERSION = THREE_PLAYER_RULES_VERSIONS["standard"]
 
 
 def parse_args():
@@ -100,7 +117,8 @@ def parse_args():
     parser.add_argument("--games", type=int, default=24,
                         help="每对参与者 × 地图的目标总局数（含已跑局数，默认 24）")
     parser.add_argument("--player-count", type=int, choices=(2, 3), default=2,
-                        help="参赛人数；三人仅标准模式内置算法，每阵容局数必须为 6 的倍数")
+                        help="参赛人数；三人仅 standard / annihilation 内置算法，"
+                             "每阵容局数必须为 6 的倍数")
     parser.add_argument("--stats-file", default=None,
                         help=f"累积 JSONL 路径（默认 {DEFAULT_STATS_FILE}）")
     parser.add_argument("--salt", default=None,
@@ -381,19 +399,23 @@ def _manifest_hash(document: dict) -> str:
 
 
 def build_three_player_manifest(ordered: list[tuple[str, str]], map_id: str,
-                                seed_prefix: str, target_games: int) -> dict:
+                                seed_prefix: str, target_games: int,
+                                mode: str = "standard") -> dict:
     """冻结一个阵容 × 地图的全部六局双向轮换 superblock。"""
     if len(ordered) != 3 or target_games <= 0 or target_games % 6:
         raise ValueError("三人 manifest 需要三个不同参与者，且局数为 6 的倍数")
+    if mode not in THREE_PLAYER_RULES_VERSIONS:
+        raise ValueError(f"三人 manifest 不支持 {mode} 模式（可选："
+                         f"{', '.join(THREE_PLAYER_MODES)}）")
     names = [name for _spec, name in ordered]
     if len(set(names)) != 3:
         raise ValueError("三人正式阵容不允许同一参与者重复占座")
     lineup_id = "lineup-" + hashlib.sha256("\0".join(names).encode("utf-8")).hexdigest()[:12]
     document = {
         "schema": 1,
-        "mode": "standard",
+        "mode": mode,
         "playerCount": 3,
-        "rulesVersion": THREE_PLAYER_RULES_VERSION,
+        "rulesVersion": THREE_PLAYER_RULES_VERSIONS[mode],
         "map": map_id,
         "lineup": names,
         "lineupId": lineup_id,
@@ -446,7 +468,7 @@ def count_three_player_existing(stats_file: Path) -> dict[tuple, list[dict]]:
 
 def plan_three_player_tasks(ordered: list[tuple[str, str]], maps: list[str], salt: str,
                             existing: dict[tuple, list[dict]], target_games: int,
-                            stats_file: Path) -> tuple[list[dict], int]:
+                            stats_file: Path, mode: str = "standard") -> tuple[list[dict], int]:
     if target_games <= 0 or target_games % 6:
         raise ValueError("三人每阵容 × 地图的目标局数必须为 6 的倍数")
     tasks: list[dict] = []
@@ -464,7 +486,7 @@ def plan_three_player_tasks(ordered: list[tuple[str, str]], maps: list[str], sal
                 skipped_games += len(previous)
                 continue
             seed_prefix = f"rr-{salt}-{map_index}-{'-'.join(map(str, indices))}"
-            manifest = build_three_player_manifest(trio, map_id, seed_prefix, target_games)
+            manifest = build_three_player_manifest(trio, map_id, seed_prefix, target_games, mode)
             current = [r for r in previous if r.get("manifestHash") == manifest["manifestHash"]]
             current_indexes = sorted((r.get("schedule") or {}).get("gameIndex") for r in current)
             if current_indexes != list(range(1, len(current) + 1)):
@@ -621,8 +643,8 @@ def run_task(command: list[str], label: str, games: int, progress: Progress,
 
 
 def run_three_player(args, root: Path, maps: list[str], mode: str, stats_file: Path) -> int:
-    if mode != "standard":
-        print("错误：三人竞技场当前仅支持 standard 模式。", file=sys.stderr)
+    if mode not in THREE_PLAYER_MODES:
+        print(f"错误：三人竞技场当前仅支持 {' / '.join(THREE_PLAYER_MODES)} 模式。", file=sys.stderr)
         return 1
     if args.models and args.models.strip().lower() not in ("none", "off"):
         print("错误：三人竞技场不支持现有 RL 模型，请使用 --models none。", file=sys.stderr)
@@ -631,6 +653,7 @@ def run_three_player(args, root: Path, maps: list[str], mode: str, stats_file: P
     if unsupported:
         print(f"错误：以下地图没有三人布局：{', '.join(unsupported)}", file=sys.stderr)
         return 1
+    rules_version = THREE_PLAYER_RULES_VERSIONS[mode]
     try:
         algorithm_infos, warning = resolve_algorithms(root, args.algorithms, mode, 3)
         if warning:
@@ -643,14 +666,14 @@ def run_three_player(args, root: Path, maps: list[str], mode: str, stats_file: P
         salt = args.salt or f"{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
         tasks, skipped = plan_three_player_tasks(
             sorted(participants, key=lambda part: part[1]), maps, salt, existing,
-            args.games, stats_file)
+            args.games, stats_file, mode)
     except (ValueError, RuntimeError) as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 1
     if len(participants) < 3:
         print(f"错误：三人参评算法不足 3 个（当前 {len(participants)} 个）。", file=sys.stderr)
         return 1
-    print(f"对局模式：standard / 三人；规则版本：{THREE_PLAYER_RULES_VERSION}")
+    print(f"对局模式：{mode} / 三人；规则版本：{rules_version}")
     print(f"参评算法：{', '.join(name for _spec, name in participants)}")
     print(f"地图池：{', '.join(maps)}；每阵容 × 每图 {args.games} 局（六局双向 superblock）")
     print(f"seed 盐：{salt}；manifest：{stats_file.parent / 'details' / 'manifests'}")

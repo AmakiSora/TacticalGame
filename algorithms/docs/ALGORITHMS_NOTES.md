@@ -400,7 +400,7 @@ export const ALGORITHM_META = {
 ```
 
 - `modes` 缺省为 `['standard']`；大厅 bot 接口、runner、`rl/training/local-worker.ts` 与 `rl/evaluation/round_robin.py` 都按它校验/过滤。`/api/arena/participants` 返回包含 `modes` 的完整清单，由客户端按模式过滤，启动接口再次校验兼容性。
-- `playerCounts` 缺省为 `[2]`（`algorithmPlayerCounts()` 统一兜底）：三人竞技场只收同时满足 `modes` 含 `standard` 且 `playerCounts` 含 `3` 的算法，RL 模型是单对手观测编码、不参评三人局；`/api/arena/participants` 与评估控制台按它过滤，启动接口再校验一次（算法不足 3 个或同一算法重复占座返回 `invalid_participants`）。3.9.0 起 7 个标准模式算法（`parallax` / `greedy` / `random` / `mcts` / `threat` / `field` / `verdict`）均已声明 `[2, 3]`，其余模式的算法仍为 `[2]`。
+- `playerCounts` 缺省为 `[2]`（`algorithmPlayerCounts()` 统一兜底）：三人竞技场只收同时满足 `modes` 含当前模式且 `playerCounts` 含 `3` 的算法，RL 模型是单对手观测编码、不参评三人局；`/api/arena/participants` 与评估控制台按它过滤，启动接口再校验一次（算法不足 3 个或同一算法重复占座返回 `invalid_participants`）。3.9.0 起 7 个标准模式算法（`parallax` / `greedy` / `random` / `mcts` / `threat` / `field` / `verdict`）声明 `[2, 3]`；3.9.1 起 5 个歼灭算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）也声明 `[2, 3]`，可跑歼灭三人批；同时回合与大逃杀算法仍为 `[2]`。
 - `version` 是算法的“当前版本”标注。算法行为被改进后应升版（如 `v1` → `v2`）；竞技场参与者 id 是 `algo_<name>@<version>`，历史对局仍归属旧版本 id。
 - 升版时必须按下面的“版本升级的文档要求”更新单算法档案，不能只改代码和 `version`。
 - 线上 bot type 是 `algo_<name>`，永远指向当前实现；`src/api/bots.ts` 的 `ALGORITHM_BOTS` 由注册表自动生成，前端下拉从 `/api/algorithms` 动态拉取。**不要再手工维护第二份算法清单。**

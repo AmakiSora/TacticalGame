@@ -274,6 +274,53 @@ describe('AI 竞技场评估控制台 API', () => {
     expect(spawner.calls[0].args.join(' ')).toContain('--algorithms field,greedy,mcts,parallax,random,threat,verdict');
   });
 
+  it('starts a three-player annihilation run on an annihilation map', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: {
+        playerCount: 3, maps: ['artillery-zone'], games: 6,
+        participants: ['random-annihilation', 'shrinkroll', 'sovereign'].map(name => `algo:${name}`),
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status.params).toMatchObject({
+      mode: 'annihilation', playerCount: 3, maps: ['artillery-zone'], games: 6,
+    });
+    const args = spawner.calls[0].args.join(' ');
+    expect(args).toContain('--mode annihilation');
+    expect(args).toContain('--player-count 3');
+    expect(args).toContain('--maps artillery-zone');
+    expect(args).toContain('--models none');
+    expect(args).toContain('--algorithms random-annihilation,shrinkroll,sovereign');
+  });
+
+  it('accepts every registered annihilation algorithm for three-player games', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: {
+        playerCount: 3, maps: ['random-annihilation'], games: 12,
+        participants: ['crucible', 'random-annihilation', 'shrinkroll', 'sovereign', 'vortex']
+          .map(name => `algo:${name}`),
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(spawner.calls[0].args.join(' '))
+      .toContain('--algorithms crucible,random-annihilation,shrinkroll,sovereign,vortex');
+  });
+
+  it('rejects an annihilation map that has no three-player layout', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/arena/eval/start',
+      payload: {
+        playerCount: 3, maps: ['trench-run'], games: 6,
+        participants: ['random-annihilation', 'shrinkroll', 'vortex'].map(name => `algo:${name}`),
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('invalid_maps');
+    expect(res.json().error).toContain('没有三人布局');
+  });
+
   it('rejects invalid three-player maps, game counts, algorithms and models', async () => {
     const base = {
       playerCount: 3, maps: ['multiplayer-ring'], games: 6,

@@ -6,6 +6,18 @@
 >
 > **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
 
+## 3.9.1（2026-11-04）— 歼灭模式三人竞技场
+
+### 评估口径
+
+- 5 个歼灭算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）的 `playerCounts` 由 `[2]` 放宽到 `[2, 3]`，可与标准模式 7 个算法一样进入三人跑批。算法实现本身未改：歼灭算法本就不假设对手人数（`shrinkroll` 按 `turnOrder` 与逐对手档案规划，其余按席位枚举敌人），本版只放开准入并提供跑批能力。
+- 三人准入改为按模式判定：分榜名册取「`modes` 含本模式且 `playerCounts` 含 3」的算法，歼灭三人局用 `annihilation-3p-v1`，与标准 `standard-3p-v1` 分成两份并列感知 Plackett-Luce 分榜；同时回合与大逃杀算法仍为 `[2]`。RL 模型是单对手观测编码，任何模式的三人局都不参评。
+
+### 测试与验证
+
+- 真实引擎三组三人歼灭阵容（`artillery-zone` 两组、`random-annihilation` 一组）全部正常终局、三个座位均实际出手；歼灭图池只有 `artillery-zone` 带三人布局（`trench-run` 是双人图），随机图 `random-annihilation` 可直接用。
+- 新增 3 个 pytest 用例锁定歼灭 manifest 的规则版本、任务模式透传与不支持模式拒绝；榜单/API 回归覆盖歼灭三人分榜隔离与 `artillery-zone` 启动。详见 [RL 日志](../../rl/docs/RELEASE_NOTES.md)。
+
 ## 3.9.0（2026-11-03）— 标准模式三人竞技场
 
 ### 评估口径

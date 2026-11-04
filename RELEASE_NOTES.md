@@ -4,6 +4,20 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.9.1
+
+### 新增
+
+- **歼灭模式三人竞技场**：三人跑批从标准模式扩展到歼灭模式，5 个歼灭算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）通过三人准入，对局写入 `annihilation-3p-v1` 并单列一份并列感知 Plackett-Luce 分榜。控制台与 CLI 沿用同一套六局双向 superblock 规则，地图须显式选择——目前只有 `artillery-zone` 与虚拟随机图 `random-annihilation` 带三人布局。
+
+### 变更
+
+- **三人榜按模式取名册**：分榜只列本模式通过三人准入的算法，标准三人榜不再出现歼灭算法、歼灭三人榜也不再出现标准算法，避免两侧各背一串 0 局条目。
+
+### 测试与验证
+
+- 真实引擎三组三人歼灭阵容（`artillery-zone` 两组、`random-annihilation` 一组）全部正常终局、三个座位均实际出手；歼灭三人的规则版本、manifest 续跑、地图布局校验与分榜隔离均有回归。`npm run build` / `npm test`（147 文件 / 1736 例）与 RL pytest（339 passed / 13 skipped）通过。
+
 ## 3.9.0
 
 ### 新增

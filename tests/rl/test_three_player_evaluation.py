@@ -1,4 +1,4 @@
-"""三人标准模式评估：六局双向轮换、manifest 续跑与并列名次（pytest）。"""
+"""三人评估（标准 / 歼灭）：六局双向轮换、manifest 续跑与并列名次（pytest）。"""
 
 from __future__ import annotations
 
@@ -20,6 +20,11 @@ PARTICIPANTS = [
     ("algo:threat@v1", "algo_threat@v1"),
 ]
 NAMES = {name for _spec, name in PARTICIPANTS}
+ANNIHILATION_PARTICIPANTS = [
+    ("algo:random-annihilation@v1", "algo_random-annihilation@v1"),
+    ("algo:shrinkroll@v1", "algo_shrinkroll@v1"),
+    ("algo:vortex@v1", "algo_vortex@v1"),
+]
 
 
 def test_six_game_manifest_balances_seats_first_turn_and_pair_order():
@@ -47,6 +52,45 @@ def test_six_game_manifest_balances_seats_first_turn_and_pair_order():
     assert len({game["gameSeed"] for game in games}) == 1
     assert round_robin.build_three_player_manifest(
         PARTICIPANTS, "multiplayer-ring", "other-salt", 6)["manifestHash"] != manifest["manifestHash"]
+
+
+def test_annihilation_manifest_freezes_its_own_rules_version():
+    manifest = round_robin.build_three_player_manifest(
+        ANNIHILATION_PARTICIPANTS, "artillery-zone", "rr-annihilation", 6, mode="annihilation")
+    assert manifest["mode"] == "annihilation"
+    assert manifest["rulesVersion"] == round_robin.THREE_PLAYER_RULES_VERSIONS["annihilation"]
+    assert manifest["rulesVersion"] == "annihilation-3p-v1"
+    # 标准榜仍是默认别名，模式不同则 hash 不同（跨模式无法续跑）。
+    assert manifest["rulesVersion"] != round_robin.THREE_PLAYER_RULES_VERSION
+    standard = round_robin.build_three_player_manifest(
+        ANNIHILATION_PARTICIPANTS, "artillery-zone", "rr-annihilation", 6)
+    assert standard["rulesVersion"] == "standard-3p-v1"
+    assert standard["manifestHash"] != manifest["manifestHash"]
+
+
+def test_three_player_plan_carries_the_annihilation_mode_into_every_task(tmp_path):
+    stats = tmp_path / "matches.jsonl"
+    tasks, skipped = round_robin.plan_three_player_tasks(
+        ANNIHILATION_PARTICIPANTS, ["artillery-zone", "random-annihilation"],
+        "rr-annihilation-plan", {}, 6, stats, mode="annihilation")
+    assert skipped == 0
+    assert [task["map"] for task in tasks] == ["artillery-zone", "random-annihilation"]
+    for task in tasks:
+        schedule = json.loads(Path(task["schedule_file"]).read_text(encoding="utf-8"))
+        assert schedule["mode"] == "annihilation"
+        assert schedule["rulesVersion"] == "annihilation-3p-v1"
+        assert len(schedule["games"]) == 6
+
+
+def test_three_player_manifest_rejects_modes_without_a_three_player_arena():
+    for mode in ("simultaneous", "royale"):
+        try:
+            round_robin.build_three_player_manifest(
+                ANNIHILATION_PARTICIPANTS, "artillery-zone", "rr-unsupported", 6, mode=mode)
+        except ValueError as exc:
+            assert mode in str(exc)
+        else:
+            raise AssertionError(f"{mode} three-player manifest must be rejected")
 
 
 def test_resume_uses_only_the_missing_tail_of_the_same_manifest(tmp_path):

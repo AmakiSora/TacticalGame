@@ -476,7 +476,7 @@ evaluate_cross 默认为每个批次在 `arena/details/<批次>.jsonl` 落盘一
 `maps/*.json` 的 `mode` 字段推断：标准模式跑「模型 × 算法」；其余三种模式只跑注册表声明
 该模式的算法（现有 RL 模型仅覆盖标准模式），同一批不允许混模式。其中 standard / annihilation
 逐动作执行（歼灭的炮火缩圈与淘汰由引擎在轮界结算），simultaneous / royale 走计划入队与
-统一结算。榜单按地图的 `mode` 分成标准/歼灭/同时回合/大逃杀独立评分池，不同模式不混榜；标准模式下还支持三人跑批（`--player-count 3`），评分与双人榜完全分离，见下文要点：
+统一结算。榜单按地图的 `mode` 分成标准/歼灭/同时回合/大逃杀独立评分池，不同模式不混榜；标准模式与歼灭模式还支持三人跑批（`--player-count 3`），评分与双人榜完全分离，见下文要点：
 
 ```powershell
 # 先小规模冒烟（只跑 default 图、3 个模型、2 个算法、每对 2 局）
@@ -494,6 +494,9 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default --models
 
 # 标准模式三人竞技场（独立 Plackett-Luce 榜；只跑内置算法，局数须为 6 的倍数）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 --maps default --models none --algorithms greedy,random,mcts --games 24
+
+# 歼灭模式三人竞技场（规则版本 annihilation-3p-v1，独立分榜；歼灭图须显式列出）
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 --maps artillery-zone,random-annihilation --models none --algorithms random-annihilation,shrinkroll,vortex --games 24
 ```
 
 地图可以用顶层 `"modelEval": false` 退出模型评估（见 [docs/MAP_FORMAT.md](../docs/MAP_FORMAT.md)）：含模型的批次在组批阶段直接跳过，
@@ -527,13 +530,14 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random-royale --
   纯算法批次不加载模型，启动与单局耗时都低一档。
 - **三人跑批**：`--player-count 3` 把参评算法按每 3 个组成阵容（`C(n,3)` 个阵容 × 地图），
   每个阵容 × 地图冻结一个六局双向 superblock manifest（3 个座位轮换 × 正反方向，落在
-  `arena/details/manifests/`），保证每人每个出生座位两次、先手两次。仅标准模式、仅
-  `playerCounts` 含 3 的算法可参评（RL 模型是单对手观测编码，须 `--models none`），
-  参评算法至少 3 个，`--games` 必须是 6 的倍数，地图必须有三人布局；续跑按 manifest 前缀补齐，
+  `arena/details/manifests/`），保证每人每个出生座位两次、先手两次。仅标准模式与歼灭模式、
+  仅本模式 `playerCounts` 含 3 的算法可参评（RL 模型是单对手观测编码，须 `--models none`），
+  参评算法至少 3 个，`--games` 必须是 6 的倍数，地图必须有三人布局（歼灭图池目前只有
+  `artillery-zone`，须显式写进 `--maps`，默认图池是标准图）；续跑按 manifest 前缀补齐，
   未跑完的块在榜单只计为残块、不评分。
 - **三人评分**：`npm run arena-leaderboard` 对三人对局按每局 `rankGroups` 建并列感知
   Plackett-Luce（L2 先验），bootstrap 按 superblock 聚类（每模式 300 次、每图 100 次）；
-  双人榜仍是 Bradley-Terry，两池完全分离，页面在标准模式下以「双人 / 三人」二级页签切换。
+  双人榜仍是 Bradley-Terry，两池完全分离，页面在标准模式与歼灭模式下以「双人 / 三人」二级页签切换。
 - **评分**：跑完执行 `npm run arena-leaderboard`（已并入 `stats-all`），
   从 JSONL 生成 `public/data/arena-leaderboard.json`，页面 `/arena.html` 展示。
   也可以直接在 `/arena.html` 的「评估控制台」页签（`#console` 直达）里网页启动/监控/停止跑批，

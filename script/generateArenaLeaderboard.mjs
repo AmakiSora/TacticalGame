@@ -281,6 +281,12 @@ function numericSeatMap(value, seats = ['player_a', 'player_b']) {
 
 const MULTIPLAYER_SEATS = ['player_a', 'player_b', 'player_c'];
 /**
+ * 已接入三人分榜的玩法模式；与 `rl/evaluation/round_robin.py` 的 `THREE_PLAYER_MODES`
+ * 同口径——同时回合/大逃杀走计划入队结算，三人轮换尚未接入。分榜按
+ * `${mode}|${rulesVersion}` 分区，标准与歼灭各成一份，从不合并评分。
+ */
+const THREE_PLAYER_MODES = new Set(['standard', 'annihilation']);
+/**
  * 三人 PL 每次 bootstrap 都要重拟合 7 人 + 全部 superblock，单次成本远高于双人 BT。
  * 默认 1000/300 次会让正式 2,520 局数据的重算超过维护任务时限；300/100 次的
  * percentile CI 已足够稳定，同时保持整份榜单可在控制台一次完成。
@@ -315,7 +321,9 @@ function normalizeMultiplayerMatch(record, registry, mapModes, line) {
   }
   const map = typeof record.map === 'string' ? record.map : 'unknown';
   const mode = mapModes.get(map) ?? 'standard';
-  if (mode !== 'standard') return { warning: `line ${line}: three-player rating currently supports standard mode only` };
+  if (!THREE_PLAYER_MODES.has(mode)) {
+    return { warning: `line ${line}: three-player rating does not support ${mode} mode` };
+  }
   return {
     match: {
       ts: record.ts ?? null,
@@ -323,7 +331,7 @@ function normalizeMultiplayerMatch(record, registry, mapModes, line) {
       mode,
       players: { ...players },
       playerCount: 3,
-      rulesVersion: typeof record.rulesVersion === 'string' ? record.rulesVersion : 'standard-3p-v1',
+      rulesVersion: typeof record.rulesVersion === 'string' ? record.rulesVersion : `${mode}-3p-v1`,
       rankGroups: record.rankGroups.map(group => [...group]),
       schedule: structuredClone(schedule),
       manifestHash: record.manifestHash,
@@ -722,7 +730,12 @@ function main() {
     const rulesVersion = key.slice(separator + 1);
     const divisionMatches = multiplayerMatches.filter(match => match.mode === mode && match.rulesVersion === rulesVersion);
     const actualIds = new Set(divisionMatches.flatMap(match => Object.values(match.players)));
-    const ids = allIds.filter(id => registry.get(id)?.playerCounts?.includes(3) || actualIds.has(id));
+    // 分榜名册=本模式通过三人准入的参与者（外加本榜真实出现过的历史 id）：
+    // 标准三人榜不拉歼灭算法，歼灭三人榜也不拉标准算法，否则两边各背一串 0 局的名字。
+    const ids = allIds.filter(id => {
+      const meta = registry.get(id);
+      return actualIds.has(id) || (meta?.playerCounts?.includes(3) && meta.modes?.includes(mode));
+    });
     const mapsForDivision = [...new Set(divisionMatches.map(match => match.map))].sort();
     const leagues = {
       all: buildMultiplayerLeague(divisionMatches, ids, {

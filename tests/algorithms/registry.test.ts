@@ -43,15 +43,17 @@ describe('algorithm registry modes', () => {
     }
   });
 
-  it('declares three-player support for every standard algorithm only', () => {
-    const standard = Object.keys(ALGORITHMS).filter(name => algorithmModes(name).includes('standard'));
-    expect(standard.sort()).toEqual([
-      'field', 'greedy', 'mcts', 'parallax', 'random', 'threat', 'verdict',
+  it('declares three-player support for the standard and annihilation algorithms only', () => {
+    const threePlayer = Object.keys(ALGORITHMS)
+      .filter(name => algorithmModes(name).includes('standard') || algorithmModes(name).includes('annihilation'));
+    expect(threePlayer.sort()).toEqual([
+      'crucible', 'field', 'greedy', 'mcts', 'parallax', 'random', 'random-annihilation',
+      'shrinkroll', 'sovereign', 'threat', 'verdict', 'vortex',
     ]);
-    for (const name of standard) {
+    for (const name of threePlayer) {
       expect(algorithmPlayerCounts(name), name).toEqual([2, 3]);
     }
-    for (const name of Object.keys(ALGORITHMS).filter(name => !standard.includes(name))) {
+    for (const name of Object.keys(ALGORITHMS).filter(name => !threePlayer.includes(name))) {
       expect(algorithmPlayerCounts(name), name).toEqual([2]);
     }
   });

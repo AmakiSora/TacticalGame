@@ -48,6 +48,12 @@ export const EVAL_MODES = [
   { id: 'royale', label: '大逃杀', supported: true },
 ] as const;
 
+/**
+ * 已接入三人跑批的模式；与 `rl/evaluation/round_robin.py` 的 `THREE_PLAYER_MODES`
+ * 同口径（同时回合/大逃杀走计划入队结算，三人轮换尚未接入）。三人局一律不参评 RL 模型。
+ */
+export const THREE_PLAYER_EVAL_MODES = new Set(['standard', 'annihilation']);
+
 export interface EvalMapInfo {
   id: string;
   label: string;
@@ -243,7 +249,7 @@ const yieldTick = () => new Promise<void>(resolve => setImmediate(resolve));
 export interface EvalRunParams {
   /** 本批对局模式（由地图池推断，同一批不允许混模式）；缺省按 standard 兼容旧调用。 */
   mode?: string;
-  /** 参赛人数；缺省 2。三人走独立 PL 分榜，只支持标准模式内置算法。 */
+  /** 参赛人数；缺省 2。三人走独立 PL 分榜（标准/歼灭各一份），只收注册表声明 3 人的内置算法。 */
   playerCount?: 2 | 3;
   maps: string[];
   /**
@@ -274,9 +280,10 @@ export function buildParticipantArgs(params: EvalRunParams): string[] {
   const args: string[] = [];
   if (modelFilters.length) {
     args.push('--models', modelFilters.join(','));
-  } else if ((params.mode ?? 'standard') === 'standard') {
+  } else if (params.playerCount === 3 || (params.mode ?? 'standard') === 'standard') {
     // 标准模式下「不传 --models」的语义是「全部模型」：只勾算法时必须显式传 none，
     // 否则 19 个模型会被一起拉进跑批（whirlpool 这种只跑算法对算法的图尤其要避免）。
+    // 三人局不参评模型（round_robin 收到 --models 会直接拒绝），同样显式 none。
     args.push('--models', 'none');
   }
   args.push('--algorithms', algoNames.length ? algoNames.join(',') : 'none');
@@ -919,9 +926,9 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
     if (playerCount !== 2 && playerCount !== 3) {
       return reply.code(400).send({ error: 'playerCount 必须是 2 或 3', code: 'invalid_player_count' });
     }
-    if (playerCount === 3 && mode !== 'standard') {
+    if (playerCount === 3 && !THREE_PLAYER_EVAL_MODES.has(mode)) {
       return reply.code(400).send({
-        error: '三人竞技场当前仅支持标准模式', code: 'mode_not_supported',
+        error: '三人竞技场当前仅支持标准模式与歼灭模式', code: 'mode_not_supported',
       });
     }
     if (playerCount === 3) {
@@ -1015,7 +1022,8 @@ export async function arenaEvalRoutes(app: FastifyInstance, deps: ArenaEvalDeps 
       }
     }
     // 非标准模式没有 RL 模型可参评，至少需要两个该模式算法才能组成对阵批次；
-    // 歼灭（random-annihilation + shrinkroll + vortex）3 个、大逃杀（random-royale + apex）2 个。
+    // 歼灭（random-annihilation + shrinkroll + vortex + crucible + sovereign）5 个、
+    // 大逃杀（random-royale + apex）2 个。
     if (mode !== 'standard') {
       const modeAlgoCount = Object.values(ALGORITHM_BOTS)
         .filter(config => config.modes.includes(mode)).length;

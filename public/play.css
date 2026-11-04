@@ -1095,13 +1095,13 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 196px;
+  height: 204px;
   min-width: 0;
   background: radial-gradient(66% 96% at 50% 48%, #101c26 0%, #0a131a 62%, #060c11 100%);
 }
-/* 窄屏再压一档，保证「地图卡 + 房间卡 + 座位列表」一屏可见。 */
+/* 窄屏再压一档（184px 卡 → 信息栏 164px）：数值表仍保持两列 6 行，间距由 1289 行起的紧凑档收紧。 */
 @media (max-width: 1100px) {
-  .lobby-map-stage { height: 168px; }
+  .lobby-map-stage { height: 184px; }
 }
 .lobby-map-thumb {
   position: relative;
@@ -1255,8 +1255,8 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   grid-template-columns: auto auto;
   justify-content: center;
   column-gap: 10px;
-  row-gap: 1px;
-  margin-top: 4px;
+  row-gap: 0;
+  margin-top: 3px;
   font-size: 11px;
   line-height: 1.5;
 }
@@ -1266,14 +1266,14 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
 .lobby-map-change {
   align-self: flex-end;
   margin-top: auto;
-  padding: 6px 16px;
+  padding: 5px 16px;
   font-size: 12px;
   width: auto;
   transition: opacity .2s ease;
 }
 /* 创建成功后不换页：地图预览慢慢收小，创建按钮 / 提示 / 更换地图退场，房间卡在预览下方展开 */
 #create-form .lobby-map-stage { transition: height .4s cubic-bezier(.22, .8, .3, 1); }
-#create-form.room-active .lobby-map-stage { height: 196px; }
+#create-form.room-active .lobby-map-stage { height: 204px; }
 #create-form.room-active #btn-create,
 #create-form.room-active > .lobby-hint { display: none; }
 #create-form.room-active .lobby-map-change {
@@ -1281,6 +1281,19 @@ header .sub { font-weight: 400; font-size: 14px; color: #7a9aaa; margin-left: 6p
   visibility: hidden;
   pointer-events: none;
   transition: opacity .2s ease, visibility 0s linear .2s;
+}
+/* 压缩档（≤1100px 宽 → 卡片 184px；≤860px 高 → 卡片 184px）：数值表保持和宽屏一样的
+   两列 6 行（不换 4 列），靠「卡片加高 + 信息栏间距收紧」放下全部内容。
+   实测两列 6 行内容要 162px：184px 卡扣掉上下留白正好容纳，页面不新增滚动条。
+   面板加宽到 190px 是长数值不换行所需；≤720px 是上下排布，交给后面的媒体查询。 */
+@media (min-width: 721px) and (max-width: 1100px),
+       (min-width: 721px) and (max-height: 860px) {
+  .lobby-map-summary { --lobby-map-panel: 190px; }
+  .lobby-map-copy { top: 10px; bottom: 10px; gap: 4px; }
+  .lobby-map-title { font-size: 17px; }
+  .lobby-map-sub { margin-top: 1px; }
+  .lobby-map-meta { column-gap: 8px; margin-top: 2px; }
+  .lobby-map-change { padding: 3px 14px; }
 }
 
 #create-result.lobby-room,
@@ -2906,14 +2919,16 @@ body.map-dialog-open { overflow: hidden; }
 #btn-rules:hover { background: #26384a; color: #d8e0e8; }
 
 /* ══════════ 矮屏再压一档（≤860px 高，如 1280×800） ══════════
-   1440×900 靠默认档能放下（底行按钮距底 14px）；1280×800 只有这一档才够。
+   这一档把地图卡提到 184px，信息栏 164px，刚好放下「名称 + 两列 6 行数值 + 更换地图」
+   （实测约 162px，见 1288 行注释）；数值表布局与宽屏完全一致，只是间距更紧。
+   1440×900 走默认档（204px 卡 + 6 行数值表）；1280×800 靠这一档不滚屏。
    只动纵向间距与块高，不动任何按钮的可点区尺寸（移动端 ≥30px 的约束在 play-m.css）。 */
 @media (max-height: 860px) {
   #join-panel { padding-top: 20px; padding-bottom: 20px; }
   .panel h2 { margin-bottom: 10px; }
   .lobby-tabs { margin-bottom: 12px; }
   .lobby-map-stage,
-  #create-form.room-active .lobby-map-stage { height: 144px; }
+  #create-form.room-active .lobby-map-stage { height: 184px; }
   #create-result.lobby-room.room-open,
   #join-result.lobby-room.room-open { padding: 9px; }
   .lobby-room-head { margin-bottom: 6px; }

@@ -21,20 +21,26 @@ function ruleOf(css: string, selector: string): string {
 }
 
 describe('lobby page is compact (V6-8)', () => {
-  it('shrinks the map stage to 196px with 168px / 148px / 144px steps', () => {
+  it('shrinks the map stage to 204px with 184px / 148px steps', () => {
     const css = read(DESKTOP);
-    expect(ruleOf(css, '.lobby-map-stage')).toContain('height: 196px');
-    expect(css).toContain('#create-form.room-active .lobby-map-stage { height: 196px; }');
-    // 窄窗口再压一档。
+    expect(ruleOf(css, '.lobby-map-stage')).toContain('height: 204px');
+    expect(css).toContain('#create-form.room-active .lobby-map-stage { height: 204px; }');
+    // 窄窗口再压一档（数值表仍保持两列 6 行）。
     expect(css).toContain('@media (max-width: 1100px)');
     const narrow = css.slice(css.indexOf('@media (max-width: 1100px)'));
-    expect(narrow.slice(0, narrow.indexOf('}')).concat(narrow.slice(0, 200))).toContain('.lobby-map-stage { height: 168px; }');
+    expect(narrow.slice(0, narrow.indexOf('}')).concat(narrow.slice(0, 200))).toContain('.lobby-map-stage { height: 184px; }');
+    // 窄窗 / 矮屏压缩档：卡片加高到 184px + 面板 190px + 间距收紧，数值表保持两列 6 行不换 4 列。
+    expect(css).toContain('@media (min-width: 721px) and (max-width: 1100px),');
+    expect(css).toContain('(min-width: 721px) and (max-height: 860px) {');
+    expect(css).toContain('.lobby-map-summary { --lobby-map-panel: 190px; }');
+    expect(css).toContain('.lobby-map-copy { top: 10px; bottom: 10px; gap: 4px; }');
+    expect(css).not.toContain('grid-template-columns: auto auto auto auto;');
     // 单列 / 手机一档。
     const column = css.slice(css.indexOf('@media (max-width: 720px)'));
     expect(column.slice(0, 400)).toContain('.lobby-map-stage { height: 148px; }');
-    // 矮屏（1280×800 那档）再压到 144px。
+    // 矮屏（1280×800 那档）压到 184px。
     const short = css.slice(css.indexOf('@media (max-height: 860px)'));
-    expect(short, '矮屏档缺地图台高度').toContain('#create-form.room-active .lobby-map-stage { height: 144px; }');
+    expect(short, '矮屏档缺地图台高度').toContain('#create-form.room-active .lobby-map-stage { height: 184px; }');
     // 旧高度必须消失。
     expect(css).not.toContain('height: 310px');
     expect(css).not.toContain('height: 246px');

@@ -157,7 +157,9 @@ function finish(outcome) {
   console.log(JSON.stringify(outcome));
   if (sleepTimer) clearTimeout(sleepTimer);
   // Exit on the next macrotask so stdout flushes and no handle is mid-close.
-  setTimeout(() => process.exit(outcome.exit), 100).unref();
+  // The timer must stay ref'd: unref'd it cannot hold an otherwise-empty event
+  // loop, so the exit code would be lost (the timeout path would exit 0).
+  setTimeout(() => process.exit(outcome.exit), 100);
 }
 
 async function main() {
@@ -171,7 +173,10 @@ async function main() {
       const game = await fetchState(args.url, args.game, args.token);
       backoffMs = 2000;
       const outcome = classifyState(game, args.player);
-      if (outcome) finish(outcome);
+      if (outcome) {
+        finish(outcome);
+        return;
+      }
 
       const lastSeq = Number(game.lastEventSeq ?? game.events?.at?.(-1)?.seq ?? 0);
       const remainingS = Math.max(0.2, (deadline - Date.now()) / 1000);
@@ -190,6 +195,7 @@ async function main() {
     } catch (err) {
       if (err.status === 403 && err.code === 'player_eliminated') {
         finish({ result: 'eliminated', status: 'player_eliminated', exit: EXIT.ELIMINATED });
+        return;
       }
       // Transient failure (network, 502/503, 429 rate_limit, ...): back off and keep polling.
       const waitMs = Math.min(backoffMs, Math.max(1000, deadline - Date.now()));

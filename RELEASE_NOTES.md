@@ -12,11 +12,12 @@
 
 ### 修复
 
+- **wait-turn.mjs 超时退出码不再丢失**：`finish()` 的退出定时器此前被 `.unref()`，timeout 路径在事件循环排空后进程直接以 0 退出，而 skill 契约里 0 = 轮到玩家，对局 agent 会把超时误当自己的回合去刷状态、重复操作。现在定时器保持 ref'd、判定到 my_turn / game_over / eliminated 后立即结束主循环，四条退出路径实测均返回契约退出码（`skill/wait-turn.mjs` / `tests/skill/wait-turn.exit-code.test.ts`）。
 - **大厅地图卡在窄窗 / 矮屏不再裁切**：桌面大厅的地图预览卡此前只有「宽 ≥1101px 且高 >860px」能完整显示——矮屏档（≤860px 高，如 1280×800）把卡片压到 144px，而「名称 + 6 行数值表 + 更换地图」要 170px，数值表末行与按钮被 `overflow:hidden` 裁掉，962×522 等窗口连地图名都看不到。现在这两档保持数值表与宽屏一致的两列 6 行不变，把卡片加高到 184px 并收紧信息栏间距，实测 962×522 ～ 1440×900 全部视口（含加入游戏页与房态卡）信息完整落卡内且不新增滚动条（`public/play.css` / `tests/public/lobby-compact.test.ts`）。
 
 ### 测试与验证
 
-- `npm run build` 与 `npm test`（147 文件 / 1741 例）通过；`npm run stats-all` 重算 244 局，`Hy4preview` 保留 17 局、正式版暂无对局。
+- `npm run build` 与 `npm test`（148 文件 / 1744 例）通过；新增 wait-turn.mjs 进程级退出码回归测试（stub 服务器 + 真实脚本断言 shell 退出码，旧代码下 timeout / game_over 两例按预期失败）。`npm run stats-all` 重算 244 局，`Hy4preview` 保留 17 局、正式版暂无对局。
 
 ## 3.9.3
 

@@ -3,6 +3,14 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-11-04 · 同时回合模式三人评估跑批（3.9.2）
+
+**一句话**：三人评估从标准、歼灭扩到同时回合。`round_robin.py --player-count 3 --mode simultaneous` 冻结 `simultaneous-3p-v1` 的六局双向 manifest，8 个同时回合算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）声明 `[2, 3]` 准入；`evaluate_cross.py` 的三人路径本就不读模式参数（`_is_plan_mode` 从对局状态取模式），本版只把 `--player-c` 帮助文案改成模式中立；榜单按 `mode × rulesVersion` 生成独立的「同时回合 · 三人」分榜，名册只取本模式通过三人准入的算法。
+
+**地图池**：同时回合静态图只有 `standoff` 带三人布局（`mistpine`、`molten-throne` 的 `layouts` 都只有 `2`），三人批写 `--maps standoff,random-simultaneous` 即可同时跑真实图与虚拟随机图；控制台按地图 `playerCounts` 过滤并用服务端布局校验兜底，`--mode simultaneous` 必须显式给出（`--player-count 3` 默认仍按标准模式解释）。
+
+**测试与验证**：真实引擎跑 112 个阵容×地图批次共 **2016 局**（56 阵容 × 2 图 × 18 局），336 个完整 superblock、0 残块、0 批次失败、用时 1h32m；分榜 8 个算法全部非 provisional。`test_three_player_evaluation.py` 更新为同时回合 manifest 规则版本、任务模式透传与不支持模式（大逃杀）拒绝三例；`tests/api/arena-eval.test.ts` 覆盖同时回合三人启动、8 算法准入与无三人布局地图拒绝，`generateArenaLeaderboard` 覆盖「同时回合 · 三人」分榜隔离与 8 条名册。
+
 ## 2026-11-04 · 歼灭模式三人评估跑批（3.9.1）
 
 **一句话**：三人评估从标准模式扩到歼灭模式。`round_robin.py` 的 `--player-count 3` 按地图推断模式，歼灭批冻结 `annihilation-3p-v1` 的六局双向 manifest，5 个歼灭算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）声明 `[2, 3]` 准入；`evaluate_cross.py` 的三人路径本身与模式无关，错误文案改为模式中立；榜单按 `mode × rulesVersion` 生成独立的「歼灭模式 · 三人」分榜，名册只取本模式通过三人准入的算法。

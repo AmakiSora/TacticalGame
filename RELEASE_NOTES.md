@@ -4,6 +4,21 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.9.2
+
+### 新增
+
+- **同时回合三人竞技场**：三人跑批从标准、歼灭扩到同时回合，该模式的 8 个算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）通过三人准入，对局冻结在 `simultaneous-3p-v1` 并单列「同时回合 · 三人」并列感知 Plackett-Luce 分榜。控制台在同时回合计可切三人，地图用 `standoff` 与虚拟随机图 `random-simultaneous`（`mistpine` / `molten-throne` 只有双人布局，不参与三人批）。
+
+### 变更
+
+- **三人同时回合需显式声明模式**：`round_robin.py --player-count 3` 默认仍按标准模式解释，跑同时回合要带 `--mode simultaneous`；评估控制台会自动带上该参数，人数切换提示中列出三种可用模式。
+
+### 测试与验证
+
+- 真实引擎跑完 112 个阵容×地图批次（**2016 局**、336 个完整 superblock、0 残块、0 批次失败，用时 1h32m），分榜 8 个算法全部非 provisional，三个座位均按六局双向轮换实际出手。
+- 规则版本、任务模式透传、地图三人布局校验与分榜名册隔离均有回归；`npm run build` / `npm test`（**147 文件 / 1738 例**）与 RL pytest（**341 passed / 13 skipped**）通过。
+
 ## 3.9.1
 
 ### 新增

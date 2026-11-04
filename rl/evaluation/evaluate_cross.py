@@ -142,7 +142,7 @@ def parse_args():
     parser.add_argument("--player-b", default=None,
                         help="player_b 座位参与者规格：模型 zip 路径或 algo:<算法名>[@<版本>]")
     parser.add_argument("--player-c", default=None,
-                        help="player_c 座位算法规格；提供后启用三人模式（标准/歼灭，仅内置算法）")
+                        help="player_c 座位算法规格；提供后启用三人模式（标准/歼灭/同时回合，仅内置算法）")
     parser.add_argument("--schedule-file", default=None,
                         help="三人轮换 manifest/待跑片段 JSON；座位、种子和 superblock 元数据以其为准")
     parser.add_argument("--model-a", default=None, help="等价 --player-a（仅模型规格），兼容保留")

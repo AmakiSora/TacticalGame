@@ -282,10 +282,10 @@ function numericSeatMap(value, seats = ['player_a', 'player_b']) {
 const MULTIPLAYER_SEATS = ['player_a', 'player_b', 'player_c'];
 /**
  * 已接入三人分榜的玩法模式；与 `rl/evaluation/round_robin.py` 的 `THREE_PLAYER_MODES`
- * 同口径——同时回合/大逃杀走计划入队结算，三人轮换尚未接入。分榜按
- * `${mode}|${rulesVersion}` 分区，标准与歼灭各成一份，从不合并评分。
+ * 同口径（大逃杀暂无三人分榜）。分榜按 `${mode}|${rulesVersion}` 分区，
+ * 标准、歼灭、同时回合各成一份，从不合并评分。
  */
-const THREE_PLAYER_MODES = new Set(['standard', 'annihilation']);
+const THREE_PLAYER_MODES = new Set(['standard', 'annihilation', 'simultaneous']);
 /**
  * 三人 PL 每次 bootstrap 都要重拟合 7 人 + 全部 superblock，单次成本远高于双人 BT。
  * 默认 1000/300 次会让正式 2,520 局数据的重算超过维护任务时限；300/100 次的

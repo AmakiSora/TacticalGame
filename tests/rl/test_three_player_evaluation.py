@@ -1,4 +1,4 @@
-"""三人评估（标准 / 歼灭）：六局双向轮换、manifest 续跑与并列名次（pytest）。"""
+"""三人评估（标准 / 歼灭 / 同时回合）：六局双向轮换、manifest 续跑与并列名次（pytest）。"""
 
 from __future__ import annotations
 
@@ -24,6 +24,11 @@ ANNIHILATION_PARTICIPANTS = [
     ("algo:random-annihilation@v1", "algo_random-annihilation@v1"),
     ("algo:shrinkroll@v1", "algo_shrinkroll@v1"),
     ("algo:vortex@v1", "algo_vortex@v1"),
+]
+SIMULTANEOUS_PARTICIPANTS = [
+    ("algo:dest-prob@v2", "algo_dest-prob@v2"),
+    ("algo:random-sim@v2", "algo_random-sim@v2"),
+    ("algo:tempo@v1", "algo_tempo@v1"),
 ]
 
 
@@ -83,14 +88,40 @@ def test_three_player_plan_carries_the_annihilation_mode_into_every_task(tmp_pat
 
 
 def test_three_player_manifest_rejects_modes_without_a_three_player_arena():
-    for mode in ("simultaneous", "royale"):
-        try:
-            round_robin.build_three_player_manifest(
-                ANNIHILATION_PARTICIPANTS, "artillery-zone", "rr-unsupported", 6, mode=mode)
-        except ValueError as exc:
-            assert mode in str(exc)
-        else:
-            raise AssertionError(f"{mode} three-player manifest must be rejected")
+    # 同时回合已接入三人分榜；大逃杀虽有 snowflake 的三人布局，但暂无三人分榜。
+    round_robin.build_three_player_manifest(
+        SIMULTANEOUS_PARTICIPANTS, "standoff", "rr-simultaneous", 6, mode="simultaneous")
+    try:
+        round_robin.build_three_player_manifest(
+            ANNIHILATION_PARTICIPANTS, "snowflake", "rr-unsupported", 6, mode="royale")
+    except ValueError as exc:
+        assert "royale" in str(exc)
+    else:
+        raise AssertionError("royale three-player manifest must be rejected")
+
+
+def test_simultaneous_manifest_freezes_its_own_rules_version():
+    manifest = round_robin.build_three_player_manifest(
+        SIMULTANEOUS_PARTICIPANTS, "standoff", "rr-simultaneous", 6, mode="simultaneous")
+    assert manifest["mode"] == "simultaneous"
+    assert manifest["rulesVersion"] == "simultaneous-3p-v1"
+    assert len(manifest["games"]) == 6
+    # 计划同时回合局的 ETA 需要该模式的单局成本，缺键会在跑批前直接 KeyError。
+    assert round_robin.THREE_PLAYER_COST_PER_GAME["simultaneous"] > 0
+
+
+def test_three_player_plan_carries_the_simultaneous_mode_into_every_task(tmp_path):
+    stats = tmp_path / "matches.jsonl"
+    tasks, skipped = round_robin.plan_three_player_tasks(
+        SIMULTANEOUS_PARTICIPANTS, ["standoff", "random-simultaneous"],
+        "rr-sim-plan", {}, 6, stats, mode="simultaneous")
+    assert skipped == 0
+    assert [task["map"] for task in tasks] == ["standoff", "random-simultaneous"]
+    for task in tasks:
+        schedule = json.loads(Path(task["schedule_file"]).read_text(encoding="utf-8"))
+        assert schedule["mode"] == "simultaneous"
+        assert schedule["rulesVersion"] == "simultaneous-3p-v1"
+        assert len(schedule["games"]) == 6
 
 
 def test_resume_uses_only_the_missing_tail_of_the_same_manifest(tmp_path):
@@ -123,6 +154,9 @@ def test_resume_uses_only_the_missing_tail_of_the_same_manifest(tmp_path):
 def test_plan_rejects_non_six_multiple_and_unsupported_maps():
     assert round_robin.map_supports_player_count(ROOT, "multiplayer-ring", 3)
     assert round_robin.map_supports_player_count(ROOT, "whirlpool", 3)
+    assert round_robin.map_supports_player_count(ROOT, "standoff", 3)
+    assert round_robin.map_supports_player_count(ROOT, "random-simultaneous", 3)
+    assert not round_robin.map_supports_player_count(ROOT, "mistpine", 3)
     assert not round_robin.map_supports_player_count(ROOT, "default", 3)
     try:
         round_robin.plan_three_player_tasks(PARTICIPANTS, ["multiplayer-ring"], "x", {}, 5, ROOT / "x.jsonl")

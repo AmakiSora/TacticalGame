@@ -384,6 +384,48 @@ describe('三人标准模式独立 PL 分榜', () => {
     expect(payload.registry['algo_shrinkroll@v1'].playerCounts).toEqual([2, 3]);
   });
 
+  it('同时回合三人记录自成一份分榜，规则版本用 simultaneous-3p-v1', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-three-simultaneous-'));
+    const statsFile = join(tempDir, 'matches.jsonl');
+    const outFile = join(tempDir, 'lb.json');
+    const modelsDir = join(tempDir, 'models');
+    mkdirSync(modelsDir, { recursive: true });
+    writeFileSync(join(modelsDir, VALID), 'zip');
+    writeFileSync(statsFile, threePlayerLines({
+      map: 'standoff',
+      rulesVersion: 'simultaneous-3p-v1',
+      lineup: ['algo_dest-prob@v2', 'algo_random-sim@v2', 'algo_tempo@v1'],
+    }).join('\n') + '\n');
+
+    const result = spawnSync(
+      process.execPath,
+      ['script/generateArenaLeaderboard.mjs', '--stats-file', statsFile, '--out', outFile,
+        '--models-dir', modelsDir, '--bootstrap', '0', '--bootstrap-per-map', '0'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const payload = JSON.parse(readFileSync(outFile, 'utf8'));
+    expect(payload.modes).toEqual([]);
+    expect(payload.divisions).toHaveLength(1);
+    const division = payload.divisions[0];
+    expect(division).toMatchObject({
+      id: 'simultaneous-3p-simultaneous-3p-v1',
+      label: '同时回合 · 三人',
+      mode: 'simultaneous',
+      playerCount: 3,
+      rulesVersion: 'simultaneous-3p-v1',
+      games: 6,
+    });
+    expect(division.maps.all.overview).toMatchObject({
+      games: 6, superblockCount: 1, quarantinedSuperblocks: 0,
+    });
+    // 同时回合三人榜列全部 8 个同时回合算法（3 个上场 + 5 个零局），不混入标准/歼灭算法。
+    expect(division.maps.all.models).toHaveLength(8);
+    expect(division.maps.all.models.filter((model: { games: number }) => model.games > 0)).toHaveLength(3);
+    expect(payload.registry['algo_tempo@v1'].playerCounts).toEqual([2, 3]);
+    expect(payload.registry['algo_tempo@v1'].modes).toEqual(['simultaneous']);
+  });
+
   it('残缺三人块不进入评分但保留隔离计数', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'rl-lb-three-partial-'));
     const statsFile = join(tempDir, 'matches.jsonl');

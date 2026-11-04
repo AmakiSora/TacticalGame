@@ -20,11 +20,14 @@
   炮火缩圈与淘汰由引擎在轮界结算），simultaneous / royale 走计划入队与统一结算。模式内
   只纳入注册表 ``ALGORITHM_META.modes`` 声明该模式的算法；RL 模型仅支持标准模式，
   不参与其他模式跑批。歼灭已有 random-annihilation、shrinkroll、vortex、crucible、
-  sovereign 五个条目，大逃杀已有 random-royale、apex 等条目，均可组批。
+  sovereign 五个条目，同时回合已有 random-sim、dest-prob、kriegspiel、matrix-eq、
+  prism、tempo、tempo-weave、horizon 八个条目，大逃杀已有 random-royale、apex 等条目，
+  均可组批。
 - 三人（``--player-count 3``）：每阵容 × 每图固定 3 座位轮换 × 2 先手 = 6 局一个
-  superblock，按模式分规则版本（standard-3p-v1 / annihilation-3p-v1）各成独立分榜；
-  不参评 RL 模型，只跑注册表声明 ``playerCounts`` 含 3 的算法。三人局需要每张图都有
-  三人布局，缺省地图池是标准模式双人图，须显式给图（如歼灭的 artillery-zone）。
+  superblock，按模式分规则版本（standard-3p-v1 / annihilation-3p-v1 /
+  simultaneous-3p-v1）各成独立分榜；不参评 RL 模型，只跑注册表声明
+  ``playerCounts`` 含 3 的算法。三人局需要每张图都有三人布局，缺省地图池是标准模式
+  双人图，须显式给图（如歼灭的 artillery-zone、同时回合的 standoff）。
 
 用法示例：
 
@@ -41,6 +44,10 @@
     # 三人歼灭（六局一个 superblock；仅 artillery-zone 与随机歼灭图有三人布局）
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 \
         --maps artillery-zone,random-annihilation --games 12
+
+    # 三人同时回合（仅 standoff 与随机同时回合图有三人布局）
+    rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 \
+        --mode simultaneous --maps standoff,random-simultaneous --games 36
 
     # 冒烟测试
     rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps default \
@@ -101,11 +108,20 @@ GAME_PROGRESS_PREFIX = "进度|"
 THREE_PLAYER_RULES_VERSIONS = {
     "standard": "standard-3p-v1",
     "annihilation": "annihilation-3p-v1",
+    "simultaneous": "simultaneous-3p-v1",
 }
 # 已接入三人跑批的模式。RL 模型是单对手观测编码，三人一律不含模型。
 THREE_PLAYER_MODES = tuple(THREE_PLAYER_RULES_VERSIONS)
 # 缺省（standard）规则版本；既有引用与历史 manifest 都指向它。
 THREE_PLAYER_RULES_VERSION = THREE_PLAYER_RULES_VERSIONS["standard"]
+# 三人批次单局耗时兜底（秒）：三人局轮换比双人更多停顿，逐动作模式按双人 1.5 倍估，
+# 计划队列模式（同时回合）直接用远高的计划档再留余量——三人同时回合单局实测
+# 6s（轻量阵容）到数十秒（kriegspiel/matrix-eq 重搜索）不等，取保守值只影响进度估算。
+THREE_PLAYER_COST_PER_GAME = {
+    mode: (SEC_PER_GAME_ALGO_PLAN if mode in PLAN_MODES
+           else SEC_PER_GAME_ALGO_SEQUENTIAL) * 1.5
+    for mode in THREE_PLAYER_MODES
+}
 
 
 def parse_args():
@@ -117,7 +133,7 @@ def parse_args():
     parser.add_argument("--games", type=int, default=24,
                         help="每对参与者 × 地图的目标总局数（含已跑局数，默认 24）")
     parser.add_argument("--player-count", type=int, choices=(2, 3), default=2,
-                        help="参赛人数；三人仅 standard / annihilation 内置算法，"
+                        help="参赛人数；三人仅 standard / annihilation / simultaneous 内置算法，"
                              "每阵容局数必须为 6 的倍数")
     parser.add_argument("--stats-file", default=None,
                         help=f"累积 JSONL 路径（默认 {DEFAULT_STATS_FILE}）")
@@ -679,7 +695,7 @@ def run_three_player(args, root: Path, maps: list[str], mode: str, stats_file: P
     print(f"seed 盐：{salt}；manifest：{stats_file.parent / 'details' / 'manifests'}")
     total_games = sum(task["games"] for task in tasks)
     print(f"任务：{len(tasks)} 个阵容批次，待跑 {total_games} 局（已完成 {skipped} 局）")
-    estimates = [TASK_OVERHEAD_SEC_ALGO + task["games"] * SEC_PER_GAME_ALGO_SEQUENTIAL * 1.5
+    estimates = [TASK_OVERHEAD_SEC_ALGO + task["games"] * THREE_PLAYER_COST_PER_GAME[mode]
                  for task in tasks]
     if not tasks:
         print("所有目标局数已达成，无需补跑。")

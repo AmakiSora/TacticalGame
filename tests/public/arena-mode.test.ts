@@ -145,6 +145,9 @@ describe('AI 竞技场按玩法模式分榜', () => {
     expect(source).toContain('仅内置算法（RL 模型暂只支持标准模式）');
     expect(source).toContain('该模式至少需要选择 2 个参评算法');
     expect(source).toContain('等第二个算法落地后才能组批');
+    // 三人局：标准、歼灭、同时回合都可跑批；大逃杀仍无三人分榜。
+    expect(source).toContain("const EVAL_THREE_PLAYER_MODES = ['standard', 'annihilation', 'simultaneous']");
+    expect(source).toContain('标准/歼灭/同时回合');
   });
 
   it('双人/三人是标准模式下的二级分类，不占一级模式页签', () => {

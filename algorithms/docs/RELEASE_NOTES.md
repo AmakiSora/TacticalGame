@@ -6,6 +6,18 @@
 >
 > **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
 
+## 3.9.2（2026-11-04）— 同时回合模式三人竞技场
+
+### 评估口径
+
+- 8 个同时回合算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）的 `playerCounts` 由 `[2]` 放宽到 `[2, 3]`，进入三人跑批。算法实现本身未改：同时回合按计划队列统一结算，策略不依赖对手人数（`matrix-eq` 的 `solveTwoPlayer` 只是内部 CFR 子求解器，不是参赛人数门槛）；本版只放开准入并提供跑批能力。
+- 同时回合三人局冻结 `simultaneous-3p-v1` 规则版本，与标准 `standard-3p-v1`、歼灭 `annihilation-3p-v1` 各自独立成并列感知 Plackett-Luce 分榜。三人地图池只有 `standoff` 与虚拟随机图 `random-simultaneous`——`mistpine`、`molten-throne` 的 `layouts` 只有双人布局，不能进三人批；RL 模型仍是单对手观测编码，任何模式的三人局都不参评。
+
+### 测试与验证
+
+- 真实引擎跑完 112 个阵容×地图批次（`standoff` 56 组、`random-simultaneous` 56 组，共 **2016 局**），336 个完整 superblock、0 残块、0 批次失败、用时 1h32m；分榜 8 个算法全部非 provisional（`tempo-weave` 1774 / `horizon` 1681 / `prism` 1680 领先，`random-sim` 1067 垫底），每人均 756 局、每座位局数均等。
+- pytest 新增/更新同时回合 manifest 的规则版本、任务模式透传与不支持模式拒绝；注册表、API、分榜与控制台回归覆盖 8 个算法的三人准入、`standoff` 启动与「同时回合 · 三人」分榜隔离。详见 [RL 日志](../../rl/docs/RELEASE_NOTES.md)。
+
 ## 3.9.1（2026-11-04）— 歼灭模式三人竞技场
 
 ### 评估口径

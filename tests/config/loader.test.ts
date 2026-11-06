@@ -633,7 +633,8 @@ describe('map config loader', () => {
     expect(map.headquarters.player_a).toEqual({ q: -5, r: 5 });
     expect(map.headquarters.player_b).toEqual({ q: 5, r: -5 });
     expect(hexDistance(map.headquarters.player_a, map.headquarters.player_b)).toBe(10);
-    expect(map.headquartersSpec.hp).toBe(100);
+    // 总部血量翻倍（100 → 200）：压住贴脸拆家的速胜路线，逼对手把兵力投入据点争夺
+    expect(map.headquartersSpec.hp).toBe(200);
     expect(map.headquartersSpec.defense).toBe(3);
 
     // 占点为王：24 座据点全部类型化，不再有全局 controlPointIncome，增援不得从总部部署
@@ -703,8 +704,19 @@ describe('map config loader', () => {
       expect(counterpart!.type).toBe(unit.type);
       expect(counterpart!.owner).toBe(unit.owner === 'player_a' ? 'player_b' : 'player_a');
     }
-    // 本图斥候特化为可战之兵（攻 25，其余地图为 16）
-    expect(map.units.scout.attack).toBe(25);
+    // 火力整体下调（≈-15%）：斥候仍比别图（攻 16）能打，但已不足以靠偷袭总部速胜
+    // 斥候 34 血 = 2×(21 攻 − 4 防)：同为斥候两刀见骨，快速占点兵打不了消耗战
+    // 斥候机动力同步 -1（5 → 4）：绕后贴脸要多花一轮，抢点仍是最快的兵
+    expect(map.units).toMatchObject({
+      infantry: { attack: 24 },
+      scout: { hp: 34, attack: 21, moveRange: 4 },
+      heavy: { attack: 31 },
+      ranger: { attack: 34 },
+      support: { attack: 8 },
+    });
+    // 占点为王：总部伤害在裁决分里只作点缀（权重 1），据点分（75）说了算
+    expect(map.balance.adjudicationWeights.enemyHqDamage).toBe(1);
+    expect(map.balance.adjudicationWeights.controlPoint).toBe(75);
 
     resetConfig();
   });

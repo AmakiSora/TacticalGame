@@ -336,7 +336,8 @@ const DEFAULT_RANGES: Record<string, [number, number]> = {
 const STARTING_WEIGHT_DEFAULTS = { infantry: 2, scout: 2, heavy: 1, ranger: 1 };
 
 // 默认域包线按 6 张静态图的极值校准（danger-close 的 1 行动点/20 补给/零据点收入、
-// dual-lanes 的 0 初始单位/208 补给、molten-throne（原 forge）的 100 血总部/24 据点等），让随机图
+// dual-lanes 的 0 初始单位/208 补给、standoff / whirlpool 的 200 血总部、molten-throne（原 forge）
+// 的 24 据点等），让随机图
 // 本身就能覆盖全部静态图的规则空间——RL 侧 v3.0.2-v3.1.0 三代的 whack-a-mole
 // （某张静态图整图崩塌）根因即这些维度从未进过训练分布。
 // 3.6.2 起硬边界放宽到初始单位 0-6、据点 1-24，molten-throne（3.5.11 重做后每方 6 单位、24 据点）

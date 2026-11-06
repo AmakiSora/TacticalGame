@@ -1,7 +1,7 @@
 {
   "mode": "simultaneous",
   "name": "熔池王座",
-  "description": "同时回合模式的占点为王地图：16 座补给站环中央熔池密布，四座维修站分居西北、东南两侧。内外两环共四座前哨站是全部部署起点——总部与其他据点均不可出兵，前哨归属即增援通道。西北与东南两角被墙垣封死，争夺全部压向中腹。全员秘密下达指令、统一同时结算；180° 旋转对称、无先手优势，20 回合终局以据点多寡定胜负。",
+  "description": "同时回合模式的占点为王地图：16 座补给站环中央熔池密布，四座维修站分居西北、东南两侧。内外两环共四座前哨站是全部部署起点——总部与其他据点均不可出兵，前哨归属即增援通道。西北与东南两角被墙垣封死，争夺全部压向中腹。全员秘密下达指令、统一同时结算；180° 旋转对称、无先手优势，20 回合终局以据点多寡定胜负；总部血量翻倍、全军火力偏弱、总部伤害在裁决分里只作点缀，抢点比偷家更划算。",
   "grid": "hex",
   "orientation": "pointy",
   "radius": 6,
@@ -255,7 +255,7 @@
   "units": {
     "infantry": {
       "hp": 90,
-      "attack": 28,
+      "attack": 24,
       "defense": 7,
       "moveRange": 3,
       "attackRange": 1,
@@ -263,17 +263,17 @@
       "canCapture": true
     },
     "scout": {
-      "hp": 58,
-      "attack": 25,
+      "hp": 34,
+      "attack": 21,
       "defense": 4,
-      "moveRange": 5,
+      "moveRange": 4,
       "attackRange": 1,
       "cost": 35,
       "canCapture": true
     },
     "heavy": {
       "hp": 140,
-      "attack": 36,
+      "attack": 31,
       "defense": 12,
       "moveRange": 2,
       "attackRange": 1,
@@ -282,7 +282,7 @@
     },
     "ranger": {
       "hp": 68,
-      "attack": 40,
+      "attack": 34,
       "defense": 3,
       "moveRange": 2,
       "attackRange": 3,
@@ -291,7 +291,7 @@
     },
     "support": {
       "hp": 78,
-      "attack": 10,
+      "attack": 8,
       "defense": 5,
       "moveRange": 3,
       "attackRange": 1,
@@ -301,7 +301,7 @@
     }
   },
   "headquartersSpec": {
-    "hp": 100,
+    "hp": 200,
     "defense": 3
   },
   "balance": {
@@ -313,7 +313,7 @@
     "actionsPerTurn": 4,
     "maxTurns": 20,
     "adjudicationWeights": {
-      "enemyHqDamage": 7,
+      "enemyHqDamage": 1,
       "ownHqHp": 2,
       "controlPoint": 75,
       "armyValue": 2,

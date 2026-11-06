@@ -186,24 +186,30 @@ Only when `game.mapId === "molten-throne"`; 2-player layout only (no 3/6-player 
   deploy allowed).
 - Deployment: `deployFromHq: false` and supply/repair points are banned as origins —
   **only owned forward bases can deploy**, so their ownership is your reinforcement route.
-- Spawn: HQ 100 HP / defense 3; 5 scouts + 1 support. Heavy and ranger are deployment options,
+- Spawn: HQ 200 HP / defense 3; 5 scouts + 1 support. Heavy and ranger are deployment options,
   not starting units.
 - Roster (snapshot — re-read `config.units`; this map configures **no** `attackShape`,
   `healShape` or `attackLock`, so every attack and heal uses the default `single` shape;
   support healing falls back to `attackRange` = 1):
   | unit | HP | atk | def | move | range | shape / ability |
   |---|---:|---:|---:|---:|---:|---|
-  | infantry | 90 | 28 | 7 | 3 | 1 | `single` — 单格；费用42 |
-  | scout | 58 | 25 | 4 | 5 | 1 | `single` — 单格，快速占点；费用35 |
-  | heavy | 140 | 36 | 12 | 2 | 1 | `single` — 单格；费用88 |
-  | ranger | 68 | 40 | 3 | 2 | 3 | `single` — 单格远程；费用72（本图无锁定） |
-  | support | 78 | 10 | 5 | 3 | 1 | `single` — 单格治疗，治疗力20；费用56 |
-  HQ: HP 100, defense 3.
+  | infantry | 90 | 24 | 7 | 3 | 1 | `single` — 单格；费用42 |
+  | scout | 34 | 21 | 4 | 4 | 1 | `single` — 单格，快速占点；费用35，两刀互杀 |
+  | heavy | 140 | 31 | 12 | 2 | 1 | `single` — 单格；费用88 |
+  | ranger | 68 | 34 | 3 | 2 | 3 | `single` — 单格远程；费用72（本图无锁定） |
+  | support | 78 | 8 | 5 | 3 | 1 | `single` — 单格治疗，治疗力20；费用56 |
+  HQ: HP 200, defense 3 — doubling the HP is the anti-snipe lever: a lone ranger needs 7 attacks
+  (7 rounds at one attack per round, 4 rounds for a pair) instead of 3, so a rush has to commit
+  real forces while you contest points.
 - Balance: `startingSupplies 30`, `baseIncome 5`, `actionsPerTurn 4`, `maxTurns 20`,
   `damageVarianceRange 5`, `healVarianceRange 10`, comeback supplies from round 4
-  (15% gap → +12/round). Adjudication weights: `enemyHqDamage 7`, `ownHqHp 2`,
+  (15% gap → +12/round). Adjudication weights: `enemyHqDamage 1`, `ownHqHp 2`,
   `controlPoint 75`, `armyValue 2`, `supplies 0`, `killValue 0.5` per killed-unit cost.
-  CPs dominate the score, so map control is the primary route to an adjudication win.
+  CPs dominate the score and HQ damage is almost cosmetic, so map control — not HQ sniping —
+  is the route to an adjudication win. The whole roster also sits ≈15% below its previous
+  attack values (the lowest of the standard-scale maps; the scout stays at 21, still above the
+  other maps' 16), so unit-vs-unit kills each take one more hit while the doubled HQ needs 7-12
+  hits per attacker: kills are slow by design and standing on points pays better.
 - Win conditions (standard HQ rules): destroy an enemy HQ to eliminate them; last player
   standing wins; at round 20 adjudicate by score. No artillery, no army-wipe elimination.
 

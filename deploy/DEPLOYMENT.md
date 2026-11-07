@@ -85,6 +85,8 @@ python deploy/deploy.py
 
 最多保留最近 30 份日志；`deploy/logs/` 已加入 gitignore，也不会上传。
 
+控制台输出是 best-effort：Windows 默认代码页（如 cp936）编不出的字符（远端构建里的 `✓`）会被替换成占位符而不是中断脚本，日志文件始终按 UTF-8 全量写入，逐行内容与编码以日志为准。
+
 ## 状态、备份与重启
 
 对局状态按局存放在 `/app/runtime/store/<gameId>.json`，由名为 `tactical-game-runtime` 的 Docker 卷承载。每次改动同步写这一局的快照（先写临时文件、`fsync`，再原子替换），响应返回时该局快照已经在盘上；上一份快照保留为 `<gameId>.json.prev`。`/app/runtime/games.json` 是旧版单文件格式，同时用作导出格式：首次升级时导入，运行中的改动去抖合并写出（trailing 250ms、最长 2s 必写），删除对局、归档与进程退出时强制 flush，因此可以用导出的文件回滚到 3.6.x。损坏的快照或损坏的旧版文件会归档为 `*.corrupt-*`，而不是静默清空状态；3.6.x 的明文 token 会在加载时迁移为哈希。该卷还保存 `runtime/records-index.json`、`runtime/token-pepper` 与 `runtime/archive/`（过期大厅 / 已结束对局）。

@@ -37,6 +37,17 @@ HEALTH_TIMEOUT = 90
 HEALTH_INTERVAL = 3
 
 
+def soften_console_encoding():
+    """控制台输出只做 best-effort：Windows 默认 cp936 打不出远端构建输出里的 ✓ 一类字符，
+    print 会抛 UnicodeEncodeError 并把整个部署中断在「构建启动」阶段（日志文件是 UTF-8 全量写入，
+    不受影响）。保留原编码，只把编不了的字符换成占位符。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def load_env():
     """Load deploy credentials from .env.deploy file."""
     if not ENV_FILE.exists():
@@ -485,6 +496,7 @@ def run_deploy(log):
 
 
 def main():
+    soften_console_encoding()
     log = init_log()
     log.line(f"部署开始: {LOCAL_BASE}")
     log.line(f"日志文件: {log.path}")

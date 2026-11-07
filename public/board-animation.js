@@ -29,7 +29,7 @@
   const HIT_COLOR = '#ff3b5c';
   const HEAL_COLOR = '#3effc8';
 
-  function create({ hexToPixel, ownerColor, unitSpec }) {
+  function create({ hexToPixel, ownerColor, unitSpec, render }) {
     const unitViews = new Map();
     const headquartersViews = new Map();
     let effects = [];
@@ -38,6 +38,44 @@
     const attackFxPlayed = new Map();
     // 治疗演出聚合：同 supportId+roundNumber 的多条 heal 合并为一次范围治疗波。
     let pendingHealFx = [];
+    let frame = null;
+    let rendering = false;
+    let needsDraw = false;
+
+    // 页面只提供绘制回调；所有动画入口都经 requestRender 唤醒，静止时不再遍历实体。
+    function scheduleFrame() {
+      if (!render || frame !== null || rendering || document.hidden) return;
+      frame = requestAnimationFrame(renderFrame);
+    }
+
+    function requestRender() {
+      needsDraw = true;
+      scheduleFrame();
+    }
+
+    function renderFrame(now) {
+      frame = null;
+      if (document.hidden) return;
+      needsDraw = false;
+      rendering = true;
+      try {
+        update(now);
+        // 即使 update 刚刚结束最后一个动画，也必须画出清除特效/插值落点的末帧。
+        render(now);
+      } finally {
+        rendering = false;
+      }
+      if (needsDraw || isActive()) scheduleFrame();
+    }
+
+    if (render) document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (frame !== null) cancelAnimationFrame(frame);
+        frame = null;
+      } else if (needsDraw || isActive()) {
+        scheduleFrame();
+      }
+    });
 
     function reducedMotion() {
       return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
@@ -176,6 +214,7 @@
       const immediate = !animate || reducedMotion();
       syncEntities(state?.units, unitViews, immediate);
       syncEntities(state?.headquarters, headquartersViews, immediate);
+      requestRender();
     }
 
     function entityPosition(id) {
@@ -192,6 +231,7 @@
         start: performance.now(),
         duration: reducedMotion() ? 1 : effect.duration,
       });
+      requestRender();
     }
 
     function addBeam(from, to, color, duration) {
@@ -400,6 +440,8 @@
             amount: payload.amount,
             time: performance.now(),
           });
+          // 治疗聚合尚未生成 effect，也需保持帧直到 60ms 后 flush。
+          requestRender();
           break;
         case 'control_point_repair': {
           const at = entityPosition(payload.unitId);
@@ -759,9 +801,11 @@
       effects = [];
       attackFxPlayed.clear();
       pendingHealFx = [];
+      requestRender();
     }
 
     return {
+      requestRender,
       reset,
       syncState,
       recordEvent,

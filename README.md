@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`、`molten-throne`、`mistpine` 等地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）与 `narrow-road`（狭路相逢）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则。
 
-当前版本：`3.9.5`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`3.9.6`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -114,4 +114,8 @@ npm run export-state
 ```bash
 npm run build
 npm test
+npx playwright install chromium
+npm run test:e2e
 ```
+
+浏览器回归覆盖桌面和移动端，在 `127.0.0.1:32106` 启动不读写真实存档的独立服务；失败截图与 trace 写入 `temp/e2e-results/`。已有 Chrome / Edge 时可设置 `PLAYWRIGHT_CHANNEL=chrome` / `msedge` 使用本机浏览器。

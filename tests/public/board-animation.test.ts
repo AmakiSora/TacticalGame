@@ -28,6 +28,7 @@ type BoardState = {
 };
 
 type BoardAnimationController = {
+  requestRender(): void;
   reset(): void;
   syncState(state: BoardState, options: { animate: boolean }): void;
   recordEvent(event: { type: string; seq?: number; payload?: Record<string, unknown> }, state: BoardState): void;
@@ -44,6 +45,7 @@ type BoardAnimationApi = {
     hexToPixel(q: number, r: number): { x: number; y: number };
     ownerColor(owner: string | null | undefined): string;
     unitSpec?(type: string | undefined): Record<string, unknown> | undefined;
+    render?(now: number): void;
   }): BoardAnimationController;
 };
 
@@ -84,14 +86,32 @@ function loadAnimation(reducedMotion = false) {
   const animationWindow = {
     matchMedia: () => ({ matches: reducedMotion }),
   } as { matchMedia: () => { matches: boolean }; BoardAnimation?: BoardAnimationApi };
+  let frameId = 0;
+  const frames = new Map<number, (now: number) => void>();
+  const listeners: Array<() => void> = [];
+  const document = {
+    hidden: false,
+    addEventListener(type: string, listener: () => void) { if (type === 'visibilitychange') listeners.push(listener); },
+  };
   const context = createContext({
-    window: animationWindow,
+    window: animationWindow, document,
     performance: { now: () => currentTime },
+    requestAnimationFrame(callback: (now: number) => void) { frames.set(++frameId, callback); return frameId; },
+    cancelAnimationFrame(id: number) { frames.delete(id); },
   });
   new Script(readFileSync('public/board-animation.js', 'utf8')).runInContext(context);
   return {
     api: animationWindow.BoardAnimation,
+    context,
     setTime(value: number) { currentTime = value; },
+    pendingFrames: () => frames.size,
+    frame(now: number) {
+      currentTime = now;
+      const callbacks = [...frames];
+      frames.clear();
+      for (const [, callback] of callbacks) callback(now);
+    },
+    setHidden(hidden: boolean) { document.hidden = hidden; listeners.forEach(listener => listener()); },
   };
 }
 
@@ -204,6 +224,138 @@ describe('shared board animation layer', () => {
     expect(animation.isActive()).toBe(true);
     animation.update(1000);
     expect(animation.isActive()).toBe(false);
+  });
+
+  for (const file of ['app.js', 'spectator-m.js', 'play.js', 'play-m.js']) {
+    it(`clears ${file}'s actual canvas when reset leaves an empty board`, () => {
+      const source = readFileSync(new URL(`../../public/${file}`, import.meta.url), 'utf8');
+      const start = source.indexOf('function drawBoard(');
+      const canvas = { width: 400, height: 300 };
+      let clears = 0;
+      const context = createContext({
+        canvas, els: { canvas }, state: { cells: [] }, performance: { now: () => 0 },
+        ctx: { clearRect() { clears++; }, fillRect() {} },
+      });
+      new Script(`${source.slice(start, source.indexOf('\n}', start) + 2)}\ndrawBoard();`).runInContext(context);
+      expect(clears).toBe(1);
+    });
+
+    it(`drives ${file}'s actual animation binding only on demand and draws the terminal frame`, () => {
+      const loaded = loadAnimation()!;
+      const source = readFileSync(new URL(`../../public/${file}`, import.meta.url), 'utf8');
+      const start = source.indexOf('const boardAnimation =');
+      const binding = source.slice(start, source.indexOf('\n});', start) + 4);
+      const drawn: Array<{ x: number; hp: number; effects: string[] }> = [];
+      let animation: BoardAnimationController;
+      Object.assign(loaded.context, {
+        hexToPixel: (q: number, r: number) => ({ x: q * 20, y: r * 20 }),
+        ownerColor: () => '#fff', OWNER_COLOR: {}, gameConfig: {},
+        drawBoard() {
+          let x = -1, hp = -1;
+          animation.forEachUnit((unit, view) => { x = view.x; hp = unit.hp; });
+          drawn.push({ x, hp, effects: animation._debugEffects() });
+        },
+      });
+      animation = new Script(`${binding}\nboardAnimation`).runInContext(loaded.context) as BoardAnimationController;
+      expect(loaded.pendingFrames()).toBe(0);
+      const state = createState();
+      animation.syncState(state, { animate: false });
+      loaded.frame(0);
+      expect(loaded.pendingFrames()).toBe(0);
+      const idleCount = drawn.length;
+      loaded.frame(16);
+      expect(drawn).toHaveLength(idleCount);
+
+      state.units.get('unit-1')!.q = 2;
+      state.units.get('unit-1')!.hp = 40;
+      animation.syncState(state, { animate: true });
+      animation.requestRender();
+      expect(loaded.pendingFrames()).toBe(1);
+      loaded.frame(32);
+      expect(drawn.at(-1)!.x).toBeGreaterThan(0);
+      expect(drawn.at(-1)!.x).toBeLessThan(40);
+      for (let now = 48; now <= 1600 && loaded.pendingFrames(); now += 16) loaded.frame(now);
+      expect(loaded.pendingFrames()).toBe(0);
+      expect(drawn.at(-1)).toEqual({ x: 40, hp: 40, effects: [] });
+
+      loaded.setTime(1600);
+      animation.recordEvent({ type: 'move', payload: { toQ: 2, toR: 0 } }, state);
+      expect(loaded.pendingFrames()).toBe(1);
+      loaded.frame(1700);
+      expect(drawn.at(-1)!.effects).toEqual(['ring']);
+      loaded.frame(2200);
+      expect(drawn.at(-1)!.effects).toEqual([]);
+      expect(loaded.pendingFrames()).toBe(0);
+      // 入口不能另留一条永久 RAF 链；上面的绘制均由真实共享控制器调度。
+      expect(source).not.toContain('requestAnimationFrame(renderLoop)');
+    });
+  }
+
+  it('wakes for delayed heal aggregation alone, then clears its last effect frame', () => {
+    const loaded = loadAnimation()!;
+    const drawn: string[][] = [];
+    const animation = loaded.api!.create({
+      hexToPixel: (q, r) => ({ x: q * 20, y: r * 20 }), ownerColor: () => '#fff',
+      render: () => { drawn.push(animation._debugEffects()); },
+    });
+    const state = createState();
+    animation.syncState(state, { animate: false });
+    loaded.frame(0);
+    expect(loaded.pendingFrames()).toBe(0);
+    for (const targetId of ['unit-1', 'hq-1']) {
+      animation.recordEvent({ type: 'heal', payload: { supportId: 'unit-1', targetId, amount: 12, roundNumber: 1 } }, state);
+    }
+    expect(loaded.pendingFrames()).toBe(1);
+    loaded.frame(32);
+    expect(drawn.at(-1)).toEqual([]);
+    expect(loaded.pendingFrames()).toBe(1);
+    loaded.frame(64);
+    expect(drawn.at(-1)!.filter(kind => kind === 'healWave')).toHaveLength(1);
+    expect(drawn.at(-1)!.filter(kind => kind === 'damageText')).toHaveLength(2);
+    loaded.frame(900);
+    expect(drawn.at(-1)).toEqual([]);
+    expect(loaded.pendingFrames()).toBe(0);
+  });
+
+  it('cancels hidden frames, wakes on return, and drops old heals/effects on replay reset', () => {
+    const loaded = loadAnimation()!;
+    let draws = 0;
+    const animation = loaded.api!.create({
+      hexToPixel: (q, r) => ({ x: q * 20, y: r * 20 }), ownerColor: () => '#fff',
+      render: () => { draws++; },
+    });
+    const state = createState();
+    animation.syncState(state, { animate: false });
+    loaded.frame(0);
+    animation.recordEvent({ type: 'move', payload: { toQ: 2, toR: 0 } }, state);
+    loaded.setHidden(true);
+    expect(loaded.pendingFrames()).toBe(0);
+    state.units.get('unit-1')!.q = 5;
+    animation.syncState(state, { animate: true });
+    loaded.frame(16);
+    expect(draws).toBe(1);
+    loaded.setHidden(false);
+    expect(loaded.pendingFrames()).toBe(1);
+    loaded.frame(32);
+    expect(draws).toBe(2);
+    animation.recordEvent({ type: 'heal', payload: { supportId: 'unit-1', targetId: 'unit-1', amount: 12 } }, state);
+    // 回放跳转/重置使用的真实接口序列：reset + immediate sync。
+    animation.reset();
+    state.units.get('unit-1')!.q = 1;
+    animation.syncState(state, { animate: false });
+    expect(loaded.pendingFrames()).toBe(1);
+    loaded.frame(100);
+    expect(animation._debugEffects()).toEqual([]);
+    expect(loaded.pendingFrames()).toBe(0);
+    let x = -1;
+    animation.forEachUnit((_entity, view) => { x = view.x; });
+    expect(x).toBe(20);
+    animation.reset();
+    loaded.frame(116);
+    expect(loaded.pendingFrames()).toBe(0);
+    loaded.setHidden(true);
+    loaded.setHidden(false);
+    expect(loaded.pendingFrames()).toBe(0);
   });
 
   it('draws attack, healing, capture, deployment, movement, and destruction feedback', () => {

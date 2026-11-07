@@ -5,6 +5,7 @@ import {
   readdirSync, renameSync, unlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import type {
   GameState, Headquarters, MapCell, PlayerId, PlayerState, SeatPlan, Unit, UnitType,
@@ -27,6 +28,7 @@ export { generateToken } from './tokens.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const PERSISTENCE_SCHEMA_VERSION = 2;
+const SNAPSHOT_BYTE_BUCKETS = [1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216];
 
 /** 全量 games.json 的写盘节奏：trailing 250ms 合并 + 最长 2s 必写一次。 */
 const FLUSH_DELAY_MS = 250;
@@ -770,6 +772,8 @@ export class GameStore {
           if (candidate !== file) {
             logger.warn(`主状态文件不可用，已从备份 ${candidate} 恢复`, { tag: 'game:persist' });
           }
+          // 有效主文件（包括空列表）就是完整状态，不能再并入旧备份。
+          break;
         } catch (err) {
           this.archiveStateFile(candidate, 'corrupt');
           logger.error(`failed to load ${candidate}`, err);
@@ -805,29 +809,39 @@ export class GameStore {
   private writeSnapshot(game: GameState): void {
     const target = this.snapshotPath(game.id);
     if (!target) return;
-    mkdirSync(dirname(target), { recursive: true });
-    const payload: PersistedGameSnapshot = {
-      schemaVersion: PERSISTENCE_SCHEMA_VERSION,
-      savedAt: new Date().toISOString(),
-      game,
-    };
-    const json = `${JSON.stringify(payload, null, 2)}\n`;
-    const tmp = `${target}.tmp`;
-    const fd = openSync(tmp, 'w');
+    const started = performance.now();
     try {
-      writeSync(fd, json);
-      fsyncSync(fd);
-    } finally {
-      closeSync(fd);
-    }
-    if (existsSync(target)) {
+      mkdirSync(dirname(target), { recursive: true });
+      const payload: PersistedGameSnapshot = {
+        schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+        savedAt: new Date().toISOString(),
+        game,
+      };
+      const json = `${JSON.stringify(payload)}\n`;
+      const tmp = `${target}.tmp`;
+      const fd = openSync(tmp, 'w');
       try {
-        renameSync(target, `${target}.prev`);
-      } catch {
-        // 快照轮转失败不阻塞主写入。
+        writeSync(fd, json);
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
       }
+      if (existsSync(target)) {
+        try {
+          renameSync(target, `${target}.prev`);
+        } catch {
+          // 快照轮转失败不阻塞主写入。
+        }
+      }
+      renameSync(tmp, target);
+      inc('tactical_snapshot_total', { result: 'ok' });
+      observe('tactical_snapshot_bytes', Buffer.byteLength(json, 'utf8'), {}, SNAPSHOT_BYTE_BUCKETS);
+    } catch (err) {
+      inc('tactical_snapshot_total', { result: 'error' });
+      throw err;
+    } finally {
+      observe('tactical_snapshot_duration_ms', performance.now() - started);
     }
-    renameSync(tmp, target);
   }
 
   private removeSnapshot(gameId: string): boolean {

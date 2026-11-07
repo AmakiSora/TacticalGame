@@ -91,6 +91,7 @@ const boardAnimation = window.BoardAnimation.create({
   hexToPixel,
   ownerColor: owner => OWNER_COLOR[owner] || '#9aa7b2',
   unitSpec: type => gameConfig?.units?.[type],
+  render: drawBoard,
 });
 
 let playerNames = defaultPlayerNames();
@@ -114,6 +115,8 @@ const playback = window.PlaybackQueue.create({
   onActiveChange: active => { els.btnSkipReplay?.classList.toggle('hidden', !active); },
 });
 let lobbyPollTimer = null;
+let lobbyPollSession = null;
+let lobbyPollInFlight = false;
 // 房主房间卡的最新大厅摘要：只有它决定「加入战斗」是否因满员而禁用。
 let hostLobbySnapshot = null;
 // 当前房间的最新摘要（房主 / 加入者共用），改名弹窗用它取当前显示名。
@@ -1294,8 +1297,10 @@ function leadersFromGameOverPayload(p) {
   return pool.filter(id => (scores[id]?.total ?? 0) === top);
 }
 
-async function loadFullState() {
-  const { ok, data } = await API.get(`/api/games/${gameId}/events`);
+async function loadFullState(isCurrent = () => true) {
+  const { ok, data, notModified } = await API.get(`/api/games/${gameId}/events`);
+  if (!isCurrent()) return false;
+  if (notModified) return Boolean(state);
   if (!ok) return false;
   playback.reset();
   playerNames = defaultPlayerNames();
@@ -1322,8 +1327,10 @@ async function refreshAdjudication() {
     try {
       do {
         adjudicationRefreshQueued = false;
-        const { ok, data } = await API.get(`/api/games/${gameId}`);
+        const { ok, data, notModified } = await API.get(`/api/games/${gameId}`);
         if (!ok || !state) return false;
+        // 304 没有 body：保留现有分数/计划，若期间有新刷新意图仍由循环补拉。
+        if (notModified) continue;
         // 终局字段也要合并：SSE 在最后一轮断开时，GET 仍是唯一的真相来源。
         if (data?.winner !== undefined) state.winner = data.winner;
         if (data?.result !== undefined) state.result = data.result;
@@ -2003,9 +2010,9 @@ function renderControlPointCard(cp) {
   </div>`;
 }
 function drawBoard(now = performance.now()) {
-  if (!state || state.cells.length === 0) return;
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
   ctx.fillStyle = '#0a0e14'; ctx.fillRect(0, 0, els.canvas.width, els.canvas.height);
+  if (!state || state.cells.length === 0) return;
   for (const c of state.cells) {
     pathHex(c.q, c.r, 1); ctx.fillStyle = TERRAIN[c.terrain] || TERRAIN.plain; ctx.fill(); ctx.strokeStyle = '#20313d'; ctx.lineWidth = 1; ctx.stroke();
   }
@@ -2031,14 +2038,6 @@ function drawBoard(now = performance.now()) {
   drawPlanActionOverlays();
   drawAimPreview();
   boardAnimation.drawEffects(ctx, now);
-}
-
-function renderLoop(now) {
-  if (boardAnimation.isActive()) {
-    boardAnimation.update(now);
-    drawBoard(now);
-  }
-  requestAnimationFrame(renderLoop);
 }
 
 function actionsPerTurn() { return gameConfig?.balance?.actionsPerTurn ?? 0; }
@@ -3802,14 +3801,14 @@ function stopAvailableGamesRefresh() {
   availableGamesTimer = null;
 }
 
-async function refreshLobbySummary() {
+async function refreshLobbySummary(isCurrent = () => true) {
   if (!gameId) return null;
   // 请求发起时快照 gameId：响应回来时若已经切到别的房间，整条丢弃——否则旧房间的
   // 成员/座位会盖到新房间卡片上，甚至把新房间里的自己误判成「已被移出」。
   const requestGameId = gameId;
   const res = await fetch(`/api/games/${encodeURIComponent(requestGameId)}/lobby`);
   const data = await res.json().catch(() => null);
-  if (requestGameId !== gameId) return null;
+  if (!isCurrent() || requestGameId !== gameId) return null;
   if (!res.ok || !data) return null;
   if (typeof data.gameId === 'string' && data.gameId !== requestGameId) return null;
   // 座位版本单调性：比当前基线旧的响应说明是上一拍（或别人的旧快照），整条丢弃，
@@ -3852,31 +3851,57 @@ function handleLobbyRemoval(lobby) {
 }
 
 function stopLobbyPolling() {
-  if (lobbyPollTimer) clearInterval(lobbyPollTimer);
+  if (lobbyPollTimer !== null) clearTimeout(lobbyPollTimer);
   lobbyPollTimer = null;
+  lobbyPollSession = null;
+}
+
+function scheduleLobbyPoll(delay = 1500) {
+  if (!lobbyPollSession || lobbyPollSession.gameId !== gameId || document.hidden
+    || lobbyPollInFlight || lobbyPollTimer !== null) return;
+  lobbyPollTimer = setTimeout(pollLobby, delay);
+}
+
+async function pollLobby() {
+  lobbyPollTimer = null;
+  const session = lobbyPollSession;
+  if (!session || session.gameId !== gameId || document.hidden || lobbyPollInFlight) return;
+  session.refreshNow = false;
+  lobbyPollInFlight = true;
+  const isCurrent = () => lobbyPollSession === session && session.gameId === gameId && !document.hidden;
+  try {
+    const lobby = await refreshLobbySummary(isCurrent);
+    if (!isCurrent()) return;
+    if (handleLobbyRemoval(lobby)) return;
+    // 已结束的房间不会再开局，继续轮询没意义。
+    if (lobby?.phase === 'game_over') { stopLobbyPolling(); return; }
+    if (lobby?.phase !== 'active') return;
+    if (els.joinStatusText) els.joinStatusText.textContent = '房主已开始，正在进入游戏…';
+    await enterGame();
+    if (isCurrent()) stopLobbyPolling();
+  } catch {
+    if (isCurrent()) statusBadge('大厅中', 'idle');
+  } finally {
+    // 单飞闸门跨 stop/start 保留；旧请求完成只能交棒给当前会话，不能复活旧轮询。
+    lobbyPollInFlight = false;
+    scheduleLobbyPoll(lobbyPollSession?.refreshNow ? 0 : 1500);
+  }
 }
 
 function startLobbyPolling() {
   stopLobbyPolling();
-  lobbyPollTimer = setInterval(async () => {
-    try {
-      // 发起时快照房间号：响应回来时若已经换了房间，这条轮询结果一律丢弃，
-      // 也不能拿它去做「我被移出」的判定（那会清掉新房间的 token）。
-      const polledGameId = gameId;
-      const lobby = await refreshLobbySummary();
-      if (polledGameId !== gameId) return;
-      if (handleLobbyRemoval(lobby)) return;
-      // 已结束的房间不会再开局，继续轮询没意义。
-      if (lobby?.phase === 'game_over') { stopLobbyPolling(); return; }
-      if (lobby?.phase !== 'active') return;
-      stopLobbyPolling();
-      if (els.joinStatusText) els.joinStatusText.textContent = '房主已开始，正在进入游戏…';
-      await enterGame();
-    } catch {
-      statusBadge('大厅中', 'idle');
-    }
-  }, 1500);
+  lobbyPollSession = { gameId, refreshNow: false };
+  scheduleLobbyPoll();
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (lobbyPollTimer !== null) clearTimeout(lobbyPollTimer);
+  lobbyPollTimer = null;
+  if (!document.hidden && lobbyPollSession) {
+    lobbyPollSession.refreshNow = true;
+    scheduleLobbyPoll(0);
+  }
+});
 
 async function kickLobbyPlayer(playerId) {
   if (!gameId || !hostToken || !playerId) return;
@@ -4727,6 +4752,10 @@ els.maxPlayers?.addEventListener('change', () => {
   }
 });
 async function enterGame() {
+  const requestGameId = gameId;
+  const session = lobbyPollSession;
+  const isCurrent = () => requestGameId === gameId && session === lobbyPollSession
+    && (!session || !document.hidden);
   closeMapDialog();
   // 进对局：复位座位同步状态（清待发意图 / 失败态 / 定时器，并推进 seq 作废在途回调）。
   // 这里不设 stopped 闸门：进对局后不再发请求由 flushSeatSync 里的 `latestLobby.phase !== 'lobby'`
@@ -4734,7 +4763,8 @@ async function enterGame() {
   // 否则会变成单向门，把之后所有新房间的座位控件和「添加 AI」都锁死。
   // 草稿视图这里不清：下次大厅摘要对账时 adoptServerLobby() 会清，对局内也用不到。
   startSeatSync();
-  const ok = await loadFullState();
+  const ok = await loadFullState(isCurrent);
+  if (!isCurrent()) return;
   if (!ok || !state.cells.length) {
     // 这颗按钮只在对局 active 时出现，正常不会走到这里：只可能是开局瞬间事件流还没就绪的竞态。
     // 不回读大厅、不刷新整页，提示后让用户稍后再点。
@@ -5066,4 +5096,3 @@ if (window.RandomMapUI) {
 }
 loadMapList();
 startAvailableGamesRefresh();
-requestAnimationFrame(renderLoop);

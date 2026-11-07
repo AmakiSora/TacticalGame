@@ -82,6 +82,7 @@ const boardAnimation = window.BoardAnimation.create({
   hexToPixel,
   ownerColor,
   unitSpec: type => gameConfig?.units?.[type],
+  render: drawBoard,
 });
 const gameSelect = document.getElementById('game-select');
 const pickerCurrentBtn = document.getElementById('picker-current');
@@ -893,14 +894,6 @@ function drawBoard(now = performance.now()) {
   boardAnimation.drawEffects(ctx, now);
 }
 
-function renderLoop(now) {
-  if (boardAnimation.isActive()) {
-    boardAnimation.update(now);
-    drawBoard(now);
-  }
-  requestAnimationFrame(renderLoop);
-}
-
 function unitLabel(type) {
   return { infantry: 'INF', scout: 'SCT', heavy: 'HVY', ranger: 'RNG', support: 'SUP' }[type] || '?';
 }
@@ -1704,7 +1697,8 @@ async function selectGame(id) {
   gameSelect.value = id;
   syncPickerCurrent();
   closePicker();
-  await loadGameState(id);
+  const isSelected = () => gameSelect.value === id;
+  if (await loadGameState(id, isSelected) === false || !isSelected()) return;
   subscribeSse(id);
 }
 
@@ -1809,16 +1803,18 @@ async function selectRecord(id) {
   }
 }
 
-async function fetchGameList() {
+async function fetchGameList(isCurrent = () => true) {
   let payload;
   try {
     const res = await fetch('/api/games');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     payload = await res.json();
   } catch {
+    if (!isCurrent()) return null;
     statusEl.textContent = '无法获取对局列表';
     return gamesList;
   }
+  if (!isCurrent()) return null;
   const { games } = payload || {};
   gamesList = sortGamesByLatest((games || []).map(normalizeListedGame)
     .filter(game => typeof game.id === 'string' && game.id.length > 0));
@@ -1938,12 +1934,13 @@ async function deleteCurrentGame() {
   await fetchGameList();
 }
 
-async function loadGameState(id) {
+async function loadGameState(id, isCurrent = () => true) {
   pausePlayback();
   importedReplayMeta = null;
   pinnedReplayStep = false;
   const res = await fetch(`/api/games/${id}/events`);
   const { events } = await res.json();
+  if (!isCurrent()) return false;
   allEvents = events;
   buildTimelineMarkers();
   if (allEvents.length > 0) rebuildToStep(allEvents.length - 1);
@@ -2204,17 +2201,54 @@ importFile.addEventListener('change', e => {
 
 let refreshTimer = null;
 let refreshInterval = 5000;
+let refreshSession = null;
+let refreshInFlight = false;
+function scheduleAutoRefresh(delay = refreshInterval) {
+  if (!refreshSession || !autoRefreshCb.checked || document.hidden
+    || refreshInFlight || refreshTimer !== null) return;
+  refreshTimer = setTimeout(autoRefreshTick, delay);
+}
 async function autoRefreshTick() {
-  if (!autoRefreshCb.checked) return;
-  const games = await fetchGameList();
-  if (followLatestCb.checked && games[0] && games[0].id !== gameSelect.value) {
-    await selectGame(games[0].id);
+  refreshTimer = null;
+  const session = refreshSession;
+  if (!session || !autoRefreshCb.checked || document.hidden || refreshInFlight) return;
+  session.refreshNow = false;
+  refreshInFlight = true;
+  const selectedId = gameSelect.value;
+  const selectedRecordId = activeRecordId;
+  const isCurrent = () => refreshSession === session && autoRefreshCb.checked && !document.hidden;
+  try {
+    // 用户在慢请求期间选了别局/回放，不让旧列表触发自动跟随覆盖这次选择。
+    const games = await fetchGameList(() => isCurrent() && gameSelect.value === selectedId && activeRecordId === selectedRecordId);
+    if (!games || !isCurrent()) return;
+    if (followLatestCb.checked && games[0] && games[0].id !== gameSelect.value) {
+      await selectGame(games[0].id);
+    }
+  } catch {
+    if (isCurrent()) statusEl.textContent = '载入最新对局失败';
+  } finally {
+    refreshInFlight = false;
+    scheduleAutoRefresh(refreshSession?.refreshNow ? 0 : refreshInterval);
   }
 }
-function startAutoRefresh() {
-  if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(autoRefreshTick, refreshInterval);
+function stopAutoRefresh() {
+  if (refreshTimer !== null) clearTimeout(refreshTimer);
+  refreshTimer = null;
+  refreshSession = null;
 }
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshSession = { refreshNow: false };
+  scheduleAutoRefresh();
+}
+document.addEventListener('visibilitychange', () => {
+  if (refreshTimer !== null) clearTimeout(refreshTimer);
+  refreshTimer = null;
+  if (!document.hidden && refreshSession) {
+    refreshSession.refreshNow = true;
+    scheduleAutoRefresh(0);
+  }
+});
 
 gameSelect.addEventListener('change', async () => {
   await selectGame(gameSelect.value);
@@ -2262,7 +2296,7 @@ timeline.addEventListener('input', () => {
 });
 btnExportJson.addEventListener('click', exportJson);
 btnImport.addEventListener('click', importJson);
-autoRefreshCb.addEventListener('change', () => { if (autoRefreshCb.checked) startAutoRefresh(); else clearInterval(refreshTimer); });
+autoRefreshCb.addEventListener('change', () => { if (autoRefreshCb.checked) startAutoRefresh(); else stopAutoRefresh(); });
 refreshIntervalInput.addEventListener('change', () => {
   refreshInterval = Math.max(1, Math.min(60, Number(refreshIntervalInput.value) || 5)) * 1000;
   if (autoRefreshCb.checked) startAutoRefresh();
@@ -2330,4 +2364,3 @@ async function initializeApp() {
 }
 
 initializeApp();
-requestAnimationFrame(renderLoop);

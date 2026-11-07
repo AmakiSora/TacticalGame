@@ -61,6 +61,67 @@ describe('persistence recovery', () => {
     expect(store.get('from-backup')).toBeDefined();
   });
 
+  it('does not restore the last deleted game from a stale legacy backup', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file, synchronousFlush: false });
+    store.save(createInitialGame('last-deleted'));
+    store.flushNow();
+    store.delete('last-deleted');
+
+    expect(JSON.parse(readFileSync(file, 'utf8')).games).toEqual([]);
+    expect(JSON.parse(readFileSync(`${file}.bak`, 'utf8')).games).toHaveLength(1);
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    expect(restored.list()).toEqual([]);
+    expect(existsSync(gameSnapshotPath(file, 'last-deleted'))).toBe(false);
+  });
+
+  it('does not restore the last archived game from a stale legacy backup', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file, synchronousFlush: false });
+    const game = createInitialGame('last-archived');
+    game.phase = 'lobby';
+    store.save(game);
+    store.flushNow();
+    game.lastActivityAt = 0;
+
+    expect(store.pruneInactive({ lobbyTtlMs: 1, gameOverTtlMs: 1 })).toEqual(['last-archived']);
+    expect(existsSync(join(tempDir!, 'archive', 'last-archived.json'))).toBe(true);
+    expect(JSON.parse(readFileSync(`${file}.bak`, 'utf8')).games).toHaveLength(1);
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+
+    expect(restored.list()).toEqual([]);
+    expect(existsSync(gameSnapshotPath(file, 'last-archived'))).toBe(false);
+  });
+
+  it('does not merge a valid nonempty legacy main file with its older backup', () => {
+    const file = tempFile();
+    writeFileSync(file, persisted(createInitialGame('current')));
+    const backup = persisted(createInitialGame('obsolete'));
+    writeFileSync(`${file}.bak`, backup);
+
+    const store = new GameStore({ persistenceFile: file });
+    store.loadFromDisk();
+
+    expect(store.list()).toEqual(['current']);
+    expect(existsSync(gameSnapshotPath(file, 'obsolete'))).toBe(false);
+    expect(readFileSync(`${file}.bak`, 'utf8')).toBe(backup);
+  });
+
+  it('restores the backup when the main file uses an unsupported schema', () => {
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify({ schemaVersion: 999, games: [] }));
+    writeFileSync(`${file}.bak`, persisted(createInitialGame('supported-backup')));
+
+    const store = new GameStore({ persistenceFile: file });
+    store.loadFromDisk();
+
+    expect(store.list()).toEqual(['supported-backup']);
+    expect(readdirSync(tempDir!).some(name => name.startsWith('games.json.schema-999-'))).toBe(true);
+  });
+
   it('recovers a per-game snapshot from .prev when the main snapshot is missing', () => {
     const file = tempFile();
     const game = createInitialGame('snapshot-prev');

@@ -1,6 +1,6 @@
 {
   "name": "tactical-game",
-  "version": "3.9.5",
+  "version": "3.9.6",
   "engines": {
     "node": ">=24 <25"
   },
@@ -16,6 +16,7 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "bench": "tsx script/bench.mjs",
     "export-state": "tsx script/export-state.mjs",
     "stats": "node script/generateStats.mjs",
@@ -36,6 +37,7 @@
     "fastify": "^5.8.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@types/node": "^24.13.3",
     "@vitest/coverage-v8": "^2.1.9",
     "concurrently": "^10.0.5",

@@ -1,8 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import * as fs from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addLobbyPlayer, createInitialGame, createLobby, GameStore } from '../../src/state/store.js';
+import { addLobbyPlayer, createInitialGame, createLobby, GameStore, gameSnapshotPath } from '../../src/state/store.js';
+import { renderMetrics, resetMetrics } from '../../src/utils/metrics.js';
+
+vi.mock('node:fs', async (importOriginal) => ({ ...await importOriginal<typeof import('node:fs')>() }));
 
 let tempDir: string | null = null;
 
@@ -12,6 +16,8 @@ function tempFile(): string {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
+  resetMetrics();
   if (tempDir) rmSync(tempDir, { recursive: true, force: true });
   tempDir = null;
 });
@@ -45,6 +51,107 @@ describe('GameStore persistence', () => {
     expect(loaded.playerNames).toEqual({ player_a: 'A', player_b: 'B' });
     expect(loaded.turn.turnNumber).toBe(3);
     expect(loaded.events).toHaveLength(1);
+  });
+
+  it('persists compact UTF-8 snapshots synchronously and records snapshot-only metrics', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file, synchronousFlush: false });
+    const game = createInitialGame('compact-snapshot');
+    game.playerNames.player_a = '测试玩家';
+    game.events.push({ seq: 1, type: 'game_start', timestamp: 100, payload: { text: '中文事件\n第二行' } });
+    const sync = vi.spyOn(fs, 'fsyncSync');
+    const rename = vi.spyOn(fs, 'renameSync');
+    resetMetrics();
+
+    store.persist(game);
+
+    const snapshot = gameSnapshotPath(file, game.id);
+    const json = readFileSync(snapshot, 'utf8');
+    const payload = JSON.parse(json);
+    expect(payload.game).toEqual(JSON.parse(JSON.stringify(game)));
+    expect(json).toBe(`${JSON.stringify(payload)}\n`);
+    expect(sync).toHaveBeenCalledTimes(1);
+    expect(sync.mock.invocationCallOrder[0]).toBeLessThan(rename.mock.invocationCallOrder[0]!);
+    expect(existsSync(`${snapshot}.tmp`)).toBe(false);
+    expect(store.flushScheduled).toBe(false);
+    expect(store.flushCount).toBe(0);
+
+    const bytes = Buffer.byteLength(json, 'utf8');
+    expect(bytes).toBe(statSync(snapshot).size);
+    expect(bytes).toBeGreaterThan(json.length);
+    const metrics = renderMetrics();
+    expect(metrics).toContain('tactical_snapshot_total{result="ok"} 1\n');
+    expect(metrics).toContain('tactical_snapshot_duration_ms_count 1\n');
+    expect(metrics).toContain(`tactical_snapshot_bytes_sum ${bytes}\n`);
+    expect(metrics).toContain('tactical_snapshot_bytes_count 1\n');
+    expect(metrics).not.toContain(game.id);
+    expect(metrics).not.toContain('tactical_persist_total');
+
+    const restored = new GameStore({ persistenceFile: file });
+    restored.loadFromDisk();
+    expect(restored.get(game.id)?.events).toEqual(game.events);
+    expect(restored.get(game.id)?.playerNames).toEqual(game.playerNames);
+    expect(restored.get(game.id)?.units).toEqual(game.units);
+  });
+
+  it('rotates the previous compact snapshot only after syncing the new one', () => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    const game = createInitialGame('snapshot-rotation');
+    store.persist(game);
+    const snapshot = gameSnapshotPath(file, game.id);
+    const previous = readFileSync(snapshot, 'utf8');
+    const sync = vi.spyOn(fs, 'fsyncSync');
+    const rename = vi.spyOn(fs, 'renameSync');
+    game.turn.turnNumber += 1;
+
+    store.persist(game);
+
+    expect(readFileSync(`${snapshot}.prev`, 'utf8')).toBe(previous);
+    expect(JSON.parse(readFileSync(snapshot, 'utf8')).game.turn.turnNumber).toBe(game.turn.turnNumber);
+    expect(rename.mock.calls).toEqual([[snapshot, `${snapshot}.prev`], [`${snapshot}.tmp`, snapshot]]);
+    expect(sync.mock.invocationCallOrder[0]).toBeLessThan(rename.mock.invocationCallOrder[0]!);
+  });
+
+  it.each(['mkdirSync', 'openSync', 'writeSync', 'fsyncSync', 'renameSync'] as const)(
+    'reports and propagates snapshot %s failures without replacing the last valid state', (operation) => {
+      const file = tempFile();
+      const store = new GameStore({ persistenceFile: file });
+      const game = createInitialGame('snapshot-failure');
+      store.persist(game);
+      const snapshot = gameSnapshotPath(file, game.id);
+      const previous = readFileSync(snapshot, 'utf8');
+      const failure = new Error(`injected ${operation} failure`);
+      vi.spyOn(fs, operation).mockImplementation(() => { throw failure; });
+      const close = vi.spyOn(fs, 'closeSync');
+      resetMetrics();
+      game.turn.turnNumber += 1;
+
+      expect(() => store.persist(game)).toThrow(failure);
+
+      expect(readFileSync(snapshot, 'utf8')).toBe(previous);
+      if (operation === 'writeSync' || operation === 'fsyncSync') expect(close).toHaveBeenCalledTimes(1);
+      const metrics = renderMetrics();
+      expect(metrics).toContain('tactical_snapshot_total{result="error"} 1\n');
+      expect(metrics).toContain('tactical_snapshot_duration_ms_count 1\n');
+      expect(metrics).not.toContain('result="ok"');
+      expect(metrics).not.toContain('tactical_snapshot_bytes');
+    },
+  );
+
+  it('reports serialization failures and skips snapshot metrics when persistence is disabled', () => {
+    const file = tempFile();
+    const game = createInitialGame('circular-snapshot');
+    game.events.push({ seq: 1, type: 'game_start', timestamp: 100, payload: { circular: game } });
+    resetMetrics();
+    new GameStore({ persistenceFile: null }).persist(game);
+    expect(renderMetrics()).toBe('\n');
+
+    const store = new GameStore({ persistenceFile: file });
+    expect(() => store.persist(game)).toThrow(/circular/i);
+    expect(renderMetrics()).toContain('tactical_snapshot_total{result="error"} 1\n');
+    expect(renderMetrics()).toContain('tactical_snapshot_duration_ms_count 1\n');
+    expect(existsSync(gameSnapshotPath(file, game.id))).toBe(false);
   });
 
   it('removes deleted games from the persistence file', () => {

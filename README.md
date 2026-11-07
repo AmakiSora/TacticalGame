@@ -68,6 +68,7 @@ npm run export-state
 - 尖顶六边形，坐标 `{ q, r }`；`game.cells` 是实际可用格集合（`map.radius` 不等于可走圆盘）；地形只有 `plain` 可通行/部署，`water` 与未爆破的 `blocker` 不可通行。
 - 行动点按**单位激活**计：首次部署/移动/攻击/治疗/爆破耗 1 点，同一单位本回合后续合法动作免费，上限 `config.balance.actionsPerTurn`。
 - 部署来源、占领限制、治疗与爆破的角色限制、收入与维修规则按模式与地图配置，见对应 skill 文件。
+- 顺序模式有**先手贴目**：先手第一回合不结算收入，其余每个座位第一次行动前先拿 `balance.komi.supplies` 点补给（金币口径，`0` = 不贴目，上限 999）。同时回合 / 大逃杀不结算，细则见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)「先手贴目」。
 - 裁决公式的权威定义见 [skill/SKILL.md](skill/SKILL.md)「Adjudication score」，实时分数直接读 `GET /api/games/:id` 的 `adjudication`，不要自行重算。
 - 歼灭计分、同时回合的分步结算/失败连锁/攻击形状、大逃杀炮火节奏等模式细则只维护在对应 skill 文件。地图清单与逐图数值以 `maps/*.json` 为准（文件名即 mapId）。
 

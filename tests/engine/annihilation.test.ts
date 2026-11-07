@@ -203,6 +203,9 @@ describe('annihilation mode', () => {
 
   it('raises turn income from 12 to 20 after capturing an inner supply point', () => {
     const { game, bus } = createAnnihilationGame();
+    // 本用例只验证「占点抬高收入」：去掉贴目字段，让第一笔按收入结算的旧口径走。
+    game.config = structuredClone(game.config);
+    delete game.config.balance.komi;
     const current = game.turn.currentPlayerId!;
     const next = game.turn.turnOrder.find(owner => owner !== current)!;
     const supplyPoint = game.controlPoints.find(point => point.kind === 'supply')!;

@@ -6,6 +6,16 @@
 >
 > **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
 
+## 3.9.5（2026-11-06）— 先手贴目金币化
+
+### 适配
+
+- `parallax` / `shrinkroll` 的内置回合模拟同步引擎的「先手贴目」新口径：顺序局第 1 回合里，非先手座位的第一笔补给改为地图 `balance.komi.supplies`（固定金币、代替该回合收入），缺省字段回退旧口径（按一次开局收入结算）。算法强度、决策权重与动作空间均未改，只是修正镜像账本——不同步时 `parallax` 的 `expectEquivalent` 对拍会因引擎侧多出/少掉一笔补给而漂移。
+
+### 测试与验证
+
+- `npm test` 全绿（149 文件 / 1763 例）：parallax 的镜像对拍与 shrinkroll 的收入对拍均覆盖贴目分支，`tests/engine/komi.test.ts` 钉住引擎侧固定金币 / `0` / 旧口径回退 / 3 人局每个非先手座各一份。
+
 ## 3.9.3（2026-11-04）— 大逃杀模式三人竞技场
 
 ### 评估口径

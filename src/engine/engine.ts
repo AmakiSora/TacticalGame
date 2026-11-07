@@ -3,7 +3,7 @@ import type {
   AdjudicationScore, AdjudicationSnapshot, EliminationReason, GameOverReason, GameRanking,
   GameState, PlayerId, PlayerRecord, Unit,
 } from '../types.js';
-import { PLAYER_IDS, isAnnihilationMode } from '../types.js';
+import { PLAYER_IDS, isAnnihilationMode, isSimultaneousMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
 import type { Result } from './result.js';
 import { appendEvent } from './events.js';
@@ -125,7 +125,12 @@ export function resetActions(game: GameState, owner: PlayerId): void {
   }
 }
 
-export function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): void {
+export interface IncomeOptions {
+  /** true = 这次结算属于「先手贴目」，事件里带 `komi: true`，前端与复盘据此区分。 */
+  komi?: boolean;
+}
+
+export function collectIncome(game: GameState, bus: EventBus, owner: PlayerId, options: IncomeOptions = {}): void {
   const resources = game.resources[owner];
   if (!resources || game.players[owner]?.status !== 'active') return;
   const base = game.config.balance.baseIncome;
@@ -139,6 +144,7 @@ export function collectIncome(game: GameState, bus: EventBus, owner: PlayerId): 
   resources.supplies += amount;
   appendEvent(game, bus, 'income', {
     owner, base, control, controlPoints: ownedPoints.length, amount, breakdown,
+    ...(options.komi ? { komi: true } : {}),
   });
 }
 
@@ -470,6 +476,37 @@ export function updateArtilleryForRound(game: GameState, bus: EventBus): boolean
   return resolveAnnihilationWipes(game, bus);
 }
 
+/** 贴目补给数（金币口径）；null = 该图没写 `komi`，走历史口径（一次开局收入）。 */
+export function komiSupplies(game: GameState): number | null {
+  return game.config.balance.komi?.supplies ?? null;
+}
+
+/**
+ * 先手贴目：把一笔固定补给记成一条带 `komi` 标记的收入事件。
+ * 与正常收入同口径（只动 resources + income 事件），统计、回放与前端都无需特殊分支。
+ */
+function grantKomi(game: GameState, bus: EventBus, owner: PlayerId, amount: number): void {
+  const resources = game.resources[owner];
+  if (!resources || game.players[owner]?.status !== 'active' || amount <= 0) return;
+  resources.supplies += amount;
+  appendEvent(game, bus, 'income', {
+    owner, base: amount, control: 0, controlPoints: 0, amount, breakdown: [], komi: true,
+  });
+}
+
+/**
+ * 是否正处在「非先手座位的第一次行动」——贴目只在这些回合结算。
+ * 先手第 1 回合没有收入；2 人局里这就是后手，N 人局里是除先手外的每一个座位。
+ * 同时回合与乱斗没有先手位置，不结算。
+ */
+function isOpeningKomiTurn(game: GameState, next: PlayerId): boolean {
+  if (isSimultaneousMode(game.config.mode)) return false;
+  const order = game.turn.turnOrder;
+  return order.length >= 2
+    && game.turn.roundNumber === 1
+    && next !== order[0];
+}
+
 function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): void {
   const active = activePlayerIds(game);
   if (active.length <= 1) {
@@ -497,7 +534,16 @@ function advanceTurn(game: GameState, bus: EventBus, previousOwner: PlayerId): v
   game.turn.currentPlayerId = next;
   game.turn.currentOwner = next;
   game.turn.actionsUsed = 0;
-  collectIncome(game, bus, next);
+  // 先手贴目：顺序局里先手第 1 回合不结算收入，其余每个座位在第一次行动前直接拿到
+  // `balance.komi.supplies` 点补给（代替该回合收入）。没写 komi 的老图 / 老存档走历史口径：
+  // 按一次开局收入结算，行为与 3.9.5 之前完全一致。
+  const komiTurn = isOpeningKomiTurn(game, next);
+  const komiAmount = komiTurn ? komiSupplies(game) : null;
+  if (komiAmount !== null) {
+    grantKomi(game, bus, next, komiAmount);
+  } else {
+    collectIncome(game, bus, next, { komi: komiTurn });
+  }
   repairFromControlPoints(game, bus, next);
   appendEvent(game, bus, 'turn_end', {
     previousOwner, nextOwner: next, previousPlayerId: previousOwner,

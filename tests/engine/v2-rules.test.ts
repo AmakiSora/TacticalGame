@@ -77,6 +77,9 @@ describe('hex V2 rules', () => {
 
   it('uses typed control point income on typed maps while keeping score based on point count', () => {
     const game = createInitialGame('g1', 'dual-lanes');
+    // 本用例只验证据点类型收入：去掉贴目字段，让第一笔按「收入结算」的旧口径走。
+    game.config = structuredClone(game.config);
+    delete game.config.balance.komi;
     const bus = new EventBus();
     joinGame(game, bus, 'B');
     game.controlPoints.find(p => p.id === 'cp_nw')!.owner = 'player_b';

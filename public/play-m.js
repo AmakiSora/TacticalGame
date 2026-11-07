@@ -2409,7 +2409,15 @@ function nextTurnIncomeFor(owner) {
       const spec = point.kind ? balance.controlPointTypes?.[point.kind] : null;
       return sum + (spec ? spec.income ?? fallback : fallback);
     }, 0);
-  return (balance.baseIncome ?? 0) + control;
+  const income = (balance.baseIncome ?? 0) + control;
+  // 镜像引擎 advanceTurn 的贴目分支：顺序局第 1 回合里，排在当前行动者之后且非先手的座位，
+  // 第一次行动前直接拿 komi.supplies 点补给（缺省字段 = 旧口径的一次收入）；本轮已行动过的座位，下一笔回到普通收入。
+  const order = state.turn?.turnOrder || [];
+  const ownerSeat = order.indexOf(owner);
+  const currentSeat = order.indexOf(state.turn?.currentPlayerId);
+  const pendingKomi = (gameConfig?.mode === 'standard' || gameConfig?.mode === 'annihilation')
+    && state.turn?.roundNumber === 1 && ownerSeat > 0 && ownerSeat > currentSeat;
+  return pendingKomi ? (balance.komi ? balance.komi.supplies : income) : income;
 }
 
 function renderResourceListHtml(owner) {
@@ -2535,7 +2543,7 @@ function formatEventShort(ev) {
     case 'headquarters_destroyed': return `${playerName(p.owner)} 指挥部被摧毁`;
     case 'control_point_captured': return `${playerName(p.owner)} 占领 ${p.name}`;
     case 'control_point_repair': return `${p.pointName || '维修站'} 修复单位 +${p.amount}`;
-    case 'income': return `${playerName(p.owner)} 收入 +${p.amount}`;
+    case 'income': return `${playerName(p.owner)} 收入 +${p.amount}${p.komi ? '（先手贴目）' : ''}`;
     case 'comeback_supply': return `${playerName(p.owner)} 追赶补给 +${p.amount}（落后${p.scoreGapPercent}%）`;
     case 'artillery_warning': return `炮火预警：第 ${p.nextShrinkRound} 轮收缩`;
     case 'artillery_shrunk': return `炮火收缩：安全半径 ${p.safeRadius}`;

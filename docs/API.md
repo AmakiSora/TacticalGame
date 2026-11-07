@@ -110,7 +110,7 @@
 
 - `game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。
 - `game_over` 的 `reason` 为 `last_player_standing`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。新生成的事件流中 `game_over` 是最后一条，最终回合的 `round_end` / `round_resolved` 必定先于它；既有归档回放仍可能保留 3.7.1 之前的旧顺序（`game_over` 后还有终局 `round_resolved`），读取旧回放时不要只按 `game_over` 截断。
-- `income` 保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。
+- `income` 保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。顺序局里非先手座位第一回合的贴目是一条 `base = amount`、`control = 0`、`breakdown = []` 且带 `komi: true` 的 `income` 事件（金额见 [MAP_FORMAT.md](MAP_FORMAT.md)「先手贴目」）。
 - `deploy` 中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。
 - `control_point_repair` 包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 - `demolish` 包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。

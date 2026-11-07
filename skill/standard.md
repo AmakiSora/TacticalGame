@@ -24,6 +24,7 @@ Every action on your turn, inspect:
   - **Move + attack/heal** — in either order — costs **1 AP total**.
   - **Deploy + attack/heal** also costs **1 AP total**. A deployed unit is created already activated (`hasMoved: true`, `actionSpent: true`), so it **cannot move** that turn, but `hasActed` is false: it **can attack or heal immediately for free** if a target is already in range from the deploy cell.
   - `actionsUsed >= actionsPerTurn` blocks only **new activations** (`action_limit_reached`); units already activated keep their free follow-up action.
+- **Income and komi:** income is paid when your turn starts (base + every CP you own). The first seat gets nothing on turn 1; every later seat receives a flat `balance.komi.supplies` grant (absent = legacy one-income-tick payout, `0` = none) before its first action — check the amount before assuming who is ahead on supplies.
 - **Deploy origins:** your HQ **or** an owned control point, into an adjacent empty plain cell.
   - `fromId` = your HQ entity id **or** owned CP id.
   - A map may set `balance.deployFromHq: false` — the HQ is then **not** a legal deploy origin; only owned CPs are. Check `config.balance.deployFromHq` before planning an HQ deploy; an HQ-deploy on such a map is rejected (`invalid_deploy`).

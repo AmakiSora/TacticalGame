@@ -263,7 +263,10 @@ Mode-specific deploy origins, elimination, artillery, and scoring live in the mo
 - Occupancy blocking depends on the mode. **Standard/annihilation** pathfind on the current board: units (**friendly and enemy**) and living HQs (standard only) all block both the path and the destination; moves execute immediately and there is no plan queue. **Simultaneous/royale** plan-time ranges are terrain-only: units and HQs do **not** block the path (arrival is settled per step — see the mode file).
 - Attack/heal: range only, no LOS.
 - Standard: income is awarded when the turn is gained (base + owned CP income;
-  per-kind amounts live in `controlPointTypes`).
+  per-kind amounts live in `controlPointTypes`). Sequential games pay a **komi**: the first seat
+  gets nothing on turn 1, while every later seat receives a flat `balance.komi.supplies` grant
+  before its first action (absent field = legacy one-income-tick payout) — count it before you
+  choose the opening deploy.
 - Simultaneous/royale: income and repair are issued together for every living player at the round
   boundary; see [`simultaneous.md`](simultaneous.md) / [`royale.md`](royale.md).
 

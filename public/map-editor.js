@@ -354,6 +354,10 @@ import './error-text.js';
         amountPerRound: numberOrDefault(sourceBalance.comebackSupply.amountPerRound, 20),
       };
     }
+    // 先手贴目：只在图里显式写了才保留（缺省 = 历史口径，导入再导出不改变行为）。
+    if (sourceBalance.komi && typeof sourceBalance.komi === 'object') {
+      normalized.balance.komi = { supplies: numberOrDefault(sourceBalance.komi.supplies, 0) };
+    }
     return normalized;
   }
 
@@ -376,6 +380,11 @@ import './error-text.js';
         scoreGapPercent: Number(config.balance.comebackSupply.scoreGapPercent),
         amountPerRound: Number(config.balance.comebackSupply.amountPerRound),
       };
+    }
+    // 贴目只在顺序回合有意义：与 annihilation 块同口径，切到同时回合 / 大逃杀后不再写出残留值，
+    // 否则面板既不渲染该字段、校验又会报错，用户没有清除入口。
+    if ((config.mode === 'standard' || config.mode === 'annihilation') && config.balance?.komi) {
+      balance.komi = { supplies: Number(config.balance.komi.supplies) };
     }
     // 据点类型恒有配置（普通据点已移除），三类型与每个据点的 kind 一律落盘。
     balance.controlPointTypes = {};
@@ -602,6 +611,18 @@ import './error-text.js';
         && comeback.startRound > maxTurns
       ) {
         errors.push(`${mapName}.balance.comebackSupply.startRound must be <= balance.maxTurns`);
+      }
+    }
+    if ('komi' in balance) {
+      const komi = record(balance.komi, `${mapName}.balance.komi`);
+      const supplies = num(komi, 'supplies', `${mapName}.balance.komi`, 0);
+      if (Number.isFinite(supplies) && !Number.isInteger(supplies)) {
+        errors.push(`${mapName}.balance.komi.supplies must be an integer`);
+      } else if (supplies > 999) {
+        errors.push(`${mapName}.balance.komi.supplies must be <= 999`);
+      }
+      if (c.mode === 'simultaneous' || c.mode === 'royale') {
+        errors.push(`${mapName}.balance.komi is only valid in sequential modes (standard/annihilation)`);
       }
     }
 
@@ -997,6 +1018,29 @@ import './error-text.js';
     };
   }
 
+  // 旧图没写 komi 时按 3.9.5 之前的口径折算成金币（基础收入 + 出生据点收入），只用于输入框回显：
+  // 不写回配置就仍是历史口径，避免「打开再导出」悄悄改掉开局经济。
+  // 贴目是全体非先手座位共用的一个数值，而各座位的出生据点类型可能不同：此时没有任何单一值
+  // 能等价于历史口径，调用方按最低额度预填并说明，避免「看到数字就照抄」抬高弱座开局。
+  function legacyKomiSupplies(mapConfig) {
+    const base = numberOrDefault(mapConfig.balance?.baseIncome, 0);
+    const slots = Array.isArray(mapConfig.spawnSlots) && mapConfig.spawnSlots.length
+      ? mapConfig.spawnSlots
+      : [{}];
+    const amounts = slots.map(slot => {
+      const point = slot?.controlPointId
+        ? (mapConfig.controlPoints || []).find(candidate => candidate.id === slot.controlPointId)
+        : null;
+      const income = point?.kind
+        ? numberOrDefault(mapConfig.balance?.controlPointTypes?.[point.kind]?.income, 0)
+        : 0;
+      return base + income;
+    });
+    const minimum = Math.min(...amounts);
+    const maximum = Math.max(...amounts);
+    return { minimum, maximum, uniform: minimum === maximum };
+  }
+
   const core = {
     createDefaultMapConfig,
     configureMapMode,
@@ -1004,6 +1048,7 @@ import './error-text.js';
     updateSpawnControlPointReferences,
     normalizeImportedMap,
     serializeMapConfig,
+    legacyKomiSupplies,
     validateMapConfig,
     resizeMapRadius,
     formatValidationError,
@@ -1722,6 +1767,18 @@ import './error-text.js';
     return value;
   }
 
+  // 回显与标签：显式写过 komi 就直接显示配置值；只有回退到历史折算、且各座位折算结果不等时
+  // 才补一句警告，避免长标签常态占据字段格。
+  function komiSuppliesField(mapConfig) {
+    const komi = mapConfig.balance?.komi;
+    if (komi) return fieldHtml('komi:supplies', '先手贴目（补给）', komi.supplies, 0, 999);
+    const legacy = legacyKomiSupplies(mapConfig);
+    if (legacy.uniform) return fieldHtml('komi:supplies', '先手贴目（补给）', legacy.minimum, 0, 999);
+    return fieldHtml('komi:supplies',
+      `先手贴目（补给）· 各座出生收入 ${legacy.minimum}~${legacy.maximum} 不等，按最低`,
+      legacy.minimum, 0, 999);
+  }
+
   function renderBalanceFields() {
     const comeback = config.balance.comebackSupply;
     const draft = comeback || comebackSupplyDraft || defaultComebackSupply();
@@ -1743,6 +1800,10 @@ import './error-text.js';
       fieldHtml('comeback:startRound', '追赶开始轮次', draft.startRound ?? 3, 1, null, !comeback),
       fieldHtml('comeback:scoreGapPercent', '追赶分差百分比', draft.scoreGapPercent ?? 40, 1, 100, !comeback),
       fieldHtml('comeback:amountPerRound', '追赶每轮补给', draft.amountPerRound ?? 20, 1, null, !comeback),
+      // 先手贴目只存在于顺序回合：同时回合 / 大逃杀没有先手位置，不渲染该字段。
+      ...(config.mode === 'standard' || config.mode === 'annihilation'
+        ? [komiSuppliesField(config)]
+        : []),
     ].join('');
     els.balanceFields.querySelectorAll('input[data-bind]').forEach(input => {
       input.addEventListener('change', () => {
@@ -1752,6 +1813,7 @@ import './error-text.js';
         if (group === 'weight') config.balance.adjudicationWeights[key] = value;
         if (group === 'hq') config.headquartersSpec[key] = value;
         if (group === 'comeback' && config.balance.comebackSupply) config.balance.comebackSupply[key] = value;
+        if (group === 'komi') config.balance.komi = { supplies: value };
         syncAll();
       });
     });

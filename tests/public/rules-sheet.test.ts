@@ -100,6 +100,31 @@ describe('rules sheet shared module', () => {
     expect(html).toContain('∞');
   });
 
+  it('renders the komi chip for sequential modes and hides it for simultaneous/royale', () => {
+    const RulesSheet = loadRulesSheet();
+    const duel = {
+      ...standoffConfig,
+      mode: 'annihilation',
+      annihilation: { artillery: { startRound: 3, intervalRounds: 2, damage: 20, minimumSafeRadius: 0 } },
+      balance: { ...standoffConfig.balance, komi: { supplies: 12 } },
+    };
+    const html = RulesSheet.buildHtml(duel);
+    expect(html).toContain('先手贴目');
+    expect(html).toContain('其余各座 +12 补给');
+
+    const noKomi = { ...duel, balance: { ...duel.balance, komi: { supplies: 0 } } };
+    expect(RulesSheet.buildHtml(noKomi)).toContain('无（开局对称）');
+
+    // 旧图没有 komi 字段：显示历史口径，不要伪装成 0。
+    const legacy = { ...duel, balance: { ...duel.balance } };
+    delete (legacy.balance as { komi?: unknown }).komi;
+    expect(RulesSheet.buildHtml(legacy)).toContain('其余各座 +1 次收入（旧口径）');
+
+    // 同时回合 / 大逃杀没有先手位置：不渲染该 chip。
+    expect(RulesSheet.buildHtml(standoffConfig)).not.toContain('先手贴目');
+    expect(RulesSheet.buildHtml(royaleConfig)).not.toContain('先手贴目');
+  });
+
   it('escapes HTML in config-driven content', () => {
     const RulesSheet = loadRulesSheet();
     const evil = JSON.parse(JSON.stringify(standoffConfig));

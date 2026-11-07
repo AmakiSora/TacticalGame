@@ -17,8 +17,9 @@ function loadNextTurnIncome(
   state: {
     players: Record<string, { status: string }>;
     controlPoints: Array<{ id: string; owner: string | null; kind?: string }>;
+    turn?: Record<string, unknown>;
   },
-  gameConfig: { balance: Record<string, unknown> } | null,
+  gameConfig: { mode?: string; balance?: Record<string, unknown> } | null,
 ): (owner: string) => number | null {
   const source = read(file);
   const start = source.indexOf('function nextTurnIncomeFor');
@@ -31,6 +32,7 @@ function loadNextTurnIncome(
     state: {
       players: state.players,
       controlPoints: new Map(state.controlPoints.map(point => [point.id, { ...point }])),
+      turn: state.turn ?? {},
     },
     gameConfig,
   };
@@ -102,6 +104,70 @@ describe('resource card next-turn income forecast', () => {
         { balance: { baseIncome: 6, controlPointTypes: { supply: { income: 6 } } } },
       );
       expect(bare('player_a')).toBe(6);
+    }
+  });
+
+  it('mirrors the flat komi while a seat still has its opening grant pending', () => {
+    const players = {
+      player_a: { status: 'active' },
+      player_b: { status: 'active' },
+      player_c: { status: 'active' },
+    };
+    // 每人一个 supply 据点：普通收入 = 10 + 4 = 14；贴目是固定 20，与据点收入无关。
+    const controlPoints = [
+      { id: 'cp1', owner: 'player_b', kind: 'supply' },
+      { id: 'cp2', owner: 'player_c', kind: 'supply' },
+    ];
+    const balance = {
+      baseIncome: 10,
+      controlPointIncome: 0,
+      controlPointTypes: { supply: { income: 4 } },
+      komi: { supplies: 20 },
+    };
+
+    for (const file of ALL_CLIENTS) {
+      const at = (
+        currentPlayerId: string | null,
+        turnOverrides: Record<string, unknown> = {},
+        config: { mode: string; balance: Record<string, unknown> } = { mode: 'annihilation', balance },
+      ) => loadNextTurnIncome(file, {
+        players,
+        controlPoints,
+        turn: { roundNumber: 1, turnOrder: ['player_a', 'player_b', 'player_c'], currentPlayerId, ...turnOverrides },
+      }, config);
+
+      // 先手自己第 1 回合不结算收入（且名下无据点，只有基础收入 10），
+      // 其余两座的下一笔就是贴目：固定 20，不再按据点收入折算。
+      let forecast = at('player_a');
+      expect(forecast('player_a'), file).toBe(10);
+      expect(forecast('player_b'), file).toBe(20);
+      expect(forecast('player_c'), file).toBe(20);
+
+      // 轮到后手：它自己的下一笔已是第 2 回合普通收入，尚未行动的第三位仍是贴目。
+      forecast = at('player_b');
+      expect(forecast('player_b'), file).toBe(14);
+      expect(forecast('player_c'), file).toBe(20);
+
+      // 第三位行动中：前两位本轮都已结算，没有人再拿贴目。
+      forecast = at('player_c');
+      expect(forecast('player_b'), file).toBe(14);
+      expect(forecast('player_c'), file).toBe(14);
+
+      // 第 2 回合起贴目不再参与预估。
+      forecast = at('player_b', { roundNumber: 2 });
+      expect(forecast('player_c'), file).toBe(14);
+
+      // 未声明 komi = 旧口径（一次开局收入 = 14）；0 则第 1 回合没有预估收入。
+      forecast = at('player_a', {}, { mode: 'standard', balance: { ...balance, komi: undefined } });
+      expect(forecast('player_b'), file).toBe(14);
+      forecast = at('player_a', {}, { mode: 'standard', balance: { ...balance, komi: { supplies: 0 } } });
+      expect(forecast('player_b'), file).toBe(0);
+
+      // 同时回合 / 大逃杀没有先手位置：恒按普通收入预估。
+      forecast = at('player_a', {}, { mode: 'simultaneous', balance });
+      expect(forecast('player_b'), file).toBe(14);
+      forecast = at('player_a', {}, { mode: 'royale', balance });
+      expect(forecast('player_b'), file).toBe(14);
     }
   });
 

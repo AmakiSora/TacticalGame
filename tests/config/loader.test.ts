@@ -137,6 +137,43 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('loads and validates optional komi (first-seat compensation) configuration', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap();
+    (map.balance as Record<string, unknown>).komi = { supplies: 20 };
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    loadMaps(dir);
+    expect(getMapConfig('default').balance.komi).toEqual({ supplies: 20 });
+    resetConfig();
+  });
+
+  it.each([
+    [{ supplies: -1 }, 'supplies must be a number >= 0'],
+    [{ supplies: 1.5 }, 'supplies must be an integer'],
+    [{ supplies: 1000 }, 'supplies must be <= 999'],
+    [{}, 'supplies must be a number >= 0'],
+  ])('rejects invalid komi configuration %#', (komi, message) => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap();
+    (map.balance as Record<string, unknown>).komi = komi;
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow(message);
+    resetConfig();
+  });
+
+  it('rejects komi on simultaneous maps (no first seat to compensate)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap();
+    (map as Record<string, unknown>).mode = 'simultaneous';
+    (map.balance as Record<string, unknown>).komi = { supplies: 12 };
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('balance.komi is only valid in sequential modes');
+    resetConfig();
+  });
+
   it('requires maxTurns and adjudication weights', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as unknown as BrokenMap;

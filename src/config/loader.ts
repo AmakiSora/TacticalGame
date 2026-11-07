@@ -68,6 +68,15 @@ export interface ComebackSupplySpec {
   amountPerRound: number;
 }
 
+/** 先手贴目：顺序局里除先手外每个座位在第一次行动前拿到的一笔固定补给。 */
+export interface KomiSpec {
+  /**
+   * 贴目补给数（金币口径）：非先手座位第一次行动前直接获得这么多补给，**代替**该回合的收入结算。
+   * 0 = 不贴目（所有人第一次收入都在各自第 2 回合，开局完全对称）。
+   */
+  supplies: number;
+}
+
 export interface StartingUnitConfig {
   owner: PlayerId;
   type: UnitType;
@@ -152,6 +161,12 @@ export interface MapConfig {
     };
     controlPointTypes?: Record<ControlPointKind, ControlPointTypeSpec>;
     comebackSupply?: ComebackSupplySpec;
+    /**
+     * 先手贴目（仅顺序模式生效）：先手第 1 回合不结算收入，其余每个座位在第一次行动前
+     * 直接获得 `supplies` 点补给（代替该回合收入）。**缺省字段 = 历史口径**：按一次开局收入
+     * 结算（老地图 / 老存档仍按原样恢复），新建地图请显式写 `supplies`。
+     */
+    komi?: KomiSpec;
   };
 }
 
@@ -419,6 +434,20 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
     if ((comeback.scoreGapPercent as number) > 100) {
       throw new Error(`Map "${id}".balance.comebackSupply.scoreGapPercent must be <= 100`);
+    }
+  }
+  if ('komi' in balance) {
+    // 贴目只存在于顺序回合（标准 / 歼灭）；同时回合与乱斗没有「先手」这个位置。
+    if (c.mode === 'simultaneous' || c.mode === 'royale') {
+      throw new Error(`Map "${id}".balance.komi is only valid in sequential modes (standard/annihilation)`);
+    }
+    const komi = asRecord(balance.komi, `Map "${id}".balance.komi`);
+    const supplies = assertNumber(komi, 'supplies', `Map "${id}".balance.komi`, 0);
+    if (!Number.isInteger(supplies)) {
+      throw new Error(`Map "${id}".balance.komi.supplies must be an integer`);
+    }
+    if (supplies > 999) {
+      throw new Error(`Map "${id}".balance.komi.supplies must be <= 999`);
     }
   }
 

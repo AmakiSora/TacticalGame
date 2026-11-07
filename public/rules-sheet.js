@@ -68,6 +68,13 @@
     if (config?.mode !== 'annihilation' && config?.mode !== 'royale' && hqSpec) {
       chips.push(['总部', `${hqSpec.hp} 血 / 防 ${hqSpec.defense}`]);
     }
+    // 先手贴目只存在于顺序回合：先手第 1 回合无收入，其余每个座位第一次行动前直接拿一笔补给。
+    if (config?.mode === 'standard' || config?.mode === 'annihilation') {
+      const komi = balance.komi;
+      if (!komi) chips.push(['先手贴目', '其余各座 +1 次收入（旧口径）']);
+      else if (komi.supplies > 0) chips.push(['先手贴目', `其余各座 +${komi.supplies} 补给`]);
+      else chips.push(['先手贴目', '无（开局对称）']);
+    }
     if (balance.deployFromHq === false) chips.push(['部署', '总部不可部署']);
     return chips.map(([label, value]) => `<span class="rs-chip" data-label="${esc(label)}"><b>${esc(value)}</b>${esc(label)}</span>`).join('');
   }

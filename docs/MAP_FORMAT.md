@@ -31,6 +31,7 @@
     "healVarianceRange": 6,
     "actionsPerTurn": 5,
     "maxTurns": 15,
+    "komi": { "supplies": 10 },
     "adjudicationWeights": { "enemyHqDamage": 5, "ownHqHp": 2, "controlPoint": 90, "armyValue": 2, "supplies": 1 }
   }
 }
@@ -43,6 +44,20 @@
 ## 无回合上限
 
 `balance.maxTurns` 接受 `>= 1` 的有限数字，或写成 `null` 表示**无回合上限**：引擎不会在回合边界做轮数裁决，对局仅由一方全灭、总部/军力被毁或房主 `POST /api/games/:id/force-adjudicate` 结束。前端回合角标此时显示 `当前轮/∞`，地图卡片显示 `⏱∞`，地图编辑器可用「无回合上限」开关切换。
+
+## 先手贴目
+
+顺序模式（`standard` / `annihilation`）里，先手方第一回合**不结算收入**，其余每个座位在自己第一次行动前**直接获得 `komi.supplies` 点补给**——这笔一次性补偿叫「先手贴目」，**代替**该回合的收入结算（不再按据点算钱）。用金币口径是为了能直接标定：写 12 就是 12 补给，与地图收入结构无关。
+
+- `"komi": { "supplies": 0 }`：不贴目，所有人第一次收入都在各自第 2 回合，开局完全对称。
+- `"komi": { "supplies": 12 }`：2 人局里后手第一次行动前 +12；N 人局里除先手外每个座位各 +12。
+- 取值必须是 `0..999` 的整数。
+
+**缺省字段 = 历史口径**：老地图 / 老存档没写 `komi` 时，仍按 3.9.5 之前的「一次开局收入」结算（当回合的 `baseIncome` + 出生据点收入），行为不变；新图请显式写 `supplies`。内置顺序图已全部显式声明：`trench-run` 12、`artillery-zone` 12、`default` / `breach` / `dual-lanes` 10、`whirlpool` 7、`danger-close` / `multiplayer-ring` 6（这些值正好等于各图旧口径的一跳开局收入，所以平衡不变）。
+
+没写 `komi` 的图在地图编辑器里仍会预填「先手贴目（补给）」输入框，值就是这套历史折算（`baseIncome` + 出生据点收入）：各座出生据点同类型时该值等价于旧口径，**类型不一致时按最低额度预填并在标签里标出区间**，因为单个 `supplies` 无法同时等于多个座位的第一跳。预填只用于回显，不改动输入框就不会写入 `komi`，导出后依旧走历史结算。
+
+贴目只对顺序模式生效（同时回合 / 大逃杀没有先手位置，地图写了 `komi` 会被加载器拒绝，地图编辑器切到这两种模式时也不再写出该字段）；**同一张图的所有人数共用同一个 `supplies`**，2 人与 6 人局不会分别标定。贴目记为一条带 `komi: true` 的 `income` 事件（`base = amount`、`control = 0`、`breakdown = []`），事件流显示「收入 +N（先手贴目）」，规则速查里以「先手贴目」chip 展示档位。见 [skill/annihilation.md](../skill/annihilation.md)。
 
 ## 模型评估开关
 

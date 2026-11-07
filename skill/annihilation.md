@@ -48,6 +48,12 @@ Every action on your turn, inspect:
 
 - **Movement path uses the current board**: water/blockers and all units (**friendly and enemy**) block both the path and the destination. There are no HQs at runtime. Moves execute immediately — there is no plan queue, so a friendly unit that moves away can open a cell for a later unit in the same turn.
 
+### Income and komi
+
+- Income is paid **when your turn starts**: `baseIncome` + the income of every CP you own (`controlPointTypes.<kind>.income`). A CP you capture on your turn only pays from your **next** turn.
+- **Komi (first-seat compensation).** The first seat collects nothing on turn 1; every later seat receives a flat `balance.komi.supplies` grant **before its first action** instead of that turn's income (2-player tables: the second seat; 3+ tables: every seat after the first). Read the amount from `game.config.balance.komi` — an absent field means the legacy payout (one opening income tick), and `supplies: 0` means no komi at all. Never assume the first seat is richer: on turn 1 the **later** seats usually hold one extra grant.
+- The komi payment is logged as an `income` event with `komi: true`; the event feed shows it as 「收入 +N（先手贴目）」.
+
 ### Artillery — read config, then live state
 
 Do **not** memorize a fixed timetable. Each annihilation map carries its own schedule.

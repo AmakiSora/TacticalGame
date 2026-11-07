@@ -547,6 +547,13 @@ function captureControlPoints(state, owner) {
 
 function collectIncome(state, owner) {
   if (state.status[owner] !== 'active') return;
+  // 先手贴目：顺序局第 1 回合里，非先手座位的第一笔是固定补给（代替该回合收入）；
+  // 缺省字段的老图 / 老回放走旧口径（按一次开局收入结算）。
+  const komi = state.config.balance.komi;
+  if (komi && state.round === 1 && owner !== state.order[0]) {
+    state.supplies[owner] = (state.supplies[owner] ?? 0) + komi.supplies;
+    return;
+  }
   const base = state.config.balance.baseIncome ?? 0;
   let control = 0;
   for (const cp of state.cps) {

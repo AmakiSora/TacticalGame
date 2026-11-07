@@ -63,6 +63,8 @@ function arena() {
     baseIncome: 0, actionsPerTurn: 2, damageVarianceRange: 0, healVarianceRange: 0, maxTurns: 6,
   });
   delete game.config.balance.comebackSupply;
+  // 沙盒只验证收入构成与行动结算：去掉贴目，让第一笔按「收入结算」的旧口径走。
+  delete game.config.balance.komi;
   game.config.balance.controlPointTypes = {
     supply: { income: 13, deployDiscount: 0, repairAmount: 0 },
     forward_base: { income: 4, deployDiscount: 8, repairAmount: 0 },

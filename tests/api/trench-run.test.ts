@@ -73,6 +73,8 @@ describe('歼灭地图「战壕」trench-run', () => {
     expect(cfg.spawnSlots).toHaveLength(2);
     expect(cfg.supportedPlayerCounts).toEqual([2]);
     expect(cfg.balance.maxTurns).toBe(22);
+    // 先手贴目：本图显式声明后手第一次行动前拿 12 补给（= 旧口径的一跳开局收入）。
+    expect(cfg.balance.komi).toEqual({ supplies: 12 });
     // 长廊必须横穿圆心，且每一环都有立足地（两端先没、中段最后）
     expect(cfg.playableCells.filter(c => c.q === 0 && c.r === 0)).toHaveLength(1);
     for (let d = 0; d <= 8; d++) {
@@ -154,6 +156,34 @@ describe('歼灭地图「战壕」trench-run', () => {
     expect(state.artillery.safeRadius).toBe(8);
     expect(state.artillery.dangerCells).toHaveLength(0);
     expect(state.headquarters).toEqual({});
+  });
+
+  it('双人局：先手第 1 回合无收入，后手第一回合行动前先拿到一次贴目收入', async () => {
+    app = await startTestServer();
+    const { gameId, tokens } = await createStartedLobby(app, 2);
+    const seatIds = Object.keys(tokens) as PlayerId[];
+    let state = await getState(app, gameId, tokens[seatIds[0]!]);
+    const first = state.turn.currentPlayerId as PlayerId;
+    const second = seatIds.find(id => id !== first)!;
+    // 先手开局只有起始补给，第 1 回合不结算收入。
+    expect(state.resources[first].supplies).toBe(45);
+
+    expect((await endTurn(app, gameId, tokens[first])).statusCode).toBe(200);
+
+    const eventsRes = await app.inject({
+      method: 'GET',
+      url: `/api/games/${gameId}/events`,
+      headers: { 'X-Player-Token': tokens[second] },
+    });
+    expect(eventsRes.statusCode).toBe(200);
+    const incomes = (eventsRes.json() as { events: Array<{ type: string; payload: Record<string, unknown> }> })
+      .events.filter(event => event.type === 'income' && event.payload.owner === second);
+    expect(incomes).toHaveLength(1);
+    expect(incomes[0]!.payload).toMatchObject({ komi: true, base: 12, control: 0, amount: 12 });
+
+    state = await getState(app, gameId, tokens[second]);
+    expect(state.turn.currentPlayerId).toBe(second);
+    expect(state.resources[second].supplies).toBe(57);
   });
 
   it('双人局推进：进入收缩后，驻守两端开局的单位开始被炮火削血', async () => {

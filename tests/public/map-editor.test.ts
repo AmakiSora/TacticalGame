@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { artilleryStateForRound } from '../../src/engine/artillery.js';
@@ -8,6 +8,7 @@ type EditorCore = {
   configureMapMode: (config: any, mode: 'standard' | 'annihilation' | 'simultaneous' | 'royale', annihilationDraft?: any) => any;
   normalizeImportedMap: (data: any) => any;
   serializeMapConfig: (config: any) => any;
+  legacyKomiSupplies: (config: any) => { minimum: number; maximum: number; uniform: boolean };
   validateMapConfig: (config: any, id?: string) => string[];
   formatValidationError: (error: string) => string;
   resizeMapRadius: (config: any, radius: number, confirmRemoval: boolean) => { config: any; removed: number; requiresConfirmation: boolean };
@@ -162,6 +163,81 @@ describe('map editor page', () => {
     expect(serialized.spawnSlots).toBeUndefined();
     expect(serialized.layouts).toBeUndefined();
     expect(core.validateMapConfig(serialized, 'default')).toEqual([]);
+  });
+
+  it('round-trips the komi field and drops it once the map leaves sequential modes', () => {
+    const core = loadCore();
+    const trench = JSON.parse(read('maps/trench-run.json'));
+
+    const normalized = core.normalizeImportedMap(trench);
+    expect(normalized.balance.komi).toEqual({ supplies: 12 });
+    const serialized = core.serializeMapConfig(normalized);
+    expect(serialized.balance.komi).toEqual({ supplies: 12 });
+    expect(core.validateMapConfig(serialized, 'trench-run')).toEqual([]);
+
+    // 同时回合图没有先手位置：缺省不带 komi。
+    const simultaneous = core.normalizeImportedMap(JSON.parse(read('maps/standoff.json')));
+    expect(simultaneous.balance.komi).toBeUndefined();
+
+    // 切模式后残留在配置里的贴目不再写出：编辑器只对序列化结果做校验，
+    // 写出非法字段会让面板既报错又没有可清除该字段的控件。
+    const switched = core.serializeMapConfig({
+      ...simultaneous,
+      balance: { ...simultaneous.balance, komi: { supplies: 20 } },
+    });
+    expect(switched.balance.komi).toBeUndefined();
+    expect(core.validateMapConfig(switched, 'standoff')).toEqual([]);
+
+    // 手写 JSON 直接交给校验器时仍然拒绝，与加载器同口径。
+    expect(core.validateMapConfig({
+      ...switched,
+      balance: { ...switched.balance, komi: { supplies: 20 } },
+    }, 'standoff').join('\n')).toContain('balance.komi is only valid in sequential modes');
+  });
+
+  it('prefills the komi field from every spawn slot and flags maps whose seats disagree', () => {
+    const core = loadCore();
+
+    // 出生据点同类型的歼灭图：基础 8 + 前哨 4，与写死的 komi 完全等价。
+    const trench = core.normalizeImportedMap(JSON.parse(read('maps/trench-run.json')));
+    expect(core.legacyKomiSupplies(trench)).toEqual({ minimum: 12, maximum: 12, uniform: true });
+
+    // 标准图没有出生据点，退回「只有基础收入」的一跳。
+    const standard = core.normalizeImportedMap(JSON.parse(read('maps/default.json')));
+    expect(core.legacyKomiSupplies(standard)).toEqual({ minimum: 10, maximum: 10, uniform: true });
+
+    // 各座绑到不同类型的据点时历史口径并不唯一：贴目只有一个数，任何单值都会悄悄改掉某个座位的开局，
+    // 所以按最低额度预填，并由标签说明区间（不写回配置就仍走历史结算）。
+    const mixed = core.normalizeImportedMap(JSON.parse(read('maps/artillery-zone.json')));
+    mixed.spawnSlots[1].controlPointId = mixed.controlPoints.find((point: any) => point.kind === 'supply').id;
+    expect(core.legacyKomiSupplies(mixed)).toEqual({ minimum: 12, maximum: 16, uniform: false });
+
+    // 区间要出现在字段标签里，否则编辑者只会看到一个「看起来正好」的数字。
+    const source = read('public/map-editor.js');
+    expect(source).toContain('function komiSuppliesField');
+    expect(source).toContain('[komiSuppliesField(config)]');
+    expect(source).toContain('各座出生收入 ${legacy.minimum}~${legacy.maximum} 不等，按最低');
+  });
+
+  it('keeps built-in sequential map komi equal to the legacy one-tick income', () => {
+    const core = loadCore();
+    const missing: string[] = [];
+
+    for (const file of readdirSync('maps').filter(name => name.endsWith('.json'))) {
+      const normalized = core.normalizeImportedMap(JSON.parse(read(`maps/${file}`)));
+      if (normalized.mode === 'simultaneous' || normalized.mode === 'royale') continue;
+
+      const legacy = core.legacyKomiSupplies(normalized);
+      // 出生据点绑到不同类型时回显只能按最低预填，这张图也就还没法安全写死贴目。
+      expect(legacy.uniform, file).toBe(true);
+      if (!normalized.balance.komi) {
+        missing.push(file);
+        continue;
+      }
+      expect(normalized.balance.komi.supplies, file).toBe(legacy.minimum);
+    }
+
+    expect(missing).toEqual([]);
   });
 
   it('migrates legacy untyped map imports to supply control points and inherits their income', () => {

@@ -360,7 +360,14 @@ export function finishSearchTurn(s) {
     if (s.active.includes(next) && !s.acted.includes(next)) { s.owner = next; break; }
   }
   s.ap = 0;
-  s.supplies[s.owner] += s.config.balance.baseIncome + s.points.filter(p => p.owner === s.owner).reduce((v, p) => v + income(s, p), 0);
+  // 先手贴目：顺序局第 1 回合里非先手座位的第一笔是固定补给（代替该回合收入）；
+  // 缺省字段走旧口径（按一次开局收入结算）。
+  const komi = s.config.balance.komi;
+  if (komi && s.round === 1 && s.owner !== s.order[0]) {
+    s.supplies[s.owner] += komi.supplies;
+  } else {
+    s.supplies[s.owner] += s.config.balance.baseIncome + s.points.filter(p => p.owner === s.owner).reduce((v, p) => v + income(s, p), 0);
+  }
   for (const u of s.units) {
     if (u.owner !== s.owner) continue;
     const repair = s.points.find(p => p.owner === s.owner && (pointSpec(s, p)?.repairAmount ?? 0) > 0 && distance(s.geo.cells[p.p], s.geo.cells[u.p]) <= 1);

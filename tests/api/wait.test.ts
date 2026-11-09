@@ -7,7 +7,7 @@ describe('AI wait endpoint', () => {
   let app: FastifyInstance;
 
   afterEach(async () => {
-    for (const id of globalStore.list()) globalStore.delete(id);
+    for (const id of globalStore.list()) await globalStore.delete(id);
     if (app) await app.close();
   });
 

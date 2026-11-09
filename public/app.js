@@ -78,6 +78,7 @@ let activeRecordId = null;
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
+const terrainLayer = window.BoardAnimation.createTerrainLayer();
 const boardAnimation = window.BoardAnimation.create({
   hexToPixel,
   ownerColor,
@@ -251,12 +252,12 @@ function hexCorners(q, r, inset = 0) {
   }
   return pts;
 }
-function pathHex(q, r, inset = 0) {
+function pathHex(q, r, inset = 0, context = ctx) {
   const pts = hexCorners(q, r, inset);
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  ctx.closePath();
+  context.beginPath();
+  context.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) context.lineTo(pts[i].x, pts[i].y);
+  context.closePath();
 }
 function computeLayout(cells) {
   const pts = cells.flatMap(c => hexCornersRaw(c.q, c.r));
@@ -315,7 +316,10 @@ function entityAt(q, r) {
 
 function setCellTerrain(targetState, q, r, terrain) {
   const cell = targetState.cells.find(c => c.q === q && c.r === r);
-  if (cell) cell.terrain = terrain;
+  if (cell && cell.terrain !== terrain) {
+    cell.terrain = terrain;
+    targetState.terrainRevision = (targetState.terrainRevision || 0) + 1;
+  }
 }
 
 function cloneMapPayload(map = {}) {
@@ -851,14 +855,16 @@ function drawBoard(now = performance.now()) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!state || state.cells.length === 0) return;
 
-  for (const cell of state.cells) {
-    pathHex(cell.q, cell.r, 1);
-    ctx.fillStyle = TERRAIN[cell.terrain] || TERRAIN.plain;
-    ctx.fill();
-    ctx.strokeStyle = '#20313d';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
+  terrainLayer.draw(ctx, state.cells, state.terrainRevision, layout, context => {
+    for (const cell of state.cells) {
+      pathHex(cell.q, cell.r, 1, context);
+      context.fillStyle = TERRAIN[cell.terrain] || TERRAIN.plain;
+      context.fill();
+      context.strokeStyle = '#20313d';
+      context.lineWidth = 1;
+      context.stroke();
+    }
+  });
 
   for (const cell of state.artillery?.warningCells || []) {
     pathHex(cell.q, cell.r, 2);
@@ -1372,25 +1378,63 @@ function renderSidebar() {
       ${state.result ? `<div class="result-note">${esc(resultText(state.result))}</div>` : ''}
     </div>`;
 
-  eventsEl.innerHTML = '';
-  // 最新事件置顶：倒序遍历，索引 i 仍是对局内的原始步序（点击跳步、当前步高亮都按它取）
-  for (let i = allEvents.length - 1; i >= 0; i--) {
-    const ev = allEvents[i];
-    const li = document.createElement('li');
-    li.dataset.type = ev.type;
-    li.textContent = `#${ev.seq} ${formatEventShort(ev)}`;
-    if (i === currentStep) li.classList.add('active');
-    li.addEventListener('click', () => { pausePlayback(); rebuildToStep(i); });
-    eventsEl.appendChild(li);
-  }
-  // 事件流是定高滚动区，回放时要让当前步留在框内；不用 scrollIntoView，避免连带滚动整页
-  const activeLi = eventsEl.querySelector('li.active');
-  if (activeLi) {
-    const row = activeLi.getBoundingClientRect(), box = eventsEl.getBoundingClientRect();
-    if (row.top < box.top) eventsEl.scrollTop -= box.top - row.top + 8;
-    else if (row.bottom > box.bottom) eventsEl.scrollTop += row.bottom - box.bottom + 8;
-  }
+  renderEventLog();
 }
+
+function createEventLogRenderer(container, afterSelect = () => {}) {
+  let source = null;
+  let rows = [];
+  let activeRow = null;
+  let textKey = '';
+  container.addEventListener('click', event => {
+    const row = event.target.closest('li[data-step]');
+    if (!row || row.parentElement !== container) return;
+    pausePlayback();
+    pinnedReplayStep = Number(row.dataset.step) < allEvents.length - 1;
+    rebuildToStep(Number(row.dataset.step));
+    afterSelect();
+  });
+  return () => {
+    if (source !== allEvents) {
+      container.replaceChildren();
+      rows = [];
+      activeRow = null;
+      textKey = '';
+      source = allEvents;
+    }
+    const nextTextKey = JSON.stringify(playerNames) + maxTurnsLabel();
+    if (nextTextKey !== textKey) {
+      rows.forEach((row, i) => { row.textContent = `#${allEvents[i].seq} ${formatEventShort(allEvents[i])}`; });
+      textKey = nextTextKey;
+    }
+    if (rows.length < allEvents.length) {
+      const fragment = document.createDocumentFragment();
+      for (let i = rows.length; i < allEvents.length; i++) {
+        const ev = allEvents[i];
+        const li = document.createElement('li');
+        li.dataset.type = ev.type;
+        li.dataset.step = i;
+        li.textContent = `#${ev.seq} ${formatEventShort(ev)}`;
+        rows.push(li);
+        fragment.prepend(li);
+      }
+      container.prepend(fragment);
+    }
+    const nextActive = rows[currentStep];
+    if (nextActive !== activeRow) {
+      activeRow?.classList.remove('active');
+      nextActive?.classList.add('active');
+      activeRow = nextActive;
+    }
+    if (activeRow) {
+      const row = activeRow.getBoundingClientRect(), box = container.getBoundingClientRect();
+      if (row.top < box.top) container.scrollTop -= box.top - row.top + 8;
+      else if (row.bottom > box.bottom) container.scrollTop += row.bottom - box.bottom + 8;
+    }
+  };
+}
+
+const renderEventLog = createEventLogRenderer(eventsEl);
 
 function committedStatusHtml() {
   const players = joinedPlayerIds().filter(id => state.players?.[id]?.status !== 'eliminated');
@@ -1447,12 +1491,21 @@ function updateControls() {
 
 // 回合开始的边界事件：game_start 开启第 1 回合；顺序模式 turn_end 应用后进入下一玩家回合，
 // 同时/royale 模式 round_start 应用后进入新一轮（收入/维修等事件都在边界事件之前入流）。
+let turnStepsSource = null;
+let indexedTurnEvents = 0;
+let turnSteps = [];
+
 function turnStartSteps() {
-  const steps = [];
-  allEvents.forEach((ev, i) => {
-    if (ev.type === 'game_start' || ev.type === 'turn_end' || ev.type === 'round_start') steps.push(i);
-  });
-  return steps;
+  if (turnStepsSource !== allEvents) {
+    turnStepsSource = allEvents;
+    indexedTurnEvents = 0;
+    turnSteps = [];
+  }
+  for (; indexedTurnEvents < allEvents.length; indexedTurnEvents++) {
+    const ev = allEvents[indexedTurnEvents];
+    if (ev.type === 'game_start' || ev.type === 'turn_end' || ev.type === 'round_start') turnSteps.push(indexedTurnEvents);
+  }
+  return turnSteps;
 }
 
 function stepForward() {
@@ -1466,7 +1519,7 @@ function stepForward() {
 }
 function stepBackward() { if (currentStep > 0) rebuildToStep(currentStep - 1); }
 function prevTurnStart() {
-  const target = turnStartSteps().reverse().find(step => step < currentStep);
+  const target = turnStartSteps().findLast(step => step < currentStep);
   if (target === undefined) return;
   pinnedReplayStep = target < allEvents.length - 1;
   rebuildToStep(target);
@@ -1496,15 +1549,24 @@ function scheduleNext() {
   playTimer = setTimeout(() => { stepForward(); if (playing) scheduleNext(); }, Number(speedSelect.value) || 500);
 }
 
+let markerSource = null;
+let markerCount = 0;
+
 function buildTimelineMarkers() {
-  timelineMarkers.innerHTML = '';
-  if (allEvents.length === 0) return;
-  allEvents.forEach((ev, i) => {
+  if (markerSource !== allEvents) {
+    timelineMarkers.replaceChildren();
+    markerSource = allEvents;
+    markerCount = 0;
+  }
+  timelineMarkers.style.setProperty('--steps', Math.max(1, allEvents.length - 1));
+  const fragment = document.createDocumentFragment();
+  for (; markerCount < allEvents.length; markerCount++) {
     const marker = document.createElement('div');
-    marker.className = `marker marker-${ev.type}`;
-    marker.style.left = `${allEvents.length === 1 ? 0 : (i / (allEvents.length - 1)) * 100}%`;
-    timelineMarkers.appendChild(marker);
-  });
+    marker.className = `marker marker-${allEvents[markerCount].type}`;
+    marker.style.setProperty('--step', markerCount);
+    fragment.appendChild(marker);
+  }
+  timelineMarkers.appendChild(fragment);
 }
 
 // 卡片列表行：第一行 状态点 + 短码 + 阶段徽标，第二行 模式/地图/人数/回合，第三行 玩家与胜者。
@@ -1833,6 +1895,7 @@ async function fetchGameList(isCurrent = () => true) {
 }
 
 function resetLoadedGame(message = '请选择在线对局') {
+  gameLoadVersion++;
   pausePlayback();
   importedReplayMeta = null;
   if (liveSse) liveSse.close();
@@ -1894,7 +1957,7 @@ async function forceAdjudicateCurrentGame() {
       statusEl.textContent = body.error || '强制裁决失败';
       return;
     }
-    await loadGameState(id);
+    if (gameSelect.value === id && await loadGameState(id, () => gameSelect.value === id) !== false) subscribeSse(id);
     await fetchGameList();
     statusEl.textContent = '对局已按当前分数裁决';
   } finally {
@@ -1934,13 +1997,21 @@ async function deleteCurrentGame() {
   await fetchGameList();
 }
 
+let gameLoadVersion = 0;
+
 async function loadGameState(id, isCurrent = () => true) {
+  const version = ++gameLoadVersion;
   pausePlayback();
+  liveSse?.close();
+  liveSse = null;
   importedReplayMeta = null;
   pinnedReplayStep = false;
   const res = await fetch(`/api/games/${id}/events`);
   const { events } = await res.json();
-  if (!isCurrent()) return false;
+  if (version !== gameLoadVersion || !isCurrent()) return false;
+  gameConfig = null;
+  playerNames = defaultPlayerNames();
+  currentStep = -1;
   allEvents = events;
   buildTimelineMarkers();
   if (allEvents.length > 0) rebuildToStep(allEvents.length - 1);
@@ -1954,19 +2025,24 @@ async function loadGameState(id, isCurrent = () => true) {
 
 function subscribeSse(id) {
   if (liveSse) liveSse.close();
-  liveSse = new EventSource(`/api/games/${id}/events`);
-  liveSse.onmessage = e => {
+  const lastSeq = allEvents.at(-1)?.seq ?? 0;
+  const connection = new EventSource(`/api/games/${id}/events?after=${lastSeq}`);
+  liveSse = connection;
+  connection.onmessage = e => {
+    if (liveSse !== connection) return;
     const ev = JSON.parse(e.data);
-    if (allEvents.some(existing => existing.seq === ev.seq)) return;
+    if (ev.seq <= (allEvents.at(-1)?.seq ?? 0)) return;
     const wasAtLatest = currentStep >= allEvents.length - 1;
     allEvents.push(ev);
     buildTimelineMarkers();
     if (!pinnedReplayStep && wasAtLatest) stepForward();
-    else updateControls();
+    else { renderEventLog(); updateControls(); }
     if (ev.type === 'game_over') forceAdjudicateBtn.disabled = true;
     statusEl.textContent = '实时连接中';
   };
-  liveSse.onerror = () => { statusEl.textContent = 'SSE 断开，自动重连中'; };
+  connection.onerror = () => {
+    if (liveSse === connection) statusEl.textContent = 'SSE 断开，自动重连中';
+  };
 }
 
 canvas.addEventListener('mousemove', e => {
@@ -2143,6 +2219,7 @@ function normalizeImportedReplay(data) {
 }
 
 function loadImportedReplay(replay) {
+  gameLoadVersion++;
   pausePlayback();
   importedReplayMeta = {
     gameId: replay.gameId || 'offline',
@@ -2289,8 +2366,8 @@ btnNext.addEventListener('click', () => { pausePlayback(); stepForward(); });
 btnNextTurn.addEventListener('click', () => { pausePlayback(); nextTurnStart(); });
 btnEnd.addEventListener('click', goToEnd);
 timeline.addEventListener('input', () => {
-  pausePlayback();
   const step = Number(timeline.value);
+  pausePlayback();
   pinnedReplayStep = step < allEvents.length - 1;
   rebuildToStep(step);
 });

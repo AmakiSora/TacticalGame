@@ -41,6 +41,10 @@ type BoardAnimationController = {
 };
 
 type BoardAnimationApi = {
+  createTerrainLayer(): {
+    draw(target: { canvas: { width: number; height: number }; drawImage: (...args: unknown[]) => void },
+      cells: unknown[], revision: number | undefined, layout: object, paint: (context: RecordingContext) => void): void;
+  };
   create(options: {
     hexToPixel(q: number, r: number): { x: number; y: number };
     ownerColor(owner: string | null | undefined): string;
@@ -90,6 +94,7 @@ function loadAnimation(reducedMotion = false) {
   const frames = new Map<number, (now: number) => void>();
   const listeners: Array<() => void> = [];
   const document = {
+    createElement() { return { width: 0, height: 0, getContext: () => new RecordingContext() }; },
     hidden: false,
     addEventListener(type: string, listener: () => void) { if (type === 'visibilitychange') listeners.push(listener); },
   };
@@ -180,6 +185,44 @@ describe('shared board animation layer', () => {
     } finally {
       await app.close();
     }
+  });
+
+  it('reuses terrain pixels until cells, terrain, layout or backing dimensions change', () => {
+    const layer = loadAnimation()!.api!.createTerrainLayer();
+    const target = { canvas: { width: 400, height: 300 }, drawImage() {} };
+    let paints = 0;
+    const paint = () => { paints++; };
+    let cells = [{ q: 0, r: 0, terrain: 'mountain' }];
+    let layout = {};
+    layer.draw(target, cells, undefined, layout, paint);
+    layer.draw(target, cells, undefined, layout, paint);
+    expect(paints).toBe(1);
+    layer.draw(target, cells, 1, layout, paint);
+    expect(paints).toBe(2);
+    layout = {};
+    layer.draw(target, cells, 1, layout, paint);
+    cells = [...cells];
+    layer.draw(target, cells, 1, layout, paint);
+    target.canvas.width++;
+    layer.draw(target, cells, 1, layout, paint);
+    target.canvas.height++;
+    layer.draw(target, cells, 1, layout, paint);
+    expect(paints).toBe(6);
+  });
+
+  it.each(['app.js', 'spectator-m.js', 'play.js', 'play-m.js'])('%s invalidates terrain only for an actual terrain change', file => {
+    const source = readFileSync(`public/${file}`, 'utf8');
+    const start = source.indexOf('function setCellTerrain(');
+    const state = { cells: [{ q: 1, r: 2, terrain: 'mountain' }], terrainRevision: 0 };
+    const context = createContext({ state });
+    new Script(`${source.slice(start, source.indexOf('\n}', start) + 2)}
+      setCellTerrain(state, 1, 2, 'mountain');
+      setCellTerrain(state, 9, 9, 'plain');
+    `).runInContext(context);
+    expect(state.terrainRevision).toBe(0);
+    new Script("setCellTerrain(state, 1, 2, 'plain');").runInContext(context);
+    expect(state.terrainRevision).toBe(1);
+    expect(state.cells[0].terrain).toBe('plain');
   });
 
   it('interpolates movement and hit points instead of snapping to the next state', () => {

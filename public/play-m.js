@@ -86,6 +86,7 @@ const els = {
   btnBotPromptCopy: $('btn-bot-prompt-copy'), btnBotPromptClose: $('btn-bot-prompt-close'),
 };
 const ctx = els.canvas.getContext('2d');
+const terrainLayer = window.BoardAnimation.createTerrainLayer();
 let gameConfig = null;
 const boardAnimation = window.BoardAnimation.create({
   hexToPixel,
@@ -319,15 +320,15 @@ function clampPopupInViewport(popup) {
     popup.style.top = `${top + dy}px`;
   }
 }
-function pathHex(q, r, inset = 0) {
+function pathHex(q, r, inset = 0, context = ctx) {
   const c = hexToPixel(q, r), size = HEX_SIZE - inset;
-  ctx.beginPath();
+  context.beginPath();
   for (let i = 0; i < 6; i++) {
     const a = Math.PI / 180 * (60 * i - 30);
     const x = c.x + size * Math.cos(a), y = c.y + size * Math.sin(a);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    if (i === 0) context.moveTo(x, y); else context.lineTo(x, y);
   }
-  ctx.closePath();
+  context.closePath();
 }
 
 const API = {
@@ -1398,7 +1399,10 @@ function projectedTerrainAt(q, r) {
 
 function setCellTerrain(targetState, q, r, terrain) {
   const cell = targetState.cells.find(c => c.q === q && c.r === r);
-  if (cell) cell.terrain = terrain;
+  if (cell && cell.terrain !== terrain) {
+    cell.terrain = terrain;
+    targetState.terrainRevision = (targetState.terrainRevision || 0) + 1;
+  }
 }
 
 function cloneMapPayload(map = {}) {
@@ -2013,9 +2017,16 @@ function drawBoard(now = performance.now()) {
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
   ctx.fillStyle = '#0a0e14'; ctx.fillRect(0, 0, els.canvas.width, els.canvas.height);
   if (!state || state.cells.length === 0) return;
-  for (const c of state.cells) {
-    pathHex(c.q, c.r, 1); ctx.fillStyle = TERRAIN[c.terrain] || TERRAIN.plain; ctx.fill(); ctx.strokeStyle = '#20313d'; ctx.lineWidth = 1; ctx.stroke();
-  }
+  terrainLayer.draw(ctx, state.cells, state.terrainRevision, layout, context => {
+    for (const c of state.cells) {
+      pathHex(c.q, c.r, 1, context);
+      context.fillStyle = TERRAIN[c.terrain] || TERRAIN.plain;
+      context.fill();
+      context.strokeStyle = '#20313d';
+      context.lineWidth = 1;
+      context.stroke();
+    }
+  });
   for (const cell of state.artillery?.warningCells || []) {
     pathHex(cell.q, cell.r, 2); ctx.fillStyle = 'rgba(244, 177, 66, .22)'; ctx.fill(); ctx.strokeStyle = 'rgba(255, 205, 105, .72)'; ctx.lineWidth = 1.5; ctx.stroke();
   }

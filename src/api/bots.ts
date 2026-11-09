@@ -606,7 +606,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       const joined = addLobbyPlayer(game, name);
       if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
-      globalStore.persist(game);
+      await globalStore.persist(game);
       const records = botsByGame.get(game.id) ?? [];
       records.push({ gameId: game.id, playerId: joined.id, token: joined.token, modelFile: model, runnerScript: known.runner });
       botsByGame.set(game.id, records);
@@ -645,7 +645,7 @@ export async function botsRoutes(app: FastifyInstance, deps: BotDeps = {}): Prom
       const joined = addLobbyPlayer(game, name);
       if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
       appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
-      globalStore.persist(game);
+      await globalStore.persist(game);
       const records = algorithmBotsByGame.get(game.id) ?? [];
       records.push({
         gameId: game.id,

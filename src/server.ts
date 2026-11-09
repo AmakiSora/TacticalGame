@@ -85,7 +85,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
   loadMaps();
-  globalStore.loadFromDisk();
+  await globalStore.loadFromDisk();
   const runtimeConfig = readRuntimeConfig();
   // 部署自检：trustProxy / 控制凭证 / 指标凭证的组合最容易配错成「控制接口对公网敞开」。
   for (const warning of controlTokenWarnings()) logger.warn(warning);
@@ -190,6 +190,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   app.get('/healthz', async () => ({ status: 'ok' }));
   app.get('/readyz', async (_req, reply) => {
     if (!ready) return reply.code(503).send({ status: 'starting' });
+    // 磁盘队列积压时不能宣称 ready：探针应等到持久化能力恢复。
+    if (globalStore.hasPendingWrites()) {
+      return reply.code(503).send({ status: 'persisting' });
+    }
     // 成功响应必须保持 CI smoke 精确断言的 {"status":"ready"}；降级时才附带 checks。
     const checks = {
       maps: mapCount() > 0 ? 'ok' : 'missing',
@@ -213,6 +217,28 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
     return reply.type('text/plain; version=0.0.4; charset=utf-8').send(renderMetrics());
   });
+  const gameMutations = new Map<string, Promise<void>>();
+  app.addHook('onRoute', route => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    if (!route.url.startsWith('/api/games/:id') || !methods.some(method => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method))) return;
+    const handler = route.handler;
+    route.handler = async function (req, reply) {
+      const { id } = req.params as { id: string };
+      const previous = gameMutations.get(id);
+      let release!: () => void;
+      const pending = new Promise<void>(resolve => { release = resolve; });
+      gameMutations.set(id, pending);
+      // await 落盘会让出事件循环，同局变更必须保持原有的串行执行顺序。
+      await previous;
+      try {
+        return await handler.call(this, req, reply);
+      } finally {
+        release();
+        if (gameMutations.get(id) === pending) gameMutations.delete(id);
+      }
+    };
+  });
+
   await app.register(mapsRoutes);
   await app.register(gamesRoutes);
   await app.register(botsRoutes);
@@ -244,36 +270,39 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
   });
 
+  let retentionTimer: NodeJS.Timeout | undefined;
+  let retentionRun: Promise<void> | undefined;
   // 生命周期 GC：lobby / 终局对局按最后活动时间归档并移除；active 不自动删除。
   if (!process.env.VITEST) {
     // 保留期解析收敛到 state/retention.ts 的纯函数（默认 2h / 3d，环境变量可覆盖）。
     const { lobbyTtlMs, gameOverTtlMs } = retentionTtlsFromEnv(process.env, message => logger.warn(message, { tag: 'game:retention' }));
     if (lobbyTtlMs > 0 || gameOverTtlMs > 0) {
-      const retentionTimer = setInterval(() => {
-        try {
-          const removed = globalStore.pruneInactive({ lobbyTtlMs, gameOverTtlMs });
-          for (const gameId of removed) {
-            globalEventBus.clear(gameId);
-            clearBotsForGame(gameId);
-            closeSseConnections(gameId);
-            app.log.info({ gameId }, 'archived and removed inactive game');
-          }
-        } catch (err) {
-          // 持久化/归档失败不能把定时器异常抛成未捕获异常导致进程退出；
-          // 下一轮会重试，快照仍在磁盘上。
-          app.log.error(err, 'failed to prune inactive games');
-        }
+      retentionTimer = setInterval(() => {
+        if (retentionRun) return;
+        retentionRun = globalStore.pruneInactive({ lobbyTtlMs, gameOverTtlMs })
+          .then(removed => {
+            for (const gameId of removed) {
+              globalEventBus.clear(gameId);
+              clearBotsForGame(gameId);
+              closeSseConnections(gameId);
+              app.log.info({ gameId }, 'archived and removed inactive game');
+            }
+          })
+          .catch(err => app.log.error(err, 'failed to prune inactive games'))
+          .finally(() => { retentionRun = undefined; });
       }, 10 * 60_000);
       retentionTimer.unref();
-      app.addHook('onClose', async () => clearInterval(retentionTimer));
     }
   }
 
   ready = true;
   // 服务 close() 时强制落定一次全量 games.json（去抖窗口里关服务不该丢最后几次变更）。
   app.addHook('onClose', async () => {
+    clearInterval(retentionTimer);
+    await retentionRun;
+    await globalStore.drain();
     try {
-      globalStore.flushNow();
+      await globalStore.flushNow();
     } catch (err) {
       logger.error('服务关闭时落盘 games.json 失败', err);
     }
@@ -291,12 +320,6 @@ if (isMain) {
         if (closing) return;
         closing = true;
         app.log.info({ signal }, 'shutting down server');
-        // 退出前导出一份旧格式 games.json，便于回滚到 3.6.x；失败不阻止关闭。
-        try {
-          globalStore.flushNow();
-        } catch (err) {
-          app.log.error(err, 'failed to export legacy games.json on shutdown');
-        }
         closeSseConnections();
         app.close()
           .then(() => process.exit(0))

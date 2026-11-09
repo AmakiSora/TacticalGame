@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 describe('simultaneous stats recovery', () => {
-  it('keeps the final-round control hold after a turn-limit snapshot reload', () => {
+  it('keeps the final-round control hold after a turn-limit snapshot reload', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'tg-hold-'));
     const file = join(tempDir, 'games.json');
     const bus = new EventBus();
@@ -45,15 +45,15 @@ describe('simultaneous stats recovery', () => {
     expect(before.controlHoldRounds).toBe(1);
 
     const store = new GameStore({ persistenceFile: file });
-    store.save(game);
+    await store.save(game);
     const restored = new GameStore({ persistenceFile: file });
-    restored.loadFromDisk();
+    await restored.loadFromDisk();
     const after = restored.get('control-hold-recovery')!.players[holder!]!.stats;
     expect(after.controlHold).toBe(before.controlHold);
     expect(after.controlHoldRounds).toBe(before.controlHoldRounds);
   });
 
-  it('rebuilds action points spent on wait steps after a reload', () => {
+  it('rebuilds action points spent on wait steps after a reload', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'tg-wait-'));
     const file = join(tempDir, 'games.json');
     const bus = new EventBus();
@@ -70,9 +70,9 @@ describe('simultaneous stats recovery', () => {
     expect(game.players[first!]!.stats.actionPointsUsed).toBe(2);
 
     const store = new GameStore({ persistenceFile: file });
-    store.save(game);
+    await store.save(game);
     const restored = new GameStore({ persistenceFile: file });
-    restored.loadFromDisk();
+    await restored.loadFromDisk();
     expect(restored.get('wait-recovery')!.players[first!]!.stats.actionPointsUsed).toBe(2);
   });
 });

@@ -13,7 +13,7 @@ describe('Events API', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
-    for (const id of globalStore.list()) globalStore.delete(id);
+    for (const id of globalStore.list()) await globalStore.delete(id);
     app = await startTestServer();
   });
 
@@ -141,18 +141,18 @@ describe('SSE backpressure lifecycle', () => {
     }, { raw, hijack() {} });
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
     resetMetrics();
     const game = createInitialGame(gameId);
     game.events = [event(1), event(2), event(3)];
-    globalStore.save(game);
+    await globalStore.save(game);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     closeSseConnections();
     globalEventBus.clear(gameId);
-    globalStore.delete(gameId);
+    await globalStore.delete(gameId);
     vi.useRealTimers();
   });
 

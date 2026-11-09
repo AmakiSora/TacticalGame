@@ -625,6 +625,7 @@ main {
 }
 #timeline-markers .marker {
   position: absolute;
+  left: calc(var(--step) * 100% / var(--steps, 1));
   top: 4px;
   width: 3px; height: 16px;
   border-radius: 1px;

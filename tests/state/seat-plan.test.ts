@@ -192,7 +192,7 @@ describe('lobby seat plan', () => {
     expect(isSeatOrderValid(['player_a', 'player_b', 3], joined)).toBe(false);
   });
 
-  it('loads a 3.8.7 snapshot without the seat fields and still starts', () => {
+  it('loads a 3.8.7 snapshot without the seat fields and still starts', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-seat-legacy-'));
     const file = join(dir, 'games.json');
     try {
@@ -204,7 +204,7 @@ describe('lobby seat plan', () => {
       writeFileSync(file, JSON.stringify({ schemaVersion: 2, savedAt: new Date().toISOString(), games: [legacy] }));
 
       const store = new GameStore({ persistenceFile: file });
-      store.loadFromDisk();
+      await store.loadFromDisk();
       const loaded = store.get('legacy-seat')!;
       expect(loaded.seatPlan).toBeNull();
       expect(loaded.seatVersion).toBe(0);

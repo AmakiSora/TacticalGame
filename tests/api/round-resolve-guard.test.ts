@@ -214,7 +214,7 @@ describe('sequence mode: skip-turn guard', () => {
 });
 
 describe('loaded snapshots: conservative default for resolvedRound', () => {
-  it('treats a legacy snapshot (no resolvedRound) as already resolved this round', () => {
+  it('treats a legacy snapshot (no resolvedRound) as already resolved this round', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-guard-'));
     tempDirs.push(dir);
     const file = join(dir, 'games.json');
@@ -222,7 +222,7 @@ describe('loaded snapshots: conservative default for resolvedRound', () => {
     game.turn.roundNumber = 4;
     delete (game.turn as { resolvedRound?: number | null }).resolvedRound;
     const store = new GameStore({ persistenceFile: file });
-    store.save(game);
+    await store.save(game);
     // 手写一份不含该字段的快照（模拟 3.8.8 的旧档）。
     const snapshotPath = gameSnapshotPath(file, 'legacy-guard');
     const payload = JSON.parse(readFileSync(snapshotPath, 'utf8')) as {
@@ -233,7 +233,7 @@ describe('loaded snapshots: conservative default for resolvedRound', () => {
     writeFileSync(snapshotPath, JSON.stringify(payload));
 
     const reloaded = new GameStore({ persistenceFile: file });
-    reloaded.loadFromDisk();
+    await reloaded.loadFromDisk();
     const loaded = reloaded.get('legacy-guard')!;
     // 保守：视为本轮已结算（= 当前轮号），否则重启后还能把这一轮再推一次。
     expect(loaded.turn.resolvedRound).toBe(loaded.turn.roundNumber);

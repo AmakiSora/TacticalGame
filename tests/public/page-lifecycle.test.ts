@@ -267,6 +267,12 @@ for (const file of SPECTATORS) describe(`${file} spectator lifecycle`, () => {
     const h = spectatorHarness(file);
     h.run(`
       let allEvents = [{ seq: 99 }];
+      let gameLoadVersion = 0;
+      let liveSse = null;
+      let gameConfig = null;
+      let playerNames = {};
+      let currentStep = -1;
+      function defaultPlayerNames() { return {}; }
       let importedReplayMeta = null;
       let pinnedReplayStep = false;
       function pausePlayback() {}

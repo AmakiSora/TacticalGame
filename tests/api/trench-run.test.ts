@@ -56,7 +56,7 @@ describe('歼灭地图「战壕」trench-run', () => {
   let app: FastifyInstance | undefined;
 
   afterEach(async () => {
-    for (const id of globalStore.list()) globalStore.delete(id);
+    for (const id of globalStore.list()) await globalStore.delete(id);
     if (app) await app.close();
     app = undefined;
   });

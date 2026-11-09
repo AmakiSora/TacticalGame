@@ -8,7 +8,7 @@ describe('action idempotency', () => {
   let app: FastifyInstance;
 
   afterEach(async () => {
-    for (const id of globalStore.list()) globalStore.delete(id);
+    for (const id of globalStore.list()) await globalStore.delete(id);
     if (app) await app.close();
   });
 
@@ -118,13 +118,53 @@ describe('action idempotency', () => {
     expect(conflict.json().code).toBe('idempotency_conflict');
   });
 
+  it('waits for persistence, serializes same-game mutations and serves unrelated reads', async () => {
+    app = await startTestServer();
+    const game = await createGameAndJoin(app);
+    const original = globalStore.persist.bind(globalStore);
+    const gate = Promise.withResolvers<void>();
+    const entered = Promise.withResolvers<void>();
+    const persist = vi.spyOn(globalStore, 'persist').mockImplementationOnce(async state => {
+      entered.resolve();
+      await gate.promise;
+      await original(state);
+    });
+    let completed = 0;
+    const first = app.inject({
+      method: 'POST', url: `/api/games/${game.gameId}/end-turn`,
+      headers: { 'x-player-token': game.playerAToken, 'idempotency-key': 'concurrent-a' }, payload: {},
+    }).then(response => { completed++; return response; });
+    await entered.promise;
+    const second = app.inject({
+      method: 'POST', url: `/api/games/${game.gameId}/end-turn`,
+      headers: { 'x-player-token': game.playerBToken }, payload: {},
+    }).then(response => { completed++; return response; });
+    try {
+      expect((await app.inject({ method: 'GET', url: '/healthz' })).statusCode).toBe(200);
+      expect(completed).toBe(0);
+      expect(persist).toHaveBeenCalledTimes(1);
+      expect(globalStore.get(game.gameId)!.turn.currentPlayerId).toBe('player_b');
+      gate.resolve();
+      const responses = await Promise.all([first, second]);
+      expect(responses.map(response => response.statusCode)).toEqual([200, 200]);
+      expect(globalStore.get(game.gameId)!.turn.currentPlayerId).toBe('player_a');
+      const replay = await app.inject({
+        method: 'POST', url: `/api/games/${game.gameId}/end-turn`,
+        headers: { 'x-player-token': game.playerAToken, 'idempotency-key': 'concurrent-a' }, payload: {},
+      });
+      expect(replay.headers['idempotent-replay']).toBe('true');
+      expect(globalStore.get(game.gameId)!.turn.currentPlayerId).toBe('player_a');
+    } finally {
+      gate.resolve();
+      await Promise.all([first, second]);
+      persist.mockRestore();
+    }
+  });
+
   it('returns persistence_degraded when the state was applied but could not be flushed', async () => {
     app = await startTestServer();
     const game = await createGameAndJoin(app);
-    const flush = vi.spyOn(globalStore as unknown as { writeSnapshot: () => void }, 'writeSnapshot')
-      .mockImplementation(() => {
-        throw new Error('disk full');
-      });
+    const flush = vi.spyOn(globalStore, 'persist').mockRejectedValue(new Error('disk full'));
     try {
       const res = await app.inject({
         method: 'POST',
@@ -147,14 +187,13 @@ describe('action idempotency', () => {
     app = await startTestServer();
     const game = await createGameAndJoin(app);
     const key = 'idem-degraded-replay';
-    const store = globalStore as unknown as { writeSnapshot: (game: GameState) => void };
-    const original = store.writeSnapshot.bind(globalStore);
+    const original = globalStore.persist.bind(globalStore);
     let calls = 0;
     let failing = true;
-    const spy = vi.spyOn(store, 'writeSnapshot').mockImplementation((game: GameState) => {
+    const spy = vi.spyOn(globalStore, 'persist').mockImplementation(async (game: GameState) => {
       calls += 1;
       if (failing) throw new Error('disk full');
-      original(game);
+      await original(game);
     });
     try {
       const first = await app.inject({

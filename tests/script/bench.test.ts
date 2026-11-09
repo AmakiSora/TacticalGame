@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 describe('benchmark measurement and isolation', () => {
-  it('times the actual operations, reports UTF-8 bytes, and removes only its own snapshots', () => {
+  it('times the actual operations, reports UTF-8 bytes, and removes only its own snapshots', async () => {
     const { benchDir, recordsDir, preserved } = fixture();
     const replayJson = JSON.stringify({ events: [{ text: '测试回放' }] });
     const replayFile = join(recordsDir, 'largest.json');
@@ -79,7 +79,7 @@ describe('benchmark measurement and isolation', () => {
       return parse(text, reviver);
     });
 
-    const payload = runBenchmarks({ benchDir, recordsDir });
+    const payload = await runBenchmarks({ benchDir, recordsDir });
 
     expect(payload.results).toHaveLength(7);
     for (const name of ['full', 'projected']) {
@@ -113,21 +113,21 @@ describe('benchmark measurement and isolation', () => {
     expect(process.env.TACTICAL_GAME_STATE_FILE).toBe(preserved[3]);
     expect(parse(read(join(benchDir, 'latest.json'), 'utf8'))).toEqual(payload);
     expect(fs.readdirSync(benchDir).filter(name => /^bench-\d.*\.json$/.test(name))).toHaveLength(1);
-  });
+  }, 30_000);
 
-  it('cleans snapshots and scheduled timers even when a benchmark fails', () => {
+  it('cleans snapshots and scheduled timers even when a benchmark fails', async () => {
     const { benchDir, recordsDir, preserved } = fixture();
     const scratch = vi.spyOn(fs, 'mkdtempSync');
     const persist = GameStore.prototype.persist;
     const failure = new Error('injected benchmark failure');
-    vi.spyOn(GameStore.prototype, 'persist').mockImplementation(function (this: GameStore, game) {
-      persist.call(this, game);
-      this.flush();
+    vi.spyOn(GameStore.prototype, 'persist').mockImplementation(async function (this: GameStore, game) {
+      await persist.call(this, game);
+      await this.flush();
       expect(this.flushScheduled).toBe(true);
       throw failure;
     });
 
-    expect(() => runBenchmarks({ benchDir, recordsDir })).toThrow(failure);
+    await expect(runBenchmarks({ benchDir, recordsDir })).rejects.toThrow(failure);
 
     expect(scratch).toHaveBeenCalledTimes(1);
     expect(fs.existsSync(scratch.mock.results[0]!.value)).toBe(false);

@@ -821,5 +821,24 @@
     };
   }
 
-  window.BoardAnimation = { create };
+  function createTerrainLayer() {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    let previous = null;
+    return {
+      draw(target, cells, revision, layout, paint) {
+        const { width, height } = target.canvas;
+        if (!previous || previous.cells !== cells || previous.revision !== revision
+          || previous.layout !== layout || canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          paint(context);
+          previous = { cells, revision, layout };
+        }
+        target.drawImage(canvas, 0, 0);
+      },
+    };
+  }
+
+  window.BoardAnimation = { create, createTerrainLayer };
 })();

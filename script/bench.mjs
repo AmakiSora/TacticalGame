@@ -1,5 +1,4 @@
-#!/usr/bin/env node
-// 轻量基准：同步单局/全量持久化、完整/投影响应、引擎、随机地图、纯回放解析。
+// 轻量基准：单局/全量持久化、完整/投影响应、引擎、随机地图、纯回放解析。
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
@@ -48,7 +47,18 @@ function measure(fn, count = SAMPLE_COUNT) {
   return { samples, value };
 }
 
-export function runBenchmarks({
+async function measureAsync(fn, count = SAMPLE_COUNT) {
+  for (let i = 0; i < WARMUP_COUNT; i++) await fn(i);
+  const samples = [];
+  for (let i = 0; i < count; i++) {
+    const started = performance.now();
+    await fn(i);
+    samples.push(performance.now() - started);
+  }
+  return { samples };
+}
+
+export async function runBenchmarks({
   benchDir = join(PROJECT_DIR, 'temp', 'perf'),
   recordsDir = join(PROJECT_DIR, 'records', 'V3'),
 } = {}) {
@@ -56,7 +66,7 @@ export function runBenchmarks({
   mkdirSync(benchDir, { recursive: true });
   const scratchDir = mkdtempSync(join(tmpdir(), 'tg-bench-'));
   const stateFile = join(scratchDir, 'games.json');
-  const store = new GameStore({ persistenceFile: stateFile, synchronousFlush: false });
+  const store = new GameStore({ persistenceFile: stateFile, immediateFlush: false });
   try {
     const results = [];
     const games = [];
@@ -71,14 +81,14 @@ export function runBenchmarks({
         });
       }
       games.push(game);
-      store.persist(game);
+      await store.persist(game);
     }
 
-    const snapshots = measure(i => store.persist(games[i % games.length]));
+    const snapshots = await measureAsync(i => store.persist(games[i % games.length]));
     results.push(summary('persist.snapshot (1 game x 500 events)', snapshots.samples, {
       bytes: statSync(gameSnapshotPath(stateFile, games[0].id)).size,
     }));
-    const flushes = measure(() => store.flushNow());
+    const flushes = await measureAsync(() => store.flushNow());
     results.push(summary('persist.flushNow (8 games x 500 events)', flushes.samples, {
       bytes: statSync(stateFile).size,
     }));
@@ -142,10 +152,11 @@ export function runBenchmarks({
     return payload;
   } finally {
     store.cancelScheduledFlush();
+    await store.drain();
     rmSync(scratchDir, { recursive: true, force: true });
   }
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
-  runBenchmarks();
+  await runBenchmarks();
 }

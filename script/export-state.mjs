@@ -3,7 +3,7 @@
 import { GameStore } from '../src/state/store.js';
 
 const store = new GameStore();
-store.loadFromDisk();
+await store.loadFromDisk();
 const games = store.list();
-store.flush();
+await store.flushNow();
 console.log(`Exported ${games.length} game(s) to the legacy games.json layout.`);

@@ -29,9 +29,9 @@ function badRequest(reply: FastifyReply, msg: string) {
  * 幂等记录会保留 persisted=false，同键回放时补写快照。
  * 返回 false 表示已写出 503 响应。
  */
-function persistWithDegraded(reply: FastifyReply, game: Parameters<typeof globalStore.persist>[0]): boolean {
+async function persistWithDegraded(reply: FastifyReply, game: Parameters<typeof globalStore.persist>[0]): Promise<boolean> {
   try {
-    globalStore.persist(game);
+    await globalStore.persist(game);
     return true;
   } catch {
     const requestId = randomUUID();
@@ -176,7 +176,7 @@ async function dispatchAction(
         return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
       }
       if (replay.record.persisted !== true) {
-        if (!persistWithDegraded(reply, ctx.game)) return;
+        if (!await persistWithDegraded(reply, ctx.game)) return;
         replay.record.persisted = true;
       }
       reply.header('Idempotent-Replay', 'true');
@@ -206,7 +206,7 @@ async function dispatchAction(
         queue: [...(ctx.game.plan?.queues[ctx.player] ?? [])],
       };
       const record = remember(response);
-      if (!persistWithDegraded(reply, ctx.game)) return;
+      if (!await persistWithDegraded(reply, ctx.game)) return;
       if (record) record.persisted = true;
       return response;
     }
@@ -221,7 +221,7 @@ async function dispatchAction(
     }
     const response = { ok: true };
     const record = remember(response);
-    if (!persistWithDegraded(reply, ctx.game)) return;
+    if (!await persistWithDegraded(reply, ctx.game)) return;
     if (record) record.persisted = true;
     return response;
   } finally {
@@ -323,7 +323,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
         }
         if (replay.record.persisted !== true) {
-          if (!persistWithDegraded(reply, ctx.game)) return;
+          if (!await persistWithDegraded(reply, ctx.game)) return;
           replay.record.persisted = true;
         }
         reply.header('Idempotent-Replay', 'true');
@@ -341,7 +341,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
       queue: [...(ctx.game.plan?.queues[ctx.player] ?? [])],
     };
     const record = scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null;
-    if (!persistWithDegraded(reply, ctx.game)) return;
+    if (!await persistWithDegraded(reply, ctx.game)) return;
     if (record) record.persisted = true;
     return response;
   });
@@ -367,7 +367,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
         }
         if (replay.record.persisted !== true) {
-          if (!persistWithDegraded(reply, ctx.game)) return;
+          if (!await persistWithDegraded(reply, ctx.game)) return;
           replay.record.persisted = true;
         }
         reply.header('Idempotent-Replay', 'true');
@@ -385,7 +385,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     }
     const response = { ok: true, queue: result.data };
     const record = scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null;
-    if (!persistWithDegraded(reply, ctx.game)) return;
+    if (!await persistWithDegraded(reply, ctx.game)) return;
     if (record) record.persisted = true;
     return response;
   });
@@ -409,7 +409,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
         }
         if (replay.record.persisted !== true) {
-          if (!persistWithDegraded(reply, ctx.game)) return;
+          if (!await persistWithDegraded(reply, ctx.game)) return;
           replay.record.persisted = true;
         }
         reply.header('Idempotent-Replay', 'true');
@@ -435,7 +435,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
         phase: ctx.game.phase,
       };
       const record = remember(response);
-      if (!persistWithDegraded(reply, ctx.game)) return;
+      if (!await persistWithDegraded(reply, ctx.game)) return;
       if (record) record.persisted = true;
       return response;
     }
@@ -448,7 +448,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     }
     const response = { ok: true };
     const record = remember(response);
-    if (!persistWithDegraded(reply, ctx.game)) return;
+    if (!await persistWithDegraded(reply, ctx.game)) return;
     if (record) record.persisted = true;
     return response;
   });
@@ -473,7 +473,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
         }
         if (replay.record.persisted !== true) {
-          if (!persistWithDegraded(reply, ctx.game)) return;
+          if (!await persistWithDegraded(reply, ctx.game)) return;
           replay.record.persisted = true;
         }
         reply.header('Idempotent-Replay', 'true');
@@ -491,7 +491,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     }
     const response = { ok: true, queue: result.data };
     const record = scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null;
-    if (!persistWithDegraded(reply, ctx.game)) return;
+    if (!await persistWithDegraded(reply, ctx.game)) return;
     if (record) record.persisted = true;
     return response;
   });
@@ -516,7 +516,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(409).send({ error: '同一幂等键对应了不同的请求内容', code: 'idempotency_conflict' });
         }
         if (replay.record.persisted !== true) {
-          if (!persistWithDegraded(reply, ctx.game)) return;
+          if (!await persistWithDegraded(reply, ctx.game)) return;
           replay.record.persisted = true;
         }
         reply.header('Idempotent-Replay', 'true');
@@ -530,7 +530,7 @@ export async function actionsRoutes(app: FastifyInstance): Promise<void> {
     }
     const response = { ok: true, queue: result.data };
     const record = scopedKey && bodyHash ? rememberAction(ctx.game, scopedKey, bodyHash, response) : null;
-    if (!persistWithDegraded(reply, ctx.game)) return;
+    if (!await persistWithDegraded(reply, ctx.game)) return;
     if (record) record.persisted = true;
     return response;
   });

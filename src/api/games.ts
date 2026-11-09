@@ -218,7 +218,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         }
         game = createLobby(randomUUID(), mapId, lobbyOptions);
       }
-      globalStore.save(game);
+      await globalStore.save(game);
       // 总对局数（大厅 + 进行中 + 终局）超阈值时也要提醒：磁盘与内存都是按局数线性增长的，
       // 只盯大厅数会漏掉「进行中/终局堆积」这一类膨胀。
       const totalGames = globalStore.size();
@@ -253,7 +253,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!joined) return reply.code(409).send({ error: '房间已满', code: 'game_already_full' });
     if (hostJoining) game.hostName = game.players[joined.id]!.name;
     appendEvent(game, globalEventBus, 'player_joined', { playerId: joined.id, name: game.players[joined.id]!.name });
-    globalStore.persist(game);
+    await globalStore.persist(game);
     return { player: joined, lobby: lobbySummary(game) };
   });
 
@@ -262,7 +262,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!game) return;
     const result = startGame(game, globalEventBus);
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
-    globalStore.persist(game);
+    await globalStore.persist(game);
     // 对局开始后拉起已登记的强化学习 AI（fire-and-forget，失败不影响开局）。
     const address = req.server.server.address();
     const port = address && typeof address === 'object' ? address.port : Number(process.env.PORT) || 3100;
@@ -276,7 +276,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (ctx.game.phase !== 'lobby') return reply.code(409).send({ error: '对局已经开始', code: 'game_already_started' });
     removeLobbyPlayer(ctx.game, ctx.player);
     appendEvent(ctx.game, globalEventBus, 'player_left', { playerId: ctx.player, reason: 'self' });
-    globalStore.persist(ctx.game);
+    await globalStore.persist(ctx.game);
     return { ok: true };
   });
 
@@ -291,7 +291,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     }
     removeBotRecord(game.id, req.params.playerId as PlayerId);
     appendEvent(game, globalEventBus, 'player_left', { playerId: req.params.playerId, reason: 'host' });
-    globalStore.persist(game);
+    await globalStore.persist(game);
     return { ok: true, lobby: lobbySummary(game) };
   });
 
@@ -304,7 +304,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (idem.kind === 'replay') return idem.response;
     const result = skipTurn(game, globalEventBus);
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
-    globalStore.persist(game);
+    await globalStore.persist(game);
     const response = { ok: true };
     if (idem.kind === 'store') rememberAction(game, idem.key, idem.hash, response);
     return response;
@@ -338,7 +338,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       game.maxPlayers = maxPlayers;
       // 该接口不发事件但改变状态响应内容；显式推进版本，避免条件 GET 命中旧 ETag。
       game.stateVersion = (game.stateVersion ?? 0) + 1;
-      globalStore.persist(game);
+      await globalStore.persist(game);
       return { ok: true, lobby: lobbySummary(game) };
     });
 
@@ -399,7 +399,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     setSeatPlan(game, body.order, firstSeat);
     // 该接口不发事件但改变状态响应内容；显式推进版本，避免条件 GET 命中旧 ETag。
     game.stateVersion = (game.stateVersion ?? 0) + 1;
-    globalStore.persist(game);
+    await globalStore.persist(game);
     return {
       ok: true, seatVersion: game.seatVersion ?? 0, firstSeat, lobby: lobbySummary(game),
     };
@@ -414,7 +414,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     }
     clearSeatPlan(game);
     game.stateVersion = (game.stateVersion ?? 0) + 1;
-    globalStore.persist(game);
+    await globalStore.persist(game);
     return { ok: true, seatVersion: game.seatVersion ?? 0, lobby: lobbySummary(game) };
   });
 
@@ -426,7 +426,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
     // simultaneous 模式下计划期淘汰：清出其计划状态；若其余玩家均已确认则立即结算。
     eliminateFromPlanAndMaybeResolve(game, globalEventBus, req.body.playerId);
-    globalStore.persist(game);
+    await globalStore.persist(game);
     return { ok: true };
   });
 
@@ -455,7 +455,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         peer: controlSocketAddressOf(req),
       });
     }
-    globalStore.persist(game);
+    await globalStore.persist(game);
     const response = {
       ok: true, resolved: true,
       roundNumber: result.data ? result.data.roundNumber : null,
@@ -482,7 +482,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       ctx.game.hostName = name;
     }
     appendEvent(ctx.game, globalEventBus, 'name_rename', { playerId: ctx.player, name });
-    globalStore.persist(ctx.game);
+    await globalStore.persist(ctx.game);
     return { ok: true, lobby: lobbySummary(ctx.game) };
   });
 
@@ -502,7 +502,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     game.players[playerId]!.name = name;
     game.playerNames[playerId] = name;
     appendEvent(game, globalEventBus, 'name_rename', { playerId, name });
-    globalStore.persist(game);
+    await globalStore.persist(game);
     return { ok: true };
   });
 
@@ -512,14 +512,14 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     if (!game) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
     const result = forceAdjudication(game, globalEventBus);
     if (!result.ok) return reply.code(statusForCode(result.code)).send({ error: result.message, code: result.code });
-    globalStore.persist(game);
+    await globalStore.persist(game);
     return { ok: true, result: game.result };
   });
 
   app.delete<{ Params: { id: string }; Querystring: { token?: string } }>('/api/games/:id', async (req, reply) => {
     if (!authorizeControlRequest(req, reply)) return;
     if (!globalStore.get(req.params.id)) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
-    globalStore.delete(req.params.id);
+    await globalStore.delete(req.params.id);
     globalEventBus.clear(req.params.id);
     closeSseConnections(req.params.id);
     clearBotsForGame(req.params.id);

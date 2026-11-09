@@ -1,9 +1,9 @@
 // src/state/store.ts
 import { randomUUID } from 'node:crypto';
 import {
-  accessSync, closeSync, constants, existsSync, fsyncSync, mkdirSync, openSync, readFileSync,
-  readdirSync, renameSync, unlinkSync, writeFileSync, writeSync,
+  accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, renameSync,
 } from 'node:fs';
+import { mkdir, open, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
@@ -41,8 +41,8 @@ interface GameStoreOptions {
   /** 全量落盘的去抖窗口；测试可传 0 或配合 fake timers。 */
   flushDelayMs?: number;
   flushMaxWaitMs?: number;
-  /** 是否同步 flush（VITEST 默认 true，避免用例靠 sleep 等定时器）。 */
-  synchronousFlush?: boolean;
+  /** 是否立即 flush（VITEST 默认 true，测试可直接等待落盘）。 */
+  immediateFlush?: boolean;
 }
 
 /** 活跃大厅数量上限（只校验，不缓存；启动时先调一次即可把错误提前）。 */
@@ -608,7 +608,7 @@ export class GameStore {
   private persistenceFileOverride: string | null | undefined;
   private flushDelayMs = FLUSH_DELAY_MS;
   private flushMaxWaitMs = FLUSH_MAX_WAIT_MS;
-  private synchronousFlush = Boolean(process.env.VITEST);
+  private immediateFlush = Boolean(process.env.VITEST);
   private flushTimer: NodeJS.Timeout | null = null;
   private flushPendingSince = 0;
   /** 全量 flush 次数：给测试与运维计数用（去抖是否真的合并了写在它上面体现）。 */
@@ -618,7 +618,7 @@ export class GameStore {
     if ('persistenceFile' in options) this.persistenceFileOverride = options.persistenceFile;
     if (options.flushDelayMs !== undefined) this.flushDelayMs = Math.max(0, options.flushDelayMs);
     if (options.flushMaxWaitMs !== undefined) this.flushMaxWaitMs = Math.max(0, options.flushMaxWaitMs);
-    if (options.synchronousFlush !== undefined) this.synchronousFlush = options.synchronousFlush;
+    if (options.immediateFlush !== undefined) this.immediateFlush = options.immediateFlush;
   }
 
   /** 已发生的全量 flush 次数（每局快照写入不计入）。 */
@@ -631,47 +631,65 @@ export class GameStore {
     return this.flushTimer !== null;
   }
 
-  save(game: GameState): void {
-    game.lastActivityAt = Date.now();
-    this.games.set(game.id, game);
-    // 每局快照同步原子写：请求返回时这一局的内容必须已经在盘上。
-    this.writeSnapshot(game);
-    this.flush();
+  private writes: Promise<void> = Promise.resolve();
+  private pendingWrites = 0;
+
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    this.pendingWrites += 1;
+    const result = this.writes.then(operation);
+    this.writes = result.then(() => {}, () => {}).finally(() => { this.pendingWrites -= 1; });
+    return result;
+  }
+
+  /** 是否有已提交但尚未完成的磁盘写入（/readyz 降级判定用）。 */
+  hasPendingWrites(): boolean {
+    return this.pendingWrites > 0;
+  }
+
+  async drain(): Promise<void> {
+    let pending: Promise<void>;
+    do {
+      pending = this.writes;
+      await pending;
+    } while (pending !== this.writes);
+  }
+
+  async save(game: GameState): Promise<void> {
+    await this.persist(game);
+    await this.flush();
   }
   get(id: string): GameState | undefined { return this.games.get(id); }
   list(): string[] { return [...this.games.keys()]; }
-  delete(id: string): void {
+  async delete(id: string): Promise<void> {
     const game = this.games.get(id);
     if (!game) return;
     this.games.delete(id);
-    const snapshotRemoved = this.removeSnapshot(id);
-    try {
-      // 删除必须同步落定：去抖窗口里崩溃会让已删的对局在重启后复活。
-      this.flushNow();
-    } catch (err) {
-      // 导出旧格式失败时不要把内存条目丢掉；快照已删除则立即补写回去。
-      this.games.set(id, game);
-      if (snapshotRemoved) {
-        try { this.writeSnapshot(game); } catch { /* 保留内存状态，等待下一次落盘 */ }
+    this.cancelScheduledFlush();
+    await this.enqueue(async () => {
+      try {
+        await this.writeFullState(this.fullStateJson());
+        if (!await this.removeSnapshot(id)) throw new Error(`failed to remove snapshot for game ${id}`);
+      } catch (err) {
+        if (!this.games.has(id)) this.games.set(id, game);
+        try {
+          await this.writeSnapshot(id, this.snapshotJson(game));
+          await this.writeFullState(this.fullStateJson());
+        } catch { /* 保留内存状态，等待下一次落盘。 */ }
+        throw err;
       }
-      throw err;
-    }
-    if (!snapshotRemoved) {
-      // 快照删除失败（Windows 文件占用/只读）不能静默成功，否则重启会复活。
-      // 恢复内存并重写一份可用快照，让调用方收到失败而不是假成功。
-      this.games.set(id, game);
-      try { this.writeSnapshot(game); this.flushNow(); } catch { /* 保留内存状态 */ }
-      throw new Error(`failed to remove snapshot for game ${id}`);
-    }
+    });
   }
-  persist(game: GameState): void {
+  async persist(game: GameState): Promise<void> {
     game.lastActivityAt = Date.now();
     this.games.set(game.id, game);
-    // 每个动作只写这一局的快照，不再序列化全部对局；games.json 只作为导出/兼容格式。
-    this.writeSnapshot(game);
+    if (!this.persistenceFile()) return;
+    // 在入队前固定快照，后续动作不能改变这次已提交写入的内容。
+    const json = this.snapshotJson(game);
+    await this.enqueue(() => this.writeSnapshot(game.id, json));
   }
 
-  loadFromDisk(): void {
+  async loadFromDisk(): Promise<void> {
+    await this.drain();
     const file = this.persistenceFile();
     if (!file) return;
     const loaded = new Map<string, GameState>();
@@ -788,7 +806,7 @@ export class GameStore {
       const game = loaded.get(id);
       if (!game) continue;
       try {
-        this.writeSnapshot(game);
+        await this.writeSnapshot(game.id, this.snapshotJson(game));
       } catch (err) {
         logger.error(`failed to migrate snapshot ${id}`, err);
       }
@@ -806,34 +824,45 @@ export class GameStore {
     return file ? gameSnapshotPath(file, gameId) : null;
   }
 
-  private writeSnapshot(game: GameState): void {
-    const target = this.snapshotPath(game.id);
-    if (!target) return;
+  private snapshotJson(game: GameState): string {
     const started = performance.now();
     try {
-      mkdirSync(dirname(target), { recursive: true });
       const payload: PersistedGameSnapshot = {
         schemaVersion: PERSISTENCE_SCHEMA_VERSION,
         savedAt: new Date().toISOString(),
         game,
       };
-      const json = `${JSON.stringify(payload)}\n`;
-      const tmp = `${target}.tmp`;
-      const fd = openSync(tmp, 'w');
-      try {
-        writeSync(fd, json);
-        fsyncSync(fd);
-      } finally {
-        closeSync(fd);
-      }
-      if (existsSync(target)) {
-        try {
-          renameSync(target, `${target}.prev`);
-        } catch {
-          // 快照轮转失败不阻塞主写入。
-        }
-      }
-      renameSync(tmp, target);
+      return `${JSON.stringify(payload)}\n`;
+    } catch (err) {
+      inc('tactical_snapshot_total', { result: 'error' });
+      throw err;
+    } finally {
+      observe('tactical_snapshot_serialize_duration_ms', performance.now() - started);
+    }
+  }
+
+  private async writeAtomic(target: string, json: string, backup: string): Promise<void> {
+    await mkdir(dirname(target), { recursive: true });
+    const tmp = `${target}.tmp`;
+    const fd = await open(tmp, 'w');
+    try {
+      await fd.writeFile(json);
+      await fd.sync();
+    } finally {
+      await fd.close();
+    }
+    try {
+      await rename(target, backup);
+    } catch { /* 备份轮转失败不阻止原子替换主文件。 */ }
+    await rename(tmp, target);
+  }
+
+  private async writeSnapshot(gameId: string, json: string): Promise<void> {
+    const target = this.snapshotPath(gameId);
+    if (!target) return;
+    const started = performance.now();
+    try {
+      await this.writeAtomic(target, json, `${target}.prev`);
       inc('tactical_snapshot_total', { result: 'ok' });
       observe('tactical_snapshot_bytes', Buffer.byteLength(json, 'utf8'), {}, SNAPSHOT_BYTE_BUCKETS);
     } catch (err) {
@@ -844,13 +873,13 @@ export class GameStore {
     }
   }
 
-  private removeSnapshot(gameId: string): boolean {
+  private async removeSnapshot(gameId: string): Promise<boolean> {
     const target = this.snapshotPath(gameId);
     if (!target) return true;
     let removed = true;
     for (const path of [target, `${target}.prev`]) {
       try {
-        unlinkSync(path);
+        await unlink(path);
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
           removed = false;
@@ -891,16 +920,12 @@ export class GameStore {
     this.flushPendingSince = 0;
   }
 
-  /**
-   * 全量落盘调度：trailing 去抖 250ms（每次新变更都重排），最长等 2s 必写一次
-   * ——持续有活动也不会被饿死。每局快照仍由 writeSnapshot 同步原子写，
-   * 这里只合并导出用的 games.json。
-   */
-  flush(): void {
+  // 只合并导出文件；每局快照仍须在请求返回前完成。
+  async flush(): Promise<void> {
     const file = this.persistenceFile();
     if (!file) return;
-    if (this.synchronousFlush) {
-      this.flushNow();
+    if (this.immediateFlush) {
+      await this.flushNow();
       return;
     }
     const now = Date.now();
@@ -911,63 +936,47 @@ export class GameStore {
     if (delay === 0) {
       this.flushTimer = null;
       this.flushPendingSince = 0;
-      this.flushNow();
+      await this.flushNow();
       return;
     }
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
       this.flushPendingSince = 0;
-      try {
-        this.flushNow();
-      } catch (err) {
-        // 定时器里的失败不能变成未捕获异常：下一轮变更会再写一次。
-        logger.error('定时全量落盘失败', err);
-      }
+      void this.flushNow().catch(err => logger.error('定时全量落盘失败', err));
     }, delay);
     // 后台任务不该把进程拖住不退出。
     this.flushTimer.unref?.();
   }
 
-  /** 立刻同步写一份全量 games.json（退出、删除、归档等「必须落定」的路径用它）。 */
-  flushNow(): void {
+  async flushNow(): Promise<void> {
+    this.cancelScheduledFlush();
+    if (!this.persistenceFile()) return;
+    await this.enqueue(() => this.writeFullState(this.fullStateJson()));
+  }
+
+  private fullStateJson(): string {
+    if (!this.persistenceFile()) return '';
+    const payload: PersistedGamesFile = {
+      schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+      savedAt: new Date().toISOString(),
+      games: [...this.games.values()],
+    };
+    return `${JSON.stringify(payload)}\n`;
+  }
+
+  private async writeFullState(json: string): Promise<void> {
     const file = this.persistenceFile();
     if (!file) return;
-    // 已经写过就不再需要排队中的那次。
-    this.cancelScheduledFlush();
-    const started = Date.now();
+    const started = performance.now();
     try {
-      mkdirSync(dirname(file), { recursive: true });
-      const payload: PersistedGamesFile = {
-        schemaVersion: PERSISTENCE_SCHEMA_VERSION,
-        savedAt: new Date().toISOString(),
-        games: [...this.games.values()],
-      };
-      const json = `${JSON.stringify(payload, null, 2)}\n`;
-      const tmp = `${file}.tmp`;
-      // 先写临时文件并 fsync，再把上一份完整文件轮转为 .bak；任一步崩溃都能从
-      // 主文件或 .bak 恢复。
-      const fd = openSync(tmp, 'w');
-      try {
-        writeSync(fd, json);
-        fsyncSync(fd);
-      } finally {
-        closeSync(fd);
-      }
-      if (existsSync(file)) {
-        try {
-          renameSync(file, `${file}.bak`);
-        } catch {
-          // 备份轮转失败不阻塞主写入；主文件仍会被下面的 rename 原子替换。
-        }
-      }
-      renameSync(tmp, file);
+      await this.writeAtomic(file, json, `${file}.bak`);
       this.flushWrites += 1;
       inc('tactical_persist_total', { result: 'ok' });
     } catch (err) {
       inc('tactical_persist_total', { result: 'error' });
       throw err;
     } finally {
-      observe('tactical_persist_duration_ms', Date.now() - started);
+      observe('tactical_persist_duration_ms', performance.now() - started);
     }
   }
 
@@ -987,56 +996,53 @@ export class GameStore {
    * 归档并删除超期未活动的 lobby / 终局对局；active 对局永不自动删除。
    * 返回被删除的 id 列表；归档失败的对局保留并留给下一次重试。
    */
-  pruneInactive(options: { lobbyTtlMs: number; gameOverTtlMs: number; now?: number }): string[] {
+  async pruneInactive(options: { lobbyTtlMs: number; gameOverTtlMs: number; now?: number }): Promise<string[]> {
     const now = options.now ?? Date.now();
     const ttls: RetentionTtls = { lobbyTtlMs: options.lobbyTtlMs, gameOverTtlMs: options.gameOverTtlMs };
-    const removed: string[] = [];
-    const removedGames: GameState[] = [];
-    for (const game of [...this.games.values()]) {
-      // 判定收敛到 retention.ts 的纯函数（同一套逻辑有单测覆盖 2h / 3d 与 env 覆盖）。
-      if (!isRetentionExpired(game, now, ttls)) continue;
-      if (!this.archiveGame(game)) continue;
-      this.games.delete(game.id);
-      removed.push(game.id);
-      removedGames.push(game);
-    }
-    if (removed.length > 0) {
-      // 先导出一致性 games.json，再删快照；flush 失败时把内存条目放回去，
-      // 避免一次磁盘故障让对局从服务内存中消失（调用方会重试下一轮）。
-      // 归档删除同样必须同步落定，不能等在去抖窗口里。
+    return this.enqueue(async () => {
+      const removedGames: GameState[] = [];
+      for (const game of [...this.games.values()]) {
+        if (!isRetentionExpired(game, now, ttls)) continue;
+        const activity = game.lastActivityAt;
+        const phase = game.phase;
+        const version = game.stateVersion;
+        if (!await this.archiveGame(game)) continue;
+        // 归档 I/O 期间可能有人重新进入大厅，不能删除已经恢复活动的对局。
+        if (this.games.get(game.id) !== game || game.lastActivityAt !== activity || game.phase !== phase || game.stateVersion !== version) continue;
+        this.games.delete(game.id);
+        removedGames.push(game);
+      }
+      if (!removedGames.length) return [];
+      this.cancelScheduledFlush();
       try {
-        this.flushNow();
+        await this.writeFullState(this.fullStateJson());
       } catch (err) {
-        for (const game of removedGames) this.games.set(game.id, game);
+        for (const game of removedGames) if (!this.games.has(game.id)) this.games.set(game.id, game);
         throw err;
       }
-      const failed = removed.filter(id => !this.removeSnapshot(id));
-      if (failed.length > 0) {
-        // 快照删不掉就不算真正删除：恢复内存并重写快照，调用方下一轮再试。
-        for (const id of failed) {
-          const game = removedGames.find(candidate => candidate.id === id);
-          if (!game) continue;
-          this.games.set(id, game);
-          try { this.writeSnapshot(game); } catch { /* 保留内存状态 */ }
+      const removed: string[] = [];
+      for (const game of removedGames) {
+        if (await this.removeSnapshot(game.id)) removed.push(game.id);
+        else {
+          this.games.set(game.id, game);
+          try { await this.writeSnapshot(game.id, this.snapshotJson(game)); } catch { /* 保留内存状态。 */ }
         }
-        try { this.flushNow(); } catch (err) { logger.error('恢复未删除对局的 games.json 失败', err); }
-        return removed.filter(id => !failed.includes(id));
       }
-    }
-    return removed;
+      if (removed.length !== removedGames.length) {
+        try { await this.writeFullState(this.fullStateJson()); } catch (err) { logger.error('恢复未删除对局的 games.json 失败', err); }
+      }
+      return removed;
+    });
   }
 
-  private archiveGame(game: GameState): boolean {
+  private async archiveGame(game: GameState): Promise<boolean> {
     const file = this.persistenceFile();
     if (!file) return false;
     const dir = join(dirname(file), 'archive');
-    const safeId = game.id.replace(/[^\w.-]/g, '_');
+    const json = `${JSON.stringify({ archivedAt: new Date().toISOString(), game })}\n`;
     try {
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, `${safeId}.json`), `${JSON.stringify({
-        archivedAt: new Date().toISOString(),
-        game,
-      }, null, 2)}\n`);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, `${safeGameId(game.id)}.json`), json);
       return true;
     } catch (err) {
       logger.error(`归档对局失败 ${game.id}`, err);

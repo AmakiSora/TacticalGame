@@ -25,12 +25,14 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 - **单副本**：状态与 SSE 均为进程内，勿引入多副本/负载均衡。
 - **`skill/` 是规范源**：服务器经 `/api/skill/files/:name` 提供，agent 应始终从服务器拉取；仓库内不维护 IDE 本地拷贝目录。
 - gitignored 勿提交：`runtime/`、`deploy/logs/`、`.env*`、`rl/models/`、`temp/`、`arena/details/`、根目录临时 `*.json`。
+- **榜单重算需 `rl/models`**：`npm run arena-leaderboard` / `npm run arena-stats` 在没有模型文件的机器上重算，会把标准模式 25 个 RL 模型整段抹掉（`matches.jsonl` 每行一条 unknown participant 警告，三万多条、榜单变空）；无模型时只提交 `arena/matches.jsonl`，两个榜单 JSON 保持旧版，等有模型的机器再重算。
 - **版本号由当前分支决定**：`release/x.y.z` 分支上版本必须等于 `x.y.z`，新建 release 分支后先 `npm run version x.y.z` 对齐（脚本会同步 package.json/README/skill 等全部引用处）；feature 等开发分支不主动 bump 版本。交付前可 `npm run check-version` 校验一致性。
 - **发版日志**：`RELEASE_NOTES.md` 按 [docs/RELEASE_NOTES_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写；只写相对上一个已发布版本的对外变化，每条 1-2 句、细节链接专题文档，测试结果每版汇总一次。`## x.y.z` 标题格式不可改，bump 脚本依赖它插入占位小节。
 - **算法日志与 RL 日志不要漏**：算法改动（新增 / 升版 / 标定 / 评估口径）必须同步 [algorithms/docs/RELEASE_NOTES.md](algorithms/docs/RELEASE_NOTES.md)；`rl/` 改动（训练环境、模型接口、模型参评口径）必须同步 [rl/docs/RELEASE_NOTES.md](rl/docs/RELEASE_NOTES.md)。两份各按文件内既有格式追加，根 `RELEASE_NOTES.md` 不能替代它们。
 - 分支：发布用 `release/x.y.z`，中文 conventional commits。
 - **提交与推送必须先经用户明确同意**：只有用户明确说出「提交」「推送」「commit」「push」或等价指令时，才可执行 `git commit` / `git push`（含 amend、force push、新建分支后顺手推送）。改完代码 / 文档先把改动与验证结果汇报给用户，待确认后再提交；用户未发话时改动一律留在工作区。
 - **Windows `/tmp` 陷阱**：Git Bash 的 `/tmp` 是 `AppData\Local\Temp`，node 却把 `/tmp/x` 解析成 `C:\tmp\x`（旧会话残留处），`curl > /tmp/a.json` 后 node 读它会拿到陈旧数据，看似服务端状态交替。快照用 `curl | node` 管道直读；落盘用 `temp/` 相对路径或 `C:/` 绝对路径，读回前校验 gameId。
+- **Windows 控制台编码**：`deploy/` 的部署脚本往 GBK 控制台打印 docker 构建输出的「✓」会 `UnicodeEncodeError` 并中断 SSH（构建中途挂掉，不是服务问题）；带 `PYTHONIOENCODING=utf-8` 重跑即可，构建缓存已热。
 
 ## 玩游戏（agent 对战）
 

@@ -17,18 +17,18 @@ afterEach(() => {
 });
 
 describe('game retention', () => {
-  it('archives and removes an inactive lobby but keeps active games', () => {
+  it('archives and removes an inactive lobby but keeps active games', async () => {
     const file = tempFile();
     const store = new GameStore({ persistenceFile: file });
     const lobby = createInitialGame('old-lobby');
     lobby.phase = 'lobby';
-    store.save(lobby);
+    await store.save(lobby);
     const active = createInitialGame('active-game');
-    store.save(active);
+    await store.save(active);
 
     lobby.lastActivityAt = 0;
     active.lastActivityAt = 0;
-    const removed = store.pruneInactive({ lobbyTtlMs: 1, gameOverTtlMs: 1, now: Date.now() });
+    const removed = await store.pruneInactive({ lobbyTtlMs: 1, gameOverTtlMs: 1, now: Date.now() });
 
     expect(removed).toEqual(['old-lobby']);
     expect(store.get('old-lobby')).toBeUndefined();
@@ -36,47 +36,74 @@ describe('game retention', () => {
     expect(existsSync(join(tempDir!, 'archive', 'old-lobby.json'))).toBe(true);
   });
 
-  it('keeps pruned games in memory when the consistency flush fails', () => {
+  it('keeps pruned games in memory when the consistency flush fails', async () => {
     const file = tempFile();
     const store = new GameStore({ persistenceFile: file });
     const lobby = createInitialGame('prune-flush-failure');
     lobby.phase = 'lobby';
-    store.save(lobby);
+    await store.save(lobby);
     lobby.lastActivityAt = 0;
-    // 归档删除走的是同步 flushNow（3.8.9 起 flush 变成去抖调度，不再抛写盘错误）。
-    const flush = vi.spyOn(store, 'flushNow').mockImplementation(() => {
-      throw new Error('disk full');
-    });
+    const flush = vi.spyOn(store as unknown as { writeFullState(json: string): Promise<void> }, 'writeFullState')
+      .mockRejectedValue(new Error('disk full'));
     try {
-      expect(() => store.pruneInactive({ lobbyTtlMs: 1, gameOverTtlMs: 1, now: Date.now() })).toThrow();
+      await expect(store.pruneInactive({ lobbyTtlMs: 1, gameOverTtlMs: 1, now: Date.now() })).rejects.toThrow('disk full');
       expect(store.get('prune-flush-failure')).toBeDefined();
     } finally {
       flush.mockRestore();
     }
   });
 
-  it('keeps a game when snapshot removal fails during delete', () => {
+  it('keeps a game when snapshot removal fails during delete', async () => {
     const file = tempFile();
     const store = new GameStore({ persistenceFile: file });
     const game = createInitialGame('delete-snapshot-failure');
-    store.save(game);
-    const remove = vi.spyOn(store as unknown as { removeSnapshot: (id: string) => boolean }, 'removeSnapshot')
-      .mockReturnValue(false);
+    await store.save(game);
+    const remove = vi.spyOn(store as unknown as { removeSnapshot: (id: string) => Promise<boolean> }, 'removeSnapshot')
+      .mockResolvedValue(false);
     try {
-      expect(() => store.delete('delete-snapshot-failure')).toThrow(/failed to remove snapshot/);
+      await expect(store.delete('delete-snapshot-failure')).rejects.toThrow(/failed to remove snapshot/);
       expect(store.get('delete-snapshot-failure')).toBeDefined();
     } finally {
       remove.mockRestore();
     }
   });
 
-  it('refreshes lastActivityAt only on writes', () => {
+  it.each([false, true])('handles an export queued during archival (reactivated=%s)', async reactivated => {
+    const file = tempFile();
+    const store = new GameStore({ persistenceFile: file });
+    const game = createInitialGame('archiving');
+    game.phase = 'lobby';
+    await store.save(game);
+    game.lastActivityAt = 0;
+    const entered = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<boolean>();
+    const archive = vi.spyOn(store as unknown as { archiveGame(): Promise<boolean> }, 'archiveGame')
+      .mockImplementationOnce(() => { entered.resolve(); return gate.promise; });
+    const pruned = store.pruneInactive({ lobbyTtlMs: 1, gameOverTtlMs: 1 });
+    await entered.promise;
+    const persisted = reactivated ? store.persist(game) : Promise.resolve();
+    const exported = store.flushNow();
+    try {
+      gate.resolve(true);
+      expect(await pruned).toEqual(reactivated ? [] : [game.id]);
+      await Promise.all([persisted, exported]);
+      const restored = new GameStore({ persistenceFile: file });
+      await restored.loadFromDisk();
+      expect(restored.list()).toEqual(reactivated ? [game.id] : []);
+    } finally {
+      gate.resolve(true);
+      await store.drain();
+      archive.mockRestore();
+    }
+  });
+
+  it('refreshes lastActivityAt only on writes', async () => {
     const file = tempFile();
     const store = new GameStore({ persistenceFile: file });
     const game = createInitialGame('activity');
-    store.save(game);
+    await store.save(game);
     game.lastActivityAt = 0;
-    store.persist(game);
+    await store.persist(game);
     expect(game.lastActivityAt).toBeGreaterThan(0);
   });
 });

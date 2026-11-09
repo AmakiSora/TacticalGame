@@ -80,6 +80,9 @@ describe('host seat assignment', () => {
     expect(lobby.seats.map(seat => seat.seat)).toEqual([1, 2, 3]);
     // 未编排时出生点还没定，不能把开局才随机出来的结果当成既成事实。
     expect(lobby.seats.map(seat => seat.spawnSlotId)).toEqual([null, null, null]);
+    // 先手同理：random 态开局由服务端重洗座位并随机抽起点，这里恒 0 只表示「还没定」，
+    // 前端不能拿它去标人（否则大厅说 1 号先手、开局却是别人）。
+    expect(lobby.firstSeat).toBe(0);
     // R2：候选出生位顺序始终给出（前端草稿预览按 layoutSlots[i] + slot.id 匹配）；
     // 它是 layouts['3'] = [slot_1, slot_3, slot_5] 这种跳位子集，不是 spawnSlots 的前 3 个。
     expect(lobby.layoutSlots).toEqual(slots);

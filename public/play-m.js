@@ -3190,6 +3190,24 @@ async function flushSeatSync() {
   handleSeatOutcome(outcome, seq);
 }
 
+/**
+ * 开局前先把还没发出去的座位意图落库：点击到 flush 之间有 180ms 合并窗口，
+ * 这期间点「开始游戏」会让服务端拿旧座位表（含旧先手）开局，与大厅刚显示的顺序对不上。
+ * 返回 false = 超时仍没同步完，调用方应中止开始，避免开局结果和界面不一致。
+ */
+async function flushSeatIntentBeforeStart(timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  while (seatSync.desired && Date.now() < deadline) {
+    clearTimeout(seatSync.timer);
+    seatSync.timer = null;
+    if (seatSync.inFlight) await seatSleep(40);
+    else await flushSeatSync();
+    // flush 被门槛挡掉（已停机 / 不在大厅期）时不会清 desired：让出一次事件循环，别空转。
+    if (seatSync.desired) await seatSleep(40);
+  }
+  return !seatSync.desired;
+}
+
 /** 结果处理：成功收敛 / rebase 后补发 / 各类失败回滚。 */
 function handleSeatOutcome(outcome, seq) {
   const lobby = latestLobby;
@@ -3297,6 +3315,8 @@ function isSimultaneousLobby(lobby) {
  * 当前生效的先手，口径是**座位下标**而不是人：草稿态用草稿的先手下标，否则用服务端 firstSeat。
  * 座位重排时 moveSeatRow() 会让先手下标跟着那个人一起挪，所以「下标 → 人」的对应关系
  * 始终由这里的下标现算，地图「先手」角标与座位列表用的是同一个答案。
+ * 注意：未编排（random 且无草稿）时服务端 firstSeat 恒 0、先手其实还没定——调用方必须先确认
+ * 「已编排」再来标人，否则会把 1 号座位误标成先手（开局会被重新随机抽起点）。
  * 同时回合 / 大逃杀没有先手，恒返回 0（该模式下调用方也不再渲染任何先手标记）。
  */
 function currentFirstSeat(lobby) {
@@ -3391,7 +3411,9 @@ function seatPlanMarkup(lobby, canManage, canKick = canManage) {
   const rowMarkup = (player, index) => {
     const slotId = arranged ? (slots[index] || seats[index]?.spawnSlotId || null) : null;
     // 同时模式没有先手：行高亮、按钮选中态一律不出现。
-    const first = !simultaneous && index === firstSeat;
+    // 顺序模式里先手也只在「已编排」时有确定答案：random 态开局由服务端重洗座位并随机抽起点
+    //（store.initializeLobbyGame），座位表里的 1 号只是加入顺序，提前标成先手会和真正的开局先手对不上。
+    const first = !simultaneous && arranged && index === firstSeat;
     const isSelf = player.id === myPlayer;
     const classes = ['lobby-seat-row'];
     if (first) classes.push('is-first');
@@ -3433,7 +3455,7 @@ function seatPlanMarkup(lobby, canManage, canKick = canManage) {
       ? simultaneous
         ? ` · 结算序第 ${mySeat + 1} 位`
         : ` · 第 ${((mySeat - firstSeat + rows.length) % rows.length) + 1} 顺位`
-      : ' · 出生点开局随机'}</div>`
+      : simultaneous ? ' · 出生点开局随机' : ' · 出生点与先手开局随机'}</div>`
     : '';
   const addBotRow = canAddBot
     ? `<button type="button" class="lobby-seat-add-bot lobby-add-bot" data-add-bot="1" title="添加强化学习 AI"><span class="ui-icon icon-plus" aria-hidden="true"></span><span>添加 AI</span></button>`
@@ -4529,6 +4551,8 @@ async function startHostedGame() {
   if (hostLobbySnapshot && hostLobbySnapshot.phase !== 'lobby') {
     return toast(hostLobbySnapshot.phase === 'game_over' ? '对局已结束，不能再次开始' : '对局已经开始', 'err');
   }
+  // 座位改动还在合并窗口 / 飞行中时先等它落库，否则开局用的是服务端旧座位表（先手也会是旧的那位）。
+  if (!(await flushSeatIntentBeforeStart())) return toast('座位还没同步完成，请稍后再开始', 'err');
   const res = await fetch(`/api/games/${gameId}/start`, {
     method: 'POST',
     headers: { 'X-Host-Token': hostToken },

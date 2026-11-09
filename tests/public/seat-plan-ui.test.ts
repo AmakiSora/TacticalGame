@@ -267,6 +267,35 @@ describe('seat list: mode semantics (V6-9)', () => {
     }
   }
 
+  for (const path of CLIENTS) {
+    /**
+     * 未编排（seatMode='random' 且无草稿）时先手还没定：服务端开局会重洗座位并随机抽起点
+     *（store.initializeLobbyGame），座位表里的 1 号只是加入顺序。大厅若标成先手，开局后
+     * 常常不是同一个人——这是用户报的「大厅说 X 先手，开局却是别人」。
+     */
+    it(`marks no first seat before the host arranges seats (${path})`, () => {
+      const ui = harness(path);
+      const html = ui.seatPlanMarkup(seatsLobby({ seatMode: 'random' }), true);
+      expect(html).not.toContain('lobby-seat-row is-first');
+      expect(html).not.toContain('lobby-seat-first is-first');
+      expect(html).not.toContain('>先手</button>');
+      // 每行都给「设为先手」：点一下就把当前顺序钉成编排，先手随之确定。
+      expect((html.match(/设为先手/g) ?? []).length).toBe(3);
+      expect(html).toContain('data-seat-first="0"');
+    });
+
+    it(`marks the drafted first seat as soon as the host chooses one (${path})`, () => {
+      const ui = harness(path);
+      const rows = ['player_a', 'player_b', 'player_c'].map(id => ({ id, name: id }));
+      ui.setDraft(rows, 1);
+      const html = ui.seatPlanMarkup(seatsLobby({ seatMode: 'random' }), true);
+      // 草稿态：第 2 行就是先手，按钮变成不可点的「先手」。
+      expect(html).toContain('data-seat-first="1"');
+      expect(html).toContain('lobby-seat-first is-first');
+      expect((html.match(/lobby-seat-row is-first/g) ?? []).length).toBe(1);
+    });
+  }
+
   it('drops the seat list header copy but keeps the empty-state hint', () => {
     for (const path of CLIENTS) {
       const ui = harness(path);

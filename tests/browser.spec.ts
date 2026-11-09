@@ -51,6 +51,13 @@ async function joinRoom(request: APIRequestContext, room: Room) {
   return joined;
 }
 
+/** 只加入、不编排座位：座位表停在 random 态（大厅不该标先手，点「设为先手」才落库）。 */
+async function joinRoomUnarranged(request: APIRequestContext, room: Room) {
+  const response = await request.post(`/api/games/${room.gameId}/join`, { data: { name: 'E2E 对手' } });
+  expect(response.ok()).toBe(true);
+  return (await response.json()) as { player: { id: string; token: string } };
+}
+
 async function setHidden(page: Page, hidden: boolean) {
   await page.evaluate(value => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => value });
@@ -158,6 +165,32 @@ test('auto-follow updates the selected room label and adjudication availability'
   await expect(page.locator(isMobile ? '#game-picker-label' : '#picker-current-body')).toContainText(next.gameId.slice(0, 8));
   await expect(page.locator('#force-adjudicate')).toBeEnabled();
   await expect(page.locator('#board')).toBeVisible();
+});
+
+test('starts with the seat chosen in the lobby even when the seat sync is slow', async ({ page, request }) => {
+  const room = await createRoomInBrowser(page);
+  const second = await joinRoomUnarranged(request, room);
+  // 座位编排的 PUT 故意慢：客户端必须先等它落库再发「开始」，否则服务端会用旧座位表开局。
+  await page.route(`**/api/games/${room.gameId}/host/seats`, async route => {
+    await new Promise(resolve => setTimeout(resolve, 600));
+    await route.continue();
+  });
+  const requests: string[] = [];
+  page.on('request', item => {
+    const url = item.url();
+    if (url.endsWith(`/api/games/${room.gameId}/host/seats`)) requests.push('seats');
+    if (url.endsWith(`/api/games/${room.gameId}/start`)) requests.push('start');
+  });
+  await expect(page.locator('.lobby-seat-row')).toHaveCount(2);
+  await expect(page.locator('#btn-start-game')).toBeEnabled();
+  await page.locator('[data-seat-first="1"]').click();
+  await page.locator('#btn-start-game').click();
+  await expect(page.locator('#board')).toBeVisible();
+  expect(requests.slice(0, 2)).toEqual(['seats', 'start']);
+  const stateResponse = await request.get(`/api/games/${room.gameId}`, { headers: { 'x-player-token': room.player.token } });
+  expect(stateResponse.ok()).toBe(true);
+  const state = await stateResponse.json();
+  expect(state.turn.currentPlayerId).toBe(second.player.id);
 });
 
 test('keeps an idle board asleep and wakes it after a game event', async ({ page, request }) => {

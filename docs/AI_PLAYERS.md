@@ -51,7 +51,7 @@ python rl/evaluate.py --model rl/models/model.zip
 
 **算法按对局模式注册，不同模式不能混用**：每个算法在注册表（`algorithms/registry.mjs` 的 `ALGORITHM_META.modes`）声明支持的模式，大厅添加、命令行运行器与竞技场评估都会按此校验；前端「算法类型」下拉只列出当前对局模式可用的算法。
 
-**参赛人数也是注册表能力**：`ALGORITHM_META.playerCounts` 决定算法能否进入三人竞技场。3.9.2 起，标准模式的 7 个算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）、歼灭模式的 5 个算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）与同时回合模式的 8 个算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）声明 `[2, 3]`，可跑三人批；3.9.3 起大逃杀的 4 个算法（`random-royale` / `echelon` / `apex` / `ark`）也声明 `[2, 3]`，四种模式全部有三人分榜。三人批只收本模式声明 3 人的算法，RL 模型是单对手观测编码，不参评。
+**参赛人数也是注册表能力**：`ALGORITHM_META.playerCounts` 决定算法能否进入三人竞技场。3.9.2 起，标准模式的 7 个算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）、歼灭模式的 5 个算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）与同时回合模式的 8 个算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）声明 `[2, 3]`，可跑三人批；3.9.3 起大逃杀的算法（`random-royale` / `echelon` / `apex` / `ark`，3.9.9 起加上 `bastion`，现共 5 个）也声明 `[2, 3]`，四种模式全部有三人分榜。三人批只收本模式声明 3 人的算法，RL 模型是单对手观测编码，不参评。
 
 当前内置算法（未标注者为标准模式）。每条只写定位，实测战绩与评分以 `/arena.html` 榜单为准，实现细节见各自档案：
 
@@ -66,6 +66,7 @@ python rl/evaluate.py --model rl/models/model.zip
 - **雁阵算法（Echelon，仅大逃杀模式）**：逐拍效用决策——敌军落点扩散预报、精确击杀概率与集火、炮火圈生存调度、爆破距离场开路（重装拆墙进入被隔断的安全区）。[档案](../algorithms/docs/algorithms/echelon.md) · [设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#echelon雁阵算法)
 - **绝境算法（Apex，仅大逃杀模式）**：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验。[档案](../algorithms/docs/algorithms/apex.md)
 - **方舟算法（Ark，仅大逃杀模式）**：安全格容量匹配分配互不相同的避难位置，按行动点竞价单/两动作组合，并按缩圈与疏散负担评估增援。[档案](../algorithms/docs/algorithms/ark.md) · [设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#ark方舟算法)
+- **堡垒算法（Bastion，仅大逃杀模式）**：逐行动点束搜索规划整轮，位置价值同时计价「存活」与「进攻覆盖」，叠加敌方威胁场、接敌梯度与集火斩杀，终局逐步重放剔除非法动作。[档案](../algorithms/docs/algorithms/bastion.md) · [设计与评估](../algorithms/docs/ALGORITHMS_NOTES.md#bastion堡垒算法)
 - **蒙特卡洛树搜索（MCTS）**：UCB1 选择 + 定次模拟推演的通用搜索，移动采样偏向 `movementGoal`，支持据点占领与入口部署。[档案](../algorithms/docs/algorithms/mcts.md)
 - **威胁感知算法（Threat）**：效用 AI + 威胁影响图，把攻击/治疗/移动/部署/爆破换算到同一效用尺度逐步选最优，无需搜索或模拟。[档案](../algorithms/docs/algorithms/threat.md)
 - **势场算法（Field）**：人工势场——斥力井 + 引力井 + 波前距离场塑形走位，无需搜索。[档案](../algorithms/docs/algorithms/field.md)
@@ -111,7 +112,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, crucible, sovereign, random-royale, echelon, apex, ark, mcts, threat, field, verdict, parallax, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
+| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, crucible, sovereign, random-royale, echelon, apex, ark, bastion, mcts, threat, field, verdict, parallax, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |

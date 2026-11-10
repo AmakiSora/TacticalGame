@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-07T09:43:00.968Z",
+  "generatedAt": "2026-11-10T09:33:22.305Z",
   "ratingMethod": {
     "model": "Bradley-Terry MLE (MM iteration), draw = 0.5 win",
     "scope": "per game mode; modes are never pooled together",
@@ -10,8 +10,8 @@
   },
   "source": {
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
-    "matchCount": 51163,
-    "multiplayerMatchCount": 5976,
+    "matchCount": 51691,
+    "multiplayerMatchCount": 6264,
     "retiredMatchesDropped": 0,
     "mapDist": {
       "artillery-zone": 240,
@@ -19,15 +19,16 @@
       "danger-close": 7806,
       "default": 7806,
       "dual-lanes": 7801,
+      "mirror-lake": 240,
       "mistpine": 672,
       "molten-throne": 672,
       "multiplayer-ring": 7802,
-      "narrow-road": 144,
+      "narrow-road": 240,
       "random": 7801,
       "random-annihilation": 240,
-      "random-royale": 144,
+      "random-royale": 240,
       "random-simultaneous": 672,
-      "snowflake": 144,
+      "snowflake": 240,
       "standoff": 672,
       "trench-run": 240,
       "whirlpool": 504
@@ -36,11 +37,11 @@
       "standard": 47323,
       "annihilation": 720,
       "simultaneous": 2688,
-      "royale": 432
+      "royale": 960
     },
     "targetGamesPerPair": 24,
     "dateMin": "2026-10-30 14:58:27",
-    "dateMax": "2026-11-01 01:52:36"
+    "dateMax": "2026-11-10 17:10:57"
   },
   "registry": {
     "hex_ppo_v2.0.0_20260824_500K.zip": {
@@ -759,6 +760,22 @@
       "algorithm": "ark",
       "version": "v1",
       "description": "大逃杀：独立安全格容量分配、行动组合调度与缩圈增援负担评估",
+      "modes": [
+        "royale"
+      ],
+      "playerCounts": [
+        2,
+        3
+      ],
+      "status": "builtin",
+      "statusNote": null
+    },
+    "algo_bastion@v1": {
+      "kind": "algorithm",
+      "short": "堡垒算法",
+      "algorithm": "bastion",
+      "version": "v1",
+      "description": "大逃杀：击杀价值与位置安全的效用权衡，威胁暴露与缩圈炮火约束下的逐拍规划",
       "modes": [
         "royale"
       ],
@@ -67431,260 +67448,382 @@
     {
       "id": "royale",
       "label": "大逃杀",
-      "games": 432,
+      "games": 960,
       "maps": {
         "all": {
           "overview": {
-            "games": 432,
-            "pairCount": 6,
-            "draws": 22,
-            "drawRate": 0.0509,
-            "avgRounds": 16.7,
-            "firstSeatWinRate": 0.4931
+            "games": 960,
+            "pairCount": 10,
+            "draws": 28,
+            "drawRate": 0.0292,
+            "avgRounds": 15.55,
+            "firstSeatWinRate": 0.4979
           },
           "models": [
             {
               "id": "algo_apex@v1",
-              "rating": 1974,
-              "ratingLo": 1860,
-              "ratingHi": 1936,
-              "wilson": 0.8242,
-              "games": 216,
-              "wins": 179,
-              "losses": 17,
-              "draws": 20,
-              "winRate": 0.8287,
+              "rating": 2009,
+              "ratingLo": 1900,
+              "ratingHi": 1973,
+              "wilson": 0.8773,
+              "games": 384,
+              "wins": 339,
+              "losses": 24,
+              "draws": 21,
+              "winRate": 0.8828,
               "firstSeat": {
-                "games": 108,
-                "winRate": 0.8426
+                "games": 192,
+                "winRate": 0.9063
               },
               "secondSeat": {
-                "games": 108,
-                "winRate": 0.8148
+                "games": 192,
+                "winRate": 0.8594
               },
-              "avgRounds": 18.03,
-              "avgDecisionMs": 27.05,
+              "avgRounds": 16.08,
+              "avgDecisionMs": 32.28,
               "vs": {
                 "algo_ark@v1": {
-                  "games": 72,
-                  "wins": 42,
+                  "games": 96,
+                  "wins": 66,
                   "draws": 15,
-                  "winRate": 0.6875
+                  "winRate": 0.7656
                 },
                 "algo_echelon@v1": {
-                  "games": 72,
-                  "wins": 65,
+                  "games": 96,
+                  "wins": 89,
                   "draws": 5,
-                  "winRate": 0.9375
+                  "winRate": 0.9531
                 },
                 "algo_random-royale@v1": {
-                  "games": 72,
-                  "wins": 72,
+                  "games": 96,
+                  "wins": 96,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_bastion@v1": {
+                  "games": 96,
+                  "wins": 88,
+                  "draws": 1,
+                  "winRate": 0.9219
                 }
               },
               "perMap": {
                 "narrow-road": {
-                  "games": 72,
-                  "wins": 48,
+                  "games": 96,
+                  "wins": 72,
                   "draws": 12,
-                  "winRate": 0.75
+                  "winRate": 0.8125
                 },
                 "random-royale": {
-                  "games": 72,
-                  "wins": 60,
-                  "draws": 8,
-                  "winRate": 0.8889
+                  "games": 96,
+                  "wins": 83,
+                  "draws": 9,
+                  "winRate": 0.9115
                 },
                 "snowflake": {
-                  "games": 72,
-                  "wins": 71,
+                  "games": 96,
+                  "wins": 88,
                   "draws": 0,
-                  "winRate": 0.9861
+                  "winRate": 0.9167
+                },
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 96,
+                  "draws": 0,
+                  "winRate": 1
                 }
               }
             },
             {
               "id": "algo_ark@v1",
-              "rating": 1866,
-              "ratingLo": 1766,
-              "ratingHi": 1824,
-              "wilson": 0.7005,
-              "games": 216,
-              "wins": 156,
-              "losses": 43,
+              "rating": 1850,
+              "ratingLo": 1765,
+              "ratingHi": 1816,
+              "wilson": 0.7276,
+              "games": 384,
+              "wins": 288,
+              "losses": 79,
               "draws": 17,
-              "winRate": 0.7222,
+              "winRate": 0.75,
               "firstSeat": {
-                "games": 108,
-                "winRate": 0.7778
+                "games": 192,
+                "winRate": 0.8125
               },
               "secondSeat": {
-                "games": 108,
-                "winRate": 0.6667
+                "games": 192,
+                "winRate": 0.6875
               },
-              "avgRounds": 17.08,
-              "avgDecisionMs": 5.41,
+              "avgRounds": 14.92,
+              "avgDecisionMs": 6.58,
               "vs": {
                 "algo_echelon@v1": {
-                  "games": 72,
-                  "wins": 69,
+                  "games": 96,
+                  "wins": 93,
                   "draws": 2,
-                  "winRate": 0.9722
+                  "winRate": 0.9792
                 },
                 "algo_apex@v1": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 15,
                   "draws": 15,
-                  "winRate": 0.3125
+                  "winRate": 0.2344
                 },
                 "algo_random-royale@v1": {
-                  "games": 72,
-                  "wins": 72,
+                  "games": 96,
+                  "wins": 96,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_bastion@v1": {
+                  "games": 96,
+                  "wins": 84,
+                  "draws": 0,
+                  "winRate": 0.875
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 72,
-                  "wins": 47,
+                  "games": 96,
+                  "wins": 71,
                   "draws": 5,
-                  "winRate": 0.6875
+                  "winRate": 0.7656
                 },
                 "narrow-road": {
-                  "games": 72,
-                  "wins": 60,
+                  "games": 96,
+                  "wins": 72,
                   "draws": 12,
-                  "winRate": 0.9167
+                  "winRate": 0.8125
                 },
                 "snowflake": {
-                  "games": 72,
-                  "wins": 49,
+                  "games": 96,
+                  "wins": 73,
                   "draws": 0,
-                  "winRate": 0.6806
+                  "winRate": 0.7604
+                },
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 72,
+                  "draws": 0,
+                  "winRate": 0.75
+                }
+              }
+            },
+            {
+              "id": "algo_bastion@v1",
+              "rating": 1537,
+              "ratingLo": 1483,
+              "ratingHi": 1539,
+              "wilson": 0.4245,
+              "games": 384,
+              "wins": 179,
+              "losses": 199,
+              "draws": 6,
+              "winRate": 0.4661,
+              "firstSeat": {
+                "games": 192,
+                "winRate": 0.4792
+              },
+              "secondSeat": {
+                "games": 192,
+                "winRate": 0.4531
+              },
+              "avgRounds": 15.5,
+              "avgDecisionMs": 13.54,
+              "vs": {
+                "algo_echelon@v1": {
+                  "games": 96,
+                  "wins": 65,
+                  "draws": 5,
+                  "winRate": 0.7031
+                },
+                "algo_ark@v1": {
+                  "games": 96,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.125
+                },
+                "algo_random-royale@v1": {
+                  "games": 96,
+                  "wins": 95,
+                  "draws": 0,
+                  "winRate": 0.9896
+                },
+                "algo_apex@v1": {
+                  "games": 96,
+                  "wins": 7,
+                  "draws": 1,
+                  "winRate": 0.0781
+                }
+              },
+              "perMap": {
+                "narrow-road": {
+                  "games": 96,
+                  "wins": 47,
+                  "draws": 0,
+                  "winRate": 0.4896
+                },
+                "random-royale": {
+                  "games": 96,
+                  "wins": 29,
+                  "draws": 6,
+                  "winRate": 0.3333
+                },
+                "snowflake": {
+                  "games": 96,
+                  "wins": 55,
+                  "draws": 0,
+                  "winRate": 0.5729
+                },
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 0.5
                 }
               }
             },
             {
               "id": "algo_echelon@v1",
-              "rating": 1426,
-              "ratingLo": 1376,
-              "ratingHi": 1439,
-              "wilson": 0.3022,
-              "games": 216,
-              "wins": 75,
-              "losses": 134,
-              "draws": 7,
-              "winRate": 0.3472,
+              "rating": 1389,
+              "ratingLo": 1351,
+              "ratingHi": 1405,
+              "wilson": 0.2955,
+              "games": 384,
+              "wins": 125,
+              "losses": 247,
+              "draws": 12,
+              "winRate": 0.3255,
               "firstSeat": {
-                "games": 108,
-                "winRate": 0.3519
+                "games": 192,
+                "winRate": 0.2917
               },
               "secondSeat": {
-                "games": 108,
-                "winRate": 0.3426
+                "games": 192,
+                "winRate": 0.3594
               },
-              "avgRounds": 18.33,
-              "avgDecisionMs": 4.07,
+              "avgRounds": 18.17,
+              "avgDecisionMs": 5.23,
               "vs": {
                 "algo_ark@v1": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 1,
                   "draws": 2,
-                  "winRate": 0.0278
+                  "winRate": 0.0208
                 },
                 "algo_apex@v1": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 2,
                   "draws": 5,
-                  "winRate": 0.0625
+                  "winRate": 0.0469
                 },
                 "algo_random-royale@v1": {
-                  "games": 72,
-                  "wins": 72,
+                  "games": 96,
+                  "wins": 96,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_bastion@v1": {
+                  "games": 96,
+                  "wins": 26,
+                  "draws": 5,
+                  "winRate": 0.2969
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 72,
-                  "wins": 27,
-                  "draws": 7,
-                  "winRate": 0.4236
+                  "games": 96,
+                  "wins": 41,
+                  "draws": 12,
+                  "winRate": 0.4896
                 },
                 "narrow-road": {
-                  "games": 72,
-                  "wins": 24,
+                  "games": 96,
+                  "wins": 36,
                   "draws": 0,
-                  "winRate": 0.3333
+                  "winRate": 0.375
                 },
                 "snowflake": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 24,
                   "draws": 0,
-                  "winRate": 0.3333
+                  "winRate": 0.25
+                },
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 0.25
                 }
               }
             },
             {
               "id": "algo_random-royale@v1",
-              "rating": 734,
-              "ratingLo": 876,
-              "ratingHi": 921,
-              "wilson": 0,
-              "games": 216,
-              "wins": 0,
-              "losses": 216,
+              "rating": 715,
+              "ratingLo": 857,
+              "ratingHi": 924,
+              "wilson": 0.0005,
+              "games": 384,
+              "wins": 1,
+              "losses": 383,
               "draws": 0,
-              "winRate": 0,
+              "winRate": 0.0026,
               "firstSeat": {
-                "games": 108,
+                "games": 192,
                 "winRate": 0
               },
               "secondSeat": {
-                "games": 108,
-                "winRate": 0
+                "games": 192,
+                "winRate": 0.0052
               },
-              "avgRounds": 13.35,
-              "avgDecisionMs": 2.3,
+              "avgRounds": 13.09,
+              "avgDecisionMs": 2.32,
               "vs": {
                 "algo_echelon@v1": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "algo_apex@v1": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "algo_ark@v1": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_bastion@v1": {
+                  "games": 96,
+                  "wins": 1,
+                  "draws": 0,
+                  "winRate": 0.0104
                 }
               },
               "perMap": {
                 "snowflake": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
                 "narrow-road": {
-                  "games": 72,
+                  "games": 96,
+                  "wins": 1,
+                  "draws": 0,
+                  "winRate": 0.0104
+                },
+                "random-royale": {
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
                 },
-                "random-royale": {
-                  "games": 72,
+                "mirror-lake": {
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -67696,30 +67835,456 @@
             {
               "a": "algo_apex@v1",
               "b": "algo_ark@v1",
-              "games": 72,
-              "aWins": 42,
+              "games": 96,
+              "aWins": 66,
               "bWins": 15,
               "draws": 15,
-              "aFirstWinRate": 0.6111,
-              "aSecondWinRate": 0.5556,
-              "aSeatSwing": 0.0556
+              "aFirstWinRate": 0.7083,
+              "aSecondWinRate": 0.6667,
+              "aSeatSwing": 0.0417
             },
             {
               "a": "algo_apex@v1",
               "b": "algo_echelon@v1",
-              "games": 72,
-              "aWins": 65,
+              "games": 96,
+              "aWins": 89,
               "bWins": 2,
               "draws": 5,
-              "aFirstWinRate": 0.9167,
-              "aSecondWinRate": 0.8889,
-              "aSeatSwing": 0.0278
+              "aFirstWinRate": 0.9375,
+              "aSecondWinRate": 0.9167,
+              "aSeatSwing": 0.0208
             },
             {
               "a": "algo_apex@v1",
               "b": "algo_random-royale@v1",
-              "games": 72,
-              "aWins": 72,
+              "games": 96,
+              "aWins": 96,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_bastion@v1",
+              "games": 96,
+              "aWins": 88,
+              "bWins": 7,
+              "draws": 1,
+              "aFirstWinRate": 0.9792,
+              "aSecondWinRate": 0.8542,
+              "aSeatSwing": 0.125
+            },
+            {
+              "a": "algo_ark@v1",
+              "b": "algo_echelon@v1",
+              "games": 96,
+              "aWins": 93,
+              "bWins": 1,
+              "draws": 2,
+              "aFirstWinRate": 0.9583,
+              "aSecondWinRate": 0.9792,
+              "aSeatSwing": -0.0208
+            },
+            {
+              "a": "algo_ark@v1",
+              "b": "algo_random-royale@v1",
+              "games": 96,
+              "aWins": 96,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_ark@v1",
+              "b": "algo_bastion@v1",
+              "games": 96,
+              "aWins": 84,
+              "bWins": 12,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 0.75,
+              "aSeatSwing": 0.25
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_echelon@v1",
+              "games": 96,
+              "aWins": 65,
+              "bWins": 26,
+              "draws": 5,
+              "aFirstWinRate": 0.5417,
+              "aSecondWinRate": 0.8125,
+              "aSeatSwing": -0.2708
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_random-royale@v1",
+              "games": 96,
+              "aWins": 95,
+              "bWins": 1,
+              "draws": 0,
+              "aFirstWinRate": 0.9792,
+              "aSecondWinRate": 1,
+              "aSeatSwing": -0.0208
+            },
+            {
+              "a": "algo_echelon@v1",
+              "b": "algo_random-royale@v1",
+              "games": 96,
+              "aWins": 96,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            }
+          ]
+        },
+        "mirror-lake": {
+          "overview": {
+            "games": 240,
+            "pairCount": 10,
+            "draws": 0,
+            "drawRate": 0,
+            "avgRounds": 13.07,
+            "firstSeatWinRate": 0.5
+          },
+          "models": [
+            {
+              "id": "algo_apex@v1",
+              "rating": 2331,
+              "ratingLo": 2317,
+              "ratingHi": 2317,
+              "wilson": 0.9615,
+              "games": 96,
+              "wins": 96,
+              "losses": 0,
+              "draws": 0,
+              "winRate": 1,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 1
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 1
+              },
+              "avgRounds": 11.83,
+              "avgDecisionMs": 41,
+              "vs": {
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_ark@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 96,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              }
+            },
+            {
+              "id": "algo_ark@v1",
+              "rating": 1885,
+              "ratingLo": 1883,
+              "ratingHi": 1883,
+              "wilson": 0.6549,
+              "games": 96,
+              "wins": 72,
+              "losses": 24,
+              "draws": 0,
+              "winRate": 0.75,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.75
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.75
+              },
+              "avgRounds": 11.81,
+              "avgDecisionMs": 6.72,
+              "vs": {
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 72,
+                  "draws": 0,
+                  "winRate": 0.75
+                }
+              }
+            },
+            {
+              "id": "algo_bastion@v1",
+              "rating": 1500,
+              "ratingLo": 1504,
+              "ratingHi": 1504,
+              "wilson": 0.4019,
+              "games": 96,
+              "wins": 48,
+              "losses": 48,
+              "draws": 0,
+              "winRate": 0.5,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.5
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.5
+              },
+              "avgRounds": 14.3,
+              "avgDecisionMs": 13.51,
+              "vs": {
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_ark@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 48,
+                  "draws": 0,
+                  "winRate": 0.5
+                }
+              }
+            },
+            {
+              "id": "algo_echelon@v1",
+              "rating": 1115,
+              "ratingLo": 1121,
+              "ratingHi": 1121,
+              "wilson": 0.1741,
+              "games": 96,
+              "wins": 24,
+              "losses": 72,
+              "draws": 0,
+              "winRate": 0.25,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.25
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.25
+              },
+              "avgRounds": 15.23,
+              "avgDecisionMs": 5.7,
+              "vs": {
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_ark@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                }
+              },
+              "perMap": {
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 0.25
+                }
+              }
+            },
+            {
+              "id": "algo_random-royale@v1",
+              "rating": 668,
+              "ratingLo": 674,
+              "ratingHi": 674,
+              "wilson": 0,
+              "games": 96,
+              "wins": 0,
+              "losses": 96,
+              "draws": 0,
+              "winRate": 0,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0
+              },
+              "avgRounds": 12.18,
+              "avgDecisionMs": 2.33,
+              "vs": {
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_ark@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "mirror-lake": {
+                  "games": 96,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              }
+            }
+          ],
+          "h2h": [
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_bastion@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_ark@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_apex@v1",
+              "b": "algo_echelon@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_ark@v1",
+              "b": "algo_bastion@v1",
+              "games": 24,
+              "aWins": 24,
               "bWins": 0,
               "draws": 0,
               "aFirstWinRate": 1,
@@ -67729,19 +68294,41 @@
             {
               "a": "algo_ark@v1",
               "b": "algo_echelon@v1",
-              "games": 72,
-              "aWins": 69,
-              "bWins": 1,
-              "draws": 2,
-              "aFirstWinRate": 0.9444,
-              "aSecondWinRate": 0.9722,
-              "aSeatSwing": -0.0278
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
             },
             {
               "a": "algo_ark@v1",
               "b": "algo_random-royale@v1",
-              "games": 72,
-              "aWins": 72,
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_echelon@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 24,
               "bWins": 0,
               "draws": 0,
               "aFirstWinRate": 1,
@@ -67751,8 +68338,8 @@
             {
               "a": "algo_echelon@v1",
               "b": "algo_random-royale@v1",
-              "games": 72,
-              "aWins": 72,
+              "games": 24,
+              "aWins": 24,
               "bWins": 0,
               "draws": 0,
               "aFirstWinRate": 1,
@@ -67763,35 +68350,35 @@
         },
         "narrow-road": {
           "overview": {
-            "games": 144,
-            "pairCount": 6,
+            "games": 240,
+            "pairCount": 10,
             "draws": 12,
-            "drawRate": 0.0833,
-            "avgRounds": 13.37,
-            "firstSeatWinRate": 0.5
+            "drawRate": 0.05,
+            "avgRounds": 12.66,
+            "firstSeatWinRate": 0.4958
           },
           "models": [
             {
               "id": "algo_apex@v1",
-              "rating": 1830,
-              "ratingLo": 1804,
-              "ratingHi": 1855,
-              "wilson": 0.6391,
-              "games": 72,
-              "wins": 48,
+              "rating": 1790,
+              "ratingLo": 1760,
+              "ratingHi": 1825,
+              "wilson": 0.723,
+              "games": 96,
+              "wins": 72,
               "losses": 12,
               "draws": 12,
-              "winRate": 0.6667,
+              "winRate": 0.75,
               "firstSeat": {
-                "games": 36,
-                "winRate": 0.6667
+                "games": 48,
+                "winRate": 0.75
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0.6667
+                "games": 48,
+                "winRate": 0.75
               },
-              "avgRounds": 13.04,
-              "avgDecisionMs": 12.17,
+              "avgRounds": 13.16,
+              "avgDecisionMs": 11.71,
               "vs": {
                 "algo_ark@v1": {
                   "games": 24,
@@ -67810,38 +68397,44 @@
                   "wins": 24,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
                 }
               },
               "perMap": {
                 "narrow-road": {
-                  "games": 72,
-                  "wins": 48,
+                  "games": 96,
+                  "wins": 72,
                   "draws": 12,
-                  "winRate": 0.75
+                  "winRate": 0.8125
                 }
               }
             },
             {
               "id": "algo_ark@v1",
-              "rating": 1997,
-              "ratingLo": 1961,
-              "ratingHi": 2041,
-              "wilson": 0.8299,
-              "games": 72,
-              "wins": 60,
-              "losses": 0,
+              "rating": 1790,
+              "ratingLo": 1741,
+              "ratingHi": 1870,
+              "wilson": 0.723,
+              "games": 96,
+              "wins": 72,
+              "losses": 12,
               "draws": 12,
-              "winRate": 0.8333,
+              "winRate": 0.75,
               "firstSeat": {
-                "games": 36,
+                "games": 48,
                 "winRate": 1
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0.6667
+                "games": 48,
+                "winRate": 0.5
               },
-              "avgRounds": 13.88,
-              "avgDecisionMs": 2,
+              "avgRounds": 12.66,
+              "avgDecisionMs": 2.61,
               "vs": {
                 "algo_echelon@v1": {
                   "games": 24,
@@ -67860,37 +68453,99 @@
                   "wins": 24,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.5
                 }
               },
               "perMap": {
                 "narrow-road": {
-                  "games": 72,
-                  "wins": 60,
+                  "games": 96,
+                  "wins": 72,
                   "draws": 12,
-                  "winRate": 0.9167
+                  "winRate": 0.8125
+                }
+              }
+            },
+            {
+              "id": "algo_bastion@v1",
+              "rating": 1527,
+              "ratingLo": 1449,
+              "ratingHi": 1600,
+              "wilson": 0.3919,
+              "games": 96,
+              "wins": 47,
+              "losses": 49,
+              "draws": 0,
+              "winRate": 0.4896,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.4792
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.5
+              },
+              "avgRounds": 11.6,
+              "avgDecisionMs": 5.48,
+              "vs": {
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.5
+                },
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 23,
+                  "draws": 0,
+                  "winRate": 0.9583
+                },
+                "algo_ark@v1": {
+                  "games": 24,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.5
+                },
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "narrow-road": {
+                  "games": 96,
+                  "wins": 47,
+                  "draws": 0,
+                  "winRate": 0.4896
                 }
               }
             },
             {
               "id": "algo_echelon@v1",
-              "rating": 1333,
-              "ratingLo": 1324,
-              "ratingHi": 1338,
-              "wilson": 0.2353,
-              "games": 72,
-              "wins": 24,
-              "losses": 48,
+              "rating": 1429,
+              "ratingLo": 1377,
+              "ratingHi": 1473,
+              "wilson": 0.2847,
+              "games": 96,
+              "wins": 36,
+              "losses": 60,
               "draws": 0,
-              "winRate": 0.3333,
+              "winRate": 0.375,
               "firstSeat": {
-                "games": 36,
-                "winRate": 0.3333
+                "games": 48,
+                "winRate": 0.25
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0.3333
+                "games": 48,
+                "winRate": 0.5
               },
-              "avgRounds": 13.72,
+              "avgRounds": 13.42,
               "avgDecisionMs": 2.45,
               "vs": {
                 "algo_ark@v1": {
@@ -67910,38 +68565,44 @@
                   "wins": 24,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 12,
+                  "draws": 0,
+                  "winRate": 0.5
                 }
               },
               "perMap": {
                 "narrow-road": {
-                  "games": 72,
-                  "wins": 24,
+                  "games": 96,
+                  "wins": 36,
                   "draws": 0,
-                  "winRate": 0.3333
+                  "winRate": 0.375
                 }
               }
             },
             {
               "id": "algo_random-royale@v1",
-              "rating": 840,
-              "ratingLo": 831,
-              "ratingHi": 845,
-              "wilson": 0,
-              "games": 72,
-              "wins": 0,
-              "losses": 72,
+              "rating": 965,
+              "ratingLo": 890,
+              "ratingHi": 1045,
+              "wilson": 0.0018,
+              "games": 96,
+              "wins": 1,
+              "losses": 95,
               "draws": 0,
-              "winRate": 0,
+              "winRate": 0.0104,
               "firstSeat": {
-                "games": 36,
+                "games": 48,
                 "winRate": 0
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0
+                "games": 48,
+                "winRate": 0.0208
               },
-              "avgRounds": 12.83,
-              "avgDecisionMs": 1.29,
+              "avgRounds": 12.48,
+              "avgDecisionMs": 1.39,
               "vs": {
                 "algo_apex@v1": {
                   "games": 24,
@@ -67960,14 +68621,20 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 1,
+                  "draws": 0,
+                  "winRate": 0.0417
                 }
               },
               "perMap": {
                 "narrow-road": {
-                  "games": 72,
-                  "wins": 0,
+                  "games": 96,
+                  "wins": 1,
                   "draws": 0,
-                  "winRate": 0
+                  "winRate": 0.0104
                 }
               }
             }
@@ -68007,6 +68674,17 @@
               "aSeatSwing": 0
             },
             {
+              "a": "algo_apex@v1",
+              "b": "algo_bastion@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
               "a": "algo_ark@v1",
               "b": "algo_echelon@v1",
               "games": 24,
@@ -68029,6 +68707,39 @@
               "aSeatSwing": 0
             },
             {
+              "a": "algo_ark@v1",
+              "b": "algo_bastion@v1",
+              "games": 24,
+              "aWins": 12,
+              "bWins": 12,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 0,
+              "aSeatSwing": 1
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_echelon@v1",
+              "games": 24,
+              "aWins": 12,
+              "bWins": 12,
+              "draws": 0,
+              "aFirstWinRate": 0,
+              "aSecondWinRate": 1,
+              "aSeatSwing": -1
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 23,
+              "bWins": 1,
+              "draws": 0,
+              "aFirstWinRate": 0.9167,
+              "aSecondWinRate": 1,
+              "aSeatSwing": -0.0833
+            },
+            {
               "a": "algo_echelon@v1",
               "b": "algo_random-royale@v1",
               "games": 24,
@@ -68043,35 +68754,35 @@
         },
         "random-royale": {
           "overview": {
-            "games": 144,
-            "pairCount": 6,
-            "draws": 10,
-            "drawRate": 0.0694,
-            "avgRounds": 23.05,
-            "firstSeatWinRate": 0.4861
+            "games": 240,
+            "pairCount": 10,
+            "draws": 16,
+            "drawRate": 0.0667,
+            "avgRounds": 22.49,
+            "firstSeatWinRate": 0.4708
           },
           "models": [
             {
               "id": "algo_apex@v1",
-              "rating": 1869,
-              "ratingLo": 1796,
-              "ratingHi": 1966,
-              "wilson": 0.7958,
-              "games": 72,
-              "wins": 60,
+              "rating": 1940,
+              "ratingLo": 1875,
+              "ratingHi": 2024,
+              "wilson": 0.8377,
+              "games": 96,
+              "wins": 83,
               "losses": 4,
-              "draws": 8,
-              "winRate": 0.8333,
+              "draws": 9,
+              "winRate": 0.8646,
               "firstSeat": {
-                "games": 36,
-                "winRate": 0.8889
+                "games": 48,
+                "winRate": 0.8958
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0.7778
+                "games": 48,
+                "winRate": 0.8333
               },
-              "avgRounds": 26.71,
-              "avgDecisionMs": 21.42,
+              "avgRounds": 24.43,
+              "avgDecisionMs": 24.63,
               "vs": {
                 "algo_ark@v1": {
                   "games": 24,
@@ -68090,38 +68801,44 @@
                   "wins": 17,
                   "draws": 5,
                   "winRate": 0.8125
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 23,
+                  "draws": 1,
+                  "winRate": 0.9792
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 72,
-                  "wins": 60,
-                  "draws": 8,
-                  "winRate": 0.8889
+                  "games": 96,
+                  "wins": 83,
+                  "draws": 9,
+                  "winRate": 0.9115
                 }
               }
             },
             {
               "id": "algo_ark@v1",
-              "rating": 1702,
-              "ratingLo": 1658,
-              "ratingHi": 1747,
-              "wilson": 0.5733,
-              "games": 72,
-              "wins": 47,
+              "rating": 1788,
+              "ratingLo": 1744,
+              "ratingHi": 1834,
+              "wilson": 0.6717,
+              "games": 96,
+              "wins": 71,
               "losses": 20,
               "draws": 5,
-              "winRate": 0.6528,
+              "winRate": 0.7396,
               "firstSeat": {
-                "games": 36,
-                "winRate": 0.6667
+                "games": 48,
+                "winRate": 0.75
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0.6389
+                "games": 48,
+                "winRate": 0.7292
               },
-              "avgRounds": 23.03,
-              "avgDecisionMs": 7.04,
+              "avgRounds": 20.97,
+              "avgDecisionMs": 7.26,
               "vs": {
                 "algo_echelon@v1": {
                   "games": 24,
@@ -68140,38 +68857,100 @@
                   "wins": 24,
                   "draws": 0,
                   "winRate": 1
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 72,
-                  "wins": 47,
+                  "games": 96,
+                  "wins": 71,
                   "draws": 5,
-                  "winRate": 0.6875
+                  "winRate": 0.7656
+                }
+              }
+            },
+            {
+              "id": "algo_bastion@v1",
+              "rating": 1374,
+              "ratingLo": 1316,
+              "ratingHi": 1422,
+              "wilson": 0.2471,
+              "games": 96,
+              "wins": 29,
+              "losses": 61,
+              "draws": 6,
+              "winRate": 0.3021,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.2917
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.3125
+              },
+              "avgRounds": 21.66,
+              "avgDecisionMs": 13.88,
+              "vs": {
+                "algo_ark@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                },
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 5,
+                  "draws": 5,
+                  "winRate": 0.3125
+                },
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 1,
+                  "winRate": 0.0208
+                }
+              },
+              "perMap": {
+                "random-royale": {
+                  "games": 96,
+                  "wins": 29,
+                  "draws": 6,
+                  "winRate": 0.3333
                 }
               }
             },
             {
               "id": "algo_echelon@v1",
-              "rating": 1485,
-              "ratingLo": 1425,
-              "ratingHi": 1533,
-              "wilson": 0.3162,
-              "games": 72,
-              "wins": 27,
-              "losses": 38,
-              "draws": 7,
-              "winRate": 0.375,
+              "rating": 1530,
+              "ratingLo": 1474,
+              "ratingHi": 1590,
+              "wilson": 0.3919,
+              "games": 96,
+              "wins": 41,
+              "losses": 43,
+              "draws": 12,
+              "winRate": 0.4271,
               "firstSeat": {
-                "games": 36,
-                "winRate": 0.3889
+                "games": 48,
+                "winRate": 0.4167
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0.3611
+                "games": 48,
+                "winRate": 0.4375
               },
-              "avgRounds": 27.51,
-              "avgDecisionMs": 4.09,
+              "avgRounds": 29.96,
+              "avgDecisionMs": 5.5,
               "vs": {
                 "algo_ark@v1": {
                   "games": 24,
@@ -68190,38 +68969,44 @@
                   "wins": 2,
                   "draws": 5,
                   "winRate": 0.1875
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 14,
+                  "draws": 5,
+                  "winRate": 0.6875
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 72,
-                  "wins": 27,
-                  "draws": 7,
-                  "winRate": 0.4236
+                  "games": 96,
+                  "wins": 41,
+                  "draws": 12,
+                  "winRate": 0.4896
                 }
               }
             },
             {
               "id": "algo_random-royale@v1",
-              "rating": 944,
-              "ratingLo": 908,
-              "ratingHi": 967,
+              "rating": 868,
+              "ratingLo": 831,
+              "ratingHi": 891,
               "wilson": 0,
-              "games": 72,
+              "games": 96,
               "wins": 0,
-              "losses": 72,
+              "losses": 96,
               "draws": 0,
               "winRate": 0,
               "firstSeat": {
-                "games": 36,
+                "games": 48,
                 "winRate": 0
               },
               "secondSeat": {
-                "games": 36,
+                "games": 48,
                 "winRate": 0
               },
-              "avgRounds": 14.94,
-              "avgDecisionMs": 3.17,
+              "avgRounds": 15.45,
+              "avgDecisionMs": 2.98,
               "vs": {
                 "algo_echelon@v1": {
                   "games": 24,
@@ -68240,11 +69025,17 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -68287,6 +69078,17 @@
               "aSeatSwing": 0.0833
             },
             {
+              "a": "algo_apex@v1",
+              "b": "algo_bastion@v1",
+              "games": 24,
+              "aWins": 23,
+              "bWins": 0,
+              "draws": 1,
+              "aFirstWinRate": 0.9167,
+              "aSecondWinRate": 1,
+              "aSeatSwing": -0.0833
+            },
+            {
               "a": "algo_ark@v1",
               "b": "algo_echelon@v1",
               "games": 24,
@@ -68309,6 +69111,39 @@
               "aSeatSwing": 0
             },
             {
+              "a": "algo_ark@v1",
+              "b": "algo_bastion@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_echelon@v1",
+              "games": 24,
+              "aWins": 5,
+              "bWins": 14,
+              "draws": 5,
+              "aFirstWinRate": 0.1667,
+              "aSecondWinRate": 0.25,
+              "aSeatSwing": -0.0833
+            },
+            {
               "a": "algo_echelon@v1",
               "b": "algo_random-royale@v1",
               "games": 24,
@@ -68323,35 +69158,35 @@
         },
         "snowflake": {
           "overview": {
-            "games": 144,
-            "pairCount": 6,
+            "games": 240,
+            "pairCount": 10,
             "draws": 0,
             "drawRate": 0,
-            "avgRounds": 13.68,
-            "firstSeatWinRate": 0.4931
+            "avgRounds": 13.98,
+            "firstSeatWinRate": 0.525
           },
           "models": [
             {
               "id": "algo_apex@v1",
-              "rating": 2149,
-              "ratingLo": 2069,
-              "ratingHi": 2212,
-              "wilson": 0.9254,
-              "games": 72,
-              "wins": 71,
-              "losses": 1,
+              "rating": 2013,
+              "ratingLo": 1935,
+              "ratingHi": 2120,
+              "wilson": 0.8441,
+              "games": 96,
+              "wins": 88,
+              "losses": 8,
               "draws": 0,
-              "winRate": 0.9861,
+              "winRate": 0.9167,
               "firstSeat": {
-                "games": 36,
-                "winRate": 0.9722
+                "games": 48,
+                "winRate": 0.9792
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 1
+                "games": 48,
+                "winRate": 0.8542
               },
-              "avgRounds": 14.35,
-              "avgDecisionMs": 42.84,
+              "avgRounds": 14.89,
+              "avgDecisionMs": 45.3,
               "vs": {
                 "algo_random-royale@v1": {
                   "games": 24,
@@ -68370,38 +69205,44 @@
                   "wins": 23,
                   "draws": 0,
                   "winRate": 0.9583
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 17,
+                  "draws": 0,
+                  "winRate": 0.7083
                 }
               },
               "perMap": {
                 "snowflake": {
-                  "games": 72,
-                  "wins": 71,
+                  "games": 96,
+                  "wins": 88,
                   "draws": 0,
-                  "winRate": 0.9861
+                  "winRate": 0.9167
                 }
               }
             },
             {
               "id": "algo_ark@v1",
-              "rating": 1751,
-              "ratingLo": 1724,
-              "ratingHi": 1789,
-              "wilson": 0.5661,
-              "games": 72,
-              "wins": 49,
+              "rating": 1846,
+              "ratingLo": 1828,
+              "ratingHi": 1878,
+              "wilson": 0.6661,
+              "games": 96,
+              "wins": 73,
               "losses": 23,
               "draws": 0,
-              "winRate": 0.6806,
+              "winRate": 0.7604,
               "firstSeat": {
-                "games": 36,
-                "winRate": 0.6667
+                "games": 48,
+                "winRate": 0.75
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0.6944
+                "games": 48,
+                "winRate": 0.7708
               },
-              "avgRounds": 14.33,
-              "avgDecisionMs": 6.09,
+              "avgRounds": 14.25,
+              "avgDecisionMs": 8.15,
               "vs": {
                 "algo_echelon@v1": {
                   "games": 24,
@@ -68420,38 +69261,100 @@
                   "wins": 1,
                   "draws": 0,
                   "winRate": 0.0417
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
                 }
               },
               "perMap": {
                 "snowflake": {
-                  "games": 72,
-                  "wins": 49,
+                  "games": 96,
+                  "wins": 73,
                   "draws": 0,
-                  "winRate": 0.6806
+                  "winRate": 0.7604
+                }
+              }
+            },
+            {
+              "id": "algo_bastion@v1",
+              "rating": 1654,
+              "ratingLo": 1591,
+              "ratingHi": 1699,
+              "wilson": 0.473,
+              "games": 96,
+              "wins": 55,
+              "losses": 41,
+              "draws": 0,
+              "winRate": 0.5729,
+              "firstSeat": {
+                "games": 48,
+                "winRate": 0.6458
+              },
+              "secondSeat": {
+                "games": 48,
+                "winRate": 0.5
+              },
+              "avgRounds": 14.43,
+              "avgDecisionMs": 17.57,
+              "vs": {
+                "algo_random-royale@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_apex@v1": {
+                  "games": 24,
+                  "wins": 7,
+                  "draws": 0,
+                  "winRate": 0.2917
+                },
+                "algo_echelon@v1": {
+                  "games": 24,
+                  "wins": 24,
+                  "draws": 0,
+                  "winRate": 1
+                },
+                "algo_ark@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
+                }
+              },
+              "perMap": {
+                "snowflake": {
+                  "games": 96,
+                  "wins": 55,
+                  "draws": 0,
+                  "winRate": 0.5729
                 }
               }
             },
             {
               "id": "algo_echelon@v1",
-              "rating": 1296,
-              "ratingLo": 1279,
-              "ratingHi": 1318,
-              "wilson": 0.2353,
-              "games": 72,
+              "rating": 1217,
+              "ratingLo": 1184,
+              "ratingHi": 1234,
+              "wilson": 0.1741,
+              "games": 96,
               "wins": 24,
-              "losses": 48,
+              "losses": 72,
               "draws": 0,
-              "winRate": 0.3333,
+              "winRate": 0.25,
               "firstSeat": {
-                "games": 36,
-                "winRate": 0.3333
+                "games": 48,
+                "winRate": 0.25
               },
               "secondSeat": {
-                "games": 36,
-                "winRate": 0.3333
+                "games": 48,
+                "winRate": 0.25
               },
-              "avgRounds": 13.76,
-              "avgDecisionMs": 5.91,
+              "avgRounds": 14.07,
+              "avgDecisionMs": 6.74,
               "vs": {
                 "algo_random-royale@v1": {
                   "games": 24,
@@ -68470,38 +69373,44 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
                 }
               },
               "perMap": {
                 "snowflake": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 24,
                   "draws": 0,
-                  "winRate": 0.3333
+                  "winRate": 0.25
                 }
               }
             },
             {
               "id": "algo_random-royale@v1",
-              "rating": 804,
-              "ratingLo": 786,
-              "ratingHi": 825,
+              "rating": 770,
+              "ratingLo": 737,
+              "ratingHi": 788,
               "wilson": 0,
-              "games": 72,
+              "games": 96,
               "wins": 0,
-              "losses": 72,
+              "losses": 96,
               "draws": 0,
               "winRate": 0,
               "firstSeat": {
-                "games": 36,
+                "games": 48,
                 "winRate": 0
               },
               "secondSeat": {
-                "games": 36,
+                "games": 48,
                 "winRate": 0
               },
-              "avgRounds": 12.28,
-              "avgDecisionMs": 2.31,
+              "avgRounds": 12.26,
+              "avgDecisionMs": 2.39,
               "vs": {
                 "algo_echelon@v1": {
                   "games": 24,
@@ -68520,11 +69429,17 @@
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
+                },
+                "algo_bastion@v1": {
+                  "games": 24,
+                  "wins": 0,
+                  "draws": 0,
+                  "winRate": 0
                 }
               },
               "perMap": {
                 "snowflake": {
-                  "games": 72,
+                  "games": 96,
                   "wins": 0,
                   "draws": 0,
                   "winRate": 0
@@ -68567,6 +69482,17 @@
               "aSeatSwing": -0.0833
             },
             {
+              "a": "algo_apex@v1",
+              "b": "algo_bastion@v1",
+              "games": 24,
+              "aWins": 17,
+              "bWins": 7,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 0.4167,
+              "aSeatSwing": 0.5833
+            },
+            {
               "a": "algo_ark@v1",
               "b": "algo_echelon@v1",
               "games": 24,
@@ -68580,6 +69506,39 @@
             {
               "a": "algo_ark@v1",
               "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_ark@v1",
+              "b": "algo_bastion@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_random-royale@v1",
+              "games": 24,
+              "aWins": 24,
+              "bWins": 0,
+              "draws": 0,
+              "aFirstWinRate": 1,
+              "aSecondWinRate": 1,
+              "aSeatSwing": 0
+            },
+            {
+              "a": "algo_bastion@v1",
+              "b": "algo_echelon@v1",
               "games": 24,
               "aWins": 24,
               "bWins": 0,
@@ -69713,533 +70672,668 @@
       "playerCount": 3,
       "rulesVersion": "royale-3p-v1",
       "label": "大逃杀 · 三人",
-      "games": 288,
+      "games": 576,
       "maps": {
         "all": {
+          "overview": {
+            "games": 576,
+            "superblockCount": 96,
+            "quarantinedSuperblocks": 0,
+            "draws": 6,
+            "drawRate": 0.0104,
+            "avgRounds": 24.17,
+            "uniqueWinRate": 0.9896
+          },
+          "models": [
+            {
+              "id": "algo_apex@v1",
+              "rating": 1879,
+              "ratingLo": 1842,
+              "ratingHi": 1928,
+              "games": 360,
+              "uniqueWins": 263,
+              "topGroupCount": 269,
+              "uniqueWinRate": 0.7306,
+              "topGroupRate": 0.7472,
+              "averageRank": 1.3139,
+              "placementScore": 0.8431,
+              "wilson": 0.8019,
+              "avgRounds": 22.63,
+              "avgDecisionMs": 36.74,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 85,
+                  "topGroupCount": 87,
+                  "uniqueWinRate": 0.7083,
+                  "topGroupRate": 0.725,
+                  "averageRank": 1.3333,
+                  "placementScore": 0.8333
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 95,
+                  "topGroupCount": 97,
+                  "uniqueWinRate": 0.7917,
+                  "topGroupRate": 0.8083,
+                  "averageRank": 1.2292,
+                  "placementScore": 0.8854
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 83,
+                  "topGroupCount": 85,
+                  "uniqueWinRate": 0.6917,
+                  "topGroupRate": 0.7083,
+                  "averageRank": 1.3792,
+                  "placementScore": 0.8104
+                }
+              },
+              "perMap": {
+                "random-royale": {
+                  "games": 180,
+                  "uniqueWins": 144,
+                  "topGroupCount": 150,
+                  "uniqueWinRate": 0.8,
+                  "topGroupRate": 0.8333,
+                  "averageRank": 1.25,
+                  "placementScore": 0.875
+                },
+                "snowflake": {
+                  "games": 180,
+                  "uniqueWins": 119,
+                  "topGroupCount": 119,
+                  "uniqueWinRate": 0.6611,
+                  "topGroupRate": 0.6611,
+                  "averageRank": 1.3778,
+                  "placementScore": 0.8111
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_ark@v1",
+              "rating": 1830,
+              "ratingLo": 1797,
+              "ratingHi": 1874,
+              "games": 360,
+              "uniqueWins": 221,
+              "topGroupCount": 227,
+              "uniqueWinRate": 0.6139,
+              "topGroupRate": 0.6306,
+              "averageRank": 1.4028,
+              "placementScore": 0.7986,
+              "wilson": 0.7541,
+              "avgRounds": 22.69,
+              "avgDecisionMs": 6.95,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 76,
+                  "topGroupCount": 78,
+                  "uniqueWinRate": 0.6333,
+                  "topGroupRate": 0.65,
+                  "averageRank": 1.3917,
+                  "placementScore": 0.8042
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 76,
+                  "topGroupCount": 78,
+                  "uniqueWinRate": 0.6333,
+                  "topGroupRate": 0.65,
+                  "averageRank": 1.375,
+                  "placementScore": 0.8125
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 69,
+                  "topGroupCount": 71,
+                  "uniqueWinRate": 0.575,
+                  "topGroupRate": 0.5917,
+                  "averageRank": 1.4417,
+                  "placementScore": 0.7792
+                }
+              },
+              "perMap": {
+                "random-royale": {
+                  "games": 180,
+                  "uniqueWins": 89,
+                  "topGroupCount": 95,
+                  "uniqueWinRate": 0.4944,
+                  "topGroupRate": 0.5278,
+                  "averageRank": 1.5389,
+                  "placementScore": 0.7306
+                },
+                "snowflake": {
+                  "games": 180,
+                  "uniqueWins": 132,
+                  "topGroupCount": 132,
+                  "uniqueWinRate": 0.7333,
+                  "topGroupRate": 0.7333,
+                  "averageRank": 1.2667,
+                  "placementScore": 0.8667
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_bastion@v1",
+              "rating": 1482,
+              "ratingLo": 1442,
+              "ratingHi": 1522,
+              "games": 288,
+              "uniqueWins": 43,
+              "topGroupCount": 43,
+              "uniqueWinRate": 0.1493,
+              "topGroupRate": 0.1493,
+              "averageRank": 2.1962,
+              "placementScore": 0.4019,
+              "wilson": 0.3469,
+              "avgRounds": 25.34,
+              "avgDecisionMs": 15.23,
+              "perSeat": {
+                "player_a": {
+                  "games": 96,
+                  "uniqueWins": 15,
+                  "topGroupCount": 15,
+                  "uniqueWinRate": 0.1563,
+                  "topGroupRate": 0.1563,
+                  "averageRank": 2.2135,
+                  "placementScore": 0.3932
+                },
+                "player_b": {
+                  "games": 96,
+                  "uniqueWins": 15,
+                  "topGroupCount": 15,
+                  "uniqueWinRate": 0.1563,
+                  "topGroupRate": 0.1563,
+                  "averageRank": 2.2135,
+                  "placementScore": 0.3932
+                },
+                "player_c": {
+                  "games": 96,
+                  "uniqueWins": 13,
+                  "topGroupCount": 13,
+                  "uniqueWinRate": 0.1354,
+                  "topGroupRate": 0.1354,
+                  "averageRank": 2.1615,
+                  "placementScore": 0.4193
+                }
+              },
+              "perMap": {
+                "random-royale": {
+                  "games": 144,
+                  "uniqueWins": 14,
+                  "topGroupCount": 14,
+                  "uniqueWinRate": 0.0972,
+                  "topGroupRate": 0.0972,
+                  "averageRank": 2.2083,
+                  "placementScore": 0.3958
+                },
+                "snowflake": {
+                  "games": 144,
+                  "uniqueWins": 29,
+                  "topGroupCount": 29,
+                  "uniqueWinRate": 0.2014,
+                  "topGroupRate": 0.2014,
+                  "averageRank": 2.184,
+                  "placementScore": 0.408
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_echelon@v1",
+              "rating": 1452,
+              "ratingLo": 1403,
+              "ratingHi": 1496,
+              "games": 360,
+              "uniqueWins": 43,
+              "topGroupCount": 49,
+              "uniqueWinRate": 0.1194,
+              "topGroupRate": 0.1361,
+              "averageRank": 2.2764,
+              "placementScore": 0.3618,
+              "wilson": 0.3139,
+              "avgRounds": 27.48,
+              "avgDecisionMs": 4.82,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 17,
+                  "topGroupCount": 19,
+                  "uniqueWinRate": 0.1417,
+                  "topGroupRate": 0.1583,
+                  "averageRank": 2.225,
+                  "placementScore": 0.3875
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 12,
+                  "topGroupCount": 14,
+                  "uniqueWinRate": 0.1,
+                  "topGroupRate": 0.1167,
+                  "averageRank": 2.3083,
+                  "placementScore": 0.3458
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 14,
+                  "topGroupCount": 16,
+                  "uniqueWinRate": 0.1167,
+                  "topGroupRate": 0.1333,
+                  "averageRank": 2.2958,
+                  "placementScore": 0.3521
+                }
+              },
+              "perMap": {
+                "random-royale": {
+                  "games": 180,
+                  "uniqueWins": 35,
+                  "topGroupCount": 41,
+                  "uniqueWinRate": 0.1944,
+                  "topGroupRate": 0.2278,
+                  "averageRank": 2.05,
+                  "placementScore": 0.475
+                },
+                "snowflake": {
+                  "games": 180,
+                  "uniqueWins": 8,
+                  "topGroupCount": 8,
+                  "uniqueWinRate": 0.0444,
+                  "topGroupRate": 0.0444,
+                  "averageRank": 2.5028,
+                  "placementScore": 0.2486
+                }
+              },
+              "provisional": false
+            },
+            {
+              "id": "algo_random-royale@v1",
+              "rating": 855,
+              "ratingLo": 799,
+              "ratingHi": 898,
+              "games": 360,
+              "uniqueWins": 0,
+              "topGroupCount": 0,
+              "uniqueWinRate": 0,
+              "topGroupRate": 0,
+              "averageRank": 2.85,
+              "placementScore": 0.075,
+              "wilson": 0.0521,
+              "avgRounds": 22.94,
+              "avgDecisionMs": 1.89,
+              "perSeat": {
+                "player_a": {
+                  "games": 120,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.8667,
+                  "placementScore": 0.0667
+                },
+                "player_b": {
+                  "games": 120,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.8375,
+                  "placementScore": 0.0813
+                },
+                "player_c": {
+                  "games": 120,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.8458,
+                  "placementScore": 0.0771
+                }
+              },
+              "perMap": {
+                "random-royale": {
+                  "games": 180,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.9944,
+                  "placementScore": 0.0028
+                },
+                "snowflake": {
+                  "games": 180,
+                  "uniqueWins": 0,
+                  "topGroupCount": 0,
+                  "uniqueWinRate": 0,
+                  "topGroupRate": 0,
+                  "averageRank": 2.7056,
+                  "placementScore": 0.1472
+                }
+              },
+              "provisional": false
+            }
+          ],
+          "audit": {
+            "encounterMatrix": {
+              "algo_apex@v1": {
+                "algo_apex@v1": 0,
+                "algo_ark@v1": 192,
+                "algo_bastion@v1": 144,
+                "algo_echelon@v1": 192,
+                "algo_random-royale@v1": 192
+              },
+              "algo_ark@v1": {
+                "algo_apex@v1": 192,
+                "algo_ark@v1": 0,
+                "algo_bastion@v1": 144,
+                "algo_echelon@v1": 192,
+                "algo_random-royale@v1": 192
+              },
+              "algo_bastion@v1": {
+                "algo_apex@v1": 144,
+                "algo_ark@v1": 144,
+                "algo_bastion@v1": 0,
+                "algo_echelon@v1": 144,
+                "algo_random-royale@v1": 144
+              },
+              "algo_echelon@v1": {
+                "algo_apex@v1": 192,
+                "algo_ark@v1": 192,
+                "algo_bastion@v1": 144,
+                "algo_echelon@v1": 0,
+                "algo_random-royale@v1": 192
+              },
+              "algo_random-royale@v1": {
+                "algo_apex@v1": 192,
+                "algo_ark@v1": 192,
+                "algo_bastion@v1": 144,
+                "algo_echelon@v1": 192,
+                "algo_random-royale@v1": 0
+              }
+            },
+            "seatPlacementScore": {
+              "player_a": 0.5013,
+              "player_b": 0.5082,
+              "player_c": 0.4905
+            },
+            "leaveOneLineupOut": {
+              "algo_apex@v1": 31,
+              "algo_ark@v1": 20,
+              "algo_bastion@v1": 37,
+              "algo_echelon@v1": 23,
+              "algo_random-royale@v1": 26
+            }
+          }
+        },
+        "random-royale": {
           "overview": {
             "games": 288,
             "superblockCount": 48,
             "quarantinedSuperblocks": 0,
             "draws": 6,
             "drawRate": 0.0208,
-            "avgRounds": 23,
+            "avgRounds": 32.86,
             "uniqueWinRate": 0.9792
           },
           "models": [
             {
               "id": "algo_apex@v1",
-              "rating": 1874,
-              "ratingLo": 1819,
-              "ratingHi": 1944,
-              "games": 216,
-              "uniqueWins": 149,
-              "topGroupCount": 155,
-              "uniqueWinRate": 0.6898,
-              "topGroupRate": 0.7176,
-              "averageRank": 1.3426,
-              "placementScore": 0.8287,
-              "wilson": 0.7728,
-              "avgRounds": 22.98,
-              "avgDecisionMs": 30.3,
+              "rating": 1895,
+              "ratingLo": 1851,
+              "ratingHi": 1998,
+              "games": 180,
+              "uniqueWins": 144,
+              "topGroupCount": 150,
+              "uniqueWinRate": 0.8,
+              "topGroupRate": 0.8333,
+              "averageRank": 1.25,
+              "placementScore": 0.875,
+              "wilson": 0.8187,
+              "avgRounds": 29.39,
+              "avgDecisionMs": 24.24,
               "perSeat": {
                 "player_a": {
-                  "games": 72,
+                  "games": 60,
                   "uniqueWins": 48,
                   "topGroupCount": 50,
-                  "uniqueWinRate": 0.6667,
-                  "topGroupRate": 0.6944,
-                  "averageRank": 1.3611,
-                  "placementScore": 0.8194
+                  "uniqueWinRate": 0.8,
+                  "topGroupRate": 0.8333,
+                  "averageRank": 1.2667,
+                  "placementScore": 0.8667
                 },
                 "player_b": {
-                  "games": 72,
-                  "uniqueWins": 56,
-                  "topGroupCount": 58,
-                  "uniqueWinRate": 0.7778,
-                  "topGroupRate": 0.8056,
-                  "averageRank": 1.2431,
-                  "placementScore": 0.8785
-                },
-                "player_c": {
-                  "games": 72,
-                  "uniqueWins": 45,
-                  "topGroupCount": 47,
-                  "uniqueWinRate": 0.625,
-                  "topGroupRate": 0.6528,
-                  "averageRank": 1.4236,
-                  "placementScore": 0.7882
-                }
-              },
-              "perMap": {
-                "random-royale": {
-                  "games": 108,
-                  "uniqueWins": 86,
-                  "topGroupCount": 92,
-                  "uniqueWinRate": 0.7963,
-                  "topGroupRate": 0.8519,
-                  "averageRank": 1.2315,
-                  "placementScore": 0.8843
-                },
-                "snowflake": {
-                  "games": 108,
-                  "uniqueWins": 63,
-                  "topGroupCount": 63,
-                  "uniqueWinRate": 0.5833,
-                  "topGroupRate": 0.5833,
-                  "averageRank": 1.4537,
-                  "placementScore": 0.7731
-                }
-              },
-              "provisional": false
-            },
-            {
-              "id": "algo_ark@v1",
-              "rating": 1818,
-              "ratingLo": 1772,
-              "ratingHi": 1881,
-              "games": 216,
-              "uniqueWins": 124,
-              "topGroupCount": 130,
-              "uniqueWinRate": 0.5741,
-              "topGroupRate": 0.6019,
-              "averageRank": 1.4398,
-              "placementScore": 0.7801,
-              "wilson": 0.7202,
-              "avgRounds": 21.65,
-              "avgDecisionMs": 4.7,
-              "perSeat": {
-                "player_a": {
-                  "games": 72,
-                  "uniqueWins": 42,
-                  "topGroupCount": 44,
-                  "uniqueWinRate": 0.5833,
-                  "topGroupRate": 0.6111,
-                  "averageRank": 1.4306,
-                  "placementScore": 0.7847
-                },
-                "player_b": {
-                  "games": 72,
-                  "uniqueWins": 42,
-                  "topGroupCount": 44,
-                  "uniqueWinRate": 0.5833,
-                  "topGroupRate": 0.6111,
-                  "averageRank": 1.4306,
-                  "placementScore": 0.7847
-                },
-                "player_c": {
-                  "games": 72,
-                  "uniqueWins": 40,
-                  "topGroupCount": 42,
-                  "uniqueWinRate": 0.5556,
-                  "topGroupRate": 0.5833,
-                  "averageRank": 1.4583,
-                  "placementScore": 0.7708
-                }
-              },
-              "perMap": {
-                "random-royale": {
-                  "games": 108,
-                  "uniqueWins": 44,
+                  "games": 60,
+                  "uniqueWins": 48,
                   "topGroupCount": 50,
-                  "uniqueWinRate": 0.4074,
-                  "topGroupRate": 0.463,
-                  "averageRank": 1.6204,
-                  "placementScore": 0.6898
-                },
-                "snowflake": {
-                  "games": 108,
-                  "uniqueWins": 80,
-                  "topGroupCount": 80,
-                  "uniqueWinRate": 0.7407,
-                  "topGroupRate": 0.7407,
-                  "averageRank": 1.2593,
-                  "placementScore": 0.8704
-                }
-              },
-              "provisional": false
-            },
-            {
-              "id": "algo_echelon@v1",
-              "rating": 1407,
-              "ratingLo": 1334,
-              "ratingHi": 1467,
-              "games": 216,
-              "uniqueWins": 9,
-              "topGroupCount": 15,
-              "uniqueWinRate": 0.0417,
-              "topGroupRate": 0.0694,
-              "averageRank": 2.3935,
-              "placementScore": 0.3032,
-              "wilson": 0.2458,
-              "avgRounds": 24.36,
-              "avgDecisionMs": 3.21,
-              "perSeat": {
-                "player_a": {
-                  "games": 72,
-                  "uniqueWins": 3,
-                  "topGroupCount": 5,
-                  "uniqueWinRate": 0.0417,
-                  "topGroupRate": 0.0694,
-                  "averageRank": 2.375,
-                  "placementScore": 0.3125
-                },
-                "player_b": {
-                  "games": 72,
-                  "uniqueWins": 1,
-                  "topGroupCount": 3,
-                  "uniqueWinRate": 0.0139,
-                  "topGroupRate": 0.0417,
-                  "averageRank": 2.4444,
-                  "placementScore": 0.2778
+                  "uniqueWinRate": 0.8,
+                  "topGroupRate": 0.8333,
+                  "averageRank": 1.2167,
+                  "placementScore": 0.8917
                 },
                 "player_c": {
-                  "games": 72,
-                  "uniqueWins": 5,
-                  "topGroupCount": 7,
-                  "uniqueWinRate": 0.0694,
-                  "topGroupRate": 0.0972,
-                  "averageRank": 2.3611,
-                  "placementScore": 0.3194
+                  "games": 60,
+                  "uniqueWins": 48,
+                  "topGroupCount": 50,
+                  "uniqueWinRate": 0.8,
+                  "topGroupRate": 0.8333,
+                  "averageRank": 1.2667,
+                  "placementScore": 0.8667
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 108,
-                  "uniqueWins": 8,
-                  "topGroupCount": 14,
-                  "uniqueWinRate": 0.0741,
-                  "topGroupRate": 0.1296,
-                  "averageRank": 2.1574,
-                  "placementScore": 0.4213
-                },
-                "snowflake": {
-                  "games": 108,
-                  "uniqueWins": 1,
-                  "topGroupCount": 1,
-                  "uniqueWinRate": 0.0093,
-                  "topGroupRate": 0.0093,
-                  "averageRank": 2.6296,
-                  "placementScore": 0.1852
-                }
-              },
-              "provisional": false
-            },
-            {
-              "id": "algo_random-royale@v1",
-              "rating": 901,
-              "ratingLo": 841,
-              "ratingHi": 953,
-              "games": 216,
-              "uniqueWins": 0,
-              "topGroupCount": 0,
-              "uniqueWinRate": 0,
-              "topGroupRate": 0,
-              "averageRank": 2.8241,
-              "placementScore": 0.088,
-              "wilson": 0.057,
-              "avgRounds": 23,
-              "avgDecisionMs": 0.98,
-              "perSeat": {
-                "player_a": {
-                  "games": 72,
-                  "uniqueWins": 0,
-                  "topGroupCount": 0,
-                  "uniqueWinRate": 0,
-                  "topGroupRate": 0,
-                  "averageRank": 2.8194,
-                  "placementScore": 0.0903
-                },
-                "player_b": {
-                  "games": 72,
-                  "uniqueWins": 0,
-                  "topGroupCount": 0,
-                  "uniqueWinRate": 0,
-                  "topGroupRate": 0,
-                  "averageRank": 2.8264,
-                  "placementScore": 0.0868
-                },
-                "player_c": {
-                  "games": 72,
-                  "uniqueWins": 0,
-                  "topGroupCount": 0,
-                  "uniqueWinRate": 0,
-                  "topGroupRate": 0,
-                  "averageRank": 2.8264,
-                  "placementScore": 0.0868
-                }
-              },
-              "perMap": {
-                "random-royale": {
-                  "games": 108,
-                  "uniqueWins": 0,
-                  "topGroupCount": 0,
-                  "uniqueWinRate": 0,
-                  "topGroupRate": 0,
-                  "averageRank": 2.9907,
-                  "placementScore": 0.0046
-                },
-                "snowflake": {
-                  "games": 108,
-                  "uniqueWins": 0,
-                  "topGroupCount": 0,
-                  "uniqueWinRate": 0,
-                  "topGroupRate": 0,
-                  "averageRank": 2.6574,
-                  "placementScore": 0.1713
-                }
-              },
-              "provisional": false
-            }
-          ],
-          "audit": {
-            "encounterMatrix": {
-              "algo_apex@v1": {
-                "algo_apex@v1": 0,
-                "algo_ark@v1": 144,
-                "algo_echelon@v1": 144,
-                "algo_random-royale@v1": 144
-              },
-              "algo_ark@v1": {
-                "algo_apex@v1": 144,
-                "algo_ark@v1": 0,
-                "algo_echelon@v1": 144,
-                "algo_random-royale@v1": 144
-              },
-              "algo_echelon@v1": {
-                "algo_apex@v1": 144,
-                "algo_ark@v1": 144,
-                "algo_echelon@v1": 0,
-                "algo_random-royale@v1": 144
-              },
-              "algo_random-royale@v1": {
-                "algo_apex@v1": 144,
-                "algo_ark@v1": 144,
-                "algo_echelon@v1": 144,
-                "algo_random-royale@v1": 0
-              }
-            },
-            "seatPlacementScore": {
-              "player_a": 0.5017,
-              "player_b": 0.5069,
-              "player_c": 0.4913
-            },
-            "leaveOneLineupOut": {
-              "algo_apex@v1": 29,
-              "algo_ark@v1": 28,
-              "algo_echelon@v1": 30,
-              "algo_random-royale@v1": 65
-            }
-          }
-        },
-        "random-royale": {
-          "overview": {
-            "games": 144,
-            "superblockCount": 24,
-            "quarantinedSuperblocks": 0,
-            "draws": 6,
-            "drawRate": 0.0417,
-            "avgRounds": 30.27,
-            "uniqueWinRate": 0.9583
-          },
-          "models": [
-            {
-              "id": "algo_apex@v1",
-              "rating": 1895,
-              "ratingLo": 1805,
-              "ratingHi": 2009,
-              "games": 108,
-              "uniqueWins": 86,
-              "topGroupCount": 92,
-              "uniqueWinRate": 0.7963,
-              "topGroupRate": 0.8519,
-              "averageRank": 1.2315,
-              "placementScore": 0.8843,
-              "wilson": 0.8103,
-              "avgRounds": 29.68,
-              "avgDecisionMs": 16.87,
-              "perSeat": {
-                "player_a": {
-                  "games": 36,
-                  "uniqueWins": 27,
-                  "topGroupCount": 29,
-                  "uniqueWinRate": 0.75,
-                  "topGroupRate": 0.8056,
-                  "averageRank": 1.2778,
-                  "placementScore": 0.8611
-                },
-                "player_b": {
-                  "games": 36,
-                  "uniqueWins": 30,
-                  "topGroupCount": 32,
-                  "uniqueWinRate": 0.8333,
-                  "topGroupRate": 0.8889,
-                  "averageRank": 1.1667,
-                  "placementScore": 0.9167
-                },
-                "player_c": {
-                  "games": 36,
-                  "uniqueWins": 29,
-                  "topGroupCount": 31,
-                  "uniqueWinRate": 0.8056,
-                  "topGroupRate": 0.8611,
+                  "games": 180,
+                  "uniqueWins": 144,
+                  "topGroupCount": 150,
+                  "uniqueWinRate": 0.8,
+                  "topGroupRate": 0.8333,
                   "averageRank": 1.25,
                   "placementScore": 0.875
                 }
               },
-              "perMap": {
-                "random-royale": {
-                  "games": 108,
-                  "uniqueWins": 86,
-                  "topGroupCount": 92,
-                  "uniqueWinRate": 0.7963,
-                  "topGroupRate": 0.8519,
-                  "averageRank": 1.2315,
-                  "placementScore": 0.8843
-                }
-              },
-              "provisional": true
+              "provisional": false
             },
             {
               "id": "algo_ark@v1",
-              "rating": 1703,
-              "ratingLo": 1647,
-              "ratingHi": 1761,
-              "games": 108,
-              "uniqueWins": 44,
-              "topGroupCount": 50,
-              "uniqueWinRate": 0.4074,
-              "topGroupRate": 0.463,
-              "averageRank": 1.6204,
-              "placementScore": 0.6898,
-              "wilson": 0.5973,
-              "avgRounds": 28.08,
-              "avgDecisionMs": 4.65,
+              "rating": 1750,
+              "ratingLo": 1706,
+              "ratingHi": 1791,
+              "games": 180,
+              "uniqueWins": 89,
+              "topGroupCount": 95,
+              "uniqueWinRate": 0.4944,
+              "topGroupRate": 0.5278,
+              "averageRank": 1.5389,
+              "placementScore": 0.7306,
+              "wilson": 0.6614,
+              "avgRounds": 30.11,
+              "avgDecisionMs": 6.7,
               "perSeat": {
                 "player_a": {
-                  "games": 36,
-                  "uniqueWins": 14,
-                  "topGroupCount": 16,
-                  "uniqueWinRate": 0.3889,
-                  "topGroupRate": 0.4444,
-                  "averageRank": 1.6389,
-                  "placementScore": 0.6806
+                  "games": 60,
+                  "uniqueWins": 31,
+                  "topGroupCount": 33,
+                  "uniqueWinRate": 0.5167,
+                  "topGroupRate": 0.55,
+                  "averageRank": 1.5333,
+                  "placementScore": 0.7333
                 },
                 "player_b": {
-                  "games": 36,
-                  "uniqueWins": 14,
-                  "topGroupCount": 16,
-                  "uniqueWinRate": 0.3889,
-                  "topGroupRate": 0.4444,
-                  "averageRank": 1.6389,
-                  "placementScore": 0.6806
+                  "games": 60,
+                  "uniqueWins": 29,
+                  "topGroupCount": 31,
+                  "uniqueWinRate": 0.4833,
+                  "topGroupRate": 0.5167,
+                  "averageRank": 1.5333,
+                  "placementScore": 0.7333
                 },
                 "player_c": {
-                  "games": 36,
-                  "uniqueWins": 16,
-                  "topGroupCount": 18,
-                  "uniqueWinRate": 0.4444,
-                  "topGroupRate": 0.5,
-                  "averageRank": 1.5833,
-                  "placementScore": 0.7083
+                  "games": 60,
+                  "uniqueWins": 29,
+                  "topGroupCount": 31,
+                  "uniqueWinRate": 0.4833,
+                  "topGroupRate": 0.5167,
+                  "averageRank": 1.55,
+                  "placementScore": 0.725
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 108,
-                  "uniqueWins": 44,
-                  "topGroupCount": 50,
-                  "uniqueWinRate": 0.4074,
-                  "topGroupRate": 0.463,
-                  "averageRank": 1.6204,
-                  "placementScore": 0.6898
+                  "games": 180,
+                  "uniqueWins": 89,
+                  "topGroupCount": 95,
+                  "uniqueWinRate": 0.4944,
+                  "topGroupRate": 0.5278,
+                  "averageRank": 1.5389,
+                  "placementScore": 0.7306
                 }
               },
-              "provisional": true
+              "provisional": false
+            },
+            {
+              "id": "algo_bastion@v1",
+              "rating": 1470,
+              "ratingLo": 1417,
+              "ratingHi": 1516,
+              "games": 144,
+              "uniqueWins": 14,
+              "topGroupCount": 14,
+              "uniqueWinRate": 0.0972,
+              "topGroupRate": 0.0972,
+              "averageRank": 2.2083,
+              "placementScore": 0.3958,
+              "wilson": 0.3197,
+              "avgRounds": 35.46,
+              "avgDecisionMs": 9.69,
+              "perSeat": {
+                "player_a": {
+                  "games": 48,
+                  "uniqueWins": 6,
+                  "topGroupCount": 6,
+                  "uniqueWinRate": 0.125,
+                  "topGroupRate": 0.125,
+                  "averageRank": 2.1875,
+                  "placementScore": 0.4063
+                },
+                "player_b": {
+                  "games": 48,
+                  "uniqueWins": 4,
+                  "topGroupCount": 4,
+                  "uniqueWinRate": 0.0833,
+                  "topGroupRate": 0.0833,
+                  "averageRank": 2.2708,
+                  "placementScore": 0.3646
+                },
+                "player_c": {
+                  "games": 48,
+                  "uniqueWins": 4,
+                  "topGroupCount": 4,
+                  "uniqueWinRate": 0.0833,
+                  "topGroupRate": 0.0833,
+                  "averageRank": 2.1667,
+                  "placementScore": 0.4167
+                }
+              },
+              "perMap": {
+                "random-royale": {
+                  "games": 144,
+                  "uniqueWins": 14,
+                  "topGroupCount": 14,
+                  "uniqueWinRate": 0.0972,
+                  "topGroupRate": 0.0972,
+                  "averageRank": 2.2083,
+                  "placementScore": 0.3958
+                }
+              },
+              "provisional": false
             },
             {
               "id": "algo_echelon@v1",
-              "rating": 1459,
-              "ratingLo": 1369,
-              "ratingHi": 1532,
-              "games": 108,
-              "uniqueWins": 8,
-              "topGroupCount": 14,
-              "uniqueWinRate": 0.0741,
-              "topGroupRate": 0.1296,
-              "averageRank": 2.1574,
-              "placementScore": 0.4213,
-              "wilson": 0.3324,
-              "avgRounds": 33.03,
-              "avgDecisionMs": 2.45,
+              "rating": 1517,
+              "ratingLo": 1441,
+              "ratingHi": 1591,
+              "games": 180,
+              "uniqueWins": 35,
+              "topGroupCount": 41,
+              "uniqueWinRate": 0.1944,
+              "topGroupRate": 0.2278,
+              "averageRank": 2.05,
+              "placementScore": 0.475,
+              "wilson": 0.4033,
+              "avgRounds": 39.44,
+              "avgDecisionMs": 4.11,
               "perSeat": {
                 "player_a": {
-                  "games": 36,
-                  "uniqueWins": 3,
-                  "topGroupCount": 5,
-                  "uniqueWinRate": 0.0833,
-                  "topGroupRate": 0.1389,
-                  "averageRank": 2.1111,
-                  "placementScore": 0.4444
+                  "games": 60,
+                  "uniqueWins": 14,
+                  "topGroupCount": 16,
+                  "uniqueWinRate": 0.2333,
+                  "topGroupRate": 0.2667,
+                  "averageRank": 1.9833,
+                  "placementScore": 0.5083
                 },
                 "player_b": {
-                  "games": 36,
-                  "uniqueWins": 1,
-                  "topGroupCount": 3,
-                  "uniqueWinRate": 0.0278,
-                  "topGroupRate": 0.0833,
-                  "averageRank": 2.2222,
-                  "placementScore": 0.3889
+                  "games": 60,
+                  "uniqueWins": 9,
+                  "topGroupCount": 11,
+                  "uniqueWinRate": 0.15,
+                  "topGroupRate": 0.1833,
+                  "averageRank": 2.1167,
+                  "placementScore": 0.4417
                 },
                 "player_c": {
-                  "games": 36,
-                  "uniqueWins": 4,
-                  "topGroupCount": 6,
-                  "uniqueWinRate": 0.1111,
-                  "topGroupRate": 0.1667,
-                  "averageRank": 2.1389,
-                  "placementScore": 0.4306
+                  "games": 60,
+                  "uniqueWins": 12,
+                  "topGroupCount": 14,
+                  "uniqueWinRate": 0.2,
+                  "topGroupRate": 0.2333,
+                  "averageRank": 2.05,
+                  "placementScore": 0.475
                 }
               },
               "perMap": {
                 "random-royale": {
-                  "games": 108,
-                  "uniqueWins": 8,
-                  "topGroupCount": 14,
-                  "uniqueWinRate": 0.0741,
-                  "topGroupRate": 0.1296,
-                  "averageRank": 2.1574,
-                  "placementScore": 0.4213
+                  "games": 180,
+                  "uniqueWins": 35,
+                  "topGroupCount": 41,
+                  "uniqueWinRate": 0.1944,
+                  "topGroupRate": 0.2278,
+                  "averageRank": 2.05,
+                  "placementScore": 0.475
                 }
               },
-              "provisional": true
+              "provisional": false
             },
             {
               "id": "algo_random-royale@v1",
-              "rating": 943,
-              "ratingLo": 878,
-              "ratingHi": 994,
-              "games": 108,
+              "rating": 868,
+              "ratingLo": 822,
+              "ratingHi": 911,
+              "games": 180,
               "uniqueWins": 0,
               "topGroupCount": 0,
               "uniqueWinRate": 0,
               "topGroupRate": 0,
-              "averageRank": 2.9907,
-              "placementScore": 0.0046,
-              "wilson": 0.0005,
-              "avgRounds": 30.3,
-              "avgDecisionMs": 0.85,
+              "averageRank": 2.9944,
+              "placementScore": 0.0028,
+              "wilson": 0.0003,
+              "avgRounds": 30.44,
+              "avgDecisionMs": 2,
               "perSeat": {
                 "player_a": {
-                  "games": 36,
+                  "games": 60,
                   "uniqueWins": 0,
                   "topGroupCount": 0,
                   "uniqueWinRate": 0,
                   "topGroupRate": 0,
-                  "averageRank": 2.9722,
-                  "placementScore": 0.0139
+                  "averageRank": 2.9833,
+                  "placementScore": 0.0083
                 },
                 "player_b": {
-                  "games": 36,
+                  "games": 60,
                   "uniqueWins": 0,
                   "topGroupCount": 0,
                   "uniqueWinRate": 0,
@@ -70248,7 +71342,7 @@
                   "placementScore": 0
                 },
                 "player_c": {
-                  "games": 36,
+                  "games": 60,
                   "uniqueWins": 0,
                   "topGroupCount": 0,
                   "uniqueWinRate": 0,
@@ -70259,164 +71353,176 @@
               },
               "perMap": {
                 "random-royale": {
-                  "games": 108,
+                  "games": 180,
                   "uniqueWins": 0,
                   "topGroupCount": 0,
                   "uniqueWinRate": 0,
                   "topGroupRate": 0,
-                  "averageRank": 2.9907,
-                  "placementScore": 0.0046
+                  "averageRank": 2.9944,
+                  "placementScore": 0.0028
                 }
               },
-              "provisional": true
+              "provisional": false
             }
           ],
           "audit": {
             "encounterMatrix": {
               "algo_apex@v1": {
                 "algo_apex@v1": 0,
-                "algo_ark@v1": 72,
-                "algo_echelon@v1": 72,
-                "algo_random-royale@v1": 72
+                "algo_ark@v1": 96,
+                "algo_bastion@v1": 72,
+                "algo_echelon@v1": 96,
+                "algo_random-royale@v1": 96
               },
               "algo_ark@v1": {
-                "algo_apex@v1": 72,
+                "algo_apex@v1": 96,
                 "algo_ark@v1": 0,
+                "algo_bastion@v1": 72,
+                "algo_echelon@v1": 96,
+                "algo_random-royale@v1": 96
+              },
+              "algo_bastion@v1": {
+                "algo_apex@v1": 72,
+                "algo_ark@v1": 72,
+                "algo_bastion@v1": 0,
                 "algo_echelon@v1": 72,
                 "algo_random-royale@v1": 72
               },
               "algo_echelon@v1": {
-                "algo_apex@v1": 72,
-                "algo_ark@v1": 72,
+                "algo_apex@v1": 96,
+                "algo_ark@v1": 96,
+                "algo_bastion@v1": 72,
                 "algo_echelon@v1": 0,
-                "algo_random-royale@v1": 72
+                "algo_random-royale@v1": 96
               },
               "algo_random-royale@v1": {
-                "algo_apex@v1": 72,
-                "algo_ark@v1": 72,
-                "algo_echelon@v1": 72,
+                "algo_apex@v1": 96,
+                "algo_ark@v1": 96,
+                "algo_bastion@v1": 72,
+                "algo_echelon@v1": 96,
                 "algo_random-royale@v1": 0
               }
             },
             "seatPlacementScore": {
-              "player_a": 0.5,
-              "player_b": 0.4965,
-              "player_c": 0.5035
+              "player_a": 0.5087,
+              "player_b": 0.4913,
+              "player_c": 0.5
             },
             "leaveOneLineupOut": {
-              "algo_apex@v1": 59,
-              "algo_ark@v1": 44,
-              "algo_echelon@v1": 38,
-              "algo_random-royale@v1": 53
+              "algo_apex@v1": 46,
+              "algo_ark@v1": 24,
+              "algo_bastion@v1": 42,
+              "algo_echelon@v1": 18,
+              "algo_random-royale@v1": 28
             }
           }
         },
         "snowflake": {
           "overview": {
-            "games": 144,
-            "superblockCount": 24,
+            "games": 288,
+            "superblockCount": 48,
             "quarantinedSuperblocks": 0,
             "draws": 0,
             "drawRate": 0,
-            "avgRounds": 15.72,
+            "avgRounds": 15.47,
             "uniqueWinRate": 1
           },
           "models": [
             {
               "id": "algo_apex@v1",
-              "rating": 1803,
-              "ratingLo": 1761,
-              "ratingHi": 1854,
-              "games": 108,
-              "uniqueWins": 63,
-              "topGroupCount": 63,
-              "uniqueWinRate": 0.5833,
-              "topGroupRate": 0.5833,
-              "averageRank": 1.4537,
-              "placementScore": 0.7731,
-              "wilson": 0.6856,
-              "avgRounds": 16.28,
-              "avgDecisionMs": 45.49,
+              "rating": 1839,
+              "ratingLo": 1803,
+              "ratingHi": 1872,
+              "games": 180,
+              "uniqueWins": 119,
+              "topGroupCount": 119,
+              "uniqueWinRate": 0.6611,
+              "topGroupRate": 0.6611,
+              "averageRank": 1.3778,
+              "placementScore": 0.8111,
+              "wilson": 0.7477,
+              "avgRounds": 15.87,
+              "avgDecisionMs": 51.92,
               "perSeat": {
                 "player_a": {
-                  "games": 36,
-                  "uniqueWins": 21,
-                  "topGroupCount": 21,
-                  "uniqueWinRate": 0.5833,
-                  "topGroupRate": 0.5833,
-                  "averageRank": 1.4444,
-                  "placementScore": 0.7778
+                  "games": 60,
+                  "uniqueWins": 37,
+                  "topGroupCount": 37,
+                  "uniqueWinRate": 0.6167,
+                  "topGroupRate": 0.6167,
+                  "averageRank": 1.4,
+                  "placementScore": 0.8
                 },
                 "player_b": {
-                  "games": 36,
-                  "uniqueWins": 26,
-                  "topGroupCount": 26,
-                  "uniqueWinRate": 0.7222,
-                  "topGroupRate": 0.7222,
-                  "averageRank": 1.3194,
-                  "placementScore": 0.8403
+                  "games": 60,
+                  "uniqueWins": 47,
+                  "topGroupCount": 47,
+                  "uniqueWinRate": 0.7833,
+                  "topGroupRate": 0.7833,
+                  "averageRank": 1.2417,
+                  "placementScore": 0.8792
                 },
                 "player_c": {
-                  "games": 36,
-                  "uniqueWins": 16,
-                  "topGroupCount": 16,
-                  "uniqueWinRate": 0.4444,
-                  "topGroupRate": 0.4444,
-                  "averageRank": 1.5972,
-                  "placementScore": 0.7014
+                  "games": 60,
+                  "uniqueWins": 35,
+                  "topGroupCount": 35,
+                  "uniqueWinRate": 0.5833,
+                  "topGroupRate": 0.5833,
+                  "averageRank": 1.4917,
+                  "placementScore": 0.7542
                 }
               },
               "perMap": {
                 "snowflake": {
-                  "games": 108,
-                  "uniqueWins": 63,
-                  "topGroupCount": 63,
-                  "uniqueWinRate": 0.5833,
-                  "topGroupRate": 0.5833,
-                  "averageRank": 1.4537,
-                  "placementScore": 0.7731
+                  "games": 180,
+                  "uniqueWins": 119,
+                  "topGroupCount": 119,
+                  "uniqueWinRate": 0.6611,
+                  "topGroupRate": 0.6611,
+                  "averageRank": 1.3778,
+                  "placementScore": 0.8111
                 }
               },
-              "provisional": true
+              "provisional": false
             },
             {
               "id": "algo_ark@v1",
-              "rating": 1880,
-              "ratingLo": 1836,
-              "ratingHi": 1923,
-              "games": 108,
-              "uniqueWins": 80,
-              "topGroupCount": 80,
-              "uniqueWinRate": 0.7407,
-              "topGroupRate": 0.7407,
-              "averageRank": 1.2593,
-              "placementScore": 0.8704,
-              "wilson": 0.7941,
-              "avgRounds": 15.22,
-              "avgDecisionMs": 4.75,
+              "rating": 1891,
+              "ratingLo": 1863,
+              "ratingHi": 1928,
+              "games": 180,
+              "uniqueWins": 132,
+              "topGroupCount": 132,
+              "uniqueWinRate": 0.7333,
+              "topGroupRate": 0.7333,
+              "averageRank": 1.2667,
+              "placementScore": 0.8667,
+              "wilson": 0.8093,
+              "avgRounds": 15.27,
+              "avgDecisionMs": 7.22,
               "perSeat": {
                 "player_a": {
-                  "games": 36,
-                  "uniqueWins": 28,
-                  "topGroupCount": 28,
-                  "uniqueWinRate": 0.7778,
-                  "topGroupRate": 0.7778,
-                  "averageRank": 1.2222,
-                  "placementScore": 0.8889
+                  "games": 60,
+                  "uniqueWins": 45,
+                  "topGroupCount": 45,
+                  "uniqueWinRate": 0.75,
+                  "topGroupRate": 0.75,
+                  "averageRank": 1.25,
+                  "placementScore": 0.875
                 },
                 "player_b": {
-                  "games": 36,
-                  "uniqueWins": 28,
-                  "topGroupCount": 28,
-                  "uniqueWinRate": 0.7778,
-                  "topGroupRate": 0.7778,
-                  "averageRank": 1.2222,
-                  "placementScore": 0.8889
+                  "games": 60,
+                  "uniqueWins": 47,
+                  "topGroupCount": 47,
+                  "uniqueWinRate": 0.7833,
+                  "topGroupRate": 0.7833,
+                  "averageRank": 1.2167,
+                  "placementScore": 0.8917
                 },
                 "player_c": {
-                  "games": 36,
-                  "uniqueWins": 24,
-                  "topGroupCount": 24,
+                  "games": 60,
+                  "uniqueWins": 40,
+                  "topGroupCount": 40,
                   "uniqueWinRate": 0.6667,
                   "topGroupRate": 0.6667,
                   "averageRank": 1.3333,
@@ -70425,169 +71531,238 @@
               },
               "perMap": {
                 "snowflake": {
-                  "games": 108,
-                  "uniqueWins": 80,
-                  "topGroupCount": 80,
-                  "uniqueWinRate": 0.7407,
-                  "topGroupRate": 0.7407,
-                  "averageRank": 1.2593,
-                  "placementScore": 0.8704
+                  "games": 180,
+                  "uniqueWins": 132,
+                  "topGroupCount": 132,
+                  "uniqueWinRate": 0.7333,
+                  "topGroupRate": 0.7333,
+                  "averageRank": 1.2667,
+                  "placementScore": 0.8667
                 }
               },
-              "provisional": true
+              "provisional": false
             },
             {
-              "id": "algo_echelon@v1",
-              "rating": 1203,
-              "ratingLo": 1154,
-              "ratingHi": 1256,
-              "games": 108,
-              "uniqueWins": 1,
-              "topGroupCount": 1,
-              "uniqueWinRate": 0.0093,
-              "topGroupRate": 0.0093,
-              "averageRank": 2.6296,
-              "placementScore": 0.1852,
-              "wilson": 0.1232,
-              "avgRounds": 15.69,
-              "avgDecisionMs": 4.33,
+              "id": "algo_bastion@v1",
+              "rating": 1465,
+              "ratingLo": 1412,
+              "ratingHi": 1504,
+              "games": 144,
+              "uniqueWins": 29,
+              "topGroupCount": 29,
+              "uniqueWinRate": 0.2014,
+              "topGroupRate": 0.2014,
+              "averageRank": 2.184,
+              "placementScore": 0.408,
+              "wilson": 0.3311,
+              "avgRounds": 15.22,
+              "avgDecisionMs": 19.83,
               "perSeat": {
                 "player_a": {
-                  "games": 36,
-                  "uniqueWins": 0,
-                  "topGroupCount": 0,
-                  "uniqueWinRate": 0,
-                  "topGroupRate": 0,
-                  "averageRank": 2.6389,
-                  "placementScore": 0.1806
+                  "games": 48,
+                  "uniqueWins": 9,
+                  "topGroupCount": 9,
+                  "uniqueWinRate": 0.1875,
+                  "topGroupRate": 0.1875,
+                  "averageRank": 2.2396,
+                  "placementScore": 0.3802
                 },
                 "player_b": {
-                  "games": 36,
-                  "uniqueWins": 0,
-                  "topGroupCount": 0,
-                  "uniqueWinRate": 0,
-                  "topGroupRate": 0,
-                  "averageRank": 2.6667,
-                  "placementScore": 0.1667
+                  "games": 48,
+                  "uniqueWins": 11,
+                  "topGroupCount": 11,
+                  "uniqueWinRate": 0.2292,
+                  "topGroupRate": 0.2292,
+                  "averageRank": 2.1563,
+                  "placementScore": 0.4219
                 },
                 "player_c": {
-                  "games": 36,
-                  "uniqueWins": 1,
-                  "topGroupCount": 1,
-                  "uniqueWinRate": 0.0278,
-                  "topGroupRate": 0.0278,
-                  "averageRank": 2.5833,
-                  "placementScore": 0.2083
+                  "games": 48,
+                  "uniqueWins": 9,
+                  "topGroupCount": 9,
+                  "uniqueWinRate": 0.1875,
+                  "topGroupRate": 0.1875,
+                  "averageRank": 2.1563,
+                  "placementScore": 0.4219
                 }
               },
               "perMap": {
                 "snowflake": {
-                  "games": 108,
-                  "uniqueWins": 1,
-                  "topGroupCount": 1,
-                  "uniqueWinRate": 0.0093,
-                  "topGroupRate": 0.0093,
-                  "averageRank": 2.6296,
-                  "placementScore": 0.1852
+                  "games": 144,
+                  "uniqueWins": 29,
+                  "topGroupCount": 29,
+                  "uniqueWinRate": 0.2014,
+                  "topGroupRate": 0.2014,
+                  "averageRank": 2.184,
+                  "placementScore": 0.408
                 }
               },
-              "provisional": true
+              "provisional": false
+            },
+            {
+              "id": "algo_echelon@v1",
+              "rating": 1327,
+              "ratingLo": 1281,
+              "ratingHi": 1366,
+              "games": 180,
+              "uniqueWins": 8,
+              "topGroupCount": 8,
+              "uniqueWinRate": 0.0444,
+              "topGroupRate": 0.0444,
+              "averageRank": 2.5028,
+              "placementScore": 0.2486,
+              "wilson": 0.1912,
+              "avgRounds": 15.52,
+              "avgDecisionMs": 6.2,
+              "perSeat": {
+                "player_a": {
+                  "games": 60,
+                  "uniqueWins": 3,
+                  "topGroupCount": 3,
+                  "uniqueWinRate": 0.05,
+                  "topGroupRate": 0.05,
+                  "averageRank": 2.4667,
+                  "placementScore": 0.2667
+                },
+                "player_b": {
+                  "games": 60,
+                  "uniqueWins": 3,
+                  "topGroupCount": 3,
+                  "uniqueWinRate": 0.05,
+                  "topGroupRate": 0.05,
+                  "averageRank": 2.5,
+                  "placementScore": 0.25
+                },
+                "player_c": {
+                  "games": 60,
+                  "uniqueWins": 2,
+                  "topGroupCount": 2,
+                  "uniqueWinRate": 0.0333,
+                  "topGroupRate": 0.0333,
+                  "averageRank": 2.5417,
+                  "placementScore": 0.2292
+                }
+              },
+              "perMap": {
+                "snowflake": {
+                  "games": 180,
+                  "uniqueWins": 8,
+                  "topGroupCount": 8,
+                  "uniqueWinRate": 0.0444,
+                  "topGroupRate": 0.0444,
+                  "averageRank": 2.5028,
+                  "placementScore": 0.2486
+                }
+              },
+              "provisional": false
             },
             {
               "id": "algo_random-royale@v1",
-              "rating": 1114,
-              "ratingLo": 1081,
-              "ratingHi": 1140,
-              "games": 108,
+              "rating": 978,
+              "ratingLo": 927,
+              "ratingHi": 1018,
+              "games": 180,
               "uniqueWins": 0,
               "topGroupCount": 0,
               "uniqueWinRate": 0,
               "topGroupRate": 0,
-              "averageRank": 2.6574,
-              "placementScore": 0.1713,
-              "wilson": 0.1119,
-              "avgRounds": 15.7,
-              "avgDecisionMs": 1.07,
+              "averageRank": 2.7056,
+              "placementScore": 0.1472,
+              "wilson": 0.1028,
+              "avgRounds": 15.43,
+              "avgDecisionMs": 1.8,
               "perSeat": {
                 "player_a": {
-                  "games": 36,
+                  "games": 60,
                   "uniqueWins": 0,
                   "topGroupCount": 0,
                   "uniqueWinRate": 0,
                   "topGroupRate": 0,
-                  "averageRank": 2.6667,
-                  "placementScore": 0.1667
+                  "averageRank": 2.75,
+                  "placementScore": 0.125
                 },
                 "player_b": {
-                  "games": 36,
+                  "games": 60,
                   "uniqueWins": 0,
                   "topGroupCount": 0,
                   "uniqueWinRate": 0,
                   "topGroupRate": 0,
-                  "averageRank": 2.6528,
-                  "placementScore": 0.1736
+                  "averageRank": 2.675,
+                  "placementScore": 0.1625
                 },
                 "player_c": {
-                  "games": 36,
+                  "games": 60,
                   "uniqueWins": 0,
                   "topGroupCount": 0,
                   "uniqueWinRate": 0,
                   "topGroupRate": 0,
-                  "averageRank": 2.6528,
-                  "placementScore": 0.1736
+                  "averageRank": 2.6917,
+                  "placementScore": 0.1542
                 }
               },
               "perMap": {
                 "snowflake": {
-                  "games": 108,
+                  "games": 180,
                   "uniqueWins": 0,
                   "topGroupCount": 0,
                   "uniqueWinRate": 0,
                   "topGroupRate": 0,
-                  "averageRank": 2.6574,
-                  "placementScore": 0.1713
+                  "averageRank": 2.7056,
+                  "placementScore": 0.1472
                 }
               },
-              "provisional": true
+              "provisional": false
             }
           ],
           "audit": {
             "encounterMatrix": {
               "algo_apex@v1": {
                 "algo_apex@v1": 0,
-                "algo_ark@v1": 72,
-                "algo_echelon@v1": 72,
-                "algo_random-royale@v1": 72
+                "algo_ark@v1": 96,
+                "algo_bastion@v1": 72,
+                "algo_echelon@v1": 96,
+                "algo_random-royale@v1": 96
               },
               "algo_ark@v1": {
-                "algo_apex@v1": 72,
+                "algo_apex@v1": 96,
                 "algo_ark@v1": 0,
+                "algo_bastion@v1": 72,
+                "algo_echelon@v1": 96,
+                "algo_random-royale@v1": 96
+              },
+              "algo_bastion@v1": {
+                "algo_apex@v1": 72,
+                "algo_ark@v1": 72,
+                "algo_bastion@v1": 0,
                 "algo_echelon@v1": 72,
                 "algo_random-royale@v1": 72
               },
               "algo_echelon@v1": {
-                "algo_apex@v1": 72,
-                "algo_ark@v1": 72,
+                "algo_apex@v1": 96,
+                "algo_ark@v1": 96,
+                "algo_bastion@v1": 72,
                 "algo_echelon@v1": 0,
-                "algo_random-royale@v1": 72
+                "algo_random-royale@v1": 96
               },
               "algo_random-royale@v1": {
-                "algo_apex@v1": 72,
-                "algo_ark@v1": 72,
-                "algo_echelon@v1": 72,
+                "algo_apex@v1": 96,
+                "algo_ark@v1": 96,
+                "algo_bastion@v1": 72,
+                "algo_echelon@v1": 96,
                 "algo_random-royale@v1": 0
               }
             },
             "seatPlacementScore": {
-              "player_a": 0.5035,
-              "player_b": 0.5174,
-              "player_c": 0.4792
+              "player_a": 0.4939,
+              "player_b": 0.5252,
+              "player_c": 0.4809
             },
             "leaveOneLineupOut": {
-              "algo_apex@v1": 24,
-              "algo_ark@v1": 32,
-              "algo_echelon@v1": 53,
-              "algo_random-royale@v1": 63
+              "algo_apex@v1": 43,
+              "algo_ark@v1": 28,
+              "algo_bastion@v1": 53,
+              "algo_echelon@v1": 31,
+              "algo_random-royale@v1": 35
             }
           }
         }

@@ -439,8 +439,9 @@ def reset_command(args, game_index: int) -> dict[str, Any]:
         # 其余模式必须显式带 mode，否则 worker 会按缺省 standard 生成一张规则不同的图。
         if random_mode != "standard":
             options["mode"] = random_mode
-        # 两张静态大逃杀图都没有回合上限（只靠淘汰/缩圈收场），随机大逃杀图沿用
-        # 同一口径；否则 10-30 回合的军队价值裁决会混进大逃杀榜。
+        # `snowflake` 与 `narrow-road` 这两张静态大逃杀图都没有回合上限（只靠淘汰/缩圈收场），
+        # 随机大逃杀图沿用同一口径；否则 10-30 回合的军队价值裁决会混进大逃杀榜。
+        # 注意 `mirror-lake` 自带 30 轮上限，随机图口径与它并不完全一致。
         if random_mode == "royale":
             options["noTurnLimit"] = True
         command["random"] = options

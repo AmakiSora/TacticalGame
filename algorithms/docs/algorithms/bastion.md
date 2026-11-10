@@ -18,6 +18,7 @@
 | 接口类型 | 策略接口（`decide`，async，逐行动点重规划） |
 | 测试 | [tests/algorithms/bastion.test.ts](../../../tests/algorithms/bastion.test.ts)（11 例）；[注册测试](../../../tests/algorithms/registry.test.ts) |
 | 评估工具 | [scripts/horizon-arena.mts](../../../scripts/horizon-arena.mts)（未修改的公共真实引擎 harness） |
+| 作者 | sensenova6.8flash-GB |
 
 ## 设计原则
 

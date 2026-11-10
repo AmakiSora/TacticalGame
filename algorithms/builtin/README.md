@@ -34,6 +34,7 @@ node algorithms/runner.mjs \
 - **random-royale** - 大逃杀随机算法：从合法计划动作中随机入队，随后提交（大逃杀模式）
 - **apex** - 绝境算法：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验（大逃杀模式）；档案 [apex.md](../docs/algorithms/apex.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#apex绝境算法)
 - **ark** - 方舟算法：安全格容量匹配（Hungarian 最小费用）+ 单/两动作行动点竞价 + 缩圈增援负担评估（大逃杀模式）；档案 [ark.md](../docs/algorithms/ark.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#ark方舟算法)
+- **bastion** - 堡垒算法：逐行动点束搜索 + 存活/进攻双向位置价值（威胁暴露、进攻覆盖、接敌梯度、抱团协同）+ 集火斩杀 + 缩圈炮火约束 + 逐步合法性重放（大逃杀模式）；档案 [bastion.md](../docs/algorithms/bastion.md)，设计与评估命令见 [开发笔记](../docs/ALGORITHMS_NOTES.md#bastion堡垒算法)
 - **mcts** - 蒙特卡洛树搜索：模拟推演选择最优动作（标准模式）
 - **threat** - 威胁感知算法：威胁图统一效用评估，集火斩杀、避险走位（标准模式）
 - **field** - 势场算法：斥力井（敌方火力）+ 引力井（据点/总部）+ 波前距离场，风筝走位、分头抢点（标准模式）

@@ -502,7 +502,7 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 --maps
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 --mode simultaneous --maps standoff,random-simultaneous --models none --algorithms dest-prob,kriegspiel,matrix-eq,prism,random-sim,tempo,tempo-weave,horizon --games 18
 
 # 大逃杀三人竞技场（规则版本 royale-3p-v1，独立分榜；三人图池只有 snowflake + 随机图）
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 --mode royale --maps snowflake,random-royale --models none --algorithms random-royale,echelon,apex,ark --games 36
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 --mode royale --maps snowflake,random-royale --models none --algorithms random-royale,echelon,apex,ark,bastion --games 36
 ```
 
 地图可以用顶层 `"modelEval": false` 退出模型评估（见 [docs/MAP_FORMAT.md](../docs/MAP_FORMAT.md)）：含模型的批次在组批阶段直接跳过，
@@ -517,7 +517,7 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps standoff,molten-
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps artillery-zone --algorithms random-annihilation,shrinkroll,vortex,crucible,sovereign --games 24
 
 # 大逃杀（仅同模式算法）
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps snowflake,narrow-road --algorithms random-royale,echelon,apex,ark --games 24
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps snowflake,narrow-road,mirror-lake --algorithms random-royale,echelon,apex,ark,bastion --games 24
 
 # 各模式的随机图（mapId 自带模式，不能与静态图或其他模式的随机图混批）
 rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random-annihilation --algorithms random-annihilation,shrinkroll --games 24
@@ -559,7 +559,7 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random-royale --
   小样本另附 Wilson 下界参考列。先手/后手只做展示统计，不进评分。
 - **评估控制台模式视图**：先选玩法模式，再只显示该模式的地图与算法（`ALGORITHM_META.modes`）；
   进程内评估链路四种模式全部接入（standard / annihilation 逐动作，simultaneous / royale
-  计划队列），RL 模型不参评非标准模式。大逃杀可选择 random-royale、echelon、apex 与 ark，
+  计划队列），RL 模型不参评非标准模式。大逃杀可选择 random-royale、echelon、apex、ark 与 bastion，
   歼灭可选择 random-annihilation、shrinkroll、vortex、crucible 与 sovereign，同时回合可选择
   random-sim、dest-prob、kriegspiel、matrix-eq、prism、tempo、tempo-weave 与 horizon；
   控制台在所选算法
@@ -567,7 +567,8 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps random-royale --
 - **按模式随机图**：四种模式各有一个虚拟随机图地图 id——`random`（标准，历史 `--map random`
   口径不变）、`random-annihilation`、`random-simultaneous`、`random-royale`。批次里给
   `--map random-annihilation` 即每局现生成一张该模式的对称随机图；大逃杀随机图自动带
-  `noTurnLimit`（与两张静态大逃杀图一样只靠淘汰/缩圈收场）。地图 id 与同名算法（如
+  `noTurnLimit`（与 `snowflake`、`narrow-road` 两张静态图一样只靠淘汰/缩圈收场，`mirror-lake` 另有
+  30 轮上限）。地图 id 与同名算法（如
   `random-annihilation` 算法）属不同命名空间，`--maps` 与 `--algorithms` 分别取值。
 - **模式隔离**：先按地图 `mode` 分池，再在每个模式内池化该模式全部地图并给出分图榜单
   （局数少，CI 更宽）；标准、歼灭、同时回合、大逃杀之间不共享评分，也不能跨模式比较。

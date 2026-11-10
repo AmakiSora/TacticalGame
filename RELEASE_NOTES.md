@@ -6,7 +6,20 @@
 
 ## 3.9.9
 
-- TODO 补充本版本改动
+### 新增
+
+- **新增大逃杀算法「堡垒」（`bastion` v1）**：逐行动点束搜索规划整轮，位置价值同时计价「存活」与「进攻覆盖」，叠加敌方威胁场、按地图半径自适应的接敌梯度与残血集火，终局逐步重放剔除非法动作。设计、参数与已知限制见 [算法档案](algorithms/docs/algorithms/bastion.md)。
+
+### 变更
+
+- **镜湖进复盘规范与地图清单**：`review-royale.md` 升到 1.2，补镜湖的据点/炮火/裁决口径与复盘要点；README、AGENTS、`skill/SKILL.md` 的内置地图清单补上 `mirror-lake`。
+- **大逃杀三人评估名册扩到 5 个算法**：`bastion` 与 `random-royale` / `echelon` / `apex` / `ark` 一样声明 2/3 人准入，评估控制台与「大逃杀 · 三人」分榜名册同源取自注册表；2026-11-10 跑批后榜单已刷新，`bastion` 双人 1537 / 三人 1482。
+
+### 测试与验证
+
+- `npm run build`、`npm run check-version` 通过；`npm test` 152 文件 / 1,861 例中 1,860 例通过，唯一失败固定在 `tests/api/control-auth.test.ts` 的真实 socket 用例（整轮并发下 5–10 s 超时，两次跑命中的用例不同；单独复跑 13 例全过），属既有偶发，与本版无关。
+- 真实引擎黑盒换座（`scripts/horizon-arena.mts`，双人 8 局/对手，seed-base 800，2026-11-10）：`bastion` 对 `random-royale` 16:0、`echelon` 12:4、`apex` 4:12、`ark` 4:12，两图均 0 非法动作；单次决策 max ≈40 ms、均值 ≈17 ms。详见 [算法日志](algorithms/docs/RELEASE_NOTES.md)。
+- 竞技场跑批落库并刷新榜单：大逃杀双人 432→960 局（镜湖首秀 240 局）、三人 288→576 局（96 个完整 superblock、0 残块）；统计看板同步纳入 tg_0255、tg_0256 两局回放（254→256 局）。原始 `arena/matches.jsonl` 与 `arena/details/` 仍不入 git。
 
 ## 3.9.8
 

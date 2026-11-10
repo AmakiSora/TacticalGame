@@ -15,7 +15,8 @@
 ### 测试与验证
 
 - 新增 `tests/algorithms/bastion.test.ts`（11 例：模式/阶段/席位/淘汰/已提交/行动点守卫、两种队列接口、snowflake 与 narrow-road 真实引擎整轮所有动作均被接受、单次决策耗时上限）；注册表测试把 `bastion` 纳入三人名单。`npm run build` 通过；全量 `npm test` 除一个既有的 `tests/api/control-auth.test.ts` socket hook 超时外全绿（该失败在 stash 掉本次全部改动后照旧复现，与堡垒无关）。
-- 真实引擎 harness（`scripts/horizon-arena.mts`，引擎 3.9.9、双人、8 局/对手、seed-base 800、2026-11-10）黑盒对战（堡垒视角 胜:负）：对 `random-royale` snowflake 8:0、narrow-road 8:0；对 `echelon` snowflake 8:0、narrow-road 4:4；对 `apex` snowflake 4:4、narrow-road 0:8；对 `ark` snowflake 0:8、narrow-road 4:4。两图对全部对手 `illegal = 0`。单次决策最大约 40 ms、均值约 17 ms，远低于 100 ms 上限（同场景 apex 峰值 600 ms+）。原始 JSONL 只落 gitignored `temp/`，未写入 `arena/matches.jsonl` 或正式排行榜。
+- 真实引擎 harness（`scripts/horizon-arena.mts`，引擎 3.9.9、双人、8 局/对手、seed-base 800、2026-11-10）黑盒对战（堡垒视角 胜:负）：对 `random-royale` snowflake 8:0、narrow-road 8:0；对 `echelon` snowflake 8:0、narrow-road 4:4；对 `apex` snowflake 4:4、narrow-road 0:8；对 `ark` snowflake 0:8、narrow-road 4:4。两图对全部对手 `illegal = 0`。单次决策最大约 40 ms、均值约 17 ms，远低于 100 ms 上限（同场景 apex 峰值 600 ms+）。harness 的原始 JSONL 只落 gitignored `temp/`，该批不进榜。
+- 竞技场跑批（2026-11-10，`arena/matches.jsonl` 累积、`npm run arena-leaderboard` 生成）：`bastion` 双人 **384 局 rating 1537**（胜率 46.6%，分图镜湖 1500 / 狭路 1527 / 雪花 1654 / 随机图 1374）、三人 **288 局 1482**；大逃杀双人池 432→960 局（镜湖首秀 240 局）、三人池 288→576 局（96 个完整 superblock、0 残块），`algo_bastion@v1` 自此进入双人与三人分榜。原始对局明细仍在 gitignored 的 `arena/matches.jsonl` 与 `arena/details/`。
 
 ## 3.9.5（2026-11-06）— 先手贴目金币化
 

@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-11-07T09:43:52.451Z",
+  "generatedAt": "2026-11-10T09:33:59.073Z",
   "source": {
     "file": "C:\\cosmos\\github\\game\\arena\\matches.jsonl",
-    "matchCount": 51163,
+    "matchCount": 51691,
     "retiredMatchesDropped": 0,
     "oldFormatMatchesDropped": 0,
-    "multiplayerMatchesDropped": 5976,
+    "multiplayerMatchesDropped": 6264,
     "mapDist": {
-      "random-royale": 144,
-      "narrow-road": 144,
-      "snowflake": 144,
+      "random-royale": 240,
+      "narrow-road": 240,
+      "snowflake": 240,
       "random-simultaneous": 672,
       "standoff": 672,
       "molten-throne": 672,
@@ -23,18 +23,19 @@
       "danger-close": 7806,
       "dual-lanes": 7801,
       "multiplayer-ring": 7802,
-      "whirlpool": 504
+      "whirlpool": 504,
+      "mirror-lake": 240
     },
     "modeDist": {
       "standard": 47323,
       "annihilation": 720,
       "simultaneous": 2688,
-      "royale": 432
+      "royale": 960
     },
     "dateMin": "2026-10-30 14:58:27",
-    "dateMax": "2026-11-01 01:52:36",
-    "detailDerived": 51163,
-    "detailFilesRead": 2150
+    "dateMax": "2026-11-10 17:10:57",
+    "detailDerived": 51691,
+    "detailFilesRead": 2172
   },
   "gameplay": {
     "overview": {
@@ -4582,141 +4583,146 @@
     {
       "id": "royale",
       "label": "大逃杀",
-      "games": 432,
+      "games": 960,
       "gameplay": {
         "overview": {
-          "games": 432,
-          "draws": 22,
-          "drawRate": 0.0509,
-          "annihilationRate": 0.9491,
-          "avgRounds": 16.7,
-          "avgDurationSec": 2.65,
-          "avgActions": 166,
+          "games": 960,
+          "draws": 28,
+          "drawRate": 0.0292,
+          "annihilationRate": 0.9573,
+          "avgRounds": 15.55,
+          "avgDurationSec": 3.45,
+          "avgActions": 172,
           "scoreBreakdown": {
             "headquartersDamage": 0,
             "ownHqHp": 0,
-            "controlPoints": 1.3,
-            "controlHold": 1.26,
-            "armyValue": 136.56,
-            "supplies": 294.89,
-            "killValue": 59.39
+            "controlPoints": 1.59,
+            "controlHold": 1.52,
+            "armyValue": 153.26,
+            "supplies": 310.41,
+            "killValue": 100.01
           },
           "actionMix": {
             "byType": {
-              "deploy": 0.0854,
-              "move": 0.5381,
-              "end_turn": 0.1904,
-              "attack": 0.1443,
-              "heal": 0.0166,
-              "wait": 0.0079,
-              "demolish": 0.0173
+              "deploy": 0.081,
+              "move": 0.5547,
+              "end_turn": 0.1715,
+              "attack": 0.1537,
+              "heal": 0.0151,
+              "wait": 0.0053,
+              "demolish": 0.0187
             },
             "rejectedRate": 0,
             "forcedEndTurnRate": 0
           },
-          "avgControlPointFlips": 1.31
+          "avgControlPointFlips": 1.82
         },
         "endReasons": [
           {
             "reason": "last_player_standing",
-            "count": 410,
-            "pct": 0.9491
+            "count": 919,
+            "pct": 0.9573
+          },
+          {
+            "reason": "max_rounds_exceeded",
+            "count": 16,
+            "pct": 0.0167
+          },
+          {
+            "reason": "turn_limit_score",
+            "count": 13,
+            "pct": 0.0135
           },
           {
             "reason": "mutual_annihilation",
             "count": 12,
-            "pct": 0.0278
-          },
-          {
-            "reason": "max_rounds_exceeded",
-            "count": 10,
-            "pct": 0.0231
+            "pct": 0.0125
           }
         ],
         "roundsDist": [
           {
             "bucket": "≤9",
-            "count": 0,
-            "pct": 0
+            "count": 19,
+            "pct": 0.0239
           },
           {
             "bucket": "10–14",
-            "count": 198,
-            "pct": 0.6149
+            "count": 531,
+            "pct": 0.6688
           },
           {
             "bucket": "15–19",
-            "count": 83,
-            "pct": 0.2578
+            "count": 163,
+            "pct": 0.2053
           },
           {
             "bucket": "20–24",
-            "count": 19,
-            "pct": 0.059
+            "count": 33,
+            "pct": 0.0416
           },
           {
             "bucket": "25–29",
-            "count": 11,
-            "pct": 0.0342
+            "count": 18,
+            "pct": 0.0227
           },
           {
             "bucket": "30（打满）",
-            "count": 11,
-            "pct": 0.0342
+            "count": 30,
+            "pct": 0.0378
           }
         ],
         "durationDist": [
           {
             "bucket": "<1s",
-            "count": 110,
-            "pct": 0.2546
+            "count": 198,
+            "pct": 0.2063
           },
           {
             "bucket": "1–2s",
-            "count": 164,
-            "pct": 0.3796
+            "count": 295,
+            "pct": 0.3073
           },
           {
             "bucket": "2–3s",
-            "count": 34,
-            "pct": 0.0787
+            "count": 123,
+            "pct": 0.1281
           },
           {
             "bucket": "3–5s",
-            "count": 75,
-            "pct": 0.1736
+            "count": 181,
+            "pct": 0.1885
           },
           {
             "bucket": "5–10s",
-            "count": 37,
-            "pct": 0.0856
+            "count": 112,
+            "pct": 0.1167
           },
           {
             "bucket": "≥10s",
-            "count": 12,
-            "pct": 0.0278
+            "count": 51,
+            "pct": 0.0531
           }
         ],
         "decisionMsDist": [
           {
             "bucket": "<1ms",
             "count": 1,
-            "pct": 0.0023
+            "pct": 0.001
           },
           {
             "bucket": "1–5ms",
-            "count": 178,
-            "pct": 0.412
+            "count": 324,
+            "pct": 0.3375
           },
           {
             "bucket": "5–20ms",
-            "count": 203,
-            "pct": 0.4699
+            "count": 477,
+            "pct": 0.4969
           },
           {
             "bucket": "20–100ms",
-            "count": 50,
-            "pct": 0.1157
+            "count": 158,
+            "pct": 0.1646
           },
           {
             "bucket": "100ms–1s",
@@ -4732,86 +4738,86 @@
         "units": [
           {
             "type": "ranger",
-            "deploys": 2255,
-            "deployShare": 0.3846,
-            "losses": 1219,
-            "lossShare": 0.2557
+            "deploys": 5409,
+            "deployShare": 0.4183,
+            "losses": 3101,
+            "lossShare": 0.2829
           },
           {
             "type": "scout",
-            "deploys": 1500,
-            "deployShare": 0.2558,
-            "losses": 1508,
-            "lossShare": 0.3163
-          },
-          {
-            "type": "support",
-            "deploys": 981,
-            "deployShare": 0.1673,
-            "losses": 775,
-            "lossShare": 0.1626
+            "deploys": 2699,
+            "deployShare": 0.2087,
+            "losses": 3120,
+            "lossShare": 0.2847
           },
           {
             "type": "infantry",
-            "deploys": 854,
-            "deployShare": 0.1457,
-            "losses": 671,
-            "lossShare": 0.1408
+            "deploys": 2534,
+            "deployShare": 0.196,
+            "losses": 1822,
+            "lossShare": 0.1662
+          },
+          {
+            "type": "support",
+            "deploys": 1761,
+            "deployShare": 0.1362,
+            "losses": 1365,
+            "lossShare": 0.1245
           },
           {
             "type": "heavy",
-            "deploys": 273,
-            "deployShare": 0.0466,
-            "losses": 594,
-            "lossShare": 0.1246
+            "deploys": 527,
+            "deployShare": 0.0408,
+            "losses": 1552,
+            "lossShare": 0.1416
           }
         ],
         "economy": {
-          "seatCount": 864,
-          "avgIncomeTotal": 363,
-          "controlShare": 0.5303,
-          "avgDeployCost": 284,
-          "avgCaptures": 0.96,
-          "avgSteals": 0.66,
-          "avgFirstCaptureRound": 3.13,
+          "seatCount": 1920,
+          "avgIncomeTotal": 418,
+          "controlShare": 0.5602,
+          "avgDeployCost": 333,
+          "avgCaptures": 1.5,
+          "avgSteals": 0.91,
+          "avgFirstCaptureRound": 2.39,
           "comebackRate": 0
         },
         "perModel": [
           {
             "id": "algo_apex@v1",
-            "games": 216,
-            "wins": 179,
-            "losses": 17,
-            "draws": 20,
-            "winRate": 0.8287,
-            "avgScore": 1061,
-            "avgDamageDealt": 176,
-            "avgDamageTaken": 227,
-            "avgKills": 8.03,
-            "avgLosses": 3.59,
-            "avgCaptures": 0.99,
-            "avgSteals": 0.69,
-            "avgIncome": 396,
-            "avgFirstCaptureRound": 2.02,
-            "avgDecisionMs": 27.05,
+            "games": 384,
+            "wins": 339,
+            "losses": 24,
+            "draws": 21,
+            "winRate": 0.8828,
+            "avgScore": 1424,
+            "avgDamageDealt": 255,
+            "avgDamageTaken": 284,
+            "avgKills": 8.58,
+            "avgLosses": 3.86,
+            "avgCaptures": 1.54,
+            "avgSteals": 0.87,
+            "avgIncome": 416,
+            "avgFirstCaptureRound": 2,
+            "avgDecisionMs": 32.28,
             "scoreBreakdown": {
               "headquartersDamage": 0,
               "ownHqHp": 0,
-              "controlPoints": 1.44,
-              "controlHold": 1.37,
-              "armyValue": 250.89,
-              "supplies": 300.03,
-              "killValue": 114.6
+              "controlPoints": 1.72,
+              "controlHold": 1.61,
+              "armyValue": 288.81,
+              "supplies": 280.78,
+              "killValue": 169.24
             },
             "actionMix": {
               "byType": {
-                "deploy": 0.0769,
-                "end_turn": 0.1905,
-                "move": 0.4581,
-                "wait": 0.0291,
-                "attack": 0.2196,
-                "heal": 0.0115,
-                "demolish": 0.0142
+                "deploy": 0.0795,
+                "end_turn": 0.17,
+                "move": 0.4583,
+                "wait": 0.0253,
+                "attack": 0.245,
+                "heal": 0.0103,
+                "demolish": 0.0116
               },
               "rejectedRate": 0,
               "forcedEndTurnRate": 0
@@ -4821,52 +4827,52 @@
             "topDeploys": [
               {
                 "type": "ranger",
-                "count": 955
+                "count": 1621
               },
               {
                 "type": "infantry",
-                "count": 202
+                "count": 536
               },
               {
                 "type": "scout",
-                "count": 168
+                "count": 246
               }
             ]
           },
           {
             "id": "algo_ark@v1",
-            "games": 216,
-            "wins": 156,
-            "losses": 43,
+            "games": 384,
+            "wins": 288,
+            "losses": 79,
             "draws": 17,
-            "winRate": 0.7222,
-            "avgScore": 1088,
-            "avgDamageDealt": 177,
-            "avgDamageTaken": 273,
-            "avgKills": 8.07,
-            "avgLosses": 4.57,
-            "avgCaptures": 1.22,
-            "avgSteals": 0.82,
-            "avgIncome": 378,
-            "avgFirstCaptureRound": 3.68,
-            "avgDecisionMs": 5.41,
+            "winRate": 0.75,
+            "avgScore": 1472,
+            "avgDamageDealt": 304,
+            "avgDamageTaken": 326,
+            "avgKills": 8.21,
+            "avgLosses": 4.13,
+            "avgCaptures": 1.48,
+            "avgSteals": 0.86,
+            "avgIncome": 401,
+            "avgFirstCaptureRound": 2.55,
+            "avgDecisionMs": 6.58,
             "scoreBreakdown": {
               "headquartersDamage": 0,
               "ownHqHp": 0,
-              "controlPoints": 1.43,
-              "controlHold": 1.36,
-              "armyValue": 237.57,
-              "supplies": 248.01,
-              "killValue": 114.46
+              "controlPoints": 1.68,
+              "controlHold": 1.56,
+              "armyValue": 271.24,
+              "supplies": 249.22,
+              "killValue": 227.68
             },
             "actionMix": {
               "byType": {
-                "deploy": 0.1073,
-                "move": 0.3958,
-                "end_turn": 0.202,
-                "attack": 0.2522,
-                "demolish": 0.0413,
-                "heal": 0.0016
+                "deploy": 0.1013,
+                "move": 0.4021,
+                "end_turn": 0.1762,
+                "attack": 0.2803,
+                "demolish": 0.0301,
+                "heal": 0.01
               },
               "rejectedRate": 0,
               "forcedEndTurnRate": 0
@@ -4876,52 +4882,106 @@
             "topDeploys": [
               {
                 "type": "ranger",
-                "count": 957
+                "count": 1542
               },
               {
                 "type": "scout",
-                "count": 532
+                "count": 777
               },
               {
                 "type": "infantry",
-                "count": 179
+                "count": 469
+              }
+            ]
+          },
+          {
+            "id": "algo_bastion@v1",
+            "games": 384,
+            "wins": 179,
+            "losses": 199,
+            "draws": 6,
+            "winRate": 0.4661,
+            "avgScore": 739,
+            "avgDamageDealt": 72,
+            "avgDamageTaken": 495,
+            "avgKills": 5.33,
+            "avgLosses": 6.26,
+            "avgCaptures": 2.49,
+            "avgSteals": 1.6,
+            "avgIncome": 483,
+            "avgFirstCaptureRound": 2.18,
+            "avgDecisionMs": 13.54,
+            "scoreBreakdown": {
+              "headquartersDamage": 0,
+              "ownHqHp": 0,
+              "controlPoints": 2.14,
+              "controlHold": 1.99,
+              "armyValue": 133.33,
+              "supplies": 338.8,
+              "killValue": 76.37
+            },
+            "actionMix": {
+              "byType": {
+                "deploy": 0.0816,
+                "end_turn": 0.1712,
+                "move": 0.5924,
+                "attack": 0.1115,
+                "demolish": 0.0433
+              },
+              "rejectedRate": 0,
+              "forcedEndTurnRate": 0
+            },
+            "policyValueMean": null,
+            "policyEntropyMean": null,
+            "topDeploys": [
+              {
+                "type": "ranger",
+                "count": 1490
+              },
+              {
+                "type": "infantry",
+                "count": 801
+              },
+              {
+                "type": "scout",
+                "count": 410
               }
             ]
           },
           {
             "id": "algo_echelon@v1",
-            "games": 216,
-            "wins": 75,
-            "losses": 134,
-            "draws": 7,
-            "winRate": 0.3472,
-            "avgScore": 209,
-            "avgDamageDealt": 16,
-            "avgDamageTaken": 418,
-            "avgKills": 4.47,
-            "avgLosses": 5.88,
-            "avgCaptures": 1.52,
-            "avgSteals": 1.05,
-            "avgIncome": 472,
-            "avgFirstCaptureRound": 2.68,
-            "avgDecisionMs": 4.07,
+            "games": 384,
+            "wins": 125,
+            "losses": 247,
+            "draws": 12,
+            "winRate": 0.3255,
+            "avgScore": 326,
+            "avgDamageDealt": 46,
+            "avgDamageTaken": 490,
+            "avgKills": 4.61,
+            "avgLosses": 6.27,
+            "avgCaptures": 1.77,
+            "avgSteals": 1.1,
+            "avgIncome": 537,
+            "avgFirstCaptureRound": 1.97,
+            "avgDecisionMs": 5.23,
             "scoreBreakdown": {
               "headquartersDamage": 0,
               "ownHqHp": 0,
-              "controlPoints": 1.7,
-              "controlHold": 1.63,
-              "armyValue": 57.76,
-              "supplies": 455.26,
-              "killValue": 7.2
+              "controlPoints": 1.78,
+              "controlHold": 1.73,
+              "armyValue": 72.41,
+              "supplies": 485.4,
+              "killValue": 23.91
             },
             "actionMix": {
               "byType": {
-                "move": 0.5564,
-                "end_turn": 0.2198,
-                "deploy": 0.0786,
-                "attack": 0.0799,
-                "heal": 0.0509,
-                "demolish": 0.0144
+                "move": 0.5452,
+                "end_turn": 0.202,
+                "deploy": 0.0733,
+                "attack": 0.1166,
+                "heal": 0.0532,
+                "demolish": 0.0096
               },
               "rejectedRate": 0,
               "forcedEndTurnRate": 0
@@ -4931,51 +4991,51 @@
             "topDeploys": [
               {
                 "type": "support",
-                "count": 588
+                "count": 1037
               },
               {
                 "type": "scout",
-                "count": 390
+                "count": 625
               },
               {
                 "type": "ranger",
-                "count": 147
+                "count": 412
               }
             ]
           },
           {
             "id": "algo_random-royale@v1",
-            "games": 216,
-            "wins": 0,
-            "losses": 216,
+            "games": 384,
+            "wins": 1,
+            "losses": 383,
             "draws": 0,
-            "winRate": 0,
-            "avgScore": 5,
-            "avgDamageDealt": 6,
-            "avgDamageTaken": 499,
-            "avgKills": 1.5,
+            "winRate": 0.0026,
+            "avgScore": 8,
+            "avgDamageDealt": 13,
+            "avgDamageTaken": 593,
+            "avgKills": 1.81,
             "avgLosses": 8.03,
-            "avgCaptures": 0.09,
-            "avgSteals": 0.06,
-            "avgIncome": 206,
-            "avgFirstCaptureRound": 6.75,
-            "avgDecisionMs": 2.3,
+            "avgCaptures": 0.21,
+            "avgSteals": 0.12,
+            "avgIncome": 252,
+            "avgFirstCaptureRound": 5.41,
+            "avgDecisionMs": 2.32,
             "scoreBreakdown": {
               "headquartersDamage": 0,
               "ownHqHp": 0,
-              "controlPoints": 0.63,
-              "controlHold": 0.7,
-              "armyValue": 0,
-              "supplies": 176.25,
-              "killValue": 1.31
+              "controlPoints": 0.61,
+              "controlHold": 0.72,
+              "armyValue": 0.5,
+              "supplies": 197.84,
+              "killValue": 2.84
             },
             "actionMix": {
               "byType": {
-                "move": 0.7476,
-                "deploy": 0.0798,
-                "end_turn": 0.1506,
-                "attack": 0.0183,
-                "heal": 0.0037
+                "move": 0.7669,
+                "deploy": 0.0708,
+                "end_turn": 0.1392,
+                "attack": 0.0209,
+                "heal": 0.0023
               },
               "rejectedRate": 0,
               "forcedEndTurnRate": 0
@@ -4985,50 +5045,61 @@
             "topDeploys": [
               {
                 "type": "scout",
-                "count": 410
+                "count": 641
               },
               {
                 "type": "infantry",
-                "count": 349
+                "count": 565
               },
               {
                 "type": "support",
-                "count": 251
+                "count": 439
               }
             ]
           }
         ],
         "perMap": [
           {
-            "map": "narrow-road",
-            "games": 144,
-            "drawRate": 0.0833,
-            "annihilationRate": 0.9167,
-            "avgRounds": 13.37,
-            "avgDurationSec": 1.21,
+            "map": "mirror-lake",
+            "games": 240,
+            "drawRate": 0,
+            "annihilationRate": 0.9458,
+            "avgRounds": 13.07,
+            "avgDurationSec": 4.23,
             "firstSeatWinRate": 0.5,
-            "avgControlPointFlips": 0.53,
+            "avgControlPointFlips": 1.21,
+            "topEndReason": "last_player_standing"
+          },
+          {
+            "map": "narrow-road",
+            "games": 240,
+            "drawRate": 0.05,
+            "annihilationRate": 0.95,
+            "avgRounds": 12.66,
+            "avgDurationSec": 1.29,
+            "firstSeatWinRate": 0.4958,
+            "avgControlPointFlips": 1.21,
             "topEndReason": "last_player_standing"
           },
           {
             "map": "random-royale",
-            "games": 144,
-            "drawRate": 0.0694,
-            "annihilationRate": 0.9306,
-            "avgRounds": 23.05,
-            "avgDurationSec": 3.16,
-            "firstSeatWinRate": 0.4861,
-            "avgControlPointFlips": 3.41,
+            "games": 240,
+            "drawRate": 0.0667,
+            "annihilationRate": 0.9333,
+            "avgRounds": 22.49,
+            "avgDurationSec": 3.73,
+            "firstSeatWinRate": 0.4708,
+            "avgControlPointFlips": 4.86,
             "topEndReason": "last_player_standing"
           },
           {
             "map": "snowflake",
-            "games": 144,
+            "games": 240,
             "drawRate": 0,
             "annihilationRate": 1,
-            "avgRounds": 13.68,
-            "avgDurationSec": 3.59,
-            "firstSeatWinRate": 0.4931,
+            "avgRounds": 13.98,
+            "avgDurationSec": 4.54,
+            "firstSeatWinRate": 0.525,
             "avgControlPointFlips": 0,
             "topEndReason": "last_player_standing"
           }
@@ -5122,6 +5193,48 @@
       "notes": "歼灭：概率齐射竞价、多轮炮火逃逸与协同让行开路，动态权衡兵力和部署窗口"
     },
     {
+      "id": "algo_apex@v1",
+      "kind": "algorithm",
+      "short": "绝境算法",
+      "version": "v1",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "apex",
+      "modes": [
+        "royale"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 2009,
+      "ratingLo": 1900,
+      "ratingHi": 1973,
+      "winRate": 0.8828,
+      "games": 384,
+      "ratings": [
+        {
+          "mode": "royale",
+          "modeLabel": "大逃杀",
+          "rating": 2009,
+          "ratingLo": 1900,
+          "ratingHi": 1973,
+          "winRate": 0.8828,
+          "games": 384,
+          "wins": 339,
+          "losses": 24,
+          "draws": 21
+        }
+      ],
+      "ratingMode": "royale",
+      "ratingModeLabel": "大逃杀",
+      "docRef": "algorithms/docs/algorithms/apex.md",
+      "docStatus": "内置算法",
+      "notes": "大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验"
+    },
+    {
       "id": "algo_tempo-weave@v1",
       "kind": "algorithm",
       "short": "经纬算法",
@@ -5162,48 +5275,6 @@
       "docRef": "algorithms/docs/algorithms/tempo-weave.md",
       "docStatus": "内置算法",
       "notes": "同时回合：任务竞价、变长行动排程与总部生存期限约束"
-    },
-    {
-      "id": "algo_apex@v1",
-      "kind": "algorithm",
-      "short": "绝境算法",
-      "version": "v1",
-      "trainDate": null,
-      "trainMap": null,
-      "opponentType": null,
-      "steps": null,
-      "algorithm": "apex",
-      "modes": [
-        "royale"
-      ],
-      "status": "builtin",
-      "statusNote": null,
-      "rated": true,
-      "sizeMB": null,
-      "rating": 1974,
-      "ratingLo": 1860,
-      "ratingHi": 1936,
-      "winRate": 0.8287,
-      "games": 216,
-      "ratings": [
-        {
-          "mode": "royale",
-          "modeLabel": "大逃杀",
-          "rating": 1974,
-          "ratingLo": 1860,
-          "ratingHi": 1936,
-          "winRate": 0.8287,
-          "games": 216,
-          "wins": 179,
-          "losses": 17,
-          "draws": 20
-        }
-      ],
-      "ratingMode": "royale",
-      "ratingModeLabel": "大逃杀",
-      "docRef": "algorithms/docs/algorithms/apex.md",
-      "docStatus": "内置算法",
-      "notes": "大逃杀：缩圈时空寻路、兵力配比、多情境同步束搜索与对抗校验"
     },
     {
       "id": "algo_verdict@v2",
@@ -5306,22 +5377,22 @@
       "statusNote": null,
       "rated": true,
       "sizeMB": null,
-      "rating": 1866,
-      "ratingLo": 1766,
-      "ratingHi": 1824,
-      "winRate": 0.7222,
-      "games": 216,
+      "rating": 1850,
+      "ratingLo": 1765,
+      "ratingHi": 1816,
+      "winRate": 0.75,
+      "games": 384,
       "ratings": [
         {
           "mode": "royale",
           "modeLabel": "大逃杀",
-          "rating": 1866,
-          "ratingLo": 1766,
-          "ratingHi": 1824,
-          "winRate": 0.7222,
-          "games": 216,
-          "wins": 156,
-          "losses": 43,
+          "rating": 1850,
+          "ratingLo": 1765,
+          "ratingHi": 1816,
+          "winRate": 0.75,
+          "games": 384,
+          "wins": 288,
+          "losses": 79,
           "draws": 17
         }
       ],
@@ -5836,6 +5907,48 @@
       "notes": "v3.3.0 候选产物（内部 num_timesteps = 11,400,000，文件名末段 14.0M 是训练目标步数）。从零训练：算法教师蒸馏冷启动（threat/greedy/field 经 decide 通道，不加载任何历史模型）+ hex_transformer 扩为 2 层×d128 / net_width 512（0.87M → 1.44M 参数，吞吐 240–260 fps）+ 无锚点（RL_NO_AUTO_ANCHOR=1）+ 随机域联合边角采样（RL_RANDOM_CORNER_BOOST）。S1 6M → S2 8M（7.15M 处宿主 OOM 后从 7.1M 无损恢复）→ S3 +3.0M 人工终止。对 v3.1.1 46.6%（lb 41.7%）、对 v3.0.3 53.6%（lb 48.6%），算法三场景 threat 41%/greedy 48%/field 53%；全图 480 局 default/breach/desert 三张静态图 0%（一票否决）、danger-close 96/96。病灶：步兵海复发（default 图步兵 81%/游侠 14%，对手 v3.1.1 为 53%/47%）——A5 novelty 是「每兵种首次部署」一次性奖励，14M 帧后失效。核心结论：「对算法 16.5%」是 7 图聚合假象（随机图上 v3.1.1 对同批算法 41%/45%/64%），静态图崩塌与算法对抗是同一个病。S1 中间产物与蒸馏断点已移入 rl/models/_archive_v3.3.0/（hex_ppo_v3.3.0_s1_6000000.zip 内部 5.7M、hex_ppo_v3.3.0_distilled.zip），未删除，可随时回滚"
     },
     {
+      "id": "algo_bastion@v1",
+      "kind": "algorithm",
+      "short": "堡垒算法",
+      "version": "v1",
+      "trainDate": null,
+      "trainMap": null,
+      "opponentType": null,
+      "steps": null,
+      "algorithm": "bastion",
+      "modes": [
+        "royale"
+      ],
+      "status": "builtin",
+      "statusNote": null,
+      "rated": true,
+      "sizeMB": null,
+      "rating": 1537,
+      "ratingLo": 1483,
+      "ratingHi": 1539,
+      "winRate": 0.4661,
+      "games": 384,
+      "ratings": [
+        {
+          "mode": "royale",
+          "modeLabel": "大逃杀",
+          "rating": 1537,
+          "ratingLo": 1483,
+          "ratingHi": 1539,
+          "winRate": 0.4661,
+          "games": 384,
+          "wins": 179,
+          "losses": 199,
+          "draws": 6
+        }
+      ],
+      "ratingMode": "royale",
+      "ratingModeLabel": "大逃杀",
+      "docRef": "algorithms/docs/algorithms/bastion.md",
+      "docStatus": "内置算法",
+      "notes": "大逃杀：击杀价值与位置安全的效用权衡，威胁暴露与缩圈炮火约束下的逐拍规划"
+    },
+    {
       "id": "hex_ppo_v3.1.0_20260910_100K.zip",
       "kind": "model",
       "short": "v3.1.0@100K",
@@ -6314,23 +6427,23 @@
       "statusNote": null,
       "rated": true,
       "sizeMB": null,
-      "rating": 1426,
-      "ratingLo": 1376,
-      "ratingHi": 1439,
-      "winRate": 0.3472,
-      "games": 216,
+      "rating": 1389,
+      "ratingLo": 1351,
+      "ratingHi": 1405,
+      "winRate": 0.3255,
+      "games": 384,
       "ratings": [
         {
           "mode": "royale",
           "modeLabel": "大逃杀",
-          "rating": 1426,
-          "ratingLo": 1376,
-          "ratingHi": 1439,
-          "winRate": 0.3472,
-          "games": 216,
-          "wins": 75,
-          "losses": 134,
-          "draws": 7
+          "rating": 1389,
+          "ratingLo": 1351,
+          "ratingHi": 1405,
+          "winRate": 0.3255,
+          "games": 384,
+          "wins": 125,
+          "losses": 247,
+          "draws": 12
         }
       ],
       "ratingMode": "royale",
@@ -6692,22 +6805,22 @@
       "statusNote": null,
       "rated": true,
       "sizeMB": null,
-      "rating": 734,
-      "ratingLo": 876,
-      "ratingHi": 921,
-      "winRate": 0,
-      "games": 216,
+      "rating": 715,
+      "ratingLo": 857,
+      "ratingHi": 924,
+      "winRate": 0.0026,
+      "games": 384,
       "ratings": [
         {
           "mode": "royale",
           "modeLabel": "大逃杀",
-          "rating": 734,
-          "ratingLo": 876,
-          "ratingHi": 921,
-          "winRate": 0,
-          "games": 216,
-          "wins": 0,
-          "losses": 216,
+          "rating": 715,
+          "ratingLo": 857,
+          "ratingHi": 924,
+          "winRate": 0.0026,
+          "games": 384,
+          "wins": 1,
+          "losses": 383,
           "draws": 0
         }
       ],

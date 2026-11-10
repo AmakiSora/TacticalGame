@@ -3,6 +3,14 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-11-10 · 大逃杀图池加镜湖、算法名册加堡垒（3.9.8 / 3.9.9）
+
+**一句话**：两个发布只扩了可参评的池子，`rl/` 代码零行为改动（仅 `evaluate_cross.py` 注释与 `rl/README.md` 示例）。`mirror-lake`（镜湖）进大逃杀双人图池——`layouts` 只有 `2`，三人图池仍是 `snowflake` + 虚拟图 `random-royale`；`bastion` 声明 `playerCounts [2, 3]` 后，大逃杀三人名册由 4 个扩到 5 个（`random-royale` / `echelon` / `apex` / `ark` / `bastion`），评估控制台的算法下拉与分榜名册同源取自注册表，`round_robin.py` 无需改动。
+
+**地图池**：双人批可直接写 `--maps snowflake,narrow-road,mirror-lake`。随机大逃杀图仍按 3.8.11 的口径带 `noTurnLimit`（`evaluate_cross.py`），而 `mirror-lake` 自带 `maxTurns: 30`、按军力 + 击杀造价裁决——随机图与镜湖不是同一套收场规则，跨图比较时需注意这条差异。
+
+**跑批与榜单**：2026-11-10 已按新池跑完并刷新榜单——大逃杀双人 4 图各 96 局/人（`snowflake` / `narrow-road` / `mirror-lake` / `random-royale`，合计 960 局），三人 **576 局 / 96 个完整 superblock / 0 残块**；`bastion` 双人 rating **1537**、三人 **1482**，`mirror-lake` 双人批 240 局首秀。榜单与统计 JSON 随本次提交更新，原始明细仍只在 gitignored 的 `arena/matches.jsonl` 与 `arena/details/`；跑批与榜单生成口径未变，详见根 `RELEASE_NOTES.md` 3.9.9 与 [算法日志](../../algorithms/docs/RELEASE_NOTES.md)。
+
 ## 2026-11-04 · 大逃杀模式三人评估跑批（3.9.3）
 
 **一句话**：三人评估补上大逃杀。`round_robin.py --player-count 3 --mode royale` 冻结 `royale-3p-v1` 的六局双向 manifest，4 个 royale 算法（`random-royale` / `echelon` / `apex` / `ark`）声明 `[2, 3]` 准入；`evaluate_cross.py` 的 `_is_plan_mode` 纳入 `royale`，三人路径按计划队列结算，reset 快照带 `playerCount: 3`；榜单按 `mode × rulesVersion` 生成独立的「大逃杀 · 三人」分榜，名册只取本模式通过三人准入的算法。

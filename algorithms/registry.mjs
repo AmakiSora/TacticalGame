@@ -37,6 +37,7 @@ export const ALGORITHMS = {
   sovereign: './builtin/sovereign.mjs',
   parallax: './builtin/parallax.mjs',
   ark: './builtin/ark.mjs',
+  bastion: './builtin/bastion.mjs',
 };
 
 /**
@@ -85,6 +86,7 @@ export const ALGORITHM_META = {
   crucible: { displayName: '熔炉算法', description: '歼灭：整回合束搜索、对抗集火回推与缩圈时间线逃逸推演', version: 'v1', modes: ['annihilation'], playerCounts: [2, 3] },
   sovereign: { displayName: '统御算法', description: '歼灭：概率齐射竞价、多轮炮火逃逸与协同让行开路，动态权衡兵力和部署窗口', version: 'v1', modes: ['annihilation'], playerCounts: [2, 3] },
   ark: { displayName: '方舟算法', description: '大逃杀：独立安全格容量分配、行动组合调度与缩圈增援负担评估', version: 'v1', modes: ['royale'], playerCounts: [2, 3] },
+  bastion: { displayName: '堡垒算法', description: '大逃杀：击杀价值与位置安全的效用权衡，威胁暴露与缩圈炮火约束下的逐拍规划', version: 'v1', modes: ['royale'], playerCounts: [2, 3] },
 };
 
 /**

@@ -48,9 +48,10 @@ describe('algorithm registry modes', () => {
     const threePlayer = Object.keys(ALGORITHMS)
       .filter(name => algorithmModes(name).some(mode => threePlayerModes.includes(mode)));
     expect(threePlayer.sort()).toEqual([
-      'apex', 'ark', 'crucible', 'dest-prob', 'echelon', 'field', 'greedy', 'horizon', 'kriegspiel',
-      'matrix-eq', 'mcts', 'parallax', 'prism', 'random', 'random-annihilation', 'random-royale',
-      'random-sim', 'shrinkroll', 'sovereign', 'tempo', 'tempo-weave', 'threat', 'verdict', 'vortex',
+      'apex', 'ark', 'bastion', 'crucible', 'dest-prob', 'echelon', 'field', 'greedy', 'horizon',
+      'kriegspiel', 'matrix-eq', 'mcts', 'parallax', 'prism', 'random', 'random-annihilation',
+      'random-royale', 'random-sim', 'shrinkroll', 'sovereign', 'tempo', 'tempo-weave', 'threat',
+      'verdict', 'vortex',
     ]);
     for (const name of threePlayer) {
       expect(algorithmPlayerCounts(name), name).toEqual([2, 3]);

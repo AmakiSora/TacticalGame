@@ -4,7 +4,18 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1、`bastion` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
+
+## 3.9.9（2026-11-10）— 新增大逃杀堡垒算法
+
+### 新增算法
+
+- 新增大逃杀模式算法 `bastion`（堡垒算法，v1，`algo_bastion@v1`，仅注册 `royale`、`playerCounts [2,3]`）：逐行动点束搜索规划整轮（束宽 10、软预算 85ms），位置价值兼顾「存活」与「进攻覆盖」——威胁场暴露惩罚之外，叠加「本格能威胁到的敌军战力」正向奖励、到最近敌人的接敌梯度（强度按地图半径自适应：开阔大图全力追击、紧凑小图收敛防过度深入）与抱团协同项，攻击对残血目标额外集火加权鼓励收人头，部署用「每点费用战力」性价比（`eff³`，偏向远程兵种避免全爆近战重装被风筝）× 军队容量边际递减。终局做一次按行动步的合法性重放（`sanitizeActions`），剔除落点占用、部署冲突与「攻击已被己方前序攻击打死目标」的空刀，保证行动点不被结算失败浪费。独立设计，不读取/导入仓库内其他算法；实现见 [algorithms/builtin/bastion.mjs](../../builtin/bastion.mjs)，设计文档见 [bastion.md](algorithms/bastion.md)。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/bastion.test.ts`（11 例：模式/阶段/席位/淘汰/已提交/行动点守卫、两种队列接口、snowflake 与 narrow-road 真实引擎整轮所有动作均被接受、单次决策耗时上限）；注册表测试把 `bastion` 纳入三人名单。`npm run build` 通过；全量 `npm test` 除一个既有的 `tests/api/control-auth.test.ts` socket hook 超时外全绿（该失败在 stash 掉本次全部改动后照旧复现，与堡垒无关）。
+- 真实引擎 harness（`scripts/horizon-arena.mts`，引擎 3.9.9、双人、8 局/对手、seed-base 800、2026-11-10）黑盒对战（堡垒视角 胜:负）：对 `random-royale` snowflake 8:0、narrow-road 8:0；对 `echelon` snowflake 8:0、narrow-road 4:4；对 `apex` snowflake 4:4、narrow-road 0:8；对 `ark` snowflake 0:8、narrow-road 4:4。两图对全部对手 `illegal = 0`。单次决策最大约 40 ms、均值约 17 ms，远低于 100 ms 上限（同场景 apex 峰值 600 ms+）。原始 JSONL 只落 gitignored `temp/`，未写入 `arena/matches.jsonl` 或正式排行榜。
 
 ## 3.9.5（2026-11-06）— 先手贴目金币化
 

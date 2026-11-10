@@ -461,8 +461,8 @@ describe('三人标准模式独立 PL 分榜', () => {
     expect(division.maps.all.overview).toMatchObject({
       games: 6, superblockCount: 1, quarantinedSuperblocks: 0,
     });
-    // 大逃杀三人榜列全部 4 个大逃杀算法（3 个上场 + 1 个零局），不混入其它模式算法。
-    expect(division.maps.all.models).toHaveLength(4);
+    // 大逃杀三人榜列全部 5 个大逃杀算法（3 个上场 + 2 个零局），不混入其它模式算法。
+    expect(division.maps.all.models).toHaveLength(5);
     expect(division.maps.all.models.filter((model: { games: number }) => model.games > 0)).toHaveLength(3);
     expect(payload.registry['algo_apex@v1'].playerCounts).toEqual([2, 3]);
     expect(payload.registry['algo_apex@v1'].modes).toEqual(['royale']);

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-07T09:43:52.570Z",
+  "generatedAt": "2026-11-10T03:06:52.698Z",
   "note": "random 图为每局一张对称随机地图，无静态文件；其先手胜率来自竞技场统计而非本文件。",
   "maps": [
     {
@@ -380,6 +380,154 @@
         },
         "komi": {
           "supplies": 12
+        }
+      }
+    },
+    {
+      "id": "mirror-lake",
+      "name": "镜湖",
+      "mode": "royale",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 6,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          6,
+          0
+        ],
+        "player_b": [
+          -6,
+          0
+        ]
+      },
+      "hqDistance": 12,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 1
+        }
+      },
+      "controlPointCount": 5,
+      "controlPointKinds": {
+        "forward_base": 2,
+        "supply": 2,
+        "repair": 1
+      },
+      "controlPoints": [
+        {
+          "id": "cp_east",
+          "kind": "forward_base",
+          "q": 5,
+          "r": 0,
+          "distToA": 1,
+          "distToB": 11,
+          "bias": 10
+        },
+        {
+          "id": "cp_west",
+          "kind": "forward_base",
+          "q": -5,
+          "r": 0,
+          "distToA": 11,
+          "distToB": 1,
+          "bias": -10
+        },
+        {
+          "id": "cp_northeast",
+          "kind": "supply",
+          "q": 4,
+          "r": -4,
+          "distToA": 6,
+          "distToB": 10,
+          "bias": 4
+        },
+        {
+          "id": "cp_southwest",
+          "kind": "supply",
+          "q": -4,
+          "r": 4,
+          "distToA": 10,
+          "distToB": 6,
+          "bias": -4
+        },
+        {
+          "id": "cp_isle",
+          "kind": "repair",
+          "q": 0,
+          "r": 0,
+          "distToA": 6,
+          "distToB": 6,
+          "bias": 0
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 3,
+          "controlPointsUnmatched": 2,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 28,
+          "share": 0.22
+        },
+        {
+          "kind": "blocker",
+          "count": 12,
+          "share": 0.09
+        }
+      ],
+      "balance": {
+        "startingSupplies": 260,
+        "baseIncome": 20,
+        "damageVarianceRange": 2,
+        "minimumDamage": 1,
+        "healVarianceRange": 10,
+        "actionsPerTurn": 8,
+        "maxTurns": 30,
+        "adjudicationWeights": {
+          "enemyHqDamage": 0,
+          "ownHqHp": 0,
+          "controlPoint": 0,
+          "armyValue": 5,
+          "supplies": 0,
+          "killValue": 1.5
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 12,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 20,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 0,
+            "deployDiscount": 0,
+            "repairAmount": 3
+          }
         }
       }
     },

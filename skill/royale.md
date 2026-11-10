@@ -1,6 +1,6 @@
 # Royale mode (大逃杀)
 
-Use only when `game.config.mode === "royale"` (maps: `snowflake` 雪花 2/3/6 players, `narrow-road` 狭路相逢 2 players).  
+Use only when `game.config.mode === "royale"` (maps: `snowflake` 雪花 2/3/6 players, `narrow-road` 狭路相逢 2 players, `mirror-lake` 镜湖 2 players).  
 If the game is `standard`, `annihilation`, or `simultaneous`, stop and read that mode file instead — do not apply this file.
 
 Royale = **simultaneous resolution** (secret plans, full-commit settlement) × **annihilation rules**
@@ -132,6 +132,37 @@ Do **not** memorize a fixed timetable. Each royale map carries its own schedule.
 - Scoring: `armyValue 1 + killValue 1` (HQ/CP/supply weights are dead — royale has no
   HQ, and supplies score 0). Securing kills (last hit) and keeping your cheap army alive are
   the whole game; do not burn turns on empty moves or hoard supplies.
+
+## Mirror-lake map (镜湖) specifics
+
+- 2-player radius-6 duel, **fully centre-symmetric** (terrain, control points and both spawn slots).
+  A ring of water surrounds a 7-cell central island; the E/W causeways along the `q` axis and the
+  NW/SE side paths are the only ways in. `spawnSlots[].headquarters` is spawn metadata only —
+  there is no HQ at runtime.
+- Control points: `cp_east` / `cp_west` (`forward_base`, income 20, your deploy pads at `q = ±5`),
+  `cp_northeast` / `cp_southwest` (`supply`, income 12), and **`cp_isle`** at `(0,0)` (`repair`,
+  `repairAmount 3`, income 0). The isle is inside the final safe ring and is the endgame prize, but
+  its repair is deliberately too weak to make the first occupant unkillable — the point is
+  contestable, do not assume an early capture decides the game.
+- Spawn: **2 heavy + 1 scout** per side, `startingSupplies 260`, `baseIncome 20`,
+  `actionsPerTurn 8`. Only `infantry` / `scout` can capture; `ranger` and `support` are deploy-only.
+  260 buys roughly 2 heavy + 1 infantry, so the opening composition is a real choice — you cannot
+  flood the board, and hoarding supplies instead of deploying loses the initiative.
+- Same standard roster as snowflake (always re-read `config.units`): infantry 90 HP / 31 atk / 7 def
+  / move 3 / range 2 `line`, scout 70 / 16 / 4 / 4 / 1, heavy 140 / 40 / 9 / 2 / 1 `arc`,
+  ranger 68 / 34 / 3 / 3 / 3 `attackLock`, support 76 / 10 / 5 / 3 / 2 heal 20 `arc`.
+- Artillery (this map only — re-derive on any other royale map): `startRound 6`, `intervalRounds 1`,
+  `damage 25`, `minimumSafeRadius 1`. Rounds 1–5 are safe (`safeRadius 6`); from round 6 the ring
+  loses one per round (6→5→…→1) and **holds at 1 from round 10**. The 7 centre cells are always
+  safe. Walking into danger is legal but billed 25 HP at every round boundary; deploy, heal and
+  control-point repair are banned on danger cells.
+- **Turn cap `maxTurns 30`**: once the ring stops shrinking, a stalemate can otherwise run past
+  round 100 with both armies parked on safe cells. At round 30 the game is adjudicated by
+  `armyValue 5 + killValue 1.5` (HQ / CP / supply weights are 0), so do not stall after round 25 —
+  army value and last-hit kills decide a capped game. Read `adjudication.weights` of the live game.
+- Practical shape: rounds 1–5 build up and contest the two `supply` pads; from round 6 fight while
+  retreating toward the island; from round 10 the final ground is the centre 7 cells. Expect
+  `destination_conflict` on the causeway mouths and the isle.
 
 ## Planning checklist
 

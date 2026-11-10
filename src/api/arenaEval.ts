@@ -68,7 +68,7 @@ const MAP_DISPLAY_ORDER = [
   'default', 'breach', 'danger-close', 'dual-lanes',
   'artillery-zone', 'trench-run',
   'standoff', 'molten-throne', 'mistpine',
-  'snowflake', 'narrow-road',
+  'snowflake', 'narrow-road', 'mirror-lake',
   'multiplayer-ring', 'whirlpool',
 ];
 

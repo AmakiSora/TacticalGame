@@ -1,0 +1,410 @@
+{
+  "mode": "royale",
+  "name": "镜湖",
+  "description": "双人大逃杀湖岛图。半径 6 的镜面对峙战场：一圈湖水环抱湖心小岛，岛上唯一的维修点是终局诱饵——炮火收缩到最后就只剩它。东、西两条栈道正对两岸出生地，北西、南东两条栈道留给迂回；两岸各一座前进基地，对角各一处补给点，先隔水对射、后抢桥登陆。",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 6,
+  "terrainCells": [
+    {
+      "q": -5,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 1,
+      "terrain": "water"
+    },
+    {
+      "q": -3,
+      "r": 2,
+      "terrain": "water"
+    },
+    {
+      "q": -2,
+      "r": -1,
+      "terrain": "water"
+    },
+    {
+      "q": -2,
+      "r": 1,
+      "terrain": "water"
+    },
+    {
+      "q": -2,
+      "r": 3,
+      "terrain": "water"
+    },
+    {
+      "q": -1,
+      "r": -2,
+      "terrain": "water"
+    },
+    {
+      "q": -1,
+      "r": -1,
+      "terrain": "water"
+    },
+    {
+      "q": -1,
+      "r": 2,
+      "terrain": "water"
+    },
+    {
+      "q": -1,
+      "r": 3,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": -6,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": -5,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": -4,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": -3,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": -2,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": 2,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": 3,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": 4,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": 5,
+      "terrain": "water"
+    },
+    {
+      "q": 0,
+      "r": 6,
+      "terrain": "water"
+    },
+    {
+      "q": 1,
+      "r": -3,
+      "terrain": "water"
+    },
+    {
+      "q": 1,
+      "r": -2,
+      "terrain": "water"
+    },
+    {
+      "q": 1,
+      "r": 1,
+      "terrain": "water"
+    },
+    {
+      "q": 1,
+      "r": 2,
+      "terrain": "water"
+    },
+    {
+      "q": 2,
+      "r": -3,
+      "terrain": "water"
+    },
+    {
+      "q": 2,
+      "r": -1,
+      "terrain": "water"
+    },
+    {
+      "q": 2,
+      "r": 1,
+      "terrain": "water"
+    },
+    {
+      "q": 3,
+      "r": -2,
+      "terrain": "water"
+    },
+    {
+      "q": 3,
+      "r": -1,
+      "terrain": "water"
+    },
+    {
+      "q": 3,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": 1,
+      "terrain": "blocker"
+    }
+  ],
+  "controlPoints": [
+    {
+      "id": "cp_east",
+      "name": "东岸基地",
+      "kind": "forward_base",
+      "q": 5,
+      "r": 0
+    },
+    {
+      "id": "cp_west",
+      "name": "西岸基地",
+      "kind": "forward_base",
+      "q": -5,
+      "r": 0
+    },
+    {
+      "id": "cp_northeast",
+      "name": "东北补给",
+      "kind": "supply",
+      "q": 4,
+      "r": -4
+    },
+    {
+      "id": "cp_southwest",
+      "name": "西南补给",
+      "kind": "supply",
+      "q": -4,
+      "r": 4
+    },
+    {
+      "id": "cp_isle",
+      "name": "湖心维修",
+      "kind": "repair",
+      "q": 0,
+      "r": 0
+    }
+  ],
+  "units": {
+    "infantry": {
+      "hp": 90,
+      "attack": 31,
+      "defense": 7,
+      "moveRange": 3,
+      "attackRange": 2,
+      "cost": 55,
+      "canCapture": true,
+      "attackShape": {
+        "type": "line",
+        "length": 2
+      }
+    },
+    "scout": {
+      "hp": 70,
+      "attack": 16,
+      "defense": 4,
+      "moveRange": 4,
+      "attackRange": 1,
+      "cost": 42,
+      "canCapture": true
+    },
+    "heavy": {
+      "hp": 140,
+      "attack": 40,
+      "defense": 9,
+      "moveRange": 2,
+      "attackRange": 1,
+      "cost": 100,
+      "canCapture": false,
+      "attackShape": {
+        "type": "arc"
+      }
+    },
+    "ranger": {
+      "hp": 68,
+      "attack": 34,
+      "defense": 3,
+      "moveRange": 3,
+      "attackRange": 3,
+      "cost": 80,
+      "canCapture": false,
+      "attackLock": true
+    },
+    "support": {
+      "hp": 76,
+      "attack": 10,
+      "defense": 5,
+      "moveRange": 3,
+      "attackRange": 2,
+      "cost": 68,
+      "canCapture": false,
+      "healPower": 20,
+      "healShape": {
+        "type": "arc"
+      }
+    }
+  },
+  "headquartersSpec": {
+    "hp": 1,
+    "defense": 0
+  },
+  "balance": {
+    "startingSupplies": 260,
+    "baseIncome": 20,
+    "damageVarianceRange": 2,
+    "minimumDamage": 1,
+    "healVarianceRange": 10,
+    "actionsPerTurn": 8,
+    "maxTurns": 30,
+    "adjudicationWeights": {
+      "enemyHqDamage": 0,
+      "ownHqHp": 0,
+      "controlPoint": 0,
+      "armyValue": 5,
+      "supplies": 0,
+      "killValue": 1.5
+    },
+    "controlPointTypes": {
+      "supply": {
+        "income": 12,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "forward_base": {
+        "income": 20,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "repair": {
+        "income": 0,
+        "deployDiscount": 0,
+        "repairAmount": 3
+      }
+    }
+  },
+  "annihilation": {
+    "artillery": {
+      "startRound": 6,
+      "intervalRounds": 1,
+      "damage": 25,
+      "minimumSafeRadius": 1
+    }
+  },
+  "spawnSlots": [
+    {
+      "id": "slot_east",
+      "headquarters": {
+        "q": 6,
+        "r": 0
+      },
+      "controlPointId": "cp_east",
+      "startingUnits": [
+        {
+          "type": "heavy",
+          "q": 6,
+          "r": -1
+        },
+        {
+          "type": "heavy",
+          "q": 5,
+          "r": -2
+        },
+        {
+          "type": "scout",
+          "q": 6,
+          "r": -2
+        }
+      ]
+    },
+    {
+      "id": "slot_west",
+      "headquarters": {
+        "q": -6,
+        "r": 0
+      },
+      "controlPointId": "cp_west",
+      "startingUnits": [
+        {
+          "type": "heavy",
+          "q": -6,
+          "r": 1
+        },
+        {
+          "type": "heavy",
+          "q": -5,
+          "r": 2
+        },
+        {
+          "type": "scout",
+          "q": -6,
+          "r": 2
+        }
+      ]
+    }
+  ],
+  "layouts": {
+    "2": [
+      "slot_east",
+      "slot_west"
+    ]
+  }
+}

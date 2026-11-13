@@ -12,7 +12,7 @@
 |---|---|
 | 代码版本 | 3.9.9 |
 | 标准图池 | `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `whirlpool` |
-| 同时回合图 | `standoff` / `molten-throne` / `mistpine` |
+| 同时回合图 | `standoff` / `molten-throne` / `mistpine` / `longbow-gallery` |
 | 大逃杀图 | `snowflake` / `narrow-road` / `mirror-lake`（内置基线：`random-royale`；强度算法：`echelon` / `apex` / `ark` / `bastion`） |
 | 歼灭图 | `artillery-zone` / `trench-run`（内置基线：`random-annihilation`；强度算法：`shrinkroll` / `vortex` / `crucible` / `sovereign`） |
 | 同时回合规则 | 3.8.0 起按行动点**分步结算**，不是“一单位一轮一动作” |

@@ -1,8 +1,8 @@
 # TacticalGame
 
-尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`、`molten-throne`、`mistpine` 等地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）、`narrow-road`（狭路相逢）与 `mirror-lake`（镜湖）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则。
+尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`、`molten-throne`、`mistpine`、`longbow-gallery` 等地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）、`narrow-road`（狭路相逢）与 `mirror-lake`（镜湖）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则。
 
-当前版本：`3.9.9`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`3.9.10`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -60,7 +60,7 @@ npm run export-state
 |---|---|---|---|
 | `standard` 逐人轮流 | `default`、`breach`、`danger-close`、`dual-lanes`、`multiplayer-ring`、`whirlpool` | 有总部、有行动顺序；总部归零淘汰；达到 `maxTurns` 按裁决分定胜负 | [skill/standard.md](skill/standard.md) |
 | `annihilation` 歼灭 | `artillery-zone`、`trench-run`（战壕） | 无总部；炮火预告后逐轮向中心收缩；危险区禁部署/治疗/维修；最后存活者获胜 | [skill/annihilation.md](skill/annihilation.md) |
-| `simultaneous` 同时回合 | `standoff`、`molten-throne`、`mistpine` | 无行动顺序：先秘密排队，再按行动点分步同时结算；攻击/治疗瞄准格子或方向 | [skill/simultaneous.md](skill/simultaneous.md) |
+| `simultaneous` 同时回合 | `standoff`、`molten-throne`、`mistpine`、`longbow-gallery`（长弓回廊） | 无行动顺序：先秘密排队，再按行动点分步同时结算；攻击/治疗瞄准格子或方向 | [skill/simultaneous.md](skill/simultaneous.md) |
 | `royale` 大逃杀 | `snowflake`、`narrow-road`、`mirror-lake`（镜湖） | 同时回合结算 + 歼灭规则（无总部、炮火收缩、打光即淘汰） | [skill/royale.md](skill/royale.md) |
 
 所有模式共享的速览：

@@ -99,7 +99,7 @@ node algorithms/runner.mjs \
   --token <playerToken> \
   --side player_a
 
-# 运行同时随机算法（同时回合模式地图，如 standoff / molten-throne）
+# 运行同时随机算法（同时回合模式地图，如 standoff / molten-throne / longbow-gallery）
 node algorithms/runner.mjs \
   --algorithm random-sim \
   --url http://localhost:3100 \

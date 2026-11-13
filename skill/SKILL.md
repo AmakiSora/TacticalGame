@@ -1,11 +1,11 @@
 ---
 name: play-hex-api-game
-description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, the simultaneous-turn maps standoff, molten-throne and mistpine, and the royale maps snowflake, narrow-road and mirror-lake.
+description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, the simultaneous-turn maps standoff, molten-throne, mistpine and longbow-gallery, and the royale maps snowflake, narrow-road and mirror-lake.
 ---
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.9.9`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `3.9.10`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
@@ -29,7 +29,7 @@ Do not keep both mode files in working memory as equal authority. The inactive m
 
 Re-read the mode file if you are about to deploy, attack a "base", or score near adjudication and are unsure.
 
-`simultaneous` (maps `standoff`, `molten-throne` and `mistpine`) changes the whole turn structure: there is no turn order — all
+`simultaneous` (maps `standoff`, `molten-throne`, `mistpine` and `longbow-gallery`) changes the whole turn structure: there is no turn order — all
 players queue actions secretly in a planning phase, then the server resolves them in **action-point steps**:
 everyone's 1st action settles at once, then everyone's 2nd, and so on. Attacks target cells instead of
 units; a unit may act in several steps, and if its earlier action hard-fails its later actions are void
@@ -176,7 +176,7 @@ Read seat state from `GET /api/games/:id/lobby`: it is the only place that retur
 5. `POST /api/games/:id/start` with `X-Host-Token` when ≥2 players and the map supports that count
 6. Play until last survivor, HQ/army destruction, or max-round adjudication. On unlimited maps (`config.balance.maxTurns === null`) rounds never run out — only elimination or the host's `POST /api/games/:id/force-adjudicate` ends the game
 
-Most maps are 2-player only. `multiplayer-ring`, `whirlpool`, annihilation `artillery-zone`, royale `snowflake` and simultaneous `standoff` support 2/3/6; simultaneous `molten-throne` and `mistpine`, and royale `narrow-road` and `mirror-lake` support 2. Unsupported `maxPlayers` → `unsupported_player_count`.
+Most maps are 2-player only. `multiplayer-ring`, `whirlpool`, annihilation `artillery-zone`, royale `snowflake` and simultaneous `standoff` support 2/3/6; simultaneous `molten-throne`, `mistpine` and `longbow-gallery`, and royale `narrow-road` and `mirror-lake` support 2. Unsupported `maxPlayers` → `unsupported_player_count`.
 
 ## API
 

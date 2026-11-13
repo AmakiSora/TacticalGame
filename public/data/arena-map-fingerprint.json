@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-10T09:33:59.175Z",
+  "generatedAt": "2026-11-13T16:17:55.984Z",
   "note": "random 图为每局一张对称随机地图，无静态文件；其先手胜率来自竞技场统计而非本文件。",
   "maps": [
     {
@@ -797,6 +797,145 @@
             "deployDiscount": 0,
             "repairAmount": 10
           }
+        }
+      }
+    },
+    {
+      "id": "longbow-gallery",
+      "name": "长弓回廊",
+      "mode": "simultaneous",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 7,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          -7,
+          0
+        ],
+        "player_b": [
+          7,
+          0
+        ]
+      },
+      "hqDistance": 14,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 3
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 3
+        }
+      },
+      "controlPointCount": 4,
+      "controlPointKinds": {
+        "forward_base": 2,
+        "repair": 2
+      },
+      "controlPoints": [
+        {
+          "id": "cp_1",
+          "kind": "forward_base",
+          "q": 3,
+          "r": 0,
+          "distToA": 10,
+          "distToB": 4,
+          "bias": -6
+        },
+        {
+          "id": "cp_2",
+          "kind": "forward_base",
+          "q": -3,
+          "r": 0,
+          "distToA": 4,
+          "distToB": 10,
+          "bias": 6
+        },
+        {
+          "id": "cp_3",
+          "kind": "repair",
+          "q": -1,
+          "r": 3,
+          "distToA": 9,
+          "distToB": 8,
+          "bias": -1
+        },
+        {
+          "id": "cp_4",
+          "kind": "repair",
+          "q": 1,
+          "r": -3,
+          "distToA": 8,
+          "distToB": 9,
+          "bias": 1
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 4,
+          "controlPointsUnmatched": 2,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "blocker",
+          "count": 54,
+          "share": 0.32
+        }
+      ],
+      "balance": {
+        "startingSupplies": 90,
+        "baseIncome": 10,
+        "damageVarianceRange": 2,
+        "minimumDamage": 1,
+        "healVarianceRange": 4,
+        "actionsPerTurn": 4,
+        "attacksPerUnit": 1,
+        "maxTurns": 16,
+        "adjudicationWeights": {
+          "enemyHqDamage": 4,
+          "ownHqHp": 2,
+          "controlPoint": 30,
+          "armyValue": 3,
+          "supplies": 0,
+          "killValue": 2.5
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 10,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 6,
+            "deployDiscount": 14,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 6,
+            "deployDiscount": 0,
+            "repairAmount": 8
+          }
+        },
+        "comebackSupply": {
+          "startRound": 4,
+          "scoreGapPercent": 35,
+          "amountPerRound": 10
         }
       }
     },

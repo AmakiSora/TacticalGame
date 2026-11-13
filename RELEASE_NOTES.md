@@ -4,6 +4,23 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 3.9.10
+
+### 新增
+
+- **新增同时回合地图「长弓回廊」（`longbow-gallery`）**：2 人局 180° 对称岩障战场，游侠射程固定 4 格、其余兵种机动压到 1–2 格，前进基地 14 点部署折扣与低占点/高击杀权重让远程火力成为胜负主线；配置见 [`maps/longbow-gallery.json`](maps/longbow-gallery.json)。
+- **竞技场与前端接入**：新图自动进入建房地图库与评估控制台「同时回合」地图池，静态地图指纹已重算补入，首页模式卡文案与控制台展示顺序同步。
+
+### 变更
+
+- **同时回合规范补图**：`skill/simultaneous.md` 增 `longbow-gallery` 专属小节，`review-simultaneous.md` 升到 3.2 补远程接敌窗口复盘要点；README、AGENTS、`skill/SKILL.md` 与算法笔记的内置地图清单一并同步，图池口径见 [RL 日志](rl/docs/RELEASE_NOTES.md)。
+
+### 测试与验证
+
+- `npm run build`、`npm run check-version` 通过；`npm test` 152 文件 / 1,861 例全过（首次全量运行时 `tests/api/control-auth.test.ts` 真实 socket 用例 5–10 s 超时，单文件与二次全量复跑均通过，属既有偶发，与本版无关）。
+- 落地链路验证：`loadMaps()` 加载 15 张图、`local-worker` 的 `reset` / `decide` 可正常开局、`round_robin.py --mode simultaneous --maps longbow-gallery` dry-run 正确识别，相关回归 188 例全过。
+- 平衡性验证：初版 headless 自对局 96 局横向选型 + 60 局独立种子复核（`dest-prob` / `kriegspiel` / `random-sim` / `prism`）显示游侠为绝对主力（伤害占比 99.7%、部署占比 34.6%），0 非法动作、0 超时；据此将游侠 HP/防御下调至 76/4、重装移速提到 2、支援 `healRange` 提到 3，并把 `enemyHqDamage` 降到 4，最终数值以地图配置为准。
+
 ## 3.9.9
 
 ### 新增

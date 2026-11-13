@@ -1,0 +1,479 @@
+{
+  "mode": "simultaneous",
+  "name": "长弓回廊",
+  "description": "同时回合 · 半径7尖顶六边形。破碎岩障把战场切成数条射击走廊：游侠射程固定 4 格，可越过障碍远程压制，但血量与防御偏低；重装移速 2 格、支援治疗距离 3 格，近战可以扛着火力逐步推进。前进基地提供远程兵前沿部署折扣。裁决压低占点权重、抬高击杀权重，让远程火力而非抢点成为胜负主线。",
+  "grid": "hex",
+  "orientation": "pointy",
+  "radius": 7,
+  "terrainCells": [
+    {
+      "q": -6,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -5,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -4,
+      "r": 7,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -3,
+      "r": 7,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": -2,
+      "r": 6,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": -1,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 0,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 1,
+      "r": 5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 2,
+      "r": 4,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": -7,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 3,
+      "r": 3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -7,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -6,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 4,
+      "r": -1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -5,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -3,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": -2,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": 0,
+      "terrain": "blocker"
+    },
+    {
+      "q": 5,
+      "r": 1,
+      "terrain": "blocker"
+    },
+    {
+      "q": 6,
+      "r": -1,
+      "terrain": "blocker"
+    }
+  ],
+  "controlPoints": [
+    {
+      "id": "cp_1",
+      "name": "东翼鹰巢",
+      "kind": "forward_base",
+      "q": 3,
+      "r": 0
+    },
+    {
+      "id": "cp_2",
+      "name": "西翼鹰巢",
+      "kind": "forward_base",
+      "q": -3,
+      "r": 0
+    },
+    {
+      "id": "cp_3",
+      "name": "南麓修械所",
+      "kind": "repair",
+      "q": -1,
+      "r": 3
+    },
+    {
+      "id": "cp_4",
+      "name": "北麓修械所",
+      "kind": "repair",
+      "q": 1,
+      "r": -3
+    }
+  ],
+  "units": {
+    "infantry": {
+      "hp": 96,
+      "attack": 24,
+      "defense": 8,
+      "moveRange": 1,
+      "attackRange": 1,
+      "cost": 50,
+      "canCapture": true
+    },
+    "scout": {
+      "hp": 60,
+      "attack": 16,
+      "defense": 4,
+      "moveRange": 2,
+      "attackRange": 1,
+      "cost": 42,
+      "canCapture": true
+    },
+    "heavy": {
+      "hp": 150,
+      "attack": 30,
+      "defense": 14,
+      "moveRange": 2,
+      "attackRange": 1,
+      "cost": 98,
+      "canCapture": false
+    },
+    "ranger": {
+      "hp": 76,
+      "attack": 46,
+      "defense": 4,
+      "moveRange": 2,
+      "attackRange": 4,
+      "cost": 58,
+      "canCapture": false
+    },
+    "support": {
+      "hp": 78,
+      "attack": 10,
+      "defense": 5,
+      "moveRange": 1,
+      "attackRange": 1,
+      "healRange": 3,
+      "cost": 64,
+      "canCapture": false,
+      "healPower": 24
+    }
+  },
+  "headquartersSpec": {
+    "hp": 200,
+    "defense": 6
+  },
+  "balance": {
+    "startingSupplies": 90,
+    "baseIncome": 10,
+    "damageVarianceRange": 2,
+    "minimumDamage": 1,
+    "healVarianceRange": 4,
+    "actionsPerTurn": 4,
+    "attacksPerUnit": 1,
+    "maxTurns": 16,
+    "adjudicationWeights": {
+      "enemyHqDamage": 4,
+      "ownHqHp": 2,
+      "controlPoint": 30,
+      "armyValue": 3,
+      "supplies": 0,
+      "killValue": 2.5
+    },
+    "controlPointTypes": {
+      "supply": {
+        "income": 10,
+        "deployDiscount": 0,
+        "repairAmount": 0
+      },
+      "forward_base": {
+        "income": 6,
+        "deployDiscount": 14,
+        "repairAmount": 0
+      },
+      "repair": {
+        "income": 6,
+        "deployDiscount": 0,
+        "repairAmount": 8
+      }
+    },
+    "comebackSupply": {
+      "startRound": 4,
+      "scoreGapPercent": 35,
+      "amountPerRound": 10
+    }
+  },
+  "spawnSlots": [
+    {
+      "id": "slot_a",
+      "headquarters": {
+        "q": -7,
+        "r": 0
+      },
+      "startingUnits": [
+        {
+          "type": "heavy",
+          "q": -6,
+          "r": 0
+        },
+        {
+          "type": "ranger",
+          "q": -7,
+          "r": 1
+        },
+        {
+          "type": "ranger",
+          "q": -6,
+          "r": -1
+        },
+        {
+          "type": "infantry",
+          "q": -7,
+          "r": 2
+        },
+        {
+          "type": "infantry",
+          "q": -5,
+          "r": -2
+        }
+      ]
+    },
+    {
+      "id": "slot_b",
+      "headquarters": {
+        "q": 7,
+        "r": 0
+      },
+      "startingUnits": [
+        {
+          "type": "ranger",
+          "q": 7,
+          "r": -1
+        },
+        {
+          "type": "ranger",
+          "q": 6,
+          "r": 1
+        },
+        {
+          "type": "heavy",
+          "q": 6,
+          "r": 0
+        },
+        {
+          "type": "infantry",
+          "q": 5,
+          "r": 2
+        },
+        {
+          "type": "infantry",
+          "q": 7,
+          "r": -2
+        }
+      ]
+    }
+  ],
+  "layouts": {
+    "2": [
+      "slot_a",
+      "slot_b"
+    ]
+  }
+}

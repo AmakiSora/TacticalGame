@@ -3,6 +3,16 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-11-13 · 同时回合双人图池加长弓回廊（3.9.10）
+
+**一句话**：新增内置同时回合地图 `longbow-gallery`（长弓回廊），`rl/` 代码零行为改动——`round_robin.py` / `evaluate_cross.py` 本就按 `maps/*.json` 动态发现静态图，评估控制台的 `readEvalMaps()` 同样直接扫目录，新图自动进入「同时回合」可勾地图池。
+
+**地图池**：`layouts` 只有 `2`，因此只进双人批；三人同时回合池仍是 `standoff` + 虚拟图 `random-simultaneous`（与 3.9.2 口径一致）。双人批可直接写 `--mode simultaneous --maps standoff,molten-throne,mistpine,longbow-gallery`。该图 `maxTurns: 16`、`actionsPerTurn: 4`，射程 4 的游侠与其余兵种 1–2 格机动形成远程主导节奏；跨图比较时注意它与 `mistpine`（30 轮 / 12 AP / 零经济）不是同一套收场规则。
+
+**跑批与榜单**：本次只完成落地与接入验证，**未跑批、未刷新榜单**——`arena/matches.jsonl` 里尚无 `longbow-gallery` 对局，榜单的地图键由对局记录派生，新图分榜要等有模型文件的机器跑批刷新后才出现；`public/data/arena-map-fingerprint.json` 已按新图重算，竞技场「地图静态指纹」表立即可见。
+
+**测试与验证**：headless 引擎自对局用同一批种子完成 96 局横向选型与 60 局独立复核（内置算法 `dest-prob` / `kriegspiel` / `random-sim` / `prism`），0 非法动作、0 超时；`npm run build` 与 `npm test` 结果见根 `RELEASE_NOTES.md` 3.9.10。
+
 ## 2026-11-10 · 大逃杀图池加镜湖、算法名册加堡垒（3.9.8 / 3.9.9）
 
 **一句话**：两个发布只扩了可参评的池子，`rl/` 代码零行为改动（仅 `evaluate_cross.py` 注释与 `rl/README.md` 示例）。`mirror-lake`（镜湖）进大逃杀双人图池——`layouts` 只有 `2`，三人图池仍是 `snowflake` + 虚拟图 `random-royale`；`bastion` 声明 `playerCounts [2, 3]` 后，大逃杀三人名册由 4 个扩到 5 个（`random-royale` / `echelon` / `apex` / `ark` / `bastion`），评估控制台的算法下拉与分榜名册同源取自注册表，`round_robin.py` 无需改动。

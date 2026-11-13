@@ -509,8 +509,8 @@ rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --player-count 3 --mode
 日志按图列出跳过原因与批数，**不计成失败批次**，算法对算法照跑。`whirlpool` 目前就是这种情况——无回合上限 + 只能从港口出兵 +
 旋臂被墙隔断，当前模型打不出胜负（详见 [RELEASE_NOTES](docs/RELEASE_NOTES.md) 2026-10-31）。
 
-# 同时回合（仅内置算法；地图池 standoff / molten-throne / mistpine）
-rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps standoff,molten-throne --games 2 \
+# 同时回合（仅内置算法；地图池 standoff / molten-throne / mistpine / longbow-gallery）
+rl/.venv/Scripts/python.exe rl/evaluation/round_robin.py --maps standoff,molten-throne,mistpine,longbow-gallery --games 2 \
     --algorithms random-sim,dest-prob,kriegspiel,matrix-eq
 
 # 歼灭（仅同模式算法）

@@ -39,7 +39,7 @@ const EVAL_TOOLCHAIN = [ROUND_ROBIN_SCRIPT, LEADERBOARD_SCRIPT, ARENA_STATS_SCRI
 // 大逃杀 random-royale / echelon / apex / ark，各模式均 ≥ 2 个可组批；「少于 2 个参评
 // 算法」的启动请求仍会被拦下。
 export const STANDARD_EVAL_MAPS = ['random', 'default', 'breach', 'danger-close', 'dual-lanes'] as const;
-export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne', 'mistpine'] as const;
+export const SIMULTANEOUS_EVAL_MAPS = ['standoff', 'molten-throne', 'mistpine', 'longbow-gallery'] as const;
 
 export const EVAL_MODES = [
   { id: 'standard', label: '标准模式', supported: true },
@@ -67,7 +67,7 @@ const MAP_DISPLAY_ORDER = [
   'random', 'random-annihilation', 'random-simultaneous', 'random-royale',
   'default', 'breach', 'danger-close', 'dual-lanes',
   'artillery-zone', 'trench-run',
-  'standoff', 'molten-throne', 'mistpine',
+  'standoff', 'molten-throne', 'mistpine', 'longbow-gallery',
   'snowflake', 'narrow-road', 'mirror-lake',
   'multiplayer-ring', 'whirlpool',
 ];

@@ -1,8 +1,8 @@
 # Simultaneous mode (同时回合)
 
 Use only when `game.config.mode === "simultaneous"`. Current built-in simultaneous maps:
-`standoff` 对峙之地 (2/3/6 players), `molten-throne` 熔池王座 (2 players) and
-`mistpine` 雾杉疏林 (2 players); the actual
+`standoff` 对峙之地 (2/3/6 players), `molten-throne` 熔池王座 (2 players),
+`mistpine` 雾杉疏林 (2 players) and `longbow-gallery` 长弓回廊 (2 players); the actual
 roster, player count, layout and balance always come from `game.config`.
 If the game is `standard`, `annihilation` or `royale`, stop and read that mode file instead — do not apply this file.
 
@@ -59,7 +59,7 @@ your signal to act is: `phase === "active"` and `plan.committed` does not includ
   Every living player's step-k action settles at the same time; nobody starts step k+1 until
   step k is fully resolved. Each queued action (including `wait`) costs 1 AP; queue length ≤
   `config.balance.actionsPerTurn` (`standoff`: **5**, `molten-throne`: **4**,
-  `mistpine`: **12**; always use the live value).
+  `mistpine`: **12**, `longbow-gallery`: **4**; always use the live value).
   In simultaneous mode `turn.currentPlayerId` and `turn.currentOwner` are always `null`; do not use
   `turn.actionsUsed` — use `plan.myQueue.length`.
 - **A unit may act in several steps**: e.g. move at step 1 and attack at step 2, or move → attack →
@@ -246,6 +246,56 @@ Only when `game.mapId === "mistpine"`; 2-player layout only.
   board; preserve high-value units and plan several action points ahead.
 - Win conditions (standard HQ rules): destroy the enemy HQ to eliminate them; last player
   standing wins; at round 30 adjudicate by HQ damage, surviving army value and kills.
+
+### `longbow-gallery` (长弓回廊)
+
+Only when `game.mapId === "longbow-gallery"`; 2-player layout only.
+
+- Radius-7 hexagon (169 cells), 180° rotationally symmetric: 54 `blocker` cells form broken
+  rock corridors that block movement **but not fire**; the two HQs sit on opposite map corners
+  at (-7,0) and (7,0), 14 hexes apart. Terrain, control points and both spawn armies are exact
+  180° mirrors, so neither seat has a positional advantage.
+- Control points: 4 total — two `forward_base` (East/West Eagle Nest at (3,0) and (-3,0)) and
+  two `repair` (south/north workshops at (-1,3) and (1,-3)). No `supply` point exists on the
+  board even though the type is configured.
+- Deployment: `deployFromHq` is not set, so the HQ **and** any owned CP (including `repair`)
+  are legal origins. `forward_base` gives a 14-supply deploy discount (the forward ranger
+  reinforcement route); `repair` heals 8 HP at the round boundary.
+- Spawn: HQ 200 HP / defense 6; each seat starts with 1 heavy, 2 rangers and 2 infantry.
+  The heavy at (-6,0)/(6,0) is boxed in by three blockers, so its first action must be
+  `demolish`; clearing (-5,0)/(5,0) opens the direct route to the forward base (6→4 steps)
+  and, if both sides do it, an extra middle lane.
+- Roster (per-map numbers — always re-read `config.units`; healing uses `healRange` when
+  configured and otherwise falls back to `attackRange`):
+  | unit | HP | atk | def | move | range | shape / ability |
+  |---|---:|---:|---:|---:|---:|---|
+  | infantry | 96 | 24 | 8 | 1 | 1 | `single` — 单格；费用50，可占点 |
+  | scout | 60 | 16 | 4 | 2 | 1 | `single` — 单格，快速占点；费用42 |
+  | heavy | 150 | 30 | 14 | 2 | 1 | `single` — 单格肉盾；费用98 |
+  | ranger | 76 | 46 | 4 | 2 | 4 | `single` — 单格远程，射程固定 4；费用58 |
+  | support | 78 | 10 | 5 | 1 | 1 | `single` — 单格治疗，治疗力24，`healRange` 3；费用64 |
+  HQ: HP 200, defense 6.
+  This map configures **no** `attackShape`, `healShape` or `attackLock`, so every attack and
+  heal uses the default `single` shape; support sets `healRange: 3` (otherwise it would fall
+  back to `attackRange` = 1).
+- Balance: `startingSupplies 90`, `baseIncome 10`, CP income 6, `actionsPerTurn 4`,
+  `attacksPerUnit 1`, `maxTurns 16`, `damageVarianceRange 2`, `healVarianceRange 4`,
+  comeback supplies from round 4 (35% gap → +10/round). Adjudication weights:
+  `enemyHqDamage 4`, `ownHqHp 2`, `controlPoint 30`, `armyValue 3`, `supplies 0`,
+  `killValue 2.5` per killed-unit cost.
+  The map is built around the ranger's fixed range 4: every other unit moves only 1–2 hexes,
+  so closing from the edge of the ranger's range to melee range costs the attacker 2–3 whole
+  rounds while the ranger fires every round. Rangers are deliberately fragile (76 HP / 4 def):
+  two ranger shots (42×2) kill one, and a heavy (move 2) with support (`healRange` 3) can push
+  a corridor. Cheap rangers (58) plus the forward-base discount make ranged fire the
+  reinforcement plan; the low `controlPoint` weight plus high `killValue` and HQ damage mean
+  fighting the enemy army — not standing on points — decides the adjudication. Do not walk
+  melee units into the open: use `wait` to time prediction fire and keep rangers out of cells
+  the enemy can predictably shell.
+- Win conditions (standard HQ rules): destroy the enemy HQ to eliminate them; last player
+  standing wins; at round 16 adjudicate by score. No artillery, no army-wipe elimination.
+
+**Do not apply this roster or economy to any other simultaneous map.**
 
 ## Planning checklist
 

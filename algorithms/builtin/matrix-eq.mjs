@@ -1169,6 +1169,20 @@ function simulateRound(board, queuesByPlayer, simRng) {
       }
       const unit = arr.unit;
       if (!unit) continue; // 预检已记 unit_gone
+      // 与引擎一致：按结算时的真实地形复核路径，防止计划期依赖的
+      // 爆破投影最终失败时仍穿过障碍。
+      const reachable = terrainReachable(
+        { cells: sim.cells, terrain: sim.terrain },
+        { q: unit.q, r: unit.r },
+        unit.moveRange ?? 0,
+        { terrain: new Map() },
+      );
+      if (!reachable.some(cell => cell.q === a.q && cell.r === a.r)) {
+        record(arr.item.owner, a, 'failed', 'path_blocked',
+          { unitId: a.unitId, fromQ: unit.q, fromR: unit.r, toQ: a.q, toR: a.r });
+        failedUnits.add(a.unitId);
+        continue;
+      }
       const fromQ = unit.q, fromR = unit.r;
       // 先校验占用表归属再删除：两个同格单位互换时，第一个 mover 先写入了
       // 目的格，第二个 mover 若无条件 delete(hexKey(self)) 会把对方刚写入的

@@ -156,7 +156,7 @@ function planningReachableCells(
   game: GameState,
   from: Position,
   range: number,
-  projection: PlanProjection,
+  projection: PlanProjection | null,
 ): Position[] {
   const visited = new Set<string>([hexKey(from)]);
   const result: Position[] = [];
@@ -169,12 +169,23 @@ function planningReachableCells(
       if (visited.has(key)) continue;
       visited.add(key);
       if (!isInBounds(game, next.q, next.r)) continue;
-      if (projectedTerrain(game, projection, next.q, next.r) !== 'plain') continue;
+      const terrain = projection
+        ? projectedTerrain(game, projection, next.q, next.r)
+        : getTerrain(game, next.q, next.r);
+      if (terrain !== 'plain') continue;
       result.push(next);
       queue.push({ position: next, distance: current.distance + 1 });
     }
   }
   return result;
+}
+
+/**
+ * 只按当前真实地形计算可达格（不含计划投影）。结算阶段复核移动路径用，
+ * 防止计划期的乐观爆破投影在拆除失败后仍被当成已清出的通道。
+ */
+export function reachableCells(game: GameState, from: Position, range: number): Position[] {
+  return planningReachableCells(game, from, range, null);
 }
 
 // ---------------------------------------------------------------- 形状系统

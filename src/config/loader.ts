@@ -501,10 +501,19 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
   }
 
+  if (!Array.isArray(c.controlPoints)) {
+    throw new Error(`Map "${id}".controlPoints must be an array`);
+  }
   const controlPoints = c.controlPoints as ControlPointConfig[];
+  // pointId 是运行、恢复与回放共用的索引；重复 ID 会让收入/持有在重启前后不一致。
+  const controlPointIds = new Set<string>();
   for (let i = 0; i < controlPoints.length; i++) {
     const cp = asRecord(controlPoints[i], `controlPoints[${i}]`);
-    assertString(cp, 'id', `controlPoints[${i}]`);
+    const controlPointId = assertString(cp, 'id', `controlPoints[${i}]`);
+    if (controlPointIds.has(controlPointId)) {
+      throw new Error(`controlPoints[${i}].id must be unique`);
+    }
+    controlPointIds.add(controlPointId);
     assertString(cp, 'name', `controlPoints[${i}]`);
     // 普通据点已移除：地图文件的每个据点都必须声明类型。
     if (!('kind' in cp)) {

@@ -1072,12 +1072,20 @@ function simulateRoundSteps(ctx, myPlan, enemyPlans, rng) {
     // ---- 5. 移动（到达失败会级联作废该单位本轮后续动作）
     for (const item of kept) {
       if (item.action.type !== 'move') continue;
-      const unitId = item.action.payload.unitId;
+      const payload = item.action.payload;
+      const unitId = payload.unitId;
       const unit = unitById.get(unitId);
       if (!unit || unit.owner !== item.seat || !unit.alive) { failedUnits.add(unitId); continue; }
       if (arrivalFailure.has(item.id)) { failedUnits.add(unitId); continue; }
-      unit.q = item.action.payload.q;
-      unit.r = item.action.payload.r;
+      // 结算复核：按当前真实地形（含已成功的爆破）重新寻路，防止计划期
+      // 的爆破投影失败后仍让移动穿过障碍。
+      const reachable = planReachable(ctx, unit, unit.moveRange ?? 0, { positions: new Map(), terrain });
+      if (!reachable.some(cell => cell.q === payload.q && cell.r === payload.r)) {
+        failedUnits.add(unitId);
+        continue;
+      }
+      unit.q = payload.q;
+      unit.r = payload.r;
     }
 
     // 移动/部署之后的实时占位：爆破的目标格判占用、攻击的目标格找人都用它。

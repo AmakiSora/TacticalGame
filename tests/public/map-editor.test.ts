@@ -219,9 +219,14 @@ describe('map editor page', () => {
     expect(source).toContain('各座出生收入 ${legacy.minimum}~${legacy.maximum} 不等，按最低');
   });
 
-  it('keeps built-in sequential map komi equal to the legacy one-tick income', () => {
+  it('keeps built-in sequential map komi at the legacy one-tick income unless deliberately tuned', () => {
     const core = loadCore();
     const missing: string[] = [];
+    // 2026-11-14 平衡实验（3.9.11）：dual-lanes 的贴目从旧口径一跳 10 下调到 2——
+    // 该图 208 起始补给 + 0 初始单位 + 5 行动点，贴目 10 会让后手第 1 回合多出一种
+    // 5 兵组合（211/212/218 三个可负担门槛），实测先手胜率被压到 36%。其余顺序图仍须
+    // 保持旧口径，防止无意改动开局经济。
+    const TUNED_KOMI: Record<string, number> = { 'dual-lanes.json': 2 };
 
     for (const file of readdirSync('maps').filter(name => name.endsWith('.json'))) {
       const normalized = core.normalizeImportedMap(JSON.parse(read(`maps/${file}`)));
@@ -234,7 +239,7 @@ describe('map editor page', () => {
         missing.push(file);
         continue;
       }
-      expect(normalized.balance.komi.supplies, file).toBe(legacy.minimum);
+      expect(normalized.balance.komi.supplies, file).toBe(TUNED_KOMI[file] ?? legacy.minimum);
     }
 
     expect(missing).toEqual([]);

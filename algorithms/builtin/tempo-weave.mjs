@@ -15,6 +15,26 @@ const signature = a => {
 };
 const planCache = new Map();
 
+/** 按当前地形做单源 BFS，忽略单位占位（与引擎结算期路径复核一致）。 */
+function reachableNow(terrain, from, range) {
+  const visited = new Set([key(from)]);
+  const queue = [{ pos: from, distance: 0 }];
+  const result = [];
+  for (let i = 0; i < queue.length; i++) {
+    const current = queue[i];
+    if (current.distance >= range) continue;
+    for (const next of adjacent(current.pos)) {
+      const k = key(next);
+      if (visited.has(k)) continue;
+      visited.add(k);
+      if (terrain.get(k)?.terrain !== 'plain') continue;
+      result.push(next);
+      queue.push({ pos: next, distance: current.distance + 1 });
+    }
+  }
+  return result;
+}
+
 /** 从配置计算合法瞄准及全部覆盖格；边界由调用者对点击格检查。 */
 function footprint(from, spec, kind, target, range) {
   const d = distance(from, target);
@@ -103,6 +123,10 @@ function resolveSteps(game, plans, random = () => 0.5) {
       if (kind === 'move') {
         const u = living(a.unitId);
         if (!u || u.owner !== x.owner) { fail(x, 'unit_gone'); continue; }
+        if (!reachableNow(terrain, { q: u.q, r: u.r }, u.moveRange ?? 0).some(cell => key(cell) === key(a))) {
+          fail(x, 'path_blocked');
+          continue;
+        }
         u.q = a.q; u.r = a.r; u.hasMoved = true; outcome(x, 'executed');
       } else {
         const s = b.config.units[a.unitType];

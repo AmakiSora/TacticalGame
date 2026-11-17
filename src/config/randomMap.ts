@@ -4,7 +4,7 @@
 // 出生位合法等既有约束，任何情况下都产出可玩的地图。
 import type { ControlPointKind, GameMode, Position, UnitType } from '../types.js';
 import { isAnnihilationMode } from '../types.js';
-import { hexDistance, hexKey } from '../engine/hex.js';
+import { hexDistance, hexKey, hexRange } from '../engine/hex.js';
 import { createRadiusPlayableCells } from './geometry.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from './loader.js';
 import { validateGeneratedMap } from './loader.js';
@@ -13,7 +13,7 @@ import { validateGeneratedMap } from './loader.js';
 export type RandomParam = number | [number, number];
 
 /** 生成器算法版本；生成逻辑发生影响输出的变化时必须 +1，使旧缓存键失效。 */
-export const RANDOM_MAP_GENERATOR_VERSION = 1;
+export const RANDOM_MAP_GENERATOR_VERSION = 2;
 
 /**
  * 虚拟随机图 id：一个随机图必须绑定一种玩法模式，所以四种模式各有一个 id。
@@ -872,7 +872,16 @@ export function generateRandomMapConfig(
   const startingUnitCount = Math.round(resolveParam(options.startingUnitCount, 'startingUnitCount', streams));
   const startingWeights = resolveStartingWeights(options, streams);
   const startingUnits = sampleStartingUnits(rng, startingUnitCount, startingWeights);
-  const spawnSlots = buildSpawnSlots(mode, spawnPositions, playableSet, controlPoints, symmetry, startingUnits);
+  const blockedCells = new Set(terrainCells.map(hexKey));
+  const spawnSlots = buildSpawnSlots(
+    mode, spawnPositions, playableSet, controlPoints, symmetry, startingUnits, blockedCells,
+  );
+  // 出生位相邻格可能被其他出生位的单位/据点占用；极端配置下补位仍可能不足。
+  // 此时统一降级到最少的一方，避免同一张图里有人少单位开局（公平性优先于请求数量）。
+  const actualUnitCount = Math.min(...spawnSlots.map(slot => slot.startingUnits.length));
+  if (actualUnitCount < startingUnits.length) {
+    for (const slot of spawnSlots) slot.startingUnits = slot.startingUnits.slice(0, actualUnitCount);
+  }
   // 追赶补给：三项都不给则整块不注入（默认随机图没有追赶机制，与改动前逐位一致）。
   const comebackRequested = options.comebackStartRound !== undefined
     || options.comebackScoreGapPercent !== undefined
@@ -976,6 +985,9 @@ function resolveParamValues(cfg: MapConfig, locals: ResolvedLocals): RandomParam
   const comeback = balance.comebackSupply;
   const adjudication = balance.adjudicationWeights;
   const artillery = cfg.annihilation?.artillery;
+  const actualStartingUnitCount = cfg.spawnSlots.length > 0
+    ? Math.min(...cfg.spawnSlots.map(slot => slot.startingUnits.length))
+    : 0;
   const values: RandomParamValues = {
     radius: cfg.radius,
     waterDensity: locals.waterDensity,
@@ -994,7 +1006,8 @@ function resolveParamValues(cfg: MapConfig, locals: ResolvedLocals): RandomParam
     comebackStartRound: comeback?.startRound ?? null,
     comebackScoreGapPercent: comeback?.scoreGapPercent ?? null,
     comebackAmountPerRound: comeback?.amountPerRound ?? null,
-    startingUnitCount: cfg.spawnSlots[0]?.startingUnits.length ?? 0,
+    // 取最小值而不是 slot_a：若未来生成回归导致某个出生位短缺，回显不应掩盖它。
+    startingUnitCount: actualStartingUnitCount,
     startingWeightInfantry: locals.startingWeights.infantry,
     startingWeightScout: locals.startingWeights.scout,
     startingWeightHeavy: locals.startingWeights.heavy,
@@ -1233,7 +1246,7 @@ function sampleTerrain(
 ): { q: number; r: number; terrain: 'water' | 'blocker' }[] {
   const protectedCells = new Set<string>();
   for (const cell of playableCells) {
-    // 出生位只保护到 1 环：初始单位只落在总部的 6 个邻格，1 环足以保证它们不被地形占据；
+    // 出生位只保护到 1 环：初始单位优先落在总部邻格；极端拥挤时补位到 2 环，补位会过滤地形；
     // 保护 2 环会在出生位较多时连成一整条带，把整个中圈挤出采样域（障碍只剩外圈）。
     const nearSpawn = spawnPositions.some(spawn => hexDistance(spawn, cell) <= 1);
     // 据点只保单格：部署单位只需据点本身可走，相邻连通性由 allReachable 兜底；
@@ -1423,11 +1436,16 @@ function buildSpawnSlots(
   controlPoints: GeneratedControlPoint[],
   symmetry: Symmetry | null,
   startingUnits: UnitType[],
+  blockedCells: ReadonlySet<string>,
 ): SpawnSlotConfig[] {
   // 歼灭/大逃杀的出生位绑定居留据点（store 据此设据点归属）：按空间就近唯一分配，
   // 对称局按旋转轨道成组处理，保证开局领土与静态图「老家据点」语义一致且旋转闭合。
   const bindings = bindControlPoints(mode, spawnPositions, controlPoints, symmetry);
-  const occupied = new Set<string>(controlPoints.map(cp => hexKey(cp)));
+  // 所有总部先入占用集：补位可能用到 2 环，避免把单位放到尚未处理的总部格上。
+  const occupied = new Set<string>([
+    ...controlPoints.map(cp => hexKey(cp)),
+    ...spawnPositions.map(hexKey),
+  ]);
   const slots: SpawnSlotConfig[] = new Array(spawnPositions.length);
   const placed: boolean[] = new Array(spawnPositions.length).fill(false);
   const count = spawnPositions.length;
@@ -1436,15 +1454,25 @@ function buildSpawnSlots(
     ? Array.from({ length: symmetry.sectors }, (_, j) => (index + j * stride) % count)
     : [index]);
 
-  // 初始单位放在最靠近地图中心的几个邻格：从正对中心起按角度依次取格。
+  // 初始单位优先放在最靠近地图中心的邻格：从正对中心起按角度依次取格。
+  // 相邻格不足时（多人局出生位相距 2 格会共享邻格）用 2 环空格补位；
+  // 2 环可能有地形，按 blockedCells 过滤，绝不把单位放进水域/阻挡。
   const unitCellsFor = (hq: Position): Position[] => {
     const hqAngle = pixelAngle(mirror(hq));
-    return HEX_OFFSETS
-      .map(offset => ({ q: hq.q + offset.q, r: hq.r + offset.r }))
-      .filter(cell => playableSet.has(hexKey(cell)) && !occupied.has(hexKey(cell)))
-      .sort((a, b) => angleDiff(pixelAngle({ q: a.q - hq.q, r: a.r - hq.r }), hqAngle)
-        - angleDiff(pixelAngle({ q: b.q - hq.q, r: b.r - hq.r }), hqAngle))
-      .slice(0, startingUnits.length);
+    const candidates = [
+      ...HEX_OFFSETS.map(offset => ({ q: hq.q + offset.q, r: hq.r + offset.r })),
+      ...hexRange(hq, 2).filter(cell => hexDistance(cell, hq) === 2),
+    ].map((cell, order) => ({ cell, order }));
+    return candidates
+      .filter(({ cell }) => playableSet.has(hexKey(cell))
+        && !occupied.has(hexKey(cell))
+        && !blockedCells.has(hexKey(cell)))
+      .sort((a, b) => hexDistance(a.cell, hq) - hexDistance(b.cell, hq)
+        || angleDiff(pixelAngle({ q: a.cell.q - hq.q, r: a.cell.r - hq.r }), hqAngle)
+          - angleDiff(pixelAngle({ q: b.cell.q - hq.q, r: b.cell.r - hq.r }), hqAngle)
+        || a.order - b.order)
+      .slice(0, startingUnits.length)
+      .map(({ cell }) => cell);
   };
   const assignUnits = (cells: Position[]) => cells.map((cell, unitIndex) => {
     occupied.add(hexKey(cell));

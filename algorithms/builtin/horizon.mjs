@@ -776,6 +776,12 @@ function simulate(M, queues, onStep) {
       const unit = units[item.a.u];
       if (!unit || !unit.alive || unit.seat !== item.s) { failedUnits.add(item.a.u); continue; }
       if (failedArrivals.has(item)) { failedUnits.add(item.a.u); continue; }
+      // 与引擎一致：按结算时的真实地形（含此前已成功的爆破）复核路径。
+      // 计划期依赖但最终失败的爆破不能再把障碍格当成通道。
+      if (bfsFrom(M.board, unit.cell, st.cleared, unit.mv ?? 0)[item.a.c] > (unit.mv ?? 0)) {
+        failedUnits.add(item.a.u);
+        continue;
+      }
       unit.cell = item.a.c;
     }
     // 6. 爆破（清出的平地从下一步起生效）

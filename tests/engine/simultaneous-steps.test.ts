@@ -23,6 +23,18 @@ function createStandoffGame(): { game: GameState; bus: EventBus } {
   return { game, bus };
 }
 
+function createMistpineGame(): { game: GameState; bus: EventBus } {
+  const bus = new EventBus();
+  const game = createLobby(`mistpine-steps-${Math.random().toString(36).slice(2, 8)}`, 'mistpine', {
+    maxPlayers: 2,
+    participate: true,
+    playerName: 'A',
+  });
+  expect(addLobbyPlayer(game, 'B')).not.toBeNull();
+  expect(startGame(game, bus, () => 0).ok).toBe(true);
+  return { game, bus };
+}
+
 function place(unit: Unit, q: number, r: number): void {
   unit.q = q;
   unit.r = r;
@@ -296,6 +308,60 @@ describe('simultaneous step resolution', () => {
     expect(events(game, 'move')).toHaveLength(1);
     expect(heavy.q).toBe(3);
     expect(heavy.r).toBe(2);
+  });
+
+  it('fails a move through a blocker when its projected demolish is cascaded', () => {
+    const { game, bus } = createMistpineGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    const heavy = unitOf(game, a, 'heavy');
+    const infantry = unitOf(game, a, 'infantry');
+    const scout = unitOf(game, a, 'scout');
+    place(heavy, -8, 4);
+    place(infantry, -6, 3);
+    place(scout, -7, 4);
+
+    // (-5,3) 也是 blocker：不排拆除时，(-7,4) -> (-4,3) 的唯一三步路线要经过 (-6,4)。
+    expect(queueMoveAction(game, a, scout.id, -4, 3))
+      .toMatchObject({ ok: false, code: 'invalid_move' });
+
+    expect(queueMoveAction(game, a, heavy.id, -6, 3).ok).toBe(true);
+    expect(queueDemolishAction(game, a, heavy.id, -6, 4).ok).toBe(true);
+    expect(queueMoveAction(game, a, scout.id, -4, 3).ok).toBe(true);
+
+    commitAll(game, bus, [a, b]);
+
+    const result = outcomes(game)[a]!;
+    expect(result.map(entry => entry.status)).toEqual(['failed', 'failed', 'failed']);
+    expect(result.map(entry => entry.reason)).toEqual([
+      'destination_occupied',
+      'previous_action_failed',
+      'path_blocked',
+    ]);
+    expect(getTerrain(game, -6, 4)).toBe('blocker');
+    expect(scout.q).toBe(-7);
+    expect(scout.r).toBe(4);
+    expect(events(game, 'demolish')).toHaveLength(0);
+    expect(events(game, 'move')).toHaveLength(0);
+  });
+
+  it('lets another friendly unit use a demolished route that actually succeeds', () => {
+    const { game, bus } = createMistpineGame();
+    const [a, b] = game.turn.turnOrder as [PlayerId, PlayerId];
+    const heavy = unitOf(game, a, 'heavy');
+    const scout = unitOf(game, a, 'scout');
+    place(heavy, -6, 3);
+    place(scout, -7, 4);
+
+    expect(queueDemolishAction(game, a, heavy.id, -6, 4).ok).toBe(true);
+    expect(queueMoveAction(game, a, scout.id, -4, 3).ok).toBe(true);
+
+    commitAll(game, bus, [a, b]);
+
+    expect(getTerrain(game, -6, 4)).toBe('plain');
+    expect(events(game, 'demolish')).toHaveLength(1);
+    expect(events(game, 'move')).toHaveLength(1);
+    expect(scout.q).toBe(-4);
+    expect(scout.r).toBe(3);
   });
 
   it('voids a dead unit\'s later action with unit_gone', () => {

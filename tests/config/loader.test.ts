@@ -304,6 +304,19 @@ describe('map config loader', () => {
     resetConfig();
   });
 
+  it('requires unique control point ids', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
+    const map = validMap() as unknown as BrokenMap;
+    map.controlPoints = [
+      { id: 'cp_a', name: 'First', q: 0, r: 0, kind: 'supply' },
+      { id: 'cp_a', name: 'Duplicate', q: 0, r: 1, kind: 'supply' },
+    ];
+    writeFileSync(join(dir, 'default.json'), JSON.stringify(map));
+
+    expect(() => loadMaps(dir)).toThrow('controlPoints[1].id must be unique');
+    resetConfig();
+  });
+
   it('requires every supported control point type to be configured', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tactical-map-'));
     const map = validMap() as unknown as BrokenMap;

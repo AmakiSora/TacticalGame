@@ -106,7 +106,11 @@ your signal to act is: `phase === "active"` and `plan.committed` does not includ
 - **Movement range uses terrain-only path search at plan time**: water/blocker cells block the
   path; units and headquarters do **not** block it. The destination may be occupied when you queue
   it — settlement decides whether it was vacated in time. You cannot queue a destination beyond
-  `moveRange` or one that needs to cross water/blockers (unless your own earlier demolish cleared it).
+  `moveRange` or one that needs to cross water/blockers (unless your own earlier demolish cleared it
+  and that demolish actually succeeds).
+  At settlement the same terrain-only reachability is rechecked from the unit's actual start cell;
+  if a projected demolish failed and the route is no longer open, the move fails (`path_blocked`)
+  instead of crossing the intact blocker.
   Queued moves never unlock a path or change this search — it ignores units entirely. The queue
   only determines each unit's projected start position for later steps and same-step arrivals (a
   cell vacated in that step can be entered).

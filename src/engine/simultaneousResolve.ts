@@ -23,7 +23,7 @@ import { getGameIndex } from './gameIndex.js';
 import { createUnitFromConfig } from '../state/store.js';
 import { deployDiscountForOrigin } from './controlPoints.js';
 import { activePlayerIds, creditKill, markPlayerEliminated } from './engine.js';
-import { coveredCellsFor } from './planning.js';
+import { coveredCellsFor, reachableCells } from './planning.js';
 import type { ShapeAim } from './planning.js';
 import { isArtilleryDanger } from './artillery.js';
 import { nextGameRandom } from './random.js';
@@ -401,10 +401,24 @@ function resolveMoves(
       ctx.failedUnits.add(unitId);
       continue;
     }
+    // 计划期可能借助尚未执行的 demolish 投影把障碍格当作平地；若那次拆除
+    // 在结算时失败/被级联作废，真实地形仍会挡住路径。这里按实际起点与当前
+    // 地形重新做一次可达性复核，避免移动到目的地后直接改写坐标“穿墙”。
+    const destination = { q: item.action.q!, r: item.action.r! };
+    if (!reachableCells(game, { q: unit.q, r: unit.r }, unit.moveRange)
+      .some(cell => cell.q === destination.q && cell.r === destination.r)) {
+      recordFailure(ctx, item, 'path_blocked', {
+        q: destination.q,
+        r: destination.r,
+        moveRange: unit.moveRange,
+      });
+      ctx.failedUnits.add(unitId);
+      continue;
+    }
     const fromQ = unit.q;
     const fromR = unit.r;
-    unit.q = item.action.q!;
-    unit.r = item.action.r!;
+    unit.q = destination.q;
+    unit.r = destination.r;
     unit.hasMoved = true;
     appendEvent(game, bus, 'move', {
       actionId: item.action.id,

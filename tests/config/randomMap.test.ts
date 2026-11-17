@@ -345,6 +345,50 @@ describe('random map generator', () => {
     loadMaps();
   });
 
+  it('fills the requested starting units even when spawn slots share neighbors', () => {
+    // 8 人局出生位相距 2 格时会共享邻格；5 人局也有类似的拥挤布局。
+    // 旧实现只从总部 6 邻格取格，后处理的出生位会少 1 个单位，且解析值只回显 slot_a。
+    const cases = [
+      { mode: 'standard' as const, playerCount: 8, seed: 'units-2', controlPointCount: 1 },
+      { mode: 'annihilation' as const, playerCount: 5, seed: 'sf-15', controlPointCount: 5 },
+    ];
+    for (const { mode, playerCount, seed, controlPointCount } of cases) {
+      const values: Record<string, number | null> = {};
+      const config = generateRandomMapConfig(
+        sanitizeRandomOptions({ mode, seed, startingUnitCount: 6, controlPointCount }),
+        playerCount,
+        values,
+      );
+      const counts = config.spawnSlots.map(slot => slot.startingUnits.length);
+      expect(counts).toEqual(Array.from({ length: playerCount }, () => 6));
+      expect(values.startingUnitCount).toBe(6);
+      if (playerCount % 2 === 0) {
+        for (let i = 0; i < playerCount / 2; i++) {
+          const slotA = config.spawnSlots[i];
+          const slotB = config.spawnSlots[i + playerCount / 2];
+          expect(slotB.startingUnits).toHaveLength(slotA.startingUnits.length);
+          for (const unit of slotA.startingUnits) {
+            const twin = slotB.startingUnits.find(other => other.q === neg(unit.q) && other.r === neg(unit.r));
+            expect(twin, `unit ${unit.type}@(${unit.q},${unit.r}) missing mirror`).toBeDefined();
+            expect(twin!.type).toBe(unit.type);
+          }
+        }
+      }
+
+      // 补位不能把单位叠到总部/据点/其他单位或水域/阻挡上。
+      const used = new Set(config.controlPoints.map(cellKey));
+      const blocked = new Set(config.terrainCells.map(cellKey));
+      for (const slot of config.spawnSlots) {
+        for (const position of [slot.headquarters, ...slot.startingUnits]) {
+          const key = cellKey(position);
+          expect(used.has(key), `duplicate spawn object at ${key}`).toBe(false);
+          used.add(key);
+          expect(blocked.has(key), `spawn object on blocked terrain at ${key}`).toBe(false);
+        }
+      }
+    }
+  });
+
   it('keeps playable terrain connected for generated maps', () => {
     const config = generateRandomMapConfig({ seed: 'connect', terrainDensity: 0.35 }, 4);
     const blocked = new Set(config.terrainCells.map(cellKey));
@@ -710,6 +754,7 @@ describe('random map generator', () => {
     expect(values.forwardBaseDeployDiscount).toBe(config.balance.controlPointTypes!.forward_base.deployDiscount);
     expect(values.repairPointRepairAmount).toBe(config.balance.controlPointTypes!.repair.repairAmount);
     expect(values.startingUnitCount).toBe(config.spawnSlots[0].startingUnits.length);
+    expect(new Set(config.spawnSlots.map(slot => slot.startingUnits.length))).toEqual(new Set([values.startingUnitCount]));
     expect(values.infantryHp).toBe(config.units.infantry.hp);
     expect(values.scoutMoveRange).toBe(config.units.scout.moveRange);
     expect(values.supportHealPower).toBe(config.units.support.healPower);

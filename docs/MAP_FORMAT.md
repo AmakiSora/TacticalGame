@@ -53,7 +53,9 @@
 - `"komi": { "supplies": 12 }`：2 人局里后手第一次行动前 +12；N 人局里除先手外每个座位各 +12。
 - 取值必须是 `0..999` 的整数。
 
-**缺省字段 = 历史口径**：老地图 / 老存档没写 `komi` 时，仍按 3.9.5 之前的「一次开局收入」结算（当回合的 `baseIncome` + 出生据点收入），行为不变；新图请显式写 `supplies`。内置顺序图已全部显式声明：`trench-run` 12、`artillery-zone` 12、`default` / `breach` / `dual-lanes` 10、`whirlpool` 7、`danger-close` / `multiplayer-ring` 6（这些值正好等于各图旧口径的一跳开局收入，所以平衡不变）。
+**缺省字段 = 历史口径**：老地图 / 老存档没写 `komi` 时，仍按 3.9.5 之前的「一次开局收入」结算（当回合的 `baseIncome` + 出生据点收入），行为不变；新图请显式写 `supplies`。内置顺序图已全部显式声明：`trench-run` 12、`artillery-zone` 12、`default` / `breach` 10、`dual-lanes` 2、`whirlpool` 7、`danger-close` / `multiplayer-ring` 6——除 `dual-lanes` 外都与各图旧口径的一跳开局收入相等，所以平衡不变。
+
+`dual-lanes`（双线抉择）是首个不按旧口径、按实测平衡目标标定的贴目：该图 208 起始补给 + 0 初始单位 + 5 行动点，贴目 10 会让后手第 1 回合多出一种 5 兵组合（211 / 212 / 218 三个可负担门槛），实测先手胜率被压到 36%，3.9.11 起改为 2。回归用例 [tests/public/map-editor.test.ts](../tests/public/map-editor.test.ts) 只要求内置顺序图贴目等于旧口径一跳，例外图须在 `TUNED_KOMI` 白名单显式登记——新增标定图补一行，其余图不要顺手放宽这条断言。
 
 没写 `komi` 的图在地图编辑器里仍会预填「先手贴目（补给）」输入框，值就是这套历史折算（`baseIncome` + 出生据点收入）：各座出生据点同类型时该值等价于旧口径，**类型不一致时按最低额度预填并在标签里标出区间**，因为单个 `supplies` 无法同时等于多个座位的第一跳。预填只用于回显，不改动输入框就不会写入 `komi`，导出后依旧走历史结算。
 
@@ -75,4 +77,4 @@
 
 未列在 `terrainCells` 的可用格默认为 `plain`。地图编辑器支持添加和移除地块，并可维护 2–8 个出生槽及对应人数布局；移除包含对象的格子会被阻止，避免隐式丢失配置。
 
-每个据点必须写 `kind`：`supply`（补给站）、`forward_base`（前线基地）、`repair`（维修站）——不存在无类型的「普通据点」。`balance.controlPointTypes` 必须完整配置三种类型的 `income`、`deployDiscount`、`repairAmount`（含地图未用到的类型）。裁决分始终按据点数量计算，不按据点类型加权。
+每个据点必须写 `kind`：`supply`（补给站）、`forward_base`（前线基地）、`repair`（维修站）——不存在无类型的「普通据点」。据点 `id` 必须在整张地图内唯一；`balance.controlPointTypes` 必须完整配置三种类型的 `income`、`deployDiscount`、`repairAmount`（含地图未用到的类型）。裁决分始终按据点数量计算，不按据点类型加权。

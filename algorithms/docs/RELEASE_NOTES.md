@@ -6,6 +6,22 @@
 >
 > **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1、`bastion` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
 
+## 3.9.11（2026-11-17）— 双线抉择贴目下调、长弓回廊入榜
+
+### 评估口径
+
+- `maps/dual-lanes.json` 的 `balance.komi.supplies` 由 10 降到 2（该图 208 起始补给 + 0 初始单位 + 5 行动点下，贴目 10 让后手首回合多出一种 5 兵组合、先手胜率 36% 的平衡实验；口径见根 [RELEASE_NOTES.md](../../RELEASE_NOTES.md) 3.9.11 与 [MAP_FORMAT.md](../../docs/MAP_FORMAT.md)「先手贴目」）。算法侧零代码改动——`parallax` / `shrinkroll` 的内置回合模拟从 `config.balance.komi` 读贴目，标定只落在地图数据；该图现有 7,801 局标准战绩（26 位参与者各约 600 局）全是贴目 10 口径，重跑前不要把旧 `dual-lanes` 分图胜率当成本版结论。
+- 同时回合「长弓回廊」入榜：`longbow-gallery` 补 672 局（28 对 × 24 局换座，8 个同时回合算法各 168 局、0 平局、平均 15.59 轮），同时回合池 2,688→3,360 局。榜单由 `arena/matches.jsonl` 重算，该原始文件已退出 git 跟踪（`250e1ad`），入库产物只有 `public/data/arena-*.json`。
+
+### 适配
+
+- 同时回合结算镜像同步引擎的路径复核：`horizon` / `kriegspiel` / `matrix-eq` / `tempo-weave` 在执行移动前，按单位实际起点与当前真实地形重新做一次可达性检查；计划期依赖但最终失败的 `demolish` 不再在镜像里打开通道。其余算法未改，`horizon` 的分步结算对拍与四个算法的自博弈回归均保持零偏差。
+
+### 测试与验证
+
+- `npm run build`、`npm run check-version` 通过；`npm test` 152 文件 / 1,863 例全过（本次默认并行跑法一次通过；历史负载型超时见根 `RELEASE_NOTES.md` 3.9.11）。内置贴目回归只钉「等于旧口径一跳，除非显式标定」，`dual-lanes` 在 `TUNED_KOMI` 白名单登记为 2（[tests/public/map-editor.test.ts](../../tests/public/map-editor.test.ts)）。
+- 同时回合新增 2 例回归：拆除投影失败时，穿墙移动以 `path_blocked` 失败并停留在真实起点；拆除实际成功时，同一路线仍可通行（[tests/engine/simultaneous-steps.test.ts](../../tests/engine/simultaneous-steps.test.ts)）。
+
 ## 3.9.9（2026-11-10）— 新增大逃杀堡垒算法
 
 ### 新增算法

@@ -74,6 +74,8 @@ interface ResolveContext {
   attackLimit: number;
   /** 本轮各单位已结算的攻击次数（含失败/落空）。 */
   attackCounts: Map<string, number>;
+  /** 本轮开始时零单位的玩家：不按步淘汰，等本轮所有队列走完再清场。 */
+  zeroUnitAtRoundStart: Set<PlayerId>;
   /** 计划时刻（回合开始）各单位站位：锁定射击据此判定"计划时点击格上的敌人"。 */
   planTimePositions: { unit: Unit; q: number; r: number }[];
 }
@@ -361,6 +363,8 @@ function resolveDeploys(
     unit.hasActed = false;
     unit.actionSpent = true;
     game.units.push(unit);
+    // 零单位开局者一旦成功部署，就恢复普通玩家的逐步清场规则。
+    ctx.zeroUnitAtRoundStart.delete(item.owner);
     appendEvent(game, bus, 'deploy', {
       actionId: item.action.id,
       unitId: unit.id, owner: item.owner, unitType: item.action.unitType, fromId: item.action.fromId,
@@ -484,6 +488,36 @@ interface Strike {
   attacker: Unit;
   aim: ShapeAim;
   lockedEntity?: Unit;
+}
+
+/** 歼灭/大逃杀：清除没有任何存活单位的玩家。 */
+function resolveArmyWipes(
+  game: GameState,
+  bus: EventBus,
+  options: { exempt?: Set<PlayerId>; killedBy?: Map<PlayerId, PlayerId> } = {},
+): number {
+  if (!isAnnihilationMode(game.config.mode)) return 0;
+  let eliminated = 0;
+  for (const owner of activePlayerIds(game)) {
+    if (game.units.some(unit => unit.owner === owner && unit.alive)) continue;
+    if (options.exempt?.has(owner)) continue;
+    markPlayerEliminated(game, bus, owner, 'army_destroyed', options.killedBy?.get(owner) ?? null);
+    eliminated += 1;
+  }
+  return eliminated;
+}
+
+/**
+ * 轮末清场：零单位开局者可以等自己的队列走完再部署；所有步骤结束后仍未
+ * 形成军队的玩家在这里统一淘汰。
+ */
+export function resolveRoundEndArmyWipes(
+  game: GameState,
+  bus: EventBus,
+): StepResolution['ending'] {
+  if (!isAnnihilationMode(game.config.mode)) return null;
+  const eliminated = resolveArmyWipes(game, bus);
+  return eliminated > 0 ? endingFor(game) : null;
 }
 
 function rollHeal(game: GameState, support: Unit): number {
@@ -739,23 +773,29 @@ function resolveAttacksAndHeals(ctx: ResolveContext, stepActions: QueuedAction[]
   }
 
   // 歼灭规则（annihilation/royale）没有总部兜底：兵力打光的玩家立即淘汰，
-  // 击杀归属取其本步阵亡单位的凶手；终局交给调用方的 active 检查。
+  // 击杀归属取其本步阵亡单位的凶手；零单位开局者等本轮队列走完再清场。
   if (isAnnihilationMode(game.config.mode)) {
     const killedBy = new Map<PlayerId, PlayerId>();
     for (const death of deaths) {
       if (death.kind === 'unit') killedBy.set((death.entity as Unit).owner, death.killer);
     }
-    for (const owner of activePlayerIds(game)) {
-      if (game.units.some(unit => unit.owner === owner && unit.alive)) continue;
-      markPlayerEliminated(game, bus, owner, 'army_destroyed', killedBy.get(owner) ?? null);
-    }
+    resolveArmyWipes(game, bus, { exempt: ctx.zeroUnitAtRoundStart, killedBy });
   }
 }
 
-function endingFor(game: GameState): { winner: PlayerId | null; reason: GameOverReason } | null {
+function endingFor(
+  game: GameState,
+  zeroUnitAtRoundStart?: Set<PlayerId>,
+): { winner: PlayerId | null; reason: GameOverReason } | null {
   const active = activePlayerIds(game);
   if (active.length === 0) return { winner: null, reason: 'mutual_annihilation' };
-  if (active.length === 1) return { winner: active[0]!, reason: 'last_player_standing' };
+  if (active.length === 1) {
+    const winner = active[0]!;
+    const hasUnits = game.units.some(unit => unit.owner === winner && unit.alive);
+    // 零单位开局者还有后续步骤可部署；不让其在部署前凭“最后存活”提前终局。
+    if (!hasUnits && zeroUnitAtRoundStart?.has(winner)) return null;
+    return { winner, reason: 'last_player_standing' };
+  }
   return null;
 }
 
@@ -781,6 +821,12 @@ export function resolveRoundSteps(
     failedUnits: new Set<string>(),
     attackLimit: game.config.balance.attacksPerUnit ?? 1,
     attackCounts: new Map<string, number>(),
+    // 只有歼灭/大逃杀会在步级清场；其他模式保持原有终局判定。
+    zeroUnitAtRoundStart: new Set(
+      isAnnihilationMode(game.config.mode)
+        ? order.filter(id => !game.units.some(unit => unit.owner === id && unit.alive))
+        : [],
+    ),
     planTimePositions: game.units
       .filter(unit => unit.alive)
       .map(unit => ({ unit, q: unit.q, r: unit.r })),
@@ -803,7 +849,7 @@ export function resolveRoundSteps(
     resolveWaits(ctx, kept);
     resolveAttacksAndHeals(ctx, kept, step);
 
-    ending = endingFor(game);
+    ending = endingFor(game, ctx.zeroUnitAtRoundStart);
     if (ending) break;
   }
 

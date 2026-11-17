@@ -18,7 +18,7 @@ import {
   updateArtilleryForRound,
 } from './engine.js';
 import { dropFromPlan, isSimultaneous, markCommitted, resetPlanForRound } from './planning.js';
-import { resolveRoundSteps } from './simultaneousResolve.js';
+import { resolveRoundEndArmyWipes, resolveRoundSteps } from './simultaneousResolve.js';
 import type { Result, Failure } from './result.js';
 
 export type { PlanOutcome } from './simultaneousResolve.js';
@@ -89,7 +89,10 @@ export function resolveRound(game: GameState, bus: EventBus, options: { force?: 
     order.map(id => [id, [...(game.plan?.queues[id] ?? [])]]),
   );
 
-  const { outcomes, steps, ending } = resolveRoundSteps(game, bus, order, queues);
+  const { outcomes, steps, ending: stepEnding } = resolveRoundSteps(game, bus, order, queues);
+  // 零单位开局者可以把自己的部署排到后续步骤；所有步骤走完后仍未建军者，
+  // 在这里按本轮结算统一淘汰（空队列也覆盖）。
+  const ending = stepEnding ?? resolveRoundEndArmyWipes(game, bus);
 
   const finish = (gameOver: boolean): void => {
     appendEvent(game, bus, 'round_end', { roundNumber, gameOver, steps });

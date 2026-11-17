@@ -16,11 +16,13 @@
 ### 适配
 
 - 同时回合结算镜像同步引擎的路径复核：`horizon` / `kriegspiel` / `matrix-eq` / `tempo-weave` 在执行移动前，按单位实际起点与当前真实地形重新做一次可达性检查；计划期依赖但最终失败的 `demolish` 不再在镜像里打开通道。其余算法未改，`horizon` 的分步结算对拍与四个算法的自博弈回归均保持零偏差。
+- 大逃杀结算镜像同步引擎的轮末清场：第 1 轮零单位开局的座位在步骤间不提前触发 `army_destroyed`，可先等待再部署；若本轮队列结束仍无单位才统一淘汰。`royale-model` 的对拍用例同步改为双方各 1 单位进入第 2 轮，并保留双方空队列在第 1 轮轮末 `mutual_annihilation` 的断言。
 
 ### 测试与验证
 
-- `npm run build`、`npm run check-version` 通过；`npm test` 152 文件 / 1,863 例全过（本次默认并行跑法一次通过；历史负载型超时见根 `RELEASE_NOTES.md` 3.9.11）。内置贴目回归只钉「等于旧口径一跳，除非显式标定」，`dual-lanes` 在 `TUNED_KOMI` 白名单登记为 2（[tests/public/map-editor.test.ts](../../tests/public/map-editor.test.ts)）。
+- `npm run build`、`npm run check-version` 通过；`npm test` 152 文件 / 1,867 例，默认并行下 7 例异常（6 例既有超时与 1 例 `ai-player` 并行状态断言），受影响文件以 `--no-file-parallelism` 复跑 108 例全过（历史负载型超时见根 `RELEASE_NOTES.md` 3.9.11）。内置贴目回归只钉「等于旧口径一跳，除非显式标定」，`dual-lanes` 在 `TUNED_KOMI` 白名单登记为 2（[tests/public/map-editor.test.ts](../../tests/public/map-editor.test.ts)）。
 - 同时回合新增 2 例回归：拆除投影失败时，穿墙移动以 `path_blocked` 失败并停留在真实起点；拆除实际成功时，同一路线仍可通行（[tests/engine/simultaneous-steps.test.ts](../../tests/engine/simultaneous-steps.test.ts)）。
+- 大逃杀新增 2 例引擎回归，并同步调整 `royale-model` 对拍：零单位开局者先等待再部署不会被第 1 步清场，双方都等待则第 1 轮轮末 `mutual_annihilation`（[tests/engine/royale.test.ts](../../tests/engine/royale.test.ts)、[tests/algorithms/royale-model.test.ts](../../tests/algorithms/royale-model.test.ts)）。
 
 ## 3.9.9（2026-11-10）— 新增大逃杀堡垒算法
 

@@ -3,12 +3,12 @@ import { EventBus } from '../../src/events/bus.js';
 import { isArtilleryDanger } from '../../src/engine/artillery.js';
 import { adjudicateAtTurnLimit, forceAdjudication, startGame } from '../../src/engine/engine.js';
 import { commitAndMaybeResolve } from '../../src/engine/simultaneous.js';
-import { queueAttackAction, queueDeployAction, queueHealAction } from '../../src/engine/planning.js';
+import { queueAttackAction, queueDeployAction, queueHealAction, queueWaitAction } from '../../src/engine/planning.js';
 import { createUnitFromConfig, addLobbyPlayer, createLobby } from '../../src/state/store.js';
 
-function createRoyaleGame(playerCount = 2) {
+function createRoyaleGame(playerCount = 2, mapId = 'snowflake') {
   const bus = new EventBus();
-  const game = createLobby('royale-test', 'snowflake', {
+  const game = createLobby('royale-test', mapId, {
     maxPlayers: playerCount,
     participate: true,
     playerName: 'A',
@@ -85,6 +85,40 @@ describe('royale mode', () => {
     expect(deploy?.payload).toMatchObject({ owner: 'player_a', fromId: point.id, cost: 55, discount: 0 });
     // 结算后进入第 2 回合：扣部署费 55（本图无部署折扣），轮界收入 base 20 + 据点 20。
     expect(game.resources['player_a']!.supplies).toBe(suppliesBefore - 55 + 40);
+  });
+
+  it('lets a zero-unit player wait once before deploying instead of wiping them at step 1', () => {
+    const { game, bus } = createRoyaleGame(2, 'narrow-road');
+    expect(game.units).toHaveLength(0);
+    const [a, b] = game.turn.turnOrder;
+    const pointA = game.controlPoints.find(point => point.owner === a)!;
+    const pointB = game.controlPoints.find(point => point.owner === b)!;
+
+    expect(queueWaitAction(game, a).ok).toBe(true);
+    expect(queueDeployAction(game, a, 'infantry', pointA.id, pointA.q + 1, pointA.r).ok).toBe(true);
+    expect(queueDeployAction(game, b, 'infantry', pointB.id, pointB.q - 1, pointB.r).ok).toBe(true);
+
+    commitAll({ game, bus });
+
+    expect(game.phase).toBe('active');
+    expect(game.players[a]?.status).toBe('active');
+    expect(game.players[b]?.status).toBe('active');
+    expect(game.turn.roundNumber).toBe(2);
+    expect(game.events.filter(event => event.type === 'deploy')).toHaveLength(2);
+    expect(game.events.filter(event => event.type === 'player_eliminated')).toHaveLength(0);
+  });
+
+  it('wipes zero-unit players only after their queued steps if they never deploy', () => {
+    const { game, bus } = createRoyaleGame(2, 'narrow-road');
+    const [a, b] = game.turn.turnOrder;
+    expect(queueWaitAction(game, a).ok).toBe(true);
+    expect(queueWaitAction(game, b).ok).toBe(true);
+
+    commitAll({ game, bus });
+
+    expect(game.phase).toBe('game_over');
+    expect(game.result?.reason).toBe('mutual_annihilation');
+    expect(game.events.filter(event => event.type === 'deploy')).toHaveLength(0);
   });
 
   it('warns in round 5 and shrinks with artillery damage from round 6 on', () => {

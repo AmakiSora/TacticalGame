@@ -269,15 +269,15 @@ describe('royale model geometry and expectations', () => {
 });
 
 describe('royale model synchronous steps', () => {
-  it('deploys immediately from zero units, but eliminates a waiting player before their later deploy', () => {
+  it('lets zero-unit players wait before deploying without an early step wipe', () => {
     const game = fixture('narrow-road', 2, false);
     const both = mirror(game, [[deploy(game, 0, 'heavy')], [deploy(game, 1, 'heavy')]], true);
     expect(both.S.active).toEqual([true, true]);
     expect(both.S.units.map((u: any) => u.id)).toEqual([null, null]);
     const late = mirror(game, [[{ type: 'wait' }, deploy(game, 0, 'heavy')], [deploy(game, 1, 'heavy')]], true);
-    expect(late.S.active).toEqual([false, true]);
-    expect(late.S.units).toHaveLength(1);
-    expect(late.S.round).toBe(1);
+    expect(late.S.active).toEqual([true, true]);
+    expect(late.S.units).toHaveLength(2);
+    expect(late.S.round).toBe(2);
     const empty = mirror(game, [[{ type: 'wait' }], [{ type: 'wait' }]], true);
     expect(empty.S.active).toEqual([false, false]);
     expect(empty.S.cpOwners).toEqual([-1, -1]);
@@ -290,7 +290,8 @@ describe('royale model synchronous steps', () => {
     expect(S.active).toEqual([true, true]);
     const result = mirror(game, [[], []], true);
     expect(result.S.active).toEqual([false, false]);
-    expect(result.S.round).toBe(2);
+    expect(result.S.round).toBe(1);
+    expect(result.S.ended).toBe(true);
   });
 
   it('settles mutual kills before elimination and stops without terminal artillery or income', () => {

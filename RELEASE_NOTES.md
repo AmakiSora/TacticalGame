@@ -16,14 +16,17 @@
 
 - **随机地图初始单位数按出生位对齐**：多人局出生位共享邻格时，后处理出生位原本可能少 1 个初始单位（8 人局、显式 6 单位或 5 人歼灭局可复现），预览又只回显 `slot_a`；现在相邻格不足时用 2 环空格补位、仍不足则全员统一降级，回显实际数量（`src/config/randomMap.ts`）。
 - **拒绝重复的据点 ID**：地图加载器现在于加载期要求 `controlPoints[].id` 全图唯一；此前同 ID 据点可通过校验，实时收入和据点持有按据点对象重复计数，而重启恢复按 `pointId` 合并，导致同一局前后计分口径不一致（`src/config/loader.ts`）。
+- **零单位开局者不再被步级清场提前淘汰**：大逃杀第 1 轮双方零单位时，原实现会在任一非空步骤结束后立即按 `army_destroyed` 清场，使排队「等待→部署」的玩家在部署前出局；现在本轮开始零单位的玩家豁免步级清场，等本轮全部队列走完后统一检查，成功部署后恢复正常规则（`src/engine/simultaneousResolve.ts`）。算法内置结算镜像同步见[算法日志](algorithms/docs/RELEASE_NOTES.md)。
 
 ### 测试与验证
 
-- `npm run build`、`npm run check-version` 通过；`npm test` 152 文件 / 1,865 例全过（本次默认并行跑法一次通过）。此前两轮默认并行跑法分别出现 4 例、2 例 5 s 超时（`control-auth`、`host-seat-plan`、`simultaneous-api`、`persistence` 的真实 socket 用例与 `board-animation` 的静态断言），单文件复跑与 `--no-file-parallelism` 全量复跑均通过，属负载相关超时，与本版改动无关。
+- `npm run build`、`npm run check-version` 通过；`npm test` 152 文件 / 1,867 例，默认并行下 7 例异常（6 例真实 socket / 静态断言 5 s 超时，1 例 `ai-player` 并行状态断言），受影响 7 个文件以 `--no-file-parallelism` 复跑 108 例全过。此前默认并行跑法也分别出现 4 例、2 例、10 例 5 s 超时（`control-auth`、`host-seat-plan`、`simultaneous-api`、`persistence` 的真实 socket 用例与 `board-animation` 的静态断言），单文件复跑与串行复跑均通过，属负载相关超时，与本版改动无关。
 - 贴目回归改为「等于旧口径一跳，除非显式标定」：`dual-lanes` 在 `TUNED_KOMI` 白名单登记为 2，其余顺序图仍钉旧口径，避免后续改动顺手抹平标定值（[tests/public/map-editor.test.ts](tests/public/map-editor.test.ts)）。
 - 同时回合新增 2 例回归：拆除投影失败时，穿墙移动以 `path_blocked` 失败并停留在真实起点；拆除实际成功时，同一路线仍可通行（[tests/engine/simultaneous-steps.test.ts](tests/engine/simultaneous-steps.test.ts)）。
 - 随机地图新增 1 例回归：8 人标准（seed `units-2`）与 5 人歼灭（seed `sf-15`）固定 6 单位时所有出生位均为 6，且补位不落在总部/据点/其他单位/水域或阻挡上（[tests/config/randomMap.test.ts](tests/config/randomMap.test.ts)）。
 - 地图加载器新增 1 例回归：重复的控制点 ID 在加载期报 `controlPoints[1].id must be unique`（[tests/config/loader.test.ts](tests/config/loader.test.ts)）。
+- 大逃杀新增 2 例回归：`narrow-road` 第 1 轮双方零单位时，`[等待, 部署]` 对 `[部署]` 不再在第 1 步提前判负，双方均正常部署进入第 2 轮；双方都只等待则在本轮结束后以 `mutual_annihilation` 收场且无部署事件（[tests/engine/royale.test.ts](tests/engine/royale.test.ts)）。
+- 算法镜像 `royale-model` 对拍同步：零单位开局者先等待再部署可进入第 2 轮，双方空队列在第 1 轮轮末终局（[tests/algorithms/royale-model.test.ts](tests/algorithms/royale-model.test.ts)）。
 - 归档 tg_0257~tg_0270、tg_0274 共 15 局回放与 31 份复盘（tg_0267 三人局三份名次）。
 
 ## 3.9.10

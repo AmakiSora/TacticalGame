@@ -2,7 +2,11 @@
 const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
 const key = ({ q, r }) => `${q},${r}`;
 const hex = (a, b) => Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs(a.q + a.r - b.q - b.r));
-const countActive = S => S.active.filter(Boolean).length;
+/** 只剩一个零单位开局者时仍允许其后续部署，不能提前判定终局。 */
+const hasContest = S => {
+  const active = S.active.map((value, seat) => value ? seat : -1).filter(seat => seat >= 0);
+  return active.length > 1 || (active.length === 1 && Boolean(S.zeroStart?.[active[0]]));
+};
 
 export function createModel(game) {
   const overrides = new Map((game.map.terrainCells ?? []).map(cell => [key(cell), cell.terrain]));
@@ -25,6 +29,7 @@ export function createModel(game) {
     cpOwners: M.points.map(point => seats.indexOf(point.owner)),
     terrain: cells.map(cell => cell.terrain),
     active: seats.map(() => true), kills: seats.map(() => 0),
+    zeroStart: seats.map((_, seat) => !game.units.some(unit => unit.alive && unit.owner === seats[seat])),
     round: M.round, ended: game.phase === 'game_over',
   };
   return M;
@@ -34,6 +39,7 @@ export function cloneState(S) {
   return {
     ...S, units: S.units.map(unit => ({ ...unit })), supplies: [...S.supplies],
     cpOwners: [...S.cpOwners], terrain: [...S.terrain], active: [...S.active], kills: [...S.kills],
+    zeroStart: [...S.zeroStart],
   };
 }
 
@@ -156,18 +162,20 @@ function occupants(S) {
   return result;
 }
 
-function wipe(S) {
+function wipe(S, includeZeroStart = false) {
   for (let s = 0; s < S.active.length; s++) {
     if (!S.active[s] || S.units.some(unit => unit.s === s && unit.alive)) continue;
+    if (S.zeroStart?.[s] && !includeZeroStart) continue;
     S.active[s] = false;
     for (const unit of S.units) if (unit.s === s) { unit.alive = false; unit.hp = 0; }
     S.cpOwners = S.cpOwners.map(owner => owner === s ? -1 : owner);
   }
-  if (countActive(S) <= 1) S.ended = true;
+  const active = S.active.map((value, seat) => value ? seat : -1).filter(seat => seat >= 0);
+  if (active.length === 0 || (active.length === 1 && !S.zeroStart?.[active[0]])) S.ended = true;
 }
 
 export function advance(M, S, actions, context = { failed: new Set(), attacks: new Map() }) {
-  if (S.ended || countActive(S) <= 1) return S;
+  if (S.ended || !hasContest(S)) return S;
   const { failed, attacks } = context;
   const kept = [];
   let hasAction = false;
@@ -209,6 +217,7 @@ export function advance(M, S, actions, context = { failed: new Set(), attacks: n
     if (cost === null || S.supplies[action.s] < cost) continue;
     S.supplies[action.s] -= cost;
     S.units.push(deployUnit(M, action.s, action));
+    S.zeroStart[action.s] = false;
   }
   for (const action of arrivals) {
     if (action.type !== 'move') continue;
@@ -270,13 +279,16 @@ export function advance(M, S, actions, context = { failed: new Set(), attacks: n
 }
 
 export function finishRound(M, S) {
-  if (S.ended || countActive(S) <= 1) return S;
+  if (S.ended || !hasContest(S)) return S;
   for (let s = 0; s < S.active.length; s++) {
     if (!S.active[s]) continue;
     M.points.forEach((point, p) => {
       if (S.units.some(unit => unit.alive && unit.s === s && unit.canCapture && unit.c === point.c)) S.cpOwners[p] = s;
     });
   }
+  // 零单位开局者必须在本轮内完成部署；所有步骤结束后仍未建军则统一清场。
+  wipe(S, true);
+  if (S.ended) return S;
   const round = S.round ?? M.round;
   const limit = M.game.config.balance.maxTurns;
   if (limit != null && round >= limit) { S.ended = true; return S; }

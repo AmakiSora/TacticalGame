@@ -10,18 +10,18 @@
 
 ### 评估口径
 
-- `maps/dual-lanes.json` 的 `balance.komi.supplies` 由 10 降到 2（该图 208 起始补给 + 0 初始单位 + 5 行动点下，贴目 10 让后手首回合多出一种 5 兵组合、先手胜率 36% 的平衡实验；口径见根 [RELEASE_NOTES.md](../../RELEASE_NOTES.md) 3.9.11 与 [MAP_FORMAT.md](../../docs/MAP_FORMAT.md)「先手贴目」）。算法侧零代码改动——`parallax` / `shrinkroll` 的内置回合模拟从 `config.balance.komi` 读贴目，标定只落在地图数据；该图现有 7,801 局标准战绩（26 位参与者各约 600 局）全是贴目 10 口径，重跑前不要把旧 `dual-lanes` 分图胜率当成本版结论。
+- `maps/dual-lanes.json` 的 `balance.komi.supplies` 由 10 降到 2（该图 208 起始补给 + 0 初始单位 + 5 行动点下，贴目 10 让后手首回合多出一种 5 兵组合、先手胜率 36% 的平衡实验；口径见根 [RELEASE_NOTES.md](../../RELEASE_NOTES.md) 3.9.11 与 [MAP_FORMAT.md](../../docs/MAP_FORMAT.md)「先手贴目」）。贴目标定本身零代码改动——`parallax` / `shrinkroll` 的内置回合模拟从 `config.balance.komi` 读贴目，标定只落在地图数据；该图现有 7,801 局标准战绩（26 位参与者各约 600 局）全是贴目 10 口径，重跑前不要把旧 `dual-lanes` 分图胜率当成本版结论。
 - 同时回合「长弓回廊」入榜：`longbow-gallery` 补 672 局（28 对 × 24 局换座，8 个同时回合算法各 168 局、0 平局、平均 15.59 轮），同时回合池 2,688→3,360 局。榜单由 `arena/matches.jsonl` 重算，该原始文件已退出 git 跟踪（`250e1ad`），入库产物只有 `public/data/arena-*.json`。
 
 ### 适配
 
-- 同时回合结算镜像同步引擎的路径复核：`horizon` / `kriegspiel` / `matrix-eq` / `tempo-weave` 在执行移动前，按单位实际起点与当前真实地形重新做一次可达性检查；计划期依赖但最终失败的 `demolish` 不再在镜像里打开通道。其余算法未改，`horizon` 的分步结算对拍与四个算法的自博弈回归均保持零偏差。
+- 同时回合结算镜像同步引擎的路径复核：`horizon` / `kriegspiel` / `matrix-eq` / `tempo-weave` 在执行移动前，按单位实际起点与当前真实地形重新做一次可达性检查；大逃杀的 `royale-model` 也补上同样的路径复核。计划期依赖但最终失败的 `demolish` 不再在镜像里打开通道。其余算法未改，`horizon` 的分步结算对拍与四个算法的自博弈回归均保持零偏差。
 - 大逃杀结算镜像同步引擎的轮末清场：第 1 轮零单位开局的座位在步骤间不提前触发 `army_destroyed`，可先等待再部署；若本轮队列结束仍无单位才统一淘汰。`royale-model` 的对拍用例同步改为双方各 1 单位进入第 2 轮，并保留双方空队列在第 1 轮轮末 `mutual_annihilation` 的断言。
 
 ### 测试与验证
 
-- `npm run build`、`npm run check-version` 通过；`npm test` 152 文件 / 1,867 例，默认并行下 7 例异常（6 例既有超时与 1 例 `ai-player` 并行状态断言），受影响文件以 `--no-file-parallelism` 复跑 108 例全过（历史负载型超时见根 `RELEASE_NOTES.md` 3.9.11）。内置贴目回归只钉「等于旧口径一跳，除非显式标定」，`dual-lanes` 在 `TUNED_KOMI` 白名单登记为 2（[tests/public/map-editor.test.ts](../../tests/public/map-editor.test.ts)）。
-- 同时回合新增 2 例回归：拆除投影失败时，穿墙移动以 `path_blocked` 失败并停留在真实起点；拆除实际成功时，同一路线仍可通行（[tests/engine/simultaneous-steps.test.ts](../../tests/engine/simultaneous-steps.test.ts)）。
+- `npm run build`、`npm run check-version` 通过；`npm test` 全量串行 154 文件 / 1,876 例全过（默认并行下 10 例负载型 5 s 超时），详见根 [RELEASE_NOTES.md](../../RELEASE_NOTES.md) 3.9.11。内置贴目回归只钉「等于旧口径一跳，除非显式标定」，`dual-lanes` 在 `TUNED_KOMI` 白名单登记为 2（[tests/public/map-editor.test.ts](../../tests/public/map-editor.test.ts)）。
+- 同时回合新增 2 例回归：拆除投影失败时，穿墙移动以 `path_blocked` 失败并停留在真实起点；拆除实际成功时，同一路线仍可通行（[tests/engine/simultaneous-steps.test.ts](../../tests/engine/simultaneous-steps.test.ts)）。另新增 1 例 `royale-model` 对拍：投影拆除失败后，模型不会让后续移动穿过障碍（[tests/algorithms/royale-model.test.ts](../../tests/algorithms/royale-model.test.ts)）。
 - 大逃杀新增 2 例引擎回归，并同步调整 `royale-model` 对拍：零单位开局者先等待再部署不会被第 1 步清场，双方都等待则第 1 轮轮末 `mutual_annihilation`（[tests/engine/royale.test.ts](../../tests/engine/royale.test.ts)、[tests/algorithms/royale-model.test.ts](../../tests/algorithms/royale-model.test.ts)）。
 
 ## 3.9.9（2026-11-10）— 新增大逃杀堡垒算法

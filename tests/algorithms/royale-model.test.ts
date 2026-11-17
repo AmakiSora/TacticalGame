@@ -466,6 +466,22 @@ describe('royale model synchronous steps', () => {
     expect(context.failed).toEqual(new Set([1]));
   });
 
+  it('does not move through a blocker when the projected demolish fails', () => {
+    const game = fixture();
+    add(game, 0, 'heavy', 0, 0);
+    add(game, 0, 'scout', 2, 0);
+    game.map.terrainCells.push({ q: 1, r: 0, terrain: 'blocker' });
+    // 绕过入队校验，复现计划期乐观接受、结算时才失败的队列。
+    const { S, context } = mirror(game, [[
+      act(game, 'move', 0, 2, 0),
+      act(game, 'demolish', 0, 1, 0),
+      act(game, 'move', 1, 0, 0),
+    ], []], false, false);
+    expect(context.failed.has(0)).toBe(true);
+    expect(S.units[0].c).toBe(cell(game, 0, 0));
+    expect(S.units[1].c).toBe(cell(game, 2, 0));
+  });
+
   it('charges discounted deploy costs, allows same-step vacating, and hits newly deployed units', () => {
     const game = fixture('narrow-road');
     game.config.balance.controlPointTypes!.forward_base.deployDiscount = 3;

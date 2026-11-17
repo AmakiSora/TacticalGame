@@ -223,6 +223,9 @@ export function advance(M, S, actions, context = { failed: new Set(), attacks: n
     if (action.type !== 'move') continue;
     const unit = S.units[action.u];
     if (blocked.has(action) || unit.s !== action.s) { failed.add(action.u); continue; }
+    if (!M.cells[action.c] || action.c === unit.c || distances(M, S, unit.c)[action.c] > unit.moveRange) {
+      failed.add(action.u); continue;
+    }
     unit.c = action.c;
     unit.q = M.cells[action.c].q; unit.r = M.cells[action.c].r;
     unit.hasMoved = true;

@@ -18,16 +18,18 @@
 - **拒绝重复的据点 ID**：地图加载器现在于加载期要求 `controlPoints[].id` 全图唯一；此前同 ID 据点可通过校验，实时收入和据点持有按据点对象重复计数，而重启恢复按 `pointId` 合并，导致同一局前后计分口径不一致（`src/config/loader.ts`）。
 - **零单位开局者不再被步级清场提前淘汰**：大逃杀第 1 轮双方零单位时，原实现会在任一非空步骤结束后立即按 `army_destroyed` 清场，使排队「等待→部署」的玩家在部署前出局；现在本轮开始零单位的玩家豁免步级清场，等本轮全部队列走完后统一检查，成功部署后恢复正常规则（`src/engine/simultaneousResolve.ts`）。算法内置结算镜像同步见[算法日志](algorithms/docs/RELEASE_NOTES.md)。
 - **导入回放后不再保留在线对局选择**：文件导入现在清空当前对局选择并退出实时模式，改名、删除、强制裁决等操作不会误作用于此前的在线对局；改名入口同时增加回放态守卫（`public/app.js`、`public/spectator-m.js`）。
+- **畸形裁定排名不再使分数面板崩溃**：回放中的 `rankings` 若含 `null` 或缺少有效 `playerId`/`rank` 的行，现按无效排名忽略并回退到分数排序；此前任意一行缺字段都会在构建排名 Map 时抛错，导致观战页无法渲染（`public/app.js`、`public/spectator-m.js`）。
 
 ### 测试与验证
 
-- `npm run build`、`npm run check-version` 通过；`npm test` 153 文件 / 1,873 例，默认并行下 6 例异常（5 例真实 socket/API 用例与 1 例静态断言 5 s 超时），受影响 6 个文件以 `--no-file-parallelism` 复跑 87 例全过。此前默认并行跑法也分别出现 4 例、2 例、10 例 5 s 超时（`control-auth`、`host-seat-plan`、`simultaneous-api`、`persistence` 的真实 socket 用例与 `board-animation` 的静态断言），单文件复跑与串行复跑均通过，属负载相关超时，与本版改动无关。
+- `npm run build`、`npm run check-version` 通过；`npm test` 154 文件 / 1,875 例，默认并行下 2 例异常（`control-auth` 与 `wait` 的真实 socket/API 用例 5 s 超时），受影响 2 个文件以 `--no-file-parallelism` 复跑 16 例全过。此前默认并行跑法也分别出现 4 例、2 例、10 例、6 例 5 s 超时（`control-auth`、`host-seat-plan`、`simultaneous-api`、`persistence` 的真实 socket 用例与 `board-animation` 的静态断言），单文件复跑与串行复跑均通过，属负载相关超时，与本版改动无关。
 - 贴目回归改为「等于旧口径一跳，除非显式标定」：`dual-lanes` 在 `TUNED_KOMI` 白名单登记为 2，其余顺序图仍钉旧口径，避免后续改动顺手抹平标定值（[tests/public/map-editor.test.ts](tests/public/map-editor.test.ts)）。
 - 同时回合新增 2 例回归：拆除投影失败时，穿墙移动以 `path_blocked` 失败并停留在真实起点；拆除实际成功时，同一路线仍可通行（[tests/engine/simultaneous-steps.test.ts](tests/engine/simultaneous-steps.test.ts)）。
 - 随机地图新增 1 例回归：8 人标准（seed `units-2`）与 5 人歼灭（seed `sf-15`）固定 6 单位时所有出生位均为 6，且补位不落在总部/据点/其他单位/水域或阻挡上（[tests/config/randomMap.test.ts](tests/config/randomMap.test.ts)）。
 - 地图加载器新增 1 例回归：重复的控制点 ID 在加载期报 `controlPoints[1].id must be unique`（[tests/config/loader.test.ts](tests/config/loader.test.ts)）。
 - 大逃杀新增 2 例回归：`narrow-road` 第 1 轮双方零单位时，`[等待, 部署]` 对 `[部署]` 不再在第 1 步提前判负，双方均正常部署进入第 2 轮；双方都只等待则在本轮结束后以 `mutual_annihilation` 收场且无部署事件（[tests/engine/royale.test.ts](tests/engine/royale.test.ts)）。
 - 观战页新增 6 例回归（桌面/移动各 3 例）：导入回放后清空在线对局选择，回放中的改名不会 PATCH 到已选在线对局，同时保留真实在线对局的改名能力（[tests/public/spectator-import-selection.test.ts](tests/public/spectator-import-selection.test.ts)）。
+- 观战页新增 2 例回归（桌面/移动各 1 例）：`rankings: [null, ...]` 不再抛错，有效排名保留、无效排名回退到分数排序（[tests/public/score-rankings.test.ts](tests/public/score-rankings.test.ts)）。
 - 算法镜像 `royale-model` 对拍同步：零单位开局者先等待再部署可进入第 2 轮，双方空队列在第 1 轮轮末终局（[tests/algorithms/royale-model.test.ts](tests/algorithms/royale-model.test.ts)）。
 - 归档 tg_0257~tg_0270、tg_0274 共 15 局回放与 31 份复盘（tg_0267 三人局三份名次）。
 

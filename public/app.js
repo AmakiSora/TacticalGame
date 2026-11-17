@@ -1178,7 +1178,9 @@ function liveAdjudicationScores() {
 
 function liveAdjudicationRankings() {
   const rows = state?.result?.rankings || [];
-  return Array.isArray(rows) ? rows : [];
+  return Array.isArray(rows)
+    ? rows.filter(row => row && typeof row === 'object' && typeof row.playerId === 'string' && Number.isFinite(row.rank))
+    : [];
 }
 
 const SCORE_TERM_DEFS = [

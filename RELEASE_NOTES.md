@@ -9,11 +9,11 @@
 ### 变更
 
 - **「双线抉择」先手贴目下调（平衡性调整）**：`dual-lanes` 的 `komi.supplies` 从 10 降到 2——该图 208 起始补给 + 0 初始单位 + 5 行动点，旧贴目让后手第 1 回合多出一种 5 兵组合，实测先手胜率被压到 36%。其余顺序图仍按旧口径一跳，标定惯例见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)「先手贴目」。
-- **竞技场榜单与玩法统计重算**：同时回合池补入长弓回廊 672 局（8 个算法各 168 局，2,688→3,360 局），总对局 51,691→52,363、数据截至 2026-11-14；标准模式名册未变（26 位参与者，含 19 个模型），`dual-lanes` 历史战绩仍是旧贴目口径。
-- **同时回合结算路径复核**：计划期仍允许依赖己方爆破投影穿过障碍，但结算时按单位实际起点和真实地形重新检查移动路径；若投影中的拆除未实际成功，移动以新失败原因 `path_blocked` 失败，不再穿过完好的障碍。规划期乐观投影与成功拆除后的通行不受影响，算法内置结算镜像同步见[算法日志](algorithms/docs/RELEASE_NOTES.md)。
+- **竞技场榜单与玩法统计重算**：同时回合池补入长弓回廊 672 局（8 个算法各 168 局，2,688→3,360 局），总对局 51,691→52,363、数据截至 2026-11-14；玩法统计看板补入 tg_0269~tg_0276 共 8 局回放（268→276 局，数据截至 2026-11-17）。标准模式名册未变（26 位参与者，含 19 个模型），`dual-lanes` 历史战绩仍是旧贴目口径。
 
 ### 修复
 
+- **同时回合移动结算按真实路径复核**：计划期仍允许依赖己方爆破投影穿过障碍，但结算时按单位实际起点和真实地形重新检查移动路径；若投影中的拆除未实际成功，移动以新失败原因 `path_blocked` 失败并停在原地，不再穿过完好的障碍（`src/engine/simultaneousResolve.ts`）。算法内置结算镜像同步见[算法日志](algorithms/docs/RELEASE_NOTES.md)。
 - **随机地图初始单位数按出生位对齐**：多人局出生位共享邻格时，后处理出生位原本可能少 1 个初始单位（8 人局、显式 6 单位或 5 人歼灭局可复现），预览又只回显 `slot_a`；现在相邻格不足时用 2 环空格补位、仍不足则全员统一降级，回显实际数量（`src/config/randomMap.ts`）。
 - **拒绝重复的据点 ID**：地图加载器现在于加载期要求 `controlPoints[].id` 全图唯一；此前同 ID 据点可通过校验，实时收入和据点持有按据点对象重复计数，而重启恢复按 `pointId` 合并，导致同一局前后计分口径不一致（`src/config/loader.ts`）。
 - **零单位开局者不再被步级清场提前淘汰**：大逃杀第 1 轮双方零单位时，原实现会在任一非空步骤结束后立即按 `army_destroyed` 清场，使排队「等待→部署」的玩家在部署前出局；现在本轮开始零单位的玩家豁免步级清场，等本轮全部队列走完后统一检查，成功部署后恢复正常规则（`src/engine/simultaneousResolve.ts`）。算法内置结算镜像同步见[算法日志](algorithms/docs/RELEASE_NOTES.md)。
@@ -22,16 +22,9 @@
 
 ### 测试与验证
 
-- `npm run build`、`npm run check-version` 通过；`npm test` 154 文件 / 1,875 例，默认并行下 2 例异常（`control-auth` 与 `wait` 的真实 socket/API 用例 5 s 超时），受影响 2 个文件以 `--no-file-parallelism` 复跑 16 例全过。此前默认并行跑法也分别出现 4 例、2 例、10 例、6 例 5 s 超时（`control-auth`、`host-seat-plan`、`simultaneous-api`、`persistence` 的真实 socket 用例与 `board-animation` 的静态断言），单文件复跑与串行复跑均通过，属负载相关超时，与本版改动无关。
-- 贴目回归改为「等于旧口径一跳，除非显式标定」：`dual-lanes` 在 `TUNED_KOMI` 白名单登记为 2，其余顺序图仍钉旧口径，避免后续改动顺手抹平标定值（[tests/public/map-editor.test.ts](tests/public/map-editor.test.ts)）。
-- 同时回合新增 2 例回归：拆除投影失败时，穿墙移动以 `path_blocked` 失败并停留在真实起点；拆除实际成功时，同一路线仍可通行（[tests/engine/simultaneous-steps.test.ts](tests/engine/simultaneous-steps.test.ts)）。
-- 随机地图新增 1 例回归：8 人标准（seed `units-2`）与 5 人歼灭（seed `sf-15`）固定 6 单位时所有出生位均为 6，且补位不落在总部/据点/其他单位/水域或阻挡上（[tests/config/randomMap.test.ts](tests/config/randomMap.test.ts)）。
-- 地图加载器新增 1 例回归：重复的控制点 ID 在加载期报 `controlPoints[1].id must be unique`（[tests/config/loader.test.ts](tests/config/loader.test.ts)）。
-- 大逃杀新增 2 例回归：`narrow-road` 第 1 轮双方零单位时，`[等待, 部署]` 对 `[部署]` 不再在第 1 步提前判负，双方均正常部署进入第 2 轮；双方都只等待则在本轮结束后以 `mutual_annihilation` 收场且无部署事件（[tests/engine/royale.test.ts](tests/engine/royale.test.ts)）。
-- 观战页新增 6 例回归（桌面/移动各 3 例）：导入回放后清空在线对局选择，回放中的改名不会 PATCH 到已选在线对局，同时保留真实在线对局的改名能力（[tests/public/spectator-import-selection.test.ts](tests/public/spectator-import-selection.test.ts)）。
-- 观战页新增 2 例回归（桌面/移动各 1 例）：`rankings: [null, ...]` 不再抛错，有效排名保留、无效排名回退到分数排序（[tests/public/score-rankings.test.ts](tests/public/score-rankings.test.ts)）。
-- 算法镜像 `royale-model` 对拍同步：零单位开局者先等待再部署可进入第 2 轮，双方空队列在第 1 轮轮末终局（[tests/algorithms/royale-model.test.ts](tests/algorithms/royale-model.test.ts)）。
-- 归档 tg_0257~tg_0270、tg_0274 共 15 局回放与 31 份复盘（tg_0267 三人局三份名次）。
+- `npm run build`、`npm run check-version` 通过；`npm test` 全量串行 154 文件 / 1,876 例全过（默认并行下曾有 10 例负载型 5 s 超时，受影响文件串行复跑亦通过）。
+- 回归覆盖同时回合路径复核（2 例引擎 + 1 例 `royale-model` 对拍）、随机地图出生位（1 例）、重复据点 ID（1 例）、大逃杀零单位开局（2 例，含 `royale-model` 对拍）、观战导入选择（6 例）与畸形排名（2 例）；相关测试见 [simultaneous-steps.test.ts](tests/engine/simultaneous-steps.test.ts)、[royale.test.ts](tests/engine/royale.test.ts)、[spectator-import-selection.test.ts](tests/public/spectator-import-selection.test.ts)。
+- 归档 tg_0257~tg_0276 共 20 局回放与 41 份复盘（tg_0267 三人局三份名次）。
 
 ## 3.9.10
 

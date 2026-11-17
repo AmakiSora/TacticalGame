@@ -11,7 +11,7 @@
 
 **口径变化**：`maps/dual-lanes.json` 的 `balance.komi.supplies` 10→2（平衡实验，先手胜率 36%；背景见 [MAP_FORMAT.md](../../docs/MAP_FORMAT.md)「先手贴目」）。训练侧 `RL_TRAIN_MAP_MIX` 含 `dual-lanes` 时该图开局经济变了；评估侧该图历史 7,801 局仍是贴目 10 口径，重跑前旧分图成绩不可与新口径混用。
 
-**测试与验证**：见根 `RELEASE_NOTES.md` 3.9.11（`npm run build` / `npm run check-version` 通过、`npm test` 152 文件 / 1,861 例全过）。
+**测试与验证**：见根 `RELEASE_NOTES.md` 3.9.11（`npm run build` / `npm run check-version` 通过、`npm test` 全量串行 154 文件 / 1,876 例全过；默认并行下 10 例负载型 5 s 超时）。
 
 ## 2026-11-13 · 同时回合双人图池加长弓回廊（3.9.10）
 

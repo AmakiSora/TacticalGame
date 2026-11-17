@@ -2100,8 +2100,8 @@ function renderSelectionInfo(ent, cp) {
 }
 
 async function renamePlayer(playerId) {
-  if (window.EMBEDDED_EVENTS || !gameSelect.value || gameSelect.value === 'offline') {
-    statusEl.textContent = '请选择在线对局后再改名';
+  if (window.EMBEDDED_EVENTS || importedReplayMeta || !gameSelect.value || gameSelect.value === 'offline') {
+    statusEl.textContent = importedReplayMeta ? '回放模式下不能改名，请选择在线对局' : '请选择在线对局后再改名';
     return;
   }
   const current = playerName(playerId);
@@ -2246,6 +2246,8 @@ function normalizeImportedReplay(data) {
 function loadImportedReplay(replay) {
   gameLoadVersion++;
   pausePlayback();
+  // 回放不是在线对局：清掉上次选择，避免改名/删除等管理操作仍发往旧对局。
+  gameSelect.value = '';
   importedReplayMeta = {
     gameId: replay.gameId || 'offline',
     mapId: replay.mapId || null,
@@ -2275,6 +2277,7 @@ function loadImportedReplay(replay) {
   renderDetail();
   if (liveSse) liveSse.close();
   liveSse = null;
+  syncGamePickerLabel();
 }
 
 function importJson() { importFile.click(); }

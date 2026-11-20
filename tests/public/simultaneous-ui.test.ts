@@ -58,7 +58,11 @@ describe('simultaneous mode UI', () => {
     for (const file of playerClients) {
       const source = read(file);
       expect(source).toContain('function canActNow()');
-      expect(source).toContain("gameConfig?.mode === 'simultaneous'");
+      // 谓词入口自带字面量（迷雾也走同时回合骨架），canActNow 经 isSimultaneous() 取用。
+      expect(source).toContain('function isSimultaneous() {');
+      expect(source).toContain("return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';");
+      const canAct = source.slice(source.indexOf('function canActNow()'), source.indexOf('function plannedStepsForUnit'));
+      expect(canAct).toContain('isSimultaneous()');
       // 单位可跨行动点多次行动：不再有“每单位一个动作”的入队拦截。
       expect(source).not.toContain('unitHasPlannedAction');
       expect(source).not.toContain('plannedAlready');
@@ -129,16 +133,19 @@ describe('simultaneous mode UI', () => {
       const source = read(file);
       expect(source).toContain('data.plan.myQueue');
       expect(source).toContain('data.plan.committed');
-      expect(source).toContain("gameConfig?.mode === 'simultaneous' ? null : (p.firstPlayer || s.turn.turnOrder[0] || null)");
+      // 玩家页用 isSimultaneous()，观战页用 game_start 内的 simultaneousStart；两者都置空当前玩家。
+      expect(source).toMatch(/currentPlayerId = (?:isSimultaneous\(\)|simultaneousStart) \? null : \(p\.firstPlayer \|\| s\.turn\.turnOrder\[0\] \|\| null\)/);
     }
   });
 
   it('labels the simultaneous map in the map picker', () => {
     for (const file of playerClients) {
       const source = read(file);
-      expect(source).toContain("const modeLabel = map.preview?.mode === 'simultaneous' ? '同时'");
-      expect(source).toContain("map.preview?.mode === 'annihilation' ? '歼灭'");
-      expect(source).toContain("? '大逃杀' : '标准';");
+      expect(source).toContain('const modeLabel = mapModeLabel(map.preview?.mode);');
+      const label = source.slice(source.indexOf('function mapModeLabel('), source.indexOf('function syncMapSelection('));
+      expect(label).toContain("mode === 'simultaneous' ? '同时'");
+      expect(label).toContain("mode === 'annihilation' ? '歼灭'");
+      expect(label).toContain("? '大逃杀' : '标准';");
     }
   });
 

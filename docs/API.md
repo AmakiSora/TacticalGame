@@ -7,11 +7,12 @@
 | 凭证 | 传递方式 | 用途 |
 |---|---|---|
 | 玩家 token | `X-Player-Token: <player.token>` | 玩家自己的操作、读状态、等待与事件流 |
+| 观战 token | `X-Spectator-Token: <spectatorToken>` 或 `?spectatorToken=<spectatorToken>` | fog 局只读全量视角（状态 / 事件 / SSE）；建房响应返回一次，不能用于任何写接口 |
 | 房主 token | `X-Host-Token: <hostToken>` | 开局、踢人、改人数、跳过回合、强制结算、添加 AI |
 | 控制 token | `X-Control-Token: <token>` 或 `?token=<token>` | 删除对局、强制裁决、管理员改名、竞技场跑批 |
 | 指标 token | `X-Metrics-Token: <token>` 或 `Authorization: Bearer <token>` | `GET /metrics`（仅在设置 `METRICS_TOKEN` 后启用） |
 
-- `create` 响应同时返回 `hostToken` 与参战玩家的 `player.token`；`join` 只返回玩家 token。
+- `create` 响应同时返回 `hostToken` 与参战玩家的 `player.token`；fog 图另返回只读的 `spectatorToken`（明文只出现这一次，落盘只存哈希，非 fog 图为 `''`）；`join` 只返回玩家 token。
 - 控制权限由环境变量 `AUTO_CONTROL_TOKEN` 决定。设置后所有控制请求都必须携带控制 token（常量时间比较；空白值等同未设置），经反向代理转来的请求也一样；未设置时只放行「本机直连」——socket 对端必须是回环地址（`::1`、`::ffff:127.0.0.1`、整段 `127.0.0.0/8`）**且**请求不带任何转发头（`X-Forwarded-For` / `Forwarded` / `X-Real-IP`），与 `TRUST_PROXY` 取值无关；socket 地址缺失（unix socket、已断连）按非本机处理。未配置 token 且非本机 → 401 `control_token_required`；凭证不符 → 401 `invalid_control_token`。
 - `TRUST_PROXY=true` 时 `req.ip` 取自客户端可写的转发头，只影响限流分桶与 SSE 的每 IP 配额（控制鉴权不看它）；因此它只能接在你信任的反向代理后面，由代理自己写入转发头，且不要直接暴露应用端口。
 - 控制权限覆盖删除对局、强制裁决、管理员改名与竞技场评估的 5 个端点（`/api/arena/eval/status`、`/start`、`/stop`、`/clear-matches`、`/api/arena/leaderboard/regenerate`）；`?token=` 形式仅用于调试，会随请求 URL 进访问日志。
@@ -34,17 +35,17 @@
 | 方法 | 路径 | 请求体 | 返回 |
 |---|---|---|---|
 | `GET` | `/api/games` | - | `{ games }` |
-| `POST` | `/api/games` | `{ mapId, maxPlayers, participate?, playerName? }` | `{ gameId, hostToken, player: { id, token } \| null, lobby }` |
+| `POST` | `/api/games` | `{ mapId, maxPlayers, participate?, playerName? }` | `{ gameId, hostToken, spectatorToken, player: { id, token } \| null, lobby }` |
 | `GET` | `/api/games/:id/lobby` | - | 公开大厅摘要，不含凭证；含座位字段 `seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots`（见下） |
 | `POST` | `/api/games/:id/join` | `{ name? }` | `{ player: { id, token }, lobby }` |
 | `POST` | `/api/games/:id/start` | host token header | `{ ok: true, game }` |
-| `GET` | `/api/games/:id` | token header | 完整状态，不含 token |
+| `GET` | `/api/games/:id` | player / spectator token header（fog 可匿名） | 按观者投影的状态，不含 token；fog 局额外带 `fog` 字段 |
 | `PATCH` | `/api/games/:id/player` | `{ name }` | `{ ok: true, lobby }` |
 | `PATCH` | `/api/games/:id/rename` | `{ playerId, name }` + control token | `{ ok: true }`（管理员改任意玩家名） |
 | `POST` | `/api/games/:id/leave` | player token header | `{ ok: true }` |
 | `DELETE` | `/api/games/:id/players/:playerId` | host token header | `{ ok: true, lobby }` |
 | `PATCH` | `/api/games/:id/host/max-players` | `{ maxPlayers }` + host token header | `{ ok: true, lobby }` |
-| `PUT` | `/api/games/:id/host/seats` | `{ order, firstSeat?, ifVersion? }` + host token header | `{ ok: true, seatVersion, firstSeat, lobby }`（仅 lobby 期；响应顶层不含 `seats`，最新座位表在 `lobby.seats`；`ifVersion` 失配 → `409 seat_conflict`；`simultaneous` / `royale` 下 `firstSeat` 恒为 `0`，见下） |
+| `PUT` | `/api/games/:id/host/seats` | `{ order, firstSeat?, ifVersion? }` + host token header | `{ ok: true, seatVersion, firstSeat, lobby }`（仅 lobby 期；响应顶层不含 `seats`，最新座位表在 `lobby.seats`；`ifVersion` 失配 → `409 seat_conflict`；`simultaneous` / `royale` / `fog` 下 `firstSeat` 恒为 `0`，见下） |
 | `DELETE` | `/api/games/:id/host/seats` | host token header | `{ ok: true, seatVersion, lobby }`（唯一清理编排的接口，回到开局随机） |
 | `POST` | `/api/games/:id/host/skip-turn` | host token header（可选 `Idempotency-Key`） | `{ ok: true }`（仅顺序模式；同一轮不能重复跳同一玩家，见下） |
 | `POST` | `/api/games/:id/host/eliminate` | `{ playerId }` + host token header | `{ ok: true }` |
@@ -56,15 +57,15 @@
 - 活跃大厅数受 `TACTICAL_GAME_MAX_LOBBIES` 限制（默认 200，设为非正整数时进程启动即报错）：达到上限后建房返回 503 `lobby_capacity`（文案「大厅数量已达上限（<上限>），请等空闲大厅过期后再建房」）并计入 `tactical_lobby_capacity_rejected_total`，用到 80% 起写 warning。
 - 保留期：无活动的大厅默认 2 小时（部署用的 `compose.yml` 未显式设置时传 24 小时）、终局对局默认 3 天后归档到 `runtime/archive/`，进行中的对局永不按 TTL 回收；用 `TACTICAL_GAME_LOBBY_TTL_HOURS` / `TACTICAL_GAME_OVER_TTL_HOURS` 覆盖（`0` 关闭对应清理，非法或负数回落默认值并告警）。
 - 落盘：每次改动同步原子写 `runtime/store/<gameId>.json`，响应返回时该局快照已在盘上；`runtime/games.json` 是导出与旧版兼容格式，去抖合并写（trailing 250ms、最长 2s 必写），删除对局、归档与进程退出时强制 flush。部署侧取值见 [deploy/DEPLOYMENT.md](../deploy/DEPLOYMENT.md)。
-- `host/skip-turn` 只在顺序模式有意义（同时 / 大逃杀没有当前行动玩家，调用返回 409 `game_not_started`，文案「对局不在进行中」）；同一轮内不能重复跳过同一玩家，重复调用返回 409 `round_already_resolved`（文案「本轮已经跳过该玩家，不能重复跳过」）。
+- `host/skip-turn` 只在顺序模式有意义（同时回合骨架的 simultaneous / royale / fog 都没有当前行动玩家，调用返回 409 `game_not_started`，文案「对局不在进行中」）；同一轮内不能重复跳过同一玩家，重复调用返回 409 `round_already_resolved`（文案「本轮已经跳过该玩家，不能重复跳过」）。
 - 座位编排（3.8.8）：大厅期房主用 `PUT /api/games/:id/host/seats` 编排座位，`DELETE` 取消编排、回到开局随机。`order` 必须是**当前已加入玩家的一次排列**（长度不符 / 重复 / 含未加入玩家 / 缺人，任一即 `400 invalid_seat_layout`）；房间内还没有玩家时无座位可编排，同样 `400 invalid_seat_layout`（文案「当前没有已加入玩家，无法编排座位」）；`ifVersion` 必须是整数，与当前 `seatVersion` 不等时 → `409 seat_conflict`，响应体带最新 `seatVersion` 与完整 `lobby`，前端可直接重绘、不必重放请求。开局后调用一律 `409 game_already_started`。
-- `firstSeat` **按模式区分**：仅顺序模式（`standard` / `annihilation`）有意义，是 0 起的先手座位下标、缺省 0，`turnOrder` 从该座位循环展开；越界（`<0` 或 `>=已加入人数`）→ `400 invalid_seat_layout`（错误文案「先手座位号越界」只会在顺序模式出现）。`simultaneous` / `royale` **没有先手概念**（`turnOrder` 只是同一步内的并列处理顺序），服务端忽略该字段、一律存 `0` 并在响应里回 `0`，不报错也不做越界校验；`GET /api/games/:id/lobby` 的 `firstSeat` 在这两个模式下同样恒为 `0`。
-- 大厅摘要的座位字段：`seatMode`（`'random'` / `'manual'`）、`seatVersion`、`firstSeat`（0 起；`random` 态恒 0，`simultaneous` / `royale` 也恒 0）、`seats[]`（`{ seat, playerId, name, spawnSlotId }`，`seat` 从 1 起、按座位号升序）。`seatMode='random'`（未编排）时出生点（以及顺序模式下的先手）**都还没决定**，`seats[].spawnSlotId` **恒为 `null`**，`seats` 只按加入顺序给座位号；`seatMode='manual'` 时才把 `spawnSlotId` 映射成 `config.layouts[人数][座位下标]`，该人数没有 `layouts` 条目时仍为 `null`。席位 id（`player_a`…）恒按加入顺序分配且不可变，座位号只决定「谁坐哪个出生点」；行动顺位只存在于顺序模式，同时 / 大逃杀里座位号只是同一步内的结算处理顺序。
+- `firstSeat` **按模式区分**：仅顺序模式（`standard` / `annihilation`）有意义，是 0 起的先手座位下标、缺省 0，`turnOrder` 从该座位循环展开；越界（`<0` 或 `>=已加入人数`）→ `400 invalid_seat_layout`（错误文案「先手座位号越界」只会在顺序模式出现）。`simultaneous` / `royale` / `fog` **没有先手概念**（`turnOrder` 只是同一步内的并列处理顺序），服务端忽略该字段、一律存 `0` 并在响应里回 `0`，不报错也不做越界校验；`GET /api/games/:id/lobby` 的 `firstSeat` 在这三个模式下同样恒为 `0`。
+- 大厅摘要的座位字段：`seatMode`（`'random'` / `'manual'`）、`seatVersion`、`firstSeat`（0 起；`random` 态恒 0，`simultaneous` / `royale` / `fog` 也恒 0）、`seats[]`（`{ seat, playerId, name, spawnSlotId }`，`seat` 从 1 起、按座位号升序）。`seatMode='random'`（未编排）时出生点（以及顺序模式下的先手）**都还没决定**，`seats[].spawnSlotId` **恒为 `null`**，`seats` 只按加入顺序给座位号；`seatMode='manual'` 时才把 `spawnSlotId` 映射成 `config.layouts[人数][座位下标]`，该人数没有 `layouts` 条目时仍为 `null`。席位 id（`player_a`…）恒按加入顺序分配且不可变，座位号只决定「谁坐哪个出生点」；行动顺位只存在于顺序模式，同时回合骨架（simultaneous / royale / fog）里座位号只是同一步内的结算处理顺序。
 - `layoutSlots` 是「本局人数对应的出生点槽位 id 顺序」（即 `config.layouts[已加入人数]`）：与 `seatMode` 无关、**恒给值**，0 人或该人数没有 `layouts` 条目时为 `[]`；`seatMode='manual'` 时 `seats[i].spawnSlotId` 恒等于 `layoutSlots[i]`。关键约束：**槽位 id 是地图 `spawnSlots` 的非连续子序列，不是前 n 个**（例：`multiplayer-ring` 三人局是 `['slot_1','slot_3','slot_5']`，对应 `spawnSlots` 下标 0/2/4），前端做座位→出生点的映射必须按 `slot.id` 匹配，**不能按数组下标**。
 - 两套版本线是**独立计数**，但别理解成「成员变动不影响 `stateVersion`」：`PUT` / `DELETE /host/seats` 自身同时推进 `seatVersion` 与 `stateVersion`；成员变动（加入 / 退出 / 被踢）使 `seatVersion` +1，其 `stateVersion` 由 `player_joined` / `player_left` 事件推进（写入事件本身就会推进 `stateVersion`）；开局降级只推进 `seatVersion`，`stateVersion` 随后由 `game_start` 事件推进。因此 join / leave 之后带旧 `If-None-Match` 请求 `GET /api/games/:id` **不会** 304，而是 200 返回含新玩家与最新座位表的状态。
 - 座位字段的**结构化形态**（`seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots`）只由 `GET /api/games/:id/lobby` 提供；状态接口里虽有 `seatPlan` 原始字段，但房间页的座位区一律读 `/lobby`，不要从状态接口自己拼座位列表。
 - `seatVersion` 的语义是「座位视图可能已变」：`PUT` 成功、`DELETE` 成功、成员进出（`seatPlan` 为空时也一样）都 `+1`。`DELETE` 在本来就未编排时也 `+1`——幂等只承诺最终状态不变，不承诺版本号不变。
-- 随机地图建房只有一种写法：`POST /api/games` 用 `mapId: "random"`，玩法模式放在 `random.mode`（`standard` / `annihilation` / `simultaneous` / `royale`）。评估控制台的 `random-annihilation` / `random-simultaneous` / `random-royale` 是**跑批批次 id**（批次要靠地图 id 推模式、`matches.jsonl` 靠它归模式），不是可建房地图；传给建房接口返回 `400 invalid_move` 并提示改用 `mapId: "random"` + `random.mode`。
+- 随机地图建房只有一种写法：`POST /api/games` 用 `mapId: "random"`，玩法模式放在 `random.mode`（`standard` / `annihilation` / `simultaneous` / `royale`）。fog **不支持随机地图**：`random.mode: "fog"` 返回 400 并提示改用内置 fog 图（本期不生成随机迷雾图）。评估控制台的 `random-annihilation` / `random-simultaneous` / `random-royale` 是**跑批批次 id**（批次要靠地图 id 推模式、`matches.jsonl` 靠它归模式），不是可建房地图；传给建房接口返回 `400 invalid_move` 并提示改用 `mapId: "random"` + `random.mode`。
 - `GET /api/games` 的每一项带 `gameId`、`mapId`、`mapName`（随机地图为「随机战场」）、`hostName`、`createdAt` 与 `phase` / `mode` / `maxPlayers` / `playerCount` / `players` 等字段。
 
 ## 操作
@@ -73,25 +74,45 @@
 |---|---|---|
 | `POST` | `/api/games/:id/deploy` | `{ unitType, fromId, q, r }` |
 | `POST` | `/api/games/:id/move` | `{ unitId, q, r }` |
-| `POST` | `/api/games/:id/attack` | 顺序模式 `{ attackerId, targetId }`；同时模式 `{ attackerId, q, r }`（指定格子） |
-| `POST` | `/api/games/:id/heal` | 顺序模式 `{ supportId, targetId }`；同时模式 `{ supportId, q, r }`（按 `healShape` 区域治疗） |
+| `POST` | `/api/games/:id/attack` | 顺序模式 `{ attackerId, targetId }`；同时回合骨架（simultaneous / royale / fog）`{ attackerId, q, r }`（指定格子；fog 下对视野外格子即盲射） |
+| `POST` | `/api/games/:id/heal` | 顺序模式 `{ supportId, targetId }`；同时回合骨架 `{ supportId, q, r }`（按 `healShape` 区域治疗） |
 | `POST` | `/api/games/:id/demolish` | `{ unitId, q, r }` |
-| `POST` | `/api/games/:id/end-turn` | `{}`（同时模式 = 确认锁定计划；全员确认即触发结算） |
-| `POST` | `/api/games/:id/plan/wait` | 无（同时模式专用，追加一条待命，消耗 1 行动点） |
-| `POST` | `/api/games/:id/plan/reorder` | `{ actionIds }`（同时模式专用，原子重排队列；必须是当前队列的一个排列） |
-| `POST` | `/api/games/:id/plan/revoke` | `{ actionId }`（同时模式专用，撤回一条排队指令） |
-| `POST` | `/api/games/:id/plan/clear` | 无（同时模式专用，清空自己的计划） |
-| `POST` | `/api/games/:id/host/force-resolve` | host token header；可选 `{ "repeat": true }`（同时回合专用；可选 `Idempotency-Key`） |
+| `POST` | `/api/games/:id/end-turn` | `{}`（同时回合骨架 = 确认锁定计划；全员确认即触发结算） |
+| `POST` | `/api/games/:id/plan/wait` | 无（同时回合骨架专用，追加一条待命，消耗 1 行动点） |
+| `POST` | `/api/games/:id/plan/reorder` | `{ actionIds }`（同时回合骨架专用，原子重排队列；必须是当前队列的一个排列） |
+| `POST` | `/api/games/:id/plan/revoke` | `{ actionId }`（同时回合骨架专用，撤回一条排队指令） |
+| `POST` | `/api/games/:id/plan/clear` | 无（同时回合骨架专用，清空自己的计划） |
+| `POST` | `/api/games/:id/host/force-resolve` | host token header；可选 `{ "repeat": true }`（同时回合骨架专用；可选 `Idempotency-Key`） |
 
 - 部署/移动/攻击/治疗/爆破/结束回合、计划撤回/清空/重排均支持 `Idempotency-Key`。
-- `host/force-resolve` 是同时回合专用（其它模式 400 `not_simultaneous_game`），响应 `{ ok, resolved, roundNumber, repeated, phase }`。同一轮已结算、之后又没有新输入（入队 / 提交）时返回 409 `round_already_resolved`（文案「本轮已经结算，等待下一次行动提交后再结算」）；房主可带 `{ "repeat": true }` 显式跳过这一次守卫（响应 `repeated: true`，计入 `tactical_round_force_repeat_total` 并写 warning），用于人工解锁推不动的存量对局。该参数只作用于本次请求（不带它仍然 409），房主可连续调用多次、每次推进一轮，服务端不设次数上限。
+- `host/force-resolve` 是同时回合骨架专用（simultaneous / royale / fog；其它模式 400 `not_simultaneous_game`），响应 `{ ok, resolved, roundNumber, repeated, phase }`。同一轮已结算、之后又没有新输入（入队 / 提交）时返回 409 `round_already_resolved`（文案「本轮已经结算，等待下一次行动提交后再结算」）；房主可带 `{ "repeat": true }` 显式跳过这一次守卫（响应 `repeated: true`，计入 `tactical_round_force_repeat_total` 并写 warning），用于人工解锁推不动的存量对局。该参数只作用于本次请求（不带它仍然 409），房主可连续调用多次、每次推进一轮，服务端不设次数上限。
 - 服务端不提供旧版 `/build`、`/produce`、`/sell` 接口。
 
 ## 状态、等待与事件
 
 ### 读取状态
 
-`GET /api/games/:id` 需要玩家 token。支持 `include=state,events,config,adjudication` 投影与 `If-None-Match`（304）。
+`GET /api/games/:id` 通常需要玩家 token；fog 局额外接受观战 token 或匿名访问（见下节）。支持 `include=state,events,config,adjudication` 投影与 `If-None-Match`（304）。
+
+### 迷雾模式（fog）的观者投影
+
+观者优先级：合法 `X-Player-Token`（或 `?token=`） > 合法 `X-Spectator-Token`（或 `?spectatorToken=`） > `public`；同时提供时以玩家为准。观战 token 只读，不能进入任何写接口。无效观战 token → `401 { error, code: 'invalid_spectator_token' }`；fog 局无任何 token → `public` 安全视角（**不是** 401）。
+
+| 字段 | player | spectator | public |
+|---|---|---|---|
+| `units` | 本人全部单位 + 视野内敌军 | 全量 | `[]` |
+| `fog` | `{ enabled: true, revealed, visibleCells, lastSeen }`（`lastSeen` 只含本人记忆） | `{ enabled: true, revealed: true, visibleCells: 全部可用格, lastSeen: [] }` | `{ enabled: true, revealed: false, visibleCells: [], lastSeen: [] }` |
+| `events` | 逐条按视野投影 | 全量 | 公开事件 |
+| `adjudication` | 本人完整；他人 `{ playerId, total, rank, hidden: true }` | 全量 | `{ hidden: true }` 整体或省略分项 |
+| `result` | 终局后按裁决投影：本人分数完整；他人只有 `{ total, hidden: true }`（`rankings` 保留 `playerId` / `rank` / 状态，仅得分被投影） | 全量 | 所有人只有 `{ total }` 与排名，无分项 |
+| `headquarters` / `controlPoints` / `cells` / `map` / `config` / `turn` / `players` / `resources` / `winner` | 公开（不变）；`players[other].adjudicationScore` 删除，`players.stats` 仍是公开统计 | 公开 | 公开（全部 `players[*].adjudicationScore` 删除，`stats` 保留） |
+| `plan` | 只看自己队列 + 公开的 `committed` | 空队列 + `committed` | 空队列 + `committed` |
+
+- 敌方隐藏单位不得经任何字段（`units`、`fog.lastSeen`、事件 payload、`adjudication`、`result`）泄露 `unitId` / `type` / `hp` / `q` / `r`。
+- `adjudication` / `result` 里缺失或标为 `hidden: true` 的分项表示**隐藏**，不是 0 分：`public` 视角缺少隐藏单位等重建分项所需的输入，客户端不得用公开统计（`players[].stats`）或残缺事件补算后当成完整分项。
+- `players[].stats` 是公开聚合统计（`headquartersDamage` / `unitsDestroyed` / `killValue` / `actionPointsUsed` / `controlHold` 等计数），不因 fog 投影而删除；只有裁决分项 `adjudicationScore` 按观者处理——玩家视角看不到他人的该项，观战与匿名视角整项删除。
+- 非 fog 模式响应字节不变（状态读取仍需玩家 token；事件补拉保持原有的匿名行为）。
+- `stateVersion` 语义不变；fog 局 ETag 按观者区分：`"<id>-<stateVersion>-<planQueueTag>-<includeKey>-<viewerTag>"`，`viewerTag ∈ player:<id> | spectator | anon`，并带 `Vary: X-Player-Token, X-Spectator-Token`。304 不得跨观者复用。
 
 ### 长轮询等待
 
@@ -102,19 +123,19 @@
 
 ### 事件流
 
-`GET /api/games/:id/events?after=<seq>` 返回增量事件；`Accept: text/event-stream` 时建立 SSE，断线可用 `Last-Event-ID` 续传。
+`GET /api/games/:id/events?after=<seq>` 返回增量事件；`Accept: text/event-stream` 时建立 SSE，断线可用 `Last-Event-ID` 续传。fog 局的 SSE 与非 SSE 路径使用同一套观者解析与事件投影：SSE 握手时解析观者、逐事件投影，匿名连接只收公开事件，初始补发的历史帧同样投影；不存在“无令牌拿全量”的旁路。
 
 事件类型：
 
 `player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `round_start`, `round_resolved`, `plan_committed`, `wait`, `action_failed`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`, `bot_failed`
 
-- `game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。
+- `game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。fog 局的玩家视角只含本人单位与视野内敌军，观战/回放才是全量。**fog 局的 `payload.config` 必带 `fog`**（与 `game.config.fog` 同值，含 `vision` 与 `revealFromRound`），回放与规则速查以它为视野/揭雾的权威来源；非 fog 局不追加该键，键集保持不变。
 - `game_over` 的 `reason` 为 `last_player_standing`、`mutual_annihilation`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。新生成的事件流中 `game_over` 是最后一条，最终回合的 `round_end` / `round_resolved` 必定先于它；既有归档回放仍可能保留 3.7.1 之前的旧顺序（`game_over` 后还有终局 `round_resolved`），读取旧回放时不要只按 `game_over` 截断。
 - `income` 保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。顺序局里非先手座位第一回合的贴目是一条 `base = amount`、`control = 0`、`breakdown = []` 且带 `komi: true` 的 `income` 事件（金额见 [MAP_FORMAT.md](MAP_FORMAT.md)「先手贴目」）。
 - `deploy` 中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。
 - `control_point_repair` 包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 - `demolish` 包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。
-- 同时回合模式有以下专用事件：`plan_committed`（只含 playerId，不泄露计划内容）、`round_resolved`（含每条指令的 `executed/failed/missed/fizzled`）、`round_start`、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit`，`hit: false` 表示预测射击落空。
+- 同时回合模式有以下专用事件：`plan_committed`（只含 playerId，不泄露计划内容）、`round_resolved`（含每条指令的 `executed/failed/missed/fizzled`）、`round_start`、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit`，`hit: false` 表示预测射击落空。fog 局这些事件按观者投影：隐藏行动整条丢弃，可部分观察的行动删除敏感键而不是置 `null`；**`round_resolved` 只保留本人结果**，`steps` 等于本人结果条数（`payload.results` 只含本人那一项），不做“可见第三方结果”——避免部分揭示泄露隐藏单位信息；拿不准时丢弃整条，不做部分揭示。
 - `wait` 是同时回合待命动作的结算事件，payload 含 `owner`、`actionId`、`roundNumber`、`step`、`actionsUsed`、`actionsRemaining`。
 - `bot_failed` 表示 bot 进程异常，payload 含 `playerId`、`bot`（`rl` / `algorithm`）、`reason`、`restarts`。
 
@@ -129,7 +150,7 @@
 
 - 两个 `bots` 接口只在大厅阶段可用，对局开始后返回 409 `game_already_started`。
 - RL 模型 bot 仅支持双人顺序对局，模型必须存在于本地 `rl/models/` 且动作空间可识别。
-- 算法 bot 的 `botType` 取 `/api/algorithms` 的 `id`，并按注册表 `modes` 与当前对局模式校验。
+- 算法 bot 的 `botType` 取 `/api/algorithms` 的 `id`，并按注册表 `modes` 与当前对局模式校验。fog 局只接受注册表声明 `modes` 含 `fog` 的算法（首批 `fog-scout`）；RL 模型与其他算法不能加入 fog 局。
 
 ## 回放记录
 
@@ -159,14 +180,14 @@
 | 字段 | 约束 |
 |---|---|
 | `maps` | 已知地图的非空子集；同一批只能属于同一模式。随机图按模式拆成四个虚拟 id：`random`（标准）、`random-annihilation`、`random-simultaneous`、`random-royale` |
-| `playerCount` | 参赛人数，`2`（默认）或 `3`。三人支持标准、歼灭、同时回合与大逃杀模式，只收注册表同时声明该模式且 `playerCounts` 含 3 的算法（现有 RL 模型是单对手观测编码，不参评），至少 3 个不同算法且不能重复占座，`games` 必须是 6 的倍数 |
+| `playerCount` | 参赛人数，`2`（默认）或 `3`。竞技场三人批支持标准、歼灭、同时回合与大逃杀模式（**不含 fog**），只收注册表同时声明该模式且 `playerCounts` 含 3 的算法（现有 RL 模型是单对手观测编码，不参评），至少 3 个不同算法且不能重复占座，`games` 必须是 6 的倍数 |
 | `games` | 2–500，默认 24 |
 | `jobs` | 1–16，默认 1 |
 | `participants` | 可选过滤，最多 32 项；算法用 `algo:<id>`，RL 模型仅支持标准模式 |
 | `salt` | 可选，最长 64 字符 |
 | `dryRun` | 试运行，不写入战报 |
 
-- 四种模式均已接入跑批：`standard` / `annihilation` 逐动作执行，`simultaneous` / `royale` 计划入队后统一结算。
+- 竞技场的四种模式均已接入跑批：`standard` / `annihilation` 逐动作执行，`simultaneous` / `royale` 计划入队后统一结算。**fog 本期不接入竞技场**：没有 fog 分榜，fog 图设 `modelEval: false`，评估入口不把 fog 列入可选模式。
 - **三人跑批（`playerCount: 3`）**：对局带 `playerCount: 3` 与按模式取的 `rulesVersion`（`standard-3p-v1` / `annihilation-3p-v1` / `simultaneous-3p-v1` / `royale-3p-v1`）写入同一份 `arena/matches.jsonl`（模式仍由地图的 `mode` 解析，与双人记录一致），榜单按 `mode × rulesVersion` 另建并列感知 Plackett-Luce 池，与双人 Bradley-Terry 完全分离。计分单元是「六局双向 superblock」（三人阵容 × 地图 × 3 个座位轮换 × 正反方向），只有跑满六局的块进入评分，未跑完的块只计为残块、不进 bootstrap。
 - **三人校验**：`playerCount` 非 2/3 → 400 `invalid_player_count`；三人搭配标准/歼灭/同时回合/大逃杀以外的模式 → 400 `mode_not_supported`；地图没有三人布局 → 400 `invalid_maps`；`games` 不是 6 的倍数 → 400 `invalid_games`；`participants` 含 RL 模型 → 400 `mode_not_supported`，含未声明该模式三人支持的算法 → 400 `invalid_participants`；该模式可选算法不足 3 个或同一算法重复占座 → 400 `invalid_participants`。大逃杀只有 `snowflake` 与虚拟图 `random-royale` 提供三人布局。
 - `GET /api/arena/eval/status` 快照的 `defaults.playerCounts` 为 `[2, 3]`，每个地图条目带自己的 `playerCounts`（缺省 `[2]`，没有 `layouts` 且没有 `supportedPlayerCounts` 的地图即双人图；随机图报 `2–8`）。

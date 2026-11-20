@@ -2,10 +2,10 @@
 //
 // 算法接口适配器：统一处理策略接口和完整控制接口
 
-// 与 src/types.ts 的 isSimultaneousMode 同口径：simultaneous 与 royale 共享
+// 与 src/types.ts 的 isSimultaneousMode 同口径：simultaneous / royale / fog 共享
 // 计划/提交机制（本文件是纯 JS，不能直接 import TS 源码）。
 function isSimultaneousMode(mode) {
-  return mode === 'simultaneous' || mode === 'royale';
+  return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
 }
 
 /** 动作指纹：同型同参视为同一动作（payload 由算法构造，键序稳定）。 */
@@ -17,7 +17,7 @@ function actionKey(action) {
  * 运行算法并执行一个完整回合
  *
  * 逐人轮流（standard）模式：循环 decide 逐动作执行，null 后 endTurn 结束回合。
- * 同时回合（simultaneous/royale）模式：循环 decide 逐个把动作**入队**（服务器
+ * 同时回合（simultaneous/royale/fog）模式：循环 decide 逐个把动作**入队**（服务器
  * 返回 queued 而非执行结果），null 后 endTurn 即提交计划；攻/治动作按 payload
  * 形态分发——带 q/r 走瞄准格子变体（attackCell/healCell），带 targetId 走原接口。
  *

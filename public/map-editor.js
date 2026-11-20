@@ -15,8 +15,15 @@ import './error-text.js';
   const CONTROL_POINT_KINDS = ['supply', 'forward_base', 'repair'];
   const CONTROL_POINT_NAMES = { supply: '补给站', forward_base: '前线基地', repair: '维修站' };
   // 模式谓词：royale = 同时回合结算 × 歼灭规则（无总部/炮火缩圈/打光淘汰），两条轴都要生效。
+  // fog = 同时回合骨架 × 视野迷雾：只进同时轴，绝不进歼灭轴（没有炮火缩圈）。
   const isAnnihilationMode = mode => mode === 'annihilation' || mode === 'royale';
-  const isSimultaneousMode = mode => mode === 'simultaneous' || mode === 'royale';
+  const isSimultaneousMode = mode => mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
+  const isFogMode = mode => mode === 'fog';
+  const MAP_MODES = ['standard', 'annihilation', 'simultaneous', 'royale', 'fog'];
+  const FOG_UNIT_ORDER = ['scout', 'ranger', 'infantry', 'support', 'heavy'];
+  const FOG_VISION_DEFAULTS = { scout: 4, ranger: 3, infantry: 2, support: 2, heavy: 1 };
+  const FOG_VISION_MAX = 8;
+  const FOG_MODEL_EVAL_NOTE = '迷雾模式本期不参与 RL 模型评估与竞技场榜单';
   const BALANCE_KEYS = [
     ['startingSupplies', '初始金币', 0],
     ['baseIncome', '每回合基础收入', 0],
@@ -135,6 +142,30 @@ import './error-text.js';
     };
   }
 
+  function defaultFog() {
+    return {
+      vision: { ...FOG_VISION_DEFAULTS },
+      revealFromRound: null,
+    };
+  }
+
+  // 导入时保留越界数值（交给校验器报可读错误），缺失字段按契约默认值补齐；
+  // 未知兵种键丢弃，避免导入后留下面板无法清除的校验错误。
+  function normalizeFog(input) {
+    const src = input && typeof input === 'object' ? input : {};
+    const sourceVision = src.vision && typeof src.vision === 'object' ? src.vision : {};
+    const vision = {};
+    for (const type of FOG_UNIT_ORDER) {
+      vision[type] = typeof sourceVision[type] === 'number' && Number.isFinite(sourceVision[type])
+        ? sourceVision[type]
+        : FOG_VISION_DEFAULTS[type];
+    }
+    return {
+      vision,
+      revealFromRound: src.revealFromRound === undefined ? null : src.revealFromRound,
+    };
+  }
+
   function createDefaultMapConfig() {
     return {
       mode: 'standard',
@@ -190,8 +221,8 @@ import './error-text.js';
   }
 
   function configureMapMode(input, mode, annihilationDraft = null) {
-    if (mode !== 'standard' && mode !== 'annihilation' && mode !== 'simultaneous' && mode !== 'royale') {
-      throw new Error('玩法模式必须是 standard、annihilation、simultaneous 或 royale');
+    if (!MAP_MODES.includes(mode)) {
+      throw new Error('玩法模式必须是 standard、annihilation、simultaneous、royale 或 fog');
     }
     const configured = deepClone(input);
     configured.mode = mode;
@@ -199,11 +230,19 @@ import './error-text.js';
       configured.radius = Math.max(2, configured.radius);
       configured.annihilation = normalizeAnnihilation(annihilationDraft || configured.annihilation, configured.radius);
       enableSpawnMode(configured);
-    } else if (mode === 'simultaneous') {
-      // simultaneous 地图也使用总部出生槽布局，但没有炮火配置或出生据点绑定。
+    } else if (mode === 'simultaneous' || isFogMode(mode)) {
+      // simultaneous / fog 地图也使用总部出生槽布局，但没有炮火配置或出生据点绑定。
       enableSpawnMode(configured);
     } else {
       delete configured.annihilation;
+    }
+    if (isFogMode(mode)) {
+      configured.fog = normalizeFog(configured.fog);
+    } else {
+      // 其他模式不允许残留 fog 块，否则导出会被服务端 loader 拒绝。
+      delete configured.fog;
+      delete configured.modelEval;
+      delete configured.modelEvalNote;
     }
     return configured;
   }
@@ -243,7 +282,7 @@ import './error-text.js';
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('地图 JSON 必须是对象');
     const defaults = createDefaultMapConfig();
     const cfg = deepClone(data);
-    const mode = ['annihilation', 'simultaneous', 'royale'].includes(cfg.mode) ? cfg.mode : 'standard';
+    const mode = ['annihilation', 'simultaneous', 'royale', 'fog'].includes(cfg.mode) ? cfg.mode : 'standard';
     const radius = Number.isInteger(cfg.radius) && cfg.radius > 0 ? cfg.radius : defaults.radius;
     const normalized = {
       mode,
@@ -276,6 +315,7 @@ import './error-text.js';
       spawnSlots: [],
       layouts: {},
       ...(isAnnihilationMode(mode) ? { annihilation: normalizeAnnihilation(cfg.annihilation, radius) } : {}),
+      ...(isFogMode(mode) ? { fog: normalizeFog(cfg.fog) } : {}),
     };
 
     if (normalized.spawnMode) {
@@ -431,6 +471,10 @@ import './error-text.js';
       },
       balance,
       ...(isAnnihilationMode(config.mode) && config.annihilation ? { annihilation: deepClone(config.annihilation) } : {}),
+      // 迷雾地图本期不进 RL 模型评估与竞技场榜单：固定落 modelEval:false，与服务端 loader 的开关同口径。
+      ...(isFogMode(config.mode)
+        ? { fog: normalizeFog(config.fog), modelEval: false, modelEvalNote: FOG_MODEL_EVAL_NOTE }
+        : {}),
     };
     if (config.spawnMode) {
       serialized.spawnSlots = (config.spawnSlots || []).map((slot, index) => ({
@@ -509,8 +553,8 @@ import './error-text.js';
     }
 
     const mode = c.mode === undefined ? 'standard' : c.mode;
-    if (mode !== 'standard' && mode !== 'annihilation' && mode !== 'simultaneous' && mode !== 'royale') {
-      errors.push(`${mapName}.mode must be standard, annihilation, simultaneous, or royale`);
+    if (!MAP_MODES.includes(mode)) {
+      errors.push(`${mapName}.mode must be standard, annihilation, simultaneous, royale, or fog`);
     }
     str(c, 'name', mapName);
     str(c, 'description', mapName);
@@ -621,9 +665,42 @@ import './error-text.js';
       } else if (supplies > 999) {
         errors.push(`${mapName}.balance.komi.supplies must be <= 999`);
       }
-      if (c.mode === 'simultaneous' || c.mode === 'royale') {
+      if (c.mode === 'simultaneous' || c.mode === 'royale' || c.mode === 'fog') {
         errors.push(`${mapName}.balance.komi is only valid in sequential modes (standard/annihilation)`);
       }
+    }
+
+    // 迷雾配置：与服务端 loader 同口径（vision 五种兵种 0–8；revealFromRound 为 null 或 ≥1 且不超 maxTurns）。
+    if (isFogMode(mode)) {
+      if (!('fog' in c)) {
+        errors.push(`${mapName}.fog is required in fog mode`);
+      } else {
+        const fog = record(c.fog, `${mapName}.fog`);
+        const vision = record(fog.vision, `${mapName}.fog.vision`);
+        for (const key of Object.keys(vision)) {
+          if (!FOG_UNIT_ORDER.includes(key)) errors.push(`${mapName}.fog.vision.${key} is not a known unit type`);
+        }
+        for (const type of FOG_UNIT_ORDER) {
+          // 缺省兵种由服务端回落到默认视野，编辑器不为缺失键报错。
+          if (!(type in vision)) continue;
+          const value = vision[type];
+          if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > FOG_VISION_MAX) {
+            errors.push(`${mapName}.fog.vision.${type} must be an integer between 0 and ${FOG_VISION_MAX}`);
+          }
+        }
+        if (!('revealFromRound' in fog)) {
+          errors.push(`${mapName}.fog.revealFromRound must be null or an integer >= 1`);
+        } else if (fog.revealFromRound !== null) {
+          const reveal = fog.revealFromRound;
+          if (typeof reveal !== 'number' || !Number.isInteger(reveal) || reveal < 1) {
+            errors.push(`${mapName}.fog.revealFromRound must be null or an integer >= 1`);
+          } else if (typeof balance.maxTurns === 'number' && Number.isInteger(balance.maxTurns) && reveal > balance.maxTurns) {
+            errors.push(`${mapName}.fog.revealFromRound must be <= balance.maxTurns`);
+          }
+        }
+      }
+    } else if ('fog' in c) {
+      errors.push(`${mapName}.fog is only valid in fog mode`);
     }
 
     const hq = record(c.headquarters, `${mapName}.headquarters`);
@@ -660,7 +737,8 @@ import './error-text.js';
       claim(pos(unit, `startingUnits[${i}]`, radius), `startingUnits[${i}]`);
     });
 
-    if (isAnnihilationMode(mode) && !Array.isArray(c.spawnSlots)) {
+    // 迷雾地图同样有总部，必须走出生槽布局（多人迷雾）。
+    if ((isAnnihilationMode(mode) || isFogMode(mode)) && !Array.isArray(c.spawnSlots)) {
       errors.push(`${mapName}.spawnSlots must contain 2-8 slots`);
     }
     if (Array.isArray(c.spawnSlots)) {
@@ -787,6 +865,8 @@ import './error-text.js';
       damage: '炮火伤害',
       minimumSafeRadius: '最小安全半径',
       controlPointId: '绑定据点',
+      revealFromRound: '揭雾轮次',
+      vision: '视野配置',
     };
     return names[key] || key;
   }
@@ -815,6 +895,8 @@ import './error-text.js';
     if (text === 'balance.comebackSupply') return '追赶补给配置';
     if (text === 'annihilation') return '歼灭模式配置';
     if (text === 'annihilation.artillery') return '炮火配置';
+    if (text === 'fog') return '迷雾配置';
+    if (text === 'fog.vision') return '视野配置';
     match = text.match(/^spawnSlots\[(\d+)\]$/);
     if (match) return `出生槽 ${Number(match[1]) + 1}`;
     match = text.match(/^spawnSlots\[(\d+)\]\.headquarters$/);
@@ -862,8 +944,16 @@ import './error-text.js';
     if (error.includes('grid must be "hex"')) return '地图网格必须是 hex。';
     if (error.includes('orientation must be "pointy"')) return '地图方向必须是 pointy。';
     if (error.includes('radius must be an integer')) return '地图半径必须是整数。';
-    if (error.includes('.mode must be standard, annihilation, simultaneous, or royale')) return '玩法模式必须是普通模式、歼灭模式、同时模式或大逃杀模式。';
+    if (error.includes('.mode must be standard, annihilation, simultaneous, royale, or fog')) return '玩法模式必须是普通模式、歼灭模式、同时模式、大逃杀模式或迷雾模式。';
     if (error.includes('.annihilation is only valid in annihilation or royale mode')) return '只有歼灭模式或大逃杀模式可以配置炮火收缩。';
+    if (error.includes('.fog is only valid in fog mode')) return '只有迷雾模式可以配置视野迷雾。';
+    if (error.includes('.fog is required in fog mode')) return '迷雾模式必须配置视野迷雾。';
+    match = error.match(/^(.+)\.fog\.vision\.(\w+) must be an integer between 0 and (\d+)$/);
+    if (match) return `${humanUnit(match[2])}的视野半径必须是 0–${match[3]} 的整数。`;
+    match = error.match(/^(.+)\.fog\.vision\.(\w+) is not a known unit type$/);
+    if (match) return `视野配置包含未知兵种 ${match[2]}。`;
+    if (error.includes('.fog.revealFromRound must be null or an integer >= 1')) return '揭雾轮次留空表示全程迷雾，否则必须是不小于 1 的整数。';
+    if (error.includes('.fog.revealFromRound must be <= balance.maxTurns')) return '揭雾轮次不能大于最大回合。';
     if (error.includes('.minimumSafeRadius must be smaller than radius')) return '炮火最小安全半径必须小于地图半径。';
     if (error.includes('.controlPointId must reference a control point')) return `出生槽 ${itemNumber(error)} 绑定了不存在的据点。`;
     if (error.includes('.controlPointId must be unique')) return `出生槽 ${itemNumber(error)} 绑定的据点已被其他出生槽使用。`;
@@ -1045,6 +1135,10 @@ import './error-text.js';
     createDefaultMapConfig,
     configureMapMode,
     defaultAnnihilation,
+    defaultFog,
+    normalizeFog,
+    isFogMode,
+    isSimultaneousMode,
     updateSpawnControlPointReferences,
     normalizeImportedMap,
     serializeMapConfig,
@@ -1082,6 +1176,9 @@ import './error-text.js';
     mapMode: $('map-mode'),
     annihilationPanel: $('annihilation-panel'),
     artilleryFields: $('artillery-fields'),
+    fogPanel: $('fog-panel'),
+    fogFields: $('fog-vision-fields'),
+    fogHint: $('fog-hint'),
     artilleryPreview: $('artillery-preview'),
     artilleryRound: $('artillery-round'),
     artilleryPreviewLabel: $('artillery-preview-label'),
@@ -1750,6 +1847,48 @@ import './error-text.js';
     });
   }
 
+  function renderFogFields() {
+    const active = isFogMode(config.mode);
+    els.fogPanel.hidden = !active;
+    if (!active) {
+      els.fogFields.innerHTML = '';
+      return;
+    }
+    if (!config.fog) config.fog = defaultFog();
+    const maxTurns = Number.isInteger(config.balance?.maxTurns) && config.balance.maxTurns >= 1
+      ? config.balance.maxTurns
+      : null;
+    const reveal = config.fog.revealFromRound === null || config.fog.revealFromRound === undefined
+      ? ''
+      : config.fog.revealFromRound;
+    els.fogFields.innerHTML = [
+      ...FOG_UNIT_ORDER.map(type => fieldHtml(
+        `fogvision:${type}`,
+        `${UNIT_NAMES[type]}视野`,
+        config.fog.vision?.[type] ?? FOG_VISION_DEFAULTS[type],
+        0,
+        FOG_VISION_MAX,
+      )),
+      // 空值即 null（全程迷雾）；max 跟随最大回合，超出时在 change 里收口，校验再兜底。
+      fieldHtml('fog:revealFromRound', '揭雾轮次（空 = 终局）', reveal, 1, maxTurns),
+    ].join('');
+    els.fogHint.textContent = maxTurns === null
+      ? '视野半径 0–8；揭雾轮次留空表示全程迷雾，终局公开；本图无回合上限。'
+      : `视野半径 0–8；揭雾轮次留空表示全程迷雾，终局公开；不得超过最大回合 ${maxTurns}。`;
+    els.fogFields.querySelectorAll('input[data-bind]').forEach(input => {
+      input.addEventListener('change', () => {
+        const [group, key] = input.dataset.bind.split(':');
+        if (group === 'fogvision') {
+          config.fog.vision[key] = clampBoundNumber(input.value, input.min, input.max);
+        } else if (group === 'fog') {
+          const raw = String(input.value).trim();
+          config.fog.revealFromRound = raw === '' ? null : clampBoundNumber(raw, input.min, input.max);
+        }
+        syncAll();
+      });
+    });
+  }
+
   // 关闭追赶补给时暂存参数，重新启用时恢复，避免用户只是临时关掉开关就丢配置。
   let comebackSupplyDraft = null;
   // 无回合上限开关同理：切回有限时还原此前填写的回合数。
@@ -2155,6 +2294,8 @@ import './error-text.js';
     renderGlobalFields();
     renderAnnihilationFields();
     renderBalanceFields();
+    // 放在平衡参数之后：揭雾轮次的上限要读当前 maxTurns。
+    renderFogFields();
     renderUnitSpecs();
     renderControlTypes();
     renderSpawnLayouts();
@@ -2248,9 +2389,16 @@ import './error-text.js';
       config = configureMapMode(config, nextMode, annihilationDraft);
       selected = null;
       syncAll();
-      if (isAnnihilationMode(nextMode)) activateInspectorTab('rules');
-      const modeName = { standard: '普通', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀' }[nextMode];
-      setStatus(isAnnihilationMode(nextMode) ? `已切换为${modeName}模式，请配置出生据点与炮火参数` : `已切换为${modeName}模式`, 'ok');
+      if (isAnnihilationMode(nextMode) || isFogMode(nextMode)) activateInspectorTab('rules');
+      const modeName = { standard: '普通', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀', fog: '迷雾' }[nextMode];
+      setStatus(
+        isAnnihilationMode(nextMode)
+          ? `已切换为${modeName}模式，请配置出生据点与炮火参数`
+          : isFogMode(nextMode)
+            ? '已切换为迷雾模式，请配置出生布局与视野参数'
+            : `已切换为${modeName}模式`,
+        'ok',
+      );
     });
   });
   els.mapRadius.addEventListener('change', async () => {

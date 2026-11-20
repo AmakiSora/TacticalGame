@@ -5,6 +5,7 @@ import './preview-tooltip.js';
 import './board-animation.js';
 import './playback.js';
 import './board-inspect.js';
+import './fog.js';
 import './rules-sheet.js';
 import './random-map-ui.js';
 import './agent-prompt.js';
@@ -601,7 +602,7 @@ function renderMapPreview(preview, seatView = null) {
 }
 
 function mapModeLabel(mode) {
-  return mode === 'simultaneous' ? '同时' : mode === 'annihilation' ? '歼灭' : mode === 'royale' ? '大逃杀' : '标准';
+  return mode === 'fog' ? '迷雾' : mode === 'simultaneous' ? '同时' : mode === 'annihilation' ? '歼灭' : mode === 'royale' ? '大逃杀' : '标准';
 }
 
 function syncMapSelection() {
@@ -901,7 +902,7 @@ function renderMapPicker(maps) {
     const maxTurns = map.preview?.maxTurns === null ? '∞' : map.preview?.maxTurns ?? '-';
     const actionsPerTurn = map.preview?.actionsPerTurn ?? '-';
     const counts = (map.preview?.supportedPlayerCounts || [2]).join('/');
-    const modeLabel = map.preview?.mode === 'simultaneous' ? '同时' : map.preview?.mode === 'annihilation' ? '歼灭' : map.preview?.mode === 'royale' ? '大逃杀' : '标准';
+    const modeLabel = mapModeLabel(map.preview?.mode);
     return `<button type="button" class="map-card ${isSelected ? 'selected-map' : ''}" data-map-id="${esc(map.id)}" role="radio" aria-checked="${isSelected}" aria-label="${esc(map.name)} (${esc(map.id)})" title="${esc(map.name)} — ${esc(map.description || '')}">
       ${renderMapPreview(map.preview)}
       <span class="map-card-copy">
@@ -1090,6 +1091,7 @@ function createEmptyState() {
     result: null,
     adjudication: null,
     artillery: null,
+    fog: null,
     eventLog: [],
   };
 }
@@ -1123,7 +1125,7 @@ function applyEvent(s, ev) {
       gameConfig = p.config; if (p.playerNames) playerNames = { ...p.playerNames };
       s.players = JSON.parse(JSON.stringify(p.players || {}));
       s.turn.turnOrder = [...(p.turnOrder || [])];
-      s.turn.currentPlayerId = gameConfig?.mode === 'simultaneous' ? null : (p.firstPlayer || s.turn.turnOrder[0] || null);
+      s.turn.currentPlayerId = isSimultaneous() ? null : (p.firstPlayer || s.turn.turnOrder[0] || null);
       s.turn.currentOwner = s.turn.currentPlayerId;
       s.plan = { committed: [], myQueue: [] };
       s.map = cloneMapPayload(p.map);
@@ -1310,6 +1312,12 @@ async function refreshAdjudication() {
             myQueue: Array.isArray(data.plan.myQueue) ? [...data.plan.myQueue] : (state.plan?.myQueue ?? []),
           };
         }
+        // 迷雾局：可见单位与 fog 投影都以本次 GET 为权威。事件重建到的"曾经可见"
+        // 敌军必须被裁掉，否则会把已离开视野的单位继续画在棋盘上。
+        if (Object.prototype.hasOwnProperty.call(data, 'fog')) {
+          state.fog = window.FogView.normalizeProjection(data.fog);
+          if (state.fog && Array.isArray(data.units)) mergeFogUnits(data.units);
+        }
       } while (adjudicationRefreshQueued);
       return true;
     } finally {
@@ -1317,6 +1325,15 @@ async function refreshAdjudication() {
     }
   })();
   return adjudicationRefreshInFlight;
+}
+
+/** 迷雾局：服务端 units 是观者可见单位的权威集合；保留已阵亡记录供事件流/统计使用。 */
+function mergeFogUnits(units) {
+  const previous = state.units;
+  const next = new Map();
+  for (const unit of units) if (unit && unit.id) next.set(unit.id, { ...(previous.get(unit.id) || {}), ...unit });
+  for (const [id, unit] of previous) if (unit.alive === false && !next.has(id)) next.set(id, unit);
+  state.units = next;
 }
 
 function cellAt(q, r) { return state.cells.find(c => c.q === q && c.r === r); }
@@ -1541,6 +1558,12 @@ function aimPreview() {
       entries.push({ q: cell.q, r: cell.r, tone: 'attack', kill, text: kill ? `-${hi} 致死` : lo === hi ? `-${lo}` : `-${lo}~${hi}` });
     }
   }
+  // 迷雾：目标格没有可见单位时仍可开火，角标提示这是盲射（残影不算可见单位）。
+  if (!isHeal && fogEnabled()) {
+    const hasVisibleTarget = entries.some(e => e.q === hoverCell.q && e.r === hoverCell.r);
+    const hint = window.FogView.blindFireHint(state.fog, hasVisibleTarget);
+    if (hint) entries.push({ q: hoverCell.q, r: hoverCell.r, tone: 'blind', kill: false, text: hint });
+  }
   // 顺序模式只有点到真实目标才有意义，空覆盖不提示。
   if (!isSimultaneous() && !entries.length) return null;
   return { cells, entries };
@@ -1557,12 +1580,12 @@ function drawChipAt(x, y, text, tone, kill) {
   ctx.lineTo(rx + w, ry + h - 4); ctx.arcTo(rx + w, ry + h, rx + w - 4, ry + h, 4);
   ctx.lineTo(rx + 4, ry + h); ctx.arcTo(rx, ry + h, rx, ry + h - 4, 4);
   ctx.lineTo(rx, ry + 4); ctx.arcTo(rx, ry, rx + 4, ry, 4); ctx.closePath();
-  ctx.fillStyle = tone === 'heal' ? 'rgba(8, 38, 30, .88)' : 'rgba(46, 10, 16, .88)';
+  ctx.fillStyle = tone === 'heal' ? 'rgba(8, 38, 30, .88)' : tone === 'blind' ? 'rgba(38, 31, 8, .9)' : 'rgba(46, 10, 16, .88)';
   ctx.fill();
-  ctx.strokeStyle = tone === 'heal' ? '#3effc8' : kill ? '#ff3b5c' : '#ff8a9a';
+  ctx.strokeStyle = tone === 'heal' ? '#3effc8' : tone === 'blind' ? '#f0c75a' : kill ? '#ff3b5c' : '#ff8a9a';
   ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.fillStyle = tone === 'heal' ? '#8affdd' : kill ? '#ffb3c0' : '#ffd2da';
+  ctx.fillStyle = tone === 'heal' ? '#8affdd' : tone === 'blind' ? '#ffe39a' : kill ? '#ffb3c0' : '#ffd2da';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, x, ry + h / 2 + 0.5);
   ctx.restore();
@@ -1601,12 +1624,13 @@ function drawAimPreview() {
   }
 }
 
-/** cellInfo 后追加的预演摘要，如「预计 -12~18、致死」。 */
+/** cellInfo 后追加的预演摘要，如「预计 -12~18、致死」；盲射单独提示。 */
 function aimPreviewInfo() {
   const preview = aimPreview();
   if (!preview || !preview.entries.length) return '';
-  const parts = preview.entries.map(e => e.text);
-  return ` | 预计 ${parts.join('、')}`;
+  const blind = preview.entries.some(e => e.tone === 'blind');
+  const parts = preview.entries.filter(e => e.tone !== 'blind').map(e => e.text);
+  return `${blind ? ' | 盲射' : ''}${parts.length ? ` | 预计 ${parts.join('、')}` : ''}`;
 }
 
 // —— 同时模式：已排队指令的棋盘预览（编号与计划面板清单一一对应） ——
@@ -2000,6 +2024,7 @@ function drawBoard(now = performance.now()) {
       context.stroke();
     }
   });
+  drawFogLayer();
   for (const cell of state.artillery?.warningCells || []) {
     pathHex(cell.q, cell.r, 2); ctx.fillStyle = 'rgba(244, 177, 66, .22)'; ctx.fill(); ctx.strokeStyle = 'rgba(255, 205, 105, .72)'; ctx.lineWidth = 1.5; ctx.stroke();
   }
@@ -2019,14 +2044,92 @@ function drawBoard(now = performance.now()) {
   }
   boardAnimation.forEachHeadquarters((hq, view) => drawHeadquartersMarker(hq, view));
   boardAnimation.forEachUnit((u, view) => drawUnitMarker(u, view));
+  drawFogGhosts();
   drawPlanActionOverlays();
   drawAimPreview();
   boardAnimation.drawEffects(ctx, now);
 }
 
+/** 迷雾暗层：只压暗服务端投影里不可见的格子，地形仍可辨认。 */
+function drawFogLayer() {
+  if (!fogEnabled() || state.fog.revealed) return;
+  ctx.save();
+  for (const cell of state.cells) {
+    if (!window.FogView.cellHidden(state.fog, cell.q, cell.r)) continue;
+    pathHex(cell.q, cell.r, 1);
+    ctx.fillStyle = 'rgba(3, 7, 11, .64)';
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** 残影：40% 透明度 + 虚线描边 + 角落「?」，不可选中也不参与瞄准预测。 */
+function drawFogGhosts() {
+  const ghosts = fogGhosts();
+  if (!ghosts.length) return;
+  ctx.save();
+  for (const ghost of ghosts) {
+    const p = hexToPixel(ghost.q, ghost.r);
+    ctx.save();
+    ctx.globalAlpha = .4;
+    ctx.fillStyle = OWNER_COLOR[ghost.owner] || '#9aa7b2';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, HEX_SIZE * .42, 0, Math.PI * 2);
+    ctx.fill();
+    drawUnitGlyph(ghost.type, p.x, p.y);
+    ctx.strokeStyle = 'rgba(230, 240, 255, .9)';
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, HEX_SIZE * .48, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = .4;
+    drawHpBar(p.x, p.y - 21, 34, ghost.hp, ghost.maxHp);
+    ctx.restore();
+    // 「?」角标：提醒这是上次确认的位置，不是实时单位。
+    ctx.fillStyle = 'rgba(8, 14, 22, .92)';
+    ctx.strokeStyle = 'rgba(230, 240, 255, .75)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(p.x + 13, p.y - 13, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#e6f0ff';
+    ctx.font = 'bold 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', p.x + 13, p.y - 12.5);
+  }
+  ctx.restore();
+}
+
 function actionsPerTurn() { return gameConfig?.balance?.actionsPerTurn ?? 0; }
-function isSimultaneous() { return gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale'; }
-function isAnnihilationRules() { return gameConfig?.mode === 'annihilation' || gameConfig?.mode === 'royale'; }
+// 无 DOM 的测试沙箱里没有 window.FogView：字面量兜底必须与 fog.js 保持同一口径。
+function isSimultaneousMode(mode) {
+  if (typeof window !== 'undefined' && window.FogView) return window.FogView.isSimultaneousMode(mode);
+  return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
+}
+function isAnnihilationMode(mode) {
+  if (typeof window !== 'undefined' && window.FogView) return window.FogView.isAnnihilationMode(mode);
+  return mode === 'annihilation' || mode === 'royale';
+}
+// 下面两个入口函数会被测试单独切出执行，字面量必须自足且与 fog.js 同口径。
+function isSimultaneous() {
+  const mode = gameConfig?.mode;
+  return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
+}
+function isAnnihilationRules() {
+  const mode = gameConfig?.mode;
+  return mode === 'annihilation' || mode === 'royale';
+}
+/** 迷雾投影（观者视角）：来自 GET /api/games/:id，非迷雾局为 null。 */
+function fogProjection() { return state?.fog || null; }
+function fogEnabled() { return Boolean(state?.fog?.enabled); }
+function fogHidesCell(q, r) { return fogEnabled() && window.FogView.cellHidden(state.fog, q, r); }
+function fogGhosts() { return fogEnabled() ? window.FogView.ghostsFor(state.fog, state.units) : []; }
 function deployFromHqEnabled() { return gameConfig?.balance?.deployFromHq !== false; }
 function myPlanQueue() { return state?.plan?.myQueue ?? []; }
 function committedList() { return state?.plan?.committed ?? []; }
@@ -2298,6 +2401,8 @@ function scoreTint(owner) {
 }
 
 function scoreBreakdown(score) {
+  // 迷雾局对手只公开总分与名次：分项为 { hidden: true }，不能当成 0 展开成假算式。
+  if (score?.hidden) return '<div class="score-breakdown score-breakdown-masked">对手分项不可见（迷雾）</div>';
   const terms = scoreTerms(score);
   if (!terms.length) return '';
   const total = Math.max(Number(score.total) || 0, terms.reduce((sum, term) => sum + Math.max(term.part, 0), 0));
@@ -2638,7 +2743,10 @@ els.canvas.addEventListener('mousemove', e => {
     const ent = entityAt(hoverCell.q, hoverCell.r);
     const cp = [...state.controlPoints.values()].find(p => p.q === hoverCell.q && p.r === hoverCell.r);
     const planned = planOverlays().find(o => (o.cells || (o.to ? [o.to] : [])).some(c => c.q === hoverCell.q && c.r === hoverCell.r));
-    els.cellInfo.textContent = `(${hoverCell.q}, ${hoverCell.r})${cp ? ` | ${cp.name}` : ''}${ent ? ` | ${UNIT_NAMES[ent.type] || 'HQ'} ${ent.hp}/${ent.maxHp}` : ''}${planned ? ` | 计划#${planned.index} ${PLAN_KIND_LABELS[planned.kind] || planned.kind}` : ''}${aimPreviewInfo()}`;
+    const ghost = fogEnabled() ? window.FogView.ghostAt(state.fog, state.units, hoverCell.q, hoverCell.r) : null;
+    const ghostNote = ghost ? ` | 残影 ${UNIT_NAMES[ghost.type] || '单位'} ${ghost.hp}/${ghost.maxHp}（第${ghost.seenRound}轮）` : '';
+    const fogNote = !ent && !ghost && fogHidesCell(hoverCell.q, hoverCell.r) ? ' | 视野外' : '';
+    els.cellInfo.textContent = `(${hoverCell.q}, ${hoverCell.r})${cp ? ` | ${cp.name}` : ''}${ent ? ` | ${UNIT_NAMES[ent.type] || 'HQ'} ${ent.hp}/${ent.maxHp}` : ''}${ghostNote}${fogNote}${planned ? ` | 计划#${planned.index} ${PLAN_KIND_LABELS[planned.kind] || planned.kind}` : ''}${aimPreviewInfo()}`;
   }
   drawBoard();
 });
@@ -2696,7 +2804,9 @@ els.canvas.addEventListener('click', async () => {
 function subscribeSse() {
   if (sse) sse.close();
   const lastSeq = state?.eventLog.at(-1)?.seq ?? 0;
-  sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}`);
+  // EventSource 不能带请求头：迷雾局按观者投影事件，令牌走契约支持的查询参数。
+  const authQuery = myToken ? `&token=${encodeURIComponent(myToken)}` : '';
+  sse = new EventSource(`/api/games/${gameId}/events?after=${lastSeq}${authQuery}`);
   sse.onmessage = e => {
     playback.enqueue(JSON.parse(e.data));
   };
@@ -3058,7 +3168,9 @@ function startSeatSync() {
  * 判据用服务端已返回的 lobby.mode，不新增字段。
  */
 function isSimultaneousLobby(lobby) {
-  return lobby?.mode === 'simultaneous' || lobby?.mode === 'royale';
+  // 该函数被测试单独切出执行，字面量必须自足且与 fog.js 同口径。
+  const mode = lobby?.mode;
+  return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
 }
 
 /**
@@ -3425,7 +3537,7 @@ document.addEventListener('mouseout', e => {
 });
 
 function availableGameModeLabel(mode) {
-  return mode === 'simultaneous' ? '同时' : mode === 'annihilation' ? '歼灭' : mode === 'royale' ? '大逃杀' : '标准';
+  return mode === 'fog' ? '迷雾' : mode === 'simultaneous' ? '同时' : mode === 'annihilation' ? '歼灭' : mode === 'royale' ? '大逃杀' : '标准';
 }
 
 function availableGameAge(createdAt) {

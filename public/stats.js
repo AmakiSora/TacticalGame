@@ -61,6 +61,7 @@ import './error-text.js';
     annihilation: '歼灭',
     simultaneous: '同时',
     royale: '大逃杀',
+    fog: '迷雾',
   };
 
   const MODE_CLASSES = {
@@ -68,6 +69,7 @@ import './error-text.js';
     annihilation: 'mode-anni',
     simultaneous: 'mode-simul',
     royale: 'mode-royale',
+    fog: 'mode-fog',
   };
 
   function modeLabel(mode) {
@@ -79,7 +81,7 @@ import './error-text.js';
   }
 
   function modeSummary(modeDist) {
-    const preferred = ['standard', 'annihilation', 'simultaneous', 'royale'];
+    const preferred = ['standard', 'annihilation', 'simultaneous', 'royale', 'fog'];
     const extra = Object.keys(modeDist || {}).filter(mode => !preferred.includes(mode)).sort();
     return [...preferred, ...extra]
       .filter(mode => Object.prototype.hasOwnProperty.call(modeDist || {}, mode))

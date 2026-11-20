@@ -13,10 +13,10 @@ import * as utils from './lib/game-utils.mjs';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// 与 src/types.ts 的 isSimultaneousMode 同口径：simultaneous 与 royale 共享
+// 与 src/types.ts 的 isSimultaneousMode 同口径：simultaneous / royale / fog 共享
 // 计划/提交机制（runner.mjs 是纯 JS，不能直接 import TS 源码）。
 function isSimultaneousMode(mode) {
-  return mode === 'simultaneous' || mode === 'royale';
+  return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
 }
 
 /**
@@ -137,7 +137,7 @@ async function waitForTurn(apiClient, side, pollSeconds, quiet) {
       return { done: true, state, reason: 'eliminated' };
     }
 
-    // 同时回合：没有轮次概念——对局进行中且己方尚未提交计划时行动；
+    // 同时回合（simultaneous/royale/fog）：没有轮次概念——对局进行中且己方尚未提交计划时行动；
     // 已提交则等全员提交结算、下一轮 plan.committed 清空后再行动。
     if (isSimultaneousMode(state.config?.mode)) {
       const committed = state.plan?.committed ?? [];

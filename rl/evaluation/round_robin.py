@@ -83,7 +83,11 @@ DEFAULT_MAPS = "random,default,breach,danger-close,dual-lanes"
 DEFAULT_STATS_FILE = Path("arena/matches.jsonl")
 # 评估链路已接入的模式：standard / annihilation 走逐动作执行（歼灭在轮界由引擎结算
 # 炮火伤害与淘汰），simultaneous / royale 走计划入队/提交；RL 模型只覆盖 standard。
+# 迷雾（fog）是同时回合骨架 × 视野迷雾，但响应/事件/裁决按观者投影，本批明确不进入
+# 竞技场：不注册模式、不发现算法、不生成三人 manifest。地图扫描仍会看到 maps/fog-*.json，
+# 保留登记只为让 resolve_mode 给出「迷雾不参评」的明确错误，而不是被当成 standard。
 SUPPORTED_EVAL_MODES = ("standard", "simultaneous", "annihilation", "royale")
+EXCLUDED_EVAL_MODES = ("fog",)
 # 计划队列模式：动作入队、全员提交后统一结算（耗时兜底与模式校验共用）。
 PLAN_MODES = ("simultaneous", "royale")
 # 虚拟随机图 id → 模式。一张随机图只能属于一种规则，故四种模式各有一个 id；
@@ -196,6 +200,7 @@ def load_map_modes(root: Path) -> dict[str, str]:
         except (OSError, ValueError) as exc:
             raise ValueError(f"无法读取地图 {path.name}：{exc}") from exc
         mode = config.get("mode") if isinstance(config, dict) else None
+        # fog 图照实登记（不静默跳过）：resolve_mode 会明确拒绝，避免被当成默认 standard。
         modes[path.stem] = mode if isinstance(mode, str) and mode else "standard"
     return modes
 
@@ -213,6 +218,11 @@ def resolve_mode(root: Path, maps: list[str], requested: str) -> str:
         detail = "、".join(f"{map_id}={map_modes[map_id]}" for map_id in maps)
         raise ValueError(f"同一批只能跑同一模式，不能混合：{detail}")
     mode = modes.pop()
+    if mode in EXCLUDED_EVAL_MODES:
+        raise ValueError(
+            f"地图模式 {mode} 本期不进入评估跑批（迷雾局不进竞技场/统计/RL；"
+            f"自对局请用 scripts/fog-selfplay.mjs）"
+        )
     if mode not in SUPPORTED_EVAL_MODES:
         raise ValueError(f"地图模式 {mode} 尚未接入评估跑批（当前支持 {' / '.join(SUPPORTED_EVAL_MODES)}）")
     if requested != "auto" and requested != mode:

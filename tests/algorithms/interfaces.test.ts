@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runAlgorithm } from '../../algorithms/lib/interfaces.mjs';
 
 const SIM_STATE = { config: { mode: 'simultaneous' } };
+const FOG_STATE = { config: { mode: 'fog' } };
 const STD_STATE = { config: { mode: 'standard' } };
 const REFRESHED_STATE = { config: { mode: 'simultaneous' }, refreshed: true };
 
@@ -70,6 +71,23 @@ describe('runAlgorithm 动作失败处理', () => {
 
     expect(decide).toHaveBeenCalledTimes(20);
     expect(client.move).toHaveBeenCalledTimes(20);
+    expect(client.endTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it('迷雾模式沿用同时回合语义：被拒不提交、重选后继续入队', async () => {
+    const decide = vi.fn()
+      .mockResolvedValueOnce({ type: 'move', payload: { unitId: 'u1', q: 1, r: 2 } })
+      .mockResolvedValueOnce({ type: 'move', payload: { unitId: 'u2', q: 3, r: 4 } })
+      .mockResolvedValue(null);
+    const client = makeClient();
+    client.move
+      .mockRejectedValueOnce(new Error('POST /api/games/g/move -> 400 invalid_target: 目的格被占'))
+      .mockResolvedValueOnce({ queued: true });
+
+    await runAlgorithm({ name: 'test', decide }, FOG_STATE, client, {}, { owner: 'player_a' });
+
+    expect(decide).toHaveBeenCalledTimes(3);
+    expect(client.move).toHaveBeenCalledTimes(2);
     expect(client.endTurn).toHaveBeenCalledTimes(1);
   });
 

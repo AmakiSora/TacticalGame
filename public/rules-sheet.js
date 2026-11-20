@@ -2,7 +2,8 @@
 // 因此进行中对局与历史回放各自显示当时生效的数值，永远不会过时。
 // 玩家页（play.js / play-m.js）与观战页（app.js / spectator-m.js）共用。
 (() => {
-  const MODE_LABELS = { standard: '标准（逐人轮流）', annihilation: '歼灭（炮火收缩）', simultaneous: '同时回合（秘密计划）', royale: '大逃杀（同时 × 缩圈）' };
+  const MODE_LABELS = { standard: '标准（逐人轮流）', annihilation: '歼灭（炮火收缩）', simultaneous: '同时回合（秘密计划）', royale: '大逃杀（同时 × 缩圈）', fog: '迷雾（同时 × 视野迷雾）' };
+  const FOG_UNIT_ORDER = ['scout', 'ranger', 'infantry', 'support', 'heavy'];
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
   const CP_KIND_NAMES = { supply: '补给站', forward_base: '前线基地', repair: '维修站' };
   const SHAPE_NAMES = { single: '单格', line: '直线', arc: '扇形三格' };
@@ -33,7 +34,7 @@
 
   function unitRow(type, spec, config) {
     const mode = config?.mode;
-    const simultaneous = mode === 'simultaneous' || mode === 'royale';
+    const simultaneous = mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
     const attackCol = simultaneous ? shapeLabel(spec?.attackShape, spec?.attackRange) : `单格（射程 ${spec?.attackRange ?? '—'}）`;
     const healCol = spec?.healPower != null
       ? `+${spec.healPower}${simultaneous ? ` · ${shapeLabel(spec?.healShape, spec?.healRange ?? spec?.attackRange)}` : ''}`
@@ -76,6 +77,10 @@
       else chips.push(['先手贴目', '无（开局对称）']);
     }
     if (balance.deployFromHq === false) chips.push(['部署', '总部不可部署']);
+    if (config?.mode === 'fog') {
+      const reveal = Number.isInteger(config?.fog?.revealFromRound) ? `第 ${config.fog.revealFromRound} 轮` : '终局';
+      chips.push(['揭雾', reveal]);
+    }
     return chips.map(([label, value]) => `<span class="rs-chip" data-label="${esc(label)}"><b>${esc(value)}</b>${esc(label)}</span>`).join('');
   }
 
@@ -96,6 +101,13 @@
     if ((mode === 'annihilation' || mode === 'royale') && config?.annihilation?.artillery) {
       const a = config.annihilation.artillery;
       return `<div class="rs-note">炮火规则：第 ${esc(a.startRound)} 轮起每 ${esc(a.intervalRounds)} 轮收缩一圈，危险区每轮 ${esc(a.damage)} 点无视防御伤害，最终安全半径 ${esc(a.minimumSafeRadius)}；危险区内禁止部署、治疗与据点维修。${mode === 'royale' ? '大逃杀无总部，兵力打光即淘汰。' : ''}</div>`;
+    }
+    if (mode === 'fog') {
+      const vision = config?.fog?.vision || {};
+      const visionText = FOG_UNIT_ORDER.map(type => `${UNIT_NAMES[type]} ${Number.isInteger(vision[type]) ? vision[type] : '默认'}`).join(' · ');
+      const reveal = Number.isInteger(config?.fog?.revealFromRound) ? `第 ${config.fog.revealFromRound} 轮起全图公开` : '全程迷雾，终局公开';
+      return `<div class="rs-note">迷雾模式：同时回合骨架 + 视野迷雾，${esc(reveal)}。视野半径：${esc(visionText)}（0 表示只可见自身格）；阻挡地形挡视线，水域不挡。敌军离开视野后保留上一轮位置的残影，残影不可选中、不参与瞄准预测；对看不见的格子可盲射。本模式无炮火、无先手贴目。</div>
+        <div class="rs-note">同时回合：指令入队不执行、可撤销，全员确认后按行动点统一同时结算；单位可跨行动点多次行动，前一步硬失败后该单位后续动作作废。攻击/治疗瞄准格子/方向，按覆盖形状结算；跨玩家同一步指向同一格时全部失败。可排「待命」占位。</div>`;
     }
     if (mode === 'simultaneous' || mode === 'royale') {
       return '<div class="rs-note">同时回合：指令入队不执行、可撤销，全员确认后按行动点统一同时结算；第 N 条与所有玩家的第 N 条同时结算。单位可跨行动点多次行动，前一步硬失败后该单位后续动作作废。移动按地形寻路（单位不挡路），目的地可在计划时被占、结算时再判；同一步可先腾格再进入。攻击/治疗瞄准格子/方向，按覆盖形状结算；跨玩家同一步指向同一格时全部失败。可排「待命」占位。</div>';

@@ -3,6 +3,14 @@
 本文档只记录 `rl/` 目录下训练环境、模型接口和训练工具的变化，不记录游戏引擎本身的版本变化。
 条目按时间倒序排列。每次修改强化学习代码时，必须在本文件顶部追加记录。
 
+## 2026-11-20 · 迷雾模式评估隔离（4.0.0）
+
+**一句话**：`rl/` 训练环境、模型接口与观测编码零行为改动；评估编排显式排除迷雾——`SUPPORTED_EVAL_MODES` 仍不含 fog，新增 `EXCLUDED_EVAL_MODES = ("fog",)`，`resolve_mode` 对 `maps/fog-*.json` 给出「迷雾不参评」的明确拒绝；地图扫描仍登记 fog 图（不静默跳过），避免 `fog-*` 被当成默认 standard 误跑。
+
+**评估口径**：`round_robin.py` 不发现 fog 算法、不生成 fog 任务/三人 manifest、不写 fog 对局到 `arena/matches.jsonl`；`fog-scout` 仅注册 `modes: ['fog']`，因此竞技场发现（按 `ALGORITHM_META.modes` 过滤）与排行榜名册都看不到它。迷雾自对局改走 `scripts/fog-selfplay.mjs`：无 HTTP、直接驱动引擎，每个座位只拿 `unitsForViewer` + `fogProjectionFor` 的服务端投影，入队走与线上同源的 `queueXxxAction`；输出非法动作数/轮数/胜负与终局原因/耗时，可重复跑。本期无模型训练或新模型产出。
+
+**测试与验证**：2p `fog-harbor` 与 3p `fog-crossing` 各 1 局真实引擎整局均完赛且 0 非法动作（详见 [算法日志](../../algorithms/docs/RELEASE_NOTES.md) 4.0.0 与根 `RELEASE_NOTES.md`）；`rl/evaluation/round_robin.py --maps fog-harbor` 现在会命中明确的「迷雾不参评」错误，而不是进入评估链路。
+
 ## 2026-11-17 · 长弓回廊跑批落库、双线抉择贴目下调（3.9.11）
 
 **一句话**：`rl/` 代码零行为改动——3.9.10 记录里「未跑批」的长弓回廊已补跑 672 局并刷新榜单/统计；标准图 `dual-lanes` 的贴目由 10 降到 2，训练混合含该图时开局经济随之改变，目前尚无按新贴目重跑的模型对局。

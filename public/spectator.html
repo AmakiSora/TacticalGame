@@ -52,7 +52,12 @@
             <span>Control token</span>
             <input id="settings-control-token" type="password" placeholder="Control token" autocomplete="off" />
           </label>
+          <label class="setting-field">
+            <span>观战令牌</span>
+            <input id="settings-spectator-token" type="password" placeholder="迷雾对局观战令牌" autocomplete="off" />
+          </label>
           <button id="btn-save-control-token" type="button" class="settings-action">保存 Token</button>
+          <button id="btn-save-spectator-token" type="button" class="settings-action">保存观战令牌</button>
         </div>
       </div>
     </div>
@@ -65,6 +70,13 @@
       <div id="board-canvas">
         <canvas id="board" width="840" height="840"></canvas>
         <div id="cell-info" class="cell-info"></div>
+        <div id="fog-lock" class="fog-lock hidden" role="status">
+          <div class="fog-lock-card">
+            <strong>迷雾模式</strong>
+            <p id="fog-lock-message">迷雾模式对局需要观战令牌。</p>
+            <p class="fog-lock-hint">在设置中填入观战令牌，或在链接后追加 ?spectatorToken=…</p>
+          </div>
+        </div>
       </div>
       <div id="replay-controls">
         <div id="control-buttons">

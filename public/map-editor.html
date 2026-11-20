@@ -163,6 +163,7 @@
               <button type="button" data-mode="annihilation" aria-pressed="false">歼灭模式</button>
               <button type="button" data-mode="simultaneous" aria-pressed="false">同时模式</button>
               <button type="button" data-mode="royale" aria-pressed="false">大逃杀</button>
+              <button type="button" data-mode="fog" aria-pressed="false">迷雾模式</button>
             </div>
           </div>
           <div class="field-grid compact">
@@ -181,6 +182,14 @@
         </section>
 
         <section class="panel inspector-pane" id="inspector-rules" role="tabpanel" data-inspector-pane="rules" hidden>
+          <section class="section-block" id="fog-panel" hidden>
+            <div class="panel-heading">
+              <h2>视野迷雾</h2>
+              <span>迷雾模式</span>
+            </div>
+            <div id="fog-vision-fields" class="field-grid compact"></div>
+            <p id="fog-hint" class="fog-panel-hint"></p>
+          </section>
           <section class="section-block" id="annihilation-panel" hidden>
             <div class="panel-heading">
               <h2>炮火收缩</h2>

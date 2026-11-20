@@ -9,7 +9,7 @@ import { barChart, hbarMidline, stackedHBar, radarChart, heatmap, scatter, CHART
   const LEADERBOARD_URL = '/data/arena-leaderboard.json';
   const FINGERPRINT_URL = '/data/arena-map-fingerprint.json';
 
-  const MODE_LABELS = { standard: '标准模式', annihilation: '歼灭模式', simultaneous: '同时回合', royale: '大逃杀' };
+  const MODE_LABELS = { standard: '标准模式', annihilation: '歼灭模式', simultaneous: '同时回合', royale: '大逃杀', fog: '迷雾' };
   const UNIT_NAMES = { infantry: '步兵', scout: '侦察兵', heavy: '重装', ranger: '远程兵', support: '支援兵' };
   const END_REASON_LABELS = {
     last_player_standing: '歼灭获胜',

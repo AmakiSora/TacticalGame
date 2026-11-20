@@ -3,8 +3,9 @@ import type { FastifyInstance } from 'fastify';
 import { globalStore } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import type { GameEvent } from '../types.js';
-import { verifyToken } from '../state/tokens.js';
 import { inc, setGauge } from '../utils/metrics.js';
+import { isFogGame, resolveViewer } from './auth.js';
+import { projectEventForViewer } from '../engine/fog.js';
 
 const MAX_SSE_PER_GAME = 20;
 const MAX_SSE_PER_IP = 10;
@@ -37,7 +38,10 @@ function bump(map: Map<string, number>, key: string, delta: number): void {
 }
 
 export async function eventsRoutes(app: FastifyInstance): Promise<void> {
-  app.get<{ Params: { id: string }; Querystring: { after?: string; close?: string; token?: string } }>(
+  app.get<{
+    Params: { id: string };
+    Querystring: { after?: string; close?: string; token?: string; spectatorToken?: string };
+  }>(
     '/api/games/:id/events',
     async (req, reply) => {
       const game = globalStore.get(req.params.id);
@@ -47,19 +51,14 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
 
       const wantsSse = (req.headers.accept ?? '').includes('text/event-stream');
       const closeAfterFlush = req.query.close === 'true';
+      const fog = isFogGame(game);
 
-      // For SSE: token is optional (spectators can connect without one).
-      let viewer: string | null = null;
-      if (wantsSse && !closeAfterFlush) {
-        const token = req.headers['x-player-token'] ?? req.query.token;
-        if (typeof token === 'string' && token.length > 0) {
-          const matched = Object.entries(game.tokens).find(([, stored]) => verifyToken(token, stored));
-          if (!matched) {
-            return reply.code(401).send({ error: '玩家凭证无效', code: 'invalid_token' });
-          }
-          viewer = matched[0];
-        }
-      }
+      // 观者三态与非 SSE 事件补拉共用同一套解析：玩家 > 观战 > 匿名。
+      // 非迷雾模式的事件列表保持旧行为（匿名全量、无效令牌忽略）；迷雾局没有匿名全量旁路。
+      const viewer = resolveViewer(req, game, reply, {
+        strictPlayerToken: fog || (wantsSse && !closeAfterFlush),
+      });
+      if (!viewer) return;
 
       // Last-Event-ID 是浏览器自动重连时带的游标；与 after 取较大值。
       const queryAfter = req.query.after ? Number(req.query.after) : 0;
@@ -68,7 +67,15 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         Number.isFinite(queryAfter) ? queryAfter : 0,
         Number.isFinite(headerAfter) ? headerAfter : 0,
       );
-      const filtered = game.events.filter(e => e.seq > after);
+      // 逐事件投影：匿名 fog 只留公开事件；玩家按视野；观战全量。
+      const project = (event: GameEvent): GameEvent | null => {
+        if (!fog || viewer.kind === 'spectator') return event;
+        return projectEventForViewer(game, event, viewer.kind === 'player' ? viewer.player : null);
+      };
+      const filtered = game.events
+        .filter(e => e.seq > after)
+        .map(project)
+        .filter((event): event is GameEvent => event !== null);
 
       if (!wantsSse) {
         return { events: filtered };
@@ -77,7 +84,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       // 配额：每局 + 每 IP + 每玩家；匿名连接没有玩家身份，只受每局/每 IP
       // 约束，避免同一局所有匿名客户端共用「3 条」桶而把正常观战者挡在门外。
       const ipKey = `${game.id}:${req.ip}`;
-      const playerKey = viewer ? `${game.id}:${viewer}` : null;
+      const playerKey = viewer.kind === 'player' ? `${game.id}:${viewer.player}` : null;
       if ((sseCounts.get(game.id) ?? 0) >= MAX_SSE_PER_GAME
         || (sseIpCounts.get(ipKey) ?? 0) >= MAX_SSE_PER_IP
         || (playerKey !== null && (ssePlayerCounts.get(playerKey) ?? 0) >= MAX_SSE_PER_PLAYER)) {
@@ -181,7 +188,10 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       };
       const unsubscribe = closeAfterFlush ? () => {} : globalEventBus.subscribe(game.id, ev => {
         if (cleanedUp) return;
-        const frame = encodeSseEvent(ev);
+        // 实时帧同样投影：握手时的观者身份固定，新事件按它过滤。
+        const visible = project(ev);
+        if (!visible) return;
+        const frame = encodeSseEvent(visible);
         const bytes = Buffer.byteLength(frame);
         if (reply.raw.writableLength + pendingBytes + bytes > MAX_BUFFER_BYTES) {
           inc('tactical_sse_disconnect_total', { reason: 'buffer_limit' });

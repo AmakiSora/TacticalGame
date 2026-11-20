@@ -59,7 +59,7 @@
 
 没写 `komi` 的图在地图编辑器里仍会预填「先手贴目（补给）」输入框，值就是这套历史折算（`baseIncome` + 出生据点收入）：各座出生据点同类型时该值等价于旧口径，**类型不一致时按最低额度预填并在标签里标出区间**，因为单个 `supplies` 无法同时等于多个座位的第一跳。预填只用于回显，不改动输入框就不会写入 `komi`，导出后依旧走历史结算。
 
-贴目只对顺序模式生效（同时回合 / 大逃杀没有先手位置，地图写了 `komi` 会被加载器拒绝，地图编辑器切到这两种模式时也不再写出该字段）；**同一张图的所有人数共用同一个 `supplies`**，2 人与 6 人局不会分别标定。贴目记为一条带 `komi: true` 的 `income` 事件（`base = amount`、`control = 0`、`breakdown = []`），事件流显示「收入 +N（先手贴目）」，规则速查里以「先手贴目」chip 展示档位。见 [skill/annihilation.md](../skill/annihilation.md)。
+贴目只对顺序模式生效（同时回合 / 大逃杀 / 迷雾没有先手位置，地图写了 `komi` 会被加载器拒绝，地图编辑器切到这些模式时也不再写出该字段）；**同一张图的所有人数共用同一个 `supplies`**，2 人与 6 人局不会分别标定。贴目记为一条带 `komi: true` 的 `income` 事件（`base = amount`、`control = 0`、`breakdown = []`），事件流显示「收入 +N（先手贴目）」，规则速查里以「先手贴目」chip 展示档位。见 [skill/annihilation.md](../skill/annihilation.md)。
 
 ## 模型评估开关
 
@@ -72,6 +72,39 @@
 歼灭模式地图另外声明 `mode: "annihilation"`、`annihilation.artillery`，并让每个 `spawnSlots[]` 通过 `controlPointId` 关联一个唯一出生据点；大逃杀模式地图声明 `mode: "royale"` 时同样**必须**携带 `annihilation.artillery` 与据点绑定的出生槽（`minimumSafeRadius` 允许为 0，即最终只剩中心一格安全）。
 
 炮火参数包含首次生效轮次 `startRound`、收缩间隔 `intervalRounds`、每轮伤害 `damage` 和最终安全半径 `minimumSafeRadius`。内置地图 `artillery-zone`（炮火禁区）支持 2、3、6 人，采用六向旋转对称出生布局，共 20 轮：第 1–4 轮争夺内圈补给点，第 5–12 轮利用额外收入扩军、外圈与内圈据点依次被炮火覆盖，第 13 轮起安全区收缩至最终半径 1、在内圈核心决胜，第 20 轮仍未分胜负则按裁决分收尾。炮火在第 4 轮预告、第 5 轮首次收缩，此后每两轮收缩一层，至第 13 轮到达最终安全半径 1。地图编辑器为这两类地图提供缩圈预览滑块，拖动可按轮次查看危险区与下一轮将被覆盖的那一圈；预览只是编辑器里的本地视图，不写入导出 JSON。
+
+## 迷雾字段
+
+迷雾模式地图声明 `mode: "fog"` 与顶层 `fog`（fog 图必须带 `fog` 块，`vision` / `revealFromRound` 可省略）。视野只影响“玩家能看到哪些敌方单位”，地形、总部位置/HP、据点归属始终公开；保密由服务端按观者投影实现，不是地图字段、也不是前端遮罩。
+
+```json
+{
+  "mode": "fog",
+  "fog": {
+    "vision": { "scout": 4, "ranger": 3, "infantry": 2, "support": 2, "heavy": 1 },
+    "revealFromRound": null
+  },
+  "modelEval": false
+}
+```
+
+- `fog.vision` 的键只能是五种兵种（`scout` / `ranger` / `infantry` / `support` / `heavy`），值为 `0..8` 的整数；缺省兵种落默认值：侦察 4、游侠 3、步兵 2、支援 2、重装 1。`0` 表示该兵种不提供视野（自身所在格仍可见）。
+- 总部与己方据点各提供 1 格视野；视线被 `blocker` 遮挡（不含起点/终点），`water` 不挡，地图外/不可用格视为挡。
+- `fog.revealFromRound` 为 `null`（全程迷雾）或 `>= 1` 的整数；地图有 `maxTurns` 时不得大于它。到达该轮或 `phase === "game_over"` 时全体揭雾。
+- `fog` 字段只允许出现在 `mode === "fog"` 的图上；非 fog 图出现 `fog` → 加载错误（错误信息带 `Map "<id>".fog...` 前缀）。
+- fog 图**禁止** `annihilation` 与 `balance.komi`；必须有总部与出生槽（总部可随 `spawnSlots[].headquarters` 声明）；`controlPoints` 允许。动作点仍由 `balance.actionsPerTurn` 决定。
+- 支持人数（`supportedPlayerCounts`）按图生效：`fog-harbor` 为 `[2]`，`fog-crossing` 为 `[3]`；未显式声明时由 `layouts` 推导。
+- 随机地图明确拒绝 `random.mode: "fog"`（本期不生成随机迷雾图，报错信息会提示改用内置 fog 图）。
+- 本期 fog 图设 `modelEval: false`，不参与竞技场模型评估（见 [STATS.md](STATS.md)）；字段本身仍按上节规则生效。
+
+首批内置地图（数值以 `maps/*.json` 为准）：
+
+| mapId | 中文名 | 人数 | 地图半径 | `maxTurns` | 揭雾 | AP |
+|---|---|---|---:|---:|---|---:|
+| `fog-harbor` | 雾港 | 2 | 8 | 20 | 全程（`revealFromRound: null`） | 6 |
+| `fog-crossing` | 雾渡 | 3 | 9 | 24 | 最后 3 轮（`revealFromRound: 22`，即 `maxTurns - 2`） | 6 |
+
+地图编辑器提供迷雾模式与 `fog` 配置区（五兵种视野、揭雾轮次），导出 JSON 必须先通过与服务端加载器相同的校验：非 fog 图不得带 `fog`，fog 图不得带 `komi` / `annihilation`，`revealFromRound` 不得超出 `maxTurns`。
 
 ## 地形与据点
 

@@ -1,8 +1,26 @@
 # TacticalGame 版本说明
 
-本文档按版本倒序整理 3.x 的主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。3.0.0 之前的 1.x / 2.x 说明归档在 [docs/release-notes-archive.md](docs/release-notes-archive.md)，内容保持原样。
+本文档按版本倒序整理 4.x 与 3.x 的主要改动。仓库当前没有 git tag，因此版本边界以 `release/*` 分支或明确的版本基线提交为准。3.0.0 之前的 1.x / 2.x 说明归档在 [docs/release-notes-archive.md](docs/release-notes-archive.md)，内容保持原样。
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
+
+## 4.0.0
+
+### 新增
+
+- **第五种玩法「迷雾模式」（`fog`）**：同时回合的秘密计划叠加视野迷雾，只隐藏敌方单位，地形、总部与据点公开；有总部、无炮火与贴目，侦察、残影、盲射与交火揭示构成信息战。规则见 [skill/fog.md](skill/fog.md)。
+- **两张迷雾地图**：「雾港」（`fog-harbor`，2 人，全程迷雾）与「雾渡」（`fog-crossing`，3 人，最后 3 轮揭雾）；视野半径、揭雾轮次与校验规则见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)。
+- **观战令牌与服务端投影**：fog 局建房返回只读 `spectatorToken`，无令牌只得到公开安全视角；`units` / `events` / `adjudication` 按观者投影，ETag 与 `Vary` 随观者区分。接口口径见 [docs/API.md](docs/API.md)。
+
+### 变更
+
+- **模式路由与复盘规范补 fog**：`skill/SKILL.md` 增加 `fog.md` 路由，复盘入口增加 `review-fog.md`（信息战决策、盲射收益、侦察存活、残影利用）。迷雾局本期不纳入统计看板、竞技场与 RL 评估，见 [docs/STATS.md](docs/STATS.md)。
+
+### 测试与验证
+
+- `npm run build` 通过；全量 `npx vitest run --minWorkers=1 --maxWorkers=2` 166 文件 / 2,005 例全过，`npm run check-version` 6 处版本引用均为 4.0.0。
+- 迷雾专项 12 文件 / 125 例全过（引擎 34、API 23、配置 18、前端 34、算法 16）；终局 `result`、他人 `adjudicationScore`、淘汰事件 `score`/`removedUnitIds`、真实 pino 日志的 `spectatorToken` 四处旁路均有断言。
+- `node scripts/fog-selfplay.mjs --games 60` 两图共 120 局：0 非法动作、0 未完赛（雾港均 20 轮、雾渡均 24 轮）。
 
 ## 3.9.11
 

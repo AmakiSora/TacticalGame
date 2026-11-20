@@ -134,6 +134,11 @@ describe('AI 竞技场评估控制台 API', () => {
       const id = file.replace(/\.json$/i, '');
       const config = JSON.parse(readFileSync(join('maps', file), 'utf8'));
       const entry = catalog.find(map => map.id === id);
+      // 迷雾模式本期不进竞技场/评估：对应地图必须被目录排除（契约 §6/§7）。
+      if (config.mode === 'fog') {
+        expect(entry, `${id} 是迷雾图，不应进入评估控制台`).toBeUndefined();
+        continue;
+      }
       expect(entry, `${id} 未进入控制台地图目录`).toBeDefined();
       expect(entry!.label).toBe(config.name ?? id);
       expect(entry!.mode).toBe(config.mode ?? 'standard');

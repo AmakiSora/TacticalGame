@@ -51,6 +51,14 @@ export function generateToken(): string {
   return randomBytes(16).toString('hex');
 }
 
+/**
+ * 观战令牌：与玩家/房主凭证同一套 HMAC 机制，但语义完全只读。
+ * 单独导出是为了让调用点一眼看出「这不是玩家令牌」，避免误入 resolvePlayer。
+ */
+export function generateSpectatorToken(): string {
+  return generateToken();
+}
+
 export function hashToken(token: string): string {
   return `${HASH_PREFIX}${createHmac('sha256', getPepper()).update(token).digest('hex')}`;
 }
@@ -66,6 +74,11 @@ export function verifyToken(token: string | undefined | null, stored: string | u
   const a = Buffer.from(actual);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** 观战令牌校验；与 verifyToken 同语义，命名上区分用途（只读全量视角）。 */
+export function verifySpectatorToken(token: string | undefined | null, stored: string | undefined | null): boolean {
+  return verifyToken(token, stored);
 }
 
 /** 仅迁移用：把旧明文 token 转成哈希；已哈希则原样返回。 */

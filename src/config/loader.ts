@@ -3,8 +3,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ControlPointKind, GameMode, MapCell, PlayerId, Position, TerrainType, UnitType } from '../types.js';
-import { isAnnihilationMode } from '../types.js';
+import { isAnnihilationMode, isSimultaneousMode } from '../types.js';
 import { isValidHex } from '../engine/hex.js';
+import { FOG_VISION_DEFAULTS } from '../engine/fog.js';
 import { createMapCells, createRadiusPlayableCells } from './geometry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -108,6 +109,13 @@ export interface AnnihilationConfig {
   artillery: ArtilleryConfig;
 }
 
+/** 迷雾模式地图配置；加载后 `vision` 总是收敛为五兵种齐全的半径表。 */
+export interface FogMapConfig {
+  vision: Record<UnitType, number>;
+  /** null = 全程迷雾；否则自该轮起全图可见。 */
+  revealFromRound: number | null;
+}
+
 export interface MapConfig {
   mode: GameMode;
   name: string;
@@ -126,6 +134,8 @@ export interface MapConfig {
   units: Record<UnitType, UnitSpec>;
   headquartersSpec: HeadquartersSpec;
   annihilation?: AnnihilationConfig;
+  /** 仅 fog 模式存在；其他模式出现会被 loader 拒绝。 */
+  fog?: FogMapConfig;
   /**
    * false = 该图不参与 RL 模型评估（竞技场只跑算法对算法）；缺省视为参与。
    * 仅评估链路读取（`rl/evaluation/round_robin.py`），引擎行为不受影响。
@@ -301,8 +311,9 @@ function assertPosition(obj: Record<string, unknown>, ctx: string, radius: numbe
 
 function validateMap(id: string, config: unknown): asserts config is MapConfig {
   const c = asRecord(config, `Map "${id}"`);
-  if (c.mode !== 'standard' && c.mode !== 'annihilation' && c.mode !== 'simultaneous' && c.mode !== 'royale') {
-    throw new Error(`Map "${id}".mode must be standard, annihilation, simultaneous, or royale`);
+  if (c.mode !== 'standard' && c.mode !== 'annihilation' && c.mode !== 'simultaneous'
+    && c.mode !== 'royale' && c.mode !== 'fog') {
+    throw new Error(`Map "${id}".mode must be standard, annihilation, simultaneous, royale, or fog`);
   }
   const name = assertString(c, 'name', `Map "${id}"`);
   const description = assertString(c, 'description', `Map "${id}"`);
@@ -437,8 +448,8 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     }
   }
   if ('komi' in balance) {
-    // 贴目只存在于顺序回合（标准 / 歼灭）；同时回合与乱斗没有「先手」这个位置。
-    if (c.mode === 'simultaneous' || c.mode === 'royale') {
+    // 贴目只存在于顺序回合（标准 / 歼灭）；同时回合、乱斗与迷雾都没有「先手」这个位置。
+    if (isSimultaneousMode(c.mode)) {
       throw new Error(`Map "${id}".balance.komi is only valid in sequential modes (standard/annihilation)`);
     }
     const komi = asRecord(balance.komi, `Map "${id}".balance.komi`);
@@ -449,6 +460,41 @@ function validateMap(id: string, config: unknown): asserts config is MapConfig {
     if (supplies > 999) {
       throw new Error(`Map "${id}".balance.komi.supplies must be <= 999`);
     }
+  }
+
+  // ---------------------------------------------------------------- 迷雾配置
+  if ('fog' in c && c.mode !== 'fog') {
+    throw new Error(`Map "${id}".fog is only valid in fog mode`);
+  }
+  if (c.mode === 'fog') {
+    // 迷雾没有炮火缩圈，annihilation 配置会被静默忽略，直接拒绝以免误配。
+    if ('annihilation' in c) {
+      throw new Error(`Map "${id}".annihilation is only valid in annihilation/royale modes`);
+    }
+    if (!('fog' in c)) throw new Error(`Map "${id}".fog is required in fog mode`);
+    const fog = asRecord(c.fog, `Map "${id}".fog`);
+    const rawVision = 'vision' in fog ? asRecord(fog.vision, `Map "${id}".fog.vision`) : {};
+    const vision: Record<UnitType, number> = { ...FOG_VISION_DEFAULTS };
+    for (const [type, value] of Object.entries(rawVision)) {
+      if (!(type in FOG_VISION_DEFAULTS)) {
+        throw new Error(`Map "${id}".fog.vision.${type} is not a unit type (scout/ranger/infantry/support/heavy)`);
+      }
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 8) {
+        throw new Error(`Map "${id}".fog.vision.${type} must be an integer from 0 to 8`);
+      }
+      vision[type as UnitType] = value;
+    }
+    const revealFromRound = fog.revealFromRound ?? null;
+    if (revealFromRound !== null) {
+      if (typeof revealFromRound !== 'number' || !Number.isInteger(revealFromRound) || revealFromRound < 1) {
+        throw new Error(`Map "${id}".fog.revealFromRound must be null or an integer >= 1`);
+      }
+      const maxTurns = balance.maxTurns as number | null;
+      if (maxTurns !== null && revealFromRound > maxTurns) {
+        throw new Error(`Map "${id}".fog.revealFromRound must not exceed maxTurns (${maxTurns})`);
+      }
+    }
+    c.fog = { vision, revealFromRound };
   }
 
   // 竞技场模型评估开关：只影响 rl/evaluation/round_robin.py 的组批，不参与引擎判定。

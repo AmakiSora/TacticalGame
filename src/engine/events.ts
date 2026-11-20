@@ -1,6 +1,8 @@
 // src/engine/events.ts
 import type { GameState, GameEvent, EventType } from '../types.js';
+import { isFogMode } from '../types.js';
 import type { EventBus } from '../events/bus.js';
+import { updateFogMemory } from './fog.js';
 
 /**
  * 追加一条事件到 game.events 并通过 bus 广播。
@@ -30,6 +32,8 @@ export function appendEvent(
   game.events.push(event);
   // 派生索引/缓存按这个版本失效；放在 push 之后，索引重建时能看到新事件。
   game.stateVersion = (game.stateVersion ?? 0) + 1;
+  // 迷雾模式：每条事件落库后刷新残影记忆（非 fog 模式零开销）。
+  if (game.fog || isFogMode(game.config.mode)) updateFogMemory(game);
   bus.emit(game.id, event);
   return event;
 }

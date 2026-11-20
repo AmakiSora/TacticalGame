@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   globalStore, createLobby, createLobbyWithConfig, addLobbyPlayer, removeLobbyPlayer,
   clearSeatPlan, isSeatOrderValid, setSeatPlan, maxLobbyGames,
-  getRawHostToken, getRawPlayerToken,
+  getRawHostToken, getRawPlayerToken, getRawSpectatorToken,
 } from '../state/store.js';
 import { verifyToken } from '../state/tokens.js';
 import { globalEventBus } from '../events/bus.js';
@@ -13,8 +13,10 @@ import { appendEvent } from '../engine/events.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
 import { eliminateFromPlanAndMaybeResolve, forceResolveRound } from '../engine/simultaneous.js';
 import {
-  authenticate, authenticateHost, sanitizeGameForResponse, statusForCode,
+  authenticate, authenticateHost, isFogGame, resolveViewer, sanitizeGameForResponse,
+  statusForCode, viewerTagOf,
 } from './auth.js';
+import type { Viewer } from './auth.js';
 import { authorizeControlRequest, controlSocketAddressOf } from './controlAuth.js';
 import { actionBodyHash, findReplay, rememberAction, scopedIdempotencyKey } from './actions.js';
 import { logger } from '../utils/logger.js';
@@ -115,9 +117,9 @@ export function lobbySummary(game: GameState) {
  * 只把请求者自己的队列算进 ETag：其他玩家入队不改变本方响应，也避免通过
  * ETag 变化泄露对手的计划活动。
  */
-function planQueueTag(game: GameState, viewer?: PlayerId): string {
-  if (!viewer || !isSimultaneousMode(game.config.mode)) return 'none';
-  const queue = game.plan?.queues[viewer] ?? [];
+function planQueueTag(game: GameState, viewer: Viewer): string {
+  if (viewer.kind !== 'player' || !isSimultaneousMode(game.config.mode)) return 'none';
+  const queue = game.plan?.queues[viewer.player] ?? [];
   if (queue.length === 0) return 'empty';
   return createHash('sha256').update(JSON.stringify(queue)).digest('hex').slice(0, 16);
 }
@@ -231,6 +233,9 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         gameId: game.id,
         hostToken: getRawHostToken(game) ?? '',
         player: creatorId ? { id: creatorId, token: getRawPlayerToken(game, creatorId) ?? '' } : null,
+        // 观战令牌（只读全量视角）：明文只在建房响应出现这一次，落盘只有哈希。
+        // 非迷雾图没有令牌，返回空串，前端可据此隐藏观战令牌入口。
+        spectatorToken: getRawSpectatorToken(game) ?? '',
         lobby: lobbySummary(game),
       };
     },
@@ -526,9 +531,18 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  app.get<{ Params: { id: string }; Querystring: { include?: string } }>('/api/games/:id', async (req, reply) => {
-    const ctx = authenticate(req, reply);
-    if (!ctx) return;
+  app.get<{ Params: { id: string }; Querystring: { include?: string; token?: string; spectatorToken?: string } }>(
+    '/api/games/:id', async (req, reply) => {
+    const game = globalStore.get(req.params.id);
+    if (!game) return reply.code(404).send({ error: '找不到该对局', code: 'game_not_found' });
+    // 观者优先级：玩家令牌 > 观战令牌 > 匿名。非迷雾局沿用旧契约：必须带玩家令牌，
+    // 匿名不是合法观者（保持 401 invalid_token，响应字节不变）；迷雾局则给出安全公开视角。
+    const fog = isFogGame(game);
+    const viewer = resolveViewer(req, game, reply, { strictPlayerToken: true });
+    if (!viewer) return;
+    if (!fog && viewer.kind !== 'player') {
+      return reply.code(401).send({ error: '缺少玩家凭证', code: 'invalid_token' });
+    }
     const includeRaw = typeof req.query.include === 'string' ? req.query.include : null;
     const include = includeRaw === null
       ? null
@@ -541,13 +555,17 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
         adjudication: include.has('adjudication'),
       };
     const includeKey = include === null ? 'all' : [...include].sort().join(',');
-    const etag = `"${ctx.game.id}-${ctx.game.stateVersion ?? 0}-${planQueueTag(ctx.game, ctx.player)}-${includeKey}"`;
+    // 迷雾局的响应随观者而变（玩家/观战/匿名），ETag 必须带上观者标签，
+    // 否则 A 的 304 会让 B 复用 A 的私有视图。非迷雾局保持旧标签字节不变。
+    const etag = fog
+      ? `"${game.id}-${game.stateVersion ?? 0}-${planQueueTag(game, viewer)}-${includeKey}-${viewerTagOf(viewer)}"`
+      : `"${game.id}-${game.stateVersion ?? 0}-${planQueueTag(game, viewer)}-${includeKey}"`;
     reply.header('ETag', etag);
-    // 响应包含请求者自己的计划队列，必须标记按玩家凭证变化，禁止共享缓存复用。
-    reply.header('Vary', 'X-Player-Token');
+    // 响应包含请求者自己的计划队列/观者视图，必须标记按两种凭证变化，禁止共享缓存复用。
+    reply.header('Vary', 'X-Player-Token, X-Spectator-Token');
     // 个性化对局状态必须每次向服务器确认；未变化时仍走 304，省流量但不吃旧缓存。
     reply.header('Cache-Control', 'no-cache');
     if (req.headers['if-none-match'] === etag) return reply.code(304).send();
-    return sanitizeGameForResponse(ctx.game, ctx.player, projection);
+    return sanitizeGameForResponse(game, viewer, projection);
   });
 }

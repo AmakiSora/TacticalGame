@@ -4,7 +4,37 @@
 >
 > **权威口径**：主项目完整发布说明以根 `RELEASE_NOTES.md` 为准；本文件只保留算法相关条目。2026-10-23 起补录 3.5.0–3.8.7 的算法里程碑，未列出的版本表示没有算法侧变化（3.6.1–3.6.5 只涉及前端构建、持久化、统计与大厅交互，没有算法实现或评估口径变化，故不单列）。算法强度数据必须带引擎版本、地图池、harness、局数与日期；不同 harness/规则版本的数字不可直接相减。
 >
-> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1、`bastion` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
+> **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1、`bastion` v1、`fog-scout` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
+
+## 4.0.0（2026-11-20）— 迷雾模式基线算法 fog-scout
+
+### 新增算法
+
+- 新增迷雾模式基线 `fog-scout`（迷雾侦察算法，v1，`algo_fog-scout@v1`，仅注册 `fog`、`playerCounts [2,3]`）：基于同时回合 plan 队列的启发式决策，只读服务端玩家投影——`game.units`（己方 + 视野内敌军）、`game.fog.visibleCells/lastSeen`、地形/总部/据点/资源/`plan.myQueue` 等公开信息，不从地图与 `config` 反推隐藏单位。优先级为「斩杀/高价值攻击 > 治疗 > 占点与总部防御走位 > 侦察前压 > 残影盲射 > 部署」，走位按兵种分工（侦察兵买视野、游侠保持射程、支援贴伤员/维修点、步兵与重装压总部），每轮入队不超过地图 `balance.actionsPerTurn`。实现见 [algorithms/builtin/fog-scout.mjs](../../builtin/fog-scout.mjs)。
+- 合法性镜像与 `src/engine/planning.ts` 对齐：地形寻路（单位不挡路）、`single/line/arc` 形状与射程、部署起点/平原/补给、每单位攻击次数、行动点预算；残影只作为盲射瞄准格与威胁参考，不当作可攻击的活单位。
+- `algorithms/runner.mjs` 与 `algorithms/lib/interfaces.mjs` 的 `isSimultaneousMode` 镜像补入 `fog`：REST runner 对迷雾局走 plan 入队 + `end-turn` 提交，不落进逐动作分支，也不会误用歼灭/炮火语义。
+- 新增 `scripts/fog-selfplay.mjs`：不启 HTTP，直接驱动真实引擎跑 `fog-scout` 自对局（2 人 `fog-harbor`、3 人 `fog-crossing`）。每个座位只拿 `unitsForViewer` + `fogProjectionFor` 的投影视角，入队调用与 HTTP 同源的 `queueXxxAction`，被拒动作计入非法。脚本为 `.mjs`，入口自动以 `node --import tsx` 重入（引擎是 TS 源码），可直接 `node scripts/fog-selfplay.mjs --games 1`。
+
+### 评估口径
+
+- 迷雾不进竞技场/统计/RL：`rl/evaluation/round_robin.py` 的 `SUPPORTED_EVAL_MODES` 仍不含 fog，新增 `EXCLUDED_EVAL_MODES = ("fog",)` 并在 `resolve_mode` 明确拒绝；`load_map_modes` 仍登记 `maps/fog-*.json`，只为给出「迷雾不参评」的准确错误，避免被当成默认 standard 误跑。fog-scout 因此不会进入 `arena/matches.jsonl`、排行榜或 RL 模型对局。
+- 本期只做基线合法性/完整对局验证，不产出强度评级或跨算法胜率结论；自对局原始输出仅供 T3 地图标定参考，不能与竞技场 EL0/BT 分混用。
+
+### 平衡修复（fog-scout v1，不升版本）
+
+- 修 `fog-crossing` 三座胜率被出生坐标绑死（east 45.0% / northwest 3.3% / south 51.7%，换布局后偏置仍跟着「西北坐标」走）。根因在启发式自身，不在图：候选 tie-break 用 `${q},${r}` 字典序，三个座位都偏向同一个绝对方向（q 越小越优先），东座因此总往中心走、西北座被推向外圈；侦察收益又直接用服务端逐格 `visibleCells` 计数，把 hex 线段光栅化在旋转下的 1~2 格差放大成固定方向的走位差。
+- tie-break 改为**座位局部坐标系**：以自家总部为原点、总部→棋盘重心为极轴，用整数不变量 `dot`（沿极轴投影，越大越靠中心）与 `cross`（叉积，区分左右）排序。棋盘整体旋转时数值不变，三个座位的同构候选拿到同一组 `(dot, cross)`，排序结果互为旋转像。坐标退化（总部正好在重心）时退回距离 + 绝对坐标兜底。
+- 侦察收益改用 `coverageGain`：目标格视野内、且不在其他己方单位视野内的格子数——只用公开地形与己方坐标，不依赖 `visibleCells` 的逐格光栅结果；`visibleCells` 只保留「是否已揭雾」语义。游侠的「保持射程距离」改用最近敌军距离标量（原来按数组顺序取最近单位，旋转下不等变）。
+- 新增短期记忆：按 `(gameId, owner)` 记上一轮给某单位排的移动目标，下一轮没到位（`destination_conflict` / `path_blocked` / 被占）就把该格短扣 2 轮分，避免每轮把行动点重复投给同一场撞格。中央格 `(0,0)` 是旋转不动点、三座侦察兵都会把它排成最优目标；记忆把重复撞格的连带损失（`previous_action_failed` 连锁作废）压下去，但不压过占点价值（取消中央争夺反而把 2 人图拉成 28/72，已回归验证）。
+- 结果（`node scripts/fog-selfplay.mjs --games 60 --detail`，本机 2026-11-20，LOS 修复后）：4 个种子（20261120 / 20261121 / 777001 / 20261122）每图各 60 局，**每图合计 240 局**（两图共 480 局，全部 0 非法、0 未完赛，单局 0.3–0.9s）。`fog-crossing` 三座 240 局合计 east 75 胜 / northwest 82 胜 / south 83 胜 → **31.3% / 34.2% / 34.6%**（240 局无平分）；`fog-harbor` 240 局 east 113 胜 / west 116 胜 / 11 平 → 决胜局 **49.3% / 50.7%**（各占全部 240 局的 47.1% / 48.3%，平分 4.6%）。**单种子 60 局仍会明显波动**（如种子 20261120 的 crossing 为 38.3 / 26.7 / 35.0），单轮抽样噪声约 ±6 个百分点，平衡结论只看多种子合计，不读单种子。
+- 引擎侧 LOS 残差已修复（HexCore，2026-11-20）：`src/engine/fog.ts` 的 `hexLineBetween` 删掉固定 `(q+1e-6, r+1e-6, s-2e-6)` 插值偏置，改为整数有理数精确光栅化（`floorDivRem` 取整；插值点落在公共边/顶点时返回全部候选格，其中任一为 blocker 即挡视线）。候选集只由线段几何决定，随棋盘镜像与 120° 旋转等变，算法拿到的服务端投影不再带方向性偏差。验证：`fog-harbor` 单侦察兵镜像位 `(1,0)` / `(-1,0)` 各 51 格、镜像差 0 格（`对称 = true`）；`tests/engine/fog-vision.test.ts` 增两例镜像 / 120° 旋转等变回归（23 例全过）。算法本身仍只把逐格可见性当「已揭雾」语义、不写进评分，交战/威胁/防御继续走服务端投影。
+
+### 测试与验证
+
+- 新增 `tests/algorithms/fog-scout.test.ts`（10 例：非 fog/缺 owner/已提交/行动点用尽守卫、同视角决策确定性、源码不触碰全量旁路接口、2p/3p 整轮零非法且队列不超 AP、两张图整局完赛、攻击目标只允许可见敌军/公开总部/残影格、残影盲射与揭雾关闭）。
+- 新增 `tests/algorithms/fog-scout-equivariance.test.ts`（4 例，约 30ms）：`fog-crossing` 三座位首轮计划互为 120° 旋转像、`fog-harbor` 两座位互为 180° 旋转像、同分候选的镜像夹具 tie-break 等变、合成镜像视角下 `decide` 等变且无随机源。旧版（字典序 tie-break）在该文件上 2 例失败。
+- 新增 `tests/algorithms/fog-scout-selfplay.test.ts`（2 例：`fog-harbor` 2p 与 `fog-crossing` 3p 各 1 局真实引擎整局，零非法并正常终局）。`tests/algorithms/registry.test.ts` 补 `fog` 模式枚举、fog-scout 注册/版本/人数断言，并把非竞技场模式的三人数例外单独钉住；`tests/algorithms/interfaces.test.ts` 补 1 例：fog 沿用同时回合的「被拒不提交、重选后继续入队」语义。
+- 2026-11-20 自对局（`node scripts/fog-selfplay.mjs --games 1`，种子 20261120）：`fog-harbor` 2p 完赛 20 轮（`turn_limit_score`，胜者 player_b@slot_west）、0 非法、261 次决策、221 个入队动作（move 133 / attack 74 / deploy 13 / heal 1）、0.18s、11 击杀、0 总部伤害、据点 west/west/east（按出生槽）；`fog-crossing` 3p 完赛 24 轮（`turn_limit_score`，胜者 player_a@slot_east）、0 非法、474 次决策、402 个入队动作（move 231 / attack 136 / deploy 31 / heal 4）、0.38s、23 击杀、334 总部伤害、据点 northwest/east/east/northwest（按出生槽）。另跑 `--games 6` 两张图各 6 局复核：12/12 完赛、0 非法；2p 按出生槽 east 4 / west 2，3p 按出生槽 south 4 / east 2 / northwest 0，两图都出现据点高度集中（一方 3–4 个）或 2-1 / 2-2 分裂的局面；6 局样本仍不足以做平衡结论（T3 标定另做，初步问题清单见交付报告）。
 
 ## 3.9.11（2026-11-17）— 双线抉择贴目下调、长弓回廊入榜
 

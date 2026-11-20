@@ -230,7 +230,8 @@ describe('map editor page', () => {
 
     for (const file of readdirSync('maps').filter(name => name.endsWith('.json'))) {
       const normalized = core.normalizeImportedMap(JSON.parse(read(`maps/${file}`)));
-      if (normalized.mode === 'simultaneous' || normalized.mode === 'royale') continue;
+      // 迷雾与同时/大逃杀一样没有先手位置，不参与贴目口径检查。
+      if (normalized.mode === 'simultaneous' || normalized.mode === 'royale' || normalized.mode === 'fog') continue;
 
       const legacy = core.legacyKomiSupplies(normalized);
       // 出生据点绑到不同类型时回显只能按最低预填，这张图也就还没法安全写死贴目。

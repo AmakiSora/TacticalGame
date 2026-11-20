@@ -1,6 +1,6 @@
 ---
 name: review-hex-api-game
-description: Use when a TacticalGame hex match has ended and the user asks the agent to 总结经验 / 复盘 / 写总结 (post-game battle review). Routes by game mode to the mode-specific review spec and writes the review markdown into records/V3. The replay JSON is exported and archived by the host from the web UI — agents never generate, download, or overwrite it.
+description: Use when a TacticalGame hex match has ended and the user asks the agent to 总结经验 / 复盘 / 写总结 (post-game battle review). Routes by game mode to the mode-specific review spec and writes the review markdown into records/V3. Covers standard, annihilation, simultaneous, royale and fog games. The replay JSON is exported and archived by the host from the web UI — agents never generate, download, or overwrite it.
 ---
 
 # TacticalGame 对局复盘（经验总结）规范
@@ -30,11 +30,14 @@ description: Use when a TacticalGame hex match has ended and the user asks the a
    - `annihilation` → `GET ${BASE_URL}/api/skill/files/review-annihilation.md`
    - `simultaneous` → `GET ${BASE_URL}/api/skill/files/review-simultaneous.md`
    - `royale` → `GET ${BASE_URL}/api/skill/files/review-royale.md`（同时回合 × 歼灭缩圈组合）
+   - `fog` → `GET ${BASE_URL}/api/skill/files/review-fog.md`（同时回合骨架 × 视野迷雾）
 3. 模式缺失或未知 → 停下说明，不要套用别的模式的模板（例如给歼灭局写 HQ 分析）。
 
 ## 取证：只从回放读
 
 回放是复盘的唯一数据源：顶层元数据（`gameId` / `mapId` / `playerNames` / `finalResult`）、`game_start` 配置和全部事件（含 `game_over.payload.rankings`）都在其中。不要调游戏 API 重新拉事件；对局中的记忆只能用于定性描述，所有数字必须出自回放文件，统计不了的如实写"无法可靠统计"。
+
+**迷雾局（`mode: "fog"`）注意：** 回放是房主导出的全量视角，不是对局当时的玩家视角。复盘必须同时写清“当时我/对手能看到什么”和“回放事后揭示了什么”，不要把回放里看到的信息当成当时的已知条件。写法见 [`review-fog.md`](review-fog.md)。
 
 ## 产物与命名（mandatory）
 

@@ -182,6 +182,7 @@ const MODE_LABELS: Record<string, string> = {
   simultaneous: '同时回合',
   royale: '大逃杀',
   annihilation: '歼灭',
+  fog: '迷雾',
 };
 function modeLabel(mode: string): string {
   return MODE_LABELS[mode] ?? mode;

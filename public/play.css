@@ -2095,6 +2095,13 @@ body.map-dialog-open { overflow: hidden; }
   background: linear-gradient(90deg, var(--tint, rgba(122,154,170,.18)) var(--share, 0%), rgba(255,255,255,0) var(--share, 0%));
 }
 .score-term:hover { background: linear-gradient(90deg, var(--tint, rgba(122,154,170,.18)) 100%, rgba(255,255,255,0) 100%); }
+/* 迷雾局对手分项被服务端隐藏：明确说明不可见，不伪造全 0 算式。 */
+.score-breakdown.score-breakdown-masked {
+  display: block;
+  color: #7d93a6;
+  font-style: italic;
+  padding: 6px 2px 2px;
+}
 .score-term.is-zero { opacity: .5; }
 .score-term-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score-term-math {

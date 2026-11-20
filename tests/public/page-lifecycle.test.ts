@@ -275,17 +275,27 @@ for (const file of SPECTATORS) describe(`${file} spectator lifecycle`, () => {
       function defaultPlayerNames() { return {}; }
       let importedReplayMeta = null;
       let pinnedReplayStep = false;
+      let liveFogGame = false;
+      let spectatorToken = '';
       function pausePlayback() {}
       function buildTimelineMarkers() {}
       function rebuildToStep() {}
+      function clearFogLock() {}
+      function showFogLocked() {}
+      async function fetchSpectatorMeta() { return { fogGame: false, data: {} }; }
       ${fn(read(file), 'loadGameState')}
     `);
+    // loadGameState 先 await 观战元数据（迷雾/令牌分流）才请求事件流：
+    // 让旧选择先发出事件请求，再切到新选择，才能构造「旧事件晚到」的竞态。
     const first = h.run("selectGame('old-room')");
+    for (let i = 0; i < 4; i++) await Promise.resolve();
     const second = h.run("selectGame('new-room')");
-    await h.respond(1, { events: [{ seq: 2 }] });
-    await second;
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    expect(h.fetch).toHaveBeenCalledTimes(2);
     await h.respond(0, { events: [{ seq: 1 }] });
     await first;
+    await h.respond(1, { events: [{ seq: 2 }] });
+    await second;
     expect(h.run('allEvents')).toEqual([{ seq: 2 }]);
     expect(h.gameSelect.value).toBe('new-room');
     expect(h.subscribe).toHaveBeenCalledTimes(1);

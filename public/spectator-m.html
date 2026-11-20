@@ -46,6 +46,13 @@
           </div>
         </div>
       </div>
+      <div id="fog-lock" class="fog-lock hidden" role="status">
+        <div class="fog-lock-card">
+          <strong>迷雾模式</strong>
+          <p id="fog-lock-message">迷雾模式对局需要观战令牌。</p>
+          <p class="fog-lock-hint">在设置中填入观战令牌，或在链接后追加 ?spectatorToken=…</p>
+        </div>
+      </div>
       <div id="zoom-controls" class="zoom-controls">
         <button type="button" id="btn-zoom-in" class="zoom-btn icon-only" title="放大" aria-label="放大"><span class="ui-icon icon-plus" aria-hidden="true"></span></button>
         <button type="button" id="btn-zoom-out" class="zoom-btn icon-only" title="缩小" aria-label="缩小"><span class="ui-icon icon-minus" aria-hidden="true"></span></button>
@@ -209,7 +216,12 @@
             <span>Control token</span>
             <input id="settings-control-token" type="password" placeholder="Control token" autocomplete="off" />
           </label>
+          <label class="setting-field">
+            <span>观战令牌</span>
+            <input id="settings-spectator-token" type="password" placeholder="迷雾对局观战令牌" autocomplete="off" />
+          </label>
           <button id="btn-save-control-token" type="button" class="btn settings-save-button">保存 Token</button>
+          <button id="btn-save-spectator-token" type="button" class="btn settings-save-button">保存观战令牌</button>
         </section>
       </div>
     </div>

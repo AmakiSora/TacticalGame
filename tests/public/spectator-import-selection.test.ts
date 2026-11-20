@@ -32,6 +32,7 @@ function loadReplayHarness(file: string) {
     scoringEraFromScores: () => 'current',
     syncPickerCurrent: sync,
     syncGamePickerLabel: sync,
+    clearFogLock: vi.fn(),
   });
   const run = (code: string) => new Script(code).runInContext(context);
   run(`
@@ -41,6 +42,7 @@ function loadReplayHarness(file: string) {
     let allEvents = [];
     let pinnedReplayStep = true;
     let liveSse = null;
+    let liveFogGame = false;
     let currentStep = -1;
     let state = {};
     let playerNames = {};

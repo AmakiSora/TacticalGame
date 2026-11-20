@@ -25,7 +25,7 @@ AI 默认会持续轮询并自动处理后续己方回合，直到游戏结束�
 | `--max-turns <n>` | 最多处理多少个己方回合，默认 `80` |
 | `--once` | 只处理当前或下一个己方回合 |
 
-AI 的决策顺序遵循对应模式 skill 的 Decision order（[standard](../skill/standard.md) / [annihilation](../skill/annihilation.md) / [simultaneous](../skill/simultaneous.md) / [royale](../skill/royale.md)），本文不复写。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。
+AI 的决策顺序遵循对应模式 skill 的 Decision order（[standard](../skill/standard.md) / [annihilation](../skill/annihilation.md) / [simultaneous](../skill/simultaneous.md) / [royale](../skill/royale.md) / [fog](../skill/fog.md)），本文不复写。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。迷雾局里可见信息只有本人单位、`fog.lastSeen` 残影与公开状态，决策不得假设自己看得见隐藏敌军。
 
 ## 2. 强化学习 AI
 
@@ -51,7 +51,9 @@ python rl/evaluate.py --model rl/models/model.zip
 
 **算法按对局模式注册，不同模式不能混用**：每个算法在注册表（`algorithms/registry.mjs` 的 `ALGORITHM_META.modes`）声明支持的模式，大厅添加、命令行运行器与竞技场评估都会按此校验；前端「算法类型」下拉只列出当前对局模式可用的算法。
 
-**参赛人数也是注册表能力**：`ALGORITHM_META.playerCounts` 决定算法能否进入三人竞技场。3.9.2 起，标准模式的 7 个算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）、歼灭模式的 5 个算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）与同时回合模式的 8 个算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）声明 `[2, 3]`，可跑三人批；3.9.3 起大逃杀的算法（`random-royale` / `echelon` / `apex` / `ark`，3.9.9 起加上 `bastion`，现共 5 个）也声明 `[2, 3]`，四种模式全部有三人分榜。三人批只收本模式声明 3 人的算法，RL 模型是单对手观测编码，不参评。
+**参赛人数也是注册表能力**：`ALGORITHM_META.playerCounts` 决定算法能否进入三人竞技场。3.9.2 起，标准模式的 7 个算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）、歼灭模式的 5 个算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）与同时回合模式的 8 个算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）声明 `[2, 3]`，可跑三人批；3.9.3 起大逃杀的算法（`random-royale` / `echelon` / `apex` / `ark`，3.9.9 起加上 `bastion`，现共 5 个）也声明 `[2, 3]`，即**本期四个参评模式（标准 / 歼灭 / 同时回合 / 大逃杀）全部有三人分榜**。三人批只收本模式声明 3 人的算法，RL 模型是单对手观测编码，不参评。
+
+**迷雾模式本期不参评**：`fog` 只接受注册表声明 `modes` 含 `fog` 的算法，本期首个 fog 算法为 `fog-scout`（是否已在册一律以 `algorithms/registry.mjs` 为准）；fog 局不进 `arena/matches.jsonl`、没有 fog 榜单，也不纳入玩法统计与 RL 模型评估（两张 fog 图设 `modelEval: false`，见 [STATS.md](STATS.md)「迷雾模式」与 [API.md](API.md)「竞技场评估」）。因此 `fog` 没有三人分榜，也不参与任何按模式对比的排名。
 
 当前内置算法（未标注者为标准模式）。每条只写定位，实测战绩与评分以 `/arena.html` 榜单为准，实现细节见各自档案：
 
@@ -80,6 +82,7 @@ python rl/evaluate.py --model rl/models/model.zip
 - **时序掌控算法（Tempo，仅同时回合模式）**：把队列位置当作结算拍，预测敌方剧本、构建威胁时间线，再按裁决权重把动作排进具体拍。[档案](../algorithms/docs/algorithms/tempo.md)
 - **经纬算法（Tempo-Weave，仅同时回合模式）**：以「单位完成什么任务、几个行动点、能否存活」为决策单位，在共享行动点预算内按收益/成本竞价排程。[档案](../algorithms/docs/algorithms/tempo-weave.md)
 - **视界算法（Horizon，仅同时回合模式）**：把一轮结算后的棋盘投影到终局估胜率，用同构对手场景与对抗探针检验计划，再做逐行动点束搜索。[档案](../algorithms/docs/algorithms/horizon.md)
+- **迷雾侦察算法（Fog Scout，仅迷雾模式，首个 fog 算法）**：只用本人单位、`fog.lastSeen` 残影与公开信息决策，把残影当“最后确认位置”而非当前坐标，对看不见的格子只做公开信息支撑的盲射。具体名册与定位以 `algorithms/registry.mjs` 和该算法档案为准；fog 本期不进竞技场/统计/RL，所以没有任何 fog 榜单成绩。
 
 添加算法 AI 时可自定义玩家名，默认预填所选算法的中文名。
 
@@ -112,7 +115,7 @@ node algorithms/runner.mjs \
 
 | 参数 | 说明 |
 |---|---|
-| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, crucible, sovereign, random-royale, echelon, apex, ark, bastion, mcts, threat, field, verdict, parallax, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon） |
+| `--algorithm <name>` | 算法名称（greedy, random, random-annihilation, shrinkroll, vortex, crucible, sovereign, random-royale, echelon, apex, ark, bastion, mcts, threat, field, verdict, parallax, random-sim, dest-prob, kriegspiel, matrix-eq, prism, tempo, tempo-weave, horizon, fog-scout） |
 | `--url <url>` | API 地址，默认 `http://localhost:3100` |
 | `--game <id>` | 游戏 ID |
 | `--token <token>` | 玩家 token |
@@ -136,4 +139,4 @@ npx tsx scripts/algorithm-arena.mjs --a threat --b greedy --map random --games 2
 
 房主可在「添加 AI」对话框的「对战提示词」标签生成并复制提示词，发送给外部 AI（如 Claude、GPT-4）。提示词包含服务器地址、对局 ID、地图信息和 API 调用指令，AI 会自己调用 `/join` 加入对局并开始游戏。
 
-局后总结走同一套 skill：让 AI 拉取 `GET http://<服务器>:3123/api/skill/files/review.md` 并按它执行即可，无需本地文件。复盘规范与玩法 skill 同源下发（`skill/review.md` 入口按模式路由到 `review-standard.md` / `review-annihilation.md` / `review-simultaneous.md` / `review-royale.md`），AI 读房主提供的回放写复盘 MD 到 `records/V3/`；**回放 JSON 由房主在观战页导出归档**（默认名 `tg_0_{日期}.json`，归档时把占位 `0` 改成真实顺序号），不由 AI 生成——同局多个 AI 各写一份复盘时互不冲突。文件名中的对局顺序号在提示词里给出（如「对局顺序号 199」→ `tg_0199_…`）。
+局后总结走同一套 skill：让 AI 拉取 `GET http://<服务器>:3123/api/skill/files/review.md` 并按它执行即可，无需本地文件。复盘规范与玩法 skill 同源下发（`skill/review.md` 入口按模式路由到 `review-standard.md` / `review-annihilation.md` / `review-simultaneous.md` / `review-royale.md` / `review-fog.md`），AI 读房主提供的回放写复盘 MD 到 `records/V3/`；**回放 JSON 由房主在观战页导出归档**（默认名 `tg_0_{日期}.json`，归档时把占位 `0` 改成真实顺序号；迷雾局先在观战页填入观战令牌，才能导出含全量事件的回放），不由 AI 生成——同局多个 AI 各写一份复盘时互不冲突。文件名中的对局顺序号在提示词里给出（如「对局顺序号 199」→ `tg_0199_…`）。迷雾局的复盘必须以“当时看得见什么”为界：`game_start.payload.config.fog` 是视野与揭雾参数的权威来源，回放全量视角不能当作当时的玩家视角（见 [`review-fog.md`](../skill/review-fog.md)）。

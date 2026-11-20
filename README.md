@@ -1,8 +1,8 @@
 # TacticalGame
 
-尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`、`molten-throne`、`mistpine`、`longbow-gallery` 等地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）、`narrow-road`（狭路相逢）与 `mirror-lake`（镜湖）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则。
+尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`、`molten-throne`、`mistpine`、`longbow-gallery` 等地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）、`narrow-road`（狭路相逢）与 `mirror-lake`（镜湖）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则；`fog-harbor`（雾港）与 `fog-crossing`（雾渡）提供**迷雾模式（fog）**——同时回合骨架叠加视野迷雾，只隐藏敌方单位，地形、总部与据点公开。
 
-当前版本：`3.9.11`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`4.0.0`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -27,7 +27,7 @@ npm run dev
 | `http://localhost:3100/` | 首页：模式介绍、单位速览与功能入口 |
 | `http://localhost:3100/play.html` | 创建/加入并手动操作（窄屏自动进入手机版） |
 | `http://localhost:3100/play-m.html` | 玩家手机版：大厅、触控棋盘与操作抽屉 |
-| `http://localhost:3100/spectator.html` | 观战、导入回放、导出 JSON/HTML（窄屏自动进入手机版） |
+| `http://localhost:3100/spectator.html` | 观战、导入回放、导出回放 JSON（窄屏自动进入手机版；迷雾局需观战令牌） |
 | `http://localhost:3100/spectator-m.html` | 观战手机版：触控棋盘、回放栏与信息抽屉 |
 | `http://localhost:3100/stats.html` | 对局统计看板（模型排行、对位、地图与对局列表） |
 | `http://localhost:3100/arena.html` | AI 竞技场：按玩法模式分榜的 RL 模型 × 内置算法榜单、对位矩阵、玩法统计与评估控制台 |
@@ -62,15 +62,17 @@ npm run export-state
 | `annihilation` 歼灭 | `artillery-zone`、`trench-run`（战壕） | 无总部；炮火预告后逐轮向中心收缩；危险区禁部署/治疗/维修；最后存活者获胜 | [skill/annihilation.md](skill/annihilation.md) |
 | `simultaneous` 同时回合 | `standoff`、`molten-throne`、`mistpine`、`longbow-gallery`（长弓回廊） | 无行动顺序：先秘密排队，再按行动点分步同时结算；攻击/治疗瞄准格子或方向 | [skill/simultaneous.md](skill/simultaneous.md) |
 | `royale` 大逃杀 | `snowflake`、`narrow-road`、`mirror-lake`（镜湖） | 同时回合结算 + 歼灭规则（无总部、炮火收缩、打光即淘汰） | [skill/royale.md](skill/royale.md) |
+| `fog` 迷雾 | `fog-harbor`（雾港，2 人）、`fog-crossing`（雾渡，3 人） | 同时回合结算 + 视野迷雾；有总部，无炮火/贴目；只藏敌方单位 | [skill/fog.md](skill/fog.md) |
 
 所有模式共享的速览：
 
 - 尖顶六边形，坐标 `{ q, r }`；`game.cells` 是实际可用格集合（`map.radius` 不等于可走圆盘）；地形只有 `plain` 可通行/部署，`water` 与未爆破的 `blocker` 不可通行。
 - 行动点按**单位激活**计：首次部署/移动/攻击/治疗/爆破耗 1 点，同一单位本回合后续合法动作免费，上限 `config.balance.actionsPerTurn`。
 - 部署来源、占领限制、治疗与爆破的角色限制、收入与维修规则按模式与地图配置，见对应 skill 文件。
-- 顺序模式有**先手贴目**：先手第一回合不结算收入，其余每个座位第一次行动前先拿 `balance.komi.supplies` 点补给（金币口径，`0` = 不贴目，上限 999）。同时回合 / 大逃杀不结算，细则见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)「先手贴目」。
+- 顺序模式有**先手贴目**：先手第一回合不结算收入，其余每个座位第一次行动前先拿 `balance.komi.supplies` 点补给（金币口径，`0` = 不贴目，上限 999）。同时回合 / 大逃杀 / 迷雾不结算，细则见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)「先手贴目」。
+- 迷雾模式的保密在**服务端投影**：`GET /api/games/:id` 的 `units`、`events`、`adjudication` 按观者过滤，地形/总部/据点为公开信息；观战全量需建房响应中的只读 `spectatorToken`，无令牌只得到公开安全视角。
 - 裁决公式的权威定义见 [skill/SKILL.md](skill/SKILL.md)「Adjudication score」，实时分数直接读 `GET /api/games/:id` 的 `adjudication`，不要自行重算。
-- 歼灭计分、同时回合的分步结算/失败连锁/攻击形状、大逃杀炮火节奏等模式细则只维护在对应 skill 文件。地图清单与逐图数值以 `maps/*.json` 为准（文件名即 mapId）。
+- 歼灭计分、同时回合的分步结算/失败连锁/攻击形状、大逃杀炮火节奏、迷雾视野/残影/盲射等模式细则只维护在对应 skill 文件。地图清单与逐图数值以 `maps/*.json` 为准（文件名即 mapId）。
 
 ## 单位
 
@@ -78,25 +80,25 @@ npm run export-state
 
 ## REST API
 
-完整接口参考见 [docs/API.md](docs/API.md)。玩家操作带 `X-Player-Token`，房主管理带 `X-Host-Token`；删除对局、强制裁决、管理员改名与竞技场跑批等控制接口使用 `AUTO_CONTROL_TOKEN`（未设置时仅本机可调用）。
+完整接口参考见 [docs/API.md](docs/API.md)。玩家操作带 `X-Player-Token`，房主管理带 `X-Host-Token`，迷雾局全量观战带只读 `X-Spectator-Token`（建房响应返回一次）；删除对局、强制裁决、管理员改名与竞技场跑批等控制接口使用 `AUTO_CONTROL_TOKEN`（未设置时仅本机可调用）。
 
 常用入口：
 
 | 用途 | 接口 |
 |---|---|
-| 对局状态 | `GET /api/games/:id`（支持 `include` 投影与 ETag） |
+| 对局状态 | `GET /api/games/:id`（支持 `include` 投影与 ETag；迷雾局按观者返回 `units` / `fog` / 事件投影） |
 | 等待轮次/事件 | `GET /api/games/:id/wait?afterSeq=<seq>&timeout=<seconds>` |
 | 事件流 | `GET /api/games/:id/events`（`Accept: text/event-stream` 时建立 SSE） |
 | 玩法动作 | `POST /api/games/:id/{deploy,move,attack,heal,demolish,end-turn}` |
-| 同时回合计划 | `POST /api/games/:id/plan/{wait,revoke,reorder,clear}`（同时回合 / 大逃杀排队阶段的等待、撤回、重排、清空） |
+| 同时回合计划 | `POST /api/games/:id/plan/{wait,revoke,reorder,clear}`（同时回合 / 大逃杀 / 迷雾排队阶段的等待、撤回、重排、清空） |
 | Agent 技能 | `GET /api/skill`、`/api/skill/manifest`、`/api/skill/files/:name` |
 | 健康与指标 | `GET /healthz`、`GET /readyz`、`GET /metrics` |
 
-失败响应统一为 `{ error, code }`；玩法动作支持 `Idempotency-Key` 幂等重试。事件类型与回放格式、AI 机器人、回放库与竞技场评估接口见 [docs/API.md](docs/API.md)。
+失败响应统一为 `{ error, code }`；玩法动作支持 `Idempotency-Key` 幂等重试。事件类型与回放格式、AI 机器人、回放库与竞技场评估接口见 [docs/API.md](docs/API.md)。迷雾局无令牌只能读公开安全视角（`units: []`、无隐藏事件），无效观战令牌返回 `401 invalid_spectator_token`。
 
 ## 地图格式
 
-地图位于 `maps/`（文件名即 `mapId`），启动时加载并校验；`GET /api/maps` 返回可选地图，浏览器编辑器在 `/map-editor.html`。字段说明、异形地图、无回合上限以及歼灭/大逃杀炮火配置见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)。
+地图位于 `maps/`（文件名即 `mapId`），启动时加载并校验；`GET /api/maps` 返回可选地图，浏览器编辑器在 `/map-editor.html`。字段说明、异形地图、无回合上限以及歼灭/大逃杀炮火、迷雾视野与揭雾配置见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)。
 
 ## AI 自动对战
 
@@ -104,10 +106,17 @@ npm run export-state
 
 ## 回放与记录
 
-- 观战页可以从在线对局导出回放 JSON 或离线 HTML。
+- 观战页可以从在线对局导出回放 JSON。
 - 导出的 JSON 可在观战页重新导入并按事件流回放。
 - 历史对战记录放在 `records/V1`、`records/V2` 和 `records/V3`；V2/V3 记录包含 `schemaVersion`，便于后续回放兼容。历史回放的 `schemaVersion` 表示导出时的回放格式，不随应用版本批量改写。
+- 迷雾局回放含全量事件（可供复盘），但本期不自动归档到 `records/`、不进统计看板/竞技场/RL，见 [docs/STATS.md](docs/STATS.md)。
 - 对局 agent 的复盘规范也经 `/api/skill/files/:name` 下发（`review.md` + 各模式文件），保证远程 agent 与本地玩家遵循同一套复盘格式。
+
+### 迷雾局观战与回放
+
+- 观战页需要只读观战令牌：可在观战页设置里保存，或在链接后追加 `?spectatorToken=…`（桌面与手机版一致）。没有令牌或令牌无效时只画公开地图（地形、总部、据点、轮次），提示需要令牌，不显示单位、事件与裁决分——不会用公开状态补算成全 0。
+- 玩家页的迷雾对局里，对手裁决只公开总分与名次，分项显示「对手分项不可见（迷雾）」；这是服务端隐藏，不是 0 分。
+- 全量回放由带令牌的观战页导出；导入回放后按回放自带事件重建全量视角，不沿用在线观战的令牌或锁定状态。
 
 ## 测试
 

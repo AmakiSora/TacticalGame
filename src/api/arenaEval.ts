@@ -100,6 +100,9 @@ function virtualRandomMaps(): EvalMapInfo[] {
  */
 export function readEvalMaps(mapsDir = join(PROJECT_ROOT, 'maps')): EvalMapInfo[] {
   const maps: EvalMapInfo[] = virtualRandomMaps();
+  // 评估/竞技场只接受 EVAL_MODES 里的模式：迷雾等新玩法本期不参评，
+  // 对应地图既不能出现在控制台地图池，也不能被当作可跑批目标。
+  const evalModeIds = new Set<string>(EVAL_MODES.map(item => item.id));
   try {
     for (const file of readdirSync(mapsDir)) {
       if (!/\.json$/i.test(file)) continue;
@@ -112,6 +115,7 @@ export function readEvalMaps(mapsDir = join(PROJECT_ROOT, 'maps')): EvalMapInfo[
       }
       const name = typeof config?.name === 'string' ? config.name.trim() : '';
       const mode = typeof config?.mode === 'string' && config.mode ? config.mode : 'standard';
+      if (!evalModeIds.has(mode)) continue;
       const layouts = (config?.layouts ?? {}) as Record<string, unknown>;
       const declaredCounts = Array.isArray(config?.supportedPlayerCounts)
         ? (config!.supportedPlayerCounts as unknown[]).map(Number).filter(Number.isInteger)

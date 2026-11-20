@@ -63,6 +63,8 @@ function fullReplayPayload(game: GameState) {
       headquartersSpec: { ...game.config.headquartersSpec },
       balance: structuredClone(game.config.balance),
       annihilation: structuredClone(game.config.annihilation),
+      // fog 局的回放/规则速查需要视野与揭雾参数；非 fog 局不追加该键（键集保持不变）。
+      ...(game.config.fog ? { fog: structuredClone(game.config.fog) } : {}),
     },
   };
 }

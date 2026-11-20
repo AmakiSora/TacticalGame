@@ -48,6 +48,7 @@ function runAimPreview(
     myPlayer: opts.myPlayer ?? 'player_a',
     gameConfig: { balance: opts.balance ?? { damageVarianceRange: 3, minimumDamage: 1, healVarianceRange: 6 } },
     isSimultaneous: () => opts.simultaneous,
+    fogEnabled: () => false,
     projectedUnitOrigin: (unit: { q: number; r: number }) => ({ q: unit.q, r: unit.r }),
     shapeAimFor: (_unit: unknown, _kind: string, q: number, r: number) => {
       if (opts.aimCells === null) return null;

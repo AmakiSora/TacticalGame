@@ -10,16 +10,19 @@ import { fileURLToPath } from 'node:url';
 import type {
   GameState, Headquarters, MapCell, PlayerId, PlayerState, SeatPlan, Unit, UnitType,
 } from '../types.js';
-import { isAnnihilationMode, isPlayerId, isSimultaneousMode, normalizePlayerName, PLAYER_IDS } from '../types.js';
+import {
+  isAnnihilationMode, isFogMode, isPlayerId, isSimultaneousMode, normalizePlayerName, PLAYER_IDS,
+} from '../types.js';
 import { getMapConfig } from '../config/loader.js';
 import type { MapConfig, SpawnSlotConfig, UnitSpec } from '../config/loader.js';
 import { createMapCells } from '../config/geometry.js';
 import { artilleryStateForRound } from '../engine/artillery.js';
+import { createFogState, normalizeFogState } from '../engine/fog.js';
 import { actionMeritForEvent } from '../engine/actionScore.js';
 import { seedGameRandom } from '../engine/random.js';
 import { logger } from '../utils/logger.js';
 import { inc, observe } from '../utils/metrics.js';
-import { generateToken, hashToken, migrateToken } from './tokens.js';
+import { generateSpectatorToken, generateToken, hashToken, migrateToken } from './tokens.js';
 import { isRetentionExpired } from './retention.js';
 import type { RetentionTtls } from './retention.js';
 
@@ -79,6 +82,8 @@ interface PersistedGameSnapshot {
 interface RawSecrets {
   hostToken: string;
   tokens: Partial<Record<PlayerId, string>>;
+  /** 观战令牌明文：仅迷雾局、仅在创建该局的内存里保留，用于建房响应回一次。 */
+  spectatorToken?: string;
 }
 
 // 原始 token 只在创建/加入响应里返回一次；不写进 GameState，避免落盘。
@@ -90,6 +95,11 @@ export function getRawHostToken(game: GameState): string | null {
 
 export function getRawPlayerToken(game: GameState, playerId: PlayerId): string | null {
   return rawSecrets.get(game)?.tokens[playerId] ?? null;
+}
+
+/** 观战令牌明文只在建房响应出现一次；加载旧档/重启后为 null（不可恢复，符合预期）。 */
+export function getRawSpectatorToken(game: GameState): string | null {
+  return rawSecrets.get(game)?.spectatorToken ?? null;
 }
 
 export interface CreateLobbyOptions {
@@ -176,6 +186,13 @@ export function createLobbyWithConfig(id: string, mapId: string, config: MapConf
     artillery: null,
   };
   rawSecrets.set(game, { hostToken, tokens: {} });
+  if (isFogMode(config.mode)) {
+    // 迷雾局：初始化视野记忆，并为每局生成只读观战令牌（明文只在建房响应出现一次）。
+    game.fog = createFogState();
+    const spectatorToken = generateSpectatorToken();
+    game.spectatorTokenHash = hashToken(spectatorToken);
+    rawSecrets.get(game)!.spectatorToken = spectatorToken;
+  }
   game.artillery = artilleryStateForRound(game, 1);
   // 大厅列表要显示房主名：参战时取房主席位名（留空由服务端分配默认名），
   // 未参战时用创建表单填的名字（可能为空，界面会只显示「房主」）。
@@ -378,6 +395,8 @@ export function initializeLobbyGame(game: GameState, random: () => number = Math
   };
   game.plan = simultaneous ? { queues: {}, committed: [] } : null;
   game.artillery = artilleryStateForRound(game, 1);
+  // 迷雾局开局补齐视野记忆（幂等：已有 lastSeen 的玩家原样保留）。
+  if (isFogMode(game.config.mode)) normalizeFogState(game);
   // 战斗/治疗掷骰序列的种子最后取：洗牌与起始玩家仍按原样消费注入的
   // random，调用方（如传 () => 0 的旧测试）观察到的开局行为不变。
   seedGameRandom(game, random);
@@ -600,6 +619,8 @@ function normalizeLoadedGame(game: GameState): void {
     }
   }
   if (migratedTokens) logger.info(`对局 ${game.id} 的凭证明文已迁移为哈希`, { tag: 'game:persist' });
+  // 迷雾局旧档（含本功能上线前误存的 fog 局）补齐 fog.lastSeen；其它模式不碰。
+  if (game.config && isFogMode(game.config.mode)) normalizeFogState(game);
   restoreActionStats(game);
 }
 

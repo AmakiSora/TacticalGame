@@ -15,7 +15,7 @@ import {
   listHistoricalAlgorithmInfo,
 } from '../../algorithms/registry.mjs';
 
-const KNOWN_MODES = ['standard', 'simultaneous', 'annihilation', 'royale'];
+const KNOWN_MODES = ['standard', 'simultaneous', 'annihilation', 'royale', 'fog'];
 
 describe('algorithm registry modes', () => {
   it('registers ark only for royale', async () => {
@@ -56,9 +56,12 @@ describe('algorithm registry modes', () => {
     for (const name of threePlayer) {
       expect(algorithmPlayerCounts(name), name).toEqual([2, 3]);
     }
-    for (const name of Object.keys(ALGORITHMS).filter(name => !threePlayer.includes(name))) {
+    for (const name of Object.keys(ALGORITHMS).filter(name => !threePlayer.includes(name) && name !== 'fog-scout')) {
       expect(algorithmPlayerCounts(name), name).toEqual([2]);
     }
+    // fog-scout 声明三人支援，但模式独占 fog（不进竞技场跑批）。
+    expect(algorithmPlayerCounts('fog-scout')).toEqual([2, 3]);
+    expect(algorithmModes('fog-scout')).toEqual(['fog']);
     // 四个大逃杀条目都在 3.9.3 接入三人：模式仍独占 royale。
     for (const name of ['random-royale', 'echelon', 'apex', 'ark']) {
       expect(algorithmPlayerCounts(name), name).toEqual([2, 3]);
@@ -127,6 +130,28 @@ describe('algorithm registry modes', () => {
     expect(algorithmSupportsMode('shrinkroll', 'annihilation')).toBe(true);
     expect(algorithmSupportsMode('shrinkroll', 'standard')).toBe(false);
     expect(algorithmSupportsMode('shrinkroll', 'simultaneous')).toBe(false);
+    // 迷雾基线只声明 fog：不混进同时回合/竞技场。
+    expect(algorithmSupportsMode('fog-scout', 'fog')).toBe(true);
+    expect(algorithmSupportsMode('fog-scout', 'simultaneous')).toBe(false);
+    expect(algorithmSupportsMode('fog-scout', 'standard')).toBe(false);
+  });
+
+  it('registers fog-scout for fog only with two/three-player support', async () => {
+    const { algorithmVersionedId, loadAlgorithm } = await import('../../algorithms/registry.mjs');
+    expect(ALGORITHMS['fog-scout']).toBe('./builtin/fog-scout.mjs');
+    expect(ALGORITHM_META['fog-scout']).toMatchObject({
+      displayName: '迷雾侦察算法',
+      version: 'v1',
+      modes: ['fog'],
+      playerCounts: [2, 3],
+    });
+    expect(algorithmVersionedId('fog-scout')).toBe('algo_fog-scout@v1');
+    const info = listAlgorithmInfo().find(entry => entry.name === 'fog-scout');
+    expect(info?.modes).toEqual(['fog']);
+    expect(info?.playerCounts).toEqual([2, 3]);
+    const algorithm = await loadAlgorithm('fog-scout');
+    expect(algorithm.name).toBe('fog-scout');
+    expect(typeof algorithm.decide).toBe('function');
   });
 
   it('registers shrinkroll with its own identity and profile doc', async () => {

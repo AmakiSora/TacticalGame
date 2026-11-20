@@ -1,11 +1,11 @@
 ---
 name: play-hex-api-game
-description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, the simultaneous-turn maps standoff, molten-throne, mistpine and longbow-gallery, and the royale maps snowflake, narrow-road and mirror-lake.
+description: Use when an agent is asked to play, operate, control, or make decisions in this repository's Hex tactical control-point game through the REST API. Covers standard HQ maps, annihilation maps such as artillery-zone, the simultaneous-turn maps standoff, molten-throne, mistpine and longbow-gallery, the royale maps snowflake, narrow-road and mirror-lake, and the fog-of-war maps fog-harbor and fog-crossing.
 ---
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `3.9.11`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `4.0.0`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
@@ -21,7 +21,8 @@ After the first successful `GET ${BASE_URL}/api/games/:id` in an active game:
    - `annihilation` → `GET ${BASE_URL}/api/skill/files/annihilation.md`
    - `simultaneous` → `GET ${BASE_URL}/api/skill/files/simultaneous.md`
    - `royale` → `GET ${BASE_URL}/api/skill/files/royale.md` (同时回合 × 歼灭缩圈组合)
-   Offline fallback only: read the same file from a local skill install ([`standard.md`](standard.md), [`annihilation.md`](annihilation.md), [`simultaneous.md`](simultaneous.md), [`royale.md`](royale.md)).
+   - `fog` → `GET ${BASE_URL}/api/skill/files/fog.md` (同时回合骨架 × 视野迷雾；有总部，无炮火)
+   Offline fallback only: read the same file from a local skill install ([`standard.md`](standard.md), [`annihilation.md`](annihilation.md), [`simultaneous.md`](simultaneous.md), [`royale.md`](royale.md), [`fog.md`](fog.md)).
 3. Follow **only** that mode file for turn checklists, deploy origins, win conditions, scoring priorities, and the decision order.
 4. If mode is missing or unknown, stop and report it. Do not guess HQ rules on annihilation maps.
 
@@ -105,7 +106,7 @@ The server serves this skill at `${BASE_URL}/api/skill*` — unauthenticated, re
 
 Always fetch these from the server regardless of the check (small files you have not read this game, so there is no double-read to save):
 
-- Mode file (Mode routing): `GET ${BASE_URL}/api/skill/files/standard.md` / `annihilation.md` / `simultaneous.md` / `royale.md`.
+- Mode file (Mode routing): `GET ${BASE_URL}/api/skill/files/standard.md` / `annihilation.md` / `simultaneous.md` / `royale.md` / `fog.md`.
 - Wait script: `curl -fsS ${BASE_URL}/api/skill/files/wait-turn.mjs -o "$SCRATCH/wait-turn.mjs"` (optionally verify its sha256 against the manifest; `$SCRATCH` is defined in [Scratch files](#scratch-files-mandatory)).
 - Any other skill file: `GET ${BASE_URL}/api/skill/files/<name>`.
 
@@ -150,14 +151,14 @@ Run it in the **foreground as a blocking command** immediately after `/end-turn`
 
 Player actions need a player token (`POST /api/games` with `participate: true`, or `POST /join`). That response is the only time the token is shown — save it to `$SCRATCH/token.txt` immediately (see [Player token](#player-token-mandatory)) and read it back from that file in every later call. Host token is separate; `participate: false` hosts never get a player token.
 
-Transient `502`/`503` (except `lobby_capacity`): back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. For action retries, reuse the same `Idempotency-Key` (see API). `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>`, no token query param.
+Transient `502`/`503` (except `lobby_capacity`): back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. For action retries, reuse the same `Idempotency-Key` (see API). `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>`; player/host tokens stay in headers (the read-only fog spectator token may also travel as `?spectatorToken=`, but prefer the header and never log the URL).
 
 ## Post-game review (复盘)
 
 When a game is over and the user asks for a battle summary / 经验总结 / 复盘, do not invent your own format:
 
 1. Fetch the review skill entry from the server: `GET ${BASE_URL}/api/skill/files/review.md` (Canonical fetch applies when reading a locally installed copy).
-2. Follow it exactly: it routes to the mode-specific review spec (`review-standard.md` / `review-annihilation.md` / `review-simultaneous.md` / `review-royale.md`) and writes the review markdown into `records/V3/` under the user-assigned sequence number.
+2. Follow it exactly: it routes to the mode-specific review spec (`review-standard.md` / `review-annihilation.md` / `review-simultaneous.md` / `review-royale.md` / `review-fog.md`) and writes the review markdown into `records/V3/` under the user-assigned sequence number.
 
 The replay JSON is exported and archived by the host from the spectator page — **never** generate, download, or overwrite it yourself (several agents may be summarizing the same game; a second writer would collide). Read the replay path the host gives you; the review markdown is your only deliverable and is exempt from the Scratch files rule.
 
@@ -165,9 +166,9 @@ The replay JSON is exported and archived by the host from the spectator page —
 
 Seats: `player_a` … `player_h` (2–8). Seat ids are assigned in join order and never change; a participant's token is bound to its seat id, so re-ordering seats never invalidates a token.
 
-In the lobby the host may also order the **seats** (`PUT /api/games/:id/host/seats`), and what that order means depends on the mode. In `standard` / `annihilation` it decides which spawn slot each player starts on **and** the turn order: `firstSeat` (0-based seat index) sets where the opening `turnOrder` starts wrapping. In `simultaneous` / `royale` there is **no first player**: seat order decides only spawn slots plus the tie-break order the server uses inside a step, so `firstSeat` is always `0` (the server ignores whatever is sent). This is cosmetic for you — never call the seat endpoints yourself, and do not infer spawn slots before `game_start`: `GET /api/games/:id/lobby` reports `seatMode: "random"` with `seats[].spawnSlotId: null` whenever the host has not ordered seats, and the real slots only appear in the `game_start` event.
+In the lobby the host may also order the **seats** (`PUT /api/games/:id/host/seats`), and what that order means depends on the mode. In `standard` / `annihilation` it decides which spawn slot each player starts on **and** the turn order: `firstSeat` (0-based seat index) sets where the opening `turnOrder` starts wrapping. In `simultaneous` / `royale` / `fog` there is **no first player**: seat order decides only spawn slots plus the tie-break order the server uses inside a step, so `firstSeat` is always `0` (the server ignores whatever is sent). This is cosmetic for you — never call the seat endpoints yourself, and do not infer spawn slots before `game_start`: `GET /api/games/:id/lobby` reports `seatMode: "random"` with `seats[].spawnSlotId: null` whenever the host has not ordered seats, and the real slots only appear in the `game_start` event.
 
-Read seat state from `GET /api/games/:id/lobby`: it is the only place that returns the structured `seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots` view, and it is always the **server-side seat plan that `game_start` will use** — the host's edits land on the server as they happen (there is no "save" step in the UI), so no extra confirmation or draft state exists for you to wait for. `layoutSlots` lists the candidate spawn-slot ids for the current player count — a non-contiguous subset of the map's `spawnSlots` (match by `slot.id`, never by array index), and not a per-player assignment. Read `game_start.turnOrder` by mode too: in `standard` / `annihilation` it is the actual play order (seat order wrapped from `firstSeat`); in `simultaneous` / `royale` every living player acts in the same step and the array is only the server's tie-break order inside a step. The game state does carry the raw `seatPlan`, but do not reconstruct the seat list from it — poll `/lobby` (or the events stream) when you need to see lobby changes. Joining/leaving also advances `stateVersion` through the `player_joined` / `player_left` events, so a conditional `GET /api/games/:id` still answers `200` after a join; seat data staying current is a matter of reading the right endpoint, not of `304` behaviour.
+Read seat state from `GET /api/games/:id/lobby`: it is the only place that returns the structured `seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots` view, and it is always the **server-side seat plan that `game_start` will use** — the host's edits land on the server as they happen (there is no "save" step in the UI), so no extra confirmation or draft state exists for you to wait for. `layoutSlots` lists the candidate spawn-slot ids for the current player count — a non-contiguous subset of the map's `spawnSlots` (match by `slot.id`, never by array index), and not a per-player assignment. Read `game_start.turnOrder` by mode too: in `standard` / `annihilation` it is the actual play order (seat order wrapped from `firstSeat`); in `simultaneous` / `royale` / `fog` every living player acts in the same step and the array is only the server's tie-break order inside a step. The game state does carry the raw `seatPlan`, but do not reconstruct the seat list from it — poll `/lobby` (or the events stream) when you need to see lobby changes. Joining/leaving also advances `stateVersion` through the `player_joined` / `player_left` events, so a conditional `GET /api/games/:id` still answers `200` after a join; seat data staying current is a matter of reading the right endpoint, not of `304` behaviour.
 
 1. `GET /api/maps` — pick a map whose `preview.supportedPlayerCounts` includes lobby size
 2. `POST /api/games` — `{ mapId, maxPlayers, participate, playerName }` → immediately save `player.token` + `hostToken` (see [Player token](#player-token-mandatory))
@@ -176,7 +177,7 @@ Read seat state from `GET /api/games/:id/lobby`: it is the only place that retur
 5. `POST /api/games/:id/start` with `X-Host-Token` when ≥2 players and the map supports that count
 6. Play until last survivor, HQ/army destruction, or max-round adjudication. On unlimited maps (`config.balance.maxTurns === null`) rounds never run out — only elimination or the host's `POST /api/games/:id/force-adjudicate` ends the game
 
-Most maps are 2-player only. `multiplayer-ring`, `whirlpool`, annihilation `artillery-zone`, royale `snowflake` and simultaneous `standoff` support 2/3/6; simultaneous `molten-throne`, `mistpine` and `longbow-gallery`, and royale `narrow-road` and `mirror-lake` support 2. Unsupported `maxPlayers` → `unsupported_player_count`.
+Most maps are 2-player only. `multiplayer-ring`, `whirlpool`, annihilation `artillery-zone`, royale `snowflake` and simultaneous `standoff` support 2/3/6; simultaneous `molten-throne`, `mistpine` and `longbow-gallery`, royale `narrow-road` and `mirror-lake`, and fog `fog-harbor` support 2; fog `fog-crossing` supports 3. Unsupported `maxPlayers` → `unsupported_player_count`.
 
 ## API
 
@@ -196,7 +197,7 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Host skip turn | `POST /api/games/:id/host/skip-turn` | host | none (sequential modes only; the same player cannot be skipped twice in one round → `409 round_already_resolved`) |
 | Host eliminate | `POST /api/games/:id/host/eliminate` | host | `{ "playerId": "player_c" }` |
 | Rename self | `PATCH /api/games/:id/player` | player | `{ "name": "New Name" }` |
-| Read state | `GET /api/games/:id` | player | none |
+| Read state | `GET /api/games/:id` | player / spectator (fog) / none (fog only) | none |
 | Deploy | `POST /api/games/:id/deploy` | player | `{ "unitType": "infantry\|scout\|heavy\|ranger\|support", "fromId": "...", "q": 0, "r": 0 }` |
 | Move | `POST /api/games/:id/move` | player | `{ "unitId": "...", "q": 0, "r": 0 }` |
 | Attack | `POST /api/games/:id/attack` | player | sequential: `{ "attackerId": "...", "targetId": "..." }`; simultaneous: `{ "attackerId": "...", "q": 0, "r": 0 }` (aim cell/direction; per-unit `attackShape` line/arc/single, ranger `attackLock`) |
@@ -208,14 +209,16 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Reorder plan | `POST /api/games/:id/plan/reorder` | player | `{ "actionIds": ["...", "..."] }` (simultaneous only; must be a permutation of the current queue; atomic) |
 | Clear plan | `POST /api/games/:id/plan/clear` | player | none (simultaneous only) |
 | Host force resolve | `POST /api/games/:id/host/force-resolve` | host | none (simultaneous only; host `Idempotency-Key` supported; `{"repeat": true}` is operator-only) |
-| Events | `GET /api/games/:id/events?after=<seq>` | none/SSE | none |
+| Events | `GET /api/games/:id/events?after=<seq>` | player / spectator / none (fog: public only) | none |
 
-Create: `{ gameId, hostToken, player: { id, token } \| null, lobby }`.  
+Create: `{ gameId, hostToken, spectatorToken, player: { id, token } \| null, lobby }` — `spectatorToken` is a non-empty read-only token on fog maps and `''` elsewhere; it is shown **only** in this response.  
 Join: `{ player: { id, token }, lobby }`.
 
 ### State response shape
 
-`GET /api/games/:id` returns the game object **directly** — there is no `{ "game": ... }` wrapper. Top-level fields include `id`, `mapId`, `phase`, `players`, `units`, `cells`, `controlPoints`, `headquarters`, `resources`, `turn`, `plan`, `config`, `adjudication` and `events`.
+`GET /api/games/:id` returns the game object **directly** — there is no `{ "game": ... }` wrapper. Top-level fields include `id`, `mapId`, `phase`, `players`, `units`, `cells`, `controlPoints`, `headquarters`, `resources`, `turn`, `plan`, `config`, `adjudication` and `events`; fog games also carry `fog` (`{ enabled, revealed, visibleCells, lastSeen }`).
+
+**Viewer-scoped responses (fog only).** The server resolves the viewer in this order: valid `X-Player-Token` (or `?token=`) → valid `X-Spectator-Token` (or `?spectatorToken=`) → public. A player token always wins when both are sent. On a fog game with no token you get the **public safe view**, not a 401: `units: []`, `fog.visibleCells: []`, `fog.revealed: false`, and public events only. The fog `units` array contains your own units plus enemies inside your vision; hidden enemies are absent from `units`, `fog.lastSeen`, event payloads and `adjudication` breakdowns. `ETag` is viewer-specific and `Vary: X-Player-Token, X-Spectator-Token` is set, so never reuse a cached body across viewers. Non-fog games keep their previous behavior: state still requires a player token, while event backfill keeps its old anonymous behavior.
 
 `players` is a **seat-keyed object, not an array**:
 
@@ -244,7 +247,7 @@ All action and plan POST endpoints accept an optional `Idempotency-Key` header (
 
 Generate a fresh key per logical action (UUID or random string) and **reuse it only when retrying that exact method + body** after a timeout or `502`/`503`. Never reuse a key for a different action.
 
-`game_already_full` / `game_already_started` → report; do not fetch state without a token. `lobby_not_ready` → wait. `unsupported_player_count` → wrong lobby size for map.
+`game_already_full` / `game_already_started` → report; do not fetch state without a token. `lobby_not_ready` → wait. `unsupported_player_count` → wrong lobby size for map. `401 invalid_spectator_token` → the spectator token is wrong or from another game: read the fog game as a player or ask the host for a fresh token; do not retry it.
 
 `409 round_already_resolved` → that simultaneous round was already resolved: do not retry the same resolution, wait for the next action/commit (or leave it to the host). `503 lobby_capacity` → the server's active-lobby cap is full: wait for idle lobbies to expire or join an existing room instead of creating in a tight loop. Neither is `game_already_started`.
 
@@ -260,15 +263,15 @@ Mode-specific deploy origins, elimination, artillery, and scoring live in the mo
 - `game.cells` is the playable set. Do not treat `map.radius` as a walkable disk.
 - Move/deploy/demolish targets must exist in `game.cells`.
 - Terrain blocks movement: water and uncleared `blocker` cells are never part of a movement path.
-- Occupancy blocking depends on the mode. **Standard/annihilation** pathfind on the current board: units (**friendly and enemy**) and living HQs (standard only) all block both the path and the destination; moves execute immediately and there is no plan queue. **Simultaneous/royale** plan-time ranges are terrain-only: units and HQs do **not** block the path (arrival is settled per step — see the mode file).
-- Attack/heal: range only, no LOS.
+- Occupancy blocking depends on the mode. **Standard/annihilation** pathfind on the current board: units (**friendly and enemy**) and living HQs (standard only) all block both the path and the destination; moves execute immediately and there is no plan queue. **Simultaneous/royale/fog** plan-time ranges are terrain-only: units and HQs do **not** block the path (arrival is settled per step — see the mode file).
+- Attack/heal: range only, no LOS. Fog's line-of-sight rule only decides **what you can see**; it never blocks an attack, so blind fire at an unseen cell is legal.
 - Standard: income is awarded when the turn is gained (base + owned CP income;
   per-kind amounts live in `controlPointTypes`). Sequential games pay a **komi**: the first seat
   gets nothing on turn 1, while every later seat receives a flat `balance.komi.supplies` grant
   before its first action (absent field = legacy one-income-tick payout) — count it before you
   choose the opening deploy.
-- Simultaneous/royale: income and repair are issued together for every living player at the round
-  boundary; see [`simultaneous.md`](simultaneous.md) / [`royale.md`](royale.md).
+- Simultaneous/royale/fog: income and repair are issued together for every living player at the round
+  boundary; see [`simultaneous.md`](simultaneous.md) / [`royale.md`](royale.md) / [`fog.md`](fog.md).
 
 ### Units — read stats every game (mandatory)
 

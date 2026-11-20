@@ -6,7 +6,7 @@ export interface AlgorithmDisplayMeta {
   displayName: string;
   description: string;
   version: string;
-  /** 算法可参与的对局模式（standard / simultaneous / royale / annihilation），缺省视为 ['standard']。 */
+  /** 算法可参与的对局模式（standard / simultaneous / royale / annihilation / fog），缺省视为 ['standard']。 */
   modes?: string[];
   /** 已通过端到端验证的参赛人数，缺省视为 [2]。 */
   playerCounts?: number[];

@@ -1394,6 +1394,13 @@ body:not(.tg-editing) #sidebar section:empty { display: none; }
   background: linear-gradient(90deg, var(--tint, rgba(122,154,170,.18)) var(--share, 0%), rgba(255,255,255,0) var(--share, 0%));
 }
 .score-term:hover { background: linear-gradient(90deg, var(--tint, rgba(122,154,170,.18)) 100%, rgba(255,255,255,0) 100%); }
+/* 迷雾局对手分项被服务端隐藏：明确说明不可见，不伪造全 0 算式。 */
+.score-breakdown.score-breakdown-masked {
+  display: block;
+  color: #7d93a6;
+  font-style: italic;
+  padding: 6px 2px 2px;
+}
 .score-term.is-zero { opacity: .5; }
 .score-term-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score-term-math {
@@ -1424,6 +1431,33 @@ body:not(.tg-editing) #sidebar section:empty { display: none; }
   white-space: nowrap;
 }
 .cell-info:empty { display: none; }
+
+/* 迷雾观战锁定提示：棋盘其余部分保持公开地图可见，不给隐藏信息任何重建入口。 */
+.fog-lock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(6, 10, 16, .42), rgba(6, 10, 16, .76));
+  pointer-events: none;
+}
+/* 桌面端没有全局 .hidden：令牌校验通过后必须显式收起锁定遮罩。 */
+.fog-lock.hidden { display: none; }
+.fog-lock-card {
+  max-width: 340px;
+  margin: 0 16px;
+  padding: 16px 18px;
+  background: rgba(12, 18, 26, .94);
+  border: 1px solid #3a4d5e;
+  border-radius: 8px;
+  text-align: center;
+  color: #cfe0ec;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}
+.fog-lock-card strong { display: block; font-size: 15px; letter-spacing: .08em; color: #eaf3fb; }
+.fog-lock-card p { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: #a9bccc; }
+.fog-lock-hint { color: #7d93a5 !important; font-size: 12px !important; }
 
 @media (max-width: 1180px) {
   main {

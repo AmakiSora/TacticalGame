@@ -262,7 +262,7 @@ describe('player page playback wiring', () => {
       expect(canActNowBlock).toContain('playback.isActive()');
 
       const sseBlock = source.slice(source.indexOf('function subscribeSse'), source.indexOf('function subscribeLobbyStart'));
-      expect(sseBlock).toContain('new EventSource(`/api/games/${gameId}/events?after=${lastSeq}`)');
+      expect(sseBlock).toContain('new EventSource(`/api/games/${gameId}/events?after=${lastSeq}${authQuery}`)');
       expect(sseBlock).toContain('playback.enqueue');
     });
   }

@@ -22,6 +22,7 @@ export const ALGORITHMS = {
   field: './builtin/field.mjs',
   verdict: './builtin/verdict.mjs',
   'random-sim': './builtin/random-sim.mjs',
+  'fog-scout': './builtin/fog-scout.mjs',
   'dest-prob': './builtin/dest-prob.mjs',
   kriegspiel: './builtin/kriegspiel.mjs',
   'matrix-eq': './builtin/matrix-eq.mjs',
@@ -46,11 +47,11 @@ export const ALGORITHMS = {
  * （src/api/bots.ts）、竞技场排行榜与评估控制台（script/generateArenaLeaderboard.mjs、
  * /api/arena/*）都从这里取，勿再另立清单（历史上双份同步出过前后端选项不一致的问题）。
  *
- * modes 声明算法可参与的对局模式（standard / simultaneous / royale / annihilation），
+ * modes 声明算法可参与的对局模式（standard / simultaneous / royale / annihilation / fog），
  * 全链路强制隔离、不同模式不能混用：大厅 bot 接口（src/api/bots.ts）、REST runner
  * （algorithms/runner.mjs）、进程内评估 decide 通道（rl/training/local-worker.ts）
  * 与竞技场跑批发现（rl/evaluation/round_robin.py）都按它校验/过滤。缺省视为
- * ['standard']。
+ * ['standard']。fog 不进竞技场/统计/RL（round_robin 的 SUPPORTED_EVAL_MODES 显式排除）。
  *
  * playerCounts 声明算法可参与的参赛人数（目前为 2 / 3），缺省视为 [2]；
  * 三人榜与三人跑批只纳入声明含 3 的算法。
@@ -72,6 +73,7 @@ export const ALGORITHM_META = {
   field: { displayName: '势场算法', description: '连续势场塑形：斥力井+引力井，风筝走位、分头抢点', version: 'v1', modes: ['standard'], playerCounts: [2, 3] },
   verdict: { displayName: '裁决线算法', description: '从终局倒推攻城排程与期限，全动作按裁决分计价', version: 'v2', modes: ['standard'], playerCounts: [2, 3] },
   'random-sim': { displayName: '同时随机算法', description: '同时回合：从所有合法计划动作中随机选择入队，随后提交', version: 'v2', modes: ['simultaneous'], playerCounts: [2, 3] },
+  'fog-scout': { displayName: '迷雾侦察算法', description: '迷雾：视野内交战与残影盲射，侦察前压、据点争夺与总部攻防', version: 'v1', modes: ['fog'], playerCounts: [2, 3] },
   'dest-prob': { displayName: '落点概率算法', description: '同时回合分步：建模敌军落点概率，预测射击并规避目的格冲突', version: 'v2', modes: ['simultaneous'], playerCounts: [2, 3] },
   kriegspiel: { displayName: '兵棋推演算法', description: '同时回合：分步结算 rollout + 整份计划联合搜索 + 风险规避', version: 'v2', modes: ['simultaneous'], playerCounts: [2, 3] },
   'matrix-eq': { displayName: '矩阵均衡算法', description: '同时回合：计划组合矩阵博弈 + CFR 均衡混合 + 事件史实证校正', version: 'v2', modes: ['simultaneous'], playerCounts: [2, 3] },

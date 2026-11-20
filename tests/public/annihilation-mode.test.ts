@@ -36,8 +36,9 @@ describe('annihilation mode UI', () => {
       expect(source).toContain('cpNames.get(slot.controlPointId)');
       // 标准 / 同时回合仍画总部方块。
       expect(source).toContain('preview-marker hq hq-slot-');
-      expect(source).toContain("const modeLabel = map.preview?.mode === 'simultaneous' ? '同时'");
-      expect(source).toContain("map.preview?.mode === 'annihilation' ? '歼灭'");
+      expect(source).toContain('const modeLabel = mapModeLabel(map.preview?.mode);');
+      expect(source).toContain("mode === 'fog' ? '迷雾'");
+      expect(source).toContain("mode === 'annihilation' ? '歼灭'");
       expect(source).toContain("? '大逃杀' : '标准';");
       expect(source).toContain('isArtilleryDangerCell');
     }

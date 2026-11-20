@@ -22,16 +22,21 @@ export function isPlayerId(value: unknown): value is PlayerId {
 }
 
 export type UnitType = 'infantry' | 'scout' | 'heavy' | 'ranger' | 'support';
-export type GameMode = 'standard' | 'annihilation' | 'simultaneous' | 'royale';
+export type GameMode = 'standard' | 'annihilation' | 'simultaneous' | 'royale' | 'fog';
 
 /** 回合机制轴：这些模式下全员并行计划、统一同时结算（plan 队列语义）。 */
 export function isSimultaneousMode(mode: GameMode): boolean {
-  return mode === 'simultaneous' || mode === 'royale';
+  return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
 }
 
-/** 歼灭规则轴：这些模式下无总部、出生绑据点、炮火缩圈、打光即淘汰。 */
+/** 歼灭规则轴：这些模式下无总部、出生绑据点、炮火缩圈、打光即淘汰（fog 不缩圈）。 */
 export function isAnnihilationMode(mode: GameMode): boolean {
   return mode === 'annihilation' || mode === 'royale';
+}
+
+/** 战争迷雾轴：只隐藏敌方动态单位，地形/据点/总部公开。 */
+export function isFogMode(mode: GameMode): boolean {
+  return mode === 'fog';
 }
 export type GamePhase = 'lobby' | 'active' | 'game_over';
 export type PlayerStatus = 'lobby' | 'active' | 'eliminated';
@@ -204,6 +209,24 @@ export interface PlanState {
   committed: PlayerId[];
 }
 
+/** 迷雾模式：某一观者最后一次确认看见的敌方单位快照（残影）。 */
+export interface FogSighting {
+  unitId: string;
+  owner: PlayerId;
+  type: UnitType;
+  q: number;
+  r: number;
+  hp: number;
+  maxHp: number;
+  /** 最后一次确认看见的规划轮号（结算轮）。 */
+  seenRound: number;
+}
+
+export interface FogState {
+  /** 按玩家隔离的"最后看见"记忆；不得互相可见。 */
+  lastSeen: PlayerRecord<Record<string, FogSighting>>;
+}
+
 export type EventType =
   | 'player_joined'
   | 'player_left'
@@ -358,6 +381,10 @@ export interface GameState {
   winner: PlayerId | null;
   result: GameResult | null;
   artillery: ArtilleryState | null;
+  /** 仅 fog 模式初始化；旧档缺省不影响其他模式行为。 */
+  fog?: FogState;
+  /** 观战令牌哈希（v1:<HMAC>），仅新房有；明文只在建房响应出现一次。 */
+  spectatorTokenHash?: string;
   /**
    * 战斗伤害/治疗掷骰的 mulberry32 状态（32 位无符号整数，随每次掷骰步进）。
    * 可 JSON 序列化，重启恢复后掷骰序列延续；对客户端响应必须剥离，

@@ -1023,6 +1023,13 @@ main {
   background: linear-gradient(90deg, var(--tint, rgba(122,154,170,.18)) var(--share, 0%), rgba(255,255,255,0) var(--share, 0%));
 }
 .score-term:active { background: linear-gradient(90deg, var(--tint, rgba(122,154,170,.18)) 100%, rgba(255,255,255,0) 100%); }
+/* 迷雾局对手分项被服务端隐藏：明确说明不可见，不伪造全 0 算式。 */
+.score-breakdown.score-breakdown-masked {
+  display: block;
+  color: #7d93a6;
+  font-style: italic;
+  padding: 6px 2px 2px;
+}
 .score-term.is-zero { opacity: .5; }
 .score-term-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score-term-math {
@@ -1775,6 +1782,31 @@ body.spectator-m-shell.drawer-open .board-viewport { pointer-events: none; }
 
 body.spectator-m-shell #m-data-mounts { display: none !important; }
 body.spectator-m-shell .hidden { display: none !important; }
+
+/* 迷雾观战锁定提示：盖在棋盘可视区上，缩放/平移都不影响可读性。 */
+.fog-lock {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 10, 16, .62);
+  pointer-events: none;
+}
+.fog-lock-card {
+  max-width: 320px;
+  padding: 16px 18px;
+  background: rgba(12, 18, 26, .96);
+  border: 1px solid #3a4d5e;
+  border-radius: 10px;
+  text-align: center;
+  color: #cfe0ec;
+}
+.fog-lock-card strong { display: block; font-size: 15px; color: #eaf3fb; }
+.fog-lock-card p { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: #a9bccc; }
+.fog-lock-hint { color: #7d93a5 !important; font-size: 12px !important; }
 
 /* drawer resource cards keep readable grid */
 body.spectator-m-shell #drawer-resources .resource-grid {

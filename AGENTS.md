@@ -1,6 +1,6 @@
 # AGENTS.md
 
-TacticalGame：六角战棋（Node.js + TypeScript + Fastify，前端原生 JS + Canvas）。四种模式：`standard` 逐人轮流、`annihilation` 歼灭（炮火收缩圈）、`simultaneous` 同时回合（地图 `standoff`、`molten-throne`、`mistpine`、`longbow-gallery`）、`royale` 大逃杀（同时回合 × 歼灭缩圈组合，地图 `snowflake`、`narrow-road`、`mirror-lake`）。详情见 [README.md](README.md)。
+TacticalGame：六角战棋（Node.js + TypeScript + Fastify，前端原生 JS + Canvas）。五种模式：`standard` 逐人轮流、`annihilation` 歼灭（炮火收缩圈）、`simultaneous` 同时回合（地图 `standoff`、`molten-throne`、`mistpine`、`longbow-gallery`）、`royale` 大逃杀（同时回合 × 歼灭缩圈组合，地图 `snowflake`、`narrow-road`、`mirror-lake`）、`fog` 迷雾（同时回合骨架 × 视野迷雾，有总部、无炮火，地图 `fog-harbor`、`fog-crossing`）。详情见 [README.md](README.md)，迷雾规则以 [skill/fog.md](skill/fog.md) 为准。
 
 ## 命令
 
@@ -13,6 +13,8 @@ npm run stats-all    # 刷新统计看板数据
 
 Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 
+迷雾模式改动的测试至少覆盖 `tests/engine/fog-*`、`tests/api/fog-*`、`tests/config/fog-map*` 与 `tests/public/fog-*`；保密用例要同时断言状态、非 SSE 事件与 SSE 在 player / spectator / public 三种观者下的结果，不能只测“前端不渲染隐藏单位”。
+
 ## 结构
 
 - `src/api/` 路由（games/actions/auth/events/skill/maps/bots/records/wait/arenaEval），`src/engine/` 纯规则引擎，`src/state/store.ts` 内存状态 + 逐局落盘 `runtime/store/<gameId>.json`（`runtime/games.json` 仅旧版导出格式）
@@ -24,6 +26,7 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 
 - **单副本**：状态与 SSE 均为进程内，勿引入多副本/负载均衡。
 - **`skill/` 是规范源**：服务器经 `/api/skill/files/:name` 提供，agent 应始终从服务器拉取；仓库内不维护 IDE 本地拷贝目录。
+- **迷雾保密在服务端投影**：`units` / `events` / `adjudication` 按观者（player / spectator / public）过滤，观战令牌只读；禁止用前端遮罩或“前端过滤”代替服务端投影。fog 局本期不进入统计/竞技场/RL，fog 图设 `modelEval: false`。
 - gitignored 勿提交：`runtime/`、`deploy/logs/`、`.env*`、`rl/models/`、`temp/`、`arena/details/`、根目录临时 `*.json`。
 - **榜单重算需 `rl/models`**：`npm run arena-leaderboard` / `npm run arena-stats` 在没有模型文件的机器上重算，会把标准模式 25 个 RL 模型整段抹掉（`matches.jsonl` 每行一条 unknown participant 警告，三万多条、榜单变空）；无模型时只提交 `arena/matches.jsonl`，两个榜单 JSON 保持旧版，等有模型的机器再重算。
 - **版本号由当前分支决定**：`release/x.y.z` 分支上版本必须等于 `x.y.z`，新建 release 分支后先 `npm run version x.y.z` 对齐（脚本会同步 package.json/README/skill 等全部引用处）；feature 等开发分支不主动 bump 版本。交付前可 `npm run check-version` 校验一致性。
@@ -36,6 +39,6 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 
 ## 玩游戏（agent 对战）
 
-按仓库根 `skill/SKILL.md` 的流程：从用户提示取服务器地址（IP → `http://<IP>:3123`）→ 校验 skill 新鲜度：`GET /api/skill/manifest` 与本地副本比对（sha256 优先，版本号兜底），一致直接用本地副本、不一致才重新 `GET /api/skill` 拉全文 → 按对局 `game.config.mode` 拉对应模式文件（standard/annihilation/simultaneous.md，始终从服务器拉）并只遵循它 → 自己调 REST 接口（读状态 → 推理 → 操作）。认证头 `X-Player-Token` / `X-Host-Token`。对局中只可运行 `wait-turn.mjs`（等待用，从服务器下载）；勿用 `ai-player.mjs` 代打。**对局产生的临时文件（下载的 `wait-turn.mjs`、状态快照、事件/调试输出等）一律写到 `temp/<gameId>/<玩家名>/`，不要落在仓库根目录**——详细约定见 SKILL.md 的 Scratch files 节。
+按仓库根 `skill/SKILL.md` 的流程：从用户提示取服务器地址（IP → `http://<IP>:3123`）→ 校验 skill 新鲜度：`GET /api/skill/manifest` 与本地副本比对（sha256 优先，版本号兜底），一致直接用本地副本、不一致才重新 `GET /api/skill` 拉全文 → 按对局 `game.config.mode` 拉对应模式文件（standard/annihilation/simultaneous/royale/fog.md，始终从服务器拉）并只遵循它 → 自己调 REST 接口（读状态 → 推理 → 操作）。认证头 `X-Player-Token` / `X-Host-Token`。对局中只可运行 `wait-turn.mjs`（等待用，从服务器下载）；勿用 `ai-player.mjs` 代打。**对局产生的临时文件（下载的 `wait-turn.mjs`、状态快照、事件/调试输出等）一律写到 `temp/<gameId>/<玩家名>/`，不要落在仓库根目录**——详细约定见 SKILL.md 的 Scratch files 节。
 
-局后总结经验（复盘）走 `skill/review.md`（服务器 `GET /api/skill/files/review.md`）：它按模式路由到 `review-standard/annihilation/simultaneous.md`，并规定复盘 MD 的 `records/V3/` 命名（顺序号由用户提示给出）。**回放 JSON 由房主从前端观战页导出归档，agent 只读不写**（同局多个 agent 都写复盘时避免争写冲突）；复盘 MD 是唯一交付物，不落 `temp/`。
+局后总结经验（复盘）走 `skill/review.md`（服务器 `GET /api/skill/files/review.md`）：它按模式路由到 `review-standard/annihilation/simultaneous/royale/fog.md`，并规定复盘 MD 的 `records/V3/` 命名（顺序号由用户提示给出）。**回放 JSON 由房主从前端观战页导出归档，agent 只读不写**（同局多个 agent 都写复盘时避免争写冲突）；复盘 MD 是唯一交付物，不落 `temp/`。

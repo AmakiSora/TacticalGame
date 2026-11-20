@@ -36,7 +36,9 @@ export const RANDOM_MAP_MODES = {
   annihilation: 'random-annihilation',
   simultaneous: 'random-simultaneous',
   royale: 'random-royale',
-} as const satisfies Record<GameMode, string>;
+  // 迷雾模式本期没有随机图：RANDOM_MAP_MODES 只覆盖四种可随机生成的玩法，
+  // random.mode='fog' 在解析时明确拒绝并指向两张静态迷雾图。
+} as const satisfies Record<Exclude<GameMode, 'fog'>, string>;
 
 /** 虚拟随机图 id → 玩法模式；静态地图 id 返回 null。 */
 export function randomMapModeForId(mapId: string): GameMode | null {
@@ -44,8 +46,11 @@ export function randomMapModeForId(mapId: string): GameMode | null {
   return entry ? (entry[0] as GameMode) : null;
 }
 
-/** 玩法模式 → 虚拟随机图 id（standard 为历史的 `random`）。 */
+/** 玩法模式 → 虚拟随机图 id（standard 为历史的 `random`）。fog 本期没有随机图。 */
 export function randomMapIdForMode(mode: GameMode): string {
+  if (mode === 'fog') {
+    throw new Error('random.mode="fog" 暂不支持：迷雾模式请使用静态地图 maps/fog-harbor.json（2 人）或 maps/fog-crossing.json（3 人）');
+  }
   return RANDOM_MAP_MODES[mode];
 }
 
@@ -489,9 +494,12 @@ export function sanitizeRandomOptions(input: unknown): RandomMapOptions {
     options[key] = value;
   }
   if (raw.mode !== undefined) {
+    if (raw.mode === 'fog') {
+      throw new Error('random.mode="fog" 暂不支持：迷雾模式请使用静态地图 maps/fog-harbor.json（2 人）或 maps/fog-crossing.json（3 人）');
+    }
     const MODES = ['standard', 'annihilation', 'simultaneous', 'royale'];
     if (typeof raw.mode !== 'string' || !MODES.includes(raw.mode)) {
-      throw new Error('random.mode 只能是 standard / annihilation / simultaneous / royale');
+      throw new Error('random.mode 只能是 standard / annihilation / simultaneous / royale（fog 本期不支持随机图）');
     }
     options.mode = raw.mode as GameMode;
   }
@@ -786,6 +794,9 @@ export function generateRandomMapConfig(
   // 本函数可被直接调用（RL/测试）而绕过 sanitize，故旧地形密度在这里也要归一化；
   // 用浅拷贝避免改写调用方传入的对象。
   const options = { ...rawOptions };
+  if (options.mode === 'fog') {
+    throw new Error('random.mode="fog" 暂不支持：迷雾模式请使用静态地图 maps/fog-harbor.json（2 人）或 maps/fog-crossing.json（3 人）');
+  }
   splitLegacyTerrainDensity(options);
   const streams = createRng(options.seed);
   // 结构性随机源：地形、出生位、据点摆放、初始单位构成。参数一律从各自独立的流里取值，

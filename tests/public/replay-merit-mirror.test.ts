@@ -15,6 +15,9 @@ const CLIENTS = ['public/app.js', 'public/spectator-m.js'];
 // computeLayout 只影响棋盘绘制、与评分无关，且两端各自依赖不同的 DOM 辅助，
 // 因此用 no-op 桩替代，避免把整套渲染依赖拖进 VM。其余全部取真实源码。
 const FN_NAMES = [
+  // applyEvent 的 game_start 分支用谓词判定同时回合骨架（迷雾同样走同时回合）；
+  // recordActionPoint 还会读回放的 isSimultaneousReplay，三者都取真实源码。
+  'isSimultaneousMode', 'isAnnihilationMode', 'isSimultaneousReplay',
   'esc', 'playerLabel', 'defaultPlayerNames', 'isAnnihilationRules', 'joinedPlayerIds',
   'createEmptyState', 'cloneMapPayload',
   'setCellTerrain', 'recordActionPoint', 'ensureStats', 'scoringEraFromVersion',

@@ -27,6 +27,7 @@ import { coveredCellsFor, reachableCells } from './planning.js';
 import type { ShapeAim } from './planning.js';
 import { isArtilleryDanger } from './artillery.js';
 import { nextGameRandom } from './random.js';
+import { recordFogContact } from './fog.js';
 
 export interface PlanOutcome {
   actionId: string;
@@ -210,6 +211,16 @@ interface Arrival {
 }
 
 /**
+ * 迷雾模式：移动/部署踩到敌方单位时双方互相揭示 1 轮快照。
+ * 部署方在结算时还没有单位，无法被对方"看见"，因此只有部署方单向获得占位者快照。
+ */
+function revealOccupantContact(game: GameState, arrival: Arrival, occupant: Unit): void {
+  if (occupant.owner === arrival.item.owner) return;
+  recordFogContact(game, arrival.item.owner, occupant);
+  if (arrival.unit) recordFogContact(game, occupant.owner, arrival.unit);
+}
+
+/**
  * 同一步的到达判定：所有 move/deploy 同时到达，目的地冲突全员失败；目的格按
  * "本步所有成功移出的单位都离开后"的占用情况判定。若依赖的移出失败，依赖者
  * 也失败（迭代到稳定），因此链式腾格与交换可以成功，失败会沿依赖链传播。
@@ -249,6 +260,16 @@ function solveArrivals(
   for (const [key, list] of byCell) {
     if (list.length > 1) {
       for (const arrival of list) failed.set(arrival.item.action.id, 'destination_conflict');
+      // 迷雾：同格撞车只对敌方揭示（同阵营内部撞车不产生新信息）。
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const left = list[i]!;
+          const right = list[j]!;
+          if (left.item.owner === right.item.owner) continue;
+          if (left.unit) recordFogContact(ctx.game, right.item.owner, left.unit);
+          if (right.unit) recordFogContact(ctx.game, left.item.owner, right.unit);
+        }
+      }
       continue;
     }
     const arrival = list[0]!;
@@ -266,6 +287,7 @@ function solveArrivals(
     // 目标格上的单位本步不移动 → 仍占用；本步移动的依赖关系在下一轮迭代处理。
     if (!moverByUnit.has(occupant.entity.id)) {
       failed.set(arrival.item.action.id, 'destination_occupied');
+      revealOccupantContact(ctx.game, arrival, occupant.entity);
     }
   }
 
@@ -279,6 +301,7 @@ function solveArrivals(
       const dependency = moverByUnit.get(occupant.entity.id);
       if (dependency && failed.has(dependency)) {
         failed.set(arrival.item.action.id, 'destination_occupied');
+        revealOccupantContact(ctx.game, arrival, occupant.entity);
         changed = true;
       }
     }
@@ -716,6 +739,13 @@ function resolveAttacksAndHeals(ctx: ResolveContext, stepActions: QueuedAction[]
       if (target.kind === 'headquarters') {
         const stats = game.players[item.owner]?.stats;
         if (stats) stats.headquartersDamage += actualDamage;
+        // 总部主人同样属于「被攻击者」：获得攻击者 1 轮快照（远程偷袭不能完全隐身）。
+        recordFogContact(game, entity.owner, strike.attacker);
+      } else {
+        // 迷雾交火揭示：攻击者得到被命中单位快照；被攻击者得到攻击者快照（1 个规划轮）。
+        // 区域攻击命中多个隐藏单位时逐个记录；未命中的第三方不因此看见。
+        recordFogContact(game, item.owner, entity as Unit);
+        recordFogContact(game, entity.owner, strike.attacker);
       }
       appendEvent(game, bus, 'attack', {
         actionId: action.id,
@@ -760,6 +790,7 @@ function resolveAttacksAndHeals(ctx: ResolveContext, stepActions: QueuedAction[]
       unit.alive = false;
       appendEvent(game, bus, 'unit_death', {
         unitId: unit.id, owner: unit.owner, type: unit.type, q: unit.q, r: unit.r, cause: 'attack',
+        killer: death.killer,
         step,
       });
     } else {

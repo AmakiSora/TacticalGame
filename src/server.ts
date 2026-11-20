@@ -74,10 +74,35 @@ function isRateLimitedPath(method: string, url: string): boolean {
   return ['POST', 'PATCH', 'DELETE'].includes(method) && /^\/api\/games(\/|$)/.test(url);
 }
 
-export async function buildServer(): Promise<FastifyInstance> {
+/**
+ * 访问日志必须脱敏的字段。新增任何“令牌走查询串”的入口时，同步加到这里，
+ * 否则 pino 会把完整 req.query 原样写进日志。
+ */
+export const LOG_REDACT_PATHS = [
+  'req.headers.x-player-token', 'req.headers.x-host-token', 'req.headers.x-control-token',
+  'req.headers.x-metrics-token', 'req.headers.x-spectator-token', 'req.headers.authorization',
+  'req.query.token', 'req.query.spectatorToken',
+] as const;
+
+/**
+ * URL 查询串脱敏：玩家 `token`、控制/指标 `access_token`、迷雾观战 `spectatorToken`。
+ * `spectatorToken` 大小写不敏感，但保持 `token` 原行为（包括 access_token）。
+ */
+export function redactRequestUrl(url: string): string {
+  return url.replace(/([?&](?:token|access_token|spectatorToken)=)[^&]*/gi, '$1[REDACTED]');
+}
+
+export interface BuildServerOptions {
+  /** 测试用：让 pino 写入自定义流，便于断言脱敏后的真实日志。 */
+  loggerStream?: NodeJS.WritableStream;
+  /** 测试用：覆盖日志级别（默认沿用 LOG_LEVEL / NODE_ENV）。 */
+  logLevel?: string;
+}
+
+export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   let ready = false;
   const production = process.env.NODE_ENV === 'production';
-  const logLevel = process.env.LOG_LEVEL || (production ? 'info' : 'warn');
+  const logLevel = options.logLevel || process.env.LOG_LEVEL || (production ? 'info' : 'warn');
   // The default protects a public server from accidental request floods.
   // Local RL experiments can explicitly raise it because one environment
   // step may issue several authenticated action requests per minute.
@@ -95,12 +120,10 @@ export async function buildServer(): Promise<FastifyInstance> {
     logger: {
       level: logLevel,
       redact: {
-        paths: [
-          'req.headers.x-player-token', 'req.headers.x-host-token', 'req.headers.x-control-token',
-          'req.headers.x-metrics-token', 'req.headers.authorization', 'req.query.token',
-        ],
+        paths: [...LOG_REDACT_PATHS],
         censor: '[REDACTED]',
       },
+      ...(options.loggerStream ? { stream: options.loggerStream } : {}),
       serializers: {
         // pino 默认 req serializer 会输出完整 req.url；控制 token/SSE token 允许走
         // 查询串，因此必须在这里按参数名脱敏，而不是只依赖上面的 redact 路径。
@@ -115,7 +138,7 @@ export async function buildServer(): Promise<FastifyInstance> {
           const claimed = request.headers?.['x-forwarded-for'];
           return {
             method: request.method,
-            url: rawUrl.replace(/([?&](?:token|access_token)=)[^&]*/gi, '$1[REDACTED]'),
+            url: redactRequestUrl(rawUrl),
             host: request.host,
             peer: request.socket?.remoteAddress,
             claimed: Array.isArray(claimed) ? claimed.join(',') : claimed,

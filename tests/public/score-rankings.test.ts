@@ -27,6 +27,7 @@ function loadScorePanel(file: string) {
   });
   const run = (code: string) => new Script(code).runInContext(context);
   run(`
+    let fogLockedView = false;
     let state = {
       result: {
         rankings: [null, { playerId: 'player_b', rank: 1 }],
@@ -46,6 +47,15 @@ for (const file of FILES) {
       expect(() => h.run('renderScorePanel()')).not.toThrow();
       expect(h.scorePanelEl.innerHTML).toContain('player_b:#1');
       expect(h.scorePanelEl.innerHTML).toContain('player_a:#99');
+    });
+
+    it('shows the token placeholder instead of fabricated scores on a locked fog view', () => {
+      const h = loadScorePanel(file);
+
+      h.run('fogLockedView = true; renderScorePanel()');
+
+      expect(h.scorePanelEl.innerHTML).toContain('迷雾对局需观战令牌查看裁决');
+      expect(h.scorePanelEl.innerHTML).not.toContain('player_');
     });
   });
 }

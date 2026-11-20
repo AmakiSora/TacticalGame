@@ -4,6 +4,7 @@ import './ui-dialog.js';
 import './error-text.js';
 import './board-animation.js';
 import './board-inspect.js';
+import './fog.js';
 import './rules-sheet.js';
 import './layout-editor.js';
 
@@ -75,6 +76,25 @@ let layout = { minX: 0, minY: 0, width: 840, height: 840 };
 let gamesList = [];
 let recordsList = [];
 let activeRecordId = null;
+// 观战令牌：URL ?spectatorToken= 优先并持久化；迷雾局没有它只能看公开锁定页。
+let spectatorToken = readSpectatorToken();
+// 当前在线对局是否是迷雾局（仅迷雾局才把令牌放进事件流/请求头）。
+let liveFogGame = false;
+// 迷雾锁定页：只拿到公开字段，不能本地补算裁决分（公开响应里 adjudication 是 hidden）。
+let fogLockedView = false;
+
+function readSpectatorToken() {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('spectatorToken');
+    if (fromUrl) {
+      localStorage.setItem('autoSpectatorToken', fromUrl);
+      return fromUrl;
+    }
+    return localStorage.getItem('autoSpectatorToken') || '';
+  } catch {
+    return '';
+  }
+}
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -129,6 +149,8 @@ const btnImport = document.getElementById('btn-import');
 const importFile = document.getElementById('import-file');
 const settingsControlToken = document.getElementById('settings-control-token');
 const btnSaveControlToken = document.getElementById('btn-save-control-token');
+const settingsSpectatorToken = document.getElementById('settings-spectator-token');
+const btnSaveSpectatorToken = document.getElementById('btn-save-spectator-token');
 
 
 function esc(s) {
@@ -163,10 +185,24 @@ function turnProgressLabel() {
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
 }
 
-function isSimultaneousReplay() {
-  return gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale';
+// 无 DOM 的测试沙箱里没有 window.FogView：字面量兜底必须与 fog.js 保持同一口径。
+function isSimultaneousMode(mode) {
+  if (typeof window !== 'undefined' && window.FogView) return window.FogView.isSimultaneousMode(mode);
+  return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
 }
-function isAnnihilationRules() { return gameConfig?.mode === 'annihilation' || gameConfig?.mode === 'royale'; }
+function isAnnihilationMode(mode) {
+  if (typeof window !== 'undefined' && window.FogView) return window.FogView.isAnnihilationMode(mode);
+  return mode === 'annihilation' || mode === 'royale';
+}
+// 下面两个入口函数会被测试单独切出执行，字面量必须自足且与 fog.js 同口径。
+function isSimultaneousReplay() {
+  const mode = gameConfig?.mode;
+  return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';
+}
+function isAnnihilationRules() {
+  const mode = gameConfig?.mode;
+  return mode === 'annihilation' || mode === 'royale';
+}
 
 function replayActionUsageText() {
   const maxActions = gameConfig?.balance?.actionsPerTurn ?? 0;
@@ -335,7 +371,7 @@ function recordActionPoint(s, owner, payload) {
   const player = s.players?.[owner];
   if (!player) return;
   if (!player.stats) player.stats = { headquartersDamage: 0, unitsDestroyed: 0, playersEliminated: 0, actionPointsUsed: 0, actionMerit: 0 };
-  if (gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale') {
+  if (isSimultaneousReplay()) {
     const previous = s.turn.actionsUsedByPlayer?.[owner] ?? 0;
     if (payload.actionsUsed <= previous) return;
     if (!s.turn.actionsUsedByPlayer) s.turn.actionsUsedByPlayer = {};
@@ -385,7 +421,7 @@ function usesLegacyAdjudication() {
 // 治疗若也套细桶会高估功绩，复现不出存档里的 actionScore。
 function recordActionMerit(s, owner, type, payload) {
   if (replayScoringEra() !== 'merit') return;
-  const simultaneous = gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale';
+  const simultaneous = isSimultaneousReplay();
   const fineBucket = simultaneous && importedReplayMeta?.schemaVersion
     && compareSemver(importedReplayMeta.schemaVersion, SIMULTANEOUS_MERIT_SCHEMA_VERSION) >= 0;
   const fixed = type === 'deploy' || type === 'demolish' ? 1 : type === 'control_point_captured' ? 2 : 0;
@@ -405,7 +441,9 @@ function applyEvent(s, ev) {
   switch (ev.type) {
     case 'game_start':
       gameConfig = p.config || null;
-      const simultaneousStart = p.mode === 'simultaneous' || p.mode === 'royale' || p.config?.mode === 'simultaneous' || p.config?.mode === 'royale' || p.map?.mode === 'simultaneous' || p.map?.mode === 'royale';
+      const simultaneousStart = isSimultaneousMode(p.mode)
+        || isSimultaneousMode(p.config?.mode)
+        || isSimultaneousMode(p.map?.mode);
       if (p.playerNames) playerNames = { ...p.playerNames };
       s.players = JSON.parse(JSON.stringify(p.players || {}));
       s.turn.turnOrder = [...(p.turnOrder || [])];
@@ -538,7 +576,7 @@ function applyEvent(s, ev) {
         if (u.owner === p.owner) { u.hasMoved = false; u.hasActed = false; u.actionSpent = false; }
       }
       if (typeof p.actionsUsed === 'number') s.turn.actionsUsed = p.actionsUsed;
-      if (gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale') s.turn.actionsUsedByPlayer = {};
+      if (isSimultaneousReplay()) s.turn.actionsUsedByPlayer = {};
       break;
     case 'turn_end':
       s.turn.currentOwner = p.nextPlayerId || p.nextOwner;
@@ -567,7 +605,7 @@ function applyEvent(s, ev) {
       s.turn.actionsUsed = 0;
       s.turn.actionsUsedByPlayer = {};
       s.plan = { committed: Array.isArray(p.committed) ? [...p.committed] : [] };
-      if (gameConfig?.mode === 'simultaneous' || gameConfig?.mode === 'royale') {
+      if (isSimultaneousReplay()) {
         s.turn.currentPlayerId = null;
         s.turn.currentOwner = null;
       }
@@ -583,7 +621,7 @@ function applyEvent(s, ev) {
     case 'action_failed':
       // 失败/落空动作仍消耗 AP；同时模式按玩家队列位置累计。
       recordActionPoint(s, p.owner, p);
-      if (typeof p.actionsUsed === 'number' && gameConfig?.mode !== 'simultaneous' && gameConfig?.mode !== 'royale') s.turn.actionsUsed = p.actionsUsed;
+      if (typeof p.actionsUsed === 'number' && !isSimultaneousReplay()) s.turn.actionsUsed = p.actionsUsed;
       break;
     case 'turn_skipped':
       break;
@@ -1025,7 +1063,7 @@ const PHASE_LABELS = {
   active: '进行中',
   game_over: '已结束',
 };
-const MODE_LABELS = { standard: '标准', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀' };
+const MODE_LABELS = { standard: '标准', annihilation: '歼灭', simultaneous: '同时', royale: '大逃杀', fog: '迷雾' };
 
 function eventLabel(type) {
   return EVENT_LABELS[type] || type;
@@ -1172,6 +1210,8 @@ function computeAdjudicationScores() {
 
 /** Final `result.scores` when present, else recompute from reconstructed event state. */
 function liveAdjudicationScores() {
+  // 锁定页没有事件流，本地状态只有公开地图：补算出来的分项全是 0，属于伪造信息。
+  if (fogLockedView) return null;
   if (state?.result?.scores && Object.keys(state.result.scores).length > 0) return state.result.scores;
   return computeAdjudicationScores();
 }
@@ -1247,6 +1287,8 @@ function scoreTint(owner) {
 }
 
 function scoreBreakdown(score) {
+  // 迷雾局对手只公开总分与名次：分项为 { hidden: true }，不能当成 0 展开成假算式。
+  if (score?.hidden) return '<div class="score-breakdown score-breakdown-masked">对手分项不可见（迷雾）</div>';
   const terms = scoreTerms(score);
   if (!terms.length) return '';
   const total = Math.max(Number(score.total) || 0, terms.reduce((sum, term) => sum + Math.max(term.part, 0), 0));
@@ -1263,6 +1305,10 @@ function scoreBreakdown(score) {
 function renderScorePanel() {
   if (!scorePanelEl) return;
   bindScoreToggles();
+  if (fogLockedView) {
+    scorePanelEl.innerHTML = '<h3>分数排行榜</h3><div class="score-empty">迷雾对局需观战令牌查看裁决</div>';
+    return;
+  }
   const scores = liveAdjudicationScores();
   if (!scores) {
     scorePanelEl.innerHTML = '<h3>分数排行榜</h3><div class="score-empty">等待对局开始</div>';
@@ -1900,6 +1946,8 @@ function resetLoadedGame(message = '请选择在线对局') {
   gameLoadVersion++;
   pausePlayback();
   importedReplayMeta = null;
+  liveFogGame = false;
+  clearFogLock();
   if (liveSse) liveSse.close();
   liveSse = null;
   pinnedReplayStep = false;
@@ -2001,6 +2049,77 @@ async function deleteCurrentGame() {
 
 let gameLoadVersion = 0;
 
+/**
+ * 观战元数据：mode 与 fog 投影只在 GET /api/games/:id 上（匿名 fog 的 game_start 只有轮号），
+ * 事件流本身无法判断"这是迷雾局且我被锁定"。先匿名取公开响应，确认是迷雾局且本地有令牌时
+ * 才带 X-Spectator-Token 重取全量；非迷雾局不受陈旧令牌影响。
+ */
+async function fetchSpectatorMeta(id) {
+  let publicRes;
+  try { publicRes = await fetch(`/api/games/${id}`); } catch { return { failed: true }; }
+  if (!publicRes.ok) return { failed: true };
+  const publicData = await publicRes.json().catch(() => null);
+  if (!publicData) return { failed: true };
+  const fogGame = publicData.config?.mode === 'fog' || publicData.fog?.enabled === true;
+  if (!fogGame) return { data: publicData, fogGame: false };
+  if (!spectatorToken) return { data: publicData, fogGame: true, locked: true, unauthorized: false };
+  let authed;
+  try {
+    authed = await fetch(`/api/games/${id}`, { headers: { 'X-Spectator-Token': spectatorToken } });
+  } catch {
+    return { data: publicData, fogGame: true, locked: true, unauthorized: false };
+  }
+  if (authed.status === 401) return { data: publicData, fogGame: true, locked: true, unauthorized: true };
+  if (!authed.ok) return { data: publicData, fogGame: true, locked: true, unauthorized: false };
+  const full = await authed.json().catch(() => null);
+  return { data: full || publicData, fogGame: true, locked: false };
+}
+
+function setFogLock(message) {
+  const el = document.getElementById('fog-lock');
+  if (!el) return;
+  const messageEl = document.getElementById('fog-lock-message');
+  if (messageEl) messageEl.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function clearFogLock() {
+  fogLockedView = false;
+  document.getElementById('fog-lock')?.classList.add('hidden');
+}
+
+/** 迷雾局无令牌：只画公开地图（服务端公开字段），不用被投影过的半量事件重建棋局。 */
+function showFogLocked(data, unauthorized) {
+  fogLockedView = true;
+  gameConfig = data?.config || null;
+  playerNames = defaultPlayerNames();
+  for (const [pid, player] of Object.entries(data?.players || {})) {
+    if (player?.name) playerNames[pid] = player.name;
+  }
+  allEvents = [];
+  currentStep = -1;
+  state = createEmptyState();
+  state.map = cloneMapPayload(data?.map || {});
+  state.cells = state.map.cells.length
+    ? state.map.cells
+    : (Array.isArray(data?.cells) ? data.cells.map(cell => ({ ...cell })) : []);
+  if (data?.turn) state.turn = { ...state.turn, ...data.turn };
+  for (const cp of Array.isArray(data?.controlPoints) ? data.controlPoints : Object.values(data?.controlPoints || {})) {
+    if (cp?.id) state.controlPoints.set(cp.id, { ...cp });
+  }
+  for (const hq of Array.isArray(data?.headquarters) ? data.headquarters : Object.values(data?.headquarters || {})) {
+    if (hq?.id) state.headquarters.set(hq.id, { ...hq });
+  }
+  if (state.cells.length) computeLayout(state.cells);
+  boardAnimation.reset();
+  boardAnimation.syncState(state, { animate: false });
+  buildTimelineMarkers();
+  drawBoard(); renderSidebar(); renderDetail(); updateControls();
+  const message = unauthorized ? '观战令牌无效，无法查看迷雾对局。' : '迷雾模式对局需要观战令牌。';
+  setFogLock(message);
+  statusEl.textContent = message;
+}
+
 async function loadGameState(id, isCurrent = () => true) {
   const version = ++gameLoadVersion;
   pausePlayback();
@@ -2008,7 +2127,16 @@ async function loadGameState(id, isCurrent = () => true) {
   liveSse = null;
   importedReplayMeta = null;
   pinnedReplayStep = false;
-  const res = await fetch(`/api/games/${id}/events`);
+  const meta = await fetchSpectatorMeta(id);
+  if (version !== gameLoadVersion || !isCurrent()) return false;
+  liveFogGame = Boolean(meta.fogGame);
+  if (meta.fogGame && meta.locked) {
+    showFogLocked(meta.data, meta.unauthorized);
+    return false;
+  }
+  clearFogLock();
+  const headers = meta.fogGame && spectatorToken ? { 'X-Spectator-Token': spectatorToken } : {};
+  const res = await fetch(`/api/games/${id}/events`, { headers });
   const { events } = await res.json();
   if (version !== gameLoadVersion || !isCurrent()) return false;
   gameConfig = null;
@@ -2028,7 +2156,9 @@ async function loadGameState(id, isCurrent = () => true) {
 function subscribeSse(id) {
   if (liveSse) liveSse.close();
   const lastSeq = allEvents.at(-1)?.seq ?? 0;
-  const connection = new EventSource(`/api/games/${id}/events?after=${lastSeq}`);
+  // EventSource 不能带请求头：迷雾局的观者投影靠契约支持的查询参数传令牌。
+  const authQuery = liveFogGame && spectatorToken ? `&spectatorToken=${encodeURIComponent(spectatorToken)}` : '';
+  const connection = new EventSource(`/api/games/${id}/events?after=${lastSeq}${authQuery}`);
   liveSse = connection;
   connection.onmessage = e => {
     if (liveSse !== connection) return;
@@ -2223,6 +2353,9 @@ function normalizeImportedReplay(data) {
 function loadImportedReplay(replay) {
   gameLoadVersion++;
   pausePlayback();
+  // 导入的回放自带完整事件，不再是锁定页；也不该给这个离线视图挂在线令牌。
+  clearFogLock();
+  liveFogGame = false;
   // 回放不是在线对局：清掉上次选择，避免改名/删除等管理操作仍发往旧对局。
   activeRecordId = null;
   gameSelect.value = '';
@@ -2396,13 +2529,19 @@ btnSaveControlToken?.addEventListener('click', e => {
   e.stopPropagation();
   saveControlTokenFromSettings();
 });
+btnSaveSpectatorToken?.addEventListener('click', e => {
+  e.stopPropagation();
+  saveSpectatorTokenFromSettings();
+});
 function fillControlTokenSettings() {
-  if (!settingsControlToken) return;
-  try {
-    settingsControlToken.value = localStorage.getItem('autoControlToken') || '';
-  } catch {
-    settingsControlToken.value = '';
+  if (settingsControlToken) {
+    try {
+      settingsControlToken.value = localStorage.getItem('autoControlToken') || '';
+    } catch {
+      settingsControlToken.value = '';
+    }
   }
+  if (settingsSpectatorToken) settingsSpectatorToken.value = spectatorToken;
 }
 
 function saveControlTokenFromSettings() {
@@ -2413,6 +2552,22 @@ function saveControlTokenFromSettings() {
   } catch {
     statusEl.textContent = '无法写入本地存储';
   }
+}
+
+/** 保存观战令牌后立即用新令牌重载当前对局（迷雾局从锁定页切到全量视角）。 */
+async function saveSpectatorTokenFromSettings() {
+  if (!settingsSpectatorToken) return;
+  spectatorToken = settingsSpectatorToken.value.trim();
+  try {
+    localStorage.setItem('autoSpectatorToken', spectatorToken);
+    statusEl.textContent = spectatorToken ? '观战令牌已保存' : '观战令牌已清空';
+  } catch {
+    statusEl.textContent = '无法写入本地存储';
+    return;
+  }
+  const id = gameSelect.value;
+  if (!id || id === 'offline') return;
+  if (await loadGameState(id) !== false) subscribeSse(id);
 }
 
 document.addEventListener('click', e => {

@@ -234,7 +234,7 @@ describe('AI player skill documentation', () => {
 
     expect(skill).toContain('legacy V1 production queues');
     expect(skill).toContain('Standard: income is awarded');
-    expect(skill).toContain('Simultaneous/royale: income and repair are issued together');
+    expect(skill).toContain('Simultaneous/royale/fog: income and repair are issued together');
     expect(simultaneous).toContain('plan.myQueue.length');
     expect(simultaneous).toContain('turn.currentPlayerId` and `turn.currentOwner` are always `null`');
     expect(simultaneous).toContain('Queue position = action point');
@@ -245,12 +245,13 @@ describe('AI player skill documentation', () => {
   });
 
   it('documents mode-specific movement blocking rules', async () => {
-    const [skill, standard, annihilation, simultaneous, royale] = await Promise.all([
+    const [skill, standard, annihilation, simultaneous, royale, fog] = await Promise.all([
       readFile('skill/SKILL.md', 'utf8'),
       readFile('skill/standard.md', 'utf8'),
       readFile('skill/annihilation.md', 'utf8'),
       readFile('skill/simultaneous.md', 'utf8'),
       readFile('skill/royale.md', 'utf8'),
+      readFile('skill/fog.md', 'utf8'),
     ]);
 
     expect(skill).toContain('Occupancy blocking depends on the mode');
@@ -261,7 +262,7 @@ describe('AI player skill documentation', () => {
     }
     expect(standard).toContain('all living HQs');
     expect(annihilation).toContain('There are no HQs at runtime');
-    for (const doc of [simultaneous, royale]) {
+    for (const doc of [simultaneous, royale, fog]) {
       expect(doc).toContain('Queued moves never unlock a path');
     }
   });

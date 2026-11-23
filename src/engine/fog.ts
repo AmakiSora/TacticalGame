@@ -544,7 +544,6 @@ function projectEventFromState(
   switch (event.type) {
     // ---------------------------------------------------------- 公开事件
     case 'round_start':
-    case 'round_end':
     case 'income':
     case 'comeback_supply':
     case 'turn_end':
@@ -560,6 +559,13 @@ function projectEventFromState(
     case 'artillery_shrunk':
     case 'artillery_damage':
       return cloneEvent(event);
+
+    case 'round_end': {
+      // steps 是全体玩家中最长的行动队列长度，等于对手行动数的上界，属于隐藏信息。
+      const cloned = cloneEvent(event);
+      delete cloned.payload.steps;
+      return cloned;
+    }
 
     case 'player_eliminated': {
       const cloned = cloneEvent(event);

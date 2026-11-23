@@ -337,6 +337,21 @@ describe('fog event projection', () => {
     expect(projectEventForViewer(game, visibleMove, null)).toBeNull();
   });
 
+  it('strips steps from round_end for players and public, keeping it for the event itself', () => {
+    const game = makeGame();
+    const event: GameEvent = {
+      seq: 201, type: 'round_end', timestamp: 0,
+      payload: { roundNumber: 3, gameOver: false, steps: 4, controlHoldCounted: true },
+    };
+    const aView = projectEventForViewer(game, event, 'player_a')!;
+    expect(aView.payload).not.toHaveProperty('steps');
+    expect(aView.payload).toMatchObject({ roundNumber: 3, gameOver: false, controlHoldCounted: true });
+    const publicView = projectEventForViewer(game, event, null)!;
+    expect(publicView.payload).not.toHaveProperty('steps');
+    // 投影副本不得修改原事件。
+    expect(event.payload.steps).toBe(4);
+  });
+
   it('projects round_resolved to own results only, anonymous gets the skeleton', () => {
     const game = makeGame();
     const event: GameEvent = {

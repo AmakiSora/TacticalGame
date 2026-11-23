@@ -26,7 +26,7 @@ Node >= 24 <25，ESM。RL 测试：`npm run test:rl`（需 `rl/.venv`）。
 
 - **单副本**：状态与 SSE 均为进程内，勿引入多副本/负载均衡。
 - **`skill/` 是规范源**：服务器经 `/api/skill/files/:name` 提供，agent 应始终从服务器拉取；仓库内不维护 IDE 本地拷贝目录。
-- **迷雾保密在服务端投影**：`units` / `events` / `adjudication` 按观者（player / spectator / public）过滤，观战令牌只读；禁止用前端遮罩或“前端过滤”代替服务端投影。fog 局本期不进入统计/竞技场/RL，fog 图设 `modelEval: false`。
+- **迷雾保密在服务端投影**：`units` / `events` / `adjudication` 按观者（player / spectator / public）过滤，观战令牌只读；禁止用前端遮罩或“前端过滤”代替服务端投影。fog 局本期不进入统计/竞技场/RL，fog 图设 `modelEval: false`。非本人 `stats` 删除、事件游标为观者序号；`stateVersion` 大厅期全局、开局后按观者。
 - gitignored 勿提交：`runtime/`、`deploy/logs/`、`.env*`、`rl/models/`、`temp/`、`arena/details/`、根目录临时 `*.json`。
 - **榜单重算需 `rl/models`**：`npm run arena-leaderboard` / `npm run arena-stats` 在没有模型文件的机器上重算，会把标准模式 25 个 RL 模型整段抹掉（`matches.jsonl` 每行一条 unknown participant 警告，三万多条、榜单变空）；无模型时只提交 `arena/matches.jsonl`，两个榜单 JSON 保持旧版，等有模型的机器再重算。
 - **版本号由当前分支决定**：`release/x.y.z` 分支上版本必须等于 `x.y.z`，新建 release 分支后先 `npm run version x.y.z` 对齐（脚本会同步 package.json/README/skill 等全部引用处）；feature 等开发分支不主动 bump 版本。交付前可 `npm run check-version` 校验一致性。

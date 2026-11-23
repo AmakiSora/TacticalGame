@@ -68,8 +68,11 @@ For a fog game the server projects the state per viewer (`X-Player-Token` → yo
 - `units` — your own units **plus enemies inside your vision**. A hidden enemy is absent: no id,
   type, HP or coordinates anywhere in the response.
 - `fog.lastSeen` — your stale sightings (see below); this is memory, not live state.
-- `events` — only events you are allowed to observe; hidden actions are omitted, partially
-  observable ones are redacted, not filled with guesses.
+- `events` — only events you were allowed to observe **at the moment they happened**; hidden
+  actions are omitted and partially observable ones are redacted, not filled with guesses.
+- `players[].stats` — your own aggregate counters only. Every other player's `stats` block is
+  removed in fog (its damage / kill / capture counters would reveal hidden actions). Absence means
+  unknown, not zero.
 - `adjudication` — your own breakdown is complete; opponents expose `{ playerId, total, rank,
   hidden: true }` only. Treat the hidden breakdown as unknown, not as zero.
 - `headquarters`, `controlPoints`, `cells`, `map`, `config`, `turn`, `players` — public as usual.
@@ -77,6 +80,52 @@ For a fog game the server projects the state per viewer (`X-Player-Token` → yo
 
 A unit in `fog.lastSeen` is a **snapshot**, not a target: it does not block, cannot be selected as a
 live unit, and may already be dead or gone. Only the cell is a legal blind-fire aim point.
+
+## Event disclosure and cursors
+
+Event disclosure is **frozen at the moment the event happens**. The server decides, for every seat
+and for the public viewer, what that event reveals, and stores that decision. State reads, event
+backfill and SSE for your seat replay the frozen decision; they never recompute it from your current
+vision. A spectator (and an exported replay) sees the full original event stream, which is not any
+player's view. Two consequences:
+
+- A reveal (`revealFromRound`, or `phase === "game_over"`) applies to **new events only**. Earlier
+  events keep the disclosure they had when they happened, so the full history in a spectator replay
+  is not what you knew at the time.
+- A hidden event never enters your event list; it is not a client-side mask.
+
+**Your cursor is your own.** In a fog game, once the game is active, for your seat and for the
+public view, `seq`, `lastEventSeq`, `wait`'s `afterSeq` / `seq`, the SSE `id` and `Last-Event-ID`,
+and the response's `stateVersion` all count **events visible to that viewer**, starting at 1. In the
+lobby, `stateVersion` is still the global change counter: there are no hidden units yet, and host
+changes such as `max-players` or seat order move state without emitting an event, so a viewer
+sequence would make conditional `GET` answer a wrong `304`. The spectator view and non-fog games
+keep the global sequence.
+
+- Do not treat a gap in `seq` as an error and do not jump your cursor by guessing; only advance it
+  to numbers you actually received.
+- Never use `lastEventSeq` deltas, `wait` return timing, or the gap between your sequence and a
+  spectator's to infer how many hidden actions the opponent took.
+- `wait` only returns when an event **you can see** appears. A busy round of hidden enemy actions
+  can leave `wait` timing out at the same `seq` you had before.
+- If you also watch the spectator stream, its `seq` values are not interchangeable with yours.
+
+**Per-event disclosure** (all judged at event time):
+
+- **Area attack** (`line` / `arc`): a third party receives a hit only for a hit cell it could see at
+  that moment; a hit on an unseen cell is not delivered at all (no cell, damage or HP hint). A
+  **miss** (`hit: false`, including a locking ranger's miss) goes only to the attacker. When a
+  visible hit has an invisible attacker, the attacker id, owner and aim geometry
+  (`aimQ` / `aimR` / `shape`) are removed, leaving the hit cell, the visible target's id/kind and
+  the damage/HP result.
+- **Area heal**: a third party receives a heal event only when that event's target was visible at
+  that moment; a heal on an unseen target is not delivered at all (no target id, amount or
+  post-heal HP hint). When the target is visible but the caster is not, the caster id, owner and
+  cell are removed too.
+- **Elimination**: `player_eliminated.eliminatedBy` is delivered only to the eliminated player and
+  to the killer. Do not read it from another player's stream or from the public view.
+- Your own actions still come back to you in full, and the hit unit's owner (or the HQ owner) still
+  receives the full exchange under the 1-round contact rule.
 
 ## Sightings (残影)
 
@@ -93,15 +142,16 @@ live unit, and may already be dead or gone. Only the cell is a legal blind-fire 
 
 - **Attack**: the attacker learns the full snapshot of every enemy actually hit, even if it was
   hidden at plan time. Each hit enemy learns the attacker's snapshot for 1 full planning round.
-  Third parties learn nothing from the exchange unless they had vision themselves.
-- **Area attacks** (`line`, `arc`) reveal only the enemies actually hit, one by one; they never
-  reveal the whole covered area.
+  Third parties only learn what they could see at event time (see the area-attack rule below).
+- **Area attacks** (`line`, `arc`): third parties learn each hit cell they could see at that
+  moment, one by one; hits on unseen cells and every miss stay hidden. They never reveal the whole
+  covered area, the attacker's aim geometry, or how many shots missed.
 - **Moving/deploying into a hidden enemy's cell**: at settlement the arrival follows the normal
   simultaneous conflict rules and fails (`destination_conflict` / `destination_occupied`). Both
   sides then receive a 1-round snapshot of the other, so a failed push still tells you what you
   ran into.
-- **Misses reveal nothing.** A blind shot into an empty cell produces no enemy information; the AP
-  is still spent.
+- **Misses reveal nothing, to anyone but the attacker.** A blind shot into an empty cell produces
+  no enemy information for third parties either; the AP is still spent.
 - **Demolition is public terrain change.** A `demolish` event may appear, but any hidden unit's
   identity/coordinates in it are redacted; do not read a hidden position out of a terrain event.
 - **Capture and HQ damage are public results.** A control point changing hands or an HQ taking
@@ -109,12 +159,13 @@ live unit, and may already be dead or gone. Only the cell is a legal blind-fire 
 
 ## Public information boundary
 
-Public to everyone:
+Public to everyone (a player additionally sees their own `stats`):
 
 - terrain and playable cells, map and rules config, round number, player names/status;
 - headquarters positions and HP, control point positions/owners/kinds;
-- supplies and public stats (`players[].stats`) are public; enemy unit composition is not
-  inferable from them;
+- supplies; a player also sees their own `players[].stats`, while every other player's `stats`
+  block is removed in fog (its damage/kill/capture counters would reveal hidden actions), so
+  absence is unknown, not 0; enemy unit composition is not inferable from your own counters;
 - committed list (who has locked in), never queue contents;
 - opponent adjudication **total and rank**, never the component breakdown.
 
@@ -126,6 +177,7 @@ identify them.
 - `fog.revealFromRound` may end fog from a given round (for example the last 3 rounds). Once the
   round number reaches it, or `phase === "game_over"`, the server sets the projection's `revealed`
   to `true` and returns **all** units; `fog.lastSeen` is then empty because live vision is complete.
+  The reveal does **not** rewrite earlier events; see [Event disclosure and cursors](#event-disclosure-and-cursors).
 - `revealFromRound: null` means fog for the whole game.
 - The final result panel/replay is full information. A replay is not a player view: while writing a
   review, separate "what I could see then" from "what the replay shows now".
@@ -223,6 +275,9 @@ same.
 - Pushing a lone scout to the centre "for vision" and losing both the unit and the next picture.
 - Firing blind at empty hexes every round: misses reveal nothing and burn the AP you need to
   defend.
+- Reading a `seq` gap, a `wait` timeout, or the difference between your sequence and the
+  spectator's as "the opponent did nothing" / as a count of hidden actions. The cursor is
+  viewer-scoped; it says what you were allowed to see, not what happened.
 - Forgetting that HQ/CP locations and HP are public — the enemy can see your HQ too, and will
   push it while your army is chasing ghosts.
 - Applying `komi`, artillery or army-wipe rules from another mode. Fog has none of them.

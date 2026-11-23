@@ -327,11 +327,12 @@ describe('fog state projection', () => {
     expect(rawEliminated).toBeTruthy();
     expect(typeof rawEliminated.armyValue).toBe('number');
 
-    // A（存活玩家）看不到 B 的分项记录，但公开 stats 仍在。
+    // A（存活玩家）看不到 B 的分项记录，B 的 stats 整块删除。
     const { body: viewA } = await fetchFogState(app, gameId, { player: seats[0]!.token });
     const playersA = (viewA as unknown as { players: Record<string, any> }).players;
     expect(playersA.player_b.adjudicationScore).toBeUndefined();
-    expect(playersA.player_b.stats).toBeTruthy();
+    expect(playersA.player_b.stats).toBeUndefined();
+    expect(playersA.player_a.stats).toBeTruthy();
     expect((viewA as unknown as { result: any }).result).toBeTruthy();
     expect((viewA as unknown as { result: any }).result.scores.player_b)
       .toEqual({ total: rawEliminated.total, hidden: true });
@@ -340,20 +341,84 @@ describe('fog state projection', () => {
     const { body: viewB } = await fetchFogState(app, gameId, { player: seats[1]!.token });
     const playersB = (viewB as unknown as { players: Record<string, any> }).players;
     expect(playersB.player_b.adjudicationScore).toEqual(rawEliminated);
+    expect(playersB.player_b.stats).toBeTruthy();
     expect(playersB.player_a.adjudicationScore).toBeUndefined();
+    expect(playersB.player_a.stats).toBeUndefined();
 
     // public：所有人的 adjudicationScore 都删除。
     const { body: pubBody } = await fetchFogState(app, gameId);
     const pubPlayers = (pubBody as unknown as { players: Record<string, any> }).players;
     for (const entry of Object.values(pubPlayers)) {
       expect(entry.adjudicationScore).toBeUndefined();
+      expect(entry.stats).toBeUndefined();
     }
 
     // spectator：全量保留。
     const { body: spectatorBody } = await fetchFogState(app, gameId, { spectator: spectatorToken });
     const spectatorPlayers = (spectatorBody as unknown as { players: Record<string, any> }).players;
     expect(spectatorPlayers.player_b.adjudicationScore).toEqual(rawEliminated);
+    expect(spectatorPlayers.player_b.stats).toBeTruthy();
     expect(game.players.player_b!.adjudicationScore).toEqual(rawEliminated);
+  });
+
+  it('deletes other players stats and eliminatedBy according to the viewer', async () => {
+    const { gameId, seats, hostToken, spectatorToken } = await gameWithFog(3);
+    const eliminated = await app.inject({
+      method: 'POST',
+      url: `/api/games/${gameId}/host/eliminate`,
+      headers: { 'x-host-token': hostToken },
+      payload: { playerId: 'player_c' },
+    });
+    expect(eliminated.statusCode).toBe(200);
+    const game = globalStore.get(gameId)!;
+    expect(game.phase).not.toBe('game_over');
+    // 模拟 A 击杀 C：引擎的 host_eliminated 不带击杀者，这里只验证投影口径。
+    game.players.player_c!.eliminatedBy = 'player_a';
+    const rawScore = game.players.player_c!.adjudicationScore!;
+    expect(rawScore).toBeTruthy();
+
+    const readPlayers = async (auth: { player?: string; spectator?: string }) => {
+      const { body } = await fetchFogState(app, gameId, auth);
+      return (body as unknown as { players: Record<string, any> }).players;
+    };
+
+    // A = 击杀者：C 的 eliminatedBy 保留，C 的 stats/分项删除；自己的 stats 保留。
+    const a = await readPlayers({ player: seats[0]!.token });
+    expect(a.player_c.eliminatedBy).toBe('player_a');
+    expect(a.player_c.stats).toBeUndefined();
+    expect(a.player_c.adjudicationScore).toBeUndefined();
+    expect(a.player_a.stats).toBeTruthy();
+    expect(a.player_b.stats).toBeUndefined();
+
+    // B = 第三方：淘汰者身份与 stats 都删除，自己的 stats 保留。
+    const b = await readPlayers({ player: seats[1]!.token });
+    expect(b.player_c.eliminatedBy).toBeUndefined();
+    expect(b.player_c.stats).toBeUndefined();
+    expect(b.player_b.stats).toBeTruthy();
+    expect(b.player_a.stats).toBeUndefined();
+
+    // C = 被淘汰者本人：保留自己的 eliminatedBy、stats、adjudicationScore。
+    const c = await readPlayers({ player: seats[2]!.token });
+    expect(c.player_c.eliminatedBy).toBe('player_a');
+    expect(c.player_c.stats).toBeTruthy();
+    expect(c.player_c.adjudicationScore).toEqual(rawScore);
+    expect(c.player_a.stats).toBeUndefined();
+
+    // public：所有 stats/eliminatedBy/adjudicationScore 删除。
+    const pub = await readPlayers({});
+    for (const entry of Object.values(pub)) {
+      expect(entry.stats).toBeUndefined();
+      expect(entry.eliminatedBy).toBeUndefined();
+      expect(entry.adjudicationScore).toBeUndefined();
+    }
+
+    // spectator：全量保留。
+    const spec = await readPlayers({ spectator: spectatorToken });
+    for (const id of ['player_a', 'player_b', 'player_c']) {
+      expect(spec[id].stats).toBeTruthy();
+    }
+    expect(spec.player_c.eliminatedBy).toBe('player_a');
+    expect(spec.player_c.adjudicationScore).toEqual(rawScore);
   });
 
   it('does not touch non-fog result or adjudicationScore', async () => {

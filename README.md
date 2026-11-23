@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`、`molten-throne`、`mistpine`、`longbow-gallery` 等地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）、`narrow-road`（狭路相逢）与 `mirror-lake`（镜湖）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则；`fog-harbor`（雾港）与 `fog-crossing`（雾渡）提供**迷雾模式（fog）**——同时回合骨架叠加视野迷雾，只隐藏敌方单位，地形、总部与据点公开。
 
-当前版本：`4.0.0`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`4.0.1`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -70,7 +70,7 @@ npm run export-state
 - 行动点按**单位激活**计：首次部署/移动/攻击/治疗/爆破耗 1 点，同一单位本回合后续合法动作免费，上限 `config.balance.actionsPerTurn`。
 - 部署来源、占领限制、治疗与爆破的角色限制、收入与维修规则按模式与地图配置，见对应 skill 文件。
 - 顺序模式有**先手贴目**：先手第一回合不结算收入，其余每个座位第一次行动前先拿 `balance.komi.supplies` 点补给（金币口径，`0` = 不贴目，上限 999）。同时回合 / 大逃杀 / 迷雾不结算，细则见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)「先手贴目」。
-- 迷雾模式的保密在**服务端投影**：`GET /api/games/:id` 的 `units`、`events`、`adjudication` 按观者过滤，地形/总部/据点为公开信息；观战全量需建房响应中的只读 `spectatorToken`，无令牌只得到公开安全视角。
+- 迷雾模式的保密在**服务端投影**：`GET /api/games/:id` 的 `units`、`events`、`adjudication` 按观者过滤，地形/总部/据点为公开信息；观战全量需建房响应中的只读 `spectatorToken`，无令牌只得到公开安全视角。非本人 `players[].stats` 整块删除，玩家与 public 的事件游标为观者序号（`stateVersion` 大厅期仍为全局值）。
 - 裁决公式的权威定义见 [skill/SKILL.md](skill/SKILL.md)「Adjudication score」，实时分数直接读 `GET /api/games/:id` 的 `adjudication`，不要自行重算。
 - 歼灭计分、同时回合的分步结算/失败连锁/攻击形状、大逃杀炮火节奏、迷雾视野/残影/盲射等模式细则只维护在对应 skill 文件。地图清单与逐图数值以 `maps/*.json` 为准（文件名即 mapId）。
 

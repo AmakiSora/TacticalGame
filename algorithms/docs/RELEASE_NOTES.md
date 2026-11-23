@@ -6,6 +6,13 @@
 >
 > **当前算法版本**：`random-sim` v2、`dest-prob` v2、`kriegspiel` v2、`matrix-eq` v2、`prism` v1、`tempo` v1、`tempo-weave` v1、`horizon` v1、`shrinkroll` v1、`vortex` v1、`echelon` v1、`apex` v1、`crucible` v1、`sovereign` v1、`ark` v1、`bastion` v1、`fog-scout` v1；标准模式算法 greedy / random / mcts / threat / field / parallax 与 3.8.10 新增的 `random-annihilation` / `random-royale` 均为 v1，`verdict` 自 3.8.21 起为 v2。
 
+## 4.0.1（2026-11-21）— 迷雾事件固化与观者游标（算法侧无行为变更）
+
+### 更正
+
+- 4.0.0 的 fog-scout 条目把 `game.fog.visibleCells` 列为算法输入；实际实现只用 `fog.revealed` 判断是否已揭雾，逐格 `visibleCells` 已在 4.0.0 的平衡修复中退出评分（侦察收益改用 `coverageGain`）。4.0.0 正文按发布时原样保留，本次只在此更正。
+- 本版无算法行为变更：`fog-scout` 不读 `seq` / `lastEventSeq`，服务端的观者序号与事件披露固化不影响它的输入或决策；fog 仍不进竞技场/统计/RL。
+
 ## 4.0.0（2026-11-20）— 迷雾模式基线算法 fog-scout
 
 ### 新增算法

@@ -4,8 +4,8 @@ import { globalStore } from '../state/store.js';
 import { globalEventBus } from '../events/bus.js';
 import type { GameEvent } from '../types.js';
 import { inc, setGauge } from '../utils/metrics.js';
-import { isFogGame, resolveViewer } from './auth.js';
-import { projectEventForViewer } from '../engine/fog.js';
+import { isFogGame, resolveViewer, stripFogEventInternals } from './auth.js';
+import { fogViewerSeqOf, projectEventForViewer, projectFogHistoryForViewer } from '../engine/fog.js';
 
 const MAX_SSE_PER_GAME = 20;
 const MAX_SSE_PER_IP = 10;
@@ -67,15 +67,13 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         Number.isFinite(queryAfter) ? queryAfter : 0,
         Number.isFinite(headerAfter) ? headerAfter : 0,
       );
-      // 逐事件投影：匿名 fog 只留公开事件；玩家按视野；观战全量。
-      const project = (event: GameEvent): GameEvent | null => {
-        if (!fog || viewer.kind === 'spectator') return event;
-        return projectEventForViewer(game, event, viewer.kind === 'player' ? viewer.player : null);
-      };
-      const filtered = game.events
-        .filter(e => e.seq > after)
-        .map(project)
-        .filter((event): event is GameEvent => event !== null);
+      const viewerId = viewer.kind === 'player' ? viewer.player : null;
+      // fog 玩家/匿名的 seq 是观者序号（隐藏事件不占号）；观战与旧模式保留全局 seq。
+      const filtered = !fog
+        ? game.events.filter(e => e.seq > after)
+        : viewer.kind === 'spectator'
+          ? game.events.filter(e => e.seq > after).map(stripFogEventInternals)
+          : projectFogHistoryForViewer(game, viewerId, after);
 
       if (!wantsSse) {
         return { events: filtered };
@@ -188,8 +186,17 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       };
       const unsubscribe = closeAfterFlush ? () => {} : globalEventBus.subscribe(game.id, ev => {
         if (cleanedUp) return;
-        // 实时帧同样投影：握手时的观者身份固定，新事件按它过滤。
-        const visible = project(ev);
+        // 实时帧同样投影：握手时的观者身份固定；fog 用事件发生时刻固化的载荷与观者序号。
+        let visible: GameEvent | null = ev;
+        if (fog) {
+          if (viewer.kind === 'spectator') {
+            visible = stripFogEventInternals(ev);
+          } else {
+            const seq = fogViewerSeqOf(game, ev, viewerId);
+            const projected = seq === null ? null : projectEventForViewer(game, ev, viewerId);
+            visible = projected && seq !== null ? { ...projected, seq } : null;
+          }
+        }
         if (!visible) return;
         const frame = encodeSseEvent(visible);
         const bytes = Buffer.byteLength(frame);

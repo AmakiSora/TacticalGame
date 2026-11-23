@@ -25,7 +25,7 @@ AI 默认会持续轮询并自动处理后续己方回合，直到游戏结束�
 | `--max-turns <n>` | 最多处理多少个己方回合，默认 `80` |
 | `--once` | 只处理当前或下一个己方回合 |
 
-AI 的决策顺序遵循对应模式 skill 的 Decision order（[standard](../skill/standard.md) / [annihilation](../skill/annihilation.md) / [simultaneous](../skill/simultaneous.md) / [royale](../skill/royale.md) / [fog](../skill/fog.md)），本文不复写。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。迷雾局里可见信息只有本人单位、`fog.lastSeen` 残影与公开状态，决策不得假设自己看得见隐藏敌军。
+AI 的决策顺序遵循对应模式 skill 的 Decision order（[standard](../skill/standard.md) / [annihilation](../skill/annihilation.md) / [simultaneous](../skill/simultaneous.md) / [royale](../skill/royale.md) / [fog](../skill/fog.md)），本文不复写。行动失败时会记录 API 错误并尝试下一个候选动作，不会在同一个非法动作上紧密重试。迷雾局里可见信息只有本人单位、`fog.lastSeen` 残影与公开状态，决策不得假设自己看得见隐藏敌军；fog 的 `seq` / `lastEventSeq` 是观者序号，不得用序号差推断隐藏行动，他人 `stats` 不可见。
 
 ## 2. 强化学习 AI
 
@@ -82,7 +82,7 @@ python rl/evaluate.py --model rl/models/model.zip
 - **时序掌控算法（Tempo，仅同时回合模式）**：把队列位置当作结算拍，预测敌方剧本、构建威胁时间线，再按裁决权重把动作排进具体拍。[档案](../algorithms/docs/algorithms/tempo.md)
 - **经纬算法（Tempo-Weave，仅同时回合模式）**：以「单位完成什么任务、几个行动点、能否存活」为决策单位，在共享行动点预算内按收益/成本竞价排程。[档案](../algorithms/docs/algorithms/tempo-weave.md)
 - **视界算法（Horizon，仅同时回合模式）**：把一轮结算后的棋盘投影到终局估胜率，用同构对手场景与对抗探针检验计划，再做逐行动点束搜索。[档案](../algorithms/docs/algorithms/horizon.md)
-- **迷雾侦察算法（Fog Scout，仅迷雾模式，首个 fog 算法）**：只用本人单位、`fog.lastSeen` 残影与公开信息决策，把残影当“最后确认位置”而非当前坐标，对看不见的格子只做公开信息支撑的盲射。具体名册与定位以 `algorithms/registry.mjs` 和该算法档案为准；fog 本期不进竞技场/统计/RL，所以没有任何 fog 榜单成绩。
+- **迷雾侦察算法（Fog Scout，仅迷雾模式，首个 fog 算法）**：只用本人单位、`fog.lastSeen` 残影与公开信息决策，把残影当“最后确认位置”而非当前坐标，对看不见的格子只做公开信息支撑的盲射。具体名册与定位以 `algorithms/registry.mjs` 和[算法档案](../algorithms/docs/algorithms/fog-scout.md)为准；fog 本期不进竞技场/统计/RL，所以没有任何 fog 榜单成绩。
 
 添加算法 AI 时可自定义玩家名，默认预填所选算法的中文名。
 

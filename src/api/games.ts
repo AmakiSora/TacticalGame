@@ -10,6 +10,7 @@ import { verifyToken } from '../state/tokens.js';
 import { globalEventBus } from '../events/bus.js';
 import { closeSseConnections } from './events.js';
 import { appendEvent } from '../engine/events.js';
+import { fogLastVisibleSeq } from '../engine/fog.js';
 import { eliminatePlayer, forceAdjudication, joinedPlayerIds, skipTurn, startGame } from '../engine/engine.js';
 import { eliminateFromPlanAndMaybeResolve, forceResolveRound } from '../engine/simultaneous.js';
 import {
@@ -557,8 +558,13 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const includeKey = include === null ? 'all' : [...include].sort().join(',');
     // 迷雾局的响应随观者而变（玩家/观战/匿名），ETag 必须带上观者标签，
     // 否则 A 的 304 会让 B 复用 A 的私有视图。非迷雾局保持旧标签字节不变。
+    // fog 开局后版本段与观者事件流对齐（隐藏事件不推进）；大厅期仍用全局版本，
+    // 避免 host/max-players / host/seats 这类“无事件但改状态”的接口被 304 吃掉。
+    const version = fog && game.phase !== 'lobby' && viewer.kind !== 'spectator'
+      ? fogLastVisibleSeq(game, viewer.kind === 'player' ? viewer.player : null)
+      : game.stateVersion ?? 0;
     const etag = fog
-      ? `"${game.id}-${game.stateVersion ?? 0}-${planQueueTag(game, viewer)}-${includeKey}-${viewerTagOf(viewer)}"`
+      ? `"${game.id}-${version}-${planQueueTag(game, viewer)}-${includeKey}-${viewerTagOf(viewer)}"`
       : `"${game.id}-${game.stateVersion ?? 0}-${planQueueTag(game, viewer)}-${includeKey}"`;
     reply.header('ETag', etag);
     // 响应包含请求者自己的计划队列/观者视图，必须标记按两种凭证变化，禁止共享缓存复用。

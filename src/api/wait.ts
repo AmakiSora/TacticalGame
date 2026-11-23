@@ -2,8 +2,9 @@
 // AI 等待端点：有事件/轮次变化立即返回，超时返回 changed:false。
 // 目的不是替代 SSE，而是让 agent 不再每 0.5–3 秒轮询完整状态。
 import type { FastifyInstance } from 'fastify';
-import { authenticate } from './auth.js';
+import { authenticate, isFogGame } from './auth.js';
 import { globalEventBus } from '../events/bus.js';
+import { fogLastVisibleSeq, fogViewerSeqOf } from '../engine/fog.js';
 import { inc } from '../utils/metrics.js';
 
 const MAX_WAIT_MS = 25_000;
@@ -23,6 +24,7 @@ export async function waitRoutes(app: FastifyInstance): Promise<void> {
       const ctx = authenticate(req, reply);
       if (!ctx) return;
       const game = ctx.game;
+      const fog = isFogGame(game);
       const afterSeq = Number(req.query.afterSeq ?? 0);
       const after = Number.isFinite(afterSeq) ? Math.max(0, afterSeq) : 0;
       const timeoutSeconds = Number(req.query.timeout ?? 25);
@@ -30,7 +32,8 @@ export async function waitRoutes(app: FastifyInstance): Promise<void> {
         MAX_WAIT_MS,
         Math.max(0, (Number.isFinite(timeoutSeconds) ? timeoutSeconds : 25) * 1000),
       );
-      const latest = game.events.at(-1)?.seq ?? 0;
+      // fog 使用观者序号：隐藏事件既不占号也不唤醒；超时/断开的 seq 同样返回最新可见号。
+      const latest = fog ? fogLastVisibleSeq(game, ctx.player) : game.events.at(-1)?.seq ?? 0;
       if (latest > after) return { changed: true, seq: latest };
 
       const key = `${game.id}:${ctx.player}`;
@@ -57,7 +60,8 @@ export async function waitRoutes(app: FastifyInstance): Promise<void> {
         };
         onClose = (): void => finish({ changed: false, seq: latest });
         unsubscribe = globalEventBus.subscribe(game.id, event => {
-          if (event.seq > after) finish({ changed: true, seq: event.seq });
+          const seq = fog ? fogViewerSeqOf(game, event, ctx.player) : event.seq;
+          if (seq !== null && seq > after) finish({ changed: true, seq });
         });
         timer = setTimeout(() => finish({ changed: false, seq: latest }), timeoutMs);
         timer.unref?.();

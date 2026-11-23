@@ -10,11 +10,12 @@
 
 | 项目 | 当前值 |
 |---|---|
-| 代码版本 | 3.9.9 |
+| 代码版本 | 4.0.1 |
 | 标准图池 | `default` / `breach` / `danger-close` / `dual-lanes` / `multiplayer-ring` / `whirlpool` |
 | 同时回合图 | `standoff` / `molten-throne` / `mistpine` / `longbow-gallery` |
 | 大逃杀图 | `snowflake` / `narrow-road` / `mirror-lake`（内置基线：`random-royale`；强度算法：`echelon` / `apex` / `ark` / `bastion`） |
 | 歼灭图 | `artillery-zone` / `trench-run`（内置基线：`random-annihilation`；强度算法：`shrinkroll` / `vortex` / `crucible` / `sovereign`） |
+| 迷雾图 | `fog-harbor`（2 人）/ `fog-crossing`（3 人）（基线：`fog-scout`；fog 不进竞技场/统计/RL，无强度榜） |
 | 同时回合规则 | 3.8.0 起按行动点**分步结算**，不是“一单位一轮一动作” |
 | 裁决分 | 3.6.0 起为击杀价值 + 据点流量制 |
 | 已退役地图 | `forge` → `molten-throne`（3.5.11，同时回合）、`desert`（3.5.8 下线）、`four-corners`（3.5.7 下线） |
@@ -50,6 +51,7 @@ algorithms/
 │   ├── verdict.mjs       # 裁决线算法（标准模式）
 │   ├── parallax.mjs      # 视差算法（标准模式）
 │   ├── random-sim.mjs    # 同时随机算法（同时回合模式）
+│   ├── fog-scout.mjs     # 迷雾侦察算法（迷雾模式）
 │   ├── dest-prob.mjs     # 落点概率算法（同时回合模式）
 │   ├── kriegspiel.mjs    # 兵棋推演算法（同时回合模式）
 │   ├── matrix-eq.mjs     # 矩阵均衡算法（同时回合模式）
@@ -93,11 +95,18 @@ algorithms/
 │       ├── parallax.md
 │       ├── echelon.md
 │       ├── ark.md
-│       └── bastion.md
+│       ├── bastion.md
+│       └── fog-scout.md
 ├── registry.mjs          # 算法注册表与 ALGORITHM_META
 ├── registry.d.mts        # 注册表 TypeScript 类型声明
 └── runner.mjs            # 通用运行器
 ```
+
+## fog-scout：迷雾侦察算法
+
+`fog-scout` v1 仅参与 `fog`，大厅类型 `algo_fog-scout`，`playerCounts [2, 3]`。单文件零导入实现（`builtin/fog-scout.mjs`，策略接口 `decide`），**独立设计**：只消费服务端玩家投影（己方单位 + 视野内敌军、`fog.revealed` / `fog.lastSeen`、公开地形/总部/据点/补给）与自己的计划队列，不读 `visibleCells` 逐格计数、全量单位、观战接口、对手队列、随机数状态或地图身份。核心是五类候选统一评分、`coverageGain` 侦察收益、座位局部坐标系 tie-break 与短期撞格记忆；完整参数、验证与限制见 [单算法档案](algorithms/fog-scout.md)。
+
+**验证（开发期数据，非竞技场强度）**：2026-11-20 真实引擎自对局 480 局（`scripts/fog-selfplay.mjs`，4 种子 × 两图各 60 局）零非法、零未完赛；`fog-crossing` 三座 240 局 31.3% / 34.2% / 34.6%，`fog-harbor` 240 局决胜局 49.3% / 50.7%（11 平）。单测 16 例（10 + 4 + 2）。fog 不进竞技场，因此没有 Elo、分图胜率或跨算法对照。
 
 ## echelon：雁阵算法
 
@@ -526,6 +535,7 @@ export const ALGORITHM_META = {
 | **tempo** | simultaneous | v1 | 逐拍排程/威胁时间线 | O(单位×候选×拍×威胁投影) | 3.8.4 真实引擎进程内标定（每对 60 局 = standoff 40 + molten-throne 20，2026-10-24，零非法）：对 random-sim **100%**、dest-prob **55.0%**、kriegspiel **50.0%**、matrix-eq **43.3%**（molten-throne 85–90%、standoff 32–40%）；3.8.5 竞技场 288 局 134W/154L、评分 1444 | 结算拍序决策、同时回合通用基线 |
 | **tempo-weave** | simultaneous | v1 | 任务排程/期限约束 | O(单位×任务×束宽×行动点×镜像步) | 3.8.2 真实引擎（两图 ×4 对手 ×30 局，2026-10-24）：对 random-sim / dest-prob / kriegspiel / matrix-eq **全部 30:0（240/240）**；多席位 standoff 3 人 15/15、6 人 24/6；3.8.5 集成抽样复验 8:0；竞技场 288 局 **288:0**、评分 **2355** 第一 | 任务级行动点预算、多席位回防 |
 | **horizon** | simultaneous | v1 | 分步结算镜像 + 终局投影胜率评估 + 同构对手场景 + 束搜索 + 对抗探针 | O(行动点×束宽×候选×场景×单轮结算) | 3.8.2 真实引擎（`scripts/horizon-arena.mts`，standoff / molten-throne 各 30 局 ×4 对手，种子基 20261026，2026-10-26）：random-sim 30:0 / 30:0、dest-prob 30:0 / 30:0、kriegspiel 30:0 / 30:0、matrix-eq 29:1 / 27:3，合计 **236:4（98.3%）**、零非法；molten-throne 据点流量低于 dest-prob / kriegspiel（7 vs 12），胜利来自斩首；多席位只做抽样（6 人局对 matrix-eq 两次复测 1:5 / 9:3 互相矛盾）；单轮规划（单进程）standoff p50 154ms、molten-throne p50 233ms、6 人 p50 529ms | 同时回合多轮视界规划、强基线 |
+| **fog-scout** | fog | v1 | 启发式（视野内交战 + 残影盲射 + 侦察覆盖 + 座位局部 tie-break） | O(单位×可达格×候选) | 2026-11-20 真实引擎自对局（`scripts/fog-selfplay.mjs`，4 种子 × 两图各 60 局）**480 局零非法、零未完赛**；`fog-crossing` 三座 240 局 31.3% / 34.2% / 34.6%，`fog-harbor` 240 局决胜局 49.3% / 50.7%（11 平）；fog 不进竞技场/统计/RL，**无 Elo**，详见 [档案](algorithms/fog-scout.md) | 迷雾模式基线、投影视角合法性与旋转等变回归 |
 
 > 表中 standard 行的 arena 数字来自 `public/data/arena-leaderboard.json`（2026-11-10 重新生成，standard 池与 2026-10-31 一致：7 图，算法每人约 3,745 局、模型 3,600 局）；simultaneous 行来自 2026-10-24 生成的 1,008 局分区（7 名参与者，tempo / tempo-weave 已入榜）；其中 prism 的 192 局 / 1977 是 3.8.3 首战快照，当前为 288 局 / 1,839。评分是 Bradley-Terry 混合池，胜率包含不同对手，不能与单图对拍数字直接比较；模式之间也不可混比。
 >
@@ -539,6 +549,7 @@ export const ALGORITHM_META = {
 | simultaneous | 8 | random-sim / dest-prob / kriegspiel / matrix-eq / prism / tempo / tempo-weave / horizon |
 | annihilation | 5 | random-annihilation（逐人轮流 + 炮火区部署/治疗镜像）/ shrinkroll（束搜索 + 缩圈时间线投影 + 轮界裁决投影）/ vortex（效用 AI + 收缩圈疏散）/ crucible（整回合束搜索 + 对抗集火回推 + 缩圈逃逸推演）/ sovereign（概率齐射竞价 + 多轮炮火逃逸 + 协同让行与移动爆破） |
 | royale | 5 | random-royale（同时回合计划队列，与 random-sim 同源枚举）/ echelon（效用 AI + 落点扩散预报 + 炮火圈调度 + 爆破距离场）/ apex（多情境束搜索 + 缩圈时空寻路）/ ark（二分图安全格匹配 + 逐行动点竞价 + 缩圈增援评估）/ bastion（逐行动点束搜索 + 存活/进攻双向位置价值 + 逐步合法性重放） |
+| fog | 1 | fog-scout（视野内交战 + 残影盲射 + `coverageGain` 侦察 + 座位局部 tie-break；不进竞技场） |
 
 > 三个随机基线是**独立条目**：注册名、展示名、版本与竞技场参与者 id 全部分开
 > （`algo_random@v1` / `algo_random-annihilation@v1` / `algo_random-royale@v1`），

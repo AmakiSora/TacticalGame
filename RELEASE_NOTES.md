@@ -4,6 +4,22 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 4.0.1
+
+### 修复
+
+- **迷雾事件改为发生时刻固化**：事件写入时即为每个座位与公开视角算好披露并持久化，玩家与公开视角的读取、补拉、SSE 只回放固化结果；观战与回放仍是全量事件（仅剥离内部固化表），揭雾只对之后的新事件生效。旧存档（4.0.0 及更早）缺少固化数据时回落到按读取时状态投影，仅作兼容。
+- **迷雾区域攻击/治疗逐目标披露**：第三方只收到当时可见命中格/目标的伤害与血量，落空只发给攻击者，隐藏攻击者的身份与瞄准几何被删除；区域治疗不再把隐藏目标的 `targetId` / `amount` / `targetHp` 带给第三方。
+- **迷雾淘汰事件不再泄露击杀者**：`player_eliminated.eliminatedBy` 只发给被淘汰者本人与击杀者，其他玩家与公开视角删除该键；状态响应里的 `players[非本人].eliminatedBy` 同样只保留给本人与击杀者。
+- **迷雾游标改为观者序号**：对局开始后 `seq`、`lastEventSeq`、`wait` 的 `afterSeq` / `seq`、SSE `id` / `Last-Event-ID`、`stateVersion` 与 ETag 都只对观者可见事件递增，堵住用序号差推算隐藏行动的旁路；大厅期仍用全局 `stateVersion`（`host/max-players` / `host/seats` 不发事件也改状态，否则条件 GET 会错误 304），观战与非迷雾局保持全局序号。
+- **迷雾删除非本人 `players[].stats`**：伤害、击杀、占点等聚合计数会旁路隐藏行动，玩家视角只保留自己的统计，公开视角全部删除，缺失表示不可见而不是 0。
+- **迷雾非观战视角删除 `lastActivityAt`**：该字段会随隐藏动作变化，玩家与公开视角不再返回，观战视角保留。
+
+### 测试与验证
+
+- `npm run build` 通过；全量 `npx vitest run --minWorkers=1 --maxWorkers=2` 168 文件 / 2,021 例全过（261.77s），`npm run check-version` 6 处版本引用均为 4.0.1。
+- 迷雾专项 `tests/engine/fog-* tests/api/fog-* tests/config/fog-* tests/public/fog-*` 11 文件 / 125 例全过；规则与接口口径见 [skill/fog.md](skill/fog.md)、[docs/API.md](docs/API.md)。
+
 ## 4.0.0
 
 ### 新增

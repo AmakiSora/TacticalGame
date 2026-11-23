@@ -225,6 +225,11 @@ export interface FogSighting {
 export interface FogState {
   /** 按玩家隔离的"最后看见"记忆；不得互相可见。 */
   lastSeen: PlayerRecord<Record<string, FogSighting>>;
+  /**
+   * 迷雾事件观者序号游标（键为 playerId，匿名/公开视角为 'public'）。
+   * 4.0.1 起每条新事件在发生时刻递增；旧存档缺这个字段时按事件扫描推导。
+   */
+  viewSeq?: Record<string, number>;
 }
 
 export type EventType =
@@ -265,6 +270,14 @@ export interface GameEvent {
   type: EventType;
   timestamp: number;
   payload: Record<string, unknown>;
+  /**
+   * 迷雾局：事件发生时刻按观者固化的投影载荷，键为 playerId 或 'public'（匿名视角）。
+   * 值为该观者可见的 payload 副本；null 表示整条事件对该观者隐藏。
+   * 非迷雾局不写这两个字段；对外投影必须剥离，不能把固化表回传给客户端。
+   */
+  fogViews?: Record<string, Record<string, unknown> | null>;
+  /** 迷雾局：该事件在各观者事件流中的序号（1 起）；隐藏的观者没有条目。 */
+  fogSeqs?: Record<string, number>;
 }
 
 /** 已成功动作的幂等回放记录；按（玩家, 键）隔离，每局保留最近 N 条。 */

@@ -62,7 +62,7 @@
 - `firstSeat` **按模式区分**：仅顺序模式（`standard` / `annihilation`）有意义，是 0 起的先手座位下标、缺省 0，`turnOrder` 从该座位循环展开；越界（`<0` 或 `>=已加入人数`）→ `400 invalid_seat_layout`（错误文案「先手座位号越界」只会在顺序模式出现）。`simultaneous` / `royale` / `fog` **没有先手概念**（`turnOrder` 只是同一步内的并列处理顺序），服务端忽略该字段、一律存 `0` 并在响应里回 `0`，不报错也不做越界校验；`GET /api/games/:id/lobby` 的 `firstSeat` 在这三个模式下同样恒为 `0`。
 - 大厅摘要的座位字段：`seatMode`（`'random'` / `'manual'`）、`seatVersion`、`firstSeat`（0 起；`random` 态恒 0，`simultaneous` / `royale` / `fog` 也恒 0）、`seats[]`（`{ seat, playerId, name, spawnSlotId }`，`seat` 从 1 起、按座位号升序）。`seatMode='random'`（未编排）时出生点（以及顺序模式下的先手）**都还没决定**，`seats[].spawnSlotId` **恒为 `null`**，`seats` 只按加入顺序给座位号；`seatMode='manual'` 时才把 `spawnSlotId` 映射成 `config.layouts[人数][座位下标]`，该人数没有 `layouts` 条目时仍为 `null`。席位 id（`player_a`…）恒按加入顺序分配且不可变，座位号只决定「谁坐哪个出生点」；行动顺位只存在于顺序模式，同时回合骨架（simultaneous / royale / fog）里座位号只是同一步内的结算处理顺序。
 - `layoutSlots` 是「本局人数对应的出生点槽位 id 顺序」（即 `config.layouts[已加入人数]`）：与 `seatMode` 无关、**恒给值**，0 人或该人数没有 `layouts` 条目时为 `[]`；`seatMode='manual'` 时 `seats[i].spawnSlotId` 恒等于 `layoutSlots[i]`。关键约束：**槽位 id 是地图 `spawnSlots` 的非连续子序列，不是前 n 个**（例：`multiplayer-ring` 三人局是 `['slot_1','slot_3','slot_5']`，对应 `spawnSlots` 下标 0/2/4），前端做座位→出生点的映射必须按 `slot.id` 匹配，**不能按数组下标**。
-- 两套版本线是**独立计数**，但别理解成「成员变动不影响 `stateVersion`」：`PUT` / `DELETE /host/seats` 自身同时推进 `seatVersion` 与 `stateVersion`；成员变动（加入 / 退出 / 被踢）使 `seatVersion` +1，其 `stateVersion` 由 `player_joined` / `player_left` 事件推进（写入事件本身就会推进 `stateVersion`）；开局降级只推进 `seatVersion`，`stateVersion` 随后由 `game_start` 事件推进。因此 join / leave 之后带旧 `If-None-Match` 请求 `GET /api/games/:id` **不会** 304，而是 200 返回含新玩家与最新座位表的状态。
+- 两套版本线是**独立计数**，但别理解成「成员变动不影响 `stateVersion`」：`PUT` / `DELETE /host/seats` 自身同时推进 `seatVersion` 与 `stateVersion`；成员变动（加入 / 退出 / 被踢）使 `seatVersion` +1，其 `stateVersion` 由 `player_joined` / `player_left` 事件推进（写入事件本身就会推进 `stateVersion`）；开局降级只推进 `seatVersion`，`stateVersion` 随后由 `game_start` 事件推进。因此 join / leave 之后带旧 `If-None-Match` 请求 `GET /api/games/:id` **不会** 304，而是 200 返回含新玩家与最新座位表的状态。fog 局例外：大厅期 `stateVersion` 仍是全局变更计数（大厅没有隐藏单位；`host/max-players`、`host/seats` 不发事件却改状态，全用观者序号会让条件 GET 错误 304）；对局开始后玩家与 `public` 视角改用该观者的观者序号（见「迷雾模式（fog）的观者投影」）。fog 大厅的座位变更请以 `seatVersion` 与 `GET /api/games/:id/lobby` 为准。
 - 座位字段的**结构化形态**（`seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots`）只由 `GET /api/games/:id/lobby` 提供；状态接口里虽有 `seatPlan` 原始字段，但房间页的座位区一律读 `/lobby`，不要从状态接口自己拼座位列表。
 - `seatVersion` 的语义是「座位视图可能已变」：`PUT` 成功、`DELETE` 成功、成员进出（`seatPlan` 为空时也一样）都 `+1`。`DELETE` 在本来就未编排时也 `+1`——幂等只承诺最终状态不变，不承诺版本号不变。
 - 随机地图建房只有一种写法：`POST /api/games` 用 `mapId: "random"`，玩法模式放在 `random.mode`（`standard` / `annihilation` / `simultaneous` / `royale`）。fog **不支持随机地图**：`random.mode: "fog"` 返回 400 并提示改用内置 fog 图（本期不生成随机迷雾图）。评估控制台的 `random-annihilation` / `random-simultaneous` / `random-royale` 是**跑批批次 id**（批次要靠地图 id 推模式、`matches.jsonl` 靠它归模式），不是可建房地图；传给建房接口返回 `400 invalid_move` 并提示改用 `mapId: "random"` + `random.mode`。
@@ -102,17 +102,24 @@
 |---|---|---|---|
 | `units` | 本人全部单位 + 视野内敌军 | 全量 | `[]` |
 | `fog` | `{ enabled: true, revealed, visibleCells, lastSeen }`（`lastSeen` 只含本人记忆） | `{ enabled: true, revealed: true, visibleCells: 全部可用格, lastSeen: [] }` | `{ enabled: true, revealed: false, visibleCells: [], lastSeen: [] }` |
-| `events` | 逐条按视野投影 | 全量 | 公开事件 |
+| `events` | 逐条按**发生时刻固化**的披露投影；`seq` 为观者序号 | 全量；全局 `seq` | 公开事件；`seq` 为 public 观者序号 |
 | `adjudication` | 本人完整；他人 `{ playerId, total, rank, hidden: true }` | 全量 | `{ hidden: true }` 整体或省略分项 |
 | `result` | 终局后按裁决投影：本人分数完整；他人只有 `{ total, hidden: true }`（`rankings` 保留 `playerId` / `rank` / 状态，仅得分被投影） | 全量 | 所有人只有 `{ total }` 与排名，无分项 |
-| `headquarters` / `controlPoints` / `cells` / `map` / `config` / `turn` / `players` / `resources` / `winner` | 公开（不变）；`players[other].adjudicationScore` 删除，`players.stats` 仍是公开统计 | 公开 | 公开（全部 `players[*].adjudicationScore` 删除，`stats` 保留） |
+| `players[].stats` | 只保留本人的；其他玩家整块删除 | 全量 | 全部删除 |
+| `stateVersion` | 大厅期全局值；开局后为观者序号（只对可见事件递增） | 全局值 | 大厅期全局值；开局后为 public 观者序号 |
+| `lastEventSeq` | 观者序号（只对可见事件递增） | 全局值 | public 观者序号 |
+| `lastActivityAt` | 删除（会随隐藏动作变化） | 保留 | 删除 |
+| `headquarters` / `controlPoints` / `cells` / `map` / `config` / `turn` / `players` / `resources` / `winner` | 公开（不变）；`players[other].adjudicationScore` 删除；`players[other].eliminatedBy` 只保留给击杀者 | 公开 | 公开（全部 `players[*].adjudicationScore` 与 `eliminatedBy` 删除） |
 | `plan` | 只看自己队列 + 公开的 `committed` | 空队列 + `committed` | 空队列 + `committed` |
 
-- 敌方隐藏单位不得经任何字段（`units`、`fog.lastSeen`、事件 payload、`adjudication`、`result`）泄露 `unitId` / `type` / `hp` / `q` / `r`。
-- `adjudication` / `result` 里缺失或标为 `hidden: true` 的分项表示**隐藏**，不是 0 分：`public` 视角缺少隐藏单位等重建分项所需的输入，客户端不得用公开统计（`players[].stats`）或残缺事件补算后当成完整分项。
-- `players[].stats` 是公开聚合统计（`headquartersDamage` / `unitsDestroyed` / `killValue` / `actionPointsUsed` / `controlHold` 等计数），不因 fog 投影而删除；只有裁决分项 `adjudicationScore` 按观者处理——玩家视角看不到他人的该项，观战与匿名视角整项删除。
+- 敌方隐藏单位不得经任何字段（`units`、`fog.lastSeen`、事件 payload、`adjudication`、`result`、`players[].stats`）泄露 `unitId` / `type` / `hp` / `q` / `r`。
+- **事件披露在发生时刻固化**：fog 局写入事件时，按当时视野为每个座位与 `public` 计算披露并随事件持久化；玩家与公开视角的状态读取、事件补拉、SSE 都只回放该观者的固化结果，不按当前视野重算。观战视角始终是全量事件（仅剥离内部固化表），不代表任一玩家当时的视角。揭雾（`revealFromRound` 到达或 `phase === "game_over"`）之后**新产生**的事件对全体全量，**不回填历史**：已固化的玩家/公开披露保持当时结果。只有不含固化数据的旧事件（4.0.0 及更早写入的 `runtime/store/*.json`）在读取时回落到按当前状态投影；带固化表但缺少该观者条目的事件按隐藏处理，不借当前视野补算。该回落只为兼容旧局，不代表新口径。
+- 固化数据是服务端内部状态（`event.fogViews` / `event.fogSeqs`），只随对局持久化，不出现在状态响应、事件响应、SSE 帧或导出的回放中。
+- `adjudication` / `result` 里缺失或标为 `hidden: true` 的分项表示**隐藏**，不是 0 分：`public` 视角缺少隐藏单位等重建分项所需的输入，客户端不得用观战/回放里的完整统计或残缺事件补算后当成完整分项。
+- **非本人 `players[].stats` 整块删除**：伤害、击杀、占点、行动点等聚合计数会旁路隐藏行动（未见的交火、占领与治疗都能从计数变化推断），因此 fog 玩家视角只保留自己的 `stats`，其他玩家整个键删除；`public` 视角全部删除；观战视角全量保留。缺失表示**不可见**，不是 0，也不得用计数反推隐藏单位或隐藏行动。
 - 非 fog 模式响应字节不变（状态读取仍需玩家 token；事件补拉保持原有的匿名行为）。
-- `stateVersion` 语义不变；fog 局 ETag 按观者区分：`"<id>-<stateVersion>-<planQueueTag>-<includeKey>-<viewerTag>"`，`viewerTag ∈ player:<id> | spectator | anon`，并带 `Vary: X-Player-Token, X-Spectator-Token`。304 不得跨观者复用。
+- **fog 的游标是观者序号（`stateVersion` 大厅期除外）**：fog 对局开始后，玩家与 `public` 的 `seq`、`lastEventSeq`、`wait` 的 `afterSeq` / `seq`、SSE `id` 与 `Last-Event-ID`、`stateVersion` 以及 ETag 的版本段，统一使用该观者的连续序号（只对**该观者可见**的事件递增，从 1 起；没有可见事件时为 0）。大厅期没有隐藏单位，`stateVersion` 与 ETag 版本段仍用全局变更计数（`host/max-players`、`host/seats` 不发事件也改状态，用观者序号会让条件 GET 错误 304）。观战视角与非 fog 局沿用全局序号。不得把观者序号当全局进度，也不得用两个观者的序号差或 `lastEventSeq` 跳变推断隐藏事件的数量与时机。
+- fog 局 ETag 为 `"<id>-<stateVersion>-<planQueueTag>-<includeKey>-<viewerTag>"`（`viewerTag ∈ player:<id> | spectator | anon`），版本段按上一条规则取值（大厅期全局，开局后观者序号），并带 `Vary: X-Player-Token, X-Spectator-Token`；304 不得跨观者复用。非 fog 局 ETag 与 `stateVersion` 的旧语义不变。
 
 ### 长轮询等待
 
@@ -120,10 +127,11 @@
 
 - 有新事件立即返回 `{ changed: true, seq }`，超时返回 `{ changed: false, seq }`。
 - `timeout` 默认且最多 25 秒；同一玩家并发等待上限 2 个，超出返回 429 `rate_limit`。
+- fog 局的 `afterSeq` 与返回的 `seq` 都是该玩家的**观者序号**：只有该玩家可见的事件才推进它，隐藏事件不会让 `wait` 提前返回（即使全局事件流已经前进）。别用两次 `wait` 的 `seq` 差值估算对手行动数。
 
 ### 事件流
 
-`GET /api/games/:id/events?after=<seq>` 返回增量事件；`Accept: text/event-stream` 时建立 SSE，断线可用 `Last-Event-ID` 续传。fog 局的 SSE 与非 SSE 路径使用同一套观者解析与事件投影：SSE 握手时解析观者、逐事件投影，匿名连接只收公开事件，初始补发的历史帧同样投影；不存在“无令牌拿全量”的旁路。
+`GET /api/games/:id/events?after=<seq>` 返回增量事件；`Accept: text/event-stream` 时建立 SSE（`id:` 为观者序号），断线可用 `Last-Event-ID` 续传。fog 局的玩家与匿名视角，`after` / `Last-Event-ID` / 返回事件的 `seq` / SSE `id:` 都是观者序号：服务端先按观者序号过滤，再按发生时刻固化的披露投影；观战视角沿用全局序号。SSE 与非 SSE 使用同一套观者解析与投影，握手时解析观者、逐事件投影，匿名连接只收公开事件，初始补发的历史帧同样投影且不因后续揭雾重算；不存在“无令牌拿全量”的旁路。
 
 事件类型：
 
@@ -135,7 +143,13 @@
 - `deploy` 中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。
 - `control_point_repair` 包含修复据点、单位、修复量和修复后的 `unitHp`，用于回放同步血量。
 - `demolish` 包含爆破单位、坐标、原地形、目标地形和行动点信息，回放端用它同步地形变化。
-- 同时回合模式有以下专用事件：`plan_committed`（只含 playerId，不泄露计划内容）、`round_resolved`（含每条指令的 `executed/failed/missed/fizzled`）、`round_start`、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit`，`hit: false` 表示预测射击落空。fog 局这些事件按观者投影：隐藏行动整条丢弃，可部分观察的行动删除敏感键而不是置 `null`；**`round_resolved` 只保留本人结果**，`steps` 等于本人结果条数（`payload.results` 只含本人那一项），不做“可见第三方结果”——避免部分揭示泄露隐藏单位信息；拿不准时丢弃整条，不做部分揭示。
+- 同时回合模式有以下专用事件：`plan_committed`（只含 playerId，不泄露计划内容）、`round_resolved`（含每条指令的 `executed/failed/missed/fizzled`）、`round_start`、`action_failed`（冲突落空等未执行的指令及原因）。同时模式的 `attack` 事件带 `q/r/hit`，`hit: false` 表示预测射击落空。
+- fog 局的逐事件披露（全部以**事件发生时刻**的视野判定并固化）：
+  - **区域攻击**（`line` / `arc`）对第三方逐命中格披露：`hit: true` 且命中格 `(q, r)` 在该时刻对观者可见才保留该条；命中格不可见则整条丢弃，不保留 `q/r`、`damage`、`actualDamage`、`targetHp`。第三方永远收不到 `hit: false`——落空（含锁定游侠的落空）只发给攻击者本人。第三方可见的命中若攻击者不可见，删除 `attackerId` / `owner` / `aimQ` / `aimR` / `shape`，保留命中格、`hit`、伤害/血量与当时可见的目标身份（`targetId` / `targetKind`）；目标也不可见时才删除目标身份。被命中单位的 owner 与总部 owner 按现有 1 轮交火快照规则收到整条。
+  - **区域治疗**（`heal`）对第三方逐目标披露：目标在该时刻可见才保留该条（`targetId` / `amount` / `targetHp`），目标不可见则整条丢弃。可见目标但施法者不可见时，再删除 `supportId` / `owner` / `q` / `r`。施法者本人收到全量。
+  - **淘汰**：`player_eliminated.payload.eliminatedBy` 只发给被淘汰者本人与击杀者本人，其他玩家与 `public` 删除该键（固化时决定，不随后续视野变化）；`removedUnitIds` 与 `score` 保持原有观者规则。
+  - **结算**：`round_resolved` 只保留本人结果，`steps` 等于本人结果条数（`payload.results` 只含本人那一项），不做“可见第三方结果”——避免部分揭示泄露隐藏单位信息。隐藏行动整条丢弃，可部分观察的行动删除敏感键而不是置 `null`；拿不准时丢弃整条，不做部分揭示。
+- `action_failed` 只发给行动者本人（失败原因可能间接暴露隐藏单位的位置或存在）。
 - `wait` 是同时回合待命动作的结算事件，payload 含 `owner`、`actionId`、`roundNumber`、`step`、`actionsUsed`、`actionsRemaining`。
 - `bot_failed` 表示 bot 进程异常，payload 含 `playerId`、`bot`（`rl` / `algorithm`）、`reason`、`restarts`。
 

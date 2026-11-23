@@ -10,6 +10,11 @@
 //
 // 可见格按（stateVersion, roundNumber, phase, viewer）缓存；引擎每次 appendEvent
 // 都会推进 stateVersion，因此缓存随状态自然失效。
+//
+// 4.0.1 事件披露口径：每条事件在 appendEvent（bus.emit 之前）把每个观者的投影
+// 载荷与观者序号固化到 event.fogViews / event.fogSeqs。读取只认固化结果，后续
+// 状态变化（单位走到旧格、揭雾）都不回填历史；只有 4.0.1 之前的旧存档没有固化
+// 数据时才回落到“按当前状态重算”。
 import type {
   FogSighting, FogState, GameEvent, GameState, PlayerId, Position,
   TerrainType, Unit, UnitType,
@@ -351,8 +356,12 @@ export function fogProjectionFor(game: GameState, viewer: PlayerId): FogProjecti
 
 // ------------------------------------------------------------------ 事件投影
 
+/** 对外返回的事件副本：必须剥离内部固化表，避免把其他观者的 payload 带出去。 */
 function cloneEvent(event: GameEvent): GameEvent {
-  return { ...event, payload: structuredClone(event.payload) };
+  const cloned: GameEvent = { ...event, payload: structuredClone(event.payload) };
+  delete cloned.fogViews;
+  delete cloned.fogSeqs;
+  return cloned;
 }
 
 function payloadNumber(payload: Record<string, unknown>, key: string): number | null {
@@ -475,6 +484,7 @@ function projectGameStart(
  * 按契约 §4.4 投影单条事件。
  * - `viewer=null` 表示匿名公开视角。
  * - 非 fog 模式返回 null（调用方不替换原事件）。
+ * - 优先返回事件发生时刻固化好的观者载荷；只有旧存档（无固化数据）才按当前状态重算。
  * - 拿不准时丢弃整条事件（null），不做部分揭示。
  */
 export function projectEventForViewer(
@@ -483,18 +493,46 @@ export function projectEventForViewer(
   viewer: PlayerId | null,
 ): GameEvent | null {
   if (!isFogMode(game.config.mode)) return null;
-  const visible = viewer ? visibleCellsFor(game, viewer) : null;
+  const key = fogViewerKey(viewer);
+  const frozen = event.fogViews;
+  if (frozen) {
+    // 有固化表就只认固化结果：没有该观者的条目（例如观者当时还不是座位）按隐藏处理，
+    // 不能借当前状态补算，否则又回到“读取时重算”的泄露路径。
+    const payload = Object.prototype.hasOwnProperty.call(frozen, key) ? frozen[key] : null;
+    if (payload === null || payload === undefined) return null;
+    return {
+      seq: event.seq,
+      type: event.type,
+      timestamp: event.timestamp,
+      payload: structuredClone(payload),
+    };
+  }
+  return projectEventFromState(game, event, viewer);
+}
+
+/** 4.0.1 之前旧存档的回落路径：按当前状态重算（新事件不再走这里）。 */
+function projectEventFromState(
+  game: GameState,
+  event: GameEvent,
+  viewer: PlayerId | null,
+): GameEvent | null {
   const revealed = isFogRevealed(game);
+  // 可见格只在真正需要时才算：公开事件（round_start 等）不该为每个观者重算视野。
+  let visibleCells: Set<string> | null | undefined;
+  const visible = (): Set<string> | null => {
+    if (visibleCells === undefined) visibleCells = viewer ? visibleCellsFor(game, viewer) : null;
+    return visibleCells;
+  };
   const cellVisible = (q: number | null, r: number | null): boolean => {
     if (!viewer) return false;
     if (revealed) return true;
     if (q === null || r === null) return false;
-    return visible!.has(`${q},${r}`);
+    return visible()!.has(`${q},${r}`);
   };
   const unitVisible = (unit: Unit | undefined): boolean => {
     if (!viewer || !unit) return false;
     if (revealed) return true;
-    return unit.owner === viewer || visible!.has(hexKey(unit));
+    return unit.owner === viewer || visible()!.has(hexKey(unit));
   };
   const unitOf = (unitId: string | null): Unit | undefined =>
     unitId ? game.units.find(unit => unit.id === unitId) : undefined;
@@ -525,6 +563,10 @@ export function projectEventForViewer(
 
     case 'player_eliminated': {
       const cloned = cloneEvent(event);
+      // 淘汰者身份只给被淘汰者本人与击杀者本人；其他玩家/公开视角看不到。
+      const eliminatedId = cloned.payload.playerId;
+      const eliminatedBy = cloned.payload.eliminatedBy;
+      if (!viewer || (viewer !== eliminatedId && viewer !== eliminatedBy)) delete cloned.payload.eliminatedBy;
       // 被淘汰玩家的剩余单位 ID 属于隐藏信息：只有本人视角保留。
       if (!viewer || viewer !== cloned.payload.playerId) delete cloned.payload.removedUnitIds;
       // score 走裁决投影：本人完整；其他人仅总分 + hidden；匿名公开仅总分。
@@ -606,50 +648,57 @@ export function projectEventForViewer(
     case 'heal': {
       const owner = clonedOwner(event.payload);
       if (!viewer) return null;
+      // 施法者本人全量。
       if (owner === viewer) return cloneEvent(event);
-      const supportVisible = unitVisible(unitOf(payloadUnitId(event.payload, 'supportId')));
+      // 区域治疗逐目标披露：隐藏目标连 targetId/amount/targetHp 一并隐藏（整条 null）。
       const targetVisible = unitVisible(unitOf(payloadUnitId(event.payload, 'targetId')));
-      const q = payloadNumber(event.payload, 'q');
-      const r = payloadNumber(event.payload, 'r');
-      const cellOk = q !== null && r !== null
-        ? cellVisible(q, r)
-        : supportVisible || targetVisible;
-      if (!cellOk || (!supportVisible && !targetVisible)) return null;
+      if (!targetVisible) return null;
       const cloned = cloneEvent(event);
-      if (!supportVisible) delete cloned.payload.supportId;
-      if (!targetVisible) delete cloned.payload.targetId;
+      // 可见目标但施法者不可见：只保留目标与治疗量，抹掉施法者的身份和施法格。
+      if (!unitVisible(unitOf(payloadUnitId(event.payload, 'supportId')))) {
+        delete cloned.payload.supportId;
+        delete cloned.payload.owner;
+        delete cloned.payload.q;
+        delete cloned.payload.r;
+      }
       return cloned;
     }
 
     case 'attack': {
       const owner = clonedOwner(event.payload);
       if (!viewer) return null;
+      // 攻击者本人全量（含落空、锁定落空与全部命中格）。
       if (owner === viewer) return cloneEvent(event);
+      // 落空（含锁定落空）只给攻击者本人；即使 viewer 是原锁定目标的 owner，
+      // 也不能借 q/r/damage/actualDamage/targetHp 推断隐藏目标的存在。
+      if (event.payload.hit === false) return null;
       const attackerId = payloadUnitId(event.payload, 'attackerId');
       const attacker = unitOf(attackerId);
       const targetId = payloadUnitId(event.payload, 'targetId');
       const target = unitOf(targetId);
-      // 被攻击者本人（单位或总部）：规则上会拿到攻击者 1 轮快照，事件可保留。
+      // 被命中单位/总部的 owner：规则上会拿到攻击者 1 轮快照，整条事件保留。
       const hqTarget = event.payload.targetKind === 'headquarters' && targetId
         ? Object.values(game.headquarters).find(hq => hq.id === targetId)
         : undefined;
       if ((target && target.owner === viewer) || (hqTarget && hqTarget.owner === viewer)) {
         return cloneEvent(event);
       }
-      const hit = event.payload.hit !== false;
-      const q = payloadNumber(event.payload, 'q');
-      const r = payloadNumber(event.payload, 'r');
-      const cellOk = cellVisible(q, r)
-        || cellVisible(payloadNumber(event.payload, 'aimQ'), payloadNumber(event.payload, 'aimR'));
-      if (!cellOk) return null;
+      const hitQ = payloadNumber(event.payload, 'q') ?? target?.q ?? hqTarget?.q ?? null;
+      const hitR = payloadNumber(event.payload, 'r') ?? target?.r ?? hqTarget?.r ?? null;
+      // 只保留命中格当时可见的命中事件；隐藏格（含盲射覆盖到的格）整条丢弃。
+      if (!cellVisible(hitQ, hitR)) return null;
       const cloned = cloneEvent(event);
-      // 第三方只看到交火发生；隐藏攻击者身份（attackerId / owner）脱敏。
+      // 攻击者不可见：身份与瞄准几何（aimQ/aimR/shape）一并脱敏，
+      // 只保留可见命中格 + 伤害/血量，避免反推攻击者位置或覆盖到的隐藏格。
       if (!unitVisible(attacker)) {
         delete cloned.payload.attackerId;
         delete cloned.payload.owner;
+        delete cloned.payload.aimQ;
+        delete cloned.payload.aimR;
+        delete cloned.payload.shape;
       }
-      // 被命中目标若不可见，同样不暴露身份（坐标已可见时目标通常可见）。
-      if (hit && !unitVisible(target)) {
+      // 命中目标若在重算时已不可见（旧存档回落），不暴露其 unitId。
+      if (!unitVisible(target) && !(hqTarget && cellVisible(hqTarget.q, hqTarget.r))) {
         delete cloned.payload.targetId;
         delete cloned.payload.targetKind;
       }
@@ -703,6 +752,156 @@ export function projectEventForViewer(
     default:
       return null;
   }
+}
+
+// ------------------------------------------------------------------ 事件固化（4.0.1）
+//
+// 披露在“事件发生时刻”一次性定稿：appendEvent 在 bus.emit 之前调用
+// recordFogEventViews，把每个座位玩家与 'public' 的投影载荷、观者序号写进事件。
+// 之后无论单位怎么移动、是否揭雾，历史事件都按固化结果返回；揭雾只影响新事件。
+
+/** 匿名/公开视角在固化表里的键。 */
+const PUBLIC_VIEWER_KEY = 'public';
+
+function fogViewerKey(viewer: PlayerId | null): string {
+  return viewer ?? PUBLIC_VIEWER_KEY;
+}
+
+interface ViewerSeqIndex {
+  /** event.seq → 观者序号；隐藏事件不在表内。 */
+  seqByEvent: Map<number, number>;
+  last: number;
+}
+
+/**
+ * 推导观者序号：优先用事件自带的固化序号；没有固化数据的旧事件按当前状态投影计数。
+ * `untilSeqExclusive` 用于只统计到某条事件之前（记录新事件时排除它自己）。
+ */
+function viewerSeqIndex(
+  game: GameState,
+  viewer: PlayerId | null,
+  untilSeqExclusive = Number.POSITIVE_INFINITY,
+): ViewerSeqIndex {
+  const key = fogViewerKey(viewer);
+  const seqByEvent = new Map<number, number>();
+  let counter = 0;
+  for (const event of game.events) {
+    if (event.seq >= untilSeqExclusive) break;
+    if (event.fogSeqs) {
+      const seq = event.fogSeqs[key];
+      if (typeof seq === 'number' && Number.isFinite(seq)) {
+        counter = seq;
+        seqByEvent.set(event.seq, seq);
+      }
+      continue;
+    }
+    if (projectEventForViewer(game, event, viewer)) {
+      counter += 1;
+      seqByEvent.set(event.seq, counter);
+    }
+  }
+  return { seqByEvent, last: counter };
+}
+
+function nextViewerSeq(
+  game: GameState,
+  fog: FogState,
+  viewer: PlayerId | null,
+  untilSeqExclusive: number,
+): number {
+  const key = fogViewerKey(viewer);
+  const stored = fog.viewSeq?.[key];
+  if (typeof stored === 'number' && Number.isFinite(stored)) return Math.trunc(stored) + 1;
+  // 旧存档没有游标：扫描已发生事件推导一次，后续就在 game.fog.viewSeq 上递增。
+  if (!fog.viewSeq) fog.viewSeq = {};
+  const derived = viewerSeqIndex(game, viewer, untilSeqExclusive).last;
+  fog.viewSeq[key] = derived;
+  return derived + 1;
+}
+
+/**
+ * 在 bus.emit 之前固化一条 fog 事件的观者投影与观者序号（仅 fog 局）。
+ * `event.fogViews[key] = null` 表示该观者完全看不到这条事件。
+ */
+export function recordFogEventViews(game: GameState, event: GameEvent): void {
+  if (!isFogMode(game.config.mode)) return;
+  const fog = ensureFogState(game);
+  const views: Record<string, Record<string, unknown> | null> = {};
+  const seqs: Record<string, number> = {};
+  const viewers: Array<PlayerId | null> = [null];
+  for (const id of PLAYER_IDS) {
+    if (game.players[id]) viewers.push(id);
+  }
+  for (const viewer of viewers) {
+    const key = fogViewerKey(viewer);
+    const projected = projectEventForViewer(game, event, viewer);
+    if (!projected) {
+      views[key] = null;
+      continue;
+    }
+    views[key] = structuredClone(projected.payload);
+    const seq = nextViewerSeq(game, fog, viewer, event.seq);
+    seqs[key] = seq;
+    if (!fog.viewSeq) fog.viewSeq = {};
+    fog.viewSeq[key] = seq;
+  }
+  event.fogViews = views;
+  event.fogSeqs = seqs;
+}
+
+/**
+ * 该观者的事件流历史：返回事件的 seq 改写为观者序号，只保留 > after 的条目。
+ * - fog 局：序列只由“该观者可见的事件”组成（隐藏事件不占号）。
+ * - 非 fog 局：保持全量事件与全局 seq（调用方不需要分支）。
+ */
+export function projectFogHistoryForViewer(
+  game: GameState,
+  viewer: PlayerId | null,
+  after = 0,
+): GameEvent[] {
+  if (!isFogMode(game.config.mode)) {
+    return game.events.filter(event => event.seq > after).map(event => cloneEvent(event));
+  }
+  const key = fogViewerKey(viewer);
+  // 只有存在旧事件（无固化数据）时才需要整段推导。
+  const legacy = game.events.some(event => !event.fogSeqs)
+    ? viewerSeqIndex(game, viewer)
+    : null;
+  const events: GameEvent[] = [];
+  for (const event of game.events) {
+    const viewerSeq = event.fogSeqs
+      ? event.fogSeqs[key]
+      : legacy?.seqByEvent.get(event.seq);
+    if (typeof viewerSeq !== 'number' || viewerSeq <= after) continue;
+    const projected = projectEventForViewer(game, event, viewer);
+    if (!projected) continue;
+    events.push({ ...projected, seq: viewerSeq });
+  }
+  return events;
+}
+
+/** 该观者事件流的最新序号（SSE/wait 游标用）；隐藏事件不推进。 */
+export function fogLastVisibleSeq(game: GameState, viewer: PlayerId | null): number {
+  if (!isFogMode(game.config.mode)) return game.events.at(-1)?.seq ?? 0;
+  const key = fogViewerKey(viewer);
+  const stored = game.fog?.viewSeq?.[key];
+  if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
+  return viewerSeqIndex(game, viewer).last;
+}
+
+/** 单条事件对该观者的序号；隐藏返回 null（非 fog 局退回全局 seq）。 */
+export function fogViewerSeqOf(
+  game: GameState,
+  event: GameEvent,
+  viewer: PlayerId | null,
+): number | null {
+  if (!isFogMode(game.config.mode)) return event.seq;
+  const key = fogViewerKey(viewer);
+  if (event.fogSeqs) {
+    const seq = event.fogSeqs[key];
+    return typeof seq === 'number' && Number.isFinite(seq) ? seq : null;
+  }
+  return viewerSeqIndex(game, viewer, event.seq + 1).seqByEvent.get(event.seq) ?? null;
 }
 
 function clonedOwner(payload: Record<string, unknown>): PlayerId | null {

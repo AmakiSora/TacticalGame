@@ -7,7 +7,8 @@ import { globalStore } from '../state/store.js';
 import { hashToken, verifySpectatorToken, verifyToken } from '../state/tokens.js';
 import { buildAdjudicationSnapshot } from '../engine/engine.js';
 import {
-  allUnitsForFullView, fogProjectionFor, projectEventForViewer, unitsForViewer,
+  allUnitsForFullView, fogLastVisibleSeq, fogProjectionFor, projectFogHistoryForViewer,
+  unitsForViewer,
 } from '../engine/fog.js';
 import type { GameEvent } from '../types.js';
 
@@ -166,6 +167,15 @@ function normalizeViewer(viewer: PlayerId | Viewer | undefined): Viewer {
   return viewer ?? { kind: 'public' };
 }
 
+/**
+ * 观战/回放使用的全量事件：保留全局 seq，但剥离引擎内部固化表。
+ * 必须 clone 后再删，不能原地改 game.events（会破坏后续投影与落盘）。
+ */
+export function stripFogEventInternals(event: GameEvent): GameEvent {
+  const { fogViews: _fogViews, fogSeqs: _fogSeqs, ...rest } = structuredClone(event);
+  return rest as GameEvent;
+}
+
 /** 观战全量视野：所有可用格（迷雾只隐藏单位，地形公开）。 */
 function fullViewFogProjection(game: GameState) {
   return {
@@ -273,7 +283,13 @@ export function sanitizeGameForResponse(
     delete turn.resolvedRound;
     delete turn.skipGuard;
   }
-  body.lastEventSeq = events.at(-1)?.seq ?? 0;
+  // fog 玩家/匿名的事件流有自己的连续序号（隐藏事件不占号）；观战与旧模式用全局 seq。
+  const fogViewerId = viewer.kind === 'player' ? viewer.player : null;
+  body.lastEventSeq = !fog
+    ? events.at(-1)?.seq ?? 0
+    : viewer.kind === 'spectator'
+      ? events.at(-1)?.seq ?? 0
+      : fogLastVisibleSeq(game, fogViewerId);
   if (fog) {
     // 非迷雾模式不进入此分支：输出保持逐字节不变。
     const player = viewer.kind === 'player' ? viewer.player : null;
@@ -287,21 +303,21 @@ export function sanitizeGameForResponse(
       : viewer.kind === 'spectator'
         ? fullViewFogProjection(game)
         : emptyFogProjection();
+    // 大厅期 stateVersion 仍用全局版本：host/max-players、host/seats 等不发事件却改状态，
+    // 若提前切到观者序号会让条件 GET 错误命中 304。开局后才与观者事件流对齐。
+    if (game.phase !== 'lobby' && viewer.kind !== 'spectator') {
+      body.stateVersion = fogLastVisibleSeq(game, fogViewerId);
+    }
+    if (viewer.kind !== 'spectator') delete body.lastActivityAt;
   }
   if (projection.events !== false) {
     if (!fog) {
       body.events = structuredClone(events);
+    } else if (viewer.kind === 'spectator') {
+      body.events = events.map(stripFogEventInternals);
     } else {
-      const projected: GameEvent[] = [];
-      for (const event of events) {
-        if (viewer.kind === 'spectator') {
-          projected.push(event);
-          continue;
-        }
-        const visible = projectEventForViewer(game, event, viewer.kind === 'player' ? viewer.player : null);
-        if (visible) projected.push(visible);
-      }
-      body.events = structuredClone(projected);
+      // 历史也按观者序号（seq 已改写），匿名观者同样走 public 投影。
+      body.events = projectFogHistoryForViewer(game, fogViewerId, 0);
     }
   }
   if (projection.config !== false) body.config = structuredClone(config);
@@ -323,10 +339,18 @@ export function sanitizeGameForResponse(
     body.result = projectResultForViewer(body.result, viewer);
     const players = body.players as Record<string, Record<string, unknown>> | undefined;
     if (players && typeof players === 'object') {
+      const self = viewer.kind === 'player' ? viewer.player : null;
       for (const [id, playerState] of Object.entries(players)) {
         if (!playerState || typeof playerState !== 'object') continue;
-        if (viewer.kind === 'player' && id === viewer.player) continue;
-        delete playerState.adjudicationScore;
+        const isSelf = self !== null && id === self;
+        const isKiller = self !== null && playerState.eliminatedBy === self;
+        if (!isSelf) {
+          // 对手的 stats 与裁决分项都会旁路隐藏行动，整块删除；
+          // 淘汰者身份（eliminatedBy）只给自己与击杀者。
+          delete playerState.stats;
+          delete playerState.adjudicationScore;
+        }
+        if (!isSelf && !isKiller) delete playerState.eliminatedBy;
       }
     }
   }

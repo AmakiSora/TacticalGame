@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-17T17:02:34.452Z",
+  "generatedAt": "2026-11-24T17:34:07.608Z",
   "ratingMethod": {
     "model": "Bradley-Terry MLE (MM iteration), draw = 0.5 win",
     "scope": "per game mode; modes are never pooled together",
@@ -523,6 +523,22 @@
       "description": "同时回合：从所有合法计划动作中随机选择入队，随后提交",
       "modes": [
         "simultaneous"
+      ],
+      "playerCounts": [
+        2,
+        3
+      ],
+      "status": "builtin",
+      "statusNote": null
+    },
+    "algo_fog-scout@v1": {
+      "kind": "algorithm",
+      "short": "迷雾侦察算法",
+      "algorithm": "fog-scout",
+      "version": "v1",
+      "description": "迷雾：视野内交战与残影盲射，侦察前压、据点争夺与总部攻防",
+      "modes": [
+        "fog"
       ],
       "playerCounts": [
         2,

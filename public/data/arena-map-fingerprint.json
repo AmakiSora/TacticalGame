@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-17T17:03:37.494Z",
+  "generatedAt": "2026-11-24T17:35:02.747Z",
   "note": "random 图为每局一张对称随机地图，无静态文件；其先手胜率来自竞技场统计而非本文件。",
   "maps": [
     {
@@ -380,6 +380,285 @@
         },
         "komi": {
           "supplies": 12
+        }
+      }
+    },
+    {
+      "id": "fog-crossing",
+      "name": "雾渡",
+      "mode": "fog",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 9,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          8,
+          0
+        ],
+        "player_b": [
+          -8,
+          8
+        ]
+      },
+      "hqDistance": 16,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 4
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 4
+        }
+      },
+      "controlPointCount": 4,
+      "controlPointKinds": {
+        "repair": 1,
+        "supply": 3
+      },
+      "controlPoints": [
+        {
+          "id": "cp_center",
+          "kind": "repair",
+          "q": 0,
+          "r": 0,
+          "distToA": 8,
+          "distToB": 8,
+          "bias": 0
+        },
+        {
+          "id": "cp_east",
+          "kind": "supply",
+          "q": 3,
+          "r": 0,
+          "distToA": 5,
+          "distToB": 11,
+          "bias": 6
+        },
+        {
+          "id": "cp_northwest",
+          "kind": "supply",
+          "q": -3,
+          "r": 3,
+          "distToA": 11,
+          "distToB": 5,
+          "bias": -6
+        },
+        {
+          "id": "cp_north",
+          "kind": "supply",
+          "q": 0,
+          "r": -3,
+          "distToA": 11,
+          "distToB": 11,
+          "bias": 0
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": false,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 3,
+          "controlPointsUnmatched": 2,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": false,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 3,
+          "controlPointsUnmatched": 3,
+          "fullySymmetric": false
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 33,
+          "share": 0.12
+        },
+        {
+          "kind": "blocker",
+          "count": 12,
+          "share": 0.04
+        }
+      ],
+      "balance": {
+        "startingSupplies": 120,
+        "baseIncome": 8,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 6,
+        "attacksPerUnit": 1,
+        "maxTurns": 24,
+        "adjudicationWeights": {
+          "enemyHqDamage": 5,
+          "ownHqHp": 1,
+          "controlPoint": 60,
+          "armyValue": 0.35,
+          "supplies": 0,
+          "killValue": 0.15
+        },
+        "comebackSupply": {
+          "startRound": 6,
+          "scoreGapPercent": 40,
+          "amountPerRound": 12
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 6,
+            "deployDiscount": 8,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 6,
+            "deployDiscount": 0,
+            "repairAmount": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "fog-harbor",
+      "name": "雾港",
+      "mode": "fog",
+      "grid": "hex",
+      "orientation": "pointy",
+      "radius": 8,
+      "playableCellCount": null,
+      "hq": {
+        "player_a": [
+          8,
+          0
+        ],
+        "player_b": [
+          -8,
+          0
+        ]
+      },
+      "hqDistance": 16,
+      "spawnMetrics": {
+        "player_a": {
+          "toHq": 1,
+          "toNearestControlPoint": 4
+        },
+        "player_b": {
+          "toHq": 1,
+          "toNearestControlPoint": 4
+        }
+      },
+      "controlPointCount": 3,
+      "controlPointKinds": {
+        "repair": 1,
+        "forward_base": 2
+      },
+      "controlPoints": [
+        {
+          "id": "cp_center",
+          "kind": "repair",
+          "q": 0,
+          "r": 0,
+          "distToA": 8,
+          "distToB": 8,
+          "bias": 0
+        },
+        {
+          "id": "cp_east",
+          "kind": "forward_base",
+          "q": 4,
+          "r": -1,
+          "distToA": 5,
+          "distToB": 12,
+          "bias": 7
+        },
+        {
+          "id": "cp_west",
+          "kind": "forward_base",
+          "q": -4,
+          "r": 1,
+          "distToA": 12,
+          "distToB": 5,
+          "bias": -7
+        }
+      ],
+      "totalControlPointBias": 0,
+      "symmetry": {
+        "mirror": {
+          "hqMatched": true,
+          "spawnsMatched": false,
+          "controlPointsMatched": false,
+          "spawnsUnmatched": 2,
+          "controlPointsUnmatched": 2,
+          "fullySymmetric": false
+        },
+        "central": {
+          "hqMatched": true,
+          "spawnsMatched": true,
+          "controlPointsMatched": true,
+          "spawnsUnmatched": 0,
+          "controlPointsUnmatched": 0,
+          "fullySymmetric": true
+        }
+      },
+      "terrain": [
+        {
+          "kind": "water",
+          "count": 14,
+          "share": 0.06
+        },
+        {
+          "kind": "blocker",
+          "count": 30,
+          "share": 0.14
+        }
+      ],
+      "balance": {
+        "startingSupplies": 120,
+        "baseIncome": 8,
+        "damageVarianceRange": 3,
+        "minimumDamage": 1,
+        "healVarianceRange": 6,
+        "actionsPerTurn": 6,
+        "attacksPerUnit": 1,
+        "maxTurns": 20,
+        "adjudicationWeights": {
+          "enemyHqDamage": 5,
+          "ownHqHp": 1,
+          "controlPoint": 60,
+          "armyValue": 0.35,
+          "supplies": 0,
+          "killValue": 0.15
+        },
+        "comebackSupply": {
+          "startRound": 5,
+          "scoreGapPercent": 40,
+          "amountPerRound": 12
+        },
+        "controlPointTypes": {
+          "supply": {
+            "income": 8,
+            "deployDiscount": 0,
+            "repairAmount": 0
+          },
+          "forward_base": {
+            "income": 6,
+            "deployDiscount": 8,
+            "repairAmount": 0
+          },
+          "repair": {
+            "income": 6,
+            "deployDiscount": 0,
+            "repairAmount": 10
+          }
         }
       }
     },

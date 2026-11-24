@@ -558,8 +558,9 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     const includeKey = include === null ? 'all' : [...include].sort().join(',');
     // 迷雾局的响应随观者而变（玩家/观战/匿名），ETag 必须带上观者标签，
     // 否则 A 的 304 会让 B 复用 A 的私有视图。非迷雾局保持旧标签字节不变。
-    // fog 开局后版本段与观者事件流对齐（隐藏事件不推进）；大厅期仍用全局版本，
-    // 避免 host/max-players / host/seats 这类“无事件但改状态”的接口被 304 吃掉。
+    // fog 进行中版本段与观者事件流对齐（隐藏事件不推进）；大厅期仍用全局版本，
+    // 避免 host/max-players / host/seats 这类“无事件但改状态”的接口被 304 吃掉；
+    // 终局 public 与观战同权，切回全局号。
     const version = fog && game.phase !== 'lobby' && viewer.kind !== 'spectator'
       ? fogLastVisibleSeq(game, viewer.kind === 'player' ? viewer.player : null)
       : game.stateVersion ?? 0;

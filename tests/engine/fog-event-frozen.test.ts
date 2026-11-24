@@ -8,8 +8,8 @@ import { eliminatePlayer, startGame } from '../../src/engine/engine.js';
 import { appendEvent } from '../../src/engine/events.js';
 import { resolveRoundSteps } from '../../src/engine/simultaneousResolve.js';
 import {
-  FOG_VISION_DEFAULTS, fogLastVisibleSeq, fogViewerSeqOf, normalizeFogState,
-  projectEventForViewer, projectFogHistoryForViewer, visibleCellsFor,
+  FOG_VISION_DEFAULTS, fogLastVisibleSeq, fogViewerSeqOf, isFogPublicRevealed, isFogRevealed,
+  normalizeFogState, projectEventForViewer, projectFogHistoryForViewer, visibleCellsFor,
 } from '../../src/engine/fog.js';
 import { hexRange } from '../../src/engine/hex.js';
 import type {
@@ -472,6 +472,135 @@ describe('viewer sequence', () => {
     expect(after.map(item => item.seq)).toEqual(after.map((_, index) => index + 1));
     expect(after.at(-1)!.seq).toBe(before.length + 1);
     expect(fogLastVisibleSeq(game, 'player_a')).toBe(after.length);
+  });
+});
+
+describe('post-game public reveal', () => {
+  it('reveals the full event stream to anonymous viewers once the fog game is over', () => {
+    const game = makeGame({}, 2);
+    const bus = new EventBus();
+    const a = unitOf(game, 'player_a');
+    const b = unitOf(game, 'player_b');
+    retype(game, a, 'scout');
+    retype(game, b, 'heavy');
+    placeUnits(game, [['player_a', 0, 0], ['player_b', 5, -5]]);
+    bump(game);
+
+    // 进行中：B 在 A 视野外移动，对玩家与 public 都隐藏。
+    const hiddenMove = appendEvent(game, bus, 'move', {
+      owner: 'player_b', unitId: b.id, fromQ: 5, fromR: -5, toQ: 5, toR: -4,
+    });
+    appendEvent(game, bus, 'round_start', { roundNumber: 2 });
+
+    expect(isFogPublicRevealed(game)).toBe(false);
+    expect(projectEventForViewer(game, hiddenMove, null)).toBeNull();
+    expect(fogViewerSeqOf(game, hiddenMove, null)).toBeNull();
+    const activeHistory = projectFogHistoryForViewer(game, null);
+    expect(activeHistory.some(item => item.type === 'move')).toBe(false);
+    expect(activeHistory.map(item => item.seq)).toEqual(activeHistory.map((_, index) => index + 1));
+    const activeLast = fogLastVisibleSeq(game, null);
+    expect(activeLast).toBe(activeHistory.length);
+    expect(activeLast).toBeLessThan(game.events.at(-1)!.seq);
+    // 揭雾轮之前 public 序号与玩家的观者序号一致。
+    expect(fogLastVisibleSeq(game, 'player_a')).toBe(activeLast);
+
+    // 终局：2 人局淘汰 B 即 last_player_standing。
+    expect(eliminatePlayer(game, bus, 'player_b', 'headquarters_destroyed', 'player_a').ok).toBe(true);
+    expect(game.phase).toBe('game_over');
+    expect(isFogPublicRevealed(game)).toBe(true);
+
+    // public 事件流与观战同权：全量事件、全局连续 seq，隐藏事件也占号并出现。
+    const all = projectFogHistoryForViewer(game, null);
+    expect(all.map(item => item.seq)).toEqual(game.events.map(event => event.seq));
+    expect(all).toHaveLength(game.events.length);
+    expect(all.every(item => item.fogViews === undefined && item.fogSeqs === undefined)).toBe(true);
+    const revealedMove = all.find(item => item.type === 'move' && item.payload.unitId === b.id)!;
+    expect(revealedMove).toBeTruthy();
+    expect(revealedMove.payload).toMatchObject({ owner: 'player_b', unitId: b.id, toQ: 5, toR: -4 });
+    expect(projectEventForViewer(game, hiddenMove, null)!.payload.unitId).toBe(b.id);
+    expect(fogLastVisibleSeq(game, null)).toBe(game.events.at(-1)!.seq);
+    expect(fogViewerSeqOf(game, hiddenMove, null)).toBe(hiddenMove.seq);
+    // after 过滤按全局 seq。
+    const afterHidden = projectFogHistoryForViewer(game, null, hiddenMove.seq);
+    expect(afterHidden[0]!.seq).toBe(hiddenMove.seq + 1);
+    expect(afterHidden.every(item => item.seq > hiddenMove.seq)).toBe(true);
+    // game_over 事件对 public 是原始全量（裁决分项不再只有 total）。
+    const rawOver = game.events.find(event => event.type === 'game_over')!;
+    const publicOver = projectEventForViewer(game, rawOver, null)!;
+    expect(publicOver.payload).toEqual(rawOver.payload);
+    const scores = publicOver.payload.scores as Record<string, Record<string, unknown>>;
+    expect(typeof scores.player_a!.armyValue).toBe('number');
+    expect(typeof scores.player_b!.armyValue).toBe('number');
+
+    // 玩家视角不因终局公开而回填：仍是冻结的本人视角，序号仍是观者序号。
+    expect(projectEventForViewer(game, hiddenMove, 'player_a')).toBeNull();
+    expect(projectFogHistoryForViewer(game, 'player_a')
+      .some(item => item.type === 'move' && item.payload.unitId === b.id)).toBe(false);
+    expect(fogLastVisibleSeq(game, 'player_a')).toBeLessThan(game.events.at(-1)!.seq);
+    // 观战（原始事件）本来全量，终局前后都不变。
+    expect((rawOver.payload.scores as Record<string, Record<string, unknown>>).player_b!.armyValue)
+      .toBe(scores.player_b!.armyValue);
+  });
+
+  it('keeps the anonymous view locked while revealFromRound is active', () => {
+    const game = makeGame({ fog: { vision: { ...FOG_VISION_DEFAULTS }, revealFromRound: 2 } }, 2);
+    const bus = new EventBus();
+    const a = unitOf(game, 'player_a');
+    const b = unitOf(game, 'player_b');
+    retype(game, a, 'scout');
+    retype(game, b, 'heavy');
+    placeUnits(game, [['player_a', 0, 0], ['player_b', 5, -5]]);
+    bump(game);
+
+    // R1 的隐藏事件在 R2（已到 revealFromRound）之后仍按发生时刻披露。
+    const hiddenMove = appendEvent(game, bus, 'move', {
+      owner: 'player_b', unitId: b.id, fromQ: 5, fromR: -5, toQ: 5, toR: -4,
+    });
+    setRound(game, 2);
+    expect(isFogRevealed(game)).toBe(true);
+    expect(isFogPublicRevealed(game)).toBe(false);
+
+    expect(projectEventForViewer(game, hiddenMove, null)).toBeNull();
+    const history = projectFogHistoryForViewer(game, null);
+    expect(history.some(item => item.type === 'move')).toBe(false);
+    expect(history.map(item => item.seq)).toEqual(history.map((_, index) => index + 1));
+    expect(fogLastVisibleSeq(game, null)).toBe(history.length);
+    expect(fogLastVisibleSeq(game, null)).toBeLessThan(game.events.at(-1)!.seq);
+  });
+
+  it('falls back to the public full stream at game_over for legacy saves without frozen data', () => {
+    const game = makeGame({}, 2);
+    const bus = new EventBus();
+    const b = unitOf(game, 'player_b');
+    placeUnits(game, [['player_a', 0, 0], ['player_b', 5, -5]]);
+    const hiddenMove = appendEvent(game, bus, 'move', {
+      owner: 'player_b', unitId: b.id, fromQ: 5, fromR: -5, toQ: 5, toR: -4,
+    });
+    appendEvent(game, bus, 'round_start', { roundNumber: 2 });
+
+    // 模拟 4.0.0 旧存档：没有固化表，也没有观者游标。
+    for (const event of game.events) {
+      delete event.fogViews;
+      delete event.fogSeqs;
+    }
+    delete game.fog!.viewSeq;
+
+    // 进行中：回落投影仍按当前状态过滤 public。
+    expect(isFogPublicRevealed(game)).toBe(false);
+    expect(projectEventForViewer(game, hiddenMove, null)).toBeNull();
+    const activeHistory = projectFogHistoryForViewer(game, null);
+    expect(activeHistory.some(item => item.type === 'move')).toBe(false);
+
+    // 已结束的旧档：public 直接全量、全局 seq。
+    game.phase = 'game_over';
+    game.turn.phase = 'game_over';
+    expect(isFogPublicRevealed(game)).toBe(true);
+    const history = projectFogHistoryForViewer(game, null);
+    expect(history.map(item => item.seq)).toEqual(game.events.map(event => event.seq));
+    expect(history.some(item => item.type === 'move' && item.payload.unitId === b.id)).toBe(true);
+    expect(projectEventForViewer(game, hiddenMove, null)!.payload.unitId).toBe(b.id);
+    expect(fogLastVisibleSeq(game, null)).toBe(game.events.at(-1)!.seq);
+    expect(fogViewerSeqOf(game, hiddenMove, null)).toBe(hiddenMove.seq);
   });
 });
 

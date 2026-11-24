@@ -54,7 +54,8 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       const fog = isFogGame(game);
 
       // 观者三态与非 SSE 事件补拉共用同一套解析：玩家 > 观战 > 匿名。
-      // 非迷雾模式的事件列表保持旧行为（匿名全量、无效令牌忽略）；迷雾局没有匿名全量旁路。
+      // 非迷雾模式保持旧行为（匿名全量、无效令牌忽略）；迷雾进行中没有匿名全量旁路，
+      // 终局 public 与观战同权全量，且不再校验观战令牌。
       const viewer = resolveViewer(req, game, reply, {
         strictPlayerToken: fog || (wantsSse && !closeAfterFlush),
       });
@@ -68,7 +69,8 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
         Number.isFinite(headerAfter) ? headerAfter : 0,
       );
       const viewerId = viewer.kind === 'player' ? viewer.player : null;
-      // fog 玩家/匿名的 seq 是观者序号（隐藏事件不占号）；观战与旧模式保留全局 seq。
+      // 进行中 fog 玩家/匿名的 seq 是观者序号（隐藏事件不占号）；观战、旧模式与终局 public
+      // 保留全局 seq。
       const filtered = !fog
         ? game.events.filter(e => e.seq > after)
         : viewer.kind === 'spectator'
@@ -186,7 +188,8 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
       };
       const unsubscribe = closeAfterFlush ? () => {} : globalEventBus.subscribe(game.id, ev => {
         if (cleanedUp) return;
-        // 实时帧同样投影：握手时的观者身份固定；fog 用事件发生时刻固化的载荷与观者序号。
+        // 实时帧同样投影：握手时的观者身份固定；进行中 fog 用事件发生时刻固化的载荷与
+        // 观者序号，终局 public 用原始全量 + 全局 seq。
         let visible: GameEvent | null = ev;
         if (fog) {
           if (viewer.kind === 'spectator') {

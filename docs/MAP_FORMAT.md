@@ -75,7 +75,7 @@
 
 ## 迷雾字段
 
-迷雾模式地图声明 `mode: "fog"` 与顶层 `fog`（fog 图必须带 `fog` 块，`vision` / `revealFromRound` 可省略）。视野只影响“玩家能看到哪些敌方单位”，地形、总部位置/HP、据点归属始终公开；保密由服务端按观者投影实现，不是地图字段、也不是前端遮罩。事件披露同样按发生时刻的视野固化：写入时即为每个观者决定可见内容，后续揭雾不回填历史事件。
+迷雾模式地图声明 `mode: "fog"` 与顶层 `fog`（fog 图必须带 `fog` 块，`vision` / `revealFromRound` 可省略）。视野只影响“玩家能看到哪些敌方单位”，地形、总部位置/HP、据点归属始终公开；保密由服务端按观者投影实现，不是地图字段、也不是前端遮罩。事件披露同样按发生时刻的视野固化：写入时即为每个观者决定可见内容，后续揭雾不回填历史事件；对局结束（`phase === "game_over"`）后 public 公开全量，不再受该投影限制。
 
 ```json
 {
@@ -90,7 +90,7 @@
 
 - `fog.vision` 的键只能是五种兵种（`scout` / `ranger` / `infantry` / `support` / `heavy`），值为 `0..8` 的整数；缺省兵种落默认值：侦察 4、游侠 3、步兵 2、支援 2、重装 1。`0` 表示该兵种不提供视野（自身所在格仍可见）。
 - 总部与己方据点各提供 1 格视野；视线被 `blocker` 遮挡（不含起点/终点），`water` 不挡，地图外/不可用格视为挡。
-- `fog.revealFromRound` 为 `null`（全程迷雾）或 `>= 1` 的整数；地图有 `maxTurns` 时不得大于它。到达该轮或 `phase === "game_over"` 时全体揭雾。
+- `fog.revealFromRound` 为 `null`（全程迷雾）或 `>= 1` 的整数；地图有 `maxTurns` 时不得大于它。到达该轮时玩家自己的视野全开（public 状态仍按安全投影）；`phase === "game_over"` 后 public 也全量公开，与观战同权。
 - `fog` 字段只允许出现在 `mode === "fog"` 的图上；非 fog 图出现 `fog` → 加载错误（错误信息带 `Map "<id>".fog...` 前缀）。
 - fog 图**禁止** `annihilation` 与 `balance.komi`；必须有总部与出生槽（总部可随 `spawnSlots[].headquarters` 声明）；`controlPoints` 允许。动作点仍由 `balance.actionsPerTurn` 决定。
 - 支持人数（`supportedPlayerCounts`）按图生效：`fog-harbor` 为 `[2]`，`fog-crossing` 为 `[3]`；未显式声明时由 `layouts` 推导。

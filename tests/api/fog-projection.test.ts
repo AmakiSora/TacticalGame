@@ -59,6 +59,47 @@ describe('fog state projection', () => {
     expect(body.plan.queues.player_b).toBeUndefined();
   });
 
+  it('anonymous game_start carries public map geometry but no hidden units or headquarters', async () => {
+    const { gameId, seats, spectatorToken } = await gameWithFog();
+    const game = globalStore.get(gameId)!;
+    const allUnitIds = game.units.map(unit => unit.id);
+
+    const { body: publicView } = await fetchFogState(app, gameId);
+    const publicStart = publicView.events.find(event => event.type === 'game_start')!;
+    expect(publicStart).toBeTruthy();
+    const publicPayload = publicStart.payload as Record<string, any>;
+    expect(publicPayload.mapId).toBe(game.mapId);
+    expect(publicPayload.mode).toBe('fog');
+    expect(typeof publicPayload.roundNumber).toBe('number');
+    expect(Array.isArray(publicPayload.map?.cells)).toBe(true);
+    expect(publicPayload.map.cells.length).toBe(game.cells.length);
+    expect(publicPayload.map.cells[0]).toHaveProperty('q');
+    expect(publicPayload.map.cells[0]).toHaveProperty('r');
+    expect(publicPayload.map.cells[0]).toHaveProperty('terrain');
+    for (const key of ['units', 'headquarters', 'players', 'resources', 'controlPoints']) {
+      expect(publicPayload[key]).toBeUndefined();
+    }
+    for (const id of allUnitIds) expect(JSON.stringify(publicPayload)).not.toContain(id);
+
+    const eventsBody = await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` });
+    expect(eventsBody.statusCode).toBe(200);
+    const anonStart = (eventsBody.json() as { events: { type: string; payload: Record<string, any> }[] })
+      .events.find(event => event.type === 'game_start')!;
+    expect(anonStart.payload.map.cells.length).toBe(game.cells.length);
+    expect(anonStart.payload.units).toBeUndefined();
+    for (const id of allUnitIds) expect(eventsBody.body).not.toContain(id);
+
+    // 玩家与观战投影不变：玩家保留自己的单位，观战保留全量。
+    const { body: playerView } = await fetchFogState(app, gameId, { player: seats[0]!.token });
+    const playerStart = playerView.events.find(event => event.type === 'game_start')!;
+    const playerPayload = playerStart.payload as Record<string, any>;
+    expect(playerPayload.map.cells.length).toBe(game.cells.length);
+    expect(playerPayload.units.some((unit: { owner: string }) => unit.owner === 'player_a')).toBe(true);
+    const { body: spectatorView } = await fetchFogState(app, gameId, { spectator: spectatorToken });
+    const spectatorStart = spectatorView.events.find(event => event.type === 'game_start')!;
+    expect((spectatorStart.payload as Record<string, any>).units).toHaveLength(game.units.length);
+  });
+
   it('redacts other players adjudication details but keeps their total and rank', async () => {
     const { gameId, seats } = await gameWithFog();
     const { body } = await fetchFogState(app, gameId, { player: seats[0]!.token });
@@ -254,7 +295,116 @@ describe('fog state projection', () => {
     }
   });
 
-  it('redacts terminal result scores for players/public and keeps spectator full', async () => {
+  it('terminal public is fully revealed while active public stays locked', async () => {
+    const { gameId, seats, spectatorToken } = await gameWithFog();
+    const game = globalStore.get(gameId)!;
+    const activePublic = await app.inject({ method: 'GET', url: `/api/games/${gameId}` });
+    expect(activePublic.statusCode).toBe(200);
+    const activeBody = activePublic.json() as { units: unknown[]; fog: { revealed: boolean }; adjudication: any };
+    expect(activeBody.units).toEqual([]);
+    expect(activeBody.fog.revealed).toBe(false);
+    expect(activeBody.adjudication).toEqual({ hidden: true });
+    const activeEtag = activePublic.headers.etag as string;
+
+    // 终局前先制造一条匿名不可见的行动，确认终局公开时它才出现。
+    const visibleIds = new Set((await fetchFogState(app, gameId, { player: seats[0]!.token }))
+      .body.units.map(unit => unit.id));
+    const hidden = game.units.find(unit => unit.owner === 'player_b' && !visibleIds.has(unit.id))!;
+    const hiddenEvent = appendEvent(game, globalEventBus, 'move', {
+      owner: 'player_b', unitId: hidden.id,
+      fromQ: hidden.q, fromR: hidden.r, toQ: hidden.q + 1, toR: hidden.r,
+    });
+    const stillLocked = await fetchFogState(app, gameId);
+    expect(stillLocked.body.units).toEqual([]);
+    expect(stillLocked.body.events.some(event => event.type === 'move')).toBe(false);
+
+    const adjudicated = await app.inject({ method: 'POST', url: `/api/games/${gameId}/force-adjudicate` });
+    expect(adjudicated.statusCode).toBe(200);
+    expect(game.phase).toBe('game_over');
+
+    const pub = await fetchFogState(app, gameId);
+    expect(pub.body.units).toHaveLength(game.units.length);
+    expect(pub.body.fog.revealed).toBe(true);
+    expect(typeof (pub.body.adjudication.scores.player_b as any).armyValue).toBe('number');
+    const hiddenCount = pub.body.events.filter(event => event.type === 'move').length;
+    expect(hiddenCount).toBeGreaterThanOrEqual(1);
+    expect(pub.body.events.map(event => event.seq)).toEqual(game.events.map(event => event.seq));
+    expect((pub.body as unknown as { stateVersion: number }).stateVersion).toBe(game.stateVersion);
+    expect(pub.body.lastEventSeq).toBe(game.events.at(-1)!.seq);
+
+    // 旧的 active 匿名 ETag 不能命中终局全量视图。
+    const stale = await app.inject({
+      method: 'GET',
+      url: `/api/games/${gameId}`,
+      headers: { 'if-none-match': activeEtag },
+    });
+    expect(stale.statusCode).toBe(200);
+    expect((stale.json() as { units: unknown[] }).units).toHaveLength(game.units.length);
+
+    // 非 SSE 事件补拉同样全量、全局 seq。
+    const fullEvents = await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` });
+    expect(fullEvents.statusCode).toBe(200);
+    const fullList = (fullEvents.json() as { events: { seq: number; type: string }[] }).events;
+    expect(fullList.map(event => event.seq)).toEqual(game.events.map(event => event.seq));
+    expect(fullList.some(event => event.type === 'move')).toBe(true);
+
+    // 玩家视角仍是冻结本人历史：隐藏行动在终局后也不补出来。
+    const player = await fetchFogState(app, gameId, { player: seats[0]!.token });
+    expect(player.body.events.some(event => event.type === 'move')).toBe(false);
+    // 观战全量。
+    const spectator = await fetchFogState(app, gameId, { spectator: spectatorToken });
+    expect(spectator.body.events.map(event => event.seq)).toEqual(game.events.map(event => event.seq));
+  });
+
+  it('accepts any spectator token after game over but still rejects invalid ones while active', async () => {
+    const { gameId, spectatorToken } = await gameWithFog();
+    const stale = 'deadbeefdeadbeefdeadbeefdeadbeef';
+
+    const activeHeader = await app.inject({
+      method: 'GET', url: `/api/games/${gameId}`, headers: { 'x-spectator-token': stale },
+    });
+    expect(activeHeader.statusCode).toBe(401);
+    expect(activeHeader.json().code).toBe('invalid_spectator_token');
+    const activeQuery = await app.inject({
+      method: 'GET', url: `/api/games/${gameId}?spectatorToken=${stale}`,
+    });
+    expect(activeQuery.statusCode).toBe(401);
+    expect(activeQuery.json().code).toBe('invalid_spectator_token');
+    const activeEvents = await app.inject({
+      method: 'GET', url: `/api/games/${gameId}/events`, headers: { 'x-spectator-token': stale },
+    });
+    expect(activeEvents.statusCode).toBe(401);
+    expect(activeEvents.json().code).toBe('invalid_spectator_token');
+
+    const adjudicated = await app.inject({ method: 'POST', url: `/api/games/${gameId}/force-adjudicate` });
+    expect(adjudicated.statusCode).toBe(200);
+    const game = globalStore.get(gameId)!;
+
+    for (const req of [
+      { url: `/api/games/${gameId}`, headers: { 'x-spectator-token': stale } },
+      { url: `/api/games/${gameId}?spectatorToken=${stale}`, headers: {} },
+      { url: `/api/games/${gameId}`, headers: { 'x-spectator-token': spectatorToken } },
+    ]) {
+      const res = await app.inject({ method: 'GET', ...req });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { units: unknown[]; adjudication: { scores: Record<string, any> }; result: any };
+      expect(body.units).toHaveLength(game.units.length);
+      expect(typeof body.adjudication.scores.player_b.armyValue).toBe('number');
+      expect(typeof body.result.scores.player_b.killValue).toBe('number');
+    }
+
+    for (const req of [
+      { url: `/api/games/${gameId}/events`, headers: { 'x-spectator-token': stale } },
+      { url: `/api/games/${gameId}/events?spectatorToken=${stale}`, headers: {} },
+    ]) {
+      const res = await app.inject({ method: 'GET', ...req });
+      expect(res.statusCode).toBe(200);
+      const events = (res.json() as { events: { seq: number; type: string }[] }).events;
+      expect(events.map(event => event.seq)).toEqual(game.events.map(event => event.seq));
+    }
+  });
+
+  it('redacts terminal result scores for players and keeps public/spectator full', async () => {
     const { gameId, seats, spectatorToken } = await gameWithFog();
     const adjudicated = await app.inject({ method: 'POST', url: `/api/games/${gameId}/force-adjudicate` });
     expect(adjudicated.statusCode).toBe(200);
@@ -286,18 +436,21 @@ describe('fog state projection', () => {
     expect((overA.payload.scores as Record<string, unknown>).player_a)
       .toMatchObject({ armyValue: rawA.armyValue });
 
-    // 匿名 public：所有人只有 total，连 hidden 标记都不给。
+    // 匿名 public：终局与观战同权，结果全量公开。
     const pub = await fetchFogState(app, gameId);
     const pubView = pub.body as unknown as { result: any; players: Record<string, any> };
-    expect(pubView.result.scores.player_a).toEqual({ total: rawA.total });
-    expect(pubView.result.scores.player_b).toEqual({ total: rawB.total });
-    expect(pubView.result.scores.player_a.armyValue).toBeUndefined();
-    for (const ranking of pubView.result.rankings) {
-      expect(ranking.score.armyValue).toBeUndefined();
-      expect(ranking.score.total).toBeTypeOf('number');
-    }
+    expect(pubView.result.scores.player_a).toEqual(rawA);
+    expect(pubView.result.scores.player_b).toEqual(rawB);
+    expect(pubView.result.scores.player_a.armyValue).toBe(rawA.armyValue);
+    const pubRankB = pubView.result.rankings.find((ranking: any) => ranking.playerId === 'player_b');
+    expect(pubRankB.score.armyValue).toBe(rawB.armyValue);
     const overPub = pub.body.events.find(event => event.type === 'game_over')!;
-    expect((overPub.payload.scores as Record<string, unknown>).player_a).toEqual({ total: rawA.total });
+    expect((overPub.payload.scores as Record<string, any>).player_a.armyValue).toBe(rawA.armyValue);
+    // 匿名终局的单元、裁决、fog 也全量。
+    expect(pub.body.units).toHaveLength(game.units.length);
+    expect(pub.body.fog.revealed).toBe(true);
+    expect(typeof (pubView as any).adjudication.scores.player_b.armyValue).toBe('number');
+    expect((pub.body as unknown as { lastActivityAt?: number }).lastActivityAt).toBeTypeOf('number');
 
     // 观战令牌：全量。
     const spectator = await fetchFogState(app, gameId, { spectator: spectatorToken });
@@ -312,7 +465,7 @@ describe('fog state projection', () => {
     expect(game.result!.scores.player_b!.armyValue).toBe(rawB.armyValue);
   });
 
-  it('drops other players adjudicationScore for player/public but keeps own and stats', async () => {
+  it('drops other players adjudicationScore for players while terminal public is full', async () => {
     const { gameId, seats, hostToken, spectatorToken } = await gameWithFog();
     const eliminated = await app.inject({
       method: 'POST',
@@ -345,13 +498,11 @@ describe('fog state projection', () => {
     expect(playersB.player_a.adjudicationScore).toBeUndefined();
     expect(playersB.player_a.stats).toBeUndefined();
 
-    // public：所有人的 adjudicationScore 都删除。
+    // public：终局与观战同权，stats / adjudicationScore 全量保留。
     const { body: pubBody } = await fetchFogState(app, gameId);
     const pubPlayers = (pubBody as unknown as { players: Record<string, any> }).players;
-    for (const entry of Object.values(pubPlayers)) {
-      expect(entry.adjudicationScore).toBeUndefined();
-      expect(entry.stats).toBeUndefined();
-    }
+    expect(pubPlayers.player_b.adjudicationScore).toEqual(rawEliminated);
+    expect(pubPlayers.player_b.stats).toBeTruthy();
 
     // spectator：全量保留。
     const { body: spectatorBody } = await fetchFogState(app, gameId, { spectator: spectatorToken });

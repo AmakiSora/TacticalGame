@@ -7,8 +7,8 @@ import { globalStore } from '../state/store.js';
 import { hashToken, verifySpectatorToken, verifyToken } from '../state/tokens.js';
 import { buildAdjudicationSnapshot } from '../engine/engine.js';
 import {
-  allUnitsForFullView, fogLastVisibleSeq, fogProjectionFor, projectFogHistoryForViewer,
-  unitsForViewer,
+  allUnitsForFullView, fogLastVisibleSeq, fogProjectionFor, isFogPublicRevealed,
+  projectFogHistoryForViewer, unitsForViewer,
 } from '../engine/fog.js';
 import type { GameEvent } from '../types.js';
 
@@ -125,8 +125,9 @@ export interface ViewerOptions {
 
 /**
  * 观者解析优先级：合法玩家令牌（头或 ?token=）> 合法观战令牌（头或 ?spectatorToken=）> 匿名。
- * 同时提供时以玩家为准；迷雾局无令牌不是错误（安全公开视角）。
- * 非迷雾局没有观战令牌（hash 不存在），因此忽略 X-Spectator-Token，保持旧行为。
+ * 进行中同时提供时以玩家为准；迷雾局无令牌不是错误（安全公开视角）。
+ * 迷雾终局后不再校验观战令牌，一律按 public 全量；非迷雾局没有观战令牌（hash 不存在），
+ * 因此忽略 X-Spectator-Token，保持旧行为。
  */
 export function resolveViewer(
   req: FastifyRequest<{ Params: { id: string } }>,
@@ -146,7 +147,8 @@ export function resolveViewer(
   }
   const spectatorToken = firstHeaderValue(req.headers['x-spectator-token'])
     ?? firstHeaderValue(query.spectatorToken);
-  if (spectatorToken && isFogGame(game)) {
+  // 终局后不再校验观战令牌：public 与观战同权全量，陈旧/无效令牌不应把浏览器挡在 401。
+  if (spectatorToken && isFogGame(game) && !isFogPublicRevealed(game)) {
     if (!verifySpectatorToken(spectatorToken, game.spectatorTokenHash)) {
       reply.code(401).send({ error: '观战凭证无效', code: 'invalid_spectator_token' });
       return null;
@@ -268,6 +270,8 @@ export function sanitizeGameForResponse(
 ): unknown {
   const viewer = normalizeViewer(viewerParam);
   const fog = isFogGame(game);
+  // 终局迷雾公开：匿名与观战同权，拿全量；进行中仍是安全公开视角。
+  const publicRevealed = fog && viewer.kind === 'public' && isFogPublicRevealed(game);
   // rngState 一并剥离：泄露会让客户端预测后续伤害/治疗掷骰。
   // spectatorTokenHash 与玩家 token 同等对待：只落盘，绝不回给客户端。
   const {
@@ -283,7 +287,8 @@ export function sanitizeGameForResponse(
     delete turn.resolvedRound;
     delete turn.skipGuard;
   }
-  // fog 玩家/匿名的事件流有自己的连续序号（隐藏事件不占号）；观战与旧模式用全局 seq。
+  // 进行中 fog 玩家/匿名用自己的连续序号（隐藏事件不占号）；观战与旧模式用全局 seq。
+  // 终局 public 与观战同权，也切回全局 seq。
   const fogViewerId = viewer.kind === 'player' ? viewer.player : null;
   body.lastEventSeq = !fog
     ? events.at(-1)?.seq ?? 0
@@ -295,20 +300,21 @@ export function sanitizeGameForResponse(
     const player = viewer.kind === 'player' ? viewer.player : null;
     body.units = player
       ? structuredClone(unitsForViewer(game, player))
-      : viewer.kind === 'spectator'
+      : (viewer.kind === 'spectator' || publicRevealed)
         ? structuredClone(allUnitsForFullView(game))
         : [];
     body.fog = player
       ? fogProjectionFor(game, player)
-      : viewer.kind === 'spectator'
+      : (viewer.kind === 'spectator' || publicRevealed)
         ? fullViewFogProjection(game)
         : emptyFogProjection();
     // 大厅期 stateVersion 仍用全局版本：host/max-players、host/seats 等不发事件却改状态，
-    // 若提前切到观者序号会让条件 GET 错误命中 304。开局后才与观者事件流对齐。
+    // 若提前切到观者序号会让条件 GET 错误命中 304。进行中 player/public 与观者事件流对齐；
+    // 终局 public 走全局号（与观战同权），旧锁定视图 ETag 不再命中。
     if (game.phase !== 'lobby' && viewer.kind !== 'spectator') {
       body.stateVersion = fogLastVisibleSeq(game, fogViewerId);
     }
-    if (viewer.kind !== 'spectator') delete body.lastActivityAt;
+    if (viewer.kind !== 'spectator' && !publicRevealed) delete body.lastActivityAt;
   }
   if (projection.events !== false) {
     if (!fog) {
@@ -316,7 +322,7 @@ export function sanitizeGameForResponse(
     } else if (viewer.kind === 'spectator') {
       body.events = events.map(stripFogEventInternals);
     } else {
-      // 历史也按观者序号（seq 已改写），匿名观者同样走 public 投影。
+      // 进行中历史按观者序号（seq 已改写）；终局 public 由 engine 返回原始全量 + 全局 seq。
       body.events = projectFogHistoryForViewer(game, fogViewerId, 0);
     }
   }
@@ -327,13 +333,13 @@ export function sanitizeGameForResponse(
       body.adjudication = snapshot;
     } else if (viewer.kind === 'player') {
       body.adjudication = projectAdjudicationForPlayer(snapshot, viewer.player);
-    } else if (viewer.kind === 'spectator') {
+    } else if (viewer.kind === 'spectator' || publicRevealed) {
       body.adjudication = snapshot;
     } else {
       body.adjudication = { hidden: true };
     }
   }
-  if (fog && viewer.kind !== 'spectator') {
+  if (fog && viewer.kind !== 'spectator' && !publicRevealed) {
     // 终局 result 与 players[].adjudicationScore 是 adjudication 之外的第二、第三条
     // 全量裁决旁路：只改投影副本，绝不原地改 game.result / game.players。
     body.result = projectResultForViewer(body.result, viewer);

@@ -4911,15 +4911,17 @@ async function enterGame() {
   startSeatSync();
   const ok = await loadFullState(isCurrent);
   if (!isCurrent()) return;
+  if (!myToken) {
+    // 未参战（房主默认旁观）或只有观战会话：对局开始后转到观战页。
+    // 必须先于 cells 判空：旧固化事件可能没有公开地图（4.0.0 时期匿名 game_start 只有轮号，新局带公开地形），
+    // state.cells 为空是观战页能处理的情况，无座用户不该留在大厅收「获取对局状态失败」。
+    window.location.href = `/spectator-m.html?gameId=${encodeURIComponent(gameId)}`;
+    return;
+  }
   if (!ok || !state.cells.length) {
     // 这颗按钮只在对局 active 时出现，正常不会走到这里：只可能是开局瞬间事件流还没就绪的竞态。
     // 不回读大厅、不刷新整页，提示后让用户稍后再点。
     return toast('获取对局状态失败，请稍后重试', 'err');
-  }
-  if (!myToken) {
-    // 未参战（房主默认旁观）或只有观战会话：对局开始后转到观战页。
-    window.location.href = `/spectator-m.html?gameId=${encodeURIComponent(gameId)}`;
-    return;
   }
   stopLobbyPolling();
   stopAvailableGamesRefresh();

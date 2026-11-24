@@ -130,7 +130,8 @@ function spectatorHarness(file: string) {
   const force = new Element();
   force.disabled = true;
   const context = createContext({
-    document: env.document, fetch: env.fetch, setTimeout, clearTimeout,
+    document: env.document, window: { addEventListener: vi.fn() },
+    fetch: env.fetch, setTimeout, clearTimeout, stopFogUnlockPoll: vi.fn(),
     gameSelect, gamePickerLabel: label, gamePickerMenu: menu, gamePicker: picker,
     gamePickerButton: pickerButton, forceAdjudicateBtn: force,
     autoRefreshCb: new Element(), followLatestCb: new Element(), statusEl: new Element(),

@@ -33,6 +33,7 @@ function loadReplayHarness(file: string) {
     syncPickerCurrent: sync,
     syncGamePickerLabel: sync,
     clearFogLock: vi.fn(),
+    stopFogUnlockPoll: vi.fn(),
   });
   const run = (code: string) => new Script(code).runInContext(context);
   run(`

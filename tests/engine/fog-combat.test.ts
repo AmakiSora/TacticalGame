@@ -431,6 +431,45 @@ describe('fog event projection', () => {
     expect(startUnits.length).toBeGreaterThan(0);
     expect(startUnits.every(unit => unit.owner === 'player_a')).toBe(true);
     const publicView = projectEventForViewer(game, start, null)!;
-    expect(publicView.payload).toEqual({ roundNumber: 1 });
+    // 匿名视角保留公开棋盘（4.0.1 修复），但仍不出现任何单位/总部明细。
+    expect(publicView.payload).toMatchObject({ roundNumber: 1, mapId: game.mapId, mode: 'fog' });
+  });
+
+  it('gives anonymous viewers the public board on game_start but no hidden units or headquarters', () => {
+    const game = makeGame();
+    const start = lastEvent(game, 'game_start')!;
+    const publicView = projectEventForViewer(game, start, null)!;
+    const payload = publicView.payload as Record<string, unknown> & { map: { cells: Record<string, unknown>[]; terrainCells: unknown } };
+
+    expect(payload.roundNumber).toBe(1);
+    expect(payload.mapId).toBe(game.mapId);
+    expect(payload.mode).toBe('fog');
+    expect(Array.isArray(payload.map.cells)).toBe(true);
+    expect(payload.map.cells.length).toBe(game.cells.length);
+    expect(payload.map.cells[0]).toMatchObject({
+      q: expect.any(Number), r: expect.any(Number), terrain: expect.any(String),
+    });
+    expect(payload.map.terrainCells).toEqual(game.map.terrainCells);
+
+    // 隐藏信息不出现：单位/总部/玩家/资源/据点归属整块没有，任何单位 id 与总部 id 也不得出现。
+    for (const key of ['units', 'headquarters', 'players', 'resources', 'controlPoints']) {
+      expect(payload[key]).toBeUndefined();
+    }
+    const serialized = JSON.stringify(payload);
+    for (const unit of game.units) expect(serialized).not.toContain(unit.id);
+    for (const hq of Object.values(game.headquarters)) {
+      expect(hq).toBeTruthy();
+      expect(serialized).not.toContain(hq!.id);
+    }
+    expect(serialized).not.toContain('"owner"');
+
+    // 固化路径同样生效：public 条目的载荷与实时投影一致（开局事件在 emit 时已固化）。
+    expect(start.fogViews?.public).toEqual(publicView.payload);
+
+    // 玩家与观战口径不变：玩家事件里只有自己的单位；原始事件（观战全量）仍是完整快照。
+    const playerView = projectEventForViewer(game, start, 'player_a')!;
+    expect((playerView.payload.units as unknown[]).length).toBeGreaterThan(0);
+    expect((start.payload.units as unknown[]).length).toBe(game.units.length);
+    expect((start.payload.headquarters as Record<string, unknown>).player_b).toBeTruthy();
   });
 });

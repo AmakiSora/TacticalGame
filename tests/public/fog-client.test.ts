@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const read = (path: string) => readFileSync(path, 'utf8');
 const PLAYER_PAGES = ['public/play.js', 'public/play-m.js'];
@@ -237,9 +237,10 @@ describe('fog spectator pages', () => {
     for (const page of SPECTATOR_PAGES) {
       const source = read(page);
 
-      expect(source, page).toContain('const authQuery = liveFogGame && spectatorToken ?');
+      expect(source, page).toContain('const authQuery = liveFogGame && spectatorToken && !fogPublicTerminal ?');
       expect(source, page).toContain('spectatorToken=${encodeURIComponent(spectatorToken)}');
       expect(slice(source, 'function resetLoadedGame(', 'function ')).toContain('liveFogGame = false;');
+      expect(slice(source, 'function resetLoadedGame(', 'function ')).toContain('fogPublicTerminal = false;');
       expect(source, page).toContain('clearFogLock();');
     }
   });
@@ -255,6 +256,520 @@ describe('fog spectator pages', () => {
     expect(read('public/spectator-m.css')).toContain('.fog-lock');
     for (const page of SPECTATOR_PAGES) {
       expect(read(page), page).toContain('function saveSpectatorTokenFromSettings()');
+    }
+  });
+});
+
+/**
+ * 旧固化事件的匿名 game_start 可能没有公开地图（4.0.0 时期的 public 载荷只含轮号，新局带公开地形），
+ * 无座用户（房主旁观）点「进入游戏」时 state.cells 为空。enterGame 必须先把
+ * 无 token 用户转去观战页，不能被 cells 判空拦下弹「获取对局状态失败」。
+ */
+function loadEnterGame(file: string, options: { myToken: string | null; cells?: number; ok?: boolean }) {
+  const source = read(file);
+  const start = source.indexOf('async function enterGame() {');
+  const end = source.indexOf('\n// 刷新/重开后用本地会话回到对局', start);
+  expect(start, `${file} 缺少 enterGame`).toBeGreaterThan(-1);
+  expect(end, `${file} enterGame 之后缺少 reconnectSavedSession 注释`).toBeGreaterThan(start);
+  const body = source.slice(start, end);
+  const toast = vi.fn();
+  const location = { href: '' };
+  const joinPanel = { classList: { add: vi.fn(), remove: vi.fn() } };
+  const gameUI = { classList: { add: vi.fn(), remove: vi.fn() } };
+  const subscribeSse = vi.fn();
+  const context: any = {
+    gameId: 'fog-entry-game',
+    lobbyPollSession: 0,
+    document: { hidden: false, getElementById: () => null },
+    closeMapDialog: vi.fn(),
+    startSeatSync: vi.fn(),
+    loadFullState: vi.fn(async () => options.ok !== false),
+    state: { cells: Array.from({ length: options.cells ?? 0 }, () => ({})) },
+    myToken: options.myToken,
+    toast,
+    window: { location },
+    stopLobbyPolling: vi.fn(),
+    stopAvailableGamesRefresh: vi.fn(),
+    sse: null,
+    els: { joinPanel, gameUI },
+    subscribeSse,
+    drawBoard: vi.fn(),
+    renderSidebar: vi.fn(),
+    statusBadge: vi.fn(),
+    requestAnimationFrame: vi.fn(),
+    fitBoardToViewport: vi.fn(),
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(`${body}\nglobalThis.__enterGame = enterGame;`, context);
+  return { enterGame: context.__enterGame as () => Promise<void>, toast, location, subscribeSse, joinPanel, gameUI };
+}
+
+describe('fog anonymous game entry', () => {
+  it('sends a seatless host to the spectator page before the empty-map guard', async () => {
+    for (const page of PLAYER_PAGES) {
+      const h = loadEnterGame(page, { myToken: null, cells: 0 });
+      await h.enterGame();
+
+      expect(h.toast, page).not.toHaveBeenCalled();
+      expect(h.subscribeSse, page).not.toHaveBeenCalled();
+      expect(h.location.href, page).toBe(
+        page === 'public/play-m.js'
+          ? '/spectator-m.html?gameId=fog-entry-game'
+          : '/spectator.html?gameId=fog-entry-game',
+      );
+    }
+  });
+
+  it('keeps the state-load error for seated players with an empty board', async () => {
+    for (const page of PLAYER_PAGES) {
+      const h = loadEnterGame(page, { myToken: 'player-token', cells: 0 });
+      await h.enterGame();
+
+      expect(h.toast, page).toHaveBeenCalledWith('获取对局状态失败，请稍后重试', 'err');
+      expect(h.location.href, page).toBe('');
+    }
+  });
+
+  it('still enters the board for a seated player with a loaded map', async () => {
+    for (const page of PLAYER_PAGES) {
+      const h = loadEnterGame(page, { myToken: 'player-token', cells: 4 });
+      await h.enterGame();
+
+      expect(h.toast, page).not.toHaveBeenCalled();
+      expect(h.location.href, page).toBe('');
+      expect(h.subscribeSse, page).toHaveBeenCalledTimes(1);
+      expect(h.joinPanel.classList.add, page).toHaveBeenCalledWith('hidden');
+      expect(h.gameUI.classList.remove, page).toHaveBeenCalledWith('hidden');
+    }
+  });
+
+  it('keeps the token branch ahead of the cells guard in source order', () => {
+    for (const page of PLAYER_PAGES) {
+      const source = read(page);
+      const start = source.indexOf('async function enterGame() {');
+      expect(start, page).toBeGreaterThan(-1);
+      const body = source.slice(start, source.indexOf('\n// 刷新/重开后用本地会话回到对局', start));
+      const tokenBranch = body.indexOf('if (!myToken) {');
+      const cellsGuard = body.indexOf('!state.cells.length');
+      expect(tokenBranch, page).toBeGreaterThan(-1);
+      expect(cellsGuard, page).toBeGreaterThan(-1);
+      expect(tokenBranch, page).toBeLessThan(cellsGuard);
+    }
+  });
+});
+
+/** 在最小沙箱里执行观战元数据探测：终局迷雾局匿名不得再被锁。 */
+function loadSpectatorMeta(file: string, publicData: any, options: { token?: string | null; authed?: any } = {}) {
+  const source = read(file);
+  const start = source.indexOf('async function fetchSpectatorMeta(');
+  const end = source.indexOf('function setFogLock(', start);
+  expect(start, `${file} 缺少 fetchSpectatorMeta`).toBeGreaterThan(-1);
+  expect(end, `${file} fetchSpectatorMeta 之后缺少 setFogLock`).toBeGreaterThan(start);
+  const body = source.slice(start, end);
+  const calls: Array<{ url: string; authed: boolean }> = [];
+  const fetchMock = vi.fn(async (url: string, init?: { headers?: unknown }) => {
+    const authed = Boolean(init?.headers);
+    calls.push({ url, authed });
+    if (!authed) return { ok: true, status: 200, json: async () => publicData };
+    return options.authed ?? { ok: true, status: 200, json: async () => ({ ...publicData, authed: true }) };
+  });
+  const context: any = { fetch: fetchMock, spectatorToken: options.token ?? null };
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(`${body}\nglobalThis.__meta = fetchSpectatorMeta;`, context);
+  return { meta: context.__meta as (id: string) => Promise<any>, calls };
+}
+
+describe('fog finished games are public', () => {
+  it('unlocks a finished fog game for an anonymous spectator', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const publicData = {
+        phase: 'game_over',
+        config: { mode: 'fog' },
+        fog: { enabled: true, revealed: true },
+        result: { winner: 'player_b' },
+      };
+      const h = loadSpectatorMeta(page, publicData);
+      const meta = await h.meta('finished-game');
+
+      expect(meta, page).toMatchObject({ fogGame: true, locked: false, unauthorized: false });
+      expect(meta.data, page).toBe(publicData);
+      // 终局不造特权头：只做一次匿名 GET，全量事件交给匿名 /events。
+      expect(h.calls, page).toEqual([{ url: '/api/games/finished-game', authed: false }]);
+    }
+  });
+
+  it('treats a stored terminal result as finished even without phase', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const publicData = { config: { mode: 'fog' }, fog: { enabled: true }, result: { winner: 'player_a' } };
+      const meta = await loadSpectatorMeta(page, publicData).meta('finished-game');
+
+      expect(meta, page).toMatchObject({ fogGame: true, locked: false, unauthorized: false });
+    }
+  });
+
+  it('keeps an in-progress fog game locked without a token', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const publicData = { phase: 'active', config: { mode: 'fog' }, fog: { enabled: true, revealed: false }, result: null };
+      const h = loadSpectatorMeta(page, publicData);
+      const meta = await h.meta('live-game');
+
+      expect(meta, page).toMatchObject({ fogGame: true, locked: true, unauthorized: false });
+      expect(h.calls, page).toHaveLength(1);
+    }
+  });
+
+  it('keeps the token path for live games and the unlocked data for finished ones', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const live = { phase: 'active', config: { mode: 'fog' }, fog: { enabled: true }, result: null };
+      const withToken = loadSpectatorMeta(page, live, { token: 'spectator-token' });
+      const liveMeta = await withToken.meta('live-game');
+
+      expect(liveMeta, page).toMatchObject({ fogGame: true, locked: false });
+      expect(liveMeta.data, page).toMatchObject({ authed: true });
+      expect(withToken.calls.map(call => call.authed), page).toEqual([false, true]);
+
+      const finished = { phase: 'game_over', config: { mode: 'fog' }, fog: { enabled: true }, result: { winner: 'player_a' } };
+      const finishedMeta = await loadSpectatorMeta(page, finished, { token: 'spectator-token' }).meta('finished-game');
+      expect(finishedMeta, page).toMatchObject({ fogGame: true, locked: false, unauthorized: false });
+    }
+  });
+
+  it('still reports a bad token on a live fog game', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const live = { phase: 'active', config: { mode: 'fog' }, fog: { enabled: true }, result: null };
+      const h = loadSpectatorMeta(page, live, {
+        token: 'bad-token',
+        authed: { ok: false, status: 401, json: async () => ({}) },
+      });
+      const meta = await h.meta('live-game');
+
+      expect(meta, page).toMatchObject({ fogGame: true, locked: true, unauthorized: true });
+    }
+  });
+
+  it('loads unlocked games through the anonymous events path without privileged headers', () => {
+    for (const page of SPECTATOR_PAGES) {
+      const source = read(page);
+      const load = slice(source, 'async function loadGameState(', 'function subscribeSse(');
+      // 无令牌与终局都走匿名 /events：终局不再出示本地残留令牌，也不另造特权头。
+      expect(load, page).toContain("fogPublicTerminal = Boolean(meta.fogGame && (meta.data?.phase === 'game_over' || meta.data?.result));");
+      expect(load, page).toContain('const headers = meta.fogGame && spectatorToken && !fogPublicTerminal ?');
+      expect(load, page).toContain("{ 'X-Spectator-Token': spectatorToken } : {}");
+    }
+  });
+});
+
+/** 抽出真实 loadGameState + subscribeSse：终局加载与 SSE 都不得再出示本地残留令牌。 */
+function loadSpectatorLoad(file: string, options: { token?: string | null; meta: any; events?: any[] }) {
+  const source = read(file);
+  const start = source.indexOf('async function loadGameState(');
+  const endMarker = file === 'public/app.js' ? "canvas.addEventListener('mousemove'" : 'function updateHoverFromPoint(';
+  const end = source.indexOf(endMarker, start);
+  expect(start, `${file} 缺少 loadGameState`).toBeGreaterThan(-1);
+  expect(end, `${file} loadGameState/subscribeSse 之后缺少分节标记`).toBeGreaterThan(start);
+  const body = source.slice(start, end);
+  const urls: string[] = [];
+  const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ events: options.events ?? [] }) }));
+  class FakeEventSource {
+    onmessage: ((e: any) => void) | null = null;
+    onerror: (() => void) | null = null;
+    closed = false;
+    constructor(readonly url: string) { urls.push(url); }
+    close() { this.closed = true; }
+  }
+  const fetchSpectatorMeta = vi.fn(async () => options.meta);
+  const showFogLocked = vi.fn();
+  const startFogUnlockPoll = vi.fn();
+  const stopFogUnlockPoll = vi.fn();
+  const factory = new Function(
+    'fetchSpectatorMeta', 'fetch', 'EventSource', 'spectatorToken',
+    'showFogLocked', 'startFogUnlockPoll', 'stopFogUnlockPoll',
+    `let gameLoadVersion = 0;
+     let liveSse = null;
+     let importedReplayMeta = null;
+     let pinnedReplayStep = false;
+     let liveFogGame = false;
+     let fogPublicTerminal = false;
+     let gameConfig = null;
+     let playerNames = {};
+     let currentStep = -1;
+     let allEvents = [];
+     let state = { cells: [] };
+     const statusEl = { textContent: '' };
+     const forceAdjudicateBtn = { disabled: false };
+     function pausePlayback() {}
+     function clearFogLock() {}
+     function defaultPlayerNames() { return {}; }
+     function buildTimelineMarkers() {}
+     function rebuildToStep() {}
+     function renderEventLog() {}
+     function renderDrawerEventLog() {}
+     function updateControls() {}
+     function stepForward() {}
+     function createEmptyState() { return { cells: [] }; }
+     function drawBoard() {}
+     function renderSidebar() {}
+     function renderDetail() {}
+     const boardAnimation = { reset() {}, syncState() {} };
+     ${body}
+     return {
+       loadGameState, subscribeSse, statusEl,
+       snapshot: () => ({ liveFogGame, fogPublicTerminal, allEvents }),
+     };`,
+  );
+  const api = factory(
+    fetchSpectatorMeta, fetchMock, FakeEventSource, options.token ?? null,
+    showFogLocked, startFogUnlockPoll, stopFogUnlockPoll,
+  );
+  return { ...api, urls, fetchMock, fetchSpectatorMeta, showFogLocked, startFogUnlockPoll, stopFogUnlockPoll };
+}
+
+describe('fog terminal games drop any leftover spectator token', () => {
+  it('sends no token to /events or SSE once the fog game is over', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const h = loadSpectatorLoad(page, {
+        token: 'stale-token',
+        meta: { fogGame: true, locked: false, unauthorized: false, data: { phase: 'game_over', result: { winner: 'player_a' } } },
+        events: [{ seq: 1, type: 'game_start' }, { seq: 2, type: 'game_over' }],
+      });
+
+      expect(await h.loadGameState('finished-game'), page).toBeUndefined();
+      expect(h.snapshot().fogPublicTerminal, page).toBe(true);
+      expect(h.fetchMock, page).toHaveBeenCalledTimes(1);
+      expect(h.fetchMock.mock.calls[0][0], page).toBe('/api/games/finished-game/events');
+      // 终局匿名分支：本地陈旧令牌不进请求头，页面不会被它打进 401。
+      expect(h.fetchMock.mock.calls[0][1]?.headers, page).toEqual({});
+      expect(h.showFogLocked, page).not.toHaveBeenCalled();
+      expect(h.statusEl.textContent, page).not.toContain('观战令牌');
+      expect(h.snapshot().allEvents, page).toHaveLength(2);
+
+      h.subscribeSse('finished-game');
+      expect(h.urls, page).toEqual(['/api/games/finished-game/events?after=2']);
+    }
+  });
+
+  it('keeps the anonymous finished-game load when no token is stored', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const h = loadSpectatorLoad(page, {
+        token: null,
+        meta: { fogGame: true, locked: false, unauthorized: false, data: { phase: 'game_over' } },
+        events: [{ seq: 1 }],
+      });
+      await h.loadGameState('finished-game');
+
+      expect(h.fetchMock.mock.calls[0][1]?.headers, page).toEqual({});
+      h.subscribeSse('finished-game');
+      expect(h.urls, page).toEqual(['/api/games/finished-game/events?after=1']);
+    }
+  });
+
+  it('still sends the token for a live fog game and keeps the 401 lock', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const live = loadSpectatorLoad(page, {
+        token: 'live-token',
+        meta: { fogGame: true, locked: false, data: { phase: 'active', config: { mode: 'fog' } } },
+        events: [{ seq: 7 }],
+      });
+      await live.loadGameState('live-game');
+
+      expect(live.snapshot().fogPublicTerminal, page).toBe(false);
+      expect(live.fetchMock.mock.calls[0][1]?.headers, page).toEqual({ 'X-Spectator-Token': 'live-token' });
+      live.subscribeSse('live-game');
+      expect(live.urls, page).toEqual(['/api/games/live-game/events?after=7&spectatorToken=live-token']);
+
+      const bad = loadSpectatorLoad(page, {
+        token: 'bad-token',
+        meta: { fogGame: true, locked: true, unauthorized: true, data: { phase: 'active' } },
+      });
+      expect(await bad.loadGameState('live-game'), page).toBe(false);
+      expect(bad.showFogLocked, page).toHaveBeenCalledWith({ phase: 'active' }, true);
+      expect(bad.startFogUnlockPoll, page).toHaveBeenCalledWith('live-game');
+      expect(bad.fetchMock, page).not.toHaveBeenCalled();
+    }
+  });
+
+  it('clears the terminal flag when a later selection is a live game', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const h = loadSpectatorLoad(page, {
+        token: 'live-token',
+        meta: { fogGame: true, locked: false, data: { phase: 'game_over' } },
+      });
+      await h.loadGameState('finished-game');
+      expect(h.snapshot().fogPublicTerminal, page).toBe(true);
+
+      h.fetchSpectatorMeta.mockResolvedValueOnce({ fogGame: true, locked: false, data: { phase: 'active' } });
+      await h.loadGameState('live-game');
+      expect(h.snapshot().fogPublicTerminal, page).toBe(false);
+      expect(h.fetchMock.mock.calls[1][1]?.headers, page).toEqual({ 'X-Spectator-Token': 'live-token' });
+      h.subscribeSse('live-game');
+      expect(h.urls.at(-1), page).toContain('spectatorToken=live-token');
+    }
+  });
+});
+
+/** 抽出终局解锁慢轮询块，外部注入元数据探测与加载桩，便于 fake timers 驱动。 */
+function loadFogUnlockPoll(file: string) {
+  const source = read(file);
+  const start = source.indexOf('// 已打开的锁定观战页要能自己醒过来');
+  const end = source.indexOf('function setFogLock(', start);
+  expect(start, `${file} 缺少终局解锁轮询块`).toBeGreaterThan(-1);
+  expect(end, `${file} 轮询块之后缺少 setFogLock`).toBeGreaterThan(start);
+  const block = source.slice(start, end);
+  const gameSelect = { value: '' };
+  const statusEl = { textContent: '' };
+  const fetchSpectatorMeta = vi.fn(async () => ({ fogGame: true, locked: true }));
+  const loadGameState = vi.fn(async () => true);
+  const subscribeSse = vi.fn();
+  const factory = new Function(
+    'fetchSpectatorMeta', 'loadGameState', 'subscribeSse', 'gameSelect', 'statusEl',
+    `${block}\nreturn { startFogUnlockPoll, stopFogUnlockPoll, FOG_UNLOCK_POLL_MS };`,
+  );
+  const api = factory(fetchSpectatorMeta, loadGameState, subscribeSse, gameSelect, statusEl);
+  return { ...api, fetchSpectatorMeta, loadGameState, subscribeSse, gameSelect, statusEl };
+}
+
+describe('fog locked spectator page auto-unlocks when the game ends', () => {
+  it('unlocks on the next poll and loads the full anonymous view', async () => {
+    vi.useFakeTimers();
+    try {
+      for (const page of SPECTATOR_PAGES) {
+        const h = loadFogUnlockPoll(page);
+        h.gameSelect.value = 'game-1';
+        h.fetchSpectatorMeta
+          .mockResolvedValueOnce({ fogGame: true, locked: true })
+          .mockResolvedValue({ fogGame: true, locked: false });
+
+        h.startFogUnlockPoll('game-1');
+        // 慢轮询：先等一轮，不在锁定页渲染时立刻请求。
+        expect(h.fetchSpectatorMeta, page).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(1);
+        expect(h.loadGameState, page).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(2);
+        expect(h.loadGameState, page).toHaveBeenCalledTimes(1);
+        expect(h.loadGameState.mock.calls[0][0], page).toBe('game-1');
+        expect(h.subscribeSse, page).toHaveBeenCalledWith('game-1');
+        expect(h.statusEl.textContent, page).toContain('已解锁');
+
+        // 解锁后不再轮询。
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS * 3);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(2);
+        h.stopFogUnlockPoll();
+        vi.clearAllTimers();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps polling quietly while the fog game is still live', async () => {
+    vi.useFakeTimers();
+    try {
+      for (const page of SPECTATOR_PAGES) {
+        const h = loadFogUnlockPoll(page); // 每轮都 locked
+        h.startFogUnlockPoll('game-1');
+
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS * 2);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(2);
+        expect(h.loadGameState, page).not.toHaveBeenCalled();
+        expect(h.statusEl.textContent, page).toBe('');
+        h.stopFogUnlockPoll();
+        vi.clearAllTimers();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps exactly one timer when the locked page re-initializes', async () => {
+    vi.useFakeTimers();
+    try {
+      for (const page of SPECTATOR_PAGES) {
+        const h = loadFogUnlockPoll(page);
+        h.startFogUnlockPoll('game-1');
+        h.startFogUnlockPoll('game-1');
+        h.startFogUnlockPoll('game-1');
+
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(1);
+        h.stopFogUnlockPoll();
+        vi.clearAllTimers();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels the pending poll when the page or game changes', async () => {
+    vi.useFakeTimers();
+    try {
+      for (const page of SPECTATOR_PAGES) {
+        const h = loadFogUnlockPoll(page);
+        h.startFogUnlockPoll('game-1');
+        h.stopFogUnlockPoll(); // 切走/卸载
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS * 2);
+        expect(h.fetchSpectatorMeta, page).not.toHaveBeenCalled();
+
+        // 换局后旧 tick 不生效，只为新对局保留一个定时器。
+        h.startFogUnlockPoll('game-1');
+        h.startFogUnlockPoll('game-2');
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(1);
+        expect(h.fetchSpectatorMeta.mock.calls[0][0], page).toBe('game-2');
+        h.stopFogUnlockPoll();
+        vi.clearAllTimers();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('survives a failed poll with a single timer', async () => {
+    vi.useFakeTimers();
+    try {
+      for (const page of SPECTATOR_PAGES) {
+        const h = loadFogUnlockPoll(page);
+        h.fetchSpectatorMeta
+          .mockRejectedValueOnce(new Error('network'))
+          .mockResolvedValueOnce({ fogGame: true, locked: true })
+          .mockResolvedValue({ fogGame: true, locked: false });
+        h.startFogUnlockPoll('game-1');
+
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(2);
+        expect(h.loadGameState, page).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(h.FOG_UNLOCK_POLL_MS);
+        expect(h.fetchSpectatorMeta, page).toHaveBeenCalledTimes(3);
+        expect(h.loadGameState, page).toHaveBeenCalledTimes(1);
+        h.stopFogUnlockPoll();
+        vi.clearAllTimers();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts the poll only on the locked branch and clears it on every reset path', () => {
+    for (const page of SPECTATOR_PAGES) {
+      const source = read(page);
+      const load = slice(source, 'async function loadGameState(', 'function subscribeSse(');
+      expect(load, page).toContain('stopFogUnlockPoll();');
+      expect(load, page).toContain('startFogUnlockPoll(id);');
+      expect(load.indexOf('startFogUnlockPoll(id);'), page)
+        .toBeGreaterThan(load.indexOf('showFogLocked(meta.data, meta.unauthorized);'));
+
+      expect(slice(source, 'function resetLoadedGame(', 'function forceAdjudicateCurrentGame('), page)
+        .toContain('stopFogUnlockPoll();');
+      expect(slice(source, 'function loadImportedReplay(', 'function importJson('), page)
+        .toContain('stopFogUnlockPoll();');
+      expect(source, page).toContain("window.addEventListener('pagehide', stopFogUnlockPoll);");
     }
   });
 });

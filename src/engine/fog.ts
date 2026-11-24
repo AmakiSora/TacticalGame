@@ -323,6 +323,15 @@ export function isFogRevealed(game: GameState): boolean {
   return revealFrom !== null && game.turn.roundNumber >= revealFrom;
 }
 
+/**
+ * 终局公开：迷雾局进入 game_over 后，匿名/公开视角与观战同权
+ * （全量单位、全量事件、全量裁决），不再需要观战令牌。
+ * 进行中的迷雾局（包括 revealFromRound 揭雾期）仍按 public 安全投影，令牌要求不变。
+ */
+export function isFogPublicRevealed(game: GameState): boolean {
+  return isFogMode(game.config.mode) && game.phase === 'game_over';
+}
+
 function sortCellKeys(keys: Iterable<string>): string[] {
   return [...keys].sort((a, b) => {
     const [aq, ar] = a.split(',').map(Number);
@@ -427,7 +436,16 @@ function projectGameStart(
 ): GameEvent | null {
   const payload = event.payload;
   const roundNumber = payloadNumber(payload, 'roundNumber') ?? game.turn.roundNumber;
-  if (!viewer) return { ...cloneEvent(event), payload: { roundNumber } };
+  if (!viewer) {
+    // 公开视角只保留公开的棋盘几何（与匿名 state 的 map/cells 同口径），
+    // 否则匿名观战无法重建棋盘；单位、总部、玩家、资源、据点归属一律不出现。
+    // 这一支同时用于固化路径（recordFogEventViews 的 'public' 条目）。
+    const publicPayload: Record<string, unknown> = { roundNumber };
+    if (typeof payload.mapId === 'string') publicPayload.mapId = payload.mapId;
+    if (typeof payload.mode === 'string') publicPayload.mode = payload.mode;
+    if (payload.map && typeof payload.map === 'object') publicPayload.map = structuredClone(payload.map);
+    return { seq: event.seq, type: event.type, timestamp: event.timestamp, payload: publicPayload };
+  }
   const cloned = cloneEvent(event);
   const units = Array.isArray(cloned.payload.units)
     ? cloned.payload.units as Record<string, unknown>[]
@@ -485,6 +503,7 @@ function projectGameStart(
  * - `viewer=null` 表示匿名公开视角。
  * - 非 fog 模式返回 null（调用方不替换原事件）。
  * - 优先返回事件发生时刻固化好的观者载荷；只有旧存档（无固化数据）才按当前状态重算。
+ * - 终局（game_over）后的匿名视角与观战同权：直接返回原始全量事件，不再看 public 固化载荷。
  * - 拿不准时丢弃整条事件（null），不做部分揭示。
  */
 export function projectEventForViewer(
@@ -493,6 +512,7 @@ export function projectEventForViewer(
   viewer: PlayerId | null,
 ): GameEvent | null {
   if (!isFogMode(game.config.mode)) return null;
+  if (viewer === null && isFogPublicRevealed(game)) return cloneEvent(event);
   const key = fogViewerKey(viewer);
   const frozen = event.fogViews;
   if (frozen) {
@@ -868,6 +888,10 @@ export function projectFogHistoryForViewer(
   if (!isFogMode(game.config.mode)) {
     return game.events.filter(event => event.seq > after).map(event => cloneEvent(event));
   }
+  // 终局后公开视角改用全局 seq：隐藏事件也要占号并出现（观者序号只用于进行中的局）。
+  if (viewer === null && isFogPublicRevealed(game)) {
+    return game.events.filter(event => event.seq > after).map(event => cloneEvent(event));
+  }
   const key = fogViewerKey(viewer);
   // 只有存在旧事件（无固化数据）时才需要整段推导。
   const legacy = game.events.some(event => !event.fogSeqs)
@@ -889,6 +913,8 @@ export function projectFogHistoryForViewer(
 /** 该观者事件流的最新序号（SSE/wait 游标用）；隐藏事件不推进。 */
 export function fogLastVisibleSeq(game: GameState, viewer: PlayerId | null): number {
   if (!isFogMode(game.config.mode)) return game.events.at(-1)?.seq ?? 0;
+  // 终局后公开视角与观战同权：游标就是最后一条全局 seq。
+  if (viewer === null && isFogPublicRevealed(game)) return game.events.at(-1)?.seq ?? 0;
   const key = fogViewerKey(viewer);
   const stored = game.fog?.viewSeq?.[key];
   if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
@@ -902,6 +928,8 @@ export function fogViewerSeqOf(
   viewer: PlayerId | null,
 ): number | null {
   if (!isFogMode(game.config.mode)) return event.seq;
+  // 终局后公开视角改用全局 seq（与 projectFogHistoryForViewer 一致）。
+  if (viewer === null && isFogPublicRevealed(game)) return event.seq;
   const key = fogViewerKey(viewer);
   if (event.fogSeqs) {
     const seq = event.fogSeqs[key];

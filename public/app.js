@@ -80,6 +80,8 @@ let activeRecordId = null;
 let spectatorToken = readSpectatorToken();
 // 当前在线对局是否是迷雾局（仅迷雾局才把令牌放进事件流/请求头）。
 let liveFogGame = false;
+// 当前迷雾局已终局（对匿名观者公开）：本地残留的观战令牌不再发给 /events 与 SSE。
+let fogPublicTerminal = false;
 // 迷雾锁定页：只拿到公开字段，不能本地补算裁决分（公开响应里 adjudication 是 hidden）。
 let fogLockedView = false;
 
@@ -1944,9 +1946,11 @@ async function fetchGameList(isCurrent = () => true) {
 
 function resetLoadedGame(message = '请选择在线对局') {
   gameLoadVersion++;
+  stopFogUnlockPoll();
   pausePlayback();
   importedReplayMeta = null;
   liveFogGame = false;
+  fogPublicTerminal = false;
   clearFogLock();
   if (liveSse) liveSse.close();
   liveSse = null;
@@ -2050,9 +2054,10 @@ async function deleteCurrentGame() {
 let gameLoadVersion = 0;
 
 /**
- * 观战元数据：mode 与 fog 投影只在 GET /api/games/:id 上（匿名 fog 的 game_start 只有轮号），
- * 事件流本身无法判断"这是迷雾局且我被锁定"。先匿名取公开响应，确认是迷雾局且本地有令牌时
- * 才带 X-Spectator-Token 重取全量；非迷雾局不受陈旧令牌影响。
+ * 观战元数据：匿名 fog 状态的 mode/fog 以 GET /api/games/:id 为准（历史固化 game_start 只有轮号，
+ * 新局 game_start 已带 mode 与公开地图）；事件流本身无法可靠判断"这是迷雾局且我被锁定"。
+ * 终局（game_over/result）后匿名即全量，不再要观战令牌；进行中的对局先匿名取公开响应，
+ * 确认是迷雾局且本地有令牌时才带 X-Spectator-Token 重取全量；非迷雾局不受陈旧令牌影响。
  */
 async function fetchSpectatorMeta(id) {
   let publicRes;
@@ -2062,6 +2067,11 @@ async function fetchSpectatorMeta(id) {
   if (!publicData) return { failed: true };
   const fogGame = publicData.config?.mode === 'fog' || publicData.fog?.enabled === true;
   if (!fogGame) return { data: publicData, fogGame: false };
+  // 终局公开：迷雾局结束后匿名观者即是全量视角（服务端在 game_over 返回完整单位与事件），
+  // 不再要求观战令牌；进行中的对局仍需令牌。
+  if (publicData.phase === 'game_over' || publicData.result) {
+    return { data: publicData, fogGame: true, locked: false, unauthorized: false };
+  }
   if (!spectatorToken) return { data: publicData, fogGame: true, locked: true, unauthorized: false };
   let authed;
   try {
@@ -2073,6 +2083,47 @@ async function fetchSpectatorMeta(id) {
   if (!authed.ok) return { data: publicData, fogGame: true, locked: true, unauthorized: false };
   const full = await authed.json().catch(() => null);
   return { data: full || publicData, fogGame: true, locked: false };
+}
+
+// 已打开的锁定观战页要能自己醒过来：慢轮询公开元数据，终局公开后自动解锁。
+const FOG_UNLOCK_POLL_MS = 25000;
+let fogUnlockPollToken = 0;
+let fogUnlockPollTimer = null;
+
+function stopFogUnlockPoll() {
+  fogUnlockPollToken += 1;
+  if (fogUnlockPollTimer !== null) {
+    clearTimeout(fogUnlockPollTimer);
+    fogUnlockPollTimer = null;
+  }
+}
+
+function startFogUnlockPoll(id) {
+  stopFogUnlockPoll();
+  const token = fogUnlockPollToken;
+  const tick = async () => {
+    fogUnlockPollTimer = null;
+    // 单实例慢轮询：上一轮请求只在响应后才安排下一轮；令牌保证切换对局/解锁后旧 tick 不再生效。
+    if (token !== fogUnlockPollToken) return;
+    let meta;
+    try {
+      meta = await fetchSpectatorMeta(id);
+    } catch {
+      meta = { failed: true };
+    }
+    if (token !== fogUnlockPollToken) return;
+    if (!meta || meta.failed || meta.locked) {
+      fogUnlockPollTimer = setTimeout(() => { void tick(); }, FOG_UNLOCK_POLL_MS);
+      return;
+    }
+    // 终局公开：停轮询，走与手动选择对局相同的匿名加载路径，不造特权头。
+    stopFogUnlockPoll();
+    if (await loadGameState(id, () => gameSelect.value === id) !== false) {
+      statusEl.textContent = '对局已结束，已解锁完整回放';
+      subscribeSse(id);
+    }
+  };
+  fogUnlockPollTimer = setTimeout(() => { void tick(); }, FOG_UNLOCK_POLL_MS);
 }
 
 function setFogLock(message) {
@@ -2122,6 +2173,7 @@ function showFogLocked(data, unauthorized) {
 
 async function loadGameState(id, isCurrent = () => true) {
   const version = ++gameLoadVersion;
+  stopFogUnlockPoll();
   pausePlayback();
   liveSse?.close();
   liveSse = null;
@@ -2130,12 +2182,15 @@ async function loadGameState(id, isCurrent = () => true) {
   const meta = await fetchSpectatorMeta(id);
   if (version !== gameLoadVersion || !isCurrent()) return false;
   liveFogGame = Boolean(meta.fogGame);
+  // 终局迷雾局对匿名观者已全量公开：即便本地存着别的局/已失效的令牌也不再发送（陈旧令牌会 401）。
+  fogPublicTerminal = Boolean(meta.fogGame && (meta.data?.phase === 'game_over' || meta.data?.result));
   if (meta.fogGame && meta.locked) {
     showFogLocked(meta.data, meta.unauthorized);
+    startFogUnlockPoll(id);
     return false;
   }
   clearFogLock();
-  const headers = meta.fogGame && spectatorToken ? { 'X-Spectator-Token': spectatorToken } : {};
+  const headers = meta.fogGame && spectatorToken && !fogPublicTerminal ? { 'X-Spectator-Token': spectatorToken } : {};
   const res = await fetch(`/api/games/${id}/events`, { headers });
   const { events } = await res.json();
   if (version !== gameLoadVersion || !isCurrent()) return false;
@@ -2156,8 +2211,8 @@ async function loadGameState(id, isCurrent = () => true) {
 function subscribeSse(id) {
   if (liveSse) liveSse.close();
   const lastSeq = allEvents.at(-1)?.seq ?? 0;
-  // EventSource 不能带请求头：迷雾局的观者投影靠契约支持的查询参数传令牌。
-  const authQuery = liveFogGame && spectatorToken ? `&spectatorToken=${encodeURIComponent(spectatorToken)}` : '';
+  // EventSource 不能带请求头：进行中的迷雾局靠契约支持的查询参数传令牌；终局公开后不再带。
+  const authQuery = liveFogGame && spectatorToken && !fogPublicTerminal ? `&spectatorToken=${encodeURIComponent(spectatorToken)}` : '';
   const connection = new EventSource(`/api/games/${id}/events?after=${lastSeq}${authQuery}`);
   liveSse = connection;
   connection.onmessage = e => {
@@ -2355,7 +2410,9 @@ function loadImportedReplay(replay) {
   pausePlayback();
   // 导入的回放自带完整事件，不再是锁定页；也不该给这个离线视图挂在线令牌。
   clearFogLock();
+  stopFogUnlockPoll();
   liveFogGame = false;
+  fogPublicTerminal = false;
   // 回放不是在线对局：清掉上次选择，避免改名/删除等管理操作仍发往旧对局。
   activeRecordId = null;
   gameSelect.value = '';
@@ -2465,6 +2522,8 @@ document.addEventListener('visibilitychange', () => {
     scheduleAutoRefresh(0);
   }
 });
+// 页面卸载/切走时停掉终局解锁轮询，避免关页后还在请求。
+window.addEventListener('pagehide', stopFogUnlockPoll);
 
 gameSelect.addEventListener('change', async () => {
   await selectGame(gameSelect.value);

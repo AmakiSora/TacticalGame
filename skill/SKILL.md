@@ -5,7 +5,7 @@ description: Use when an agent is asked to play, operate, control, or make decis
 
 # Play Hex API Game
 
-Manual operation of the Hex multiplayer game (app version `4.0.1`). Reason from live state, call REST endpoints yourself, refresh, repeat.
+Manual operation of the Hex multiplayer game (app version `4.0.2`). Reason from live state, call REST endpoints yourself, refresh, repeat.
 
 **Freshness (mandatory):** this skill is served by the game server itself, and the server copy is the only source of truth. If you are reading a locally installed copy, it may be stale — before any game action, follow [Canonical fetch](#canonical-fetch-mandatory) once you know `BASE_URL`. The check is deliberately cheap: one small manifest, and you only re-read the full skill when your copy is actually outdated.
 
@@ -151,7 +151,7 @@ Run it in the **foreground as a blocking command** immediately after `/end-turn`
 
 Player actions need a player token (`POST /api/games` with `participate: true`, or `POST /join`). That response is the only time the token is shown — save it to `$SCRATCH/token.txt` immediately (see [Player token](#player-token-mandatory)) and read it back from that file in every later call. Host token is separate; `participate: false` hosts never get a player token.
 
-Transient `502`/`503` (except `lobby_capacity`): back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. For action retries, reuse the same `Idempotency-Key` (see API). `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>` (in fog, players and the public view pass their own viewer sequence; a fog spectator passes the global sequence); player/host tokens stay in headers (the read-only fog spectator token may also travel as `?spectatorToken=`, but prefer the header and never log the URL).
+Transient `502`/`503` (except `lobby_capacity`): back off, hit `/readyz`, re-fetch with the **existing** token. Do not create/join again. For action retries, reuse the same `Idempotency-Key` (see API). `429 rate_limit` ≠ `429 action_limit_reached`. SSE: reconnect with `?after=<seq>` (in an in-progress fog game, players and the public view pass their own viewer sequence; a fog spectator passes the global sequence, and so does the public view after `game_over`); player/host tokens stay in headers (the read-only fog spectator token may also travel as `?spectatorToken=`, but prefer the header and never log the URL).
 
 ## Post-game review (复盘)
 
@@ -197,7 +197,7 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Host skip turn | `POST /api/games/:id/host/skip-turn` | host | none (sequential modes only; the same player cannot be skipped twice in one round → `409 round_already_resolved`) |
 | Host eliminate | `POST /api/games/:id/host/eliminate` | host | `{ "playerId": "player_c" }` |
 | Rename self | `PATCH /api/games/:id/player` | player | `{ "name": "New Name" }` |
-| Read state | `GET /api/games/:id` | player / spectator (fog) / none (fog only) | none |
+| Read state | `GET /api/games/:id` | player / spectator (fog) / none (fog only; full after `game_over`) | none |
 | Deploy | `POST /api/games/:id/deploy` | player | `{ "unitType": "infantry\|scout\|heavy\|ranger\|support", "fromId": "...", "q": 0, "r": 0 }` |
 | Move | `POST /api/games/:id/move` | player | `{ "unitId": "...", "q": 0, "r": 0 }` |
 | Attack | `POST /api/games/:id/attack` | player | sequential: `{ "attackerId": "...", "targetId": "..." }`; simultaneous: `{ "attackerId": "...", "q": 0, "r": 0 }` (aim cell/direction; per-unit `attackShape` line/arc/single, ranger `attackLock`) |
@@ -209,16 +209,16 @@ Player actions: `X-Player-Token`. Host: `X-Host-Token`.
 | Reorder plan | `POST /api/games/:id/plan/reorder` | player | `{ "actionIds": ["...", "..."] }` (simultaneous only; must be a permutation of the current queue; atomic) |
 | Clear plan | `POST /api/games/:id/plan/clear` | player | none (simultaneous only) |
 | Host force resolve | `POST /api/games/:id/host/force-resolve` | host | none (simultaneous only; host `Idempotency-Key` supported; `{"repeat": true}` is operator-only) |
-| Events | `GET /api/games/:id/events?after=<seq>` | player / spectator / none (fog: public only) | none |
+| Events | `GET /api/games/:id/events?after=<seq>` | player / spectator / none (fog: public; full after `game_over`) | none |
 
-Create: `{ gameId, hostToken, spectatorToken, player: { id, token } \| null, lobby }` — `spectatorToken` is a non-empty read-only token on fog maps and `''` elsewhere; it is shown **only** in this response.  
+Create: `{ gameId, hostToken, spectatorToken, player: { id, token } \| null, lobby }` — `spectatorToken` is a non-empty read-only token on fog maps and `''` elsewhere; it is shown **only** in this response and is needed only while the fog game is in progress (a finished fog game is public without it).
 Join: `{ player: { id, token }, lobby }`.
 
 ### State response shape
 
 `GET /api/games/:id` returns the game object **directly** — there is no `{ "game": ... }` wrapper. Top-level fields include `id`, `mapId`, `phase`, `players`, `units`, `cells`, `controlPoints`, `headquarters`, `resources`, `turn`, `plan`, `config`, `adjudication` and `events`; fog games also carry `fog` (`{ enabled, revealed, visibleCells, lastSeen }`).
 
-**Viewer-scoped responses (fog only).** The server resolves the viewer in this order: valid `X-Player-Token` (or `?token=`) → valid `X-Spectator-Token` (or `?spectatorToken=`) → public. A player token always wins when both are sent. On a fog game with no token you get the **public safe view**, not a 401: `units: []`, `fog.visibleCells: []`, `fog.revealed: false`, and public events only. The fog `units` array contains your own units plus enemies inside your vision; hidden enemies are absent from `units`, `fog.lastSeen`, event payloads and `adjudication` breakdowns. Event disclosure is frozen at the moment each event happens: a later reveal never backfills history, and for fog players and the public view `seq` / `lastEventSeq` are viewer sequences (the lobby's `stateVersion` is still global; after `game_start` it becomes viewer-scoped too). Non-self `players[].stats` are removed entirely (absence means unknown, not zero), and `lastActivityAt` is removed for fog players and the public view because it moves with hidden actions; only the spectator view keeps it. `ETag` is viewer-specific and `Vary: X-Player-Token, X-Spectator-Token` is set, so never reuse a cached body across viewers. Non-fog games keep their previous behavior: state still requires a player token, while event backfill keeps its old anonymous behavior.
+**Viewer-scoped responses (fog only).** The server resolves the viewer in this order: valid `X-Player-Token` (or `?token=`) → valid `X-Spectator-Token` (or `?spectatorToken=`) → public. A player token always wins when both are sent. **While a fog game is in progress**, no token gives the **public safe view**, not a 401: `units: []`, `fog.visibleCells: []`, `fog.revealed: false`, and public events only. The fog `units` array contains your own units plus enemies inside your vision; hidden enemies are absent from `units`, `fog.lastSeen`, event payloads and `adjudication` breakdowns. Event disclosure is frozen at the moment each event happens while in progress: a mid-game reveal never backfills history, and for fog players and the public view `seq` / `lastEventSeq` are viewer sequences (the lobby's `stateVersion` is still global; after `game_start` it becomes viewer-scoped too). Non-self `players[].stats` are removed for players, and for the public view while in progress (absence means unknown, not zero); at `game_over` the public view matches the spectator view. `lastActivityAt` is removed for fog players and the in-progress public view because it moves with hidden actions; the spectator view and the post-game public view keep it. `ETag` is viewer-specific and `Vary: X-Player-Token, X-Spectator-Token` is set, so never reuse a cached body across viewers. **Once `phase === "game_over"`**, an anonymous/public read is the full spectator view — all units, the original full event stream (including a complete `game_start`), full adjudication and complete scores — with global `seq` / `lastEventSeq` / `stateVersion`, and the spectator token is no longer needed; an invalid or stale spectator token is ignored at `game_over` (public full, not a `401`), and strict validation applies only in progress; this is endgame publicity, not a mid-game unfreeze. A seated player's own event history still replays its frozen decisions. Non-fog games keep their previous behavior: state still requires a player token, while event backfill keeps its old anonymous behavior.
 
 `players` is a **seat-keyed object, not an array**:
 
@@ -247,7 +247,7 @@ All action and plan POST endpoints accept an optional `Idempotency-Key` header (
 
 Generate a fresh key per logical action (UUID or random string) and **reuse it only when retrying that exact method + body** after a timeout or `502`/`503`. Never reuse a key for a different action.
 
-`game_already_full` / `game_already_started` → report; do not fetch state without a token. `lobby_not_ready` → wait. `unsupported_player_count` → wrong lobby size for map. `401 invalid_spectator_token` → the spectator token is wrong or from another game: read the fog game as a player or ask the host for a fresh token; do not retry it.
+`game_already_full` / `game_already_started` → report; do not fetch state without a token. `lobby_not_ready` → wait. `unsupported_player_count` → wrong lobby size for map. `401 invalid_spectator_token` → the spectator token is wrong or from another game: for an in-progress fog game, read it as a player or ask the host for a fresh token; do not retry it. A finished (`game_over`) fog game needs no token and never rejects a wrong or stale one (public full, not `401`).
 
 `409 round_already_resolved` → that simultaneous round was already resolved: do not retry the same resolution, wait for the next action/commit (or leave it to the host). `503 lobby_capacity` → the server's active-lobby cap is full: wait for idle lobbies to expire or join an existing room instead of creating in a tight loop. Neither is `game_already_started`.
 

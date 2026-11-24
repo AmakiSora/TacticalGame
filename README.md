@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`、`molten-throne`、`mistpine`、`longbow-gallery` 等地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）、`narrow-road`（狭路相逢）与 `mirror-lake`（镜湖）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则；`fog-harbor`（雾港）与 `fog-crossing`（雾渡）提供**迷雾模式（fog）**——同时回合骨架叠加视野迷雾，只隐藏敌方单位，地形、总部与据点公开。
 
-当前版本：`4.0.1`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`4.0.2`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -27,7 +27,7 @@ npm run dev
 | `http://localhost:3100/` | 首页：模式介绍、单位速览与功能入口 |
 | `http://localhost:3100/play.html` | 创建/加入并手动操作（窄屏自动进入手机版） |
 | `http://localhost:3100/play-m.html` | 玩家手机版：大厅、触控棋盘与操作抽屉 |
-| `http://localhost:3100/spectator.html` | 观战、导入回放、导出回放 JSON（窄屏自动进入手机版；迷雾局需观战令牌） |
+| `http://localhost:3100/spectator.html` | 观战、导入回放、导出回放 JSON（窄屏自动进入手机版；迷雾局进行中需观战令牌，终局后公开） |
 | `http://localhost:3100/spectator-m.html` | 观战手机版：触控棋盘、回放栏与信息抽屉 |
 | `http://localhost:3100/stats.html` | 对局统计看板（模型排行、对位、地图与对局列表） |
 | `http://localhost:3100/arena.html` | AI 竞技场：按玩法模式分榜的 RL 模型 × 内置算法榜单、对位矩阵、玩法统计与评估控制台 |
@@ -70,7 +70,7 @@ npm run export-state
 - 行动点按**单位激活**计：首次部署/移动/攻击/治疗/爆破耗 1 点，同一单位本回合后续合法动作免费，上限 `config.balance.actionsPerTurn`。
 - 部署来源、占领限制、治疗与爆破的角色限制、收入与维修规则按模式与地图配置，见对应 skill 文件。
 - 顺序模式有**先手贴目**：先手第一回合不结算收入，其余每个座位第一次行动前先拿 `balance.komi.supplies` 点补给（金币口径，`0` = 不贴目，上限 999）。同时回合 / 大逃杀 / 迷雾不结算，细则见 [docs/MAP_FORMAT.md](docs/MAP_FORMAT.md)「先手贴目」。
-- 迷雾模式的保密在**服务端投影**：`GET /api/games/:id` 的 `units`、`events`、`adjudication` 按观者过滤，地形/总部/据点为公开信息；观战全量需建房响应中的只读 `spectatorToken`，无令牌只得到公开安全视角。非本人 `players[].stats` 整块删除，玩家与 public 的事件游标为观者序号（`stateVersion` 大厅期仍为全局值）。
+- 迷雾模式的保密在**服务端投影**：进行中的 `GET /api/games/:id` 的 `units`、`events`、`adjudication` 按观者过滤，地形/总部/据点为公开信息；进行中的观战全量需建房响应中的只读 `spectatorToken`，无令牌只得到公开安全视角。对局结束（`phase === "game_over"`）后不再需要令牌：匿名/public 直接得到全量单位、原始全量事件与完整裁决。进行中非本人 `players[].stats` 整块删除，玩家与 public 的事件游标为观者序号（`stateVersion` 大厅期仍为全局值）；终局后 public 改用全局序号。
 - 裁决公式的权威定义见 [skill/SKILL.md](skill/SKILL.md)「Adjudication score」，实时分数直接读 `GET /api/games/:id` 的 `adjudication`，不要自行重算。
 - 歼灭计分、同时回合的分步结算/失败连锁/攻击形状、大逃杀炮火节奏、迷雾视野/残影/盲射等模式细则只维护在对应 skill 文件。地图清单与逐图数值以 `maps/*.json` 为准（文件名即 mapId）。
 
@@ -80,7 +80,7 @@ npm run export-state
 
 ## REST API
 
-完整接口参考见 [docs/API.md](docs/API.md)。玩家操作带 `X-Player-Token`，房主管理带 `X-Host-Token`，迷雾局全量观战带只读 `X-Spectator-Token`（建房响应返回一次）；删除对局、强制裁决、管理员改名与竞技场跑批等控制接口使用 `AUTO_CONTROL_TOKEN`（未设置时仅本机可调用）。
+完整接口参考见 [docs/API.md](docs/API.md)。玩家操作带 `X-Player-Token`，房主管理带 `X-Host-Token`，迷雾局进行中的全量观战带只读 `X-Spectator-Token`（建房响应返回一次；终局后无需）；删除对局、强制裁决、管理员改名与竞技场跑批等控制接口使用 `AUTO_CONTROL_TOKEN`（未设置时仅本机可调用）。
 
 常用入口：
 
@@ -94,7 +94,7 @@ npm run export-state
 | Agent 技能 | `GET /api/skill`、`/api/skill/manifest`、`/api/skill/files/:name` |
 | 健康与指标 | `GET /healthz`、`GET /readyz`、`GET /metrics` |
 
-失败响应统一为 `{ error, code }`；玩法动作支持 `Idempotency-Key` 幂等重试。事件类型与回放格式、AI 机器人、回放库与竞技场评估接口见 [docs/API.md](docs/API.md)。迷雾局无令牌只能读公开安全视角（`units: []`、无隐藏事件），无效观战令牌返回 `401 invalid_spectator_token`。
+失败响应统一为 `{ error, code }`；玩法动作支持 `Idempotency-Key` 幂等重试。事件类型与回放格式、AI 机器人、回放库与竞技场评估接口见 [docs/API.md](docs/API.md)。迷雾局进行中无令牌只能读公开安全视角（`units: []`、无隐藏事件），无效观战令牌返回 `401 invalid_spectator_token`（仅进行中）；对局结束后匿名即全量，无需令牌，且带无效/他局观战令牌也按全量返回、不 401。
 
 ## 地图格式
 
@@ -114,9 +114,10 @@ npm run export-state
 
 ### 迷雾局观战与回放
 
-- 观战页需要只读观战令牌：可在观战页设置里保存，或在链接后追加 `?spectatorToken=…`（桌面与手机版一致）。没有令牌或令牌无效时只画公开地图（地形、总部、据点、轮次），提示需要令牌，不显示单位、事件与裁决分——不会用公开状态补算成全 0。
+- 进行中的迷雾局观战页需要只读观战令牌：可在观战页设置里保存，或在链接后追加 `?spectatorToken=…`（桌面与手机版一致）。没有令牌或令牌无效时只画公开地图（地形、总部、据点、轮次），提示需要令牌，不显示单位、事件与裁决分——不会用公开状态补算成全 0。**对局结束（`game_over`）后不再需要令牌**：所有人直接看到全量回放；此时带无效或陈旧观战令牌也不会被拒。
+- 房主未占座（开局旁观）时，点「进入游戏」会直接转到观战页，不会停在玩家页提示「获取对局状态失败」；进行中且没有观战令牌时仍只看到公开地图与需要令牌的提示，结束后则直接全量。
 - 玩家页的迷雾对局里，对手裁决只公开总分与名次，分项显示「对手分项不可见（迷雾）」；这是服务端隐藏，不是 0 分。
-- 全量回放由带令牌的观战页导出；导入回放后按回放自带事件重建全量视角，不沿用在线观战的令牌或锁定状态。
+- 进行中的全量回放由带令牌的观战页导出；已结束的对局无需令牌即可导出。导入回放后按回放自带事件重建全量视角，不沿用在线观战的令牌或锁定状态。
 
 ## 测试
 

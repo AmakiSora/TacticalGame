@@ -12,7 +12,7 @@ import { appendEvent } from '../../src/engine/events.js';
 import { globalEventBus } from '../../src/events/bus.js';
 import { closeSseConnections, eventsRoutes } from '../../src/api/events.js';
 import {
-  createFogGame, installFogMap, restoreMaps, sseDataLines,
+  createFogGame, fetchFogState, installFogMap, restoreMaps, sseDataLines,
 } from './fog-fixtures.js';
 
 beforeAll(() => installFogMap());
@@ -101,6 +101,130 @@ describe('fog SSE projection', () => {
     });
     expect(badPlayer.statusCode).toBe(401);
     expect(badPlayer.json().code).toBe('invalid_token');
+  });
+
+  it('anonymous SSE game_start carries public map geometry but no hidden units', async () => {
+    app = await startTestServer();
+    const fog = await createFogGame(app);
+    const game = globalStore.get(fog.gameId)!;
+    const allUnitIds = game.units.map(unit => unit.id);
+
+    const anonymous = await app.inject({
+      method: 'GET',
+      url: `/api/games/${fog.gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream' },
+    });
+    expect(anonymous.statusCode).toBe(200);
+    const anonStart = sseDataLines(anonymous.body).find(event => event.type === 'game_start')!;
+    expect(anonStart).toBeTruthy();
+    const payload = anonStart.payload as Record<string, any>;
+    expect(payload.mapId).toBe(game.mapId);
+    expect(payload.map.cells.length).toBe(game.cells.length);
+    expect(payload.roundNumber).toBeTypeOf('number');
+    for (const key of ['units', 'headquarters', 'players', 'resources', 'controlPoints']) {
+      expect(payload[key]).toBeUndefined();
+    }
+    for (const id of allUnitIds) expect(anonymous.body).not.toContain(id);
+
+    // 玩家与观战帧不因公开地图修复而变形。
+    const player = await app.inject({
+      method: 'GET',
+      url: `/api/games/${fog.gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream', 'x-player-token': fog.seats[0]!.token },
+    });
+    const playerStart = sseDataLines(player.body).find(event => event.type === 'game_start')!;
+    expect((playerStart.payload as Record<string, any>).map.cells.length).toBe(game.cells.length);
+    const spectator = await app.inject({
+      method: 'GET',
+      url: `/api/games/${fog.gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream', 'x-spectator-token': fog.spectatorToken },
+    });
+    const spectatorStart = sseDataLines(spectator.body).find(event => event.type === 'game_start')!;
+    expect((spectatorStart.payload as Record<string, any>).units).toHaveLength(game.units.length);
+  });
+
+  it('terminal public SSE is the full log with global ids, no token needed', async () => {
+    app = await startTestServer();
+    const fog = await createFogGame(app);
+    const game = globalStore.get(fog.gameId)!;
+    const before = await fetchFogState(app, fog.gameId, { player: fog.seats[0]!.token });
+    const visibleIds = new Set(before.body.units.map(unit => unit.id));
+    const hidden = game.units.find(unit => unit.owner === 'player_b' && !visibleIds.has(unit.id))!;
+    appendEvent(game, globalEventBus, 'move', {
+      owner: 'player_b', unitId: hidden.id,
+      fromQ: hidden.q, fromR: hidden.r, toQ: hidden.q + 1, toR: hidden.r,
+    });
+    const adjudicated = await app.inject({ method: 'POST', url: `/api/games/${fog.gameId}/force-adjudicate` });
+    expect(adjudicated.statusCode).toBe(200);
+
+    const anonymous = await app.inject({
+      method: 'GET',
+      url: `/api/games/${fog.gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream' },
+    });
+    expect(anonymous.statusCode).toBe(200);
+    const events = sseDataLines(anonymous.body);
+    expect(events.map(event => event.seq)).toEqual(game.events.map(event => event.seq));
+    expect(events.some(event => event.type === 'move')).toBe(true);
+    const over = events.find(event => event.type === 'game_over')!;
+    expect(typeof (over.payload.scores as Record<string, any>).player_b.armyValue).toBe('number');
+    expect(anonymous.body).not.toContain('fogViews');
+    expect(anonymous.body).not.toContain('fogSeqs');
+
+    // 观战同全量；玩家仍是冻结本人历史（隐藏行动不补出）。
+    const spectator = await app.inject({
+      method: 'GET',
+      url: `/api/games/${fog.gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream', 'x-spectator-token': fog.spectatorToken },
+    });
+    expect(sseDataLines(spectator.body).map(event => event.seq)).toEqual(game.events.map(event => event.seq));
+    const player = await app.inject({
+      method: 'GET',
+      url: `/api/games/${fog.gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream', 'x-player-token': fog.seats[0]!.token },
+    });
+    expect(sseDataLines(player.body).some(event => event.type === 'move')).toBe(false);
+  });
+
+  it('accepts stale spectator tokens on terminal SSE but rejects them while active', async () => {
+    app = await startTestServer();
+    const fog = await createFogGame(app);
+    const stale = 'deadbeefdeadbeefdeadbeefdeadbeef';
+    for (const headers of [
+      { accept: 'text/event-stream', 'x-spectator-token': stale },
+      { accept: 'text/event-stream' },
+    ]) {
+      const url = headers['x-spectator-token']
+        ? `/api/games/${fog.gameId}/events?close=true`
+        : `/api/games/${fog.gameId}/events?close=true&spectatorToken=${stale}`;
+      const active = await app.inject({ method: 'GET', url, headers });
+      expect(active.statusCode).toBe(401);
+      expect(active.json().code).toBe('invalid_spectator_token');
+    }
+
+    const game = globalStore.get(fog.gameId)!;
+    const hidden = game.units.find(unit => unit.owner === 'player_b')!;
+    appendEvent(game, globalEventBus, 'move', {
+      owner: 'player_b', unitId: hidden.id,
+      fromQ: hidden.q, fromR: hidden.r, toQ: hidden.q + 1, toR: hidden.r,
+    });
+    expect((await app.inject({ method: 'POST', url: `/api/games/${fog.gameId}/force-adjudicate` })).statusCode).toBe(200);
+
+    for (const headers of [
+      { accept: 'text/event-stream', 'x-spectator-token': stale },
+      { accept: 'text/event-stream' },
+    ]) {
+      const url = headers['x-spectator-token']
+        ? `/api/games/${fog.gameId}/events?close=true`
+        : `/api/games/${fog.gameId}/events?close=true&spectatorToken=${stale}`;
+      const res = await app.inject({ method: 'GET', url, headers });
+      expect(res.statusCode).toBe(200);
+      const events = sseDataLines(res.body);
+      expect(events.map(event => event.seq)).toEqual(game.events.map(event => event.seq));
+      expect(events.some(event => event.type === 'move')).toBe(true);
+      expect(typeof (events.find(event => event.type === 'game_over')!
+        .payload.scores as Record<string, any>).player_b.armyValue).toBe('number');
+    }
   });
 
   it('never writes the spectator token to access logs', async () => {

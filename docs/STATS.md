@@ -17,7 +17,7 @@ npm run stats-all
 
 ## 迷雾模式（fog）
 
-迷雾局本期**不纳入统计与竞技场**：`records/` 不自动归档 fog 回放，`public/data/stats.json` / `fun-stats.json` 不统计 fog 局，`arena/matches.jsonl` 不记录 fog 对局，`/arena.html` 没有 fog 分榜，`rl/evaluation/round_robin.py` 的评估模式清单也不含 fog。观战页/房主仍可导出 fog 回放 JSON 供当次复盘（先在观战页填入观战令牌以载入全量事件），但不会因此刷新上述看板；`npm run stats-all` 不会把 fog 局计入。等迷雾玩法稳定后再单独开接入版本。
+迷雾局本期**不纳入统计与竞技场**：`records/` 不自动归档 fog 回放，`public/data/stats.json` / `fun-stats.json` 不统计 fog 局，`arena/matches.jsonl` 不记录 fog 对局，`/arena.html` 没有 fog 分榜，`rl/evaluation/round_robin.py` 的评估模式清单也不含 fog。观战页/房主仍可导出 fog 回放 JSON 供当次复盘（进行中的迷雾局先在观战页填入观战令牌以载入全量事件，已结束的对局无需令牌），但不会因此刷新上述看板；`npm run stats-all` 不会把 fog 局计入。等迷雾玩法稳定后再单独开接入版本。
 
 ## 竞技场数据
 

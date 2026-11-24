@@ -7,7 +7,7 @@
 | 凭证 | 传递方式 | 用途 |
 |---|---|---|
 | 玩家 token | `X-Player-Token: <player.token>` | 玩家自己的操作、读状态、等待与事件流 |
-| 观战 token | `X-Spectator-Token: <spectatorToken>` 或 `?spectatorToken=<spectatorToken>` | fog 局只读全量视角（状态 / 事件 / SSE）；建房响应返回一次，不能用于任何写接口 |
+| 观战 token | `X-Spectator-Token: <spectatorToken>` 或 `?spectatorToken=<spectatorToken>` | fog 局只读全量视角（状态 / 事件 / SSE）；建房响应返回一次，不能用于任何写接口。进行中必须带它才能看全量；对局结束（`phase === "game_over"`）后无需该令牌，匿名即全量，且不校验观战令牌（无效/他局令牌也按 public 全量返回，不返回 401） |
 | 房主 token | `X-Host-Token: <hostToken>` | 开局、踢人、改人数、跳过回合、强制结算、添加 AI |
 | 控制 token | `X-Control-Token: <token>` 或 `?token=<token>` | 删除对局、强制裁决、管理员改名、竞技场跑批 |
 | 指标 token | `X-Metrics-Token: <token>` 或 `Authorization: Bearer <token>` | `GET /metrics`（仅在设置 `METRICS_TOKEN` 后启用） |
@@ -39,7 +39,7 @@
 | `GET` | `/api/games/:id/lobby` | - | 公开大厅摘要，不含凭证；含座位字段 `seatMode` / `seatVersion` / `firstSeat` / `seats` / `layoutSlots`（见下） |
 | `POST` | `/api/games/:id/join` | `{ name? }` | `{ player: { id, token }, lobby }` |
 | `POST` | `/api/games/:id/start` | host token header | `{ ok: true, game }` |
-| `GET` | `/api/games/:id` | player / spectator token header（fog 可匿名） | 按观者投影的状态，不含 token；fog 局额外带 `fog` 字段 |
+| `GET` | `/api/games/:id` | player / spectator token header（fog 进行中可匿名；终局匿名即全量） | 按观者投影的状态，不含 token；fog 局额外带 `fog` 字段 |
 | `PATCH` | `/api/games/:id/player` | `{ name }` | `{ ok: true, lobby }` |
 | `PATCH` | `/api/games/:id/rename` | `{ playerId, name }` + control token | `{ ok: true }`（管理员改任意玩家名） |
 | `POST` | `/api/games/:id/leave` | player token header | `{ ok: true }` |
@@ -92,15 +92,17 @@
 
 ### 读取状态
 
-`GET /api/games/:id` 通常需要玩家 token；fog 局额外接受观战 token 或匿名访问（见下节）。支持 `include=state,events,config,adjudication` 投影与 `If-None-Match`（304）。
+`GET /api/games/:id` 通常需要玩家 token；fog 局额外接受观战 token 或匿名访问（进行中匿名是 public 安全视角，`game_over` 后匿名即全量；见下节）。支持 `include=state,events,config,adjudication` 投影与 `If-None-Match`（304）。
 
 ### 迷雾模式（fog）的观者投影
 
-观者优先级：合法 `X-Player-Token`（或 `?token=`） > 合法 `X-Spectator-Token`（或 `?spectatorToken=`） > `public`；同时提供时以玩家为准。观战 token 只读，不能进入任何写接口。无效观战 token → `401 { error, code: 'invalid_spectator_token' }`；fog 局无任何 token → `public` 安全视角（**不是** 401）。
+观者优先级：合法 `X-Player-Token`（或 `?token=`） > 合法 `X-Spectator-Token`（或 `?spectatorToken=`） > `public`；同时提供时以玩家为准。观战 token 只读，不能进入任何写接口。**fog 局 `phase === "game_over"` 时匿名即全量**：无需观战令牌，返回与观战同权的全量状态和原始事件流（见下方终局说明）。**终局不校验观战令牌**：携带无效或他局观战令牌也按 public 全量处理，不返回 `401 invalid_spectator_token`。进行中：无效观战 token → `401 { error, code: 'invalid_spectator_token' }`；fog 局无任何 token → `public` 安全视角（**不是** 401）。
+
+下表是**进行中**（`phase !== "game_over"`）的投影。`phase === "game_over"` 时 public 与 spectator 同权：`units` / `fog` / `adjudication` / `result` / `players[].stats` / `lastActivityAt` / `players[].adjudicationScore` / `eliminatedBy` 按 spectator 列返回，`events` 为原始全量，`seq` / `lastEventSeq` / `stateVersion` 为全局值，无需观战令牌，也不校验观战令牌（无效/他局令牌也按 public 全量返回）。玩家视角在 `revealFromRound` 到达或 `game_over` 时 `units` 为全量、`fog.revealed` 为 `true`（`lastSeen` 为空），但事件与裁决仍按本人投影。
 
 | 字段 | player | spectator | public |
 |---|---|---|---|
-| `units` | 本人全部单位 + 视野内敌军 | 全量 | `[]` |
+| `units` | 本人全部单位 + 视野内敌军；`revealFromRound` 到达后全量 | 全量 | `[]` |
 | `fog` | `{ enabled: true, revealed, visibleCells, lastSeen }`（`lastSeen` 只含本人记忆） | `{ enabled: true, revealed: true, visibleCells: 全部可用格, lastSeen: [] }` | `{ enabled: true, revealed: false, visibleCells: [], lastSeen: [] }` |
 | `events` | 逐条按**发生时刻固化**的披露投影；`seq` 为观者序号 | 全量；全局 `seq` | 公开事件；`seq` 为 public 观者序号 |
 | `adjudication` | 本人完整；他人 `{ playerId, total, rank, hidden: true }` | 全量 | `{ hidden: true }` 整体或省略分项 |
@@ -113,13 +115,13 @@
 | `plan` | 只看自己队列 + 公开的 `committed` | 空队列 + `committed` | 空队列 + `committed` |
 
 - 敌方隐藏单位不得经任何字段（`units`、`fog.lastSeen`、事件 payload、`adjudication`、`result`、`players[].stats`）泄露 `unitId` / `type` / `hp` / `q` / `r`。
-- **事件披露在发生时刻固化**：fog 局写入事件时，按当时视野为每个座位与 `public` 计算披露并随事件持久化；玩家与公开视角的状态读取、事件补拉、SSE 都只回放该观者的固化结果，不按当前视野重算。观战视角始终是全量事件（仅剥离内部固化表），不代表任一玩家当时的视角。揭雾（`revealFromRound` 到达或 `phase === "game_over"`）之后**新产生**的事件对全体全量，**不回填历史**：已固化的玩家/公开披露保持当时结果。只有不含固化数据的旧事件（4.0.0 及更早写入的 `runtime/store/*.json`）在读取时回落到按当前状态投影；带固化表但缺少该观者条目的事件按隐藏处理，不借当前视野补算。该回落只为兼容旧局，不代表新口径。
+- **事件披露在发生时刻固化（进行中）**：fog 局写入事件时，按当时视野为每个座位与 `public` 计算披露并随事件持久化；进行中的玩家与公开视角的状态读取、事件补拉、SSE 都只回放该观者的固化结果，不按当前视野重算。观战视角始终是全量事件（仅剥离内部固化表），不代表任一玩家当时的视角。揭雾（`revealFromRound` 到达）之后**新产生**的事件对全体全量，**不回填历史**：已固化的玩家/公开披露保持当时结果。只有不含固化数据的旧事件（4.0.0 及更早写入的 `runtime/store/*.json`）在读取时回落到按当前状态投影；带固化表但缺少该观者条目的事件按隐藏处理，不借当前视野补算。该回落只为兼容旧局，不代表新口径。**`phase === "game_over"` 是终局公开，不是回填**：public/匿名读取改回原始全量事件（含完整 `game_start` 与进行中隐藏的动作，全局 `seq`），不重写任何观者的固化表；玩家本人的历史仍按固化结果回放。`revealFromRound` 的揭雾期（对局未结束）不会解冻 public 的历史固化披露，也不取消令牌要求；它只让之后新产生的事件按揭雾规则披露。
 - 固化数据是服务端内部状态（`event.fogViews` / `event.fogSeqs`），只随对局持久化，不出现在状态响应、事件响应、SSE 帧或导出的回放中。
-- `adjudication` / `result` 里缺失或标为 `hidden: true` 的分项表示**隐藏**，不是 0 分：`public` 视角缺少隐藏单位等重建分项所需的输入，客户端不得用观战/回放里的完整统计或残缺事件补算后当成完整分项。
-- **非本人 `players[].stats` 整块删除**：伤害、击杀、占点、行动点等聚合计数会旁路隐藏行动（未见的交火、占领与治疗都能从计数变化推断），因此 fog 玩家视角只保留自己的 `stats`，其他玩家整个键删除；`public` 视角全部删除；观战视角全量保留。缺失表示**不可见**，不是 0，也不得用计数反推隐藏单位或隐藏行动。
+- `adjudication` / `result` 里缺失或标为 `hidden: true` 的分项表示**隐藏**，不是 0 分：进行中的 `public` 视角缺少隐藏单位等重建分项所需的输入，客户端不得用观战/回放里的完整统计或残缺事件补算后当成完整分项；`game_over` 后 public 与观战一致，是完整分项。
+- **非本人 `players[].stats` 整块删除**：伤害、击杀、占点、行动点等聚合计数会旁路隐藏行动（未见的交火、占领与治疗都能从计数变化推断），因此 fog 玩家视角只保留自己的 `stats`，其他玩家整个键删除；进行中的 `public` 视角全部删除；`game_over` 后 public 与观战一致保留全量。缺失表示**不可见**，不是 0，也不得用计数反推隐藏单位或隐藏行动。
 - 非 fog 模式响应字节不变（状态读取仍需玩家 token；事件补拉保持原有的匿名行为）。
-- **fog 的游标是观者序号（`stateVersion` 大厅期除外）**：fog 对局开始后，玩家与 `public` 的 `seq`、`lastEventSeq`、`wait` 的 `afterSeq` / `seq`、SSE `id` 与 `Last-Event-ID`、`stateVersion` 以及 ETag 的版本段，统一使用该观者的连续序号（只对**该观者可见**的事件递增，从 1 起；没有可见事件时为 0）。大厅期没有隐藏单位，`stateVersion` 与 ETag 版本段仍用全局变更计数（`host/max-players`、`host/seats` 不发事件也改状态，用观者序号会让条件 GET 错误 304）。观战视角与非 fog 局沿用全局序号。不得把观者序号当全局进度，也不得用两个观者的序号差或 `lastEventSeq` 跳变推断隐藏事件的数量与时机。
-- fog 局 ETag 为 `"<id>-<stateVersion>-<planQueueTag>-<includeKey>-<viewerTag>"`（`viewerTag ∈ player:<id> | spectator | anon`），版本段按上一条规则取值（大厅期全局，开局后观者序号），并带 `Vary: X-Player-Token, X-Spectator-Token`；304 不得跨观者复用。非 fog 局 ETag 与 `stateVersion` 的旧语义不变。
+- **fog 的游标进行中是观者序号（`stateVersion` 大厅期除外）**：fog 对局开始后，玩家与 `public` 的 `seq`、`lastEventSeq`、`wait` 的 `afterSeq` / `seq`、SSE `id` 与 `Last-Event-ID`、`stateVersion` 以及 ETag 的版本段，统一使用该观者的连续序号（只对**该观者可见**的事件递增，从 1 起；没有可见事件时为 0）。大厅期没有隐藏单位，`stateVersion` 与 ETag 版本段仍用全局变更计数（`host/max-players`、`host/seats` 不发事件也改状态，用观者序号会让条件 GET 错误 304）。观战视角与非 fog 局沿用全局序号。**`phase === "game_over"` 后 public 改用全局序号**：`seq`、`lastEventSeq`、SSE `id` / `Last-Event-ID`、`stateVersion` 与 ETag 版本段都回到全局值（与观战一致）；玩家视角仍用自己的观者序号。不得把观者序号当全局进度，也不得用两个观者的序号差或 `lastEventSeq` 跳变推断隐藏事件的数量与时机。
+- fog 局 ETag 为 `"<id>-<stateVersion>-<planQueueTag>-<includeKey>-<viewerTag>"`（`viewerTag ∈ player:<id> | spectator | anon`），版本段按上一条规则取值（大厅期全局，开局后观者序号，`game_over` 后 public 全局），并带 `Vary: X-Player-Token, X-Spectator-Token`；304 不得跨观者复用。非 fog 局 ETag 与 `stateVersion` 的旧语义不变。
 
 ### 长轮询等待
 
@@ -131,13 +133,13 @@
 
 ### 事件流
 
-`GET /api/games/:id/events?after=<seq>` 返回增量事件；`Accept: text/event-stream` 时建立 SSE（`id:` 为观者序号），断线可用 `Last-Event-ID` 续传。fog 局的玩家与匿名视角，`after` / `Last-Event-ID` / 返回事件的 `seq` / SSE `id:` 都是观者序号：服务端先按观者序号过滤，再按发生时刻固化的披露投影；观战视角沿用全局序号。SSE 与非 SSE 使用同一套观者解析与投影，握手时解析观者、逐事件投影，匿名连接只收公开事件，初始补发的历史帧同样投影且不因后续揭雾重算；不存在“无令牌拿全量”的旁路。
+`GET /api/games/:id/events?after=<seq>` 返回增量事件；`Accept: text/event-stream` 时建立 SSE（`id:` 为观者序号），断线可用 `Last-Event-ID` 续传。**进行中**的 fog 局，玩家与匿名视角的 `after` / `Last-Event-ID` / 返回事件的 `seq` / SSE `id:` 都是观者序号：服务端先按观者序号过滤，再按发生时刻固化的披露投影；观战视角沿用全局序号。SSE 与非 SSE 使用同一套观者解析与投影，握手时解析观者、逐事件投影，匿名连接只收公开事件，初始补发的历史帧同样投影且不因后续揭雾重算。**`phase === "game_over"` 后**，匿名视角改用全局序号并收到原始全量事件（含完整 `game_start`）；玩家连接仍按观者序号与固化投影。所以“无令牌拿全量”只发生在终局公开，进行中没有该旁路。
 
 事件类型：
 
 `player_joined`, `player_left`, `game_start`, `deploy`, `move`, `attack`, `heal`, `unit_death`, `demolish`, `control_point_captured`, `control_point_neutralized`, `control_point_repair`, `income`, `comeback_supply`, `artillery_warning`, `artillery_shrunk`, `artillery_damage`, `reset_actions`, `turn_skipped`, `turn_end`, `round_end`, `round_start`, `round_resolved`, `plan_committed`, `wait`, `action_failed`, `headquarters_destroyed`, `player_eliminated`, `game_over`, `name_rename`, `bot_failed`
 
-- `game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。fog 局的玩家视角只含本人单位与视野内敌军，观战/回放才是全量。**fog 局的 `payload.config` 必带 `fog`**（与 `game.config.fog` 同值，含 `vision` 与 `revealFromRound`），回放与规则速查以它为视野/揭雾的权威来源；非 fog 局不追加该键，键集保持不变。
+- `game_start` 包含完整玩家列表、出生分配、行动顺序、地图、据点、总部、单位、资源和数值配置，观战页可只靠事件流重放。fog 局**进行中**按观者投影：玩家视角保留全量字段，仅 `units` 裁成本人单位与视野内敌军；观战/回放是全量；**匿名（public）视角只带 `roundNumber`、`mapId`、`mode` 与公开地图几何 `map`**（`id` / `name` / `description` / `mode` / `grid` / `orientation` / `radius` / `terrainCells` / `cells`；这是开局地形，匿名状态的 `map` / `cells` 则是当前地形），不含 `units` / `headquarters` / `players` / `resources` / `controlPoints`，也不含任何单位或总部 id；状态响应的 `events`、`/events` 补拉与 SSE 帧同口径。进行中 public 的固化载荷同样不回填：已固化事件若其 `public` 条目只有 `roundNumber`，升级后仍无地图，旧局请读匿名状态的 `map` / `cells`（4.0.0 及更早没有固化表，回落投影会带上地图）。**`phase === "game_over"` 后**，public 的 `game_start` 与全部历史事件改为原始全量（完整玩家 / 总部 / 单位 / 资源 / 据点 / `config`，全局 `seq`），不再使用 public 固化载荷；玩家视角仍按自己的固化结果。**fog 局的 `payload.config` 必带 `fog`**（与 `game.config.fog` 同值，含 `vision` 与 `revealFromRound`），回放与规则速查以它为视野/揭雾的权威来源；非 fog 局不追加该键，键集保持不变。
 - `game_over` 的 `reason` 为 `last_player_standing`、`mutual_annihilation`、`turn_limit_score`、`turn_limit_draw`、`forced_adjudication_score` 或 `forced_adjudication_draw`。新生成的事件流中 `game_over` 是最后一条，最终回合的 `round_end` / `round_resolved` 必定先于它；既有归档回放仍可能保留 3.7.1 之前的旧顺序（`game_over` 后还有终局 `round_resolved`），读取旧回放时不要只按 `game_over` 截断。
 - `income` 保留总额字段，并在类型化据点地图中提供 `breakdown` 明细：`pointId`、`name`、`kind`、`amount`。顺序局里非先手座位第一回合的贴目是一条 `base = amount`、`control = 0`、`breakdown = []` 且带 `komi: true` 的 `income` 事件（金额见 [MAP_FORMAT.md](MAP_FORMAT.md)「先手贴目」）。
 - `deploy` 中 `cost` 表示实际消耗，`unitCost` 表示单位基础费用，`discount` 表示部署源折扣。

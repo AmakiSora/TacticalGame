@@ -45,10 +45,12 @@ Vision sources for a player:
 
 - A map may override any unit type in `fog.vision` (`game.config.fog.vision`), values 0–8
   integers. `0` means that unit type projects **no** vision; its own cell is still visible.
-- `game_start.payload.config.fog` (the event payload) is the authoritative record of `vision` and
-  `revealFromRound` for a fog game: it always carries the same value as the live `game.config.fog`.
-  Use it when you need the parameters after the fact (replay, review, rules lookup); do not deduce
-  radii from which cells happened to be visible.
+- `game_start.payload.config.fog` (the full event payload, as a player or spectator sees it) is the
+  authoritative record of `vision` and `revealFromRound` for a fog game: it always carries the same value
+  as the live `game.config.fog`. Use it when you need the parameters after the fact (replay, review,
+  rules lookup); do not deduce radii from which cells happened to be visible. The anonymous public
+  projection of `game_start` keeps only `roundNumber`, `mapId`, `mode` and the public map (no
+  `config`), so read the public state's `config.fog` there.
 - **Line of sight:** a `blocker` cell on the straight line between the source and the target blocks
   vision. The source cell and the target cell themselves do not block. `water` never blocks.
   Cells outside the map / not in `game.cells` block.
@@ -63,7 +65,8 @@ is `true` for fog games.
 ## What you receive
 
 For a fog game the server projects the state per viewer (`X-Player-Token` → your view,
-`X-Spectator-Token` → full view, no token → public safe view):
+`X-Spectator-Token` → full view, no token → public safe view **while the game is in progress**;
+once `phase === "game_over"` the public view is the full spectator view and needs no token):
 
 - `units` — your own units **plus enemies inside your vision**. A hidden enemy is absent: no id,
   type, HP or coordinates anywhere in the response.
@@ -78,29 +81,55 @@ For a fog game the server projects the state per viewer (`X-Player-Token` → yo
 - `headquarters`, `controlPoints`, `cells`, `map`, `config`, `turn`, `players` — public as usual.
 - `plan.myQueue` — only yours; `plan.committed` is public (who locked in, never the contents).
 
+An anonymous (public) viewer gets that public boundary without a token. Its opening `game_start` event —
+state read, event backfill and SSE alike — carries `roundNumber`, `mapId`, `mode` and the public map
+geometry `map` (`terrainCells` / `cells`, the opening terrain), so a board can be drawn without a
+spectator token; it carries no `units`, `headquarters`, `players`, `resources` or `controlPoints`, and no
+unit or HQ id. The anonymous state read supplies the remaining public fields (such as `players`, `config`,
+`headquarters`, `controlPoints`, `resources`) and the current `map` / `cells`. Like every fog event this
+payload is frozen when written, so an event already stored with a `public` payload of only `roundNumber`
+stays that way; read the public state's `map` / `cells` for those older games.
+
+**At endgame the public view is no longer a safe projection.** When `phase === "game_over"`, an
+anonymous read returns the same full view as a spectator: all units, the original full event stream
+(including a complete `game_start` and every action that was hidden while the game was running), full
+adjudication and complete scores. The frozen public payloads are only used while the game is in
+progress; the public `seq` / `lastEventSeq` then return to the global sequence. A spectator token
+remains read-only and is still shown only once in the create response, but it is only needed for a
+live fog game — a finished one is public. **A finished game never rejects a spectator token:** an
+invalid or stale token is ignored and the read is served as public full, not `401
+invalid_spectator_token`; the strict check applies only while the game is in progress.
+
 A unit in `fog.lastSeen` is a **snapshot**, not a target: it does not block, cannot be selected as a
 live unit, and may already be dead or gone. Only the cell is a legal blind-fire aim point.
 
 ## Event disclosure and cursors
 
-Event disclosure is **frozen at the moment the event happens**. The server decides, for every seat
-and for the public viewer, what that event reveals, and stores that decision. State reads, event
-backfill and SSE for your seat replay the frozen decision; they never recompute it from your current
-vision. A spectator (and an exported replay) sees the full original event stream, which is not any
-player's view. Two consequences:
+Event disclosure is **frozen at the moment the event happens while a fog game is in progress**. The
+server decides, for every seat and for the public viewer, what that event reveals, and stores that
+decision. State reads, event backfill and SSE for your seat replay the frozen decision; they never
+recompute it from your current vision. A spectator (and an exported replay) sees the full original
+event stream, which is not any player's view. Two consequences for the in-progress read:
 
-- A reveal (`revealFromRound`, or `phase === "game_over"`) applies to **new events only**. Earlier
-  events keep the disclosure they had when they happened, so the full history in a spectator replay
-  is not what you knew at the time.
+- A mid-game reveal (`revealFromRound`) applies to **new events only**. Earlier events keep the
+  disclosure they had when they happened, so the full history in a spectator replay is not what you
+  knew at the time. The `game_over` endgame read below is different: it opens the whole public
+  history.
 - A hidden event never enters your event list; it is not a client-side mask.
 
+**`game_over` is an endgame disclosure, not a mid-game unfreeze.** Once the game is over, the
+public/anon read switches to the original full history: every event, the complete `game_start`, and
+actions that were hidden when they happened, all with global `seq`. No stored per-seat projection is
+rewritten: a seated player's own history still replays the frozen decisions, and the spectator view
+is unchanged.
+
 **Your cursor is your own.** In a fog game, once the game is active, for your seat and for the
-public view, `seq`, `lastEventSeq`, `wait`'s `afterSeq` / `seq`, the SSE `id` and `Last-Event-ID`,
-and the response's `stateVersion` all count **events visible to that viewer**, starting at 1. In the
-lobby, `stateVersion` is still the global change counter: there are no hidden units yet, and host
-changes such as `max-players` or seat order move state without emitting an event, so a viewer
-sequence would make conditional `GET` answer a wrong `304`. The spectator view and non-fog games
-keep the global sequence.
+public view **while the game is in progress**, `seq`, `lastEventSeq`, `wait`'s `afterSeq` / `seq`,
+the SSE `id` and `Last-Event-ID`, and the response's `stateVersion` all count **events visible to
+that viewer**, starting at 1. In the lobby, `stateVersion` is still the global change counter: there
+are no hidden units yet, and host changes such as `max-players` or seat order move state without
+emitting an event, so a viewer sequence would make conditional `GET` answer a wrong `304`. The
+spectator view, the public view after `game_over`, and non-fog games keep the global sequence.
 
 - Do not treat a gap in `seq` as an error and do not jump your cursor by guessing; only advance it
   to numbers you actually received.
@@ -109,6 +138,8 @@ keep the global sequence.
 - `wait` only returns when an event **you can see** appears. A busy round of hidden enemy actions
   can leave `wait` timing out at the same `seq` you had before.
 - If you also watch the spectator stream, its `seq` values are not interchangeable with yours.
+  After `game_over`, a public read uses the spectator/global sequence; a player's own cursor stays
+  viewer-scoped.
 
 **Per-event disclosure** (all judged at event time):
 
@@ -170,17 +201,27 @@ Public to everyone (a player additionally sees their own `stats`):
 - opponent adjudication **total and rank**, never the component breakdown.
 
 Hidden until revealed: enemy unit existence, type, HP, position, and any event payload that would
-identify them.
+identify them. These boundaries apply while the game is in progress; at `game_over` the public view
+is the full spectator view (see [Endgame reveal](#endgame-reveal)).
 
 ## Endgame reveal
 
 - `fog.revealFromRound` may end fog from a given round (for example the last 3 rounds). Once the
-  round number reaches it, or `phase === "game_over"`, the server sets the projection's `revealed`
-  to `true` and returns **all** units; `fog.lastSeen` is then empty because live vision is complete.
-  The reveal does **not** rewrite earlier events; see [Event disclosure and cursors](#event-disclosure-and-cursors).
+  round number reaches it, a **seated player's** projection sets `revealed` to `true` and returns
+  **all** units; `fog.lastSeen` is then empty because live vision is complete. The reveal does **not**
+  rewrite earlier events; see [Event disclosure and cursors](#event-disclosure-and-cursors).
+- A reveal round is **not** endgame public: while the game is still running (even after
+  `revealFromRound`), the anonymous/public state keeps the safe projection and a spectator token is
+  still needed for the full view. Only `phase === "game_over"` unlocks it.
 - `revealFromRound: null` means fog for the whole game.
-- The final result panel/replay is full information. A replay is not a player view: while writing a
-  review, separate "what I could see then" from "what the replay shows now".
+- A **finished** game (`phase === "game_over"`) is fully public: the anonymous/public view becomes the
+  spectator view — all units, the original full event stream, full adjudication and complete scores —
+  with no spectator token; a wrong or stale token is ignored and cannot block the read. This is the
+  endgame public read described in [Event disclosure and cursors](#event-disclosure-and-cursors), not
+  a rewrite of any stored per-seat projection.
+- The public/spectator view and an exported replay are full information at endgame. A replay is not a
+  player's in-game view: while writing a review, separate "what I could see then" from "what the
+  replay shows now".
 
 ## The round loop
 

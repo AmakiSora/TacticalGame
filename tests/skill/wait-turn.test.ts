@@ -27,6 +27,11 @@ function royaleGame(overrides = {}) {
   return simultaneousGame({ config: { mode: 'royale' }, ...overrides });
 }
 
+function fogGame(overrides = {}) {
+  // 迷雾局沿用同时回合骨架：turn.currentPlayerId 为 null，轮次窗口由 plan.committed 判断。
+  return simultaneousGame({ config: { mode: 'fog' }, ...overrides });
+}
+
 describe('wait-turn classifyState', () => {
   it('keeps the sequential contract unchanged', () => {
     expect(classifyState(baseGame(), 'player_b')).toMatchObject({ result: 'my_turn', exit: EXIT.MY_TURN });
@@ -51,6 +56,27 @@ describe('wait-turn classifyState', () => {
     expect(classifyState(royaleGame({ plan: { committed: ['player_a'] } }), 'player_a')).toBeNull();
     expect(classifyState(royaleGame({ phase: 'game_over', winner: 'player_b' }), 'player_a'))
       .toMatchObject({ result: 'game_over', exit: EXIT.GAME_OVER });
+  });
+
+  it('treats an open fog planning window as my_turn (same as simultaneous)', () => {
+    expect(classifyState(fogGame(), 'player_a'))
+      .toMatchObject({ result: 'my_turn', round: 3, exit: EXIT.MY_TURN });
+    // 自己已提交 -> 继续等待别人。
+    expect(classifyState(fogGame({ plan: { committed: ['player_a'] } }), 'player_a')).toBeNull();
+    // 仅对手已提交 -> 自己的规划窗口仍开着。
+    expect(classifyState(fogGame({ plan: { committed: ['player_b'] } }), 'player_a'))
+      .toMatchObject({ result: 'my_turn', round: 3, exit: EXIT.MY_TURN });
+    // 两边都提交后不再判 my_turn（等待结算）。
+    expect(classifyState(fogGame({ plan: { committed: ['player_a', 'player_b'] } }), 'player_a')).toBeNull();
+  });
+
+  it('still reports game over and elimination first in fog mode', () => {
+    expect(classifyState(fogGame({ phase: 'game_over', winner: 'player_b' }), 'player_a'))
+      .toMatchObject({ result: 'game_over', winner: 'player_b', exit: EXIT.GAME_OVER });
+    expect(classifyState(
+      fogGame({ players: { player_a: { status: 'eliminated' }, player_b: { status: 'active' } } }),
+      'player_a',
+    )).toMatchObject({ result: 'eliminated', exit: EXIT.ELIMINATED });
   });
 
   it('still reports game over and elimination in simultaneous mode', () => {

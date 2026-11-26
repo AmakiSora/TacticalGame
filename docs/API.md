@@ -12,7 +12,7 @@
 | 控制 token | `X-Control-Token: <token>` 或 `?token=<token>` | 删除对局、强制裁决、管理员改名、竞技场跑批 |
 | 指标 token | `X-Metrics-Token: <token>` 或 `Authorization: Bearer <token>` | `GET /metrics`（仅在设置 `METRICS_TOKEN` 后启用） |
 
-- `create` 响应同时返回 `hostToken` 与参战玩家的 `player.token`；fog 图另返回只读的 `spectatorToken`（明文只出现这一次，落盘只存哈希，非 fog 图为 `''`）；`join` 只返回玩家 token。
+- `create` 响应同时返回 `hostToken` 与参战玩家的 `player.token`；fog 图另返回只读的 `spectatorToken`（明文仅本次响应返回一次，落盘只存哈希且无重新获取接口，服务端重启不会让已签发令牌失效；非 fog 图为 `''`）；`join` 只返回玩家 token。
 - 控制权限由环境变量 `AUTO_CONTROL_TOKEN` 决定。设置后所有控制请求都必须携带控制 token（常量时间比较；空白值等同未设置），经反向代理转来的请求也一样；未设置时只放行「本机直连」——socket 对端必须是回环地址（`::1`、`::ffff:127.0.0.1`、整段 `127.0.0.0/8`）**且**请求不带任何转发头（`X-Forwarded-For` / `Forwarded` / `X-Real-IP`），与 `TRUST_PROXY` 取值无关；socket 地址缺失（unix socket、已断连）按非本机处理。未配置 token 且非本机 → 401 `control_token_required`；凭证不符 → 401 `invalid_control_token`。
 - `TRUST_PROXY=true` 时 `req.ip` 取自客户端可写的转发头，只影响限流分桶与 SSE 的每 IP 配额（控制鉴权不看它）；因此它只能接在你信任的反向代理后面，由代理自己写入转发头，且不要直接暴露应用端口。
 - 控制权限覆盖删除对局、强制裁决、管理员改名与竞技场评估的 5 个端点（`/api/arena/eval/status`、`/start`、`/stop`、`/clear-matches`、`/api/arena/leaderboard/regenerate`）；`?token=` 形式仅用于调试，会随请求 URL 进访问日志。

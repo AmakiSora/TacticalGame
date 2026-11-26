@@ -73,26 +73,51 @@ let state = null;
 let hoverCell = null;
 let layout = { minX: 0, minY: 0, width: 840, height: 840 };
 let gamesList = [];
-// 观战令牌：URL ?spectatorToken= 优先并持久化；迷雾局没有它只能看公开锁定页。
-let spectatorToken = readSpectatorToken();
+// 观战令牌按对局隔离：A 局的令牌绝不能带给 B 局（进行中的迷雾局会因此 401）。
+// 用 localStorage['tacticalGame.spectator.<gameId>'] 存取；链接 ?spectatorToken= 只写入
+// 同一链接 ?gameId= 对应的键，不再使用没有归属信息的全局键。
+const SPECTATOR_TOKEN_PREFIX = 'tacticalGame.spectator.';
+function spectatorTokenKey(id) {
+  return `${SPECTATOR_TOKEN_PREFIX}${id}`;
+}
+function readSpectatorTokenFor(id) {
+  if (!id) return '';
+  try {
+    return localStorage.getItem(spectatorTokenKey(id)) || '';
+  } catch {
+    return '';
+  }
+}
+function writeSpectatorTokenFor(id, token) {
+  if (!id) return false;
+  try {
+    if (token) localStorage.setItem(spectatorTokenKey(id), token);
+    else localStorage.removeItem(spectatorTokenKey(id));
+    return true;
+  } catch {
+    return false;
+  }
+}
+/** 链接参数只写进同一链接对应对局的键；没有 gameId 时无从判断归属，直接忽略。 */
+function ingestUrlSpectatorToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get('spectatorToken');
+    const gameId = params.get('gameId') || params.get('game');
+    if (fromUrl && gameId) writeSpectatorTokenFor(gameId, fromUrl);
+    // 旧版本的全局键没有记录所属对局，无法校验归属：读取即清除，避免把 A 局令牌带到 B 局。
+    localStorage.removeItem('autoSpectatorToken');
+  } catch {
+    // 浏览器禁用本地存储时，令牌只存在于本次链接参数里。
+  }
+}
+ingestUrlSpectatorToken();
 let liveFogGame = false;
 // 当前迷雾局已终局（对匿名观者公开）：本地残留的观战令牌不再发给 /events 与 SSE。
 let fogPublicTerminal = false;
 // 迷雾锁定页：只拿到公开字段，不能本地补算裁决分（公开响应里 adjudication 是 hidden）。
 let fogLockedView = false;
 
-function readSpectatorToken() {
-  try {
-    const fromUrl = new URLSearchParams(window.location.search).get('spectatorToken');
-    if (fromUrl) {
-      localStorage.setItem('autoSpectatorToken', fromUrl);
-      return fromUrl;
-    }
-    return localStorage.getItem('autoSpectatorToken') || '';
-  } catch {
-    return '';
-  }
-}
 // mobile board transform (forked from app.js for phone shell)
 let boardScale = 1;
 let boardPanX = 0;
@@ -1792,6 +1817,8 @@ function renderGamePickerMenu() {
 async function selectGame(id) {
   if (!id) return;
   gameSelect.value = id;
+  // 设置面板若开着：令牌输入框跟着切到本局的键（各局令牌互相隔离）。
+  if (settingsSpectatorToken) settingsSpectatorToken.value = readSpectatorTokenFor(id);
   syncGamePickerLabel();
   closeGamePicker();
   const isSelected = () => gameSelect.value === id;
@@ -1956,10 +1983,12 @@ async function fetchSpectatorMeta(id) {
   if (publicData.phase === 'game_over' || publicData.result) {
     return { data: publicData, fogGame: true, locked: false, unauthorized: false };
   }
-  if (!spectatorToken) return { data: publicData, fogGame: true, locked: true, unauthorized: false };
+  // 令牌按对局取：本局没有令牌就锁定，绝不复用其他对局残留的令牌。
+  const token = readSpectatorTokenFor(id);
+  if (!token) return { data: publicData, fogGame: true, locked: true, unauthorized: false };
   let authed;
   try {
-    authed = await fetch(`/api/games/${id}`, { headers: { 'X-Spectator-Token': spectatorToken } });
+    authed = await fetch(`/api/games/${id}`, { headers: { 'X-Spectator-Token': token } });
   } catch {
     return { data: publicData, fogGame: true, locked: true, unauthorized: false };
   }
@@ -2074,7 +2103,8 @@ async function loadGameState(id, isCurrent = () => true) {
     return false;
   }
   clearFogLock();
-  const headers = meta.fogGame && spectatorToken && !fogPublicTerminal ? { 'X-Spectator-Token': spectatorToken } : {};
+  const token = readSpectatorTokenFor(id);
+  const headers = meta.fogGame && token && !fogPublicTerminal ? { 'X-Spectator-Token': token } : {};
   const res = await fetch(`/api/games/${id}/events`, { headers });
   const { events } = await res.json();
   if (version !== gameLoadVersion || !isCurrent()) return false;
@@ -2096,7 +2126,9 @@ function subscribeSse(id) {
   if (liveSse) liveSse.close();
   const lastSeq = allEvents.at(-1)?.seq ?? 0;
   // EventSource 不能带请求头：进行中的迷雾局靠契约支持的查询参数传令牌；终局公开后不再带。
-  const authQuery = liveFogGame && spectatorToken && !fogPublicTerminal ? `&spectatorToken=${encodeURIComponent(spectatorToken)}` : '';
+  // 令牌按当前对局取，切换对局不会把上一局的令牌带过来。
+  const token = readSpectatorTokenFor(id);
+  const authQuery = liveFogGame && token && !fogPublicTerminal ? `&spectatorToken=${encodeURIComponent(token)}` : '';
   const connection = new EventSource(`/api/games/${id}/events?after=${lastSeq}${authQuery}`);
   liveSse = connection;
   connection.onmessage = e => {
@@ -2612,7 +2644,10 @@ function fillControlTokenSettings() {
       settingsControlToken.value = '';
     }
   }
-  if (settingsSpectatorToken) settingsSpectatorToken.value = spectatorToken;
+  if (settingsSpectatorToken) {
+    const id = gameSelect.value;
+    settingsSpectatorToken.value = id && id !== 'offline' ? readSpectatorTokenFor(id) : '';
+  }
 }
 
 function saveControlTokenFromSettings() {
@@ -2628,16 +2663,18 @@ function saveControlTokenFromSettings() {
 /** 保存观战令牌后立即用新令牌重载当前对局（迷雾局从锁定页切到全量视角）。 */
 async function saveSpectatorTokenFromSettings() {
   if (!settingsSpectatorToken) return;
-  spectatorToken = settingsSpectatorToken.value.trim();
-  try {
-    localStorage.setItem('autoSpectatorToken', spectatorToken);
-    statusEl.textContent = spectatorToken ? '观战令牌已保存' : '观战令牌已清空';
-  } catch {
+  const token = settingsSpectatorToken.value.trim();
+  const id = gameSelect.value;
+  if (!id || id === 'offline') {
+    statusEl.textContent = '请先选择一局对局，再保存观战令牌';
+    return;
+  }
+  // 只写当前对局的键：换局后输入框会跟着切换，不会把令牌带到别的对局。
+  if (!writeSpectatorTokenFor(id, token)) {
     statusEl.textContent = '无法写入本地存储';
     return;
   }
-  const id = gameSelect.value;
-  if (!id || id === 'offline') return;
+  statusEl.textContent = token ? '观战令牌已保存（只用于本局）' : '观战令牌已清空';
   if (await loadGameState(id) !== false) subscribeSse(id);
 }
 document.addEventListener('click', e => { if (gamePicker && !gamePicker.contains(e.target)) closeGamePicker(); });

@@ -139,6 +139,8 @@ function spectatorHarness(file: string) {
     syncPickerCurrent: vi.fn(), closePicker: vi.fn(), renderGamePickerMenu: vi.fn(),
     MODE_LABELS: { standard: '标准' }, esc: (s: unknown) => String(s), playerName: (s: string) => s,
     phaseLabel: (phase: string) => ({ active: '进行中', lobby: '大厅', game_over: '已结束' })[phase],
+    settingsSpectatorToken: null,
+    readSpectatorTokenFor: () => '',
   });
   const run = (code: string) => new Script(code).runInContext(context);
   run(`let gamesList = []; let activeRecordId = null;
@@ -277,7 +279,8 @@ for (const file of SPECTATORS) describe(`${file} spectator lifecycle`, () => {
       let importedReplayMeta = null;
       let pinnedReplayStep = false;
       let liveFogGame = false;
-      let spectatorToken = '';
+      let settingsSpectatorToken = null;
+      function readSpectatorTokenFor() { return ''; }
       function pausePlayback() {}
       function buildTimelineMarkers() {}
       function rebuildToStep() {}

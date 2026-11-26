@@ -57,6 +57,7 @@ interface RoomUiHarness {
 
 const EL_NAMES = [
   'createdPlayerTokenRow', 'createdToken', 'createdTokenCopy',
+  'createdSpectatorRow', 'createdSpectatorUrl',
   'createRoomStatus', 'createRoomTitle', 'createRoomHint', 'createRoomBadge',
   'btnStartGame', 'btnHostParticipate', 'btnConnectCreate', 'btnViewReplay',
   'joinRoomStatus', 'joinRoomTitle', 'joinRoomHint', 'joinRoomBadge',
@@ -89,9 +90,15 @@ function harness(path: string): RoomUiHarness {
     let myPlayer = 'player_a';
     let hostSeatBusy = false;
     const gameId = 'game-1';
+    const hostToken = 'host-1';
+    let spectatorToken = null;
+    const window = { location: { origin: 'http://127.0.0.1:3123' } };
     const lobbyPlayerName = () => '房主';
     const lobbyWinnerName = () => '房主';
     const syncCreateFormStatic = () => {};
+    ${extractFunction(source, 'spectatorPageUrl')}
+    ${extractFunction(source, 'spectatorShareUrl')}
+    ${extractFunction(source, 'syncSpectatorLinkUi')}
     ${extractFunction(source, 'syncHostSeatUi')}
     ${extractFunction(source, 'syncJoinRoomUi')}
     return { els, syncHostSeatUi, syncJoinRoomUi, setLobby(lobby) { hostLobbySnapshot = lobby; } };

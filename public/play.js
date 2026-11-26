@@ -61,6 +61,7 @@ const els = {
   btnViewReplay: $('btn-view-replay'), btnViewReplayJoin: $('btn-view-replay-join'),
   connStatus: $('conn-status'), createResult: $('create-result'), createdGameId: $('created-game-id'),
   createdHostToken: $('created-host-token'), createdToken: $('created-token'), createdTokenCopy: $('created-token-copy'),
+  createdSpectatorRow: $('created-spectator-row'), createdSpectatorUrl: $('created-spectator-url'), btnCopySpectatorUrl: $('btn-copy-spectator-url'),
   createdMore: $('created-more'), btnCreatedMore: $('btn-created-more'),
   createdPlayerTokenRow: $('created-player-token-row'), createRoomStatus: $('create-room-status'),
   createRoomBadge: $('create-room-badge'), createRoomTitle: $('create-room-title'), createRoomHint: $('create-room-hint'),
@@ -103,6 +104,9 @@ let gameId = null;
 let myToken = null;
 let hostToken = null;
 let myPlayer = null;
+// 本局观战令牌：仅迷雾局建房响应会明文返回一次（非迷雾图为空串）。
+// 房主未参战时，开局后自动带着它跳观战页；也用于房间卡里的观战链接。
+let spectatorToken = null;
 // 本地会话记住的昵称：刷新后创建表单 / 加入表单仍能显示同一个名字。
 let sessionName = null;
 let sse = null;
@@ -338,7 +342,7 @@ async function loadMapList() {
 }
 function persistSession() {
   try {
-    localStorage.setItem('tacticalGame.session', JSON.stringify({ gameId, myToken, myPlayer, hostToken, name: sessionName }));
+    localStorage.setItem('tacticalGame.session', JSON.stringify({ gameId, myToken, myPlayer, hostToken, spectatorToken, name: sessionName }));
   } catch {
     // 浏览器禁用本地存储时不影响本局操作。
   }
@@ -355,6 +359,7 @@ function readStoredSession() {
       myToken: parsed.myToken || null,
       myPlayer: parsed.myPlayer || null,
       hostToken: parsed.hostToken || null,
+      spectatorToken: parsed.spectatorToken || null,
       name: parsed.name || null,
     };
   } catch {
@@ -391,6 +396,8 @@ function applySessionFieldsFromSettings() {
     toast('请填写 Game ID', 'err');
     return false;
   }
+  // 换到另一局时，旧局的观战令牌必须丢弃：令牌只对签发它的那一局有效。
+  if (nextGameId !== gameId) spectatorToken = null;
   gameId = nextGameId;
   myToken = (els.settingsPlayerToken?.value || '').trim() || null;
   hostToken = (els.settingsHostToken?.value || '').trim() || null;
@@ -411,6 +418,7 @@ function clearSavedSession() {
   myToken = null;
   hostToken = null;
   myPlayer = null;
+  spectatorToken = null;
   sessionName = null;
   try {
     localStorage.removeItem('tacticalGame.session');
@@ -441,6 +449,7 @@ function restoreSessionIntoMemory() {
   myToken = session.myToken;
   myPlayer = session.myPlayer;
   hostToken = session.hostToken;
+  spectatorToken = session.spectatorToken;
   sessionName = session.name;
   if (sessionName) {
     if (els.createName) els.createName.value = sessionName;
@@ -3445,8 +3454,9 @@ function syncHostSeatUi() {
   }
   if (els.btnViewReplay) {
     els.btnViewReplay.classList.toggle('hidden', !ended || !gameId);
-    if (ended && gameId) els.btnViewReplay.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
+    if (ended && gameId) els.btnViewReplay.href = spectatorPageUrl('spectator.html');
   }
+  syncSpectatorLinkUi();
   syncCreateFormStatic();
 }
 
@@ -3480,7 +3490,7 @@ function syncJoinRoomUi(lobby) {
   }
   if (els.btnViewReplayJoin) {
     els.btnViewReplayJoin.classList.toggle('hidden', !ended || !gameId);
-    if (ended && gameId) els.btnViewReplayJoin.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
+    if (ended && gameId) els.btnViewReplayJoin.href = spectatorPageUrl('spectator.html');
   }
 }
 
@@ -4296,6 +4306,8 @@ function clearCreateRoomView() {
   if (els.createdGameId) els.createdGameId.textContent = '';
   if (els.createdHostToken) els.createdHostToken.textContent = '';
   if (els.createdToken) els.createdToken.textContent = '';
+  if (els.createdSpectatorUrl) els.createdSpectatorUrl.textContent = '';
+  els.createdSpectatorRow?.classList.add('hidden');
   if (els.createRoomStatus) els.createRoomStatus.textContent = '等待玩家加入';
   els.createdPlayerTokenRow?.classList.add('hidden');
   if (els.lobbySummary) els.lobbySummary.innerHTML = '';
@@ -4475,6 +4487,9 @@ els.btnCreate.addEventListener('click', async () => {
     hostToken = data.hostToken;
     myToken = data.player?.token || null;
     myPlayer = data.player?.id || null;
+    // 迷雾局建房响应在这里一次性返回明文观战令牌（非迷雾图为空串）。
+    // 房主不参战时，开局后 enterGame 会带着它自动进观战页。
+    spectatorToken = captureSpectatorToken(data);
     // 新房间：旧房间的座位同步状态（含 stopped 停机门）一律复位。
     startSeatSync();
     sessionName = data.lobby?.players?.find(player => player.id === myPlayer)?.name
@@ -4514,6 +4529,8 @@ els.btnJoin.addEventListener('click', async () => {
   myPlayer = data.player.id;
   gameId = gid;
   hostToken = null;
+  // 加入的是别人的房间：旧房间的观战令牌不能带过来（按局隔离）。
+  spectatorToken = null;
   sessionName = data.lobby?.players?.find(player => player.id === myPlayer)?.name
     || els.joinName.value.trim() || null;
   if (sessionName) els.joinName.value = sessionName;
@@ -4642,6 +4659,33 @@ els.maxPlayers?.addEventListener('change', () => {
     scheduleMapDialogPreview();
   }
 });
+/**
+ * 观战页链接：非参战房主开局后自动带着本局观战令牌过去。
+ * 非迷雾局建房响应没有令牌（空串），保持原链接、不拼参数。
+ */
+function spectatorPageUrl(page) {
+  const base = `/${page}?gameId=${encodeURIComponent(gameId)}`;
+  return spectatorToken ? `${base}&spectatorToken=${encodeURIComponent(spectatorToken)}` : base;
+}
+
+/** 可复制给别人的观战链接：必须是绝对地址；没有令牌（非迷雾局）就不生成入口。 */
+function spectatorShareUrl(page) {
+  if (!gameId || !spectatorToken) return '';
+  return `${window.location.origin}${spectatorPageUrl(page)}`;
+}
+
+/** 房间卡里的「观战链接（含令牌）」行：仅迷雾局建房且令牌未丢时显示。 */
+function syncSpectatorLinkUi() {
+  const url = hostToken && spectatorToken ? spectatorShareUrl('spectator.html') : '';
+  if (els.createdSpectatorRow) els.createdSpectatorRow.classList.toggle('hidden', !url);
+  if (els.createdSpectatorUrl) els.createdSpectatorUrl.textContent = url;
+}
+
+/** 建房响应里的观战令牌只对迷雾局有值（非迷雾图为空串）：空值统一收敛成 null，不生成入口。 */
+function captureSpectatorToken(data) {
+  return typeof data?.spectatorToken === 'string' && data.spectatorToken ? data.spectatorToken : null;
+}
+
 async function enterGame() {
   const requestGameId = gameId;
   const session = lobbyPollSession;
@@ -4660,7 +4704,8 @@ async function enterGame() {
     // 未参战（房主默认旁观）或只有观战会话：对局开始后转到观战页。
     // 必须先于 cells 判空：旧固化事件可能没有公开地图（4.0.0 时期匿名 game_start 只有轮号，新局带公开地形），
     // state.cells 为空是观战页能处理的情况，无座用户不该留在大厅收「获取对局状态失败」。
-    window.location.href = `/spectator.html?gameId=${encodeURIComponent(gameId)}`;
+    // 有本局观战令牌就一并带上（迷雾局房主不参战），否则保持匿名观战。
+    window.location.href = spectatorPageUrl('spectator.html');
     return;
   }
   if (!ok || !state.cells.length) {
@@ -4857,7 +4902,7 @@ function copyText(text) {
   document.body.appendChild(textarea);
   textarea.select();
   try {
-    document.execCommand('copy');
+    if (!document.execCommand('copy')) throw new Error('copy unavailable');
   } finally {
     document.body.removeChild(textarea);
   }
@@ -4870,7 +4915,7 @@ function onCopySuccess(btn) {
   toast('已复制', 'ok');
 }
 
-document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('click', async () => {
+document.querySelectorAll('.btn-copy[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
   const text = $(btn.dataset.copy)?.textContent || '';
   if (!text) return toast('没有可复制的内容', 'err');
   try {
@@ -4880,6 +4925,22 @@ document.querySelectorAll('.btn-copy').forEach(btn => btn.addEventListener('clic
     toast('复制失败', 'err');
   }
 }));
+// 观战链接可能很长，剪贴板不可用（局域网 http / 权限拒绝）时选中整段让用户手动复制。
+els.btnCopySpectatorUrl?.addEventListener('click', async () => {
+  const url = els.createdSpectatorUrl?.textContent || '';
+  if (!url) return;
+  try {
+    await copyText(url);
+    onCopySuccess(els.btnCopySpectatorUrl);
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(els.createdSpectatorUrl);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    toast('复制失败，已选中链接，请手动复制', 'err');
+  }
+});
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMapDialog(); closeBotDialog(); deselect(); } });
 document.addEventListener('click', e => { const popup = $('map-popup'); if (!popup.classList.contains('hidden') && !popup.contains(e.target) && e.target !== els.canvas) closePopup(); });
 els.btnSettings?.addEventListener('click', e => {

@@ -170,14 +170,16 @@ describe('fog spectator pages', () => {
       const source = read(page);
       const meta = slice(source, 'async function fetchSpectatorMeta(', 'function setFogLock(');
 
-      expect(source, page).toContain('let spectatorToken = readSpectatorToken();');
-      expect(source, page).toContain("new URLSearchParams(window.location.search).get('spectatorToken')");
+      expect(source, page).toContain("const SPECTATOR_TOKEN_PREFIX = 'tacticalGame.spectator.';");
+      expect(source, page).toContain('new URLSearchParams(window.location.search)');
+      expect(source, page).toContain("params.get('spectatorToken')");
+      expect(meta, page).toContain('const token = readSpectatorTokenFor(id);');
       expect(source, page).toContain('function isSimultaneousReplay() {');
       expect(source, page).toContain("return mode === 'simultaneous' || mode === 'royale' || mode === 'fog';");
       expect(meta, page).toContain('publicData.config?.mode === \'fog\' || publicData.fog?.enabled === true');
       // 非迷雾局不受陈旧令牌影响。
       expect(meta, page).toContain('if (!fogGame) return { data: publicData, fogGame: false };');
-      expect(meta, page).toContain("headers: { 'X-Spectator-Token': spectatorToken }");
+      expect(meta, page).toContain("headers: { 'X-Spectator-Token': token }");
       expect(meta, page).toContain('authed.status === 401');
     }
   });
@@ -237,8 +239,9 @@ describe('fog spectator pages', () => {
     for (const page of SPECTATOR_PAGES) {
       const source = read(page);
 
-      expect(source, page).toContain('const authQuery = liveFogGame && spectatorToken && !fogPublicTerminal ?');
-      expect(source, page).toContain('spectatorToken=${encodeURIComponent(spectatorToken)}');
+      expect(source, page).toContain('const token = readSpectatorTokenFor(id);');
+      expect(source, page).toContain('const authQuery = liveFogGame && token && !fogPublicTerminal ?');
+      expect(source, page).toContain('spectatorToken=${encodeURIComponent(token)}');
       expect(slice(source, 'function resetLoadedGame(', 'function ')).toContain('liveFogGame = false;');
       expect(slice(source, 'function resetLoadedGame(', 'function ')).toContain('fogPublicTerminal = false;');
       expect(source, page).toContain('clearFogLock();');
@@ -265,9 +268,11 @@ describe('fog spectator pages', () => {
  * 无座用户（房主旁观）点「进入游戏」时 state.cells 为空。enterGame 必须先把
  * 无 token 用户转去观战页，不能被 cells 判空拦下弹「获取对局状态失败」。
  */
-function loadEnterGame(file: string, options: { myToken: string | null; cells?: number; ok?: boolean }) {
+function loadEnterGame(file: string, options: { myToken: string | null; cells?: number; ok?: boolean; spectatorToken?: string | null }) {
   const source = read(file);
-  const start = source.indexOf('async function enterGame() {');
+  // enterGame 现在经 spectatorPageUrl 拼观战链接：连同上面的助手一起切出来执行。
+  const helperStart = source.indexOf('function spectatorPageUrl(page) {');
+  const start = helperStart >= 0 ? helperStart : source.indexOf('async function enterGame() {');
   const end = source.indexOf('\n// 刷新/重开后用本地会话回到对局', start);
   expect(start, `${file} 缺少 enterGame`).toBeGreaterThan(-1);
   expect(end, `${file} enterGame 之后缺少 reconnectSavedSession 注释`).toBeGreaterThan(start);
@@ -286,6 +291,7 @@ function loadEnterGame(file: string, options: { myToken: string | null; cells?: 
     loadFullState: vi.fn(async () => options.ok !== false),
     state: { cells: Array.from({ length: options.cells ?? 0 }, () => ({})) },
     myToken: options.myToken,
+    spectatorToken: options.spectatorToken ?? null,
     toast,
     window: { location },
     stopLobbyPolling: vi.fn(),
@@ -318,6 +324,23 @@ describe('fog anonymous game entry', () => {
           ? '/spectator-m.html?gameId=fog-entry-game'
           : '/spectator.html?gameId=fog-entry-game',
       );
+    }
+  });
+
+  it('carries the host spectator token into the spectator URL and omits it without one', async () => {
+    for (const page of PLAYER_PAGES) {
+      const token = 'tok/en +?';
+      const withToken = loadEnterGame(page, { myToken: null, cells: 0, spectatorToken: token });
+      await withToken.enterGame();
+      const pageName = page === 'public/play-m.js' ? 'spectator-m.html' : 'spectator.html';
+      expect(withToken.location.href, page).toBe(
+        `/${pageName}?gameId=fog-entry-game&spectatorToken=${encodeURIComponent(token)}`,
+      );
+
+      // 非迷雾局建房响应没有令牌（null / 空串）：链接不得留下空参数。
+      const withoutToken = loadEnterGame(page, { myToken: null, cells: 0, spectatorToken: '' });
+      await withoutToken.enterGame();
+      expect(withoutToken.location.href, page).toBe(`/${pageName}?gameId=fog-entry-game`);
     }
   });
 
@@ -360,7 +383,7 @@ describe('fog anonymous game entry', () => {
 });
 
 /** 在最小沙箱里执行观战元数据探测：终局迷雾局匿名不得再被锁。 */
-function loadSpectatorMeta(file: string, publicData: any, options: { token?: string | null; authed?: any } = {}) {
+function loadSpectatorMeta(file: string, publicData: any, options: { token?: string | null; tokens?: Record<string, string>; authed?: any } = {}) {
   const source = read(file);
   const start = source.indexOf('async function fetchSpectatorMeta(');
   const end = source.indexOf('function setFogLock(', start);
@@ -374,7 +397,11 @@ function loadSpectatorMeta(file: string, publicData: any, options: { token?: str
     if (!authed) return { ok: true, status: 200, json: async () => publicData };
     return options.authed ?? { ok: true, status: 200, json: async () => ({ ...publicData, authed: true }) };
   });
-  const context: any = { fetch: fetchMock, spectatorToken: options.token ?? null };
+  // 令牌按对局取：默认对任何 id 都给 options.token；tokens 用来看 A 局令牌不会出现在 B 局。
+  const context: any = {
+    fetch: fetchMock,
+    readSpectatorTokenFor: (id: string) => options.tokens?.[id] ?? options.token ?? '',
+  };
   context.globalThis = context;
   vm.createContext(context);
   vm.runInContext(`${body}\nglobalThis.__meta = fetchSpectatorMeta;`, context);
@@ -449,20 +476,33 @@ describe('fog finished games are public', () => {
     }
   });
 
+  it('never sends another game token when probing this game', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const live = { phase: 'active', config: { mode: 'fog' }, fog: { enabled: true }, result: null };
+      const h = loadSpectatorMeta(page, live, { tokens: { 'game-a': 'token-a' } });
+      const meta = await h.meta('game-b');
+
+      // A 局令牌不得出现在 B 局的探测请求里（否则 B 局会 401，甚至跨局带权限）。
+      expect(meta, page).toMatchObject({ fogGame: true, locked: true, unauthorized: false });
+      expect(h.calls, page).toEqual([{ url: '/api/games/game-b', authed: false }]);
+    }
+  });
+
   it('loads unlocked games through the anonymous events path without privileged headers', () => {
     for (const page of SPECTATOR_PAGES) {
       const source = read(page);
       const load = slice(source, 'async function loadGameState(', 'function subscribeSse(');
       // 无令牌与终局都走匿名 /events：终局不再出示本地残留令牌，也不另造特权头。
       expect(load, page).toContain("fogPublicTerminal = Boolean(meta.fogGame && (meta.data?.phase === 'game_over' || meta.data?.result));");
-      expect(load, page).toContain('const headers = meta.fogGame && spectatorToken && !fogPublicTerminal ?');
-      expect(load, page).toContain("{ 'X-Spectator-Token': spectatorToken } : {}");
+      expect(load, page).toContain('const token = readSpectatorTokenFor(id);');
+      expect(load, page).toContain('const headers = meta.fogGame && token && !fogPublicTerminal ?');
+      expect(load, page).toContain("{ 'X-Spectator-Token': token } : {}");
     }
   });
 });
 
 /** 抽出真实 loadGameState + subscribeSse：终局加载与 SSE 都不得再出示本地残留令牌。 */
-function loadSpectatorLoad(file: string, options: { token?: string | null; meta: any; events?: any[] }) {
+function loadSpectatorLoad(file: string, options: { token?: string | null; tokens?: Record<string, string>; meta: any; events?: any[] }) {
   const source = read(file);
   const start = source.indexOf('async function loadGameState(');
   const endMarker = file === 'public/app.js' ? "canvas.addEventListener('mousemove'" : 'function updateHoverFromPoint(';
@@ -484,7 +524,7 @@ function loadSpectatorLoad(file: string, options: { token?: string | null; meta:
   const startFogUnlockPoll = vi.fn();
   const stopFogUnlockPoll = vi.fn();
   const factory = new Function(
-    'fetchSpectatorMeta', 'fetch', 'EventSource', 'spectatorToken',
+    'fetchSpectatorMeta', 'fetch', 'EventSource', 'readSpectatorTokenFor',
     'showFogLocked', 'startFogUnlockPoll', 'stopFogUnlockPoll',
     `let gameLoadVersion = 0;
      let liveSse = null;
@@ -520,7 +560,8 @@ function loadSpectatorLoad(file: string, options: { token?: string | null; meta:
      };`,
   );
   const api = factory(
-    fetchSpectatorMeta, fetchMock, FakeEventSource, options.token ?? null,
+    fetchSpectatorMeta, fetchMock, FakeEventSource,
+    (id: string) => options.tokens?.[id] ?? options.token ?? '',
     showFogLocked, startFogUnlockPoll, stopFogUnlockPoll,
   );
   return { ...api, urls, fetchMock, fetchSpectatorMeta, showFogLocked, startFogUnlockPoll, stopFogUnlockPoll };
@@ -587,6 +628,26 @@ describe('fog terminal games drop any leftover spectator token', () => {
       expect(bad.showFogLocked, page).toHaveBeenCalledWith({ phase: 'active' }, true);
       expect(bad.startFogUnlockPoll, page).toHaveBeenCalledWith('live-game');
       expect(bad.fetchMock, page).not.toHaveBeenCalled();
+    }
+  });
+
+  it('sends each game only its own token on /events and SSE', async () => {
+    for (const page of SPECTATOR_PAGES) {
+      const h = loadSpectatorLoad(page, {
+        tokens: { 'game-a': 'token-a' },
+        meta: { fogGame: true, locked: false, data: { phase: 'active' } },
+        events: [{ seq: 1 }],
+      });
+
+      await h.loadGameState('game-b');
+      expect(h.fetchMock.mock.calls[0][1]?.headers, page).toEqual({});
+      h.subscribeSse('game-b');
+      expect(h.urls.at(-1), page).toBe('/api/games/game-b/events?after=1');
+
+      await h.loadGameState('game-a');
+      expect(h.fetchMock.mock.calls[1][1]?.headers, page).toEqual({ 'X-Spectator-Token': 'token-a' });
+      h.subscribeSse('game-a');
+      expect(h.urls.at(-1), page).toBe('/api/games/game-a/events?after=1&spectatorToken=token-a');
     }
   });
 

@@ -54,11 +54,15 @@ describe('host lobby seat', () => {
 
   it('sends hosts without a seat to the spectator view once the game starts', () => {
     expect(read('public/play.js'), '桌面端未参战房主应转观战').toContain(
-      '`/spectator.html?gameId=${encodeURIComponent(gameId)}`',
+      "window.location.href = spectatorPageUrl('spectator.html')",
     );
     expect(read('public/play-m.js'), '手机端未参战房主应转观战').toContain(
-      '`/spectator-m.html?gameId=${encodeURIComponent(gameId)}`',
+      "window.location.href = spectatorPageUrl('spectator-m.html')",
     );
+    // 观战链接助手在没有令牌（非迷雾局）时仍必须给出原来的 gameId 地址。
+    for (const path of CLIENTS) {
+      expect(read(path), `${path} 观战基础地址不对`).toContain('`/${page}?gameId=${encodeURIComponent(gameId)}`');
+    }
     for (const path of CLIENTS) {
       expect(read(path), `${path} 观战跳转未以缺少 player token 为条件`).toContain('未参战（房主默认旁观）或只有观战会话');
     }

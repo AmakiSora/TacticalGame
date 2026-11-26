@@ -206,7 +206,11 @@ describe('lobby map dialog and room state', () => {
       // 已结束的房间不再轮询开局。
       expect(source, `${path} 恢复已结束房间仍在轮询`).toContain("if (lobby.phase === 'lobby') startLobbyPolling();");
     }
-    const replayPath = { 'public/play.js': '/spectator.html?gameId=', 'public/play-m.js': '/spectator-m.html?gameId=' } as Record<string, string>;
+    // 回放 / 观战链接走 spectatorPageUrl()：无令牌时仍是 ?gameId=，有迷雾令牌时再追加参数。
+    const replayPath = {
+      'public/play.js': "spectatorPageUrl('spectator.html')",
+      'public/play-m.js': "spectatorPageUrl('spectator-m.html')",
+    } as Record<string, string>;
     for (const [path, href] of Object.entries(replayPath)) {
       expect(read(path), `${path} 回放地址不对`).toContain(href);
     }

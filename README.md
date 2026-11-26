@@ -2,7 +2,7 @@
 
 尖顶六边形、轴坐标 `q/r` 的回合制多人战棋。支持 2-8 名玩家自由混战，玩家争夺地图据点获取补给，在总部或己方据点部署单位，摧毁其他玩家总部并成为最后存活者。除逐人轮流的经典模式与歼灭模式外，`standoff`、`molten-throne`、`mistpine`、`longbow-gallery` 等地图提供**同时回合模式**：全员秘密下达指令，服务器统一同时结算，无先手优势、多人无需排队等待；`snowflake`（雪花）、`narrow-road`（狭路相逢）与 `mirror-lake`（镜湖）地图则提供**大逃杀模式（royale）**——同时回合的指令方式叠加歼灭缩圈规则；`fog-harbor`（雾港）与 `fog-crossing`（雾渡）提供**迷雾模式（fog）**——同时回合骨架叠加视野迷雾，只隐藏敌方单位，地形、总部与据点公开。
 
-当前版本：`4.0.2`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
+当前版本：`4.0.3`。完整版本变更见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)（编写规范见 [`docs/RELEASE_NOTES_SPEC.md`](docs/RELEASE_NOTES_SPEC.md)）。
 
 ## 技术栈
 
@@ -109,7 +109,7 @@ npm run export-state
 - 观战页可以从在线对局导出回放 JSON。
 - 导出的 JSON 可在观战页重新导入并按事件流回放。
 - 历史对战记录放在 `records/V1`、`records/V2` 和 `records/V3`；V2/V3 记录包含 `schemaVersion`，便于后续回放兼容。历史回放的 `schemaVersion` 表示导出时的回放格式，不随应用版本批量改写。
-- 迷雾局回放含全量事件（可供复盘），但本期不自动归档到 `records/`、不进统计看板/竞技场/RL，见 [docs/STATS.md](docs/STATS.md)。
+- 迷雾局回放含全量事件（可供复盘），归档到 `records/V3` 后自 4.0.3 起计入统计看板；仍不进竞技场/RL，见 [docs/STATS.md](docs/STATS.md)。
 - 对局 agent 的复盘规范也经 `/api/skill/files/:name` 下发（`review.md` + 各模式文件），保证远程 agent 与本地玩家遵循同一套复盘格式。
 
 ### 迷雾局观战与回放

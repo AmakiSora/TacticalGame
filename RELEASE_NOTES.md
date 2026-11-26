@@ -4,6 +4,17 @@
 
 自 3.0.0 起按 [docs/RELEASE\_NOTES\_SPEC.md](docs/RELEASE_NOTES_SPEC.md) 编写：每个版本小节内按 **新增 / 变更 / 修复 / 移除 / 测试与验证** 分类，分类与语义化版本号（SemVer 2.0.0）递增的对应关系见规范文件。3.8.1 起已按「简洁优先」整理（每条 1-2 句、细节外链）；更早小节保留原有详细写法；3.x 各版本号沿用发布时的实际编号，为保持既有引用不回改。
 
+## 4.0.3
+
+### 变更
+
+- **迷雾模式纳入回放统计**：fog 回放归档到 `records/V3` 后由 `npm run stats-all` 计入统计与娱乐看板（`stats.json` / `fun-stats.json`）；统计脚本按 `game_start.mode` 通用解析，前端已支持 fog 标签、筛选与模式分布，盲射落空（`hit:false`）计入攻击落空率。竞技场与 RL 仍不参与（fog 图 `modelEval: false`），口径见 [docs/STATS.md](docs/STATS.md)「迷雾模式」。
+
+### 测试与验证
+
+- `npm run build` 通过；全量 `npm test` 168 文件 / 2,057 例全过，`npm run check-version` 6 处版本引用均为 4.0.3。
+- 新增 fog 回放统计用例：双人雾港（摧毁总部、盲射落空、淘汰归属）与三人雾渡（轮数裁决）经 `extractMatch → aggregate` 计入模式分布与模型榜，娱乐统计的地图阶段与淘汰榜同样计入 fog。
+
 ## 4.0.2
 
 ### 变更

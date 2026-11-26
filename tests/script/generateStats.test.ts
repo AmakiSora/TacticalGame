@@ -371,3 +371,137 @@ describe('stats aggregation', () => {
     ]);
   });
 });
+
+describe('fog mode replays', () => {
+  function fogScore(overrides: Record<string, unknown> = {}) {
+    return {
+      headquartersDamage: 0, ownHqHp: 200, controlPoints: 0, controlHold: 0,
+      armyValue: 152, supplies: 120, killValue: 0, total: 253.2, ...overrides,
+    };
+  }
+
+  function writeFogReplay(dir: string, fileName: string, opts: {
+    mapId: string;
+    names: Record<string, string>;
+    seats: string[];
+    winner: string | null;
+    reason: string;
+    rankings: Array<{ playerId: string; rank: number; status: string; score: Record<string, unknown> }>;
+    extraEvents?: Array<Record<string, unknown>>;
+  }) {
+    const { mapId, names, seats, winner, reason, rankings, extraEvents = [] } = opts;
+    const scores = Object.fromEntries(seats.map(s => [s, fogScore()]));
+    const gameStart = {
+      mapId, mode: 'fog',
+      map: { id: mapId, grid: 'hex', orientation: 'pointy', radius: 8, terrainCells: [], cells: [] },
+      players: Object.fromEntries(seats.map(s => [s, { name: names[s], status: 'active' }])),
+      turnOrder: seats,
+      controlPoints: [{ id: 'cp_center', q: 0, r: 0, owner: null }],
+      headquarters: Object.fromEntries(seats.map(s => [s, { hp: 200, maxHp: 200 }])),
+      units: seats.map((s, i) => ({ id: `u-${s}`, owner: s, type: 'scout', q: i, r: 0, hp: 70 })),
+      resources: Object.fromEntries(seats.map(s => [s, { supplies: 120 }])),
+      artillery: null,
+      firstPlayer: seats[0],
+      playerNames: names,
+      config: {
+        mode: 'fog', units: {}, headquartersSpec: { hp: 200 }, balance: {}, annihilation: null,
+        fog: { vision: { scout: 4, ranger: 3, infantry: 2, support: 2, heavy: 1 }, revealFromRound: null },
+      },
+      roundNumber: 0,
+    };
+    const events = [
+      ...seats.map(s => ({ type: 'player_joined', timestamp: 1000, payload: { playerId: s, name: names[s] } })),
+      { type: 'game_start', timestamp: 1000, payload: gameStart },
+      { type: 'round_start', timestamp: 1001, payload: { roundNumber: 1, players: seats, committed: [] } },
+      ...seats.map(s => ({ type: 'plan_committed', timestamp: 1002, payload: { playerId: s, roundNumber: 1, committed: seats } })),
+      { type: 'round_resolved', timestamp: 1003, payload: { roundNumber: 1, gameOver: false, results: [], steps: 3 } },
+      { type: 'deploy', timestamp: 1004, payload: { unitId: `d-${seats[0]}`, owner: seats[0], unitType: 'scout', q: 1, r: 0, cost: 42 } },
+      { type: 'move', timestamp: 1005, payload: { unitId: `u-${seats[0]}`, owner: seats[0], fromQ: 0, fromR: 0, toQ: 1, toR: 0, roundNumber: 1 } },
+      { type: 'attack', timestamp: 1006, payload: { owner: seats[0], attackerId: `u-${seats[0]}`, hit: false, aimQ: 3, aimR: 0, shape: 'line', targetId: null, targetKind: null, damage: 0, actualDamage: 0, roundNumber: 1 } },
+      { type: 'attack', timestamp: 1007, payload: { owner: seats[0], attackerId: `u-${seats[0]}`, hit: true, targetId: `u-${seats[1]}`, targetKind: 'unit', actualDamage: 16, targetHp: 54, roundNumber: 1 } },
+      { type: 'control_point_captured', timestamp: 1008, payload: { pointId: 'cp_center', owner: seats[1], previousOwner: null, q: 0, r: 0, roundNumber: 1 } },
+      { type: 'income', timestamp: 1009, payload: { owner: seats[0], amount: 8, roundNumber: 2 } },
+      { type: 'round_end', timestamp: 1010, payload: { roundNumber: 1, gameOver: false, controlHoldCounted: true, steps: 3 } },
+      ...extraEvents,
+      { type: 'game_over', timestamp: 2000, payload: { winner, reason, scores, rankings, roundNumber: 2 } },
+    ];
+    const filePath = join(dir, fileName);
+    writeFileSync(filePath, JSON.stringify({
+      format: 'hex-v2-replay', schemaVersion: '4.0.3', gameId: `fog-${mapId}`,
+      mapId, playerNames: names, exportedAt: '2026-11-26T00:00:00.000Z',
+      eventCount: events.length, finalResult: { winner, reason, scores }, events,
+    }), 'utf8');
+    return filePath;
+  }
+
+  it('parses a fog-harbor duel replay with blind-shot misses and HQ elimination', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-fog-stats-'));
+    const fileName = 'tg_9001_20261126.json';
+    try {
+      const filePath = writeFogReplay(dir, fileName, {
+        mapId: 'fog-harbor',
+        names: { player_a: 'hy4-WB', player_b: 'glm5.3-OMP' },
+        seats: ['player_a', 'player_b'],
+        winner: 'player_a', reason: 'headquarters_destroyed',
+        rankings: [
+          { playerId: 'player_a', rank: 1, status: 'active', score: fogScore({ headquartersDamage: 200, total: 453.2 }) },
+          { playerId: 'player_b', rank: 2, status: 'eliminated', score: fogScore({ ownHqHp: 0, total: 200 }) },
+        ],
+        extraEvents: [
+          { type: 'unit_death', timestamp: 1500, payload: { unitId: 'u-player_b', owner: 'player_b', type: 'scout', cause: 'attack', roundNumber: 2 } },
+          { type: 'headquarters_destroyed', timestamp: 1501, payload: { owner: 'player_b', attackerId: 'u-player_a', roundNumber: 2 } },
+          { type: 'player_eliminated', timestamp: 1502, payload: { playerId: 'player_b', reason: 'headquarters_destroyed', eliminatedBy: 'player_a' } },
+        ],
+      });
+
+      const m = extractMatch(filePath, 'V3', fileName, new Map());
+      expect(m).toMatchObject({ mode: 'fog', mapId: 'fog-harbor', completed: true, reason: 'headquarters_destroyed', playerCount: 2 });
+      expect(m?.participants.find(p => p.playerId === 'player_a')).toMatchObject({ model: 'Hy4', agent: 'WB', rank: 1, isWinner: true });
+      expect(m?.participants.find(p => p.playerId === 'player_b')).toMatchObject({ model: 'glm5.3', agent: 'OMP', rank: 2, isWinner: false });
+      expect(m?.participants.find(p => p.playerId === 'player_a')?.score?.total).toBe(453.2);
+      expect(m?.eventStats).toMatchObject({ attacks: 2, attackMisses: 1, captures: 1, deploys: 1, unitDeaths: 1, artilleryDamage: 0, artilleryHits: 0 });
+      expect(m?.eliminations).toEqual([{ playerId: 'player_b', eliminatedBy: 'player_a', reason: 'headquarters_destroyed' }]);
+      expect(m?.hqKills).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('counts fog duels and three-player games in the mode distribution and leaderboard', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-fog-stats-'));
+    try {
+      const harborPath = writeFogReplay(dir, 'tg_9001_20261126.json', {
+        mapId: 'fog-harbor',
+        names: { player_a: 'hy4-WB', player_b: 'glm5.3-OMP' },
+        seats: ['player_a', 'player_b'],
+        winner: 'player_a', reason: 'headquarters_destroyed',
+        rankings: [
+          { playerId: 'player_a', rank: 1, status: 'active', score: fogScore({ total: 453.2 }) },
+          { playerId: 'player_b', rank: 2, status: 'eliminated', score: fogScore({ ownHqHp: 0, total: 200 }) },
+        ],
+      });
+      const crossingPath = writeFogReplay(dir, 'tg_9002_20261126.json', {
+        mapId: 'fog-crossing',
+        names: { player_a: 'hy4-WB', player_b: 'glm5.3-OMP', player_c: 'kimik3-PI' },
+        seats: ['player_a', 'player_b', 'player_c'],
+        winner: 'player_a', reason: 'turn_limit_score',
+        rankings: [
+          { playerId: 'player_a', rank: 1, status: 'active', score: fogScore({ controlPoints: 2, controlHold: 1.5, total: 400 }) },
+          { playerId: 'player_b', rank: 2, status: 'active', score: fogScore({ total: 300 }) },
+          { playerId: 'player_c', rank: 3, status: 'active', score: fogScore({ total: 200 }) },
+        ],
+      });
+
+      const harbor = extractMatch(harborPath, 'V3', 'tg_9001_20261126.json', new Map());
+      const crossing = extractMatch(crossingPath, 'V3', 'tg_9002_20261126.json', new Map());
+      const agg = aggregate([harbor!, crossing!]);
+
+      expect(agg.overview.modeDist).toEqual({ fog: 2 });
+      expect(agg.overview).toMatchObject({ matchCount: 2, completedCount: 2 });
+      expect(agg.modelLeaderboard.find(r => r.model === 'Hy4')).toMatchObject({ games: 2, duelGames: 1, multiGames: 1, wins: 2 });
+      expect(agg.modelLeaderboard.find(r => r.model === 'kimik3')).toMatchObject({ games: 1, duelGames: 0, multiGames: 1, multiPlacement: 0 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

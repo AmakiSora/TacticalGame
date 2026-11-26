@@ -127,6 +127,23 @@ describe('entertainment stats rules', () => {
     expect(stage[0].mapId).toBe('default');
   });
 
+  it('includes fog matches in map stage and elimination boards', () => {
+    const fog = match('tg_fog', 10, [
+      { playerId: 'player_a', model: 'Hy4' },
+      { playerId: 'player_b', model: 'glm5.3' },
+    ]);
+    fog.mapId = 'fog-harbor';
+    fog.mode = 'fog';
+    fog.eventStats = eventStats({ rounds: 8, captures: 3, attacks: 5, attackMisses: 2 });
+    fog.eliminations = [{ playerId: 'player_b', eliminatedBy: 'player_a', reason: 'headquarters_destroyed' }];
+
+    const stage = buildMapStage([fog]);
+    expect(stage.find((s) => s.mapId === 'fog-harbor')).toMatchObject({ games: 1, avgRounds: 8, capturesPerGame: 3 });
+
+    const eliminations = buildEliminations([fog]);
+    expect(eliminations.killerBoard).toContainEqual({ model: 'Hy4', kills: 1, deaths: 0, net: 1 });
+  });
+
   it('reports the busiest match by actions per round and the biggest spender', () => {
     const busy = match('tg_busy', 10);
     busy.eventStats = eventStats({ rounds: 2, moves: 10, attacks: 6, deploys: 2 });

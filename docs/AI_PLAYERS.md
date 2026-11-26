@@ -53,7 +53,7 @@ python rl/evaluate.py --model rl/models/model.zip
 
 **参赛人数也是注册表能力**：`ALGORITHM_META.playerCounts` 决定算法能否进入三人竞技场。3.9.2 起，标准模式的 7 个算法（`greedy` / `random` / `mcts` / `threat` / `field` / `verdict` / `parallax`）、歼灭模式的 5 个算法（`random-annihilation` / `shrinkroll` / `vortex` / `crucible` / `sovereign`）与同时回合模式的 8 个算法（`random-sim` / `dest-prob` / `kriegspiel` / `matrix-eq` / `prism` / `tempo` / `tempo-weave` / `horizon`）声明 `[2, 3]`，可跑三人批；3.9.3 起大逃杀的算法（`random-royale` / `echelon` / `apex` / `ark`，3.9.9 起加上 `bastion`，现共 5 个）也声明 `[2, 3]`，即**本期四个参评模式（标准 / 歼灭 / 同时回合 / 大逃杀）全部有三人分榜**。三人批只收本模式声明 3 人的算法，RL 模型是单对手观测编码，不参评。
 
-**迷雾模式本期不参评**：`fog` 只接受注册表声明 `modes` 含 `fog` 的算法，本期首个 fog 算法为 `fog-scout`（是否已在册一律以 `algorithms/registry.mjs` 为准）；fog 局不进 `arena/matches.jsonl`、没有 fog 榜单，也不纳入玩法统计与 RL 模型评估（两张 fog 图设 `modelEval: false`，见 [STATS.md](STATS.md)「迷雾模式」与 [API.md](API.md)「竞技场评估」）。因此 `fog` 没有三人分榜，也不参与任何按模式对比的排名。
+**迷雾模式本期不参评**：`fog` 只接受注册表声明 `modes` 含 `fog` 的算法，本期首个 fog 算法为 `fog-scout`（是否已在册一律以 `algorithms/registry.mjs` 为准）；fog 局不进 `arena/matches.jsonl`、没有 fog 榜单，也不纳入竞技场玩法统计与 RL 模型评估（两张 fog 图设 `modelEval: false`，见 [STATS.md](STATS.md)「迷雾模式」与 [API.md](API.md)「竞技场评估」）；回放统计看板（`stats.json` / `fun-stats.json`）自 4.0.3 起计入 fog 归档局。因此 `fog` 没有三人分榜，也不参与任何按模式对比的排名。
 
 当前内置算法（未标注者为标准模式）。每条只写定位，实测战绩与评分以 `/arena.html` 榜单为准，实现细节见各自档案：
 
@@ -82,7 +82,7 @@ python rl/evaluate.py --model rl/models/model.zip
 - **时序掌控算法（Tempo，仅同时回合模式）**：把队列位置当作结算拍，预测敌方剧本、构建威胁时间线，再按裁决权重把动作排进具体拍。[档案](../algorithms/docs/algorithms/tempo.md)
 - **经纬算法（Tempo-Weave，仅同时回合模式）**：以「单位完成什么任务、几个行动点、能否存活」为决策单位，在共享行动点预算内按收益/成本竞价排程。[档案](../algorithms/docs/algorithms/tempo-weave.md)
 - **视界算法（Horizon，仅同时回合模式）**：把一轮结算后的棋盘投影到终局估胜率，用同构对手场景与对抗探针检验计划，再做逐行动点束搜索。[档案](../algorithms/docs/algorithms/horizon.md)
-- **迷雾侦察算法（Fog Scout，仅迷雾模式，首个 fog 算法）**：只用本人单位、`fog.lastSeen` 残影与公开信息决策，把残影当“最后确认位置”而非当前坐标，对看不见的格子只做公开信息支撑的盲射。具体名册与定位以 `algorithms/registry.mjs` 和[算法档案](../algorithms/docs/algorithms/fog-scout.md)为准；fog 本期不进竞技场/统计/RL，所以没有任何 fog 榜单成绩。
+- **迷雾侦察算法（Fog Scout，仅迷雾模式，首个 fog 算法）**：只用本人单位、`fog.lastSeen` 残影与公开信息决策，把残影当“最后确认位置”而非当前坐标，对看不见的格子只做公开信息支撑的盲射。具体名册与定位以 `algorithms/registry.mjs` 和[算法档案](../algorithms/docs/algorithms/fog-scout.md)为准；fog 本期不进竞技场/RL，所以没有任何 fog 榜单成绩（回放统计看板自 4.0.3 起计入 fog）。
 
 添加算法 AI 时可自定义玩家名，默认预填所选算法的中文名。
 

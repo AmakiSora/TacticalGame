@@ -106,7 +106,11 @@
       const vision = config?.fog?.vision || {};
       const visionText = FOG_UNIT_ORDER.map(type => `${UNIT_NAMES[type]} ${Number.isInteger(vision[type]) ? vision[type] : '默认'}`).join(' · ');
       const reveal = Number.isInteger(config?.fog?.revealFromRound) ? `第 ${config.fog.revealFromRound} 轮起全图公开` : '全程迷雾，终局公开';
-      return `<div class="rs-note">迷雾模式：同时回合骨架 + 视野迷雾，${esc(reveal)}。视野半径：${esc(visionText)}（0 表示只可见自身格）；阻挡地形挡视线，水域不挡。敌军离开视野后保留上一轮位置的残影，残影不可选中、不参与瞄准预测；对看不见的格子可盲射。本模式无炮火、无先手贴目。</div>
+      const comeback = config?.balance?.comebackSupply;
+      const comebackText = comeback
+        ? `第 ${esc(comeback.startRound)} 轮起落后领先者 ${esc(comeback.scoreGapPercent)}% 时每轮追赶补给 +${esc(comeback.amountPerRound)}。`
+        : '';
+      return `<div class="rs-note">迷雾模式：同时回合骨架 + 视野迷雾，${esc(reveal)}。视野半径：${esc(visionText)}（0 表示只可见自身格）；阻挡地形挡视线，水域不挡。敌军离开视野后保留上一轮位置的残影，残影不可选中、不参与瞄准预测；对看不见的格子可盲射。本模式无炮火、无先手贴目。${comebackText}</div>
         <div class="rs-note">同时回合：指令入队不执行、可撤销，全员确认后按行动点统一同时结算；单位可跨行动点多次行动，前一步硬失败后该单位后续动作作废。攻击/治疗瞄准格子/方向，按覆盖形状结算；跨玩家同一步指向同一格时全部失败。可排「待命」占位。</div>`;
     }
     if (mode === 'simultaneous' || mode === 'royale') {

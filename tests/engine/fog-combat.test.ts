@@ -5,10 +5,11 @@ import { describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/events/bus.js';
 import { addLobbyPlayer, createLobbyWithConfig } from '../../src/state/store.js';
 import { startGame, eliminatePlayer } from '../../src/engine/engine.js';
+import { appendEvent } from '../../src/engine/events.js';
 import { resolveRoundSteps } from '../../src/engine/simultaneousResolve.js';
 import {
   FOG_VISION_DEFAULTS, fogProjectionFor, normalizeFogState, projectEventForViewer,
-  unitsForViewer, updateFogMemory,
+  unitsForViewer, updateFogMemory, visibleCellsFor,
 } from '../../src/engine/fog.js';
 import { hexRange } from '../../src/engine/hex.js';
 import type {
@@ -471,5 +472,130 @@ describe('fog event projection', () => {
     expect((playerView.payload.units as unknown[]).length).toBeGreaterThan(0);
     expect((start.payload.units as unknown[]).length).toBe(game.units.length);
     expect((start.payload.headquarters as Record<string, unknown>).player_b).toBeTruthy();
+  });
+});
+
+describe('fog public-result disclosure', () => {
+  it('redacts comeback supply scores for the public viewer but keeps them for seated players', () => {
+    const game = makeGame();
+    const bus = new EventBus();
+    const event = appendEvent(game, bus, 'comeback_supply', {
+      owner: 'player_b', roundNumber: 5, amount: 12,
+      leaderScore: 80, playerScore: 30, scoreGap: 50, scoreGapPercent: 62.5,
+    });
+    // 座位玩家：他人总分按规范公开，保留全量。
+    expect(projectEventForViewer(game, event, 'player_a')!.payload)
+      .toMatchObject({ owner: 'player_b', amount: 12, leaderScore: 80, playerScore: 30, scoreGap: 50 });
+    expect(projectEventForViewer(game, event, 'player_b')!.payload.leaderScore).toBe(80);
+    // 匿名 public：发放本身公开，裁决总分（含隐藏兵力成分）脱敏。
+    const pub = projectEventForViewer(game, event, null)!;
+    expect(pub.payload).toMatchObject({ owner: 'player_b', roundNumber: 5, amount: 12 });
+    for (const key of ['leaderScore', 'playerScore', 'scoreGap', 'scoreGapPercent']) {
+      expect(key in pub.payload).toBe(false);
+    }
+    // 固化路径与实时投影一致。
+    expect(event.fogViews?.public).toEqual(pub.payload);
+  });
+
+  it('keeps the capturer own unitId and only redacts hidden capturers for third parties', () => {
+    const game = makeGame({}, 3);
+    const bus = new EventBus();
+    const a = unitOf(game, 'player_a');
+    const b = unitOf(game, 'player_b');
+    const c = unitOf(game, 'player_c');
+    retype(game, a, 'infantry');
+    retype(game, b, 'infantry');
+    retype(game, c, 'scout');
+    // C 看得见 (0,0) 的 A，看不见远处 (5,-5) 的 B。
+    placeUnits(game, [['player_a', 0, 0], ['player_b', 5, -5], ['player_c', 0, -3]]);
+    clearMemory(game);
+    expect(visibleCellsFor(game, 'player_c').has('0,0')).toBe(true);
+    expect(visibleCellsFor(game, 'player_c').has('5,-5')).toBe(false);
+
+    const capA = appendEvent(game, bus, 'control_point_captured', {
+      pointId: 'cp1', name: '补给站', owner: 'player_a', previousOwner: null, unitId: a.id, q: 0, r: 0,
+    });
+    // 本人行动全量（含 unitId 与据点坐标）。
+    expect(projectEventForViewer(game, capA, 'player_a')!.payload).toMatchObject({ unitId: a.id, q: 0, r: 0 });
+    // 第三方当时看得见执行者：保留 unitId。
+    expect(projectEventForViewer(game, capA, 'player_c')!.payload.unitId).toBe(a.id);
+    // 匿名公开：脱敏执行者身份。
+    expect(projectEventForViewer(game, capA, null)!.payload.unitId).toBeUndefined();
+
+    const capB = appendEvent(game, bus, 'control_point_captured', {
+      pointId: 'cp2', name: '前线基地', owner: 'player_b', previousOwner: null, unitId: b.id, q: 5, r: -5,
+    });
+    expect(projectEventForViewer(game, capB, 'player_b')!.payload.unitId).toBe(b.id);
+    // 第三方看不见执行者：脱敏 unitId，但事件仍作为公开结果保留。
+    const capBasC = projectEventForViewer(game, capB, 'player_c')!;
+    expect(capBasC).not.toBeNull();
+    expect(capBasC.payload.unitId).toBeUndefined();
+    expect(capBasC.payload.owner).toBe('player_b');
+    expect(projectEventForViewer(game, capB, null)!.payload.unitId).toBeUndefined();
+  });
+
+  it('projects repair events by target visibility (own/visible kept, hidden dropped)', () => {
+    const game = makeGame({}, 3);
+    const bus = new EventBus();
+    const a = unitOf(game, 'player_a');
+    const b = unitOf(game, 'player_b');
+    const c = unitOf(game, 'player_c');
+    retype(game, c, 'scout');
+    placeUnits(game, [['player_a', 0, 0], ['player_b', 5, -5], ['player_c', 0, -3]]);
+    clearMemory(game);
+
+    const repA = appendEvent(game, bus, 'control_point_repair', {
+      owner: 'player_a', pointId: 'cp1', pointName: '维修站', unitId: a.id, amount: 10, unitHp: 90,
+    });
+    expect(projectEventForViewer(game, repA, 'player_a')).not.toBeNull();
+    expect(projectEventForViewer(game, repA, 'player_c')).not.toBeNull();
+    expect(projectEventForViewer(game, repA, null)).toBeNull();
+
+    const repB = appendEvent(game, bus, 'control_point_repair', {
+      owner: 'player_b', pointId: 'cp2', pointName: '维修站', unitId: b.id, amount: 10, unitHp: 90,
+    });
+    expect(projectEventForViewer(game, repB, 'player_b')).not.toBeNull();
+    expect(projectEventForViewer(game, repB, 'player_c')).toBeNull();
+    expect(projectEventForViewer(game, repB, null)).toBeNull();
+  });
+
+  it('discloses HQ damage to third parties and public even when the HQ cell is unseen', () => {
+    const game = makeGame({}, 3);
+    const bus = new EventBus();
+    const a = unitOf(game, 'player_a');
+    const c = unitOf(game, 'player_c');
+    retype(game, a, 'ranger');
+    retype(game, c, 'scout');
+    const hqB = game.headquarters.player_b!;
+    hqB.q = 0;
+    hqB.r = 2;
+    // A 在 (0,0) 打 HQ(0,2)；C 在 (-5,5) 既看不见 HQ 格也看不见 A。
+    placeUnits(game, [['player_a', 0, 0], ['player_b', 5, -5], ['player_c', -5, 5]]);
+    clearMemory(game);
+    expect(visibleCellsFor(game, 'player_c').has('0,2')).toBe(false);
+    expect(visibleCellsFor(game, 'player_c').has('0,0')).toBe(false);
+
+    const attack: PendingAction = { id: 'a1', type: 'attack', attackerId: a.id, q: 0, r: 2 };
+    resolveRoundSteps(game, bus, game.turn.turnOrder, queuesFor(game, { player_a: [attack] }));
+    const hit = lastEvent(game, 'attack')!;
+    expect(hit.payload).toMatchObject({ hit: true, targetKind: 'headquarters', targetId: hqB.id });
+
+    // 总部 owner 全量（含攻击者身份）。
+    expect(projectEventForViewer(game, hit, 'player_b')!.payload.attackerId).toBe(a.id);
+    // 攻击者本人全量。
+    expect(projectEventForViewer(game, hit, 'player_a')!.payload.attackerId).toBe(a.id);
+    // 第三方 C 看不见 HQ 格，仍收到公开结果，但隐藏攻击者身份与瞄准几何脱敏。
+    const asC = projectEventForViewer(game, hit, 'player_c')!;
+    expect(asC).not.toBeNull();
+    expect(asC.payload.targetId).toBe(hqB.id);
+    expect(asC.payload.targetKind).toBe('headquarters');
+    for (const key of ['attackerId', 'owner', 'aimQ', 'aimR', 'shape']) {
+      expect(key in asC.payload).toBe(false);
+    }
+    // 匿名 public 与观战同口径收到 HQ 伤害（HQ 公开），攻击者脱敏。
+    const pub = projectEventForViewer(game, hit, null)!;
+    expect(pub).not.toBeNull();
+    expect(pub.payload.targetId).toBe(hqB.id);
+    expect(pub.payload.attackerId).toBeUndefined();
   });
 });

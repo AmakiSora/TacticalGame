@@ -858,11 +858,56 @@ describe('fog presentation', () => {
     expect(html).toContain('阻挡地形挡视线，水域不挡');
     expect(html).toContain('本模式无炮火、无先手贴目');
     expect(html).toContain('揭雾');
+    // 追赶补给参数来自地图 balance.comebackSupply（雾港第 5 轮起）。
+    expect(html).toContain('第 5 轮起落后领先者 40%');
+    expect(html).toContain('追赶补给 +12');
     expect(html).not.toContain('炮火规则');
 
     // 同时回合的覆盖形状列对迷雾同样生效。
     expect(html).toContain('直线 2 格');
     const source = read('public/rules-sheet.js');
     expect(source).toContain("mode === 'simultaneous' || mode === 'royale' || mode === 'fog'");
+  });
+});
+
+/** 在最小沙箱里执行 fogRevealBadge：注入 gameConfig / state / currentTurnNumber。 */
+function loadFogRevealBadge(file: string): (cfg: any, st: any, round: number) => string {
+  const fnSource = slice(read(file), 'function fogRevealBadge() {', 'function statusBadge(');
+  const context: any = {};
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(`${fnSource}\nglobalThis.__badge = fogRevealBadge;`, context);
+  return (cfg, st, round) => {
+    context.gameConfig = cfg;
+    context.state = st;
+    context.currentTurnNumber = () => round;
+    return context.__badge();
+  };
+}
+
+describe('fog reveal countdown', () => {
+  it('counts down to the reveal round, switches to revealed, and stays silent otherwise', () => {
+    for (const page of PLAYER_PAGES) {
+      const badge = loadFogRevealBadge(page);
+      const cfg = { mode: 'fog', fog: { revealFromRound: 22 } };
+      expect(badge(cfg, { fog: { revealed: false } }, 20), page).toContain('距揭雾 2 轮');
+      expect(badge(cfg, { fog: { revealed: false } }, 22), page).toContain('已揭雾');
+      expect(badge(cfg, { fog: { revealed: true } }, 5), page).toContain('已揭雾');
+      // 全程迷雾（revealFromRound: null）与非 fog 模式不显示角标。
+      expect(badge({ mode: 'fog', fog: { revealFromRound: null } }, { fog: {} }, 3), page).toBe('');
+      expect(badge({ mode: 'simultaneous' }, { fog: {} }, 3), page).toBe('');
+      // 回合栏确实插入该角标。
+      expect(read(page), page).toContain('${fogRevealBadge()}');
+    }
+  });
+});
+
+describe('fog locked spectator public info', () => {
+  it('populates public resources and the committed list on the locked view', () => {
+    for (const page of SPECTATOR_PAGES) {
+      const locked = slice(read(page), 'function showFogLocked(', 'async function loadGameState(');
+      expect(locked, page).toContain('state.resources = JSON.parse(JSON.stringify(data?.resources || {}));');
+      expect(locked, page).toContain('state.plan = { committed: Array.isArray(data?.plan?.committed) ? [...data.plan.committed] : [] };');
+    }
   });
 });

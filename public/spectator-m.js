@@ -2074,6 +2074,9 @@ function showFogLocked(data, unauthorized) {
   for (const hq of Array.isArray(data?.headquarters) ? data.headquarters : Object.values(data?.headquarters || {})) {
     if (hq?.id) state.headquarters.set(hq.id, { ...hq });
   }
+  // 资源与 committed 名单按规范公开：锁定页直接取公开字段展示，不依赖被投影的事件重建。
+  state.resources = JSON.parse(JSON.stringify(data?.resources || {}));
+  state.plan = { committed: Array.isArray(data?.plan?.committed) ? [...data.plan.committed] : [] };
   if (state.cells.length) computeLayout(state.cells);
   boardAnimation.reset();
   boardAnimation.syncState(state, { animate: false });

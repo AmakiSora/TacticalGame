@@ -213,6 +213,16 @@ function turnProgressLabel() {
   if (maxTurns === null) return `${current}/∞`;
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
 }
+/** 迷雾揭雾倒计时：仅 fog 且配置了 revealFromRound 时显示；已揭雾切换文案。 */
+function fogRevealBadge() {
+  if (gameConfig?.mode !== 'fog') return '';
+  const revealFrom = gameConfig?.fog?.revealFromRound;
+  if (!Number.isInteger(revealFrom)) return '';
+  if (state?.fog?.revealed === true || currentTurnNumber() >= revealFrom) {
+    return '<span class="turn-fog-reveal is-revealed">已揭雾</span>';
+  }
+  return `<span class="turn-fog-reveal">距揭雾 ${revealFrom - currentTurnNumber()} 轮</span>`;
+}
 function statusBadge(text, cls) { els.connStatus.textContent = text; els.connStatus.className = `badge ${cls}`; }
 function toast(msg, type = 'info', action = null) {
   const t = $('toast');
@@ -2591,7 +2601,7 @@ function renderSidebar() {
   els.turnBadge.innerHTML = `
     <span class="turn-kicker">${simultaneous ? (replaying ? '结算回放中…' : (iCommitted() ? '已确认 · 等待全员' : '同时计划阶段')) : (mine ? '你的回合' : '等待中')}</span>
     <strong class="turn-count">${esc(turnProgressLabel())}</strong>
-    <span class="turn-player">${simultaneous ? `${committedList().length}/${joinedPlayerIds().filter(id => state.players[id]?.status === 'active').length} 已确认` : esc(playerName(owner) || '—')}</span>${commitStatus}`;
+    <span class="turn-player">${simultaneous ? `${committedList().length}/${joinedPlayerIds().filter(id => state.players[id]?.status === 'active').length} 已确认` : esc(playerName(owner) || '—')}</span>${commitStatus}${fogRevealBadge()}`;
   els.turnBadge.classList.toggle('my-turn', mine);
 
   // Compact top strip: only my supplies (full multiplayer list lives in drawer)

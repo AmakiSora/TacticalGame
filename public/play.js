@@ -205,6 +205,16 @@ function turnProgressLabel() {
   if (maxTurns === null) return `${current}/∞`;
   return Number.isFinite(maxTurns) && maxTurns > 0 ? `${current}/${maxTurns}` : String(current);
 }
+/** 迷雾揭雾倒计时：仅 fog 且配置了 revealFromRound 时显示；已揭雾切换文案。 */
+function fogRevealBadge() {
+  if (gameConfig?.mode !== 'fog') return '';
+  const revealFrom = gameConfig?.fog?.revealFromRound;
+  if (!Number.isInteger(revealFrom)) return '';
+  if (state?.fog?.revealed === true || currentTurnNumber() >= revealFrom) {
+    return '<span class="turn-fog-reveal is-revealed">已揭雾</span>';
+  }
+  return `<span class="turn-fog-reveal">距揭雾 ${revealFrom - currentTurnNumber()} 轮</span>`;
+}
 function statusBadge(text, cls) { els.connStatus.textContent = text; els.connStatus.className = `badge ${cls}`; }
 /**
  * 轻提示。action = { label, onClick, timeout } 时在文案后挂一个可点按钮（如「撤销」）；
@@ -2520,7 +2530,7 @@ function renderSidebar() {
   const replaying = playback.isActive();
   const owner = simultaneous ? null : (state.turn.currentPlayerId || state.turn.currentOwner);
   const commitStatus = committedStatusHtml();
-  els.turnBadge.innerHTML = `<strong class="turn-count">${esc(turnProgressLabel())}</strong><span class="turn-player">${simultaneous ? (replaying ? '结算回放中…' : (iCommitted() ? '已确认 · 等待全员提交' : '同时计划阶段')) : esc(playerName(owner))}</span>${commitStatus}`;
+  els.turnBadge.innerHTML = `<strong class="turn-count">${esc(turnProgressLabel())}</strong><span class="turn-player">${simultaneous ? (replaying ? '结算回放中…' : (iCommitted() ? '已确认 · 等待全员提交' : '同时计划阶段')) : esc(playerName(owner))}</span>${commitStatus}${fogRevealBadge()}`;
   els.turnBadge.classList.toggle('my-turn', simultaneous ? (!iCommitted() && !state.winner && !replaying) : owner === myPlayer);
   const resourceRows = joinedPlayerIds().map(id => {
     const color = OWNER_COLOR[id] || '#9aa7b2';

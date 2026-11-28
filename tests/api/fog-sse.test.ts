@@ -326,3 +326,63 @@ async function connectLive(raw: LiveRaw, gameId: string, headers: Record<string,
     ip: '127.0.0.1',
   }, { raw, hijack() {} });
 }
+
+describe('fog comeback supply disclosure', () => {
+  async function fogWithComeback() {
+    app = await startTestServer();
+    const fog = await createFogGame(app);
+    const game = globalStore.get(fog.gameId)!;
+    appendEvent(game, globalEventBus, 'comeback_supply', {
+      owner: 'player_b', roundNumber: 5, amount: 12,
+      leaderScore: 80, playerScore: 30, scoreGap: 50, scoreGapPercent: 62.5,
+    });
+    return fog;
+  }
+
+  it('keeps scores for players/spectator but redacts them for public across state, events and SSE', async () => {
+    const { gameId, seats, spectatorToken } = await fogWithComeback();
+    const scoreKeys = ['leaderScore', 'playerScore', 'scoreGap', 'scoreGapPercent'];
+    const comebackIn = (events: { type: string; payload: Record<string, any> }[]) =>
+      events.find(event => event.type === 'comeback_supply');
+
+    // 玩家 A：状态内嵌事件、非 SSE 补拉、SSE 都保留裁决总分（他人总分按规范公开）。
+    const { body: stateA } = await fetchFogState(app, gameId, { player: seats[0]!.token });
+    expect(comebackIn(stateA.events)?.payload.leaderScore).toBe(80);
+    const eventsA = (await app.inject({
+      method: 'GET', url: `/api/games/${gameId}/events`, headers: { 'x-player-token': seats[0]!.token },
+    })).json() as { events: { type: string; payload: Record<string, any> }[] };
+    expect(comebackIn(eventsA.events)?.payload.leaderScore).toBe(80);
+    const sseA = await app.inject({
+      method: 'GET', url: `/api/games/${gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream', 'x-player-token': seats[0]!.token },
+    });
+    expect(comebackIn(sseDataLines(sseA.body))?.payload.leaderScore).toBe(80);
+
+    // 观战：全量。
+    const { body: stateS } = await fetchFogState(app, gameId, { spectator: spectatorToken });
+    expect(comebackIn(stateS.events)?.payload.leaderScore).toBe(80);
+    const sseS = await app.inject({
+      method: 'GET', url: `/api/games/${gameId}/events?close=true`,
+      headers: { accept: 'text/event-stream', 'x-spectator-token': spectatorToken },
+    });
+    expect(comebackIn(sseDataLines(sseS.body))?.payload.leaderScore).toBe(80);
+
+    // 匿名 public：三种读取都收到发放事件，但裁决总分脱敏，发放量保留。
+    const { body: stateP } = await fetchFogState(app, gameId);
+    const pubState = comebackIn(stateP.events);
+    expect(pubState?.payload.amount).toBe(12);
+    for (const key of scoreKeys) expect(pubState?.payload[key]).toBeUndefined();
+    const eventsP = (await app.inject({ method: 'GET', url: `/api/games/${gameId}/events` }))
+      .json() as { events: { type: string; payload: Record<string, any> }[] };
+    const pubEvents = comebackIn(eventsP.events);
+    expect(pubEvents?.payload.amount).toBe(12);
+    for (const key of scoreKeys) expect(pubEvents?.payload[key]).toBeUndefined();
+    const sseP = await app.inject({
+      method: 'GET', url: `/api/games/${gameId}/events?close=true`, headers: { accept: 'text/event-stream' },
+    });
+    const pubSse = comebackIn(sseDataLines(sseP.body));
+    expect(pubSse?.payload.amount).toBe(12);
+    for (const key of scoreKeys) expect(pubSse?.payload[key]).toBeUndefined();
+    expect(sseP.body).not.toContain('leaderScore');
+  });
+});

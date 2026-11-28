@@ -565,7 +565,6 @@ function projectEventFromState(
     // ---------------------------------------------------------- 公开事件
     case 'round_start':
     case 'income':
-    case 'comeback_supply':
     case 'turn_end':
     case 'plan_committed':
     case 'wait':
@@ -579,6 +578,19 @@ function projectEventFromState(
     case 'artillery_shrunk':
     case 'artillery_damage':
       return cloneEvent(event);
+
+    case 'comeback_supply': {
+      const cloned = cloneEvent(event);
+      // 发放本身公开（资源与玩家公开）；但 leaderScore/playerScore/scoreGap 是裁决总分，
+      // 含隐藏兵力成分。匿名 public 的 adjudication 整体隐藏，这条事件不得成为旁路。
+      // 座位玩家的他人总分按规范公开，保留全量。
+      if (!viewer) {
+        for (const key of ['leaderScore', 'playerScore', 'scoreGap', 'scoreGapPercent']) {
+          delete cloned.payload[key];
+        }
+      }
+      return cloned;
+    }
 
     case 'round_end': {
       // steps 是全体玩家中最长的行动队列长度，等于对手行动数的上界，属于隐藏信息。
@@ -624,8 +636,12 @@ function projectEventFromState(
 
     case 'control_point_captured': {
       const cloned = cloneEvent(event);
-      // 据点信息与归属公开；隐藏执行者的 unitId / 坐标脱敏。
-      delete cloned.payload.unitId;
+      // 据点归属公开；本人行动全量返回（含执行者 unitId 与据点坐标）。
+      if (viewer && clonedOwner(event.payload) === viewer) return cloned;
+      // 第三方/公开：执行者身份只在隐藏时脱敏（当时可见的单位保留 unitId）；
+      // 据点坐标虽公开，仍随执行者身份一并省略，保持事件最小披露。
+      const capturer = unitOf(payloadUnitId(event.payload, 'unitId'));
+      if (!viewer || !(capturer && unitVisible(capturer))) delete cloned.payload.unitId;
       delete cloned.payload.q;
       delete cloned.payload.r;
       return cloned;
@@ -692,25 +708,38 @@ function projectEventFromState(
 
     case 'attack': {
       const owner = clonedOwner(event.payload);
+      const attackerId = payloadUnitId(event.payload, 'attackerId');
+      const attacker = unitOf(attackerId);
+      const targetId = payloadUnitId(event.payload, 'targetId');
+      const target = unitOf(targetId);
+      const hqTarget = event.payload.targetKind === 'headquarters' && targetId
+        ? Object.values(game.headquarters).find(hq => hq.id === targetId)
+        : undefined;
+      // 总部伤害是公开结果（与 headquarters_destroyed 同口径）：HQ 位置/HP 公开，
+      // 第三方与匿名即使视野未覆盖 HQ 格也应收到事件；攻击者隐藏时脱敏身份与瞄准几何。
+      if (hqTarget && event.payload.hit !== false) {
+        if (viewer && (owner === viewer || hqTarget.owner === viewer)) return cloneEvent(event);
+        const cloned = cloneEvent(event);
+        if (!viewer || !unitVisible(attacker)) {
+          delete cloned.payload.attackerId;
+          delete cloned.payload.owner;
+          delete cloned.payload.aimQ;
+          delete cloned.payload.aimR;
+          delete cloned.payload.shape;
+        }
+        // HQ 身份公开：保留 targetId/targetKind、命中格与伤害/血量。
+        return cloned;
+      }
       if (!viewer) return null;
       // 攻击者本人全量（含落空、锁定落空与全部命中格）。
       if (owner === viewer) return cloneEvent(event);
       // 落空（含锁定落空）只给攻击者本人；即使 viewer 是原锁定目标的 owner，
       // 也不能借 q/r/damage/actualDamage/targetHp 推断隐藏目标的存在。
       if (event.payload.hit === false) return null;
-      const attackerId = payloadUnitId(event.payload, 'attackerId');
-      const attacker = unitOf(attackerId);
-      const targetId = payloadUnitId(event.payload, 'targetId');
-      const target = unitOf(targetId);
-      // 被命中单位/总部的 owner：规则上会拿到攻击者 1 轮快照，整条事件保留。
-      const hqTarget = event.payload.targetKind === 'headquarters' && targetId
-        ? Object.values(game.headquarters).find(hq => hq.id === targetId)
-        : undefined;
-      if ((target && target.owner === viewer) || (hqTarget && hqTarget.owner === viewer)) {
-        return cloneEvent(event);
-      }
-      const hitQ = payloadNumber(event.payload, 'q') ?? target?.q ?? hqTarget?.q ?? null;
-      const hitR = payloadNumber(event.payload, 'r') ?? target?.r ?? hqTarget?.r ?? null;
+      // 被命中单位的 owner：规则上会拿到攻击者 1 轮快照，整条事件保留。
+      if (target && target.owner === viewer) return cloneEvent(event);
+      const hitQ = payloadNumber(event.payload, 'q') ?? target?.q ?? null;
+      const hitR = payloadNumber(event.payload, 'r') ?? target?.r ?? null;
       // 只保留命中格当时可见的命中事件；隐藏格（含盲射覆盖到的格）整条丢弃。
       if (!cellVisible(hitQ, hitR)) return null;
       const cloned = cloneEvent(event);
@@ -724,7 +753,7 @@ function projectEventFromState(
         delete cloned.payload.shape;
       }
       // 命中目标若在重算时已不可见（旧存档回落），不暴露其 unitId。
-      if (!unitVisible(target) && !(hqTarget && cellVisible(hqTarget.q, hqTarget.r))) {
+      if (!unitVisible(target)) {
         delete cloned.payload.targetId;
         delete cloned.payload.targetKind;
       }

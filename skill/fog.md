@@ -155,6 +155,10 @@ spectator view, the public view after `game_over`, and non-fog games keep the gl
   cell are removed too.
 - **Elimination**: `player_eliminated.eliminatedBy` is delivered only to the eliminated player and
   to the killer. Do not read it from another player's stream or from the public view.
+- **Comeback supply**: the grant (`owner`, `roundNumber`, `amount`) is public; the adjudication
+  totals it carries (`leaderScore` / `playerScore` / `scoreGap` / `scoreGapPercent`) are kept for
+  seated players and the spectator but removed for the anonymous public view, whose `adjudication`
+  is hidden while the game is in progress.
 - Your own actions still come back to you in full, and the hit unit's owner (or the HQ owner) still
   receives the full exchange under the 1-round contact rule.
 
@@ -186,7 +190,11 @@ spectator view, the public view after `game_over`, and non-fog games keep the gl
 - **Demolition is public terrain change.** A `demolish` event may appear, but any hidden unit's
   identity/coordinates in it are redacted; do not read a hidden position out of a terrain event.
 - **Capture and HQ damage are public results.** A control point changing hands or an HQ taking
-  damage is observable; the executing unit's identity may be redacted when it was hidden.
+  damage is delivered to every viewer (including the anonymous public view) even when the cell is
+  outside their vision. The executing unit's identity is redacted only when it was hidden: your own
+  capture keeps its `unitId`, and a third party who could see the capturing unit keeps it too. For
+  HQ damage the attacker's identity and aim geometry are redacted when the attacker was hidden; the
+  HQ identity, hit cell and damage/HP result stay public.
 
 ## Public information boundary
 
@@ -198,7 +206,9 @@ Public to everyone (a player additionally sees their own `stats`):
   block is removed in fog (its damage/kill/capture counters would reveal hidden actions), so
   absence is unknown, not 0; enemy unit composition is not inferable from your own counters;
 - committed list (who has locked in), never queue contents;
-- opponent adjudication **total and rank**, never the component breakdown.
+- opponent adjudication **total and rank** for a seated player, never the component breakdown;
+  the anonymous public view hides `adjudication` entirely (`{ hidden: true }`) while the game is in
+  progress, and only sees the full breakdown at `game_over`.
 
 Hidden until revealed: enemy unit existence, type, HP, position, and any event payload that would
 identify them. These boundaries apply while the game is in progress; at `game_over` the public view
@@ -264,6 +274,12 @@ Fog changes what you know, not how the round resolves. In particular:
   spends their AP (`previous_action_failed`); a missed attack does not void later steps.
 - **Income, repair and capture**: round 1 has no income; from round 2 every living player receives
   income and repair-CP healing at the round boundary. Capture resolves at the end of the round.
+- **Comeback supplies**: both launch maps enable `balance.comebackSupply`. After a non-final round
+  past its `startRound`, a living player whose adjudication total trails the shared leader by at
+  least `scoreGapPercent` receives `amountPerRound` extra supplies (fog-harbor: from round 5, 40%
+  gap, +12/round; fog-crossing: from round 6, 40% gap, +12/round). The grant itself is public; the
+  score totals behind it are not public to an anonymous viewer (see
+  [Public information boundary](#public-information-boundary)).
 - **No first player**: `turn.currentPlayerId` / `currentOwner` are always `null`; act when
   `phase === "active"` and you are not in `plan.committed`.
 
@@ -274,14 +290,16 @@ Read `game.mapId`; the live `config` and `maps/*.json` always win over this summ
 ### `fog-harbor` (雾港)
 
 Only when `game.mapId === "fog-harbor"`; 2 players. Radius 8, `maxTurns` 20, fog for the whole
-game (`revealFromRound: null`), 6 AP. Warehouses and containers cut sightlines; the central repair
+game (`revealFromRound: null`), 6 AP, comeback supplies from round 5 (40% gap → +12/round).
+Warehouses and containers cut sightlines; the central repair
 hub is worth contesting, but approaching it blind is a gamble. Expect the opening rounds to be a
 gathering of information rather than a straight race to the centre.
 
 ### `fog-crossing` (雾渡)
 
 Only when `game.mapId === "fog-crossing"`; 3 players. Radius 9, `maxTurns` 24, last 3 rounds
-revealed (`revealFromRound: 22`, i.e. `maxTurns - 2`), 6 AP. A three-way river crossing: the centre
+revealed (`revealFromRound: 22`, i.e. `maxTurns - 2`), 6 AP, comeback supplies from round 6
+(40% gap → +12/round). A three-way river crossing: the centre
 is a meeting point, not a safe one, and a brawl there can hand the game to the third player. Use
 the reveal window to convert a hidden lead into a decisive fight, and expect the others to do the
 same.

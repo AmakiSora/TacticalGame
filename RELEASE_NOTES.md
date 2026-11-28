@@ -9,11 +9,17 @@
 ### 变更
 
 - **迷雾模式纳入回放统计**：fog 回放归档到 `records/V3` 后由 `npm run stats-all` 计入统计与娱乐看板（`stats.json` / `fun-stats.json`）；统计脚本按 `game_start.mode` 通用解析，前端已支持 fog 标签、筛选与模式分布，盲射落空（`hit:false`）计入攻击落空率。竞技场与 RL 仍不参与（fog 图 `modelEval: false`），口径见 [docs/STATS.md](docs/STATS.md)「迷雾模式」。
+- **房主观战令牌自动携带**：房主建房返回的观战令牌由前端按对局保存，未参战房主开局后自动带令牌进入观战页，房间卡可复制含令牌观战链接；换房或切换对局不会串用。说明见 [README.md](README.md)「迷雾局观战与回放」。
+
+### 修复
+
+- **迷雾事件披露对齐规则**：追赶补给对匿名公开视角删除裁决总分；总部伤害对第三方与匿名公开、隐藏攻击者脱敏；占点与维修按执行者/目标可见性披露。见 [skill/fog.md](skill/fog.md)、[docs/API.md](docs/API.md)。
 
 ### 测试与验证
 
-- `npm run build` 通过；全量 `npm test` 168 文件 / 2,057 例全过，`npm run check-version` 6 处版本引用均为 4.0.3。
+- `npm run build` 通过；全量 `npm test` 169 文件 / 2,075 例全过，`npm run check-version` 6 处版本引用均为 4.0.3。
 - 新增 fog 回放统计用例：双人雾港（摧毁总部、盲射落空、淘汰归属）与三人雾渡（轮数裁决）经 `extractMatch → aggregate` 计入模式分布与模型榜，娱乐统计的地图阶段与淘汰榜同样计入 fog。
+- 新增覆盖：追赶补给在状态 / 非 SSE / SSE × 玩家 / 观战 / 匿名九组合，总部/占点/维修投影，以及前端揭雾角标与锁定页公开字段。
 
 ## 4.0.2
 

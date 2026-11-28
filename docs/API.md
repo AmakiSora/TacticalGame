@@ -151,6 +151,9 @@
   - **区域治疗**（`heal`）对第三方逐目标披露：目标在该时刻可见才保留该条（`targetId` / `amount` / `targetHp`），目标不可见则整条丢弃。可见目标但施法者不可见时，再删除 `supportId` / `owner` / `q` / `r`。施法者本人收到全量。
   - **淘汰**：`player_eliminated.payload.eliminatedBy` 只发给被淘汰者本人与击杀者本人，其他玩家与 `public` 删除该键（固化时决定，不随后续视野变化）；`removedUnitIds` 与 `score` 保持原有观者规则。
   - **结算**：`round_resolved` 只保留本人结果，`steps` 等于本人结果条数（`payload.results` 只含本人那一项），不做“可见第三方结果”——避免部分揭示泄露隐藏单位信息。隐藏行动整条丢弃，可部分观察的行动删除敏感键而不是置 `null`；拿不准时丢弃整条，不做部分揭示。
+  - **总部伤害**是公开结果（与 `headquarters_destroyed` 同口径）：命中总部（`targetKind: "headquarters"` 且 `hit: true`）的攻击事件，对第三方与匿名公开即使 HQ 格不在其视野内也保留；攻击者隐藏时删除 `attackerId` / `owner` / `aimQ` / `aimR` / `shape`，保留 HQ 身份（`targetId` / `targetKind`）、命中格与伤害/血量。总部 owner 与攻击者本人全量；落空（`hit: false`）仍只给攻击者。
+  - **占点**（`control_point_captured`）：本人行动全量（含 `unitId` 与据点坐标）；第三方/公开仅在执行者当时隐藏时删除 `unitId`（当时可见的执行者保留），据点归属公开。
+  - **追赶补给**（`comeback_supply`）：发放（`owner` / `roundNumber` / `amount`）公开；裁决总分 `leaderScore` / `playerScore` / `scoreGap` / `scoreGapPercent` 对座位玩家与观战保留（他人总分按规范公开），对匿名公开删除（与其 `adjudication` 整体隐藏一致）。
 - `action_failed` 只发给行动者本人（失败原因可能间接暴露隐藏单位的位置或存在）。
 - `wait` 是同时回合待命动作的结算事件，payload 含 `owner`、`actionId`、`roundNumber`、`step`、`actionsUsed`、`actionsRemaining`。
 - `bot_failed` 表示 bot 进程异常，payload 含 `playerId`、`bot`（`rl` / `algorithm`）、`reason`、`restarts`。

@@ -94,6 +94,9 @@ your signal to act is: `phase === "active"` and `plan.committed` does not includ
     shot **locks onto it**: at settlement it hits that unit wherever it ended up, as long as it
     did not escape the attacker's `attackRange` bubble; escaping the bubble is the only dodge
     (`missed`, reason `target_escaped`). Locked shots on movers are the anti-kite tool.
+    If no enemy unit is on the clicked cell at plan time, the shot is a normal cell attack: at
+    settlement it hits any enemy unit or headquarters in the covered cells; locking is only the
+    extra tracking effect.
   - Attack events carry `shape` (`single/line/arc`), `locked: true` for lock shots, and the step number.
 - **Arrival rules within one step**: all moves/deploys of that step are declared together.
   Two or more arrivals on the same cell all fail (`destination_conflict`). An arrival fails if the
